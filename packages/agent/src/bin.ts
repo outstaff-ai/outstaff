@@ -28,6 +28,11 @@ const version = (
   }
 ).version;
 
+if (process.argv.slice(2).some((a) => a === "--version" || a === "-v")) {
+  process.stdout.write(`${version}\n`);
+  process.exit(0);
+}
+
 try {
   const registry = new AdapterRegistry()
     .register(githubVcs)
