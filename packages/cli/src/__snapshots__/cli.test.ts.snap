@@ -169,7 +169,7 @@ acme: 0 errors, 2 warnings
 exports[`ost validate > prints a JSON report 1`] = `
 "{
   "ok": true,
-  "file": "<tmp>/p2/.outstaff/team.yaml",
+  "file": "<tmp>/p3/.outstaff/team.yaml",
   "errors": [],
   "warnings": [
     {

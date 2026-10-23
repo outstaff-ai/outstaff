@@ -24,7 +24,7 @@ ost [global options] <command> [options]
 
 Check the team config for errors and warnings.
 
-Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written.
+Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written, but the options of adapters this build ships are checked against that adapter's schema.
 
 ```
 ost validate

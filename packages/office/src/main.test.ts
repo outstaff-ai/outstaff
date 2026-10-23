@@ -1,10 +1,10 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { envSecretSource, silentLogger } from "@outstaff/core";
+import { envSecretSource, parseTeamConfig, parseYaml, silentLogger } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { afterEach, describe, expect, it } from "vitest";
-import { startOffice, type RunningOffice } from "./main.js";
+import { officeRegistry, startOffice, type RunningOffice } from "./main.js";
 
 const TEAM = `
 version: 1
@@ -70,5 +70,34 @@ describe("startOffice", () => {
     await expect(startOffice(env({ OUTSTAFF_AGENT_PORT: "abc" }), deps)).rejects.toThrow(
       "OUTSTAFF_AGENT_PORT",
     );
+  });
+});
+
+describe("the acme example", () => {
+  it("parses the options of every integration the office can create", () => {
+    const file = new URL("../../../examples/acme/.outstaff/team.yaml", import.meta.url);
+    const parsed = parseTeamConfig(parseYaml(readFileSync(file, "utf8")).value);
+    if (!parsed.ok) {
+      throw new Error("the acme example does not parse");
+    }
+
+    const registry = officeRegistry();
+    let checked = 0;
+    for (const [port, ref] of Object.entries(parsed.config.integrations)) {
+      if (!ref) {
+        continue;
+      }
+
+      const def = registry.list().find((d) => d.port === port && d.name === ref.adapter);
+      if (!def) {
+        continue;
+      }
+
+      const { adapter: _adapter, ...options } = ref;
+      expect(def.options.safeParse(options).success, `integrations.${port}`).toBe(true);
+      checked += 1;
+    }
+
+    expect(checked).toBeGreaterThanOrEqual(3);
   });
 });

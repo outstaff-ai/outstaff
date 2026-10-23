@@ -102,6 +102,24 @@ describe("ost validate", () => {
     expect(r.out).toMatchSnapshot();
   });
 
+  it("rejects an option the adapter does not know, at its line", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
+      "    adapter: github\n",
+      "    adapter: github\n    owner: acme-example\n",
+    );
+
+    const r = await ost(project(undefined, team), ["validate", "--json"]);
+    expect(r.code).toBe(1);
+    const line = team.split("\n").findIndex((l) => l.includes("owner: acme-example")) + 1;
+    expect(JSON.parse(r.out).errors).toEqual([
+      expect.objectContaining({
+        code: "integrations.invalid_options",
+        path: ["integrations", "vcs", "owner"],
+        line,
+      }),
+    ]);
+  });
+
   it("lists warnings with their consequence and still exits 0", async () => {
     const r = await ost(warned(), ["validate"]);
     expect(r.code).toBe(0);
