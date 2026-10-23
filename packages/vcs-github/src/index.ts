@@ -1,4 +1,5 @@
 import { defineAdapter, type SecretSpec } from "@outstaff/core";
+import { validateGithubIdentities } from "./identities.js";
 import { githubCommandRules } from "./permissions.js";
 import { githubOptions } from "./options.js";
 import { createGithubVcs } from "./vcs.js";
@@ -56,5 +57,6 @@ export const githubVcs = defineAdapter({
   // Agents hold the read-only office App too: they clone read-granted repos with it.
   secrets: (scope) => (scope === "person" ? [...ownApp(), ...officeApp()] : officeApp()),
   create: (ctx) => createGithubVcs(ctx),
+  validateIdentities: validateGithubIdentities,
   permissions: () => githubCommandRules(),
 });

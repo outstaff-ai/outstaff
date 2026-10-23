@@ -52,6 +52,10 @@ A warning describes something that will not work as written or a default that ap
 | --- | --- |
 | `capability.missing` | A role needs a capability that no configured integration provides. |
 | `capability.optional_missing` | A role can use a capability that no configured integration provides. |
+| `identities.chat_not_member_id` | A chat identity is not a Slack member id (for example U0123ABCD); names never match. |
+| `identities.tracker_empty` | A tracker identity is blank. |
+| `identities.vcs_not_bot_login` | A person's vcs identity is not a GitHub App bot login (<slug>[bot]), so the agent's own activity is not recognized. |
+| `identities.vcs_not_login` | A human's vcs identity is not a GitHub login (letters, digits, hyphens or underscores, up to 39 characters). |
 | `people.missing_vcs_identity` | A person has a write grant but no identities.vcs. |
 | `people.no_repos` | A person has no repo grants. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

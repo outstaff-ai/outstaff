@@ -50,15 +50,43 @@ settings:
 
 To let an agent read the history of a channel it was mentioned in, add `channels:history` (and `groups:history` for private channels) and subscribe to nothing more; threads in direct messages need only `im:history`.
 
+## Create the office app (one per team)
+
+The office posts notifications and mirrors agent-to-agent questions through its own app, `<team>-outstaff-office`, which posts and reads history only. It has no app-level token or Socket Mode because the office never listens. Install it and copy its Bot User OAuth Token to `SLACK_OFFICE_BOT_TOKEN`. When chat is configured and the key is missing, the office stops at startup naming it.
+
+```yaml
+display_information:
+  name: acme-outstaff-office
+  description: Notifications from the acme team's office
+features:
+  bot_user:
+    display_name: acme-outstaff-office
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - im:write
+      - im:history
+      - channels:history
+      - groups:history
+      - users:read
+settings:
+  socket_mode_enabled: false
+  org_deploy_enabled: false
+  token_rotation_enabled: false
+```
+
 ## Secrets
 
-All in the person scope; the office does not talk to Slack.
+`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` and `SLACK_BOT_USER_ID` are in the person scope; `SLACK_OFFICE_BOT_TOKEN` is the office scope's only secret.
 
-| Key                 | Meaning                                             | Derivable                  |
-| ------------------- | --------------------------------------------------- | -------------------------- |
-| `SLACK_BOT_TOKEN`   | Bot User OAuth Token (`xoxb-...`)                   | no                         |
-| `SLACK_APP_TOKEN`   | App-level token with `connections:write` (`xapp-`)  | no                         |
-| `SLACK_BOT_USER_ID` | member id of the bot user, to ignore its own echoes | yes, `auth.test`; optional |
+| Key                      | Meaning                                                  | Derivable                  |
+| ------------------------ | -------------------------------------------------------- | -------------------------- |
+| `SLACK_BOT_TOKEN`        | Bot User OAuth Token (`xoxb-...`)                        | no                         |
+| `SLACK_APP_TOKEN`        | App-level token with `connections:write` (`xapp-`)       | no                         |
+| `SLACK_BOT_USER_ID`      | member id of the bot user, to ignore its own echoes      | yes, `auth.test`; optional |
+| `SLACK_OFFICE_BOT_TOKEN` | office app's Bot User OAuth Token (`xoxb-`), office only | no                         |
 
 ## Trust
 

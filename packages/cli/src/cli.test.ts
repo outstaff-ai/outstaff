@@ -139,6 +139,20 @@ describe("ost validate", () => {
     expect(r.out).toMatchSnapshot();
   });
 
+  it("warns about a malformed chat identity with its file and line", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8");
+    const chat = /chat: (U[A-Z0-9]+)/.exec(team)?.[1];
+    expect(chat).toBeDefined();
+    const r = await ost(project(undefined, team.replace(`chat: ${chat}`, "chat: alex")), [
+      "validate",
+    ]);
+
+    expect(r.code).toBe(0);
+    expect(r.out).toMatch(
+      /^warning {2}\.outstaff\/team\.yaml:\d+:\d+ identities\.chat_not_member_id: /m,
+    );
+  });
+
   it.each([
     ["duplicate handle", DUPLICATE_HANDLE_TEAM],
     ["unknown repo grant", UNKNOWN_REPO_GRANT_TEAM],

@@ -2,7 +2,9 @@ import type { ChatMessage } from "@outstaff/core";
 import { PortError } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { slackChat } from "./index.js";
-import { slackWith, teamWith } from "./testing/harness.js";
+import { createSlackChat } from "./chat.js";
+import { silentLogger } from "@outstaff/core";
+import { secretMap, slackWith, teamWith } from "./testing/harness.js";
 import { BOT_USER, slackError } from "./testing/slack-fake.js";
 
 async function started(humans?: string[]) {
@@ -29,7 +31,7 @@ describe("adapter definition", () => {
       optional: true,
     });
 
-    expect(slackChat.secrets("office")).toEqual([]);
+    expect(slackChat.secrets("office").map((s) => s.key)).toEqual(["SLACK_OFFICE_BOT_TOKEN"]);
     expect(slackChat.options.parse({})).toEqual({});
   });
 });
@@ -337,5 +339,40 @@ describe("lifecycle", () => {
     expect(fake.socket.started).toBe(true);
     await chat.stop();
     expect(fake.socket.started).toBe(false);
+  });
+});
+
+describe("office scope", () => {
+  const officeCtx = (values: Record<string, string>) => ({
+    options: {},
+    secrets: secretMap(values),
+    team: teamWith(),
+    scope: "office" as const,
+    log: silentLogger,
+    fetch,
+    now: () => new Date("2026-01-01T00:00:00Z"),
+  });
+
+  it("names the missing office token instead of staying silent", () => {
+    expect(() => createSlackChat(officeCtx({ SLACK_BOT_TOKEN: "xoxb-agent" }))).toThrow(
+      /SLACK_OFFICE_BOT_TOKEN/,
+    );
+  });
+
+  it("reads the office token and needs no app token", () => {
+    expect(() =>
+      createSlackChat(officeCtx({ SLACK_OFFICE_BOT_TOKEN: "xoxb-office" })),
+    ).not.toThrow();
+  });
+
+  it("never listens", async () => {
+    const chat = createSlackChat(officeCtx({ SLACK_OFFICE_BOT_TOKEN: "xoxb-office" }));
+    await expect(chat.start(async () => {})).rejects.toThrow(/never listens/);
+  });
+
+  it("keeps requiring the person token for an agent", () => {
+    expect(() =>
+      createSlackChat({ ...officeCtx({ SLACK_OFFICE_BOT_TOKEN: "x" }), scope: "person" }),
+    ).toThrow(/SLACK_BOT_TOKEN/);
   });
 });

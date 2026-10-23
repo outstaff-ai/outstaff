@@ -1,4 +1,5 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
+import { MEMBER_ID } from "./identities.js";
 import type { SlackUser, SlackWeb } from "./api.js";
 
 export interface Sender {
@@ -8,8 +9,6 @@ export interface Sender {
 }
 
 const TTL_MS = 10 * 60_000;
-
-const MEMBER_ID = /^[UW][A-Z0-9]{8,}$/;
 
 /**
  * Who may talk to the agents. With a `humans` list in the team config: the people whose `identities.chat` is their
@@ -31,7 +30,7 @@ export function createTrust(deps: {
     ? new Set(chatIdentities.filter((i) => MEMBER_ID.test(i)))
     : undefined;
 
-  // No adapter hook exists in `ost validate` yet, so a malformed identity is reported at startup and never matches.
+  // `ost validate` reports this too (validateSlackIdentities); this is the backstop for configs that skipped it.
   for (const identity of chatIdentities ?? []) {
     if (!MEMBER_ID.test(identity)) {
       deps.log.warn(

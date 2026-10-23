@@ -68,7 +68,7 @@ YAML
   docker run -d --name "$name" --read-only --tmpfs /tmp --cap-drop ALL \
     --security-opt no-new-privileges \
     -v "$dir:/team:ro" -v ost-smoke-data:/var/lib/outstaff \
-    -e OUTSTAFF_TEAM_FILE=/team/team.yaml -e OUTSTAFF_AGENT_TOKEN_SAM=smoke -e ITSAPLAN_API_KEY=smoke -e SLACK_BOT_TOKEN=xoxb-smoke -e SLACK_APP_TOKEN=xapp-smoke \
+    -e OUTSTAFF_TEAM_FILE=/team/team.yaml -e OUTSTAFF_AGENT_TOKEN_SAM=smoke -e ITSAPLAN_API_KEY=smoke -e SLACK_OFFICE_BOT_TOKEN=xoxb-smoke \
     -e GH_OFFICE_APP_ID=1 -e GH_OFFICE_APP_INSTALLATION_ID=1 -e GH_OFFICE_APP_SLUG=acme-office \
     "$(ref "$image")" >/dev/null
 

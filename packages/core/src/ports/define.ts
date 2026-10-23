@@ -1,5 +1,5 @@
 import { registerAdapterOptions } from "../config/adapters.js";
-import type { AdapterInfo } from "../config/validate.js";
+import type { AdapterInfo, IdentityValidator } from "../config/validate.js";
 import type { RulePack } from "../permissions/types.js";
 import type { TeamConfig } from "../config/schema.js";
 import type { AdapterDefinition, PortName } from "./adapter.js";
@@ -82,6 +82,15 @@ export class AdapterRegistry {
         `${d.port}/${d.name}`,
         { port: d.port, name: d.name, capabilities: [...d.capabilities] },
       ]),
+    );
+  }
+
+  /** The `identityValidators` map `validateTeam` expects, for adapters that define `validateIdentities`. */
+  toIdentityValidators(): Map<string, IdentityValidator> {
+    return new Map(
+      this.list().flatMap((d) =>
+        d.validateIdentities ? [[`${d.port}/${d.name}`, d.validateIdentities] as const] : [],
+      ),
     );
   }
 }

@@ -7,12 +7,18 @@ import type { TeamConfig } from "./schema.js";
 export type RoleNeeds = { needs: Capability[]; optionalNeeds?: Capability[] };
 export type AdapterInfo = { port: AdapterPort; name: string; capabilities: Capability[] };
 
+/** An adapter's check of the identities it owns (see `AdapterDefinition.validateIdentities`). */
+export type IdentityValidator = (team: TeamConfig) => ConfigWarning[];
+
 export type ValidationContext = {
   /** Catalog roles by name. An empty map means the catalog is unknown and role names are not checked. */
   roles: Map<string, RoleNeeds>;
 
   /** Installed adapters keyed by `<port>/<adapter>`. An empty map means adapter names are not checked. */
   adapters: Map<string, AdapterInfo>;
+
+  /** Identity checks of installed adapters keyed `<port>/<adapter>`; only those of configured integrations run. Independent of `adapters`, so a host can check identities without checking adapter names. */
+  identityValidators?: Map<string, IdentityValidator>;
 };
 
 export type ConfigWarning = ConfigIssue & {
@@ -28,6 +34,10 @@ export const WARNING_CODES = {
   trustDefault: "trust.default",
   peopleNoRepos: "people.no_repos",
   peopleMissingVcsIdentity: "people.missing_vcs_identity",
+  identityChatNotMemberId: "identities.chat_not_member_id",
+  identityVcsNotLogin: "identities.vcs_not_login",
+  identityVcsNotBotLogin: "identities.vcs_not_bot_login",
+  identityTrackerEmpty: "identities.tracker_empty",
 } as const;
 
 export type WarningCode = (typeof WARNING_CODES)[keyof typeof WARNING_CODES];
@@ -91,6 +101,13 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "trust.default": "humans is omitted, so the default trust rule applies.",
   "people.no_repos": "A person has no repo grants.",
   "people.missing_vcs_identity": "A person has a write grant but no identities.vcs.",
+  "identities.chat_not_member_id":
+    "A chat identity is not a Slack member id (for example U0123ABCD); names never match.",
+  "identities.vcs_not_login":
+    "A human's vcs identity is not a GitHub login (letters, digits, hyphens or underscores, up to 39 characters).",
+  "identities.vcs_not_bot_login":
+    "A person's vcs identity is not a GitHub App bot login (<slug>[bot]), so the agent's own activity is not recognized.",
+  "identities.tracker_empty": "A tracker identity is blank.",
 };
 
 const adapterKey = (port: string, adapter: string) => `${port}/${adapter}`;
@@ -220,6 +237,16 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       consequence:
         "trusted humans are repo writers and full chat-workspace members; set humans: for open-source repos or large workspaces",
     });
+  }
+
+  if (ctx.identityValidators) {
+    for (const port of ADAPTER_PORTS) {
+      const ref = config.integrations[port];
+      const validator = ref && ctx.identityValidators.get(adapterKey(port, ref.adapter));
+      if (validator) {
+        warnings.push(...validator(config));
+      }
+    }
   }
 
   return { errors, warnings };

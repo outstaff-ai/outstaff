@@ -11,25 +11,9 @@ export COMPOSE_PROJECT_NAME="ost-compose-smoke-$$"
 export POSTGRES_PASSWORD=smoke
 export OUTSTAFF_TEAM_DIR="$work/team"
 export SECRETS_DIR="$work/secrets"
-compose() { docker compose -f "$here/compose.yaml" -f "$work/override.yaml" "$@"; }
+compose() { docker compose -f "$here/compose.yaml" "$@"; }
 fail() { echo "FAIL: $*" >&2; compose logs --no-color >&2 || true; exit 1; }
 trap 'compose down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
-
-# The team schema of some releases requires a chat integration, and the office of those releases reads
-# SLACK_BOT_TOKEN and SLACK_APP_TOKEN at start. Dummy files for both names keep the smoke
-# independent of which release it runs on; releases that read only SLACK_OFFICE_BOT_TOKEN ignore them.
-cat >"$work/override.yaml" <<'YAML'
-services:
-  office:
-    secrets:
-      - { source: smoke_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
-      - { source: smoke_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
-secrets:
-  smoke_SLACK_BOT_TOKEN:
-    file: ${SECRETS_DIR}/office/SLACK_BOT_TOKEN
-  smoke_SLACK_APP_TOKEN:
-    file: ${SECRETS_DIR}/office/SLACK_APP_TOKEN
-YAML
 
 # A one-person team: acme's shape, but only the adapters the smoke can start without a network.
 mkdir -p "$work/team"
