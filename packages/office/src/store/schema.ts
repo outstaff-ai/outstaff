@@ -42,6 +42,7 @@ export interface WorkItemsTable {
   updated_at: string;
   trigger: WorkItemTrigger;
   attempts: number;
+  position: number;
 }
 
 export interface RunsTable {
@@ -95,6 +96,12 @@ export interface ConversationsTable {
   answered_at: string | null;
 }
 
+export interface PausesTable {
+  scope: string;
+  reason: string | null;
+  paused_at: string;
+}
+
 export interface Database {
   cursors: CursorsTable;
   events: EventsTable;
@@ -105,6 +112,7 @@ export interface Database {
   subjects: SubjectsTable;
   loop_guard: LoopGuardTable;
   conversations: ConversationsTable;
+  pauses: PausesTable;
 }
 
 export type Db = Kysely<Database>;

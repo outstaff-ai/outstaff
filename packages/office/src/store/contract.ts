@@ -257,6 +257,87 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
       expect(await store.countLoopGuard(other.id, 10 * 60_000)).toBe(1);
     });
 
+    it("orders the queue by priority, then position, then age", async () => {
+      const mk = (title: string, extra: { priority?: number; position?: number } = {}) =>
+        store.enqueue({ person: "ann", kind: "k", title, trigger: "human", ...extra });
+
+      const a = await mk("a");
+      const b = await mk("b");
+      const c = await mk("c");
+      expect([a.position, b.position, c.position]).toEqual([1, 2, 3]);
+      await mk("front", { position: -5 });
+      expect((await store.dequeueNext("ann"))?.title).toBe("front");
+      expect((await store.dequeueNext("ann"))?.title).toBe("a");
+
+      await store.reorderQueue([
+        { id: c.id, priority: 100, position: 1 },
+        { id: b.id, priority: 100, position: 2 },
+      ]);
+
+      expect((await store.getItem(c.id))?.position).toBe(1);
+      expect((await store.dequeueNext("ann"))?.title).toBe("c");
+      expect((await store.dequeueNext("ann"))?.title).toBe("b");
+      await expect(
+        store.reorderQueue([{ id: "missing", priority: 1, position: 1 }]),
+      ).rejects.toThrow(/./);
+    });
+
+    it("rolls back a reorder that names an unknown item", async () => {
+      const a = await store.enqueue({ person: "ann", kind: "k", title: "a", trigger: "human" });
+      await expect(
+        store.reorderQueue([
+          { id: a.id, priority: 1, position: 9 },
+          { id: "missing", priority: 1, position: 1 },
+        ]),
+      ).rejects.toThrow(/./);
+
+      expect(await store.getItem(a.id)).toMatchObject({ priority: 100, position: 1 });
+    });
+
+    it("activates only queued items, once", async () => {
+      const a = await store.enqueue({ person: "ann", kind: "k", title: "a", trigger: "human" });
+      expect(await store.activateItem(a.id)).toMatchObject({ status: "active", attempts: 1 });
+      expect(await store.activateItem(a.id)).toBeUndefined();
+      expect(await store.activateItem("missing")).toBeUndefined();
+      const got = await Promise.all([store.activateItem(a.id), store.activateItem(a.id)]);
+      expect(got.filter((x) => x !== undefined)).toHaveLength(0);
+    });
+
+    it("persists pauses by scope", async () => {
+      expect(await store.listPauses()).toEqual([]);
+      await store.setPause("team", "release freeze");
+      await store.setPause("team", "ignored second reason");
+      await store.setPause("person:ann");
+      const pauses = await store.listPauses();
+      expect(pauses.map((p) => [p.scope, p.reason])).toEqual([
+        ["person:ann", null],
+        ["team", "release freeze"],
+      ]);
+
+      expect(await store.clearPause("team")).toBe(true);
+      expect(await store.clearPause("team")).toBe(false);
+      expect((await store.listPauses()).map((p) => p.scope)).toEqual(["person:ann"]);
+    });
+
+    it("keeps queue order and pauses across a restart", async () => {
+      if (!h.persistent) {
+        return;
+      }
+
+      const a = await store.enqueue({ person: "ann", kind: "k", title: "a", trigger: "human" });
+      const b = await store.enqueue({ person: "ann", kind: "k", title: "b", trigger: "human" });
+      await store.reorderQueue([
+        { id: b.id, priority: 100, position: 1 },
+        { id: a.id, priority: 100, position: 2 },
+      ]);
+
+      await store.setPause("team");
+      await store.close();
+      await open();
+      expect((await store.listPauses()).map((p) => p.scope)).toEqual(["team"]);
+      expect((await store.dequeueNext("ann"))?.title).toBe("b");
+    });
+
     it("creates and answers conversations once", async () => {
       const asker = await store.enqueue({ person: "ann", kind: "k", title: "t", trigger: "human" });
       const c = await store.createConversation({

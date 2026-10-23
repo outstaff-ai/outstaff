@@ -9,6 +9,8 @@ import type {
   NewConversation,
   NewEvent,
   NewWorkItem,
+  Pause,
+  QueueOrderEntry,
   Ref,
   Run,
   Store,
@@ -59,6 +61,7 @@ const toItem = (r: Selectable<Database["work_items"]>): WorkItem => ({
   updatedAt: r.updated_at,
   trigger: r.trigger,
   attempts: Number(r.attempts),
+  position: Number(r.position),
 });
 
 const toRun = (r: Selectable<Database["runs"]>): Run => ({
@@ -180,6 +183,18 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
 
     async enqueue(input: NewWorkItem) {
       const at = now();
+      let position = input.position;
+      if (position === undefined) {
+        const top = await db
+          .selectFrom("work_items")
+          .select((eb) => eb.fn.max("position").as("p"))
+          .where("person", "=", input.person)
+          .where("status", "=", "queued")
+          .executeTakeFirst();
+
+        position = top?.p === null || top?.p === undefined ? 1 : Number(top.p) + 1;
+      }
+
       const row = await db
         .insertInto("work_items")
         .values({
@@ -198,6 +213,7 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
           updated_at: iso(at),
           trigger: input.trigger,
           attempts: 0,
+          position,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
@@ -213,6 +229,7 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
           .where("person", "=", person)
           .where("status", "=", "queued")
           .orderBy("priority", "asc")
+          .orderBy("position", "asc")
           .orderBy("created_at", "asc")
           .orderBy("id", "asc")
           .limit(1);
@@ -235,6 +252,46 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
           .executeTakeFirstOrThrow();
 
         return toItem(row);
+      });
+    },
+
+    async activateItem(id) {
+      return db.transaction().execute(async (trx) => {
+        const cur = await trx
+          .selectFrom("work_items")
+          .selectAll()
+          .where("id", "=", id)
+          .where("status", "=", "queued")
+          .executeTakeFirst();
+
+        if (!cur) {
+          return undefined;
+        }
+
+        const row = await trx
+          .updateTable("work_items")
+          .set({ status: "active", attempts: Number(cur.attempts) + 1, updated_at: stamp() })
+          .where("id", "=", id)
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        return toItem(row);
+      });
+    },
+
+    async reorderQueue(entries: QueueOrderEntry[]) {
+      await db.transaction().execute(async (trx) => {
+        for (const e of entries) {
+          const res = await trx
+            .updateTable("work_items")
+            .set({ priority: e.priority, position: e.position, updated_at: stamp() })
+            .where("id", "=", e.id)
+            .executeTakeFirst();
+
+          if (Number(res.numUpdatedRows) === 0) {
+            throw new Error(`unknown work item: ${e.id}`);
+          }
+        }
       });
     },
 
@@ -274,6 +331,10 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
 
       if (patch.priority !== undefined) {
         set["priority"] = patch.priority;
+      }
+
+      if (patch.position !== undefined) {
+        set["position"] = patch.position;
       }
 
       if (patch.sessionId !== undefined) {
@@ -480,6 +541,24 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
         .executeTakeFirstOrThrow();
 
       return Number(row.n);
+    },
+
+    async setPause(scope, reason) {
+      await db
+        .insertInto("pauses")
+        .values({ scope, reason: reason ?? null, paused_at: stamp() })
+        .onConflict((oc) => oc.doNothing())
+        .execute();
+    },
+
+    async clearPause(scope) {
+      const res = await db.deleteFrom("pauses").where("scope", "=", scope).executeTakeFirst();
+      return Number(res.numDeletedRows) > 0;
+    },
+
+    async listPauses(): Promise<Pause[]> {
+      const rows = await db.selectFrom("pauses").selectAll().orderBy("scope", "asc").execute();
+      return rows.map((r) => ({ scope: r.scope, reason: r.reason, pausedAt: r.paused_at }));
     },
 
     async createConversation(input: NewConversation) {

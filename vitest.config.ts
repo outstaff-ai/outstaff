@@ -31,6 +31,9 @@ export default defineConfig({
           name: pkg,
           root: `packages/${pkg}`,
           include: ["src/**/*.test.ts"],
+
+          // Office test files share one Postgres database when OUTSTAFF_TEST_POSTGRES_URL is set.
+          ...(pkg === "office" ? { fileParallelism: false } : {}),
         },
       })),
       ...adapters.map((pkg) => ({

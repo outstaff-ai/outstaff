@@ -1,0 +1,596 @@
+import { randomUUID } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Client } from "pg";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { TeamConfig } from "@outstaff/core";
+import { manualClock, type ManualClock } from "../clock.js";
+import { openStore } from "../store/open.js";
+import type { Store } from "../store/types.js";
+import { createScheduler, type Scheduler, type UsageSource } from "./scheduler.js";
+
+const team = {
+  policies: {
+    agent_loop_guard: { max_runs_per_item_per_hour: 3 },
+    usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
+  },
+} as Pick<TeamConfig, "policies">;
+
+interface Harness {
+  open(now: () => Date): Promise<Store>;
+  cleanup(): Promise<void>;
+}
+
+const harnesses: [string, () => Harness][] = [
+  [
+    "sqlite file",
+    () => {
+      const dir = mkdtempSync(join(tmpdir(), "outstaff-sched-"));
+      return {
+        open: (now) => openStore(`sqlite://${join(dir, "office.db")}`, { now }),
+        cleanup: async () => rmSync(dir, { recursive: true, force: true }),
+      };
+    },
+  ],
+];
+
+const pgUrl = process.env["OUTSTAFF_TEST_POSTGRES_URL"] ?? "";
+if (pgUrl) {
+  harnesses.push([
+    "postgres",
+    () => {
+      const schema = `t_${randomUUID().replaceAll("-", "")}`;
+      return {
+        open: (now) => openStore(pgUrl, { now, schema }),
+        cleanup: async () => {
+          const c = new Client({ connectionString: pgUrl });
+          await c.connect();
+          try {
+            await c.query(`drop schema if exists "${schema}" cascade`);
+          } finally {
+            await c.end();
+          }
+        },
+      };
+    },
+  ]);
+}
+
+describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
+  let h: Harness;
+  let clock: ManualClock;
+  let store: Store;
+  let usage: { windows: { name: string; utilization: number }[]; fail: boolean };
+  let sched: Scheduler;
+
+  const usageSource: UsageSource = {
+    async windows() {
+      if (usage.fail) {
+        throw new Error("down");
+      }
+
+      return usage.windows;
+    },
+  };
+
+  const build = (staleAfterMinutes = 10) =>
+    createScheduler({ store, team, clock, usage: usageSource, staleAfterMinutes });
+
+  beforeEach(async () => {
+    h = makeHarness();
+    clock = manualClock();
+    usage = { windows: [], fail: false };
+    store = await h.open(() => clock.now());
+    sched = build();
+  });
+
+  afterEach(async () => {
+    sched.stop();
+    await store.close().catch(() => undefined);
+    await h.cleanup();
+  });
+
+  const add = (
+    title: string,
+    trigger: "human" | "agent" | "automation" | "schedule" = "human",
+    extra: { kind?: string; person?: string } = {},
+  ) =>
+    sched.enqueue({
+      person: extra.person ?? "ann",
+      kind: extra.kind ?? "task",
+      title,
+      trigger,
+    });
+
+  const titles = async (person = "ann") =>
+    (await store.listItems({ person, status: "queued" }))
+      .toSorted((a, b) => a.priority - b.priority || a.position - b.position)
+      .map((i) => i.title);
+
+  const runNext = async (person = "ann") => {
+    const item = await sched.next(person);
+    expect(item).not.toBeNull();
+    const res = await sched.markActive(item!.id);
+    expect(res.started).toBe(true);
+    return item!;
+  };
+
+  describe("priorities", () => {
+    it("runs chat, human, agent, automation, schedule in that order", async () => {
+      await add("sched", "schedule");
+      await add("auto", "automation");
+      await add("agent", "agent");
+      await add("human", "human");
+      await sched.enqueue({
+        person: "ann",
+        kind: "chat",
+        title: "chat",
+        trigger: "human",
+        placement: "next",
+      });
+
+      const seen: string[] = [];
+      for (let i = 0; i < 5; i++) {
+        const item = await runNext();
+        seen.push(item.title);
+        await sched.finish(item.id, { outcome: "ok" });
+      }
+
+      expect(seen).toEqual(["chat", "human", "agent", "auto", "sched"]);
+    });
+
+    it("breaks ties inside a class by position, then age", async () => {
+      await add("first", "agent");
+      clock.advance(1000);
+      await add("second", "agent");
+      clock.advance(1000);
+      const third = await add("third", "agent");
+      expect((await sched.next("ann"))?.title).toBe("first");
+      await sched.move(third.id, { before: (await sched.next("ann"))!.id });
+      expect((await sched.next("ann"))?.title).toBe("third");
+    });
+
+    it("lets an explicit priority override the class", async () => {
+      await add("normal", "human");
+      await sched.enqueue({
+        person: "ann",
+        kind: "task",
+        title: "urgent",
+        trigger: "agent",
+        priority: 1,
+      });
+
+      expect((await sched.next("ann"))?.title).toBe("urgent");
+    });
+
+    it("keeps people independent", async () => {
+      await add("ann's");
+      await add("bob's", "human", { person: "bob" });
+      expect((await sched.next("bob"))?.title).toBe("bob's");
+      expect(await sched.next("cy")).toBeNull();
+    });
+  });
+
+  describe("one active item per person", () => {
+    it("returns null while an item is active and refuses a second start", async () => {
+      const a = await add("a");
+      const b = await add("b");
+      await runNext();
+      expect(await sched.next("ann")).toBeNull();
+      const res = await sched.markActive(b.id);
+      expect(res).toMatchObject({ started: false, reason: "busy" });
+      await sched.finish(a.id, { outcome: "ok" });
+      expect((await sched.next("ann"))?.id).toBe(b.id);
+    });
+
+    it("does not start an item twice", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      expect(await sched.markActive(a.id)).toMatchObject({ started: false, reason: "not_queued" });
+    });
+
+    it("counts the attempt and records a run", async () => {
+      const a = await add("a");
+      const res = await sched.markActive(a.id);
+      expect(res.started && res.item.attempts).toBe(1);
+      const done = await sched.finish(a.id, { outcome: "ok" });
+      expect(done.status).toBe("done");
+      expect((await store.listRuns(a.id))[0]).toMatchObject({ outcome: "ok" });
+    });
+
+    it("can hand an item back as waiting or queued", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      expect((await sched.finish(a.id, { outcome: "asked", status: "waiting" })).status).toBe(
+        "waiting",
+      );
+
+      await sched.markActive(a.id).then((r) => expect(r.started).toBe(false));
+    });
+  });
+
+  describe("human chat and move", () => {
+    it("starts chat immediately when the person is idle", async () => {
+      const chat = await add("chat", "human", { kind: "chat" });
+      expect((await sched.next("ann"))?.id).toBe(chat.id);
+    });
+
+    it("starts chat immediately when idle and queues it last when busy", async () => {
+      const work = await add("work");
+      await add("later");
+      await runNext();
+      const chat = await add("chat", "human", { kind: "chat" });
+      expect(await titles()).toEqual(["later", "chat"]);
+      await sched.finish(work.id, { outcome: "ok" });
+      expect((await sched.next("ann"))?.title).toBe("later");
+      await sched.move(chat.id, { before: (await sched.next("ann"))!.id });
+      expect((await sched.next("ann"))?.id).toBe(chat.id);
+    });
+
+    it("honors the position the human chose", async () => {
+      const a = await add("a", "human");
+      const b = await add("b", "human");
+      await add("c", "human");
+      await sched.markActive(a.id);
+      await add("chat-last", "human", { kind: "chat" }).then((c) =>
+        sched.move(c.id, { last: true }),
+      );
+
+      expect(await titles()).toEqual(["b", "c", "chat-last"]);
+      await sched.enqueue({
+        person: "ann",
+        kind: "chat",
+        title: "chat-after-b",
+        trigger: "human",
+        placement: { after: b.id },
+      });
+
+      expect(await titles()).toEqual(["b", "chat-after-b", "c", "chat-last"]);
+      await sched.enqueue({
+        person: "ann",
+        kind: "chat",
+        title: "chat-next",
+        trigger: "human",
+        placement: "next",
+      });
+
+      expect((await titles())[0]).toBe("chat-next");
+      await sched.enqueue({
+        person: "ann",
+        kind: "chat",
+        title: "chat-end",
+        trigger: "human",
+        placement: "last",
+      });
+
+      expect((await titles()).at(-1)).toBe("chat-end");
+    });
+
+    it("places 'next' on an empty queue", async () => {
+      await sched.enqueue({
+        person: "ann",
+        kind: "x",
+        title: "only",
+        trigger: "agent",
+        placement: "next",
+      });
+
+      expect(await titles()).toEqual(["only"]);
+    });
+
+    it("moves before, after and last, and the order survives a restart", async () => {
+      const a = await add("a");
+      const b = await add("b");
+      const c = await add("c");
+      await sched.move(c.id, { before: a.id });
+      expect(await titles()).toEqual(["c", "a", "b"]);
+      await sched.move(c.id, { after: b.id });
+      expect(await titles()).toEqual(["a", "b", "c"]);
+      await sched.move(a.id, { last: true });
+      expect(await titles()).toEqual(["b", "c", "a"]);
+
+      await store.close();
+      store = await h.open(() => clock.now());
+      sched = build();
+      expect((await sched.next("ann"))?.title).toBe("b");
+      expect(await titles()).toEqual(["b", "c", "a"]);
+    });
+
+    it("lets a new item queue behind a reordered one", async () => {
+      const a = await add("a");
+      await add("b");
+      await sched.move(a.id, { last: true });
+      await add("c");
+      expect(await titles()).toEqual(["b", "a", "c"]);
+    });
+
+    it("never interrupts or moves an active item, or moves across people", async () => {
+      const a = await add("a");
+      const b = await add("b");
+      const other = await add("o", "human", { person: "bob" });
+      await sched.markActive(a.id);
+      await expect(sched.move(a.id, { last: true })).rejects.toThrow(/only queued/);
+      await expect(sched.move(b.id, { before: other.id })).rejects.toThrow(/same queue/);
+      await expect(sched.move("missing", { last: true })).rejects.toThrow(/unknown/);
+      expect((await store.getItem(a.id))?.status).toBe("active");
+    });
+  });
+
+  describe("loop guard", () => {
+    const cycle = async (id: string) => {
+      const res = await sched.markActive(id);
+      if (res.started) {
+        await sched.finish(id, { outcome: "ok", status: "queued" });
+      }
+
+      return res;
+    };
+
+    it("blocks an agent-triggered item after the limit and reports it", async () => {
+      const a = await add("loop", "agent");
+      for (let i = 0; i < 3; i++) {
+        expect((await cycle(a.id)).started).toBe(true);
+      }
+
+      const res = await sched.markActive(a.id);
+      expect(res).toMatchObject({ started: false, reason: "loop_guard" });
+      expect(res.started === false && res.blocked?.reason).toMatch(/Loop guard/);
+      expect((await store.getItem(a.id))?.status).toBe("blocked");
+      expect((await store.readJournal(a.id)).at(-1)?.text).toMatch(/Blocked: Loop guard/);
+    });
+
+    it("counts automation, ignores humans and schedules, and uses a sliding hour", async () => {
+      const auto = await add("auto", "automation");
+      const human = await add("human", "human");
+      const sch = await add("sched", "schedule");
+      for (let i = 0; i < 5; i++) {
+        expect((await cycle(human.id)).started).toBe(true);
+        expect((await cycle(sch.id)).started).toBe(true);
+      }
+
+      for (let i = 0; i < 3; i++) {
+        await cycle(auto.id);
+      }
+
+      clock.advance(61 * 60_000);
+      expect((await cycle(auto.id)).started).toBe(true);
+    });
+
+    it("keeps tripped items out of next() and blocks them on tick", async () => {
+      const a = await add("loop", "agent");
+      const ok = await add("fine", "agent");
+      for (let i = 0; i < 3; i++) {
+        await cycle(a.id);
+      }
+
+      expect((await sched.next("ann"))?.id).toBe(ok.id);
+      const tick = await sched.tick();
+      expect(tick.blocked).toHaveLength(1);
+      expect(tick.blocked[0]).toMatchObject({ code: "loop_guard", item: { id: a.id } });
+      expect((await store.getItem(a.id))?.status).toBe("blocked");
+      expect((await sched.tick()).blocked).toHaveLength(0);
+    });
+
+    it("block() blocks with a reason from outside", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      const n = await sched.block(a.id, "needs a human");
+      expect(n).toMatchObject({ code: "manual", reason: "needs a human" });
+      expect(n.item.status).toBe("blocked");
+      expect((await store.listRuns(a.id))[0]).toMatchObject({ outcome: "blocked" });
+      await expect(sched.block("missing", "x")).rejects.toThrow(/unknown/);
+    });
+  });
+
+  describe("usage policy", () => {
+    it("defers scheduled work, then pauses automatic work, always answering humans", async () => {
+      await add("sched", "schedule");
+      await add("agent", "agent");
+      await add("human", "human");
+
+      usage.windows = [{ name: "5h", utilization: 0.9 }];
+      expect((await sched.next("ann"))?.title).toBe("human");
+      const human = await runNext();
+      await sched.finish(human.id, { outcome: "ok" });
+      expect((await sched.next("ann"))?.title).toBe("agent");
+
+      const agent = await runNext();
+      await sched.finish(agent.id, { outcome: "ok" });
+      expect(await sched.next("ann")).toBeNull();
+
+      usage.windows = [{ name: "7d", utilization: 0.5 }];
+      expect((await sched.next("ann"))?.title).toBe("sched");
+    });
+
+    it("pauses agents and automation but not humans at the pause threshold", async () => {
+      await add("agent", "agent");
+      await add("auto", "automation");
+      usage.windows = [{ name: "5h", utilization: 0.96 }];
+      expect(await sched.next("ann")).toBeNull();
+      await add("human", "human");
+      expect((await sched.next("ann"))?.title).toBe("human");
+    });
+
+    it("skips held items instead of stalling the queue", async () => {
+      await add("sched", "schedule");
+      await add("agent", "agent");
+      usage.windows = [{ name: "5h", utilization: 0.9 }];
+      expect((await sched.next("ann"))?.title).toBe("agent");
+    });
+
+    it("explains why via isPausedFor", async () => {
+      usage.windows = [{ name: "5h", utilization: 0.9 }];
+      expect(await sched.isPausedFor("ann", { trigger: "human" })).toBeNull();
+      expect(await sched.isPausedFor("ann", { trigger: "agent" })).toBeNull();
+      expect(await sched.isPausedFor("ann", { trigger: "schedule" })).toMatchObject({
+        code: "usage_defer",
+        reason: expect.stringContaining("90%"),
+      });
+
+      usage.windows = [{ name: "5h", utilization: 0.99 }];
+      expect(await sched.isPausedFor("ann", { trigger: "agent" })).toMatchObject({
+        code: "usage_pause",
+      });
+
+      expect(await sched.isPausedFor("ann", { trigger: "human" })).toBeNull();
+    });
+
+    it("refuses markActive for a held item", async () => {
+      const s = await add("sched", "schedule");
+      usage.windows = [{ name: "5h", utilization: 0.9 }];
+      expect(await sched.markActive(s.id)).toMatchObject({ started: false, reason: "usage_defer" });
+    });
+
+    it("fails open when the usage source errors, and works without one", async () => {
+      await add("sched", "schedule");
+      usage.fail = true;
+      expect((await sched.next("ann"))?.title).toBe("sched");
+      const bare = createScheduler({ store, team, clock });
+      expect((await bare.next("ann"))?.title).toBe("sched");
+    });
+  });
+
+  describe("pause and resume", () => {
+    it("pauses the whole team and resumes", async () => {
+      await add("a");
+      await add("b", "human", { person: "bob" });
+      await sched.pause(undefined, "freeze");
+      expect(await sched.next("ann")).toBeNull();
+      expect(await sched.next("bob")).toBeNull();
+      expect(await sched.isPausedFor("ann", { trigger: "human" })).toMatchObject({
+        code: "paused_team",
+        reason: expect.stringContaining("freeze"),
+      });
+
+      await sched.resume();
+      expect((await sched.next("ann"))?.title).toBe("a");
+    });
+
+    it("pauses one person only", async () => {
+      const a = await add("a");
+      await add("b", "human", { person: "bob" });
+      await sched.pause("ann");
+      expect(await sched.next("ann")).toBeNull();
+      expect((await sched.next("bob"))?.title).toBe("b");
+      expect(await sched.markActive(a.id)).toMatchObject({
+        started: false,
+        reason: "paused_person",
+      });
+
+      await sched.resume("ann");
+      expect((await sched.next("ann"))?.title).toBe("a");
+    });
+
+    it("does not interrupt the active item", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      await sched.pause("ann");
+      expect((await store.getItem(a.id))?.status).toBe("active");
+    });
+
+    it("persists across a restart", async () => {
+      await add("a");
+      await sched.pause(undefined, "why");
+      await sched.pause("ann");
+      await store.close();
+      store = await h.open(() => clock.now());
+      sched = build();
+      const state = await sched.pauseState();
+      expect(state.team?.reason).toBe("why");
+      expect(Object.keys(state.people)).toEqual(["ann"]);
+      expect(await sched.next("ann")).toBeNull();
+      await sched.resume();
+      await sched.resume("ann");
+      expect((await sched.next("ann"))?.title).toBe("a");
+      expect(await sched.pauseState()).toEqual({ team: null, people: {} });
+    });
+  });
+
+  describe("stale runs", () => {
+    it("retries once, then blocks with a reason", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      clock.advance(9 * 60_000);
+      expect(await sched.tick()).toEqual({ retried: [], blocked: [] });
+
+      clock.advance(2 * 60_000);
+      const first = await sched.tick();
+      expect(first.retried.map((i) => i.id)).toEqual([a.id]);
+      expect((await store.getItem(a.id))?.status).toBe("queued");
+      expect((await store.listRuns(a.id))[0]).toMatchObject({ outcome: "stale" });
+
+      const again = await runNext();
+      expect(again.id).toBe(a.id);
+      expect((await store.getItem(a.id))?.attempts).toBe(2);
+      clock.advance(11 * 60_000);
+      const second = await sched.tick();
+      expect(second.blocked).toHaveLength(1);
+      expect(second.blocked[0]).toMatchObject({ code: "stale", item: { status: "blocked" } });
+      expect(second.blocked[0]?.reason).toMatch(/Stale again/);
+    });
+
+    it("heartbeats keep a run alive", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      for (let i = 0; i < 5; i++) {
+        clock.advance(6 * 60_000);
+        await sched.heartbeat(a.id);
+        expect((await sched.tick()).retried).toHaveLength(0);
+      }
+    });
+
+    it("forgives an earlier stale run after a good one", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      clock.advance(11 * 60_000);
+      await sched.tick();
+      await runNext();
+      await sched.finish(a.id, { outcome: "ok", status: "queued" });
+      await runNext();
+      clock.advance(11 * 60_000);
+      expect((await sched.tick()).retried).toHaveLength(1);
+    });
+
+    it("honors the configured threshold", async () => {
+      sched = build(2);
+      const a = await add("a");
+      await sched.markActive(a.id);
+      clock.advance(3 * 60_000);
+      expect((await sched.tick()).retried).toHaveLength(1);
+    });
+  });
+
+  describe("background tick", () => {
+    it("ticks on the clock until stopped", async () => {
+      const a = await add("a");
+      await sched.markActive(a.id);
+      const seen: number[] = [];
+      sched.start((r) => seen.push(r.retried.length));
+      clock.advance(11 * 60_000);
+      await new Promise((r) => setTimeout(r, 100));
+      expect(seen[0]).toBe(1);
+      sched.stop();
+      const n = seen.length;
+      clock.advance(60 * 60_000);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(seen).toHaveLength(n);
+    });
+  });
+
+  describe("restart rebuild", () => {
+    it("rebuilds queue, active item and policies from the store alone", async () => {
+      await add("later", "schedule");
+      await add("now", "human");
+      const active = await runNext();
+      await add("chat", "human", { kind: "chat" });
+
+      await store.close();
+      store = await h.open(() => clock.now());
+      sched = build();
+      expect(await sched.next("ann")).toBeNull();
+      await sched.finish(active.id, { outcome: "ok" });
+      expect((await sched.next("ann"))?.title).toBe("later");
+    });
+  });
+});
