@@ -1,6 +1,7 @@
 import { defineAdapter, type SecretSpec } from "@outstaff/core";
 import { validateGithubIdentities } from "./identities.js";
 import { githubCommandRules } from "./permissions.js";
+import { deriveGithub, githubSetupGuide } from "./setup.js";
 import { githubOptions } from "./options.js";
 import { createGithubVcs } from "./vcs.js";
 
@@ -26,6 +27,13 @@ const appSecrets = (prefix: string, who: string, where: string): SecretSpec[] =>
     description: `Installation id of ${who} on the team's account`,
     where: "The number in the installation URL, or let ost setup --derive look it up",
     derivable: true,
+  },
+  {
+    key: `${prefix}BOT_EMAIL`,
+    description: `Commit email of the bot of ${who}: <bot id>+<slug>[bot]@users.noreply.github.com`,
+    where: "Let ost setup --derive look it up",
+    derivable: true,
+    optional: true,
   },
   {
     key: `${prefix}SLUG`,
@@ -58,5 +66,7 @@ export const githubVcs = defineAdapter({
   secrets: (scope) => (scope === "person" ? [...ownApp(), ...officeApp()] : officeApp()),
   create: (ctx) => createGithubVcs(ctx),
   validateIdentities: validateGithubIdentities,
+  setupGuide: githubSetupGuide,
+  derive: deriveGithub,
   permissions: () => githubCommandRules(),
 });

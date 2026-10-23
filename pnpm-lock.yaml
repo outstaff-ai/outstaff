@@ -288,9 +288,18 @@ importers:
       '@outstaff/catalog':
         specifier: workspace:*
         version: link:../catalog
+      '@outstaff/chat-slack':
+        specifier: workspace:*
+        version: link:../chat-slack
       '@outstaff/core':
         specifier: workspace:*
         version: link:../core
+      '@outstaff/runtime-agent-sdk':
+        specifier: workspace:*
+        version: link:../runtime-agent-sdk
+      '@outstaff/tracker-itsaplan':
+        specifier: workspace:*
+        version: link:../tracker-itsaplan
       '@outstaff/vcs-github':
         specifier: workspace:*
         version: link:../vcs-github

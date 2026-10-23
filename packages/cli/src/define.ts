@@ -28,6 +28,16 @@ export type Context = {
   /** Replaces building the agent environment from the team file (tests only). */
   agentEnv?: () => Promise<AgentEnv>;
 
+  /** HTTP for `ost setup --derive`; defaults to the global `fetch` (tests only). */
+  fetch?: typeof fetch;
+  now?: () => Date;
+
+  /** Home directory, where `ost setup --derive` looks for a downloaded key in `Downloads`; defaults to the user's. */
+  home?: string;
+
+  /** Asks a yes/no question; absent when there is no terminal to ask on. */
+  confirm?: (question: string) => Promise<boolean>;
+
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;
 };
