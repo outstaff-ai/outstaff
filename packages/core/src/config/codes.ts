@@ -20,6 +20,10 @@ export const CONFIG_CODES = {
   yamlSyntax: "config.yaml_syntax",
   readFailed: "config.read_failed",
   gitFailed: "config.git_failed",
+  peopleUnknownRole: "people.unknown_role",
+  peopleUnknownExtends: "people.unknown_extends",
+  peopleWriteWithoutVcs: "people.write_without_vcs",
+  integrationsUnknownAdapter: "integrations.unknown_adapter",
 } as const;
 
 export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];

@@ -21,3 +21,15 @@ export {
   type ConfigSource,
 } from "./config/load.js";
 export { type ConfigFs, type GitClient } from "./config/io.js";
+export { CAPABILITIES, CAPABILITY_PORT, type Capability } from "./capabilities.js";
+export {
+  validateTeam,
+  documentedCodes,
+  WARNING_CODES,
+  type WarningCode,
+  type RoleNeeds,
+  type AdapterInfo,
+  type ValidationContext,
+  type ValidationReport,
+  type ConfigWarning,
+} from "./config/validate.js";
