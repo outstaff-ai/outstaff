@@ -1,0 +1,54 @@
+name: Runtime upgrade
+
+# Runs real Claude sessions against the pinned Claude Agent SDK to check that skills, settings, hooks and tools
+# still load in an unattended run. It needs an API key; without the secret the job is skipped with a notice.
+on:
+  pull_request:
+    paths:
+      - packages/runtime-agent-sdk/package.json
+      - pnpm-lock.yaml
+  workflow_dispatch:
+  # the release workflow calls this before it publishes
+  workflow_call:
+    secrets:
+      OUTSTAFF_TEST_ANTHROPIC_API_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-upgrade-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.OUTSTAFF_TEST_ANTHROPIC_API_KEY }}
+    steps:
+      - name: Check for the API key
+        id: key
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Skipped: the repository secret OUTSTAFF_TEST_ANTHROPIC_API_KEY is not available (forks and pull requests without secrets). The live runtime upgrade test did not run."
+          fi
+      - uses: actions/checkout@v7.0.1
+        if: steps.key.outputs.present == 'true'
+      - uses: pnpm/action-setup@v6.1.0
+        if: steps.key.outputs.present == 'true'
+      - uses: actions/setup-node@v7.1.0
+        if: steps.key.outputs.present == 'true'
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        if: steps.key.outputs.present == 'true'
+      - name: Live upgrade test
+        if: steps.key.outputs.present == 'true'
+        env:
+          OUTSTAFF_TEST_LIVE_SDK: "1"
+        run: pnpm vitest run --project runtime-agent-sdk upgrade

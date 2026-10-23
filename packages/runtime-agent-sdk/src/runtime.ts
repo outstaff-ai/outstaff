@@ -12,6 +12,7 @@ import {
   type RuntimeEvent,
   type UsageEvent,
 } from "@outstaff/core";
+import { renderedSkillNames } from "./layout.js";
 import { mapMessage, type MapState } from "./messages.js";
 import type { AgentSdkOptions } from "./options.js";
 import { permissionHook } from "./permissions.js";
@@ -70,7 +71,8 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     return {
       settingSources: ["project"],
       strictMcpConfig: true,
-      settings: { disableClaudeAiConnectors: true },
+      // Claude Code's own skills are removed; the `skills` allowlist in run() then limits the rest to the rendered ones.
+      settings: { disableClaudeAiConnectors: true, disableBundledSkills: true },
       env: childEnv(),
       ...(config.options.claudeCodePath
         ? { pathToClaudeCodeExecutable: config.options.claudeCodePath }
@@ -98,6 +100,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     const options: Options = {
       ...isolated(),
       cwd: req.workdir,
+      skills: renderedSkillNames(req.workdir),
       additionalDirectories: req.addDirs,
       systemPrompt: { type: "preset", preset: "claude_code", append: req.systemPrompt },
       model: req.model ?? config.options.model,

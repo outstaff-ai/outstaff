@@ -219,12 +219,13 @@ describe("options passed to the SDK", () => {
       systemPrompt: { type: "preset", preset: "claude_code", append: "Be brief." },
       settingSources: ["project"],
       strictMcpConfig: true,
-      settings: { disableClaudeAiConnectors: true },
+      settings: { disableClaudeAiConnectors: true, disableBundledSkills: true },
       permissionMode: "dontAsk",
     });
 
     expect(o.env).toMatchObject({ PATH: "/bin", ENABLE_CLAUDEAI_MCP_SERVERS: "false" });
     expect(o.plugins).toBeUndefined();
+    expect(o.skills).toEqual([]);
     expect(o.allowedTools).toBeUndefined();
   });
 
