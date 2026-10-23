@@ -3,6 +3,8 @@ import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
 import { teamCommandsSchema } from "../permissions/schema.js";
 import { customIssue } from "./issues.js";
+import { ruleInputSchema } from "../workflow/rules.js";
+import { checkWorkflowConfig } from "../workflow/validate.js";
 
 const d = (description: string) => ({ description });
 
@@ -124,9 +126,26 @@ const workflowSchema = z
       .optional()
       .meta(d("Maps canonical statuses to the status names used in your tracker.")),
     rules: z
-      .array(z.looseObject({}))
+      .array(ruleInputSchema)
       .optional()
-      .meta(d("Custom workflow rules; their shape is defined by the workflow engine.")),
+      .meta(
+        d(
+          "Rules added to the preset. A rule with a preset rule's id replaces it; { id, disabled: true } removes it.",
+        ),
+      ),
+    templates: z
+      .record(z.string().regex(/^[a-z][a-z0-9_-]*$/), z.string().min(1))
+      .optional()
+      .meta(
+        d(
+          "Comment and notification templates by id, with {{variable}} placeholders. They override built-in templates with the same id.",
+        ),
+      ),
+    needs_human_label: z
+      .string()
+      .min(1)
+      .optional()
+      .meta(d('Ticket label that keeps work with a human. Default "needs-human".')),
   })
   .meta(d("How work moves through the team."));
 
@@ -303,6 +322,12 @@ export const teamConfigSchema = z
         }
       }
     });
+
+    if (cfg.workflow) {
+      for (const i of checkWorkflowConfig(cfg.workflow)) {
+        ctx.addIssue(customIssue(i.code, i.message, i.path));
+      }
+    }
 
     const seenHandles = new Map<string, number>();
     cfg.people.forEach((p, i) => {

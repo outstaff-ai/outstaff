@@ -399,13 +399,273 @@
           }
         },
         "rules": {
-          "description": "Custom workflow rules; their shape is defined by the workflow engine.",
+          "description": "Rules added to the preset. A rule with a preset rule's id replaces it; { id, disabled: true } removes it.",
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": {}
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^[a-z][a-z0-9_-]*$",
+                    "description": "Unique id. A rule with the same id as a preset rule replaces it."
+                  },
+                  "on": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "pr.opened",
+                          "pr.merged",
+                          "pr.closed",
+                          "pr.review_submitted",
+                          "pr.comment",
+                          "pr.conflicted",
+                          "pr.ci_failed",
+                          "ticket.assigned",
+                          "ticket.moved",
+                          "ticket.commented",
+                          "agent.handed_back",
+                          "agent.asked",
+                          "schedule.cron"
+                        ]
+                      },
+                      {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "pr.opened",
+                            "pr.merged",
+                            "pr.closed",
+                            "pr.review_submitted",
+                            "pr.comment",
+                            "pr.conflicted",
+                            "pr.ci_failed",
+                            "ticket.assigned",
+                            "ticket.moved",
+                            "ticket.commented",
+                            "agent.handed_back",
+                            "agent.asked",
+                            "schedule.cron"
+                          ]
+                        }
+                      }
+                    ],
+                    "description": "Event type or types that trigger the rule."
+                  },
+                  "if": {
+                    "description": "Condition that must hold.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/__schema0"
+                      }
+                    ]
+                  },
+                  "do": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "move": {
+                              "type": "string",
+                              "enum": [
+                                "backlog",
+                                "ready",
+                                "active",
+                                "review",
+                                "blocked",
+                                "done",
+                                "canceled"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "move"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Move the ticket to a canonical status."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "assign": {
+                              "type": "string",
+                              "pattern": "^(author|last_worker|requester|none|human:\\S+|role:[a-z][a-z0-9-]*)$",
+                              "description": "Assign the ticket."
+                            }
+                          },
+                          "required": [
+                            "assign"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Assign the ticket."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "comment": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_-]*$"
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "template": {
+                                      "type": "string",
+                                      "pattern": "^[a-z][a-z0-9_-]*$"
+                                    },
+                                    "on": {
+                                      "type": "string",
+                                      "enum": [
+                                        "ticket",
+                                        "pr"
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "template"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "comment"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Post a rendered template as a comment (on the ticket by default)."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "schedule": {
+                              "type": "object",
+                              "properties": {
+                                "person": {
+                                  "type": "string",
+                                  "pattern": "^(author|assignee|last_worker|role:[a-z][a-z0-9-]*)$"
+                                },
+                                "kind": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_-]*$"
+                                },
+                                "priority": {
+                                  "default": "normal",
+                                  "type": "string",
+                                  "enum": [
+                                    "low",
+                                    "normal",
+                                    "high"
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "person",
+                                "kind"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "schedule"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Schedule a work item for an agent."
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "notify": {
+                              "type": "object",
+                              "properties": {
+                                "to": {
+                                  "type": "string",
+                                  "pattern": "^(requester|assignee|channel(:\\S+)?)$"
+                                },
+                                "template": {
+                                  "type": "string",
+                                  "pattern": "^[a-z][a-z0-9_-]*$"
+                                }
+                              },
+                              "required": [
+                                "to",
+                                "template"
+                              ],
+                              "additionalProperties": false
+                            }
+                          },
+                          "required": [
+                            "notify"
+                          ],
+                          "additionalProperties": false,
+                          "description": "Send a rendered template to a person or channel."
+                        }
+                      ]
+                    },
+                    "description": "Actions, run in order."
+                  },
+                  "disabled": {
+                    "description": "Set to true to remove the rule.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "on",
+                  "do"
+                ],
+                "additionalProperties": false,
+                "description": "A workflow rule."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "pattern": "^[a-z][a-z0-9_-]*$"
+                  },
+                  "disabled": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "disabled"
+                ],
+                "additionalProperties": false,
+                "description": "Removes the preset rule with this id."
+              }
+            ]
           }
+        },
+        "templates": {
+          "description": "Comment and notification templates by id, with {{variable}} placeholders. They override built-in templates with the same id.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]*$"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "needs_human_label": {
+          "description": "Ticket label that keeps work with a human. Default \"needs-human\".",
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false,
@@ -818,5 +1078,209 @@
   ],
   "additionalProperties": false,
   "description": "Outstaff team configuration (.outstaff/team.yaml).",
+  "definitions": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "all": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/__schema0"
+              }
+            }
+          },
+          "required": [
+            "all"
+          ],
+          "additionalProperties": false,
+          "description": "Every condition must hold."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "any": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/__schema0"
+              }
+            }
+          },
+          "required": [
+            "any"
+          ],
+          "additionalProperties": false,
+          "description": "At least one condition must hold."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "not": {
+              "$ref": "#/definitions/__schema0"
+            }
+          },
+          "required": [
+            "not"
+          ],
+          "additionalProperties": false,
+          "description": "The condition must not hold."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ticket_status": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "backlog",
+                  "ready",
+                  "active",
+                  "review",
+                  "blocked",
+                  "done",
+                  "canceled"
+                ]
+              }
+            }
+          },
+          "required": [
+            "ticket_status"
+          ],
+          "additionalProperties": false,
+          "description": "The linked ticket is in one of these canonical statuses."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "moved_to": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "backlog",
+                  "ready",
+                  "active",
+                  "review",
+                  "blocked",
+                  "done",
+                  "canceled"
+                ]
+              }
+            }
+          },
+          "required": [
+            "moved_to"
+          ],
+          "additionalProperties": false,
+          "description": "A ticket.moved event moved the ticket into one of these statuses."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "actor_kind": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent",
+                "automation"
+              ]
+            }
+          },
+          "required": [
+            "actor_kind"
+          ],
+          "additionalProperties": false,
+          "description": "Who caused the event."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "assignee_kind": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent",
+                "none"
+              ]
+            }
+          },
+          "required": [
+            "assignee_kind"
+          ],
+          "additionalProperties": false,
+          "description": "Who the ticket is assigned to."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "has_label": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "has_label"
+          ],
+          "additionalProperties": false,
+          "description": "The ticket has this label. \"$needs_human\" means the configured needs-human label."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "pr_author_kind": {
+              "type": "string",
+              "enum": [
+                "human",
+                "agent",
+                "bot"
+              ]
+            }
+          },
+          "required": [
+            "pr_author_kind"
+          ],
+          "additionalProperties": false,
+          "description": "Who authored the pull request."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "pr_draft": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pr_draft"
+          ],
+          "additionalProperties": false,
+          "description": "The pull request is (or is not) a draft."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "review_state": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "review_state"
+          ],
+          "additionalProperties": false,
+          "description": "The review state in the event, for example \"approved\"."
+        }
+      ]
+    }
+  },
   "title": "Outstaff team.yaml"
 }

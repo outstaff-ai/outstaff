@@ -25,6 +25,11 @@ export const CONFIG_CODES = {
   peopleUnknownExtends: "people.unknown_extends",
   peopleWriteWithoutVcs: "people.write_without_vcs",
   integrationsUnknownAdapter: "integrations.unknown_adapter",
+  workflowDuplicateRuleId: "workflow.duplicate_rule_id",
+  workflowUnknownRule: "workflow.unknown_rule",
+  workflowUnknownTemplate: "workflow.unknown_template",
+  workflowUnknownPlaceholder: "workflow.unknown_placeholder",
+  workflowDuplicateStatusName: "workflow.duplicate_status_name",
 } as const;
 
 export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];

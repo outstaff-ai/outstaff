@@ -74,7 +74,11 @@ const valid = (): TeamConfigInput => ({
   },
   email: { pattern: "{handle}@acme.example" },
   office: { events: "webhook", poll_interval_seconds: 30 },
-  workflow: { preset: "scrum", statuses: { review: "In Review" }, rules: [{ when: "x" }] },
+  workflow: {
+    preset: "scrum",
+    statuses: { review: "In Review" },
+    rules: [{ id: "x", on: "pr.opened", do: [{ move: "review" }] }],
+  },
   policies: {
     agent_loop_guard: { max_runs_per_item_per_hour: 6 },
     usage: { defer_scheduled_at: 0.5, pause_automatic_at: 0.9 },
