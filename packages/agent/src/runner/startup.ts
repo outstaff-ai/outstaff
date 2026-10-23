@@ -1,8 +1,9 @@
 import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import {
   PROFILE_SPECS,
   buildPolicy,
+  effectiveTools,
   envSecretSource,
   formatCatalogIssue,
   formatIssue,
@@ -13,6 +14,7 @@ import {
   silentLogger,
   teamCommandsToPack,
   toolsetToPack,
+  toolsToPacks,
   CatalogError,
   RenderError,
   type AdapterRegistry,
@@ -24,6 +26,7 @@ import {
   type Runtime,
   type SecretSource,
   type TeamConfig,
+  type Toolset,
 } from "@outstaff/core";
 import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
 import {
@@ -32,6 +35,7 @@ import {
   type ClonedRepo,
   type SyncRepositoriesOptions,
 } from "../repos/index.js";
+import { installTools, type MiseRunner, type ToolStatus } from "../tools/index.js";
 import { createAgentEnv } from "../verbs/env.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { buildIdentityPrompt } from "./identity.js";
@@ -60,6 +64,9 @@ export interface StartupOptions {
 
   /** Overrides for cloning: the remote of each repo, the credential helper command, the git runner (tests only). */
   repositories?: Pick<SyncRepositoriesOptions, "remoteUrl" | "helper" | "git">;
+
+  /** Overrides for tool installation: the mise runner and what to do with the shims directory (tests only). */
+  tools?: { mise?: MiseRunner; addToPath?: (shimsDir: string) => void };
 }
 
 export interface PreparedAgent {
@@ -76,6 +83,9 @@ export interface PreparedAgent {
 
   /** The repos cloned for the person, one per grant. */
   repos: ClonedRepo[];
+
+  /** The declared tools and whether each is available. */
+  tools: ToolStatus[];
 }
 
 /** Why the agent cannot start, in words an operator can act on. */
@@ -117,6 +127,14 @@ function loadCatalogs(
     }
 
     throw e;
+  }
+}
+
+/** The runtime starts its children with the process environment, so the shims go on this process's PATH. */
+function addToPath(shimsDir: string): void {
+  const parts = (process.env["PATH"] ?? "").split(delimiter);
+  if (!parts.includes(shimsDir)) {
+    process.env["PATH"] = [shimsDir, ...parts].filter(Boolean).join(delimiter);
   }
 }
 
@@ -167,6 +185,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
 
   // Working files: stock catalog plus the team's ejected one, laid out the way the runtime expects them.
   const catalogs = loadCatalogs(opts.stockCatalogDir, team, source.dir);
+  let toolStatuses: ToolStatus[] = [];
   let rendered: RenderedWorkdir;
   try {
     rendered = renderPerson({
@@ -187,6 +206,40 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
 
   for (const w of rendered.warnings) {
     log.warn(w.message);
+  }
+
+  const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
+  const role = roles[me.role];
+  const toolsetNames = [
+    ...new Set([me.role, ...rendered.extends].map((r) => roles[r]?.toolset).filter((t) => t)),
+  ] as string[];
+
+  const toolsets: Toolset[] = [];
+  for (const name of toolsetNames) {
+    const file = join(opts.stockCatalogDir, "toolsets", `${name}.yaml`);
+    if (existsSync(file)) {
+      toolsets.push(loadToolset(file));
+    }
+  }
+
+  // Person beats team beats toolset. Installing a tool allows nothing; its `allow` becomes policy rules below.
+  const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });
+  if (tools.length > 0) {
+    const installed = await installTools({
+      tools,
+      home: opts.home,
+      env: opts.env,
+      log,
+      ...(opts.tools?.mise ? { mise: opts.tools.mise } : {}),
+    });
+
+    toolStatuses = installed.statuses;
+    for (const t of toolStatuses.filter((x) => x.state === "unavailable")) {
+      log.error(`tool ${t.name}@${t.version} is unavailable: ${t.error ?? "install failed"}`);
+    }
+
+    env.tools = toolStatuses;
+    (opts.tools?.addToPath ?? addToPath)(installed.shimsDir);
   }
 
   const runtimeRef = team.integrations.runtime;
@@ -253,19 +306,12 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     now: () => new Date(),
   })) as Runtime;
 
-  const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
-  const role = roles[me.role];
-  const toolsets = [
-    ...new Set([me.role, ...rendered.extends].map((r) => roles[r]?.toolset).filter((t) => t)),
-  ] as string[];
-
   const packs: RulePack[] = [...opts.registry.rulePacks("person", team)];
-  for (const name of toolsets) {
-    const file = join(opts.stockCatalogDir, "toolsets", `${name}.yaml`);
-    if (existsSync(file)) {
-      packs.push(toolsetToPack(loadToolset(file)));
-    }
+  for (const ts of toolsets) {
+    packs.push(toolsetToPack(ts));
   }
+
+  packs.push(...toolsToPacks(tools));
 
   const teamPack = teamCommandsToPack(team.policies?.commands);
   if (teamPack) {
@@ -311,5 +357,6 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     systemPrompt,
     workdir: layout.workDir,
     repos,
+    tools: toolStatuses,
   };
 }

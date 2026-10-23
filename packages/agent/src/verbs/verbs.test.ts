@@ -281,6 +281,18 @@ describe("me", () => {
     expect(r.data).toMatchObject({ handle: "sam", role: "developer" });
   });
 
+  it("lists the tools and names the ones that are unavailable", async () => {
+    const f = fakeEnv();
+    f.env.tools = [
+      { name: "go", version: "1.23.4", state: "installed" },
+      { name: "their-cli", version: "0.9.1", state: "unavailable", error: "404 not found" },
+    ];
+
+    const r = await run("me", f.env);
+    expect(r.text).toContain("Tools: go 1.23.4; their-cli 0.9.1 UNAVAILABLE (404 not found)");
+    expect((await run("me", fakeEnv().env)).text).toContain("Tools: none");
+  });
+
   it("reports connected ports", async () => {
     const r = await run("me", fakeEnv({ tracker: false }).env);
     expect(r.data).toMatchObject({ connected: { tracker: false, knowledge: true } });

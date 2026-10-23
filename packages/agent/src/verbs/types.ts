@@ -1,5 +1,6 @@
 import type { Knowledge, Logger, PortName, TeamConfig, Tracker, Vcs } from "@outstaff/core";
 import type { z } from "zod";
+import type { ToolStatus } from "../tools/types.js";
 import type { OfficeClient } from "./office.js";
 
 /** What every verb returns; `text` already contains every URL in `links`. */
@@ -23,6 +24,9 @@ export interface AgentEnv {
   /** Why a configured port is missing (adapter not installed, creation failed), by port. */
   unavailable?: Partial<Record<PortName, string>>;
   log?: Logger;
+
+  /** The tools declared for this person and whether each installed; set at startup. */
+  tools?: ToolStatus[];
 }
 
 export interface VerbContext {

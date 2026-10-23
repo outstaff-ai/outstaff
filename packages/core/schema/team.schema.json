@@ -221,6 +221,198 @@
               ]
             }
           },
+          "tools": {
+            "description": "Tools for this agent only; they replace team-level tools of the same name.",
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "version": {
+                  "type": "string",
+                  "description": "Exact version to install, for example \"1.23.4\"."
+                },
+                "source": {
+                  "description": "Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cli or npm:their-cli. Defaults to the tool name, which mise looks up in its registry.",
+                  "type": "string",
+                  "pattern": "^[a-z0-9_-]+:\\S+$"
+                },
+                "allow": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "const": "all"
+                    },
+                    {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "description": "Subcommand verbs the agent may run."
+                    },
+                    {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "program": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^[^\\s/]+$",
+                            "description": "Optional; when given it must be the tool's own name."
+                          },
+                          "subcommand": {
+                            "description": "Leading positional words, for example [\"pr\", \"view\"].",
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "args": {
+                            "description": "Every condition must hold for the rule to apply.",
+                            "minItems": 1,
+                            "type": "array",
+                            "items": {
+                              "oneOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "flag"
+                                    },
+                                    "names": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "description": "Flag spellings, for example [-X, --method]."
+                                    },
+                                    "present": {
+                                      "type": "boolean",
+                                      "description": "Whether one of the flags must (true) or must not (false) be present."
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "names",
+                                    "present"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "flag-value"
+                                    },
+                                    "names": {
+                                      "minItems": 1,
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "description": "Flag spellings whose value is checked."
+                                    },
+                                    "values": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "description": "Values compared case-insensitively."
+                                    },
+                                    "match": {
+                                      "type": "string",
+                                      "enum": [
+                                        "in",
+                                        "not-in"
+                                      ],
+                                      "description": "Whether the flag value is in or not in `values`."
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "names",
+                                    "values",
+                                    "match"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "positional"
+                                    },
+                                    "index": {
+                                      "type": "integer",
+                                      "minimum": 0,
+                                      "maximum": 9007199254740991,
+                                      "description": "Position after the subcommand words, from 0."
+                                    },
+                                    "pattern": {
+                                      "type": "string",
+                                      "minLength": 1,
+                                      "description": "Case-insensitive regular expression the argument matches."
+                                    }
+                                  },
+                                  "required": [
+                                    "kind",
+                                    "index",
+                                    "pattern"
+                                  ],
+                                  "additionalProperties": false
+                                }
+                              ],
+                              "description": "A condition on the command arguments."
+                            }
+                          },
+                          "reason": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Why the rule exists; shown when it decides a call."
+                          },
+                          "requires_repo": {
+                            "description": "The working repository must have at least this grant.",
+                            "type": "string",
+                            "enum": [
+                              "read",
+                              "write"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "reason"
+                        ],
+                        "additionalProperties": false,
+                        "description": "A command rule for the tool."
+                      },
+                      "description": "Structured command rules."
+                    }
+                  ],
+                  "description": "What the agent may run: \"all\" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win."
+                }
+              },
+              "required": [
+                "version",
+                "allow"
+              ],
+              "additionalProperties": false,
+              "description": "A tool installed at agent start, with the commands it may run."
+            }
+          },
           "avatar": {
             "description": "Avatar settings.",
             "type": "object",
@@ -391,6 +583,198 @@
         }
       },
       "additionalProperties": false
+    },
+    "tools": {
+      "description": "Tools every agent of the team installs at start, with the commands they may run.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Exact version to install, for example \"1.23.4\"."
+          },
+          "source": {
+            "description": "Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cli or npm:their-cli. Defaults to the tool name, which mise looks up in its registry.",
+            "type": "string",
+            "pattern": "^[a-z0-9_-]+:\\S+$"
+          },
+          "allow": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "all"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Subcommand verbs the agent may run."
+              },
+              {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "program": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "^[^\\s/]+$",
+                      "description": "Optional; when given it must be the tool's own name."
+                    },
+                    "subcommand": {
+                      "description": "Leading positional words, for example [\"pr\", \"view\"].",
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "args": {
+                      "description": "Every condition must hold for the rule to apply.",
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "oneOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "flag"
+                              },
+                              "names": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "description": "Flag spellings, for example [-X, --method]."
+                              },
+                              "present": {
+                                "type": "boolean",
+                                "description": "Whether one of the flags must (true) or must not (false) be present."
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "names",
+                              "present"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "flag-value"
+                              },
+                              "names": {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "description": "Flag spellings whose value is checked."
+                              },
+                              "values": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                },
+                                "description": "Values compared case-insensitively."
+                              },
+                              "match": {
+                                "type": "string",
+                                "enum": [
+                                  "in",
+                                  "not-in"
+                                ],
+                                "description": "Whether the flag value is in or not in `values`."
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "names",
+                              "values",
+                              "match"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "positional"
+                              },
+                              "index": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "maximum": 9007199254740991,
+                                "description": "Position after the subcommand words, from 0."
+                              },
+                              "pattern": {
+                                "type": "string",
+                                "minLength": 1,
+                                "description": "Case-insensitive regular expression the argument matches."
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "index",
+                              "pattern"
+                            ],
+                            "additionalProperties": false
+                          }
+                        ],
+                        "description": "A condition on the command arguments."
+                      }
+                    },
+                    "reason": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "Why the rule exists; shown when it decides a call."
+                    },
+                    "requires_repo": {
+                      "description": "The working repository must have at least this grant.",
+                      "type": "string",
+                      "enum": [
+                        "read",
+                        "write"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "reason"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A command rule for the tool."
+                },
+                "description": "Structured command rules."
+              }
+            ],
+            "description": "What the agent may run: \"all\" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win."
+          }
+        },
+        "required": [
+          "version",
+          "allow"
+        ],
+        "additionalProperties": false,
+        "description": "A tool installed at agent start, with the commands it may run."
+      }
     },
     "workflow": {
       "type": "object",

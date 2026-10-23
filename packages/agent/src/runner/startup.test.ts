@@ -57,10 +57,18 @@ function registry() {
   );
 }
 
-function setup(extra: Record<string, string> = {}) {
+const TOOLS_TEAM = TEAM.replace(
+  "policies:",
+  `tools:
+  go: { version: 1.23.4, allow: all }
+  their-cli: { source: "ubi:vendor/their-cli", version: 0.9.1, allow: [status] }
+policies:`,
+);
+
+function setup(extra: Record<string, string> = {}, team = TEAM) {
   const dir = mkdtempSync(join(tmpdir(), "ost-agent-"));
   mkdirSync(join(dir, "team", ".outstaff"), { recursive: true });
-  writeFileSync(join(dir, "team", ".outstaff", "team.yaml"), TEAM);
+  writeFileSync(join(dir, "team", ".outstaff", "team.yaml"), team);
   const home = join(dir, "home");
   const connection = createOfficeConnection({
     url: "ws://office.test/agent",
@@ -84,6 +92,11 @@ function setup(extra: Record<string, string> = {}) {
     stockCatalogDir,
     agentVersion: "test",
     connection,
+    // The developer role's stock tools would otherwise run the real mise and change this process's PATH.
+    tools: {
+      mise: async () => ({ code: 0, stdout: "", stderr: "" }),
+      addToPath: () => {},
+    },
   };
 
   return { dir, home, options };
@@ -148,5 +161,76 @@ describe("prepareAgent", () => {
     await expect(prepareAgent({ ...options, registry: new AdapterRegistry() })).rejects.toThrow(
       'runtime adapter "fake" is not installed',
     );
+  });
+
+  it("installs the declared tools and allows exactly their declared verbs", async () => {
+    const { home, options } = setup({}, TOOLS_TEAM);
+    const calls: string[][] = [];
+    const paths: string[] = [];
+    const agent = await prepareAgent({
+      ...options,
+      tools: {
+        mise: async (args) => {
+          calls.push(args);
+          return { code: 0, stdout: "", stderr: "" };
+        },
+        addToPath: (dir) => paths.push(dir),
+      },
+    });
+
+    expect(calls).toEqual([["lock"], ["install"]]);
+    expect(paths).toEqual([join(home, ".local/share/mise/shims")]);
+    // The team's go replaces the code toolset's; the toolset's other tools stay.
+    expect(agent.tools.map((t) => [t.name, t.version])).toEqual([
+      ["go", "1.23.4"],
+      ["pnpm", "12.9.1"],
+      ["python", "3.13.9"],
+      ["their-cli", "0.9.1"],
+      ["yarn", "1.22.22"],
+    ]);
+
+    expect(agent.tools.every((t) => t.state === "installed")).toBe(true);
+
+    const run = (command: string) =>
+      evaluate(agent.policy, { kind: "shell", command, cwd: join(home, "worktrees/shop") });
+
+    expect(run("go test ./...").effect).toBe("allow");
+    expect(run("their-cli status").effect).toBe("allow");
+    expect(run("their-cli deploy").effect).toBe("ask");
+  });
+
+  it("starts anyway when a tool cannot be installed and says which", async () => {
+    const { options } = setup({}, TOOLS_TEAM);
+    const logged: string[] = [];
+    const agent = await prepareAgent({
+      ...options,
+      log: { debug() {}, info() {}, warn() {}, error: (m) => logged.push(m) },
+      tools: {
+        mise: async () => ({
+          code: 127,
+          stdout: "",
+          stderr: "mise is not installed in this image.",
+        }),
+        addToPath: () => {},
+      },
+    });
+
+    expect(agent.tools.every((t) => t.state === "unavailable")).toBe(true);
+    expect(logged.some((m) => m.includes("go@1.23.4 is unavailable"))).toBe(true);
+    expect(agent.env.tools).toBe(agent.tools);
+  });
+
+  it("does not run mise when no tool is declared", async () => {
+    const { options } = setup({}, TEAM.replace("role: developer", "role: reviewer"));
+    const agent = await prepareAgent({
+      ...options,
+      tools: {
+        mise: async () => {
+          throw new Error("mise must not run");
+        },
+      },
+    });
+
+    expect(agent.tools).toEqual([]);
   });
 });

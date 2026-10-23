@@ -1,7 +1,7 @@
 import { valid } from "semver";
 import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
-import { teamCommandsSchema } from "../permissions/schema.js";
+import { teamCommandsSchema, toolsSchema } from "../permissions/schema.js";
 import { customIssue } from "./issues.js";
 import { ruleInputSchema } from "../workflow/rules.js";
 import { checkWorkflowConfig } from "../workflow/validate.js";
@@ -110,6 +110,9 @@ const peopleSchema = z
           'Repository access by repo name, "kind:<primary|baseline|infra|other>" or "*"; values are "read" or "write".',
         ),
       ),
+    tools: toolsSchema
+      .optional()
+      .meta(d("Tools for this agent only; they replace team-level tools of the same name.")),
     avatar: z
       .strictObject({
         seed: z.string().optional().meta(d("Seed for a generated avatar.")),
@@ -322,6 +325,9 @@ export const teamConfigSchema = z
       })
       .optional()
       .meta(d("Office event intake settings.")),
+    tools: toolsSchema
+      .optional()
+      .meta(d("Tools every agent of the team installs at start, with the commands they may run.")),
     workflow: workflowSchema.optional(),
     policies: policiesSchema.optional(),
   })

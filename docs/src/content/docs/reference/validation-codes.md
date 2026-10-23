@@ -38,6 +38,9 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `schema.too_big` | A value, list or string is above its maximum. |
 | `schema.too_small` | A value, list or string is below its minimum. |
 | `schema.unknown_key` | A key is not part of the schema. |
+| `tools.duplicate` | A tool lists a verb twice, or two tools share a source. |
+| `tools.invalid_version` | A tool version is a range, prefix or alias instead of an exact version. |
+| `tools.rule_program` | A structured rule of a tool names a different program than the tool. |
 | `workflow.duplicate_rule_id` | Two workflow rules share the same id. |
 | `workflow.duplicate_status_name` | Two canonical statuses map to the same tracker status name. |
 | `workflow.unknown_placeholder` | A workflow template is malformed or uses a variable that does not exist. |

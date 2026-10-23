@@ -4,8 +4,10 @@ import {
   evaluate,
   loadToolset,
   parseToolset,
+  effectiveTools,
   teamCommandsToPack,
   toolsetToPack,
+  toolsToPacks,
   type Layout,
   type Profile,
   type RulePack,
@@ -58,8 +60,17 @@ const parseText = (text: string) => parseTeamConfig(parse(text));
 const catalogFile = (name: string) =>
   new URL(`../../../catalog/toolsets/${name}.yaml`, import.meta.url).pathname;
 
-const code = toolsetToPack(loadToolset(catalogFile("code")));
-const infra = toolsetToPack(loadToolset(catalogFile("infra")));
+const codeToolset = loadToolset(catalogFile("code"));
+const code: RulePack = {
+  ...toolsetToPack(codeToolset),
+  rules: [
+    ...toolsetToPack(codeToolset).rules,
+    ...toolsToPacks(effectiveTools({ toolsets: [codeToolset] })).flatMap((p) => p.rules),
+  ],
+};
+
+const infraToolset = loadToolset(catalogFile("infra"));
+const infra = toolsToPacks(effectiveTools({ toolsets: [infraToolset] }))[0]!;
 
 describe("catalog toolsets", () => {
   it("code allows pnpm test in a code-profile write repo", () => {
@@ -84,7 +95,7 @@ describe("catalog toolsets", () => {
   });
 
   it("names the toolset in the rule id", () => {
-    expect(run("code", [code], "pnpm test").rule).toBe("code.allow.pnpm.test");
+    expect(run("code", [code], "pnpm test").rule).toBe("tools.pnpm.test");
   });
 });
 

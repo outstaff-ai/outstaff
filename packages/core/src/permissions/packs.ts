@@ -26,7 +26,7 @@ function idFor(prefix: string, effect: string, program: string, sub?: string[]):
 
 export function toolsetToPack(toolset: Toolset): RulePack {
   const rules: CommandRule[] = [];
-  for (const r of toolset.rules) {
+  for (const r of toolset.rules ?? []) {
     const programs = typeof r.program === "string" ? [r.program] : r.program;
     const subs: (string[] | undefined)[] = r.verbs ? r.verbs.map((v) => [v]) : [r.subcommand];
     for (const program of programs) {
