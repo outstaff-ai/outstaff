@@ -1,0 +1,38 @@
+name: Role request
+description: Propose a new generic role for the catalog, or a change to an existing one.
+title: "role: "
+labels: ["role"]
+body:
+  - type: input
+    id: role-name
+    attributes:
+      label: Role name
+      description: A short, generic name, for example "security reviewer" or "release manager".
+    validations:
+      required: true
+  - type: textarea
+    id: responsibilities
+    attributes:
+      label: Responsibilities
+      description: What this role does day to day, and what it does not do.
+    validations:
+      required: true
+  - type: textarea
+    id: skills
+    attributes:
+      label: Skills it needs
+      description: The skills or tools the role uses, such as reviewing pull requests or triaging tickets.
+  - type: textarea
+    id: handoffs
+    attributes:
+      label: Handoffs
+      description: Which other roles does it hand work to, and which ones hand work to it?
+  - type: dropdown
+    id: change
+    attributes:
+      label: Kind of change
+      options:
+        - New role
+        - Change to an existing role
+    validations:
+      required: true
