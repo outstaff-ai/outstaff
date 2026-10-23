@@ -122,6 +122,31 @@ ost init --separate-repo
 ost init --force
 ```
 
+## ost workflow explain
+
+Show which workflow rules an event triggers, and why.
+
+Runs the team's workflow (its preset and rule overrides) against one event and a static snapshot of the world, and prints for every rule whether it matched, why, and what it would do. Nothing is applied. The event is JSON with a type, an optional subject, actor and data; the snapshot (--state) is JSON with tickets, prs, links and roles, and defaults to an empty world, in which most rules report that no ticket is linked.
+
+```
+ost workflow explain <event-json> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--state <json>` | World snapshot as JSON: {"tickets": {"ACME-1": {"status": "review"}}, "prs": [], "links": {"10": "ACME-1"}, "roles": {}}. |
+
+Exit codes:
+
+- 0: the event was explained (whether or not any rule matched)
+- 1: the team config could not be loaded, or the event or state is malformed
+
+Examples:
+
+```sh
+ost workflow explain '{"type":"ticket.assigned","subject":{"ticket":"ACME-1"},"actor":{"kind":"human","id":"dana"}}' --state '{"tickets":{"ACME-1":{"status":"ready","assignee":{"id":"sam","kind":"agent"}}}}'
+```
+
 ## ost ticket show
 
 Show a ticket with its description and comments.

@@ -161,6 +161,47 @@ describe("ost validate", () => {
   });
 });
 
+describe("ost workflow explain", () => {
+  const event = JSON.stringify({
+    type: "ticket.assigned",
+    subject: { ticket: "ACME-1" },
+    actor: { kind: "human", id: "dana" },
+  });
+
+  const state = JSON.stringify({
+    tickets: { "ACME-1": { status: "ready", assignee: { id: "sam", kind: "agent" } } },
+  });
+
+  it("explains each rule against the event and state", async () => {
+    const r = await ost(acme(), ["workflow", "explain", event, "--state", state]);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("match    assigned-agent-scheduled");
+    expect(r.out).toContain("schedule assigned for sam (normal)");
+    expect(r.out).toContain("no match  pr-opened-review");
+  });
+
+  it("prints JSON", async () => {
+    const r = await ost(acme(), ["workflow", "explain", event, "--state", state, "--json"]);
+    expect(JSON.parse(r.out).effects).toEqual([
+      expect.objectContaining({ type: "schedule", person: "sam", kind: "assigned" }),
+    ]);
+  });
+
+  it("works against an empty world", async () => {
+    const r = await ost(acme(), ["workflow", "explain", '{"type":"pr.opened"}']);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("Effects\n  none");
+  });
+
+  it("rejects a malformed event or state", async () => {
+    expect((await ost(acme(), ["workflow", "explain", "{"])).code).toBe(1);
+    expect((await ost(acme(), ["workflow", "explain", '{"type":"nope"}'])).err).toContain('"type"');
+
+    const bad = await ost(acme(), ["workflow", "explain", event, "--state", "[]"]);
+    expect(bad.code).toBe(1);
+  });
+});
+
 describe("ost team", () => {
   it("prints the resolved acme team", async () => {
     const r = await ost(acme(), ["team"]);
