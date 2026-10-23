@@ -78,6 +78,30 @@ const peopleSchema = z
       .min(1)
       .optional()
       .meta(d("LLM model for this agent; the runtime adapter's default when omitted.")),
+    identities: z
+      .strictObject({
+        vcs: z
+          .string()
+          .min(1)
+          .optional()
+          .meta(d('Login of this agent on the VCS host, for example "acme-sam[bot]".')),
+        tracker: z
+          .string()
+          .min(1)
+          .optional()
+          .meta(d("Username or id of this agent in the issue tracker.")),
+        chat: z
+          .string()
+          .min(1)
+          .optional()
+          .meta(d("Username or id of this agent in the chat workspace.")),
+      })
+      .optional()
+      .meta(
+        d(
+          "How this agent is known on each connected system. The office recognizes the agent's own activity only by an exact match with these.",
+        ),
+      ),
     repos: z
       .record(z.string(), z.enum(["read", "write"]))
       .default({})

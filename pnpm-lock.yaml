@@ -283,6 +283,9 @@ importers:
 
   packages/office:
     dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../core
       kysely:
         specifier: 0.29.7
         version: 0.29.7

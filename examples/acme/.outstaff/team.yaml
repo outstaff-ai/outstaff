@@ -41,6 +41,8 @@ people:
     name: Priya Raman
     pronouns: she/her
     role: pm
+    identities:
+      vcs: acme-priya[bot]
     repos:
       "*": read
       docs-site: write
@@ -48,6 +50,8 @@ people:
     name: Tomas Novak
     pronouns: he/him
     role: product
+    identities:
+      vcs: acme-tomas[bot]
     repos:
       "*": read
       docs-site: write
@@ -56,6 +60,8 @@ people:
     pronouns: she/her
     role: architect
     extends: [developer]
+    identities:
+      vcs: acme-mira[bot]
     repos:
       shop: write
       "kind:baseline": read
@@ -63,6 +69,8 @@ people:
     name: Leo Fischer
     pronouns: he/him
     role: designer
+    identities:
+      vcs: acme-leo[bot]
     repos:
       design-system: write
       shop: read
@@ -70,6 +78,8 @@ people:
     name: Sam Duarte
     pronouns: they/them
     role: developer
+    identities:
+      vcs: acme-sam[bot]
     repos:
       shop: write
       "kind:baseline": read
@@ -77,6 +87,8 @@ people:
     name: Noor Haddad
     pronouns: she/her
     role: developer
+    identities:
+      vcs: acme-noor[bot]
     repos:
       shop: write
       "kind:baseline": read
@@ -84,12 +96,16 @@ people:
     name: Ines Varga
     pronouns: she/her
     role: reviewer
+    identities:
+      vcs: acme-ines[bot]
     repos:
       "*": read
   - handle: kofi
     name: Kofi Mensah
     pronouns: he/him
     role: devops
+    identities:
+      vcs: acme-kofi[bot]
     repos:
       infra: write
       shop: read

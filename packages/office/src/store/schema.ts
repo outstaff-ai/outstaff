@@ -1,4 +1,4 @@
-import type { Kysely } from "kysely";
+import type { Generated, Kysely } from "kysely";
 
 // Timestamps are ISO-8601 UTC text with milliseconds; JSON columns are text.
 // Both sort correctly as plain strings on either database.
@@ -21,6 +21,9 @@ export interface EventsTable {
   type: string;
   payload: string;
   received_at: string;
+  processed_at: string | null;
+  attempts: Generated<number>;
+  process_error: string | null;
 }
 
 export interface WorkItemsTable {

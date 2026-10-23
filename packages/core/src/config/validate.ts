@@ -27,6 +27,7 @@ export const WARNING_CODES = {
   capabilityOptionalMissing: "capability.optional_missing",
   trustDefault: "trust.default",
   peopleNoRepos: "people.no_repos",
+  peopleMissingVcsIdentity: "people.missing_vcs_identity",
 } as const;
 
 export type WarningCode = (typeof WARNING_CODES)[keyof typeof WARNING_CODES];
@@ -89,6 +90,7 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
     "A role can use a capability that no configured integration provides.",
   "trust.default": "humans is omitted, so the default trust rule applies.",
   "people.no_repos": "A person has no repo grants.",
+  "people.missing_vcs_identity": "A person has a write grant but no identities.vcs.",
 };
 
 const adapterKey = (port: string, adapter: string) => `${port}/${adapter}`;
@@ -167,6 +169,15 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
         code: WARNING_CODES.peopleNoRepos,
         message: `${person.handle} has no repo grants.`,
         consequence: `${person.handle} cannot read or change any repository.`,
+      });
+    }
+
+    if (!person.identities?.vcs && Object.values(person.repos).includes("write")) {
+      warnings.push({
+        path: ["people", i, "identities", "vcs"],
+        code: WARNING_CODES.peopleMissingVcsIdentity,
+        message: `${person.handle} has a write grant but no identities.vcs.`,
+        consequence: `${person.handle}'s pull requests and comments are treated as an unknown human's, not as the agent's own.`,
       });
     }
 

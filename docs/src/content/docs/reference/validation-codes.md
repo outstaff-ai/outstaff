@@ -52,5 +52,6 @@ A warning describes something that will not work as written or a default that ap
 | --- | --- |
 | `capability.missing` | A role needs a capability that no configured integration provides. |
 | `capability.optional_missing` | A role can use a capability that no configured integration provides. |
+| `people.missing_vcs_identity` | A person has a write grant but no identities.vcs. |
 | `people.no_repos` | A person has no repo grants. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

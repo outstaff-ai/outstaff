@@ -44,7 +44,13 @@ const config = (mutate: (c: any) => void = () => {}) => {
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
     people: [
-      { handle: "ada", name: "Ada", role: "developer", repos: { app: "write" } },
+      {
+        handle: "ada",
+        name: "Ada",
+        role: "developer",
+        identities: { vcs: "acme-ada[bot]" },
+        repos: { app: "write" },
+      },
       { handle: "marcus", name: "Marcus", role: "architect", repos: { app: "read" } },
     ],
     integrations: {
@@ -197,6 +203,19 @@ describe("validateTeam", () => {
         message: "humans is not set, so trust follows the default rule.",
         consequence:
           "trusted humans are repo writers and full chat-workspace members; set humans: for open-source repos or large workspaces",
+      },
+    ]);
+  });
+
+  it("warns about writers without a vcs identity", () => {
+    const c = config((x) => delete x.people[0].identities);
+    expect(validateTeam(c, ctx()).warnings).toEqual([
+      {
+        path: ["people", 0, "identities", "vcs"],
+        code: "people.missing_vcs_identity",
+        message: "ada has a write grant but no identities.vcs.",
+        consequence:
+          "ada's pull requests and comments are treated as an unknown human's, not as the agent's own.",
       },
     ]);
   });
