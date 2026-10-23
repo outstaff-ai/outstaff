@@ -7,12 +7,12 @@ description: How ost-agent starts, takes work from the office, keeps one session
 
 ## Startup
 
-The container contract is a few environment variables and secrets. Hosting and secret storage stay with the operator ([0008](/decisions/0008-hosting-and-secrets-out-of-scope/)).
+The [container contract](/reference/container-contract/) is a few environment variables and secrets. Hosting and secret storage stay with the operator ([0008](/decisions/0008-hosting-and-secrets-out-of-scope/)).
 
 | Input                                                           | What it is                                                                          |
 | --------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `OUTSTAFF_PERSON`                                               | Handle of the person this container runs as.                                        |
-| `OUTSTAFF_OFFICE_URL`                                           | WebSocket URL of the office, for example `ws://office:8787/agent`.                  |
+| `OUTSTAFF_OFFICE_URL`                                           | WebSocket URL of the office, for example `ws://office:8080/agent`.                  |
 | `OUTSTAFF_AGENT_TOKEN`                                          | The person's agent token, read as a secret (file first, environment as a fallback). |
 | `OUTSTAFF_TEAM_FILE`, `OUTSTAFF_TEAM_REPO`, `OUTSTAFF_TEAM_REF` | Where the team config is, as for the CLI.                                           |
 

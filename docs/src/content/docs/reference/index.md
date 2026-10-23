@@ -9,4 +9,5 @@ These pages are generated from the code, so they always match the version you re
 - [Validation codes](/reference/validation-codes/): the errors and warnings that `ost validate` reports.
 - [CLI reference](/reference/cli/): commands and options of the `ost` command line.
 - [Agent verbs](/reference/agent-verbs/): the `ost` verbs agents call, as commands and as runtime tools.
+- [Container contract](/reference/container-contract/): environment variables, secrets, volumes, ports, health checks and egress of the office and agent containers.
 - [Agent protocol](/reference/agent-protocol/): the messages agents and the office exchange.
