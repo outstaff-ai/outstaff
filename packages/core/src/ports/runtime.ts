@@ -11,6 +11,9 @@ export interface RuntimeTool {
 
 export interface RunRequest {
   sessionId?: string;
+
+  /** Passed to `ost` tool handlers as context. */
+  workItemId?: string;
   prompt: string;
   systemPrompt: string;
   workdir: string;

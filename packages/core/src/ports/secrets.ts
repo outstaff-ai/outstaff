@@ -10,6 +10,9 @@ export interface SecretSpec {
 
   /** `ost setup --derive` can compute it. */
   derivable?: boolean;
+
+  /** The adapter works without it (for example when another credential is supplied instead). */
+  optional?: boolean;
 }
 
 export interface SecretSource {

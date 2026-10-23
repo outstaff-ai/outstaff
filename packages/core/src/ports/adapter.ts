@@ -11,6 +11,9 @@ export type PortName = AdapterPort;
 export interface AdapterContext<Options> {
   options: Options;
   secrets: SecretSource;
+
+  /** Every secret key declared by the registered adapters, both scopes. Set by the host; adapters that start child processes scrub these from the child's environment. */
+  secretKeys?: readonly string[];
   team: TeamConfig;
   log: Logger;
   fetch: typeof fetch;
