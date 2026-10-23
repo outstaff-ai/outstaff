@@ -118,6 +118,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
   const offerOf = async (item: WorkItem): Promise<Offer> => {
     const subjects = await subjectsOf(item);
     return {
+      ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       workItem: {
         id: item.id,
         kind: item.kind,
@@ -197,13 +198,16 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
     async decline(person, id, reason) {
       const item = await own(person, id);
-      if (item.status !== "active" || (await stateOf(id)).accepted) {
-        throw new ProtocolError("invalid", `Work item ${id} is not an open offer.`);
+      // Offered or accepted: an agent that restarted drops what it had accepted too.
+      if (item.status !== "active") {
+        throw new ProtocolError("invalid", `Work item ${id} is not running.`);
       }
 
-      await store.appendJournal(id, person, `Declined the offer: ${reason}`);
-      await scheduler.finish(id, { outcome: `declined: ${reason}`, status: "queued" });
+      // The item stays as it is (same run, attempt, journal and session) and is only offered again.
+      await store.appendJournal(id, person, `Gave the item back: ${reason}`);
       await store.upsertSubject(OFFER_SUBJECT, id, { accepted: false });
+      await scheduler.heartbeat(id);
+      opts.notify?.(person);
     },
 
     async heartbeat(person, id) {
@@ -217,6 +221,11 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       await own(person, id);
       await store.appendJournal(id, person, `Progress: ${text}`);
       await scheduler.heartbeat(id);
+    },
+
+    async setSession(person, id, sessionId) {
+      await own(person, id);
+      await store.updateItem(id, { sessionId });
     },
 
     async journal(person, id, text) {
