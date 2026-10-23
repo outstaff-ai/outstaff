@@ -49,6 +49,9 @@ export type RuntimeEvent =
       costUsd?: number;
       error?: string;
       interrupted?: boolean;
+
+      /** The run asked to resume a session the runtime no longer knows (unknown or expired). */
+      sessionLost?: boolean;
     };
 
 export interface Runtime {

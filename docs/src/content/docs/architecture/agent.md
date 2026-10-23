@@ -1,6 +1,6 @@
 ---
 title: The agent
-description: How ost-agent starts, takes work from the office, keeps one session per work item and builds the agent's identity.
+description: How ost-agent starts, takes work from the office, keeps one session, worktree and journal per work item and builds the agent's identity.
 ---
 
 `ost-agent` is the process inside each agent container. It runs as one person of the team, connects out to the office, and works through the items the office offers, one at a time. The LLM runtime is an adapter ([0009](/decisions/0009-agent-sdk-runtime/)); the agent never talks to a model itself.
@@ -43,7 +43,8 @@ For each offer the agent:
 2. builds the prompt from the offer: item kind and title, subjects and links, and the journal of earlier rounds;
 3. runs it through the runtime with the identity prompt, the policy, the built-in tools of the profile and the `ost` verbs as in-process tools (`createRuntimeTools`, including `ask` and `question answer`);
 4. sends `progress` from the runtime's text events, at most once per interval (30 seconds by default);
-5. hands back with the final message as the summary, the links found in it, and a status: `done`, or `waiting` when a question the agent asked is still open. A failed run, or a runtime that throws, sends `fail` with the reason.
+5. appends a journal entry (see [Journal](#journal));
+6. hands back with the final message as the summary, the links found in it, and a status: `done`, or `waiting` when a question the agent asked is still open. A failed run, or a runtime that throws, sends `fail` with the reason.
 
 Heartbeats are sent by the office connection itself, at the interval the office asks for, with the id of the item being worked on. Items run one at a time. A second offer waits in the connection until the first is handed back.
 
@@ -55,7 +56,32 @@ Heartbeats are sent by the office connection itself, at the interval the office 
 
 One runtime session per work item ([0010](/decisions/0010-context-per-work-item/)). When the runtime starts a session the agent stores its id with the item by sending `session`; the office keeps it and puts it in `sessionId` on every later offer of that item. The agent resumes that session when present and starts a new one otherwise. A session is never used for another item, and nothing is kept on the agent's disk, so a replaced container loses nothing.
 
+**A lost session.** The runtime adapter marks a failed run as `sessionLost` when it was asked to resume a session the runtime no longer knows (unknown or expired; the Claude Agent SDK adapter recognizes "No conversation found"). The agent then:
+
+1. appends the journal note "Session restarted from journal: the stored session could not be resumed.";
+2. starts a new session for the same item with a prompt that says so and carries the same journal and current state as every offer: subjects with their links and status, and the journal of earlier rounds;
+3. stores the new session id with the item, replacing the lost one.
+
+It never starts from nothing silently, and it restarts once: if the new session fails too, the item fails as usual.
+
 Chat threads will get their own sessions ([#43](https://github.com/outstaff-ai/outstaff/issues/43)); the session manager has a marked place for them, and until then only work items have sessions.
+
+## Journal
+
+Every hand-back (done, waiting, or stopped by a shutdown) is preceded by a short structured entry in the item's journal, which the office stores and puts in the context of every later offer. For a finished run the agent asks the runtime for it with one more turn in the same session, without tools:
+
+```
+Done: what you did this round.
+Decisions: what you decided and why, or none.
+Open: what is still open or what you wait for, or none.
+Links: the pull requests, documents and tickets involved, or none.
+```
+
+If the answer does not follow the format, or the extra turn fails, the entry is built from the final message and its links instead, so a hand-back never goes without one. When the agent stops for a shutdown it does not ask the runtime again; it uses the last message. A journal entry that cannot be stored is logged and does not hold back the hand-back. The office also records the hand-back summary itself and the progress lines, so the journal reads as the full history of the item.
+
+## Memory
+
+`~/memory` is per person, shared by all items, and holds lasting lessons only ([0010](/decisions/0010-context-per-work-item/)). The agent process never writes there: item details go to the journal, and memory changes only when the model itself writes a file with its tools. The directory is one of the runtime's added directories and the policy allows writes to it, to scratch and to granted repositories, and nowhere else in the layout.
 
 ## Repositories and credentials
 

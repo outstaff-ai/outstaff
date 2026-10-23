@@ -11,13 +11,22 @@ import type { Offer, OfficeConnection } from "../office-client/index.js";
 import type { Workspaces } from "../repos/index.js";
 import { createRuntimeTools } from "../verbs/index.js";
 import type { AgentEnv } from "../verbs/types.js";
+import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import { buildWorkPrompt } from "./prompt.js";
 import { createSessionManager, type SessionManager } from "./sessions.js";
 
 /** What the loop uses of the office connection. Heartbeats are sent by the connection itself while an item is accepted. */
 export type WorkConnection = Pick<
   OfficeConnection,
-  "offers" | "accept" | "decline" | "progress" | "handBack" | "fail" | "session" | "resume"
+  | "offers"
+  | "accept"
+  | "decline"
+  | "progress"
+  | "handBack"
+  | "fail"
+  | "session"
+  | "journal"
+  | "resume"
 >;
 
 export interface WorkLoopOptions {
@@ -91,6 +100,15 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     }
   }
 
+  /** A journal entry that cannot be stored is logged; it must not keep the hand-back from the office. */
+  async function appendJournal(id: string, text: string) {
+    try {
+      await opts.office.journal(id, text);
+    } catch (e) {
+      log.warn("could not store a journal entry", { workItemId: id, error: reason(e) });
+    }
+  }
+
   async function work(offer: Offer, abort: AbortController) {
     const id = offer.workItem.id;
     const sessionId = sessions.resumeFor(offer);
@@ -113,13 +131,10 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
         }
       : opts.env;
 
-    const request: RunRequest = {
-      ...(sessionId ? { sessionId } : {}),
+    const requestFor = (prompt: string, resume: string | undefined): RunRequest => ({
+      ...(resume ? { sessionId: resume } : {}),
       workItemId: id,
-      prompt: buildWorkPrompt(offer, {
-        resumed: sessionId !== undefined,
-        ...(workspace ? { workspace } : {}),
-      }),
+      prompt,
       systemPrompt: opts.systemPrompt,
       workdir: opts.workdir,
       addDirs: workspace ? [...opts.addDirs, workspace.worktree, workspace.scratch] : opts.addDirs,
@@ -129,38 +144,99 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.maxTurns ? { maxTurns: opts.maxTurns } : {}),
       signal: abort.signal,
-    };
+    });
 
     let lastProgress = Number.NEGATIVE_INFINITY;
     let lastText = "";
-    let outcome:
-      | { ok: boolean; text: string; error?: string | undefined; interrupted?: boolean | undefined }
-      | undefined;
+    let current = sessionId;
+    type Outcome = {
+      ok: boolean;
+      text: string;
+      error?: string | undefined;
+      interrupted?: boolean | undefined;
+      sessionLost?: boolean | undefined;
+    };
 
-    try {
-      for await (const e of opts.runtime.run(request)) {
-        if (e.type === "started") {
-          await sessions.started(id, e.sessionId);
-        } else if (e.type === "text") {
-          lastText = e.text;
-          const t = now();
-          const line = progressLine(e.text);
-          if (line && t - lastProgress >= progressEveryMs) {
-            lastProgress = t;
-            opts.office.progress(id, line).catch((err) => {
-              log.warn("could not send progress", { workItemId: id, error: reason(err) });
-            });
+    async function round(request: RunRequest): Promise<Outcome | undefined> {
+      let outcome: Outcome | undefined;
+      try {
+        for await (const e of opts.runtime.run(request)) {
+          if (e.type === "started") {
+            current = e.sessionId;
+            await sessions.started(id, e.sessionId);
+          } else if (e.type === "text") {
+            lastText = e.text;
+            const t = now();
+            const line = progressLine(e.text);
+            if (line && t - lastProgress >= progressEveryMs) {
+              lastProgress = t;
+              opts.office.progress(id, line).catch((err) => {
+                log.warn("could not send progress", { workItemId: id, error: reason(err) });
+              });
+            }
+          } else if (e.type === "finished") {
+            outcome = e;
           }
-        } else if (e.type === "finished") {
-          outcome = e;
+        }
+      } catch (e) {
+        outcome = { ok: false, text: lastText, error: reason(e) };
+      }
+
+      return outcome;
+    }
+
+    const prompt = (restarted: boolean) =>
+      buildWorkPrompt(offer, {
+        resumed: sessionId !== undefined && !restarted,
+        restarted,
+        ...(workspace ? { workspace } : {}),
+      });
+
+    let outcome = await round(requestFor(prompt(false), sessionId));
+
+    // A stored session the runtime no longer knows is replaced by a new one that starts from the journal and the
+    // state in the offer. It never starts from nothing, and the journal says so.
+    if (sessionId && outcome?.sessionLost && !abort.signal.aborted) {
+      log.warn("the stored session is lost; starting a new one from the journal", {
+        workItemId: id,
+      });
+
+      await appendJournal(
+        id,
+        "Session restarted from journal: the stored session could not be resumed.",
+      );
+
+      lastText = "";
+      current = undefined;
+      outcome = await round(requestFor(prompt(true), undefined));
+    }
+
+    /** The entry for this hand-back: asked of the runtime in the same session, else taken from the final message. */
+    async function entryFor(text: string, links: Link[], ask: boolean) {
+      let answer: string | undefined;
+      if (ask && current) {
+        try {
+          for await (const e of opts.runtime.run({
+            ...requestFor(JOURNAL_PROMPT, current),
+            tools: [],
+            builtinTools: [],
+            maxTurns: 1,
+          })) {
+            if (e.type === "finished" && e.ok) {
+              answer = e.text;
+            }
+          }
+        } catch (e) {
+          log.warn("could not ask for a journal entry", { workItemId: id, error: reason(e) });
         }
       }
-    } catch (e) {
-      outcome = { ok: false, text: lastText, error: reason(e) };
+
+      return journalEntry(answer, text, links);
     }
 
     if (abort.signal.aborted || outcome?.interrupted) {
       const text = outcome?.text || lastText;
+      await appendJournal(id, await entryFor(text, linksIn(text), false));
       await opts.office.handBack(id, {
         summary: `Stopped before finishing because the agent shut down. ${text ? `Last message: ${text}` : "Nothing to report yet."}`,
         links: linksIn(text),
@@ -182,6 +258,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
     const text = outcome.text || lastText;
     const status = asked ? "waiting" : "done";
+    await appendJournal(id, await entryFor(text, linksIn(text), true));
     await opts.office.handBack(id, {
       summary: text || "Finished without a message.",
       links: linksIn(text),

@@ -38,6 +38,17 @@ export interface AgentSdkRuntimeConfig {
 
 const PROBE_MODEL = "haiku";
 
+/** What Claude Code says when `resume` names a session it cannot find. */
+const SESSION_LOST =
+  /no conversation found|session\b.{0,40}\b(not found|expired|does not exist|unknown)/i;
+
+/** Marks a failed finish as a lost session when the run tried to resume one. */
+function markLost(e: Extract<RuntimeEvent, { type: "finished" }>, resumed: boolean): RuntimeEvent {
+  return resumed && !e.ok && !e.interrupted && e.error && SESSION_LOST.test(e.error)
+    ? { ...e, sessionLost: true }
+    : e;
+}
+
 export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
   const query: QueryFn = config.query ?? sdkQuery;
   const log = config.log ?? silentLogger;
@@ -127,7 +138,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
             finished = true;
           }
 
-          yield e;
+          yield e.type === "finished" ? markLost(e, req.sessionId !== undefined) : e;
         }
 
         yield* pending.splice(0);
@@ -137,14 +148,17 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
       if (!finished) {
         finished = true;
         const interrupted = req.signal?.aborted === true;
-        yield {
-          type: "finished",
-          ok: false,
-          text: state.lastText,
-          ...(interrupted
-            ? { interrupted: true }
-            : { error: e instanceof Error ? e.message : String(e) }),
-        };
+        yield markLost(
+          {
+            type: "finished",
+            ok: false,
+            text: state.lastText,
+            ...(interrupted
+              ? { interrupted: true }
+              : { error: e instanceof Error ? e.message : String(e) }),
+          },
+          req.sessionId !== undefined,
+        );
       }
     } finally {
       req.signal?.removeEventListener("abort", onAbort);
