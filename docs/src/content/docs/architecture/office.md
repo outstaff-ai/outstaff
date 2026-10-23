@@ -62,3 +62,52 @@ await intake.start();
 ```
 
 The clock is injected, so tests drive the poll loop deterministically.
+
+## Scheduler
+
+The scheduler decides which work item each person runs next. It keeps no state of its own: the queue, positions, loop-guard counts and pauses live in the store, so a restart rebuilds it from there. Time comes from an injected clock, and the policy rules are pure functions that are tested apart from the store.
+
+### Priority
+
+Lower numbers run first. The class comes from what triggered the item:
+
+| Priority | Class                                              |
+| -------- | -------------------------------------------------- |
+| 0        | human chat (a human-triggered item of kind `chat`) |
+| 10       | human-triggered                                    |
+| 50       | agent-triggered                                    |
+| 60       | automation                                         |
+| 80       | scheduled                                          |
+
+Within a class, items run by explicit position, then by creation time. A new item goes after the person's queued items, so a class is first-in first-out until someone moves an item.
+
+### One active item per person
+
+`next(person)` returns the next runnable item, or nothing while the person has an active item, while they are paused, or while every queued item is held back by a policy. An active item is never interrupted. `markActive(itemId)` starts a run and checks all policies again.
+
+A human chat request starts at once when the person is idle. When the person is busy it waits last until the human chooses a position (`next`, after a given item, or last) or the PM re-prioritizes it with `move`.
+
+### Reordering
+
+`move(itemId, { before } | { after } | { last })` is the explicit reorder operation behind `ost work move <item> --before|--after <item>`. Only queued items of the same person can be moved. The queue is renumbered and stored, so the order survives restarts. If the target is in a different priority class, the moved item takes the nearest class that keeps the order valid.
+
+### Loop guard
+
+A run of an agent- or automation-triggered item is counted when it starts. When an item already had `policies.agent_loop_guard.max_runs_per_item_per_hour` runs in the last hour, it is blocked instead of started, and the reason is returned to the caller (and written to the item's journal) so the workflow engine can comment and notify. `tick()` also blocks queued items that tripped the guard. Human-triggered and scheduled runs are never limited.
+
+### Usage policy
+
+An injected `UsageSource` reports the 5-hour and 7-day utilization. The busiest window counts:
+
+- at or above `policies.usage.defer_scheduled_at`, scheduled work waits;
+- at or above `policies.usage.pause_automatic_at`, only human-triggered work runs.
+
+Humans are always answered. `isPausedFor(person, item)` tells why an item cannot run. If the usage source fails, the policy is skipped rather than blocking people.
+
+### Stale runs
+
+An active item with no heartbeat for `staleAfterMinutes` (default 10) is sent back to the queue once. If the retry also goes stale, the item is blocked with a reason. A good run in between resets the allowance. `heartbeat(itemId)` marks activity; `tick()` does the sweep, and `start()` runs it on the clock.
+
+### Pause and resume
+
+`pause()` stops the whole team from starting new work; `pause(person)` stops one person. Running items finish. `resume` mirrors it. Pauses are stored, so they survive restarts.

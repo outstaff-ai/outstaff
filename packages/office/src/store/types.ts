@@ -17,6 +17,9 @@ export interface NewWorkItem {
 
   /** Lower runs first. Default 100. */
   priority?: number;
+
+  /** Order within a priority class, lower first. Default: after every queued item of the person. */
+  position?: number;
   parentId?: string;
   subject?: { type: string; ref: string };
 }
@@ -44,12 +47,14 @@ export interface WorkItem {
   updatedAt: string;
   trigger: WorkItemTrigger;
   attempts: number;
+  position: number;
 }
 
 export interface WorkItemPatch {
   status?: WorkItemStatus;
   title?: string;
   priority?: number;
+  position?: number;
   sessionId?: string | null;
   workspace?: string | null;
 }
@@ -116,6 +121,19 @@ export interface NewConversation {
   depth?: number;
 }
 
+export interface QueueOrderEntry {
+  id: string;
+  priority: number;
+  position: number;
+}
+
+export interface Pause {
+  /** Opaque key chosen by the caller, for example "team" or "person:ann". */
+  scope: string;
+  reason: string | null;
+  pausedAt: string;
+}
+
 export interface Store {
   readonly dialect: "postgres" | "sqlite";
 
@@ -141,6 +159,12 @@ export interface Store {
    * then oldest), marks it active, counts the attempt, and returns it.
    */
   dequeueNext(person: string): Promise<WorkItem | undefined>;
+
+  /** Atomically moves one queued item to active and counts the attempt; undefined if it is not queued. */
+  activateItem(id: string): Promise<WorkItem | undefined>;
+
+  /** Rewrites priority and position of queued items in one transaction. Throws on an unknown item. */
+  reorderQueue(entries: QueueOrderEntry[]): Promise<void>;
   getItem(id: string): Promise<WorkItem | undefined>;
   listItems(filter?: { person?: string; status?: WorkItemStatus }): Promise<WorkItem[]>;
   updateItem(id: string, patch: WorkItemPatch): Promise<WorkItem>;
@@ -169,6 +193,13 @@ export interface Store {
 
   /** Number of guarded runs of the item in the last `windowMs`. */
   countLoopGuard(workItemId: string, windowMs: number): Promise<number>;
+
+  /** Idempotent: pausing a paused scope keeps the first pause. */
+  setPause(scope: string, reason?: string): Promise<void>;
+
+  /** Returns whether the scope was paused. */
+  clearPause(scope: string): Promise<boolean>;
+  listPauses(): Promise<Pause[]>;
 
   createConversation(input: NewConversation): Promise<Conversation>;
 
