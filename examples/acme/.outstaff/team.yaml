@@ -101,7 +101,7 @@ integrations:
     adapter: github
     owner: acme-example
   runtime:
-    adapter: claude-code
+    adapter: claude-agent-sdk
   tracker:
     adapter: itsaplan
     url: https://tracker.acme.example

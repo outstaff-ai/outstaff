@@ -1,13 +1,4 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { nodeContext, run } from "./program.js";
 
-const pkgUrl = new URL("../package.json", import.meta.url);
-const { version } = JSON.parse(readFileSync(pkgUrl, "utf8")) as { version: string };
-
-const args = process.argv.slice(2);
-
-if (args.includes("--version") || args.includes("-v")) {
-  console.log(version);
-} else {
-  console.log("Usage: outstaff [--version]");
-}
+process.exitCode = await run(process.argv.slice(2), nodeContext());

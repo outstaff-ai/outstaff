@@ -33,3 +33,4 @@ export {
   type ValidationReport,
   type ConfigWarning,
 } from "./config/validate.js";
+export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";

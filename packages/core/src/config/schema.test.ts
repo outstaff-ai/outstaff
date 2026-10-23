@@ -30,7 +30,7 @@ const valid = (): TeamConfigInput => ({
   integrations: {
     chat: { adapter: "slack" },
     vcs: { adapter: "github" },
-    runtime: { adapter: "claude-code" },
+    runtime: { adapter: "claude-agent-sdk" },
     tracker: { adapter: "linear", project: "ACME" },
     knowledge: { adapter: "notion" },
     avatars: { adapter: "dicebear" },
