@@ -162,3 +162,44 @@ Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`)
 **Mirroring.** Every question and answer is mirrored to humans. If the chat adapter exists and `office.channel` is set, the office posts to that channel. Otherwise it comments on the ticket of the asker's item when it has one. The asker's journal always records where the text went, so nothing is invisible. A failing channel or tracker falls through to the next option and never fails the question.
 
 **Roster.** `ost team` (`ost roster`) shows the people with role title, busy or idle (or paused), what they work on, and the trusted humans. Titles and summaries come from the catalog when the office has it; otherwise the role id is shown.
+
+## Engine
+
+The engine (`createEngine`) is the glue between what happened and what the office does about it. It receives every event after the work state has applied it, asks the workflow what to do, and carries out the answer.
+
+```ts
+const engine = createEngine({
+  store,
+  workState,
+  scheduler,
+  team,
+  clock,
+  logger,
+  ports: { tracker, chat },
+});
+intake.onEvent((event, meta) => workState.apply(event, meta)); // first, so the state is current
+intake.onEvent((event, meta) => engine.handle(event, meta).then(() => undefined));
+workState.onEvent((event, meta) => engine.handle(event, meta).then(() => undefined));
+```
+
+For each event it computes `evaluateWorkflow(event, workState, resolveWorkflow(team.workflow))` and applies the resulting effects in order:
+
+| Effect     | What the engine does                                                                                                                                                                                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `move`     | `tracker.transition(ticket, status)`.                                                                                                                                                                                                                                                                                                                                            |
+| `assign`   | `tracker.assign(ticket, member)`. Agents map through `people[].identities.tracker`; humans are looked up among the tracker's members by id, username or name.                                                                                                                                                                                                                    |
+| `comment`  | `tracker.comment(ticket, body)`. The body is already rendered by the workflow. Comments on pull requests are skipped until the VCS port can post them.                                                                                                                                                                                                                           |
+| `schedule` | `scheduler.enqueue`. The trigger comes from the event's actor (`human`, `agent`, `automation`; `schedule` for cron events). The subject is the pull request (`workState.prSubject`) when the effect has one, else the ticket. `high` and `low` priority sit five below and above the trigger's class. The parent is the person's latest item on the same ticket or pull request. |
+| `notify`   | `chat.post` to the requester's or assignee's direct channel (`humans[].identities.chat`, `people[].identities.chat`), or to a channel (`channel:<name>`, or `integrations.chat.channel`).                                                                                                                                                                                        |
+
+After a `move` or `assign` the engine refreshes the ticket in the work state straight away, so the next event is judged against the ticket as the engine left it instead of waiting for the tracker's echo.
+
+**No duplicate work.** A `schedule` is skipped while the person already has a queued or active item of the same kind on the same subject.
+
+**Missing ports.** Without a tracker the `move`, `assign` and `comment` effects are skipped; without chat so are `notify` effects. Scheduling does not need either. Each skipped effect is recorded with the reason.
+
+**Untrusted events.** An event with `meta.trusted === false` or `data.untrusted` is never evaluated, so it cannot cause any effect.
+
+**Idempotent under redelivery.** Before applying anything the engine stores the plan (the evaluated effects) under the event's `source:externalId` as a subject of type `engine`, and records each effect's outcome (`applied`, `skipped` or `failed`, with a note and a time) as soon as it is done. A redelivered event, whether from intake's retry or from a synthetic event arriving through both intake and `workState.onEvent`, replays the stored plan and does only what is left. The state has usually moved on by then, so re-evaluating could change the effects and their positions. Transient port errors (`rate_limited`, `unavailable`) fail the handler so intake redelivers with backoff; other port errors are recorded as `failed` and do not hold back the remaining effects. If the office dies between performing an effect and recording it, that single effect can run again; moves and assignments are naturally repeatable, and a comment can be posted twice.
+
+**Explaining a rule.** `ost workflow explain '<event-json>' --state '<json>'` runs `explainWorkflow` against the team's workflow and a static snapshot and prints, for every rule, whether it matched and why. See the [CLI reference](/reference/cli/).

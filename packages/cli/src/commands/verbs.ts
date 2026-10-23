@@ -17,6 +17,7 @@ export const groupSummaries: Record<string, string> = {
   ticket: "Read and update tickets in the team's tracker.",
   doc: "Read, write and discuss documents in the team's knowledge base.",
   pr: "Inspect pull requests and resolve your own review threads.",
+  workflow: "Inspect how the team workflow reacts to events.",
 };
 
 /** The adapters this build can create; teams using others get a clear message from the verbs that need them. */
