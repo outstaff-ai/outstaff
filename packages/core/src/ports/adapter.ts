@@ -54,6 +54,20 @@ export interface DeriveContext extends SetupContext {
   warn: (message: string) => void;
 }
 
+/** One finding of `ost doctor`. */
+export interface DoctorCheck {
+  /** The secret key the check is about, when it is about one. */
+  key?: string;
+  name: string;
+  status: "ok" | "warn" | "fail";
+
+  /** Names exactly which value is wrong. Never contains a secret value. */
+  detail: string;
+
+  /** What to change, when `status` is not `ok`. */
+  fix?: string;
+}
+
 export interface AdapterDefinition<P extends PortName, Options, Impl> {
   port: P;
 
@@ -72,6 +86,13 @@ export interface AdapterDefinition<P extends PortName, Options, Impl> {
    * keys it could compute; `ost setup --derive` writes them as secret files and never prints them.
    */
   derive?: (secrets: SecretSource, ctx: DeriveContext) => Promise<Record<string, string>>;
+
+  /**
+   * Live checks for `ost doctor`: calls the provider with the person's (or the office's) secrets and compares the
+   * answers with the team file. Skip what needs a secret that is missing, since doctor reports that itself. Never put a
+   * secret value in a check.
+   */
+  doctor?: (secrets: SecretSource, ctx: DeriveContext) => Promise<DoctorCheck[]>;
 
   /**
    * Command rules for the adapter's own CLI, for example a read-only `pr view` allow and a mutating `api` deny.

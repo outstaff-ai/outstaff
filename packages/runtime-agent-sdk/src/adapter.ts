@@ -1,4 +1,11 @@
-import { defineAdapter, type SecretSpec, type SetupStep } from "@outstaff/core";
+import {
+  defineAdapter,
+  type DeriveContext,
+  type DoctorCheck,
+  type SecretSource,
+  type SecretSpec,
+  type SetupStep,
+} from "@outstaff/core";
 import { workdirFiles } from "./layout.js";
 import { agentSdkOptions } from "./options.js";
 import { createAgentSdkRuntime } from "./runtime.js";
@@ -40,6 +47,41 @@ const setupGuide = (ctx: { scope: "person" | "office" }): SetupStep[] =>
         },
       ];
 
+const SIGN_IN = ["ANTHROPIC_API_KEY", "CLAUDE_CODE_OAUTH_TOKEN"];
+const PROVIDER_SWITCHES = [
+  "CLAUDE_CODE_USE_BEDROCK",
+  "CLAUDE_CODE_USE_VERTEX",
+  "CLAUDE_CODE_USE_FOUNDRY",
+];
+
+// No network call: the runtime reads none of these, and a provider switch is only a flag.
+async function doctor(secrets: SecretSource, ctx: DeriveContext): Promise<DoctorCheck[]> {
+  if (ctx.scope === "office") {
+    return [];
+  }
+
+  const found = [...SIGN_IN, ...PROVIDER_SWITCHES].filter((k) => secrets.get(k));
+  if (found.length > 0) {
+    return [
+      {
+        key: found[0]!,
+        name: "Claude credential",
+        status: "ok",
+        detail: `${found.join(", ")} ${found.length === 1 ? "is" : "are"} set.`,
+      },
+    ];
+  }
+
+  return [
+    {
+      name: "Claude credential",
+      status: "fail",
+      detail: `None of ${SIGN_IN.join(", ")} or a cloud provider switch (${PROVIDER_SWITCHES.join(", ")}) is set.`,
+      fix: "Supply one of them to the agent container; see the setup guide for the options.",
+    },
+  ];
+}
+
 export const claudeAgentSdk = defineAdapter({
   port: "runtime",
   name: "claude-agent-sdk",
@@ -47,6 +89,7 @@ export const claudeAgentSdk = defineAdapter({
   options: agentSdkOptions,
   secrets: () => secrets,
   setupGuide,
+  doctor,
   workdirLayout: workdirFiles,
   create: (ctx) =>
     createAgentSdkRuntime({

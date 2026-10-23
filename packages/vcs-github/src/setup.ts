@@ -140,7 +140,7 @@ function api(ctx: DeriveContext): Api {
   };
 }
 
-function privateKey(secrets: SecretSource, prefix: string): string | undefined {
+export function privateKey(secrets: SecretSource, prefix: string): string | undefined {
   const inline = secrets.get(`${prefix}PRIVATE_KEY`);
   if (inline) {
     return inline;

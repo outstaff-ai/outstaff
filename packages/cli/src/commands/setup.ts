@@ -23,10 +23,10 @@ import { defineCommand, type Context } from "../define.js";
 import { loadTeam } from "../load.js";
 import { renderEnvExample, sections, type AnyDef, type Scope } from "./setup-template.js";
 
-const DEFAULT_SECRETS_DIR = "secrets";
+export const DEFAULT_SECRETS_DIR = "secrets";
 
 /** Every adapter this build ships, for guides and derived values; loaded on demand to keep other commands fast. */
-async function shippedRegistry(): Promise<AdapterRegistry> {
+export async function shippedRegistry(): Promise<AdapterRegistry> {
   const [{ githubVcs }, { slackChat }, { itsaplanTracker, itsaplanKnowledge }, { claudeAgentSdk }] =
     await Promise.all([
       import("@outstaff/vcs-github"),
@@ -48,7 +48,7 @@ interface Configured {
   options: unknown;
 }
 
-function configuredAdapters(
+export function configuredAdapters(
   team: TeamConfig,
   registry: AdapterRegistry,
   scope: Scope,

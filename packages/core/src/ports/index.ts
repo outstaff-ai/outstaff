@@ -7,6 +7,7 @@ export type {
   AdapterContext,
   AdapterDefinition,
   DeriveContext,
+  DoctorCheck,
   PortName,
   SetupContext,
   SetupStep,

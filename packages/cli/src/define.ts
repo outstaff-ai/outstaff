@@ -32,6 +32,9 @@ export type Context = {
   fetch?: typeof fetch;
   now?: () => Date;
 
+  /** How long `ost doctor` waits for the office's handshake; tests only. */
+  officeTimeoutMs?: number;
+
   /** Home directory, where `ost setup --derive` looks for a downloaded key in `Downloads`; defaults to the user's. */
   home?: string;
 
