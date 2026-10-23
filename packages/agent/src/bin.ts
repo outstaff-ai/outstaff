@@ -3,12 +3,8 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AdapterRegistry, type Logger } from "@outstaff/core";
-import { slackChat } from "@outstaff/chat-slack";
-import { claudeAgentSdk } from "@outstaff/runtime-agent-sdk";
-import { itsaplanKnowledge, itsaplanTracker } from "@outstaff/tracker-itsaplan";
-import { githubVcs } from "@outstaff/vcs-github";
-import { StartupError, prepareAgent } from "./runner/index.js";
+import type { Logger } from "@outstaff/core";
+import { StartupError, agentRegistry, prepareAgent } from "./runner/index.js";
 
 const write = (level: string) => (message: string, data?: Record<string, unknown>) =>
   process.stderr.write(
@@ -29,17 +25,10 @@ const version = (
 ).version;
 
 try {
-  const registry = new AdapterRegistry()
-    .register(githubVcs)
-    .register(slackChat)
-    .register(itsaplanTracker)
-    .register(itsaplanKnowledge)
-    .register(claudeAgentSdk);
-
   const agent = await prepareAgent({
     env: process.env,
     home: process.env["HOME"] ?? homedir(),
-    registry,
+    registry: agentRegistry(),
     stockCatalogDir: dirname(fileURLToPath(import.meta.resolve("@outstaff/catalog/package.json"))),
     agentVersion: version,
     log,

@@ -11,3 +11,4 @@ export {
 export { buildWorkPrompt } from "./prompt.js";
 export { createSessionManager, type SessionManager, type SessionStore } from "./sessions.js";
 export { StartupError, prepareAgent, type PreparedAgent, type StartupOptions } from "./startup.js";
+export { agentRegistry } from "./registry.js";
