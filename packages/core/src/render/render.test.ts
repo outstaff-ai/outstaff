@@ -137,7 +137,10 @@ describe("renderPerson", () => {
     );
 
     const r = renderPerson({ team: asExample, handle: "sam", catalog: stock, ejected });
-    expect(r.files.get("skills/example/SKILL.md")).toBe("ejected acme\n");
+    expect(r.files.get("skills/example/SKILL.md")).toBe(
+      "---\nname: example\ndescription: s\n---\n\nejected acme\n",
+    );
+
     expect(r.files.get("references/guide.md")).toBe("ref acme\n");
     expect(r.files.get("process/example-lifecycle.md")).toContain("acme");
   });
@@ -212,6 +215,84 @@ describe("renderPerson", () => {
       'references/a.md:2:3 Unknown placeholder "team.nme".',
       'templates/b.md:1:17 Unknown placeholder "missing".',
     ]);
+  });
+});
+
+/** Splits a rendered skill into its parsed front matter and body. */
+const split = (text: string): { meta: Record<string, unknown>; body: string } => {
+  const m = /^---\n([\s\S]*?)---\n\n([\s\S]*)$/.exec(text);
+  if (!m) {
+    throw new Error(`No front matter in:\n${text}`);
+  }
+
+  return { meta: parse(m[1]!) as Record<string, unknown>, body: m[2]! };
+};
+
+describe("skill front matter", () => {
+  const skillOf = (skill: string, extra = "", summary = "s") => {
+    const dir = make({
+      "roles/example/role.yaml": role("example", extra).replace(
+        "summary: s",
+        `summary: ${summary}`,
+      ),
+      "roles/example/SKILL.md": skill,
+    });
+
+    const r = renderPerson({ team: asExample, handle: "sam", catalog: loadCatalog(dir) });
+    return r.files.get("skills/example/SKILL.md")!;
+  };
+
+  it("starts every stock skill with its role name and summary", () => {
+    const team: TeamConfig = {
+      ...acme,
+      people: acme.people.map((p) => ({ ...p, extends: undefined })),
+    };
+
+    for (const person of team.people) {
+      const r = renderPerson({ team, handle: person.handle, catalog: real });
+      const text = r.files.get(`skills/${person.role}/SKILL.md`)!;
+      expect(text.startsWith("---\n")).toBe(true);
+      const { meta, body } = split(text);
+      expect(meta).toEqual({
+        name: person.role,
+        description: real.roles[person.role]!.summary,
+      });
+
+      expect(body.startsWith("---")).toBe(false);
+    }
+  });
+
+  it("quotes YAML-special summaries so they round-trip", () => {
+    const summary = "'Fix: bugs # and \"things\" - [fast]'";
+    const { meta } = split(skillOf("body\n", "", summary));
+    expect(meta.description).toBe('Fix: bugs # and "things" - [fast]');
+  });
+
+  it("keeps a source description and falls back to the summary without one", () => {
+    const own = split(skillOf("---\ndescription: mine\n---\nbody\n"));
+    expect(own.meta).toEqual({ name: "example", description: "mine" });
+    const none = split(skillOf("---\nallowed-tools: Bash\n---\nbody\n"));
+    expect(none.meta.description).toBe("s");
+  });
+
+  it("merges source front matter instead of duplicating it", () => {
+    const text = skillOf(
+      "---\nname: other\ndescription: mine\nallowed-tools: Bash\n---\n# Title\n",
+    );
+
+    const { meta, body } = split(text);
+    expect(meta).toEqual({ name: "example", description: "mine", "allowed-tools": "Bash" });
+    expect(body).toBe("# Title\n");
+    expect(text.match(/^---$/gm)).toHaveLength(2);
+  });
+
+  it("fails on invalid source front matter with a located error", () => {
+    expect(() => skillOf("---\nname: [oops\n---\nbody\n")).toThrow(/catalog\.front_matter_invalid/);
+  });
+
+  it("does not treat a leading horizontal rule without a closing marker as front matter", () => {
+    const { body } = split(skillOf("---\nnot front matter\n"));
+    expect(body).toBe("---\nnot front matter\n");
   });
 });
 

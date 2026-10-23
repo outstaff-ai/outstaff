@@ -352,9 +352,9 @@ describe("ost render", () => {
 
     const r = await ost(cwd, [...sam, "--json"]);
     const files = (JSON.parse(r.out) as { files: { path: string; content: string }[] }).files;
-    expect(files.find((f) => f.path.endsWith("developer/SKILL.md"))?.content).toBe(
-      "Ejected developer.\n",
-    );
+    const content = files.find((f) => f.path.endsWith("developer/SKILL.md"))?.content;
+    expect(content).toMatch(/^---\nname: developer\n/);
+    expect(content).toMatch(/\n---\n\nEjected developer\.\n$/);
   });
 
   it("accepts an ejected dir with only some folders", async () => {

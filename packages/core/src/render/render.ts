@@ -5,6 +5,7 @@ import { buildContext } from "../catalog/context.js";
 import type { Catalog, CatalogDoc, CatalogRole } from "../catalog/load.js";
 import { render } from "../catalog/template.js";
 import type { TeamConfig } from "../config/schema.js";
+import { withSkillFrontMatter } from "./frontmatter.js";
 
 export type RenderWarning = { code: string; message: string };
 
@@ -160,11 +161,18 @@ function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWor
   });
 
   const out = new Map<string, string>();
-  const put = (path: string, doc: CatalogDoc) => {
+  const put = (path: string, doc: CatalogDoc, skillOf?: CatalogRole) => {
     let hit = cache.get(path);
     if (hit === undefined) {
       try {
         hit = normalize(render(doc.text, context, { file: doc.file }));
+        if (skillOf) {
+          hit = withSkillFrontMatter(
+            hit,
+            { name: skillOf.name, description: skillOf.summary },
+            doc.file,
+          );
+        }
       } catch (e) {
         if (!(e instanceof CatalogError)) {
           throw e;
@@ -186,7 +194,7 @@ function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWor
   for (const name of order) {
     const r = merged.roles[name];
     if (r) {
-      put(`skills/${name}/SKILL.md`, r.skill);
+      put(`skills/${name}/SKILL.md`, r.skill, r);
     }
   }
 

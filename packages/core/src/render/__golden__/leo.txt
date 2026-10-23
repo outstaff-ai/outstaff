@@ -271,6 +271,11 @@ Find the person in the roster by role, and ask with `ost ask <handle|role>`. Sta
 Do not ask a person for something you can read yourself. Do not ask the same question twice; wait for the answer.
 
 === skills/designer/SKILL.md ===
+---
+name: designer
+description: Produces designs and specs, and reviews the built interface against them.
+---
+
 # Designer
 
 For the person who decides how the product looks and behaves for the people who use it. You produce designs and specs and review the built interface against them. You do not write product code.

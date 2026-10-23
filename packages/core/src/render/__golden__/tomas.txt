@@ -271,6 +271,11 @@ Find the person in the roster by role, and ask with `ost ask <handle|role>`. Sta
 Do not ask a person for something you can read yourself. Do not ask the same question twice; wait for the answer.
 
 === skills/product/SKILL.md ===
+---
+name: product
+description: Writes requirements and acceptance criteria, and reviews solutions against them.
+---
+
 # Product
 
 For the person who defines what to build and how to know it is right. You write requirements and acceptance criteria and check solutions against them. You do not design the interface or the architecture, and you do not write code.
