@@ -9,6 +9,10 @@ const coreAlias = [
   { find: /^@outstaff\/core\/fakes$/, replacement: core("fakes/index.ts") },
   { find: /^@outstaff\/core$/, replacement: core("index.ts") },
   {
+    find: /^@outstaff\/protocol$/,
+    replacement: fileURLToPath(new URL("packages/protocol/src/index.ts", import.meta.url)),
+  },
+  {
     find: /^@outstaff\/agent$/,
     replacement: fileURLToPath(new URL("packages/agent/src/index.ts", import.meta.url)),
   },
@@ -18,7 +22,7 @@ const coreAlias = [
   },
 ];
 
-const packages = ["core", "catalog", "cli", "agent", "office"];
+const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];
 const adapters = ["vcs-github", "runtime-agent-sdk", "chat-slack", "tracker-itsaplan"];
 
 export default defineConfig({

@@ -111,3 +111,17 @@ An active item with no heartbeat for `staleAfterMinutes` (default 10) is sent ba
 ### Pause and resume
 
 `pause()` stops the whole team from starting new work; `pause(person)` stops one person. Running items finish. `resume` mirrors it. Pauses are stored, so they survive restarts.
+
+## Agent connection
+
+Agents connect out to the office over a WebSocket, so an agent needs no inbound port. The office listens on one port, path `/agent`, and speaks the [agent protocol](/reference/agent-protocol/), which is defined once in the `@outstaff/protocol` package and used by both sides.
+
+**Authentication.** Every person has a token, which the office reads from its secrets as `OUTSTAFF_AGENT_TOKEN_<HANDLE>` (the handle in upper case, `-` as `_`). The office hashes the tokens with scrypt when it starts and compares in constant time. A person without a token cannot connect. The agent sends `hello` with its handle, the token and the protocol version; a wrong token or a different protocol version closes the connection.
+
+**One connection per person.** A new, valid connection replaces the old one. An agent that gets replaced does not reconnect on its own, so two copies of the same agent do not fight over the connection.
+
+**Offers.** The office takes the next queued item for a person from the scheduler and offers it with its context: the journal, the subjects and links. Delivery is at least once. The server keeps no delivery state of its own: which items are offered and accepted is stored behind the work source, so it survives a restart. After a reconnect the office offers again what was not accepted, and `welcome` lists the accepted, unfinished items to resume. Messages about an item are idempotent by its id.
+
+**Liveness.** The office tells the agent how often to send a heartbeat, and drops a connection that is silent for three times that long. The agent drops a connection when the office stops answering and reconnects with exponential backoff and jitter, starting from one second up to thirty.
+
+**Boundaries.** The server depends on the scheduler only through the small `WorkSource` interface, and on question routing only through the optional `Messaging` interface. Frames are limited to 1 MiB, malformed or unknown messages get an `error` reply and never close the connection, and unexpected failures reach the agent as a generic `failed` error, with the detail only in the office log.
