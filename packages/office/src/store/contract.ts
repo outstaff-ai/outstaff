@@ -356,6 +356,28 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
       await expect(store.answerConversation("missing", "x")).rejects.toThrow(/./);
     });
 
+    it("tracks which answers reached the asker", async () => {
+      const asker = await store.enqueue({ person: "ann", kind: "k", title: "t", trigger: "human" });
+      const make = (q: string) =>
+        store.createConversation({ askerItemId: asker.id, target: "bob", question: q });
+
+      const a = await make("one");
+      const b = await make("two");
+      await make("open");
+      expect(await store.listUndelivered(asker.id)).toEqual([]);
+      await store.answerConversation(b.id, "b");
+      await store.answerConversation(a.id, "a");
+      expect((await store.listUndelivered(asker.id)).map((c) => c.id).toSorted()).toEqual(
+        [a.id, b.id].toSorted(),
+      );
+
+      await store.markDelivered(b.id);
+      await store.markDelivered(b.id);
+      expect((await store.listUndelivered(asker.id)).map((c) => c.id)).toEqual([a.id]);
+      expect((await store.getConversation(b.id))?.deliveredAt).not.toBeNull();
+      expect(await store.listUndelivered("other")).toEqual([]);
+    });
+
     it("losing the store only costs a rescan", async () => {
       await store.setCursor("github", "etag", "abc");
       await store.recordEvent({ source: "github", externalId: "1", type: "t", payload: {} });

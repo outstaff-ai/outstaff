@@ -81,8 +81,14 @@ export const memberSchema = z.strictObject({
   handle: z.string(),
   name: z.string(),
   role: z.string(),
+  title: z.string().optional().describe("Display title of the role, for example Developer."),
+  summary: z.string().optional().describe("One line on what the role does."),
   status: z.enum(MEMBER_STATUSES),
   current: z.string().optional().describe("What the person is working on."),
+});
+
+export const humanSchema = z.strictObject({
+  name: z.string(),
 });
 
 export const answerStateSchema = z.strictObject({
@@ -167,7 +173,13 @@ export const messageSchema = z.discriminatedUnion("type", [
   message("ask_result", answerStateSchema),
   message("answer", z.strictObject({ questionId: z.string().min(1), answer: text })),
   message("roster", empty),
-  message("roster_result", z.strictObject({ members: z.array(memberSchema) })),
+  message(
+    "roster_result",
+    z.strictObject({
+      members: z.array(memberSchema),
+      humans: z.array(humanSchema).optional().describe("The trusted humans of the team."),
+    }),
+  ),
   message("work_list", z.strictObject({ workItemId: itemId.optional() })),
   message("work_list_result", z.strictObject({ items: z.array(workSummarySchema) })),
   message(
@@ -202,5 +214,6 @@ export type JournalLine = z.infer<typeof journalEntrySchema>;
 export type OfferedWorkItem = z.infer<typeof workItemSchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
+export type Human = z.infer<typeof humanSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type AnswerState = z.infer<typeof answerStateSchema>;

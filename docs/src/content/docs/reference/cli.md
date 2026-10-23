@@ -425,9 +425,9 @@ ost me --json
 
 ## ost ask
 
-Ask a teammate a question through the office.
+Ask a teammate, or anyone with a role, a question through the office.
 
-Asks another person of the team a question. The office routes it; the answer may come later, as a new message in your work item.
+Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. A role nobody has gets an explicit reply: ask a human.
 
 ```
 ost ask <to> <question>
@@ -442,7 +442,30 @@ Examples:
 
 ```sh
 ost ask mira "Should the cart survive a deploy?"
+ost ask architect "Should the cart survive a deploy?"
 ost ask mira "Should the cart survive a deploy?" --json
+```
+
+## ost answer
+
+Answer a question a teammate asked you.
+
+Answers a question that the office gave you as a work item. The asker continues their work with your answer. Only the person who was asked can answer, once.
+
+```
+ost answer <question> <answer>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost answer 01J9X "Use the fast queue; orders must not wait on mail."
+ost answer 01J9X "Use the fast queue; orders must not wait on mail." --json
 ```
 
 ## ost work

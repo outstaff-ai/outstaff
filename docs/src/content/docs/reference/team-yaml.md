@@ -611,6 +611,14 @@ Seconds between polls when events is "poll".
 - Minimum 10
 - Maximum 3600
 
+### office.channel
+
+Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 ## workflow
 
 How work moves through the team.

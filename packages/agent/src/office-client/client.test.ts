@@ -197,7 +197,7 @@ describe("office connection", () => {
       const team = conn.team();
       expect(current().last().type).toBe("roster");
       current().reply(current().last(), "roster_result", { members: [] });
-      expect(await team).toEqual([]);
+      expect(await team).toEqual({ members: [], humans: [] });
     });
 
     it("turns error replies into port errors", async () => {
@@ -224,7 +224,7 @@ describe("office connection", () => {
       await flush();
       expect(current().last().type).toBe("roster");
       current().reply(current().last(), "roster_result", { members: [] });
-      expect(await later).toEqual([]);
+      expect(await later).toEqual({ members: [], humans: [] });
     });
 
     it("times out when nobody answers or the office is unreachable", async () => {

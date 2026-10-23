@@ -112,6 +112,9 @@ export interface Conversation {
   depth: number;
   createdAt: string;
   answeredAt: string | null;
+
+  /** When the answer was handed to the asker's work item; null while it waits for the asker to stop running. */
+  deliveredAt: string | null;
 }
 
 export interface NewConversation {
@@ -206,6 +209,12 @@ export interface Store {
   /** Throws if the conversation is unknown or already answered. */
   answerConversation(id: string, answer: string): Promise<Conversation>;
   getConversation(id: string): Promise<Conversation | undefined>;
+
+  /** Answered conversations of an asker item whose answer was not delivered yet, oldest first. */
+  listUndelivered(askerItemId: string): Promise<Conversation[]>;
+
+  /** Idempotent. */
+  markDelivered(id: string): Promise<void>;
 
   close(): Promise<void>;
 }

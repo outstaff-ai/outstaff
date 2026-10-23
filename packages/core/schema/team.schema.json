@@ -383,6 +383,11 @@
           "type": "integer",
           "minimum": 10,
           "maximum": 3600
+        },
+        "channel": {
+          "description": "Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.",
+          "type": "string",
+          "minLength": 1
         }
       },
       "additionalProperties": false

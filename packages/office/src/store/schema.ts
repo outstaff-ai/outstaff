@@ -94,6 +94,7 @@ export interface ConversationsTable {
   depth: number;
   created_at: string;
   answered_at: string | null;
+  delivered_at: string | null;
 }
 
 export interface PausesTable {
