@@ -1,0 +1,128 @@
+# Synthetic example: the "acme" team does not exist. All names, handles,
+# addresses and URLs below are made up. It is used by tests and docs.
+version: 1
+
+team:
+  name: acme
+  product: Acme Shop
+  description: The team that builds and runs Acme Shop.
+
+humans:
+  - name: Ada Admin
+    identities:
+      vcs: ada-admin
+      tracker: ada.admin
+      chat: U0ADA0001
+      email: ada@acme.example
+  - name: Grace Lead
+    identities:
+      vcs: grace-lead
+      chat: U0GRACE02
+
+catalog:
+  version: 0.0.0
+
+repos:
+  - name: shop
+    url: github.com/acme-example/shop
+    kind: primary
+  - name: infra
+    url: github.com/acme-example/infra
+    kind: infra
+  - name: design-system
+    url: github.com/acme-example/design-system
+    kind: baseline
+  - name: docs-site
+    url: github.com/acme-example/docs-site
+    kind: other
+
+people:
+  - handle: priya
+    name: Priya Raman
+    pronouns: she/her
+    role: pm
+    repos:
+      "*": read
+      docs-site: write
+  - handle: tomas
+    name: Tomas Novak
+    pronouns: he/him
+    role: product
+    repos:
+      "*": read
+      docs-site: write
+  - handle: mira
+    name: Mira Okafor
+    pronouns: she/her
+    role: architect
+    extends: [developer]
+    repos:
+      shop: write
+      "kind:baseline": read
+  - handle: leo
+    name: Leo Fischer
+    pronouns: he/him
+    role: designer
+    repos:
+      design-system: write
+      shop: read
+  - handle: sam
+    name: Sam Duarte
+    pronouns: they/them
+    role: developer
+    repos:
+      shop: write
+      "kind:baseline": read
+  - handle: noor
+    name: Noor Haddad
+    pronouns: she/her
+    role: developer
+    repos:
+      shop: write
+      "kind:baseline": read
+  - handle: ines
+    name: Ines Varga
+    pronouns: she/her
+    role: reviewer
+    repos:
+      "*": read
+  - handle: kofi
+    name: Kofi Mensah
+    pronouns: he/him
+    role: devops
+    repos:
+      infra: write
+      shop: read
+
+integrations:
+  chat:
+    adapter: slack
+  vcs:
+    adapter: github
+    owner: acme-example
+  runtime:
+    adapter: claude-code
+  tracker:
+    adapter: itsaplan
+    url: https://tracker.acme.example
+    project: SHOP
+  knowledge:
+    adapter: itsaplan
+  avatars:
+    adapter: dicebear
+    style: notionists
+
+workflow:
+  preset: kanban
+  statuses:
+    backlog: Backlog
+    ready: Ready
+    active: In Progress
+    review: In Review
+    blocked: Blocked
+    done: Done
+    canceled: Canceled
+
+policies:
+  messages:
+    max_lines: 3
