@@ -12,3 +12,12 @@ export {
   clearAdapterOptions,
   type AdapterPort,
 } from "./config/adapters.js";
+export {
+  loadTeamConfig,
+  formatIssue,
+  type LoadOptions,
+  type LoadResult,
+  type LocatedIssue,
+  type ConfigSource,
+} from "./config/load.js";
+export { type ConfigFs, type GitClient } from "./config/io.js";

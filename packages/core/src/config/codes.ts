@@ -16,6 +16,10 @@ export const CONFIG_CODES = {
   emailMissingPlaceholder: "email.missing_placeholder",
   usageThresholdOrder: "policies.usage_threshold_order",
   adapterInvalidOptions: "integrations.invalid_options",
+  notFound: "config.not_found",
+  yamlSyntax: "config.yaml_syntax",
+  readFailed: "config.read_failed",
+  gitFailed: "config.git_failed",
 } as const;
 
 export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];
