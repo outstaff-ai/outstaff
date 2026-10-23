@@ -292,12 +292,24 @@ importers:
 
   packages/office:
     dependencies:
+      '@outstaff/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@outstaff/chat-slack':
+        specifier: workspace:*
+        version: link:../chat-slack
       '@outstaff/core':
         specifier: workspace:*
         version: link:../core
       '@outstaff/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@outstaff/tracker-itsaplan':
+        specifier: workspace:*
+        version: link:../tracker-itsaplan
+      '@outstaff/vcs-github':
+        specifier: workspace:*
+        version: link:../vcs-github
       kysely:
         specifier: 0.29.7
         version: 0.29.7
