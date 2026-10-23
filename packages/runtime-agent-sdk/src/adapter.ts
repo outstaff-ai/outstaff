@@ -1,4 +1,5 @@
 import { defineAdapter, type SecretSpec } from "@outstaff/core";
+import { workdirFiles } from "./layout.js";
 import { agentSdkOptions } from "./options.js";
 import { createAgentSdkRuntime } from "./runtime.js";
 
@@ -27,6 +28,7 @@ export const claudeAgentSdk = defineAdapter({
   capabilities: ["runtime.sessions", "runtime.usage"],
   options: agentSdkOptions,
   secrets: () => secrets,
+  workdirLayout: workdirFiles,
   create: (ctx) =>
     createAgentSdkRuntime({
       options: ctx.options,

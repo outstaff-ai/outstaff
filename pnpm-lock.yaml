@@ -202,12 +202,27 @@ importers:
 
   packages/agent:
     dependencies:
+      '@outstaff/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@outstaff/chat-slack':
+        specifier: workspace:*
+        version: link:../chat-slack
       '@outstaff/core':
         specifier: workspace:*
         version: link:../core
       '@outstaff/protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@outstaff/runtime-agent-sdk':
+        specifier: workspace:*
+        version: link:../runtime-agent-sdk
+      '@outstaff/tracker-itsaplan':
+        specifier: workspace:*
+        version: link:../tracker-itsaplan
+      '@outstaff/vcs-github':
+        specifier: workspace:*
+        version: link:../vcs-github
       ws:
         specifier: 8.22.0
         version: 8.22.0

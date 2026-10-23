@@ -47,6 +47,12 @@ export const MESSAGE_META = {
     summary: "A short status line about the item, shown to people.",
     replies: ["ack", "error"],
   },
+  session: {
+    from: "agent",
+    summary:
+      "Stores the runtime session of an item, so a later round of the item resumes it. One session per item; sessions are never shared between items.",
+    replies: ["ack", "error"],
+  },
   journal: {
     from: "agent",
     summary: "Appends a line to the item's journal, which later rounds start from.",

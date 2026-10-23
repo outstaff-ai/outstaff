@@ -69,31 +69,32 @@ A work item for the agent to take, with its context. Delivered at least once: an
 
 Sent by: office.
 
-| Field                      | Type                                             | Required | Description                                                           |
-| -------------------------- | ------------------------------------------------ | -------- | --------------------------------------------------------------------- |
-| `workItem`                 | object                                           | yes      | The item to work on.                                                  |
-| `workItem.id`              | string                                           | yes      |                                                                       |
-| `workItem.kind`            | string                                           | yes      | What the work is, for example a ticket, a review round or a question. |
-| `workItem.title`           | string                                           | yes      |                                                                       |
-| `workItem.priority`        | number                                           | yes      | Lower runs first.                                                     |
-| `workItem.trigger`         | `human` or `agent` or `automation` or `schedule` | yes      |                                                                       |
-| `workItem.parentId`        | string                                           | no       | The item this one was split from, for questions.                      |
-| `workItem.subject`         | object                                           | no       |                                                                       |
-| `workItem.subject.type`    | string                                           | yes      |                                                                       |
-| `workItem.subject.ref`     | string                                           | yes      |                                                                       |
-| `context`                  | object                                           | yes      | What the agent needs to start.                                        |
-| `context.journal`          | list of objects                                  | yes      | What earlier rounds of this item recorded.                            |
-| `context.journal[].at`     | string                                           | yes      | ISO-8601 timestamp.                                                   |
-| `context.journal[].author` | string                                           | yes      | Handle of the author.                                                 |
-| `context.journal[].text`   | string                                           | yes      |                                                                       |
-| `context.subjects`         | list of objects                                  | yes      | The tickets, pull requests and people the item concerns.              |
-| `context.subjects[].type`  | string                                           | yes      | Kind of subject, for example a ticket or a pull request.              |
-| `context.subjects[].ref`   | string                                           | yes      | Reference of the subject in its system.                               |
-| `context.subjects[].title` | string                                           | no       | Human-readable title.                                                 |
-| `context.subjects[].url`   | string                                           | no       | Link to the subject.                                                  |
-| `context.links`            | list of objects                                  | yes      | Further links worth opening.                                          |
-| `context.links[].url`      | string                                           | yes      | Absolute URL.                                                         |
-| `context.links[].title`    | string                                           | no       | Label for the link.                                                   |
+| Field                      | Type                                             | Required | Description                                                                 |
+| -------------------------- | ------------------------------------------------ | -------- | --------------------------------------------------------------------------- |
+| `workItem`                 | object                                           | yes      | The item to work on.                                                        |
+| `workItem.id`              | string                                           | yes      |                                                                             |
+| `workItem.kind`            | string                                           | yes      | What the work is, for example a ticket, a review round or a question.       |
+| `workItem.title`           | string                                           | yes      |                                                                             |
+| `workItem.priority`        | number                                           | yes      | Lower runs first.                                                           |
+| `workItem.trigger`         | `human` or `agent` or `automation` or `schedule` | yes      |                                                                             |
+| `workItem.parentId`        | string                                           | no       | The item this one was split from, for questions.                            |
+| `workItem.subject`         | object                                           | no       |                                                                             |
+| `workItem.subject.type`    | string                                           | yes      |                                                                             |
+| `workItem.subject.ref`     | string                                           | yes      |                                                                             |
+| `context`                  | object                                           | yes      | What the agent needs to start.                                              |
+| `context.journal`          | list of objects                                  | yes      | What earlier rounds of this item recorded.                                  |
+| `context.journal[].at`     | string                                           | yes      | ISO-8601 timestamp.                                                         |
+| `context.journal[].author` | string                                           | yes      | Handle of the author.                                                       |
+| `context.journal[].text`   | string                                           | yes      |                                                                             |
+| `context.subjects`         | list of objects                                  | yes      | The tickets, pull requests and people the item concerns.                    |
+| `context.subjects[].type`  | string                                           | yes      | Kind of subject, for example a ticket or a pull request.                    |
+| `context.subjects[].ref`   | string                                           | yes      | Reference of the subject in its system.                                     |
+| `context.subjects[].title` | string                                           | no       | Human-readable title.                                                       |
+| `context.subjects[].url`   | string                                           | no       | Link to the subject.                                                        |
+| `context.links`            | list of objects                                  | yes      | Further links worth opening.                                                |
+| `context.links[].url`      | string                                           | yes      | Absolute URL.                                                               |
+| `context.links[].title`    | string                                           | no       | Label for the link.                                                         |
+| `sessionId`                | string                                           | no       | Runtime session of this item from an earlier round; resume it when present. |
 
 ### `accept`
 
@@ -136,6 +137,17 @@ Sent by: agent. Answered by: `ack`, `error`.
 | ------------ | ------ | -------- | -------------------- |
 | `workItemId` | string | yes      | Id of the work item. |
 | `text`       | string | yes      |                      |
+
+### `session`
+
+Stores the runtime session of an item, so a later round of the item resumes it. One session per item; sessions are never shared between items.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field        | Type   | Required | Description                                 |
+| ------------ | ------ | -------- | ------------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                        |
+| `sessionId`  | string | yes      | Id of the runtime session working the item. |
 
 ### `journal`
 

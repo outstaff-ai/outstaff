@@ -94,6 +94,9 @@ export interface OfficeConnection extends OfficeClient {
   accept(workItemId: string): Promise<void>;
   decline(workItemId: string, reason: string): Promise<void>;
   progress(workItemId: string, text: string): Promise<void>;
+
+  /** Stores the runtime session of the item; the next offer of the item carries it. */
+  session(workItemId: string, sessionId: string): Promise<void>;
   journal(workItemId: string, text: string): Promise<void>;
   handBack(
     workItemId: string,
@@ -448,6 +451,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
 
     decline: (workItemId, reason) => ack("decline", { workItemId, reason }),
     progress: (workItemId, text) => ack("progress", { workItemId, text }),
+    session: (workItemId, sessionId) => ack("session", { workItemId, sessionId }),
     journal: (workItemId, text) => ack("journal", { workItemId, text }),
     async handBack(workItemId, result) {
       await ack("handback", { workItemId, ...result, links: result.links ?? [] });
