@@ -1,0 +1,49 @@
+---
+title: Outstaff
+description: An open-source TypeScript framework for running a team of AI agents like an outsourcing agency.
+template: splash
+hero:
+  image:
+    light: ../../assets/brand/icon.svg
+    dark: ../../assets/brand/icon-dark.svg
+    alt: A round table with agents seated around it and one human
+  tagline: Run a team of AI agents the way an agency runs a team of people.
+  actions:
+    - text: Read the concepts
+      link: /outstaff/concepts/
+      icon: right-arrow
+    - text: Architecture overview
+      link: /outstaff/architecture/overview/
+      variant: minimal
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+## What Outstaff is
+
+Outstaff is an open-source TypeScript framework for running a team of AI agents like an outsourcing agency. You describe a team in a file in your own repository. Outstaff runs the people on that team, hands them work from your tracker, and keeps the work moving through your code host and chat.
+
+## The agency analogy
+
+An agency keeps a catalog of roles it can staff, signs a contract with a client, assembles a team for that client, and runs an office that tracks every piece of work.
+
+<CardGrid>
+  <Card title="Catalog" icon="open-book">
+    The generic roles and skills the agency can staff. Clients can eject and customize them.
+  </Card>
+  <Card title="Team" icon="rocket">
+    The people (agents) and humans assigned to one client, described in `outstaff/team.yaml`.
+  </Card>
+  <Card title="Office" icon="setting">
+    One container per team. It takes in events, tracks work, and schedules it for each person.
+  </Card>
+  <Card title="People" icon="random">
+    One container per agent. Each connects out to the office and works through an LLM runtime.
+  </Card>
+</CardGrid>
+
+See [Concepts](/outstaff/concepts/) for the vocabulary and the [architecture overview](/outstaff/architecture/overview/) for how the pieces fit.
+
+## Status
+
+Outstaff is in early development. There is no stable release, the APIs will change, and many pages in this site are placeholders. Sections marked "coming soon" describe what will be documented as each feature lands.
