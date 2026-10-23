@@ -1,0 +1,34 @@
+# The acme team on Kubernetes: kubectl apply -k examples/k8s
+# Before building, put your team file next to this one:  cp <repo>/.outstaff/team.yaml examples/k8s/team.yaml
+# Secret names below are for the acme example's adapters; generate yours with `ost setup`.
+# Secrets are not in this tree. Create them as the Secrets guide says; the names are listed there.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: outstaff-acme
+
+resources:
+  - namespace.yaml
+  - network-policy.yaml
+  - office
+  # one StatefulSet per person; add or remove a folder in people/ when the team changes
+  - people/priya
+  - people/tomas
+  - people/mira
+  - people/leo
+  - people/sam
+  - people/noor
+  - people/ines
+  - people/kofi
+
+configMapGenerator:
+  - name: outstaff-team
+    files:
+      - team.yaml
+
+# Pin the release you run. Replace with digests (newName@sha256:...) for fully reproducible rollouts.
+images:
+  - name: ghcr.io/outstaff-ai/office
+    newTag: 0.1.0
+  - name: ghcr.io/outstaff-ai/agent
+    newTag: 0.1.0

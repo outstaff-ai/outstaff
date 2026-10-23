@@ -1,0 +1,89 @@
+name: Examples
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - examples/**
+      - images/**
+      - packages/**
+      - pnpm-lock.yaml
+      - .github/workflows/examples.yml
+  # the merge queue tests each PR combined with everything ahead of it
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: examples-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  KUSTOMIZE_VERSION: 5.8.1
+  KUSTOMIZE_SHA256: 029a7f0f4e1932c52a0476cf02a0fd855c0bb85694b82c338fc648dcb53a819d
+  KUBECONFORM_VERSION: 0.7.0
+  KUBECONFORM_SHA256: c31518ddd122663b3f3aa874cfe8178cb0988de944f29c74a0b9260920d115d3
+  # The Kubernetes minor the manifests are validated against.
+  KUBERNETES_VERSION: 1.33.0
+
+jobs:
+  validate:
+    name: validate (compose, kubernetes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Compose file is valid
+        run: docker compose -f examples/compose/compose.yaml config --quiet
+        env:
+          POSTGRES_PASSWORD: validate
+      - name: Install kustomize and kubeconform (pinned, checksum verified)
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o kustomize.tgz "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+          echo "${KUSTOMIZE_SHA256}  kustomize.tgz" | sha256sum -c -
+          curl -fsSL -o kubeconform.tgz "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          echo "${KUBECONFORM_SHA256}  kubeconform.tgz" | sha256sum -c -
+          mkdir -p "$HOME/bin"
+          tar -xzf kustomize.tgz -C "$HOME/bin" kustomize
+          tar -xzf kubeconform.tgz -C "$HOME/bin" kubeconform
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      - name: Kubernetes manifests build and validate
+        run: |
+          cp examples/acme/.outstaff/team.yaml examples/k8s/team.yaml
+          kustomize build examples/k8s | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" -
+
+  compose-smoke:
+    name: compose smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-buildx-action@v4.4.1
+      # The tags are the defaults of compose.yaml, so the smoke test starts exactly these images.
+      - name: Build office
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: images/Dockerfile
+          target: office
+          load: true
+          tags: outstaff/office:local
+          cache-from: type=gha,scope=office
+          cache-to: type=gha,mode=max,scope=office
+      - name: Build agent
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: images/Dockerfile
+          target: agent
+          load: true
+          tags: outstaff/agent:local
+          cache-from: type=gha,scope=agent
+          cache-to: type=gha,mode=max,scope=agent
+      - name: Office with Postgres and one agent, dummy secrets
+        run: examples/compose/smoke.sh
+        env:
+          SMOKE_PREBUILT: "1"

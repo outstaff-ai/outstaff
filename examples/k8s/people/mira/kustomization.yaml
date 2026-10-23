@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../agent
+nameSuffix: -mira
+labels:
+  - pairs:
+      outstaff.work/person: mira
+    includeSelectors: true
+    includeTemplates: true
+patches:
+  - target: { kind: StatefulSet }
+    patch: |-
+      - { op: replace, path: /spec/template/spec/containers/0/env/0/value, value: mira }
+      - { op: replace, path: /spec/template/spec/volumes/0/projected/sources/0/secret/name, value: outstaff-agent-mira }

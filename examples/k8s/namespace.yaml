@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: outstaff-acme
+  labels:
+    # Enforces the same restrictions the manifests already meet (non-root, no privileges, seccomp).
+    pod-security.kubernetes.io/enforce: restricted

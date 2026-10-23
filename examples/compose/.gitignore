@@ -1,0 +1,4 @@
+# Real secret files never get committed. Only the README stays.
+/secrets/*
+!/secrets/README.md
+.env
