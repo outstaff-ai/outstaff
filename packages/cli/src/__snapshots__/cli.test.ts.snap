@@ -1,0 +1,202 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ost init > --separate-repo writes team.yaml at the root 1`] = `
+"# Outstaff team configuration. Run \`ost validate\` after editing.
+version: 1
+
+team:
+  name: acme-team
+  # product: Name of what the team builds
+  # description: One line about the team
+
+# Trusted humans. Remove this block to use the default rule: repo writers and
+# full chat-workspace members.
+humans:
+  - name: Your Name
+    identities:
+      vcs: your-vcs-username
+
+catalog:
+  version: 0.0.0
+
+repos:
+  # This file lives in its own repository. The product repository goes here as
+  # \`kind: primary\`; the repository holding this file is not listed unless agents
+  # should work in it too.
+  - name: product
+    url: github.com/your-org/your-repo
+    kind: primary
+
+# No people yet. Add agents with \`ost hire\`, or list them here with a handle,
+# name, role and repo grants (for example \`product: write\`).
+people: []
+
+integrations:
+  chat:
+    adapter: slack
+  vcs:
+    adapter: github
+  # Credentials (API key, cloud provider, or your own subscription token) are supplied by the operator to the containers, never written in this file.
+  runtime:
+    adapter: claude-agent-sdk
+"
+`;
+
+exports[`ost init > scaffolds a valid team in an empty directory 1`] = `
+"Wrote .outstaff/team.yaml
+Added to .gitignore: .outstaff/people/*/.env, .env, *.pem
+Next: edit .outstaff/team.yaml, then run \`ost validate\`.
+"
+`;
+
+exports[`ost init > scaffolds a valid team in an empty directory 2`] = `
+"# Outstaff team configuration. Run \`ost validate\` after editing.
+version: 1
+
+team:
+  name: acme-shop
+  # product: Name of what the team builds
+  # description: One line about the team
+
+# Trusted humans. Remove this block to use the default rule: repo writers and
+# full chat-workspace members.
+humans:
+  - name: Your Name
+    identities:
+      vcs: your-vcs-username
+
+catalog:
+  version: 0.0.0
+
+repos:
+  # The repository that holds this file. \`kind: primary\` marks the product repo
+  # (at most one). Other kinds: baseline, infra, other.
+  - name: product
+    url: github.com/your-org/your-repo
+    kind: primary
+
+# No people yet. Add agents with \`ost hire\`, or list them here with a handle,
+# name, role and repo grants (for example \`product: write\`).
+people: []
+
+integrations:
+  chat:
+    adapter: slack
+  vcs:
+    adapter: github
+  # Credentials (API key, cloud provider, or your own subscription token) are supplied by the operator to the containers, never written in this file.
+  runtime:
+    adapter: claude-agent-sdk
+"
+`;
+
+exports[`ost team > prints the resolved acme team 1`] = `
+"Team: acme (Acme Shop)
+The team that builds and runs Acme Shop.
+
+Humans
+  NAME        IDENTITIES
+  Ada Admin   vcs:ada-admin, tracker:ada.admin, chat:U0ADA0001, email:ada@acme.example
+  Grace Lead  vcs:grace-lead, chat:U0GRACE02
+
+Repos
+  NAME           KIND      URL                                    BRANCH
+  shop           primary   github.com/acme-example/shop           main
+  infra          infra     github.com/acme-example/infra          main
+  design-system  baseline  github.com/acme-example/design-system  main
+  docs-site      other     github.com/acme-example/docs-site      main
+
+People
+  HANDLE  NAME         ROLE                 MODEL    GRANTS
+  priya   Priya Raman  pm                   default  *:read, docs-site:write
+  tomas   Tomas Novak  product              default  *:read, docs-site:write
+  mira    Mira Okafor  architect+developer  default  shop:write, kind:baseline:read
+  leo     Leo Fischer  designer             default  design-system:write, shop:read
+  sam     Sam Duarte   developer            default  shop:write, kind:baseline:read
+  noor    Noor Haddad  developer            default  shop:write, kind:baseline:read
+  ines    Ines Varga   reviewer             default  *:read
+  kofi    Kofi Mensah  devops               default  infra:write, shop:read
+
+Integrations
+  PORT       ADAPTER
+  chat       slack
+  vcs        github
+  runtime    claude-agent-sdk
+  tracker    itsaplan
+  knowledge  itsaplan
+  avatars    dicebear
+"
+`;
+
+exports[`ost validate > accepts the acme team cleanly 1`] = `
+"acme: 0 errors, 0 warnings
+"
+`;
+
+exports[`ost validate > exits 1 with file:line for duplicate handle 1`] = `
+"error    .outstaff/team.yaml:76:13 people.duplicate_handle: Handle "sam" is already used by people[4].
+1 error, 0 warnings
+"
+`;
+
+exports[`ost validate > exits 1 with file:line for missing repos 1`] = `
+"error    .outstaff/team.yaml:3:1 schema.invalid_type: Invalid input: expected array, received undefined
+1 error, 0 warnings
+"
+`;
+
+exports[`ost validate > exits 1 with file:line for unknown repo grant 1`] = `
+"error    .outstaff/team.yaml:75:7 people.unknown_repo: Grant refers to unknown repo "billing".
+1 error, 0 warnings
+"
+`;
+
+exports[`ost validate > exits 1 with file:line for yaml syntax 1`] = `
+"error    .outstaff/team.yaml:59:5 config.yaml_syntax: Flow sequence in block collection must be sufficiently indented and end with a ]
+1 error, 0 warnings
+"
+`;
+
+exports[`ost validate > lists warnings with their consequence and still exits 0 1`] = `
+"warning  .outstaff/team.yaml:75:5 people.no_repos: ines has no repo grants.
+         Consequence: ines cannot read or change any repository.
+warning  .outstaff/team.yaml:3:1 trust.default: humans is not set, so trust follows the default rule.
+         Consequence: trusted humans are repo writers and full chat-workspace members; set humans: for open-source repos or large workspaces
+acme: 0 errors, 2 warnings
+"
+`;
+
+exports[`ost validate > prints a JSON report 1`] = `
+"{
+  "ok": true,
+  "file": "<tmp>/p2/.outstaff/team.yaml",
+  "errors": [],
+  "warnings": [
+    {
+      "code": "people.no_repos",
+      "message": "ines has no repo grants.",
+      "consequence": "ines cannot read or change any repository.",
+      "file": ".outstaff/team.yaml",
+      "line": 75,
+      "column": 5,
+      "path": [
+        "people",
+        6,
+        "repos"
+      ]
+    },
+    {
+      "code": "trust.default",
+      "message": "humans is not set, so trust follows the default rule.",
+      "consequence": "trusted humans are repo writers and full chat-workspace members; set humans: for open-source repos or large workspaces",
+      "file": ".outstaff/team.yaml",
+      "line": 3,
+      "column": 1,
+      "path": [
+        "humans"
+      ]
+    }
+  ]
+}
+"
+`;

@@ -7,7 +7,7 @@
   "license": "MIT",
   "scripts": {
     "lint": "oxlint",
-    "typecheck": "pnpm -r --workspace-concurrency=1 run typecheck",
+    "typecheck": "pnpm -r --workspace-concurrency=1 run build && pnpm -r --workspace-concurrency=1 run typecheck",
     "test": "vitest run",
     "build": "pnpm -r run build",
     "docs:build": "pnpm --filter @outstaff/docs build",

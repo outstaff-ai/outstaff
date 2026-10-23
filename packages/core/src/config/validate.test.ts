@@ -16,7 +16,7 @@ const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
   adapters: new Map([
     adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads"]),
     adapter("chat", "slack", ["chat.messages"]),
-    adapter("runtime", "claude-code", ["runtime.sessions"]),
+    adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
     adapter("knowledge", "notion", ["knowledge.docs"]),
     adapter("tracker", "linear", ["tracker.issues"]),
   ]),
@@ -37,7 +37,7 @@ const config = (mutate: (c: any) => void = () => {}) => {
     integrations: {
       chat: { adapter: "slack" },
       vcs: { adapter: "github" },
-      runtime: { adapter: "claude-code" },
+      runtime: { adapter: "claude-agent-sdk" },
       knowledge: { adapter: "notion" },
       tracker: { adapter: "linear" },
     },
@@ -71,7 +71,7 @@ describe("validateTeam", () => {
 
   it("errors on write grants without pull request support", () => {
     const c = config((x) => (x.people[0].repos = { app: "write", "kind:primary": "read", "*": "write" }));
-    const noPr = ctx({ adapters: new Map([adapter("vcs", "github", []), adapter("chat", "slack", []), adapter("runtime", "claude-code", []), adapter("knowledge", "notion", ["knowledge.docs"]), adapter("tracker", "linear", [])]) });
+    const noPr = ctx({ adapters: new Map([adapter("vcs", "github", []), adapter("chat", "slack", []), adapter("runtime", "claude-agent-sdk", []), adapter("knowledge", "notion", ["knowledge.docs"]), adapter("tracker", "linear", [])]) });
     expect(validateTeam(c, noPr).errors).toEqual([
       {
         path: ["people", 0, "repos", "app"],
