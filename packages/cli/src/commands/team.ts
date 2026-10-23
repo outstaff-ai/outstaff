@@ -1,6 +1,7 @@
-import { formatIssue } from "@outstaff/core";
+import { formatIssue, validateTeam } from "@outstaff/core";
+import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
+import { issueJson, loadTeam } from "../load.js";
 import { table } from "../table.js";
 
 const DEFAULT_TRUST = "default rule: repo writers and full chat-workspace members";
@@ -9,10 +10,13 @@ export const team = defineCommand({
   name: "team",
   summary: "Show the resolved team: humans, repos, people and integrations.",
   description:
-    "Prints the team as Outstaff sees it after defaults are applied, including each person's repo grants. Exits 1 if the config cannot be loaded.",
+    "Prints the team as Outstaff sees it after defaults are applied, including each person's repo grants. Roles are checked against the stock catalog plus the team's ejected catalog; exits 1 if the config cannot be loaded or a role is unknown.",
   options: [],
   examples: ["ost team", "ost team --json"],
-  exitCodes: ["0: the team was printed", "1: the config could not be loaded"],
+  exitCodes: [
+    "0: the team was printed",
+    "1: the config could not be loaded or a role is not in the catalog",
+  ],
   async run(ctx, options) {
     const loaded = await loadTeam(ctx, options);
     if (!loaded.ok) {
@@ -24,14 +28,21 @@ export const team = defineCommand({
     }
 
     const { config } = loaded;
+    const found = loadCatalogs(ctx, config, loaded.source.dir);
+    const problems = found.ok
+      ? validateTeam(config, {
+          roles: roleRegistry(found.catalogs),
+          adapters: new Map(),
+        }).errors.map(loaded.locate)
+      : found.issues.map(catalogIssue);
 
     if (options.json) {
       const { humans, repos, people, integrations } = config;
       ctx.out(
-        `${JSON.stringify({ file: loaded.source.file, team: config.team, humans: humans ?? null, repos, people, integrations }, null, 2)}\n`,
+        `${JSON.stringify({ file: loaded.source.file, team: config.team, humans: humans ?? null, repos, people, integrations, ...(problems.length ? { errors: problems.map(issueJson) } : {}) }, null, 2)}\n`,
       );
 
-      return 0;
+      return problems.length === 0 ? 0 : 1;
     }
 
     const out: string[] = [];
@@ -102,6 +113,10 @@ export const team = defineCommand({
     );
 
     ctx.out(`${out.join("\n")}\n`);
-    return 0;
+    for (const p of problems) {
+      ctx.err(`error    ${formatIssue(p)}\n`);
+    }
+
+    return problems.length === 0 ? 0 : 1;
   },
 });

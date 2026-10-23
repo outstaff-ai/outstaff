@@ -24,7 +24,7 @@ ost [global options] <command> [options]
 
 Check the team config for errors and warnings.
 
-Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Catalog roles and adapters are not checked yet, so role names and adapter names are accepted as written.
+Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written.
 
 ```
 ost validate
@@ -47,7 +47,7 @@ ost validate --json
 
 Show the resolved team: humans, repos, people and integrations.
 
-Prints the team as Outstaff sees it after defaults are applied, including each person's repo grants. Exits 1 if the config cannot be loaded.
+Prints the team as Outstaff sees it after defaults are applied, including each person's repo grants. Roles are checked against the stock catalog plus the team's ejected catalog; exits 1 if the config cannot be loaded or a role is unknown.
 
 ```
 ost team
@@ -56,13 +56,42 @@ ost team
 Exit codes:
 
 - 0: the team was printed
-- 1: the config could not be loaded
+- 1: the config could not be loaded or a role is not in the catalog
 
 Examples:
 
 ```sh
 ost team
 ost team --json
+```
+
+## ost render
+
+Render the working files of one person from the catalog.
+
+Renders a person's skills, references, templates and process documents from the stock catalog (the installed @outstaff/catalog package) and the team's ejected catalog (catalog.path, relative to the team file; same-named roles and documents replace stock ones). Without --out it lists the files with their sizes; with --out it writes them below that directory, refusing a non-empty directory unless --force is given.
+
+```
+ost render <handle> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--out <dir>` | Write the files below this directory. |
+| `--force` | Write into a non-empty --out directory. |
+
+Exit codes:
+
+- 0: the files were listed or written
+- 1: the config or catalog could not be loaded, the person is unknown, rendering failed, or --out is not empty
+
+Examples:
+
+```sh
+ost render sam
+ost render sam --out ./work/sam
+ost render sam --out ./work/sam --force
+ost render sam --json
 ```
 
 ## ost init

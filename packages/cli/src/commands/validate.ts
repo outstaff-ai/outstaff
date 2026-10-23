@@ -1,4 +1,5 @@
 import { formatIssue, validateTeam, type ConfigWarning, type LocatedIssue } from "@outstaff/core";
+import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
 import { issueJson, loadTeam } from "../load.js";
 
@@ -8,7 +9,7 @@ export const validate = defineCommand({
   name: "validate",
   summary: "Check the team config for errors and warnings.",
   description:
-    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Catalog roles and adapters are not checked yet, so role names and adapter names are accepted as written.",
+    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written.",
   options: [],
   examples: ["ost validate", "ost validate --team ../acme-team", "ost validate --json"],
   exitCodes: [
@@ -23,12 +24,21 @@ export const validate = defineCommand({
     if (!loaded.ok) {
       errors = loaded.issues;
     } else {
-      const report = validateTeam(loaded.config, { roles: new Map(), adapters: new Map() });
-      errors = report.errors.map(loaded.locate);
-      warnings = report.warnings.map((w: ConfigWarning) => ({
-        ...loaded.locate(w),
-        consequence: w.consequence,
-      }));
+      const found = loadCatalogs(ctx, loaded.config, loaded.source.dir);
+      if (!found.ok) {
+        errors = found.issues.map(catalogIssue);
+      } else {
+        const report = validateTeam(loaded.config, {
+          roles: roleRegistry(found.catalogs),
+          adapters: new Map(),
+        });
+
+        errors = report.errors.map(loaded.locate);
+        warnings = report.warnings.map((w: ConfigWarning) => ({
+          ...loaded.locate(w),
+          consequence: w.consequence,
+        }));
+      }
     }
 
     const ok = errors.length === 0;

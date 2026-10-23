@@ -43,7 +43,7 @@ export function buildProgram(ctx: Context, setExit: (code: number) => void) {
 
   for (const def of commands) {
     const cmd = program
-      .command(def.name)
+      .command(def.args ? `${def.name} ${def.args}` : def.name)
       .description(def.summary)
       .exitOverride()
       .configureOutput({ writeOut: ctx.out, writeErr: ctx.err });
@@ -54,7 +54,8 @@ export function buildProgram(ctx: Context, setExit: (code: number) => void) {
 
     cmd.action(async (...args: unknown[]) => {
       const self = args.at(-1) as Command;
-      setExit(await def.run(ctx, self.optsWithGlobals() as GlobalOptions));
+      const positional = args.slice(0, -2).map(String);
+      setExit(await def.run(ctx, self.optsWithGlobals() as GlobalOptions, positional));
     });
   }
 
