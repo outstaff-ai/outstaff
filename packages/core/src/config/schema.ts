@@ -110,7 +110,6 @@ const integrationsSchema = z
     tracker: adapterRefSchema.optional().meta(d("Issue tracker adapter.")),
     knowledge: adapterRefSchema.optional().meta(d("Knowledge base adapter.")),
     avatars: adapterRefSchema.optional().meta(d("Avatar generation adapter.")),
-    mail: adapterRefSchema.optional().meta(d("Mailbox adapter.")),
   })
   .meta(d("Which adapters connect Outstaff to your tools."));
 

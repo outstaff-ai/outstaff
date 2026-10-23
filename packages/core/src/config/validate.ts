@@ -42,11 +42,10 @@ const LACKING: Record<Capability, string> = {
   "vcs.webhooks": "react to repository changes instantly",
   "chat.messages": "send chat messages",
   "chat.history": "read earlier chat messages",
-  "chat.homeView": "show a home view in chat",
+  "chat.agentProfile": "show the agent's profile and status in chat",
   "runtime.sessions": "keep sessions between runs",
   "runtime.usage": "track LLM usage against limits",
   "avatars.generate": "get a generated avatar",
-  "mail.inbox": "read or send email",
 };
 
 export const documentedCodes: Record<ConfigCode | WarningCode, string> = {

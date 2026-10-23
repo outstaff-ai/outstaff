@@ -16,6 +16,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts/index.d.ts",
+      "default": "./dist/contracts/index.js"
+    },
+    "./fakes": {
+      "types": "./dist/fakes/index.d.ts",
+      "default": "./dist/fakes/index.js"
     }
   },
   "files": [
@@ -33,6 +41,15 @@
   },
   "devDependencies": {
     "@types/semver": "7.8.0",
-    "tsx": "4.23.15"
+    "tsx": "4.23.15",
+    "vitest": "5.0.5"
+  },
+  "peerDependencies": {
+    "vitest": "^5.0.5"
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
+    }
   }
 }

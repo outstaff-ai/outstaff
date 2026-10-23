@@ -71,7 +71,6 @@ const valid = (): TeamConfigInput => ({
     tracker: { adapter: "linear", project: "ACME" },
     knowledge: { adapter: "notion" },
     avatars: { adapter: "dicebear" },
-    mail: { adapter: "imap" },
   },
   email: { pattern: "{handle}@acme.example" },
   office: { events: "webhook", poll_interval_seconds: 30 },

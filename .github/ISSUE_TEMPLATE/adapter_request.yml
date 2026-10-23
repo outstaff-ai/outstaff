@@ -15,7 +15,6 @@ body:
         - chat (messenger)
         - runtime (LLM runtime)
         - avatars (agent identities and images)
-        - mail (email)
     validations:
       required: true
   - type: input

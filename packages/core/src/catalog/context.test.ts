@@ -39,8 +39,8 @@ describe("buildContext", () => {
   });
 
   it("reports integrations, links and policies", () => {
-    expect(ctx.integrations.has).toMatchObject({ tracker: true, vcs: true, mail: false });
-    expect(ctx.integrations.adapter).toMatchObject({ tracker: "itsaplan", mail: "" });
+    expect(ctx.integrations.has).toMatchObject({ tracker: true, vcs: true, avatars: true });
+    expect(ctx.integrations.adapter).toMatchObject({ tracker: "itsaplan" });
     expect(ctx.links).toEqual({ issue: "https://t.example/{key}", pr: "", doc: "" });
     expect(ctx.policies.messages).toEqual({
       max_lines: 3,
@@ -51,9 +51,9 @@ describe("buildContext", () => {
 
   it("renders a template end to end and keeps typos strict", () => {
     const t =
-      "{{team.name}} on {{team.product}}: {{#each people.byRole.developer}}{{this.handle}} {{/each}}{{#if integrations.has.mail}}mail{{/if}}";
+      "{{team.name}} on {{team.product}}: {{#each people.byRole.developer}}{{this.handle}} {{/each}}{{#if integrations.has.avatars}}avatars{{/if}}";
 
-    expect(render(t, ctx)).toBe("acme on Acme Shop: sam noor ");
+    expect(render(t, ctx)).toBe("acme on Acme Shop: sam noor avatars");
     expect(() => render("{{#each people.byRole.nobody}}x{{/each}}", ctx, { file: "s.md" })).toThrow(
       /unknown_placeholder/,
     );
