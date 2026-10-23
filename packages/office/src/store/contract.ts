@@ -62,6 +62,49 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
       expect(await store.recordEvent({ ...e, externalId: "43" })).toBe(true);
     });
 
+    it("tracks event delivery: unprocessed in order, attempts, processed", async () => {
+      const mk = (externalId: string) => ({
+        source: "github",
+        externalId,
+        type: "t",
+        payload: { id: externalId },
+      });
+
+      await store.recordEvent(mk("1"));
+      await store.recordEvent(mk("2"));
+      await store.recordEvent(mk("3"));
+      expect((await store.listUnprocessed()).map((e) => e.externalId)).toEqual(["1", "2", "3"]);
+      expect(await store.listUnprocessed(2)).toHaveLength(2);
+      expect((await store.listUnprocessed())[0]).toMatchObject({
+        source: "github",
+        type: "t",
+        payload: { id: "1" },
+        attempts: 0,
+      });
+
+      expect(await store.noteEventAttempt("github", "1")).toBe(1);
+      expect(await store.noteEventAttempt("github", "1")).toBe(2);
+      await store.markProcessed("github", "1");
+      await store.markProcessed("github", "2", "gave up");
+      await store.markProcessed("github", "2");
+      expect((await store.listUnprocessed()).map((e) => e.externalId)).toEqual(["3"]);
+
+      // A duplicate is still a duplicate once processed, and does not come back.
+      expect(await store.recordEvent(mk("1"))).toBe(false);
+      expect((await store.listUnprocessed()).map((e) => e.externalId)).toEqual(["3"]);
+    });
+
+    it("keeps unprocessed events across a restart", async () => {
+      if (!h.persistent) {
+        return;
+      }
+
+      await store.recordEvent({ source: "github", externalId: "1", type: "t", payload: {} });
+      await store.close();
+      await open();
+      expect(await store.listUnprocessed()).toHaveLength(1);
+    });
+
     it("enqueues and dequeues by priority, then age, per person", async () => {
       const mk = (person: string, title: string, priority?: number) =>
         store.enqueue({

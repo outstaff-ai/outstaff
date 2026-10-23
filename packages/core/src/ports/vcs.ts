@@ -85,4 +85,11 @@ export interface Vcs {
   /** For the trust model. */
   permission(repo: RepoRef, login: string): Promise<VcsPermission>;
   events(repos: RepoRef[], cursor?: string): Promise<EventPage<VcsEvent>>;
+
+  /**
+   * Webhook mode: verify the delivery (signature) and turn it into events; return `[]` for deliveries to ignore.
+   * Throws `forbidden` when verification fails and `invalid` for a malformed body. Adapters without webhook
+   * support leave it out.
+   */
+  parseWebhook?(headers: Record<string, string | undefined>, body: string): Promise<VcsEvent[]>;
 }

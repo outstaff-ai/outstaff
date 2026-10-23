@@ -67,4 +67,7 @@ export interface Tracker {
   link(key: string, otherKey: string, relation: "blocks" | "relates" | "duplicates"): Promise<void>;
   members(): Promise<Member[]>;
   events(cursor?: string): Promise<EventPage<TrackerEvent>>;
+
+  /** Webhook mode; same contract as `Vcs.parseWebhook`. */
+  parseWebhook?(headers: Record<string, string | undefined>, body: string): Promise<TrackerEvent[]>;
 }

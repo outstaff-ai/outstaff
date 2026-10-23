@@ -64,6 +64,8 @@ people:
     name: Priya Raman
     pronouns: she/her
     role: pm
+    identities:
+      vcs: acme-priya[bot]
     repos:
       "*": read
       docs-site: write
@@ -71,6 +73,8 @@ people:
     name: Tomas Novak
     pronouns: he/him
     role: product
+    identities:
+      vcs: acme-tomas[bot]
     repos:
       "*": read
       docs-site: write
@@ -79,6 +83,8 @@ people:
     pronouns: she/her
     role: architect
     extends: [developer]
+    identities:
+      vcs: acme-mira[bot]
     repos:
       shop: write
       "kind:baseline": read
@@ -86,6 +92,8 @@ people:
     name: Leo Fischer
     pronouns: he/him
     role: designer
+    identities:
+      vcs: acme-leo[bot]
     repos:
       design-system: write
       shop: read
@@ -93,6 +101,8 @@ people:
     name: Sam Duarte
     pronouns: they/them
     role: developer
+    identities:
+      vcs: acme-sam[bot]
     repos:
       shop: write
       "kind:baseline": read
@@ -100,6 +110,8 @@ people:
     name: Noor Haddad
     pronouns: she/her
     role: developer
+    identities:
+      vcs: acme-noor[bot]
     repos:
       shop: write
       "kind:baseline": read
@@ -107,12 +119,16 @@ people:
     name: Ines Varga
     pronouns: she/her
     role: reviewer
+    identities:
+      vcs: acme-ines[bot]
     repos:
       "*": read
   - handle: kofi
     name: Kofi Mensah
     pronouns: he/him
     role: devops
+    identities:
+      vcs: acme-kofi[bot]
     repos:
       infra: write
       shop: read
@@ -398,6 +414,37 @@ LLM model for this agent; the runtime adapter's default when omitted.
 - Optional
 - Minimum length 1
 
+### people[].identities
+
+How this agent is known on each connected system. The office recognizes the agent's own activity only by an exact match with these.
+
+- Type: `object`
+- Optional
+
+#### people[].identities.vcs
+
+Login of this agent on the VCS host, for example "acme-sam[bot]".
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### people[].identities.tracker
+
+Username or id of this agent in the issue tracker.
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### people[].identities.chat
+
+Username or id of this agent in the chat workspace.
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 ### people[].repos
 
 Repository access by repo name, "kind:<primary|baseline|infra|other>" or "*"; values are "read" or "write".
@@ -615,13 +662,13 @@ Event type or types that trigger the rule.
 
 - Type: `string or list of string`
 - Required
-- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `agent.handed_back`, `agent.asked`, `schedule.cron`
+- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `agent.handed_back`, `agent.asked`, `schedule.cron`
 
 #### workflow.rules[].on[]
 
 - Type: `string`
 - Optional
-- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `agent.handed_back`, `agent.asked`, `schedule.cron`
+- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `agent.handed_back`, `agent.asked`, `schedule.cron`
 
 #### workflow.rules[].if
 

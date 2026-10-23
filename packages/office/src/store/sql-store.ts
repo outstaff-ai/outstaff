@@ -135,6 +135,49 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
       return Number(res.numInsertedOrUpdatedRows ?? 0) > 0;
     },
 
+    async listUnprocessed(limit = 1000) {
+      const rows = await db
+        .selectFrom("events")
+        .selectAll()
+        .where("processed_at", "is", null)
+        .orderBy("received_at")
+        .orderBy("id")
+        .limit(limit)
+        .execute();
+
+      return rows.map((r) => ({
+        id: r.id,
+        source: r.source,
+        externalId: r.external_id,
+        type: r.type,
+        payload: JSON.parse(r.payload) as unknown,
+        receivedAt: r.received_at,
+        attempts: Number(r.attempts),
+      }));
+    },
+
+    async noteEventAttempt(source, externalId) {
+      const row = await db
+        .updateTable("events")
+        .set((eb) => ({ attempts: eb("attempts", "+", 1) }))
+        .where("source", "=", source)
+        .where("external_id", "=", externalId)
+        .returning("attempts")
+        .executeTakeFirst();
+
+      return Number(row?.attempts ?? 0);
+    },
+
+    async markProcessed(source, externalId, error) {
+      await db
+        .updateTable("events")
+        .set({ processed_at: iso(now()), process_error: error ?? null })
+        .where("source", "=", source)
+        .where("external_id", "=", externalId)
+        .where("processed_at", "is", null)
+        .execute();
+    },
+
     async enqueue(input: NewWorkItem) {
       const at = now();
       const row = await db

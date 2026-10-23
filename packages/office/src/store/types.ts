@@ -21,6 +21,14 @@ export interface NewWorkItem {
   subject?: { type: string; ref: string };
 }
 
+export interface StoredEvent extends NewEvent {
+  id: string;
+  receivedAt: string;
+
+  /** Failed delivery attempts so far. */
+  attempts: number;
+}
+
 export interface WorkItem {
   id: string;
   person: string;
@@ -116,6 +124,15 @@ export interface Store {
 
   /** Returns false when (source, externalId) was already recorded. */
   recordEvent(event: NewEvent): Promise<boolean>;
+
+  /** Events recorded but not yet marked processed, oldest first. */
+  listUnprocessed(limit?: number): Promise<StoredEvent[]>;
+
+  /** Counts a failed delivery and returns the new total. */
+  noteEventAttempt(source: string, externalId: string): Promise<number>;
+
+  /** Marks delivery done; `error` records why delivery was given up. Idempotent. */
+  markProcessed(source: string, externalId: string, error?: string): Promise<void>;
 
   enqueue(input: NewWorkItem): Promise<WorkItem>;
 
