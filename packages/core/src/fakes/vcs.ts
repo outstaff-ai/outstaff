@@ -16,6 +16,9 @@ export interface FakeVcsOptions {
   host?: string;
   now?: () => Date;
 
+  /** The login the fake acts as when `resolveThread` gets no `asLogin`. Default "sam". */
+  login?: string;
+
   /** How many times `getPullRequest({ waitForMergeable })` re-reads an `unknown` value. Default 5. */
   mergeableRetries?: number;
 }
@@ -33,6 +36,7 @@ interface StoredPr {
 export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
   const host = opts.host ?? "git.acme.example";
   const now = opts.now ?? steppingClock();
+  const self = opts.login ?? "sam";
   const retries = opts.mergeableRetries ?? 5;
   const prs = new Map<string, Map<number, StoredPr>>();
   const checks = new Map<string, Check[]>();
@@ -99,6 +103,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     links,
     seed: {
       repo: defaultRepo,
+      selfLogin: self,
       async pullRequest(repo, p) {
         const map = prs.get(key(repo)) ?? new Map<number, StoredPr>();
         prs.set(key(repo), map);
@@ -224,7 +229,8 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     async reviewThreads(repo, number) {
       return structuredClone(need(repo, number).threads);
     },
-    async resolveThread(repo, threadId, asLogin) {
+    async resolveThread(repo, threadId, login) {
+      const asLogin = login ?? self;
       for (const s of prs.get(key(repo))?.values() ?? []) {
         const thread = s.threads.find((t) => t.id === threadId);
         if (!thread) {

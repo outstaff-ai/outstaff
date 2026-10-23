@@ -1,5 +1,7 @@
 import { commands } from "./commands/index.js";
-import { GLOBAL_OPTIONS, type OptionDef } from "./define.js";
+import { GLOBAL_OPTIONS, type CommandDef, type OptionDef } from "./define.js";
+
+const path = (c: CommandDef) => (c.group ? `${c.group} ${c.name}` : c.name);
 
 const options = (list: OptionDef[]) =>
   [
@@ -32,14 +34,14 @@ export function renderCliReference(): string {
   for (const c of commands) {
     out.push(
       "",
-      `## ost ${c.name}`,
+      `## ost ${path(c)}`,
       "",
       c.summary,
       "",
       c.description,
       "",
       "```",
-      `ost ${c.name}${c.args ? ` ${c.args}` : ""}${c.options.length ? " [options]" : ""}`,
+      `ost ${path(c)}${c.args ? ` ${c.args}` : ""}${c.options.length ? " [options]" : ""}`,
       "```",
     );
 

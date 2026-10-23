@@ -72,11 +72,14 @@ export interface Vcs {
   checks(repo: RepoRef, sha: string): Promise<Check[]>;
   reviewThreads(repo: RepoRef, number: number): Promise<ReviewThread[]>;
 
-  /** Resolves only when the last comment in the thread is `asLogin`'s. */
+  /**
+   * Resolves only when the last comment in the thread is `asLogin`'s. Without `asLogin` the adapter uses its own
+   * identity (for example the container's own App bot), so callers need not know their login on the host.
+   */
   resolveThread(
     repo: RepoRef,
     threadId: string,
-    asLogin: string,
+    asLogin?: string,
   ): Promise<{ resolved: boolean; reason?: string }>;
 
   /** For the trust model. */

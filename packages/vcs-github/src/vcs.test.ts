@@ -637,6 +637,19 @@ describe("review threads", () => {
       expect(mutations).toEqual([{ id: "PRRT_1" }]);
     });
 
+    it("defaults to the container's own bot login", async () => {
+      const own = setup(lastBy("sam"));
+      expect(await own.vcs.resolveThread(REPO, "PRRT_1")).toEqual({ resolved: true });
+      expect(own.mutations).toEqual([{ id: "PRRT_1" }]);
+      const other = setup(lastBy("noor"));
+      expect((await other.vcs.resolveThread(REPO, "PRRT_1")).resolved).toBe(false);
+      expect(other.mutations).toEqual([]);
+      await expectPortError(
+        setup(lastBy("sam"), officeSecrets).vcs.resolveThread(REPO, "PRRT_1"),
+        "forbidden",
+      );
+    });
+
     it("sends the mutation with the container's own App token, not the read-only office token", async () => {
       const { vcs, auth, stub } = setup(lastBy("sam"));
       await vcs.resolveThread(REPO, "PRRT_1", "sam");

@@ -135,6 +135,36 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
       await expectPortError(s.subject.resolveThread(repo, "missing-thread", "sam"), "not_found");
     });
 
+    it("resolves a thread as its own identity when no login is given", async (t) => {
+      const s = get();
+      requireCapability(t, s, "vcs.pullRequests", "vcs.reviewThreads");
+      const self = s.seed.selfLogin;
+      if (!self) {
+        t.skip();
+        return;
+      }
+
+      const repo = repoOf(t, s);
+      const pr = await requireSeed(t, s.seed, "pullRequest")(repo, { title: "Own login" });
+      const thread = requireSeed(t, s.seed, "thread");
+      const mine = await thread(repo, pr.number, {
+        comments: [
+          { author: "noor", body: "rename this" },
+          { author: self, body: "done" },
+        ],
+      });
+
+      const theirs = await thread(repo, pr.number, {
+        comments: [
+          { author: self, body: "done" },
+          { author: "noor", body: "not yet" },
+        ],
+      });
+
+      expect((await s.subject.resolveThread(repo, theirs)).resolved).toBe(false);
+      expect(await s.subject.resolveThread(repo, mine)).toMatchObject({ resolved: true });
+    });
+
     it("reports permissions and gates credentials on them", async (t) => {
       const s = get();
       requireCapability(t, s, "vcs.pullRequests");

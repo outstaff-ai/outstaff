@@ -393,7 +393,16 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       });
     },
 
-    async resolveThread(repo, threadId, asLogin) {
+    async resolveThread(repo, threadId, login) {
+      const app = own();
+      const asLogin = login ?? (app ? `${await app.slug()}[bot]` : undefined);
+      if (asLogin === undefined) {
+        throw new PortError(
+          "forbidden",
+          "Resolving review threads needs this container's own GitHub App.",
+        );
+      }
+
       const token = await apiToken(repo);
       const read = await http.graphql<{
         node: {
@@ -420,7 +429,6 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         };
       }
 
-      const app = own();
       if (!app) {
         throw new PortError(
           "forbidden",
