@@ -154,7 +154,9 @@ function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWor
 
   const context = buildContext(team, {
     ...(links ? { links } : {}),
-    roles: Object.keys(merged.roles).toSorted(),
+    roles: Object.values(merged.roles)
+      .map((r) => ({ name: r.name, title: r.title, summary: r.summary }))
+      .toSorted((a, b) => a.name.localeCompare(b.name)),
   });
 
   const out = new Map<string, string>();

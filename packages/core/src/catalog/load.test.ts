@@ -15,6 +15,9 @@ const CATALOG_PKG = fileURLToPath(new URL("../../../catalog", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "outstaff-catalog-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));
 
+const infos = (c: { roles: Record<string, { name: string; title: string; summary: string }> }) =>
+  Object.values(c.roles).map((r) => ({ name: r.name, title: r.title, summary: r.summary }));
+
 let n = 0;
 const GOOD_ROLE =
   "name: dev\ntitle: Dev\nsummary: Writes code.\ntoolset: code\npermissions: code\n";
@@ -68,7 +71,7 @@ describe("loadCatalog on the example role", () => {
       { name: "review", when: "A pull request needs a second pair of eyes." },
     ]);
 
-    expect(Object.keys(catalog.process)).toEqual(["example-lifecycle"]);
+    expect(Object.keys(catalog.process)).toContain("example-lifecycle");
   });
 
   it("renders the example skill for the acme team", () => {
@@ -77,7 +80,7 @@ describe("loadCatalog on the example role", () => {
       throw new Error("acme invalid");
     }
 
-    const ctx = buildContext(parsed.config, { roles: Object.keys(catalog.roles) });
+    const ctx = buildContext(parsed.config, { roles: infos(catalog) });
     const out = render(catalog.roles.example!.skill.text, ctx, {
       file: catalog.roles.example!.skill.file,
     });
@@ -85,6 +88,66 @@ describe("loadCatalog on the example role", () => {
     expect(out).toContain("The acme team works on Acme Shop.");
     expect(out).toContain("The main repository is shop.");
     expect(out).toContain("- 0: shop\n- 1: infra");
+  });
+});
+
+describe("shared catalog files", () => {
+  const catalog = loadCatalog(CATALOG_PKG);
+  const parsed = parseTeamConfig(parse(readAcmeTeam()));
+  if (!parsed.ok) {
+    throw new Error("acme invalid");
+  }
+
+  const roles = ["pm", "product", "architect", "designer", "developer", "reviewer", "devops"].map(
+    (name) => ({ name, title: name, summary: "A role." }),
+  );
+
+  const docs = [
+    ...Object.values(catalog.process),
+    ...Object.values(catalog.references),
+    ...Object.values(catalog.templates),
+  ];
+
+  it("ships the expected files", () => {
+    expect(Object.keys(catalog.process)).toEqual(
+      expect.arrayContaining([
+        "ticket-lifecycle",
+        "work-items",
+        "review-loop",
+        "hand-back",
+        "direct-requests",
+      ]),
+    );
+
+    expect(Object.keys(catalog.references)).toEqual(
+      expect.arrayContaining(["team", "git", "security", "memory", "ost"]),
+    );
+
+    expect(Object.keys(catalog.templates)).toEqual(
+      expect.arrayContaining(["pull-request", "hand-back"]),
+    );
+  });
+
+  for (const withTracker of [true, false]) {
+    it(`renders every file strictly for acme (tracker: ${withTracker})`, () => {
+      const base = buildContext(parsed.config, { roles });
+      const ctx = {
+        ...base,
+        integrations: {
+          ...base.integrations,
+          has: { ...base.integrations.has, tracker: withTracker },
+        },
+      };
+
+      for (const d of docs) {
+        expect(() => render(d.text, ctx, { file: d.file })).not.toThrow();
+      }
+    });
+  }
+
+  it("never uses a person placeholder", () => {
+    const bad = docs.filter((d) => /\{\{[^}]*\bperson\b/.test(d.text)).map((d) => d.file);
+    expect(bad).toEqual([]);
   });
 });
 
