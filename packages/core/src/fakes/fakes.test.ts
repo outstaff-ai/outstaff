@@ -50,6 +50,23 @@ describe("fake tracker", () => {
   });
 });
 
+describe("fake tracker identities", () => {
+  it("attributes the calls of a view to its identity and the rest to the default actor", async () => {
+    const tracker = createFakeTracker({ actor: { id: "u-1", name: "Dana", kind: "human" } });
+    const sam = await tracker.seed.member({ name: "Sam", kind: "agent" });
+    const issue = await tracker.as(sam).createIssue({ title: "x", body: "", assignee: sam.id });
+    await tracker.as(sam).assign(issue.key, sam.id);
+    await tracker.assign(issue.key, sam.id);
+    const page = await tracker.events();
+    expect(page.events.map((e) => [e.type, e.actor.id])).toEqual([
+      ["created", "u-2"],
+      ["assigned", "u-2"],
+      ["assigned", "u-2"],
+      ["assigned", "u-1"],
+    ]);
+  });
+});
+
 describe("fake chat", () => {
   it("splits long posts at line breaks", async () => {
     const chat = createFakeChat({ maxMessageLength: 20 });

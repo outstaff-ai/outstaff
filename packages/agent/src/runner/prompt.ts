@@ -4,7 +4,12 @@ import type { Workspace } from "../repos/index.js";
 /** The user prompt of a run, from what the office sent with the offer. */
 export function buildWorkPrompt(
   offer: Offer,
-  opts: { resumed: boolean; restarted?: boolean; workspace?: Workspace },
+  opts: {
+    resumed: boolean;
+    restarted?: boolean;
+    workspace?: Workspace;
+    chatContext?: string;
+  },
 ): string {
   const { workItem: item, context } = offer;
   const lines = [
@@ -36,6 +41,19 @@ export function buildWorkPrompt(
     lines.push("", "Journal of earlier rounds:");
     for (const j of context.journal) {
       lines.push(`- ${j.at} ${j.author}: ${j.text}`);
+    }
+  }
+
+  const origin = item.origin;
+  if (origin) {
+    const who = origin.requester.name ?? origin.requester.id;
+    lines.push(
+      "",
+      `This is a request from ${who}, a trusted human, in chat. Follow process/direct-requests.md. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the thread, mentioning ${who}, as the result. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
+    );
+
+    if (opts.chatContext) {
+      lines.push("", opts.chatContext);
     }
   }
 

@@ -1,4 +1,4 @@
-import type { Knowledge, Logger, PortName, TeamConfig, Tracker, Vcs } from "@outstaff/core";
+import type { Chat, Knowledge, Logger, PortName, TeamConfig, Tracker, Vcs } from "@outstaff/core";
 import type { z } from "zod";
 import type { ToolStatus } from "../tools/types.js";
 import type { OfficeClient } from "./office.js";
@@ -19,6 +19,7 @@ export interface AgentEnv {
   tracker?: Tracker;
   knowledge?: Knowledge;
   vcs?: Vcs;
+  chat?: Chat;
   office?: OfficeClient;
 
   /** Why a configured port is missing (adapter not installed, creation failed), by port. */

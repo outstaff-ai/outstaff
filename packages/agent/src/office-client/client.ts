@@ -11,6 +11,8 @@ import {
 } from "@outstaff/protocol";
 import { WebSocket } from "ws";
 import type {
+  ChatMessageResult,
+  ChatReportResult,
   OfficeAnswer,
   OfficeClient,
   OfficeTeam,
@@ -472,6 +474,31 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
 
     usage: (windows) => ack("usage", { windows }),
     answer: (questionId, answer) => ack("answer", { questionId, answer }),
+
+    async place(workItemId, placement) {
+      const r = await call(
+        "work_place",
+        {
+          workItemId,
+          position: placement.position,
+          ...(placement.relativeTo ? { relativeTo: placement.relativeTo } : {}),
+        },
+        "work_move_result",
+      );
+
+      return compact(r.item) as OfficeWorkItem;
+    },
+
+    chatMessage: (m): Promise<ChatMessageResult> => call("chat_message", m, "chat_message_result"),
+    chatReport: (workItemId, kind): Promise<ChatReportResult> =>
+      call("chat_report", { workItemId, kind }, "chat_report_result"),
+    async linkTicket(workItemId, ticket) {
+      const r = await call("work_link", { workItemId, ticket }, "work_link_result");
+      return r.url ? { url: r.url } : {};
+    },
+    async currentWork() {
+      return (await call("current_work", {}, "current_work_result")).text;
+    },
 
     async ask(q): Promise<OfficeAnswer> {
       const r = await call("ask", q, "ask_result");

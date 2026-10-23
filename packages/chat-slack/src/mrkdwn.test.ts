@@ -48,6 +48,12 @@ describe("toMrkdwn goldens", () => {
     expect(toMrkdwn(input)).toBe(expected);
   });
 
+  it("keeps a mention of a member and still escapes other angle brackets", () => {
+    expect(toMrkdwn("<@U0AB12CD3> done, see <b> and [PR](https://example.test/pr/1)")).toBe(
+      "<@U0AB12CD3> done, see &lt;b&gt; and <https://example.test/pr/1|PR>",
+    );
+  });
+
   it("is idempotent enough to leave plain text alone", () => {
     expect(toMrkdwn("plain text, nothing special.")).toBe("plain text, nothing special.");
   });

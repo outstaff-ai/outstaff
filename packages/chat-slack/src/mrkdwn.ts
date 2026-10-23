@@ -38,6 +38,9 @@ function inline(raw: string): string {
     stash(`<${escapeSlack(url)}>`),
   );
 
+  // A mention of a workspace member, written `<@U123ABC456>` in Markdown.
+  text = text.replaceAll(/<@[UW][A-Z0-9]{8,}>/g, (mention) => stash(mention));
+
   text = escapeSlack(text);
 
   text = text

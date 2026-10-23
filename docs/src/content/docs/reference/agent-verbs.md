@@ -105,6 +105,30 @@ ost ticket assign ACME-12 me
 ost ticket assign ACME-12 none
 ```
 
+## ticket.create
+
+Create a ticket assigned to you.
+
+Creates a ticket assigned to you. Inside a chat request, the ticket becomes the request's ticket: the requester is told about it and the work item is tracked by it. A chat request that already has a ticket refuses a second one. Create one only for a request that is work; answer a question directly.
+
+```
+ost ticket create --title <title> [--body <body>] [--status <status>]
+```
+
+Runtime tool: `ticket_create`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `title` | string | yes | Short title. |
+| `body` | string | no | What is asked and why, Markdown. Default: "". |
+| `status` | ready \| active | no | Where it starts; active when you start now (the default inside a work item). |
+
+Examples:
+
+```sh
+ost ticket create --title "Add a search page" --body "Asked by Dana in chat."
+```
+
 ## doc.search
 
 Search the knowledge base.
@@ -365,7 +389,7 @@ List your work items.
 Lists the work items the office has scheduled for you, with their tickets and pull requests.
 
 ```
-ost work
+ost work list
 ```
 
 Runtime tool: `work`
@@ -373,7 +397,32 @@ Runtime tool: `work`
 Examples:
 
 ```sh
-ost work
+ost work list
+```
+
+## work.move
+
+Put one of your queued work items at a place in your queue.
+
+Moves a queued work item of yours: next (ahead of the other queued items), last, or before or after another queued item. A running item is never interrupted. Use it when a human tells you where a chat request goes.
+
+```
+ost work move <id> <position> [relativeTo]
+```
+
+Runtime tool: `work_move`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | string | yes | Id of the queued work item. |
+| `position` | next \| last \| before \| after | yes | Where it goes. |
+| `relativeTo` | string | no | The queued item it goes before or after; needed for before and after. |
+
+Examples:
+
+```sh
+ost work move 01J9X next
+ost work move 01J9X after 01J9Y
 ```
 
 ## team

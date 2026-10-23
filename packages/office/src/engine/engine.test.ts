@@ -62,6 +62,42 @@ describe("engine", () => {
     expect(await h.items("sam")).toHaveLength(1);
   });
 
+  it("never starts work for a person from an event the person caused", async () => {
+    h = await harness();
+    await h.human("Dana");
+    const issue = await h.tracker.createIssue({ title: "Search", body: "", assignee: "u-sam" });
+    await h.ws.apply(
+      { type: "ticket.created", subject: { ticket: issue.key }, actor: dana, data: {} },
+      { source: "tracker", externalId: "c", trusted: true },
+    );
+
+    const assigned = (actor: WorkflowEvent["actor"]): WorkflowEvent => ({
+      type: "ticket.assigned",
+      subject: { ticket: issue.key },
+      actor,
+      data: {},
+    });
+
+    const own = await h.engine.handle(assigned({ kind: "agent", id: "sam" }), {
+      source: "tracker",
+      externalId: "own",
+      trusted: true,
+    });
+
+    expect(own.at(-1)).toMatchObject({ status: "skipped" });
+    expect(own.at(-1)!.note).toContain("caused the event themselves");
+    expect(await h.items("sam")).toHaveLength(0);
+
+    const byHuman = await h.engine.handle(assigned(dana), {
+      source: "tracker",
+      externalId: "human",
+      trusted: true,
+    });
+
+    expect(byHuman.at(-1)).toMatchObject({ status: "applied" });
+    expect(await h.items("sam")).toHaveLength(1);
+  });
+
   it("does not queue a second item while one for the same person, subject and kind is live", async () => {
     h = await harness();
     const { conflicted } = await conflictSetup();
@@ -95,6 +131,30 @@ describe("engine", () => {
     const items = await h.items("sam");
     expect(items).toHaveLength(2);
     expect(items.find((i) => i.status === "queued")!.parentId).toBe(item!.id);
+  });
+
+  it("does not queue an item for a subject a chat request is already working on", async () => {
+    h = await harness();
+    const { conflicted } = await conflictSetup();
+    await h.engine.handle(conflicted("1"), { source: "workstate", externalId: "a", trusted: true });
+    const [first] = await h.items("sam");
+    await h.store.updateItem(first!.id, { status: "done" });
+    await h.store.enqueue({
+      person: "sam",
+      kind: "chat",
+      title: "Chat: fix the conflict",
+      trigger: "human",
+      subject: first!.subject!,
+    });
+
+    const b = await h.engine.handle(conflicted("2"), {
+      source: "workstate",
+      externalId: "b",
+      trusted: true,
+    });
+
+    expect(b.at(-1)).toMatchObject({ status: "skipped" });
+    expect(await h.items("sam")).toHaveLength(2);
   });
 
   it("continues after a transient failure without repeating what was applied", async () => {

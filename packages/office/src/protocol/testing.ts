@@ -149,5 +149,9 @@ export function createFakeSource(members: Member[] = []): FakeSource {
       it.state = status;
       return summary(id, it);
     },
+    async place(person, id) {
+      record("place", person, id);
+      return summary(id, find(person, id));
+    },
   };
 }

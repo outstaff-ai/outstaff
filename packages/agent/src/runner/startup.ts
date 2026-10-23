@@ -39,6 +39,7 @@ import { installTools, type MiseRunner, type ToolStatus } from "../tools/index.j
 import { createAgentEnv } from "../verbs/env.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { buildIdentityPrompt } from "./identity.js";
+import { createChatRelay, type ChatRelay } from "./chat.js";
 import { agentLayout } from "./layout.js";
 import { createWorkLoop, type WorkLoop } from "./loop.js";
 import { createUsageReporter, type UsageReporter } from "./usage.js";
@@ -93,6 +94,9 @@ export interface PreparedAgent {
 
   /** The declared tools and whether each is available. */
   tools: ToolStatus[];
+
+  /** Listens on the agent's own chat identity; absent when the team has no chat or it cannot start. */
+  chat?: ChatRelay;
 }
 
 /** Why the agent cannot start, in words an operator can act on. */
@@ -349,7 +353,22 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     log,
   });
 
+  let chat: ChatRelay | undefined;
+  if (env.chat) {
+    chat = createChatRelay({
+      chat: env.chat,
+      office: connection,
+      team,
+      person,
+      log,
+      ...(env.tracker ? { tracker: env.tracker } : {}),
+    });
+  } else if (env.unavailable?.chat) {
+    log.warn("chat requests are off", { reason: env.unavailable.chat });
+  }
+
   const loop = createWorkLoop({
+    ...(chat ? { chat } : {}),
     office: connection,
     usage,
     runtime,
@@ -383,5 +402,6 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     workdir: layout.workDir,
     repos,
     tools: toolStatuses,
+    ...(chat ? { chat } : {}),
   };
 }

@@ -7,6 +7,7 @@ import { FakeSocket, createManualClock, type ManualClientClock } from "../office
 import { fakeEnv } from "../verbs/testing.js";
 import type { Workspaces } from "../repos/index.js";
 import { JOURNAL_PROMPT } from "./journal.js";
+import type { ChatRelay } from "./chat.js";
 import { createWorkLoop, linksIn, type WorkLoop } from "./loop.js";
 import { createUsageReporter, type UsageReporter } from "./usage.js";
 
@@ -26,18 +27,37 @@ class OfficeSocket extends FakeSocket {
         this.reply(m, "ask_result", { id: "q1", to: m.payload.to, status: "pending" });
       } else if (m.type === "journal" && this.failJournal) {
         this.reply(m, "error", { code: "invalid", message: "No journal today." });
+      } else if (m.type === "work_list") {
+        this.reply(m, "work_list_result", { items: [] });
+      } else if (m.type === "work_link") {
+        this.reply(m, "work_link_result", {});
       } else {
         this.reply(m, "ack");
       }
     });
   }
 
-  offerWith(id: string, extra: { sessionId?: string; journal?: boolean } = {}) {
+  offerWith(id: string, extra: { sessionId?: string; journal?: boolean; origin?: boolean } = {}) {
     this.receive({
       id: `offer-${id}`,
       type: "offer",
       payload: {
-        workItem: { id, kind: "ticket", title: `Fix ${id}`, priority: 1, trigger: "human" },
+        workItem: {
+          id,
+          kind: extra.origin ? "chat" : "ticket",
+          title: `Fix ${id}`,
+          priority: 1,
+          trigger: "human",
+          ...(extra.origin
+            ? {
+                origin: {
+                  channel: "D1",
+                  thread: "t1",
+                  requester: { id: "U0REQ0001", name: "Dana" },
+                },
+              }
+            : {}),
+        },
         context: {
           journal: extra.journal
             ? [{ at: "2030-01-01T00:00:00Z", author: "sam", text: "Plan: a" }]
@@ -125,7 +145,12 @@ describe("work loop", () => {
 
   function start(
     runtime: Runtime,
-    extra: { progressEveryMs?: number; workspaces?: Workspaces; usage?: UsageReporter } = {},
+    extra: {
+      progressEveryMs?: number;
+      workspaces?: Workspaces;
+      usage?: UsageReporter;
+      chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
+    } = {},
   ) {
     const { env } = fakeEnv();
     const policy = buildPolicy({
@@ -582,6 +607,194 @@ describe("work loop", () => {
     await until(() => sentOf("handback").length === 2);
     await loop.stop();
     await conn.stop();
+  });
+
+  describe("chat requests", () => {
+    const relay = () => {
+      const reports: { kind: string; text: string; links: unknown; item: string }[] = [];
+      const acks: { item: string; key: string }[] = [];
+      const chat: Pick<ChatRelay, "context" | "report" | "acknowledge"> = {
+        async context() {
+          return "Recent messages:\n- Dana: add search\n\nYour current work:\nTicket ACME-9";
+        },
+        async acknowledge(offer, ticket) {
+          acks.push({ item: offer.workItem.id, key: ticket.key });
+        },
+        async report(offer, kind, text, links) {
+          reports.push({ kind, text, links, item: offer.workItem.id });
+        },
+      };
+
+      return { chat, reports, acks };
+    };
+
+    it("acknowledges in the thread when the agent creates a ticket for the request", async () => {
+      await connect();
+      const { chat, acks } = relay();
+      const runtime: Runtime = {
+        async *run(req) {
+          yield { type: "started", sessionId: "s" };
+          await req.tools
+            .find((t) => t.name === "ticket_create")!
+            .handler({ title: "Add search" }, { workItemId: req.workItemId! });
+
+          yield { type: "finished", ok: true, text: "Done." };
+        },
+      };
+
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("work_link")[0]?.payload).toMatchObject({ workItemId: "c1" });
+      expect(acks).toEqual([{ item: "c1", key: expect.stringMatching(/^SHOP-/) as string }]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("starts a new chat session with the conversation and current work, and reports the result", async () => {
+      await connect();
+      const { chat, reports } = relay();
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Search is up: https://git.acme.example/pull/3" }]);
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => reports.length === 1);
+
+      const prompt = runtime.requests[0]!.prompt;
+      expect(prompt).toContain("request from Dana, a trusted human, in chat");
+      expect(prompt).toContain("Recent messages:\n- Dana: add search");
+      expect(prompt).toContain("Ticket ACME-9");
+      expect(reports).toEqual([
+        {
+          kind: "result",
+          item: "c1",
+          text: "Search is up: https://git.acme.example/pull/3",
+          links: [{ url: "https://git.acme.example/pull/3" }],
+        },
+      ]);
+
+      // Reported after the hand-back, so the office sees the item done when it grants the report.
+      expect(types().indexOf("handback")).toBeGreaterThan(-1);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("restarts a lost chat session with the conversation, the journal entry, and reports once after it", async () => {
+      await connect();
+      const { chat, reports } = relay();
+      const runtime = createFakeRuntime();
+      runtime.enqueue([
+        { type: "finish", ok: false, error: "No conversation found", sessionLost: true },
+      ]);
+
+      runtime.enqueue([{ type: "finish", text: "Done: https://git.acme.example/pull/5" }]);
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true, sessionId: "gone-1" });
+      await until(() => reports.length === 1);
+
+      const [lost, fresh] = runtime.requests;
+      expect(lost?.sessionId).toBe("gone-1");
+      expect(lost?.prompt).not.toContain("Recent messages");
+      expect(fresh?.sessionId).toBeUndefined();
+      expect(fresh?.prompt).toContain("Recent messages");
+      const journals = sentOf("journal").map((m) => (m.payload as { text: string }).text);
+      expect(journals[0]).toContain("Session restarted from journal");
+      expect(types().indexOf("handback")).toBeGreaterThan(types().indexOf("journal"));
+      expect(reports[0]).toMatchObject({ kind: "result", item: "c1" });
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("does not add the conversation to a resumed session", async () => {
+      await connect();
+      const { chat } = relay();
+      const runtime = createFakeRuntime();
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true, sessionId: "thread-session" });
+      await until(() => sentOf("handback").length === 1);
+      expect(runtime.requests[0]!.sessionId).toBe("thread-session");
+      expect(runtime.requests[0]!.prompt).not.toContain("Recent messages");
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("tells the requester nothing while the item waits for a teammate's answer", async () => {
+      await connect();
+      const { chat, reports } = relay();
+      const runtime: Runtime = {
+        async *run(req) {
+          yield { type: "started", sessionId: "s" };
+          await req.tools
+            .find((t) => t.name === "ask")!
+            .handler({ to: "mira", question: "Which queue?" }, { workItemId: req.workItemId! });
+
+          yield { type: "finished", ok: true, text: "Asked Mira." };
+        },
+      };
+
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "waiting" });
+      expect(reports).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("tells the requester when the run fails", async () => {
+      await connect();
+      const { chat, reports } = relay();
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", ok: false, error: "model overloaded" }]);
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => reports.length === 1);
+      expect(reports[0]).toMatchObject({ kind: "failed", text: "model overloaded" });
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("does not report an item that was interrupted by a shutdown, nor one without a chat origin", async () => {
+      await connect();
+      const { chat, reports } = relay();
+      const { runtime } = blockingRuntime();
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("progress").length === 1);
+      await loop.stop();
+      expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "waiting" });
+      expect(reports).toEqual([]);
+      await conn.stop();
+      await running;
+
+      socket = new OfficeSocket();
+      await connect();
+      start(createFakeRuntime(), { chat });
+      socket.offerWith("plain");
+      await until(() => sentOf("handback").length === 1);
+      expect(reports).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("carries on when reporting fails", async () => {
+      await connect();
+      const chat: Pick<ChatRelay, "context" | "report" | "acknowledge"> = {
+        context: async () => undefined,
+        acknowledge: async () => {},
+        report: async () => {
+          throw new Error("chat is down");
+        },
+      };
+
+      start(createFakeRuntime(), { chat });
+      socket.offerWith("c1", { origin: true });
+      socket.offerWith("c2", { origin: true });
+      await until(() => sentOf("handback").length === 2);
+      expect(sentOf("fail")).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
   });
 
   it("declines items left from before a restart so the office offers them again", async () => {

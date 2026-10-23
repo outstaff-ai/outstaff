@@ -48,8 +48,8 @@ try {
     stopping = true;
     log.info("stopping", { signal });
     agent.usage.stop();
-    agent.loop
-      .stop()
+    (agent.chat?.stop() ?? Promise.resolve())
+      .then(() => agent.loop.stop())
       .then(() => agent.connection.stop())
       .catch((e) => log.error("could not stop cleanly", { error: String(e) }));
   };
@@ -62,6 +62,10 @@ try {
   await agent.connection.whenConnected();
   log.info("connected");
   agent.usage.start();
+  await agent.chat?.start().catch((e: unknown) => {
+    log.error("chat requests are off: the chat connection failed", { error: String(e) });
+  });
+
   await agent.loop.run();
   await agent.connection.stop();
   process.exitCode = agent.connection.rejection() ? 1 : 0;

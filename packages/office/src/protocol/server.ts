@@ -14,7 +14,7 @@ import {
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Clock } from "../clock.js";
 import type { AgentAuth } from "./auth.js";
-import { ProtocolError, type Messaging, type WorkSource } from "./source.js";
+import { ProtocolError, type ChatDesk, type Messaging, type WorkSource } from "./source.js";
 
 export const CLOSE_AUTH = 4401;
 export const CLOSE_VERSION = 4426;
@@ -26,6 +26,7 @@ export interface ProtocolServerOptions {
 
   /** Receives the usage windows agents report. Without it a report is refused as unsupported. */
   usage?: { report(person: string, windows: PayloadOf<"usage">["windows"]): Promise<void> };
+  chat?: ChatDesk;
   auth: AgentAuth;
   clock: Clock;
   logger?: Logger;
@@ -146,6 +147,14 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     deliveries.set(person, next);
   }
 
+  function desk(): ChatDesk {
+    if (!opts.chat) {
+      throw new ProtocolError("unsupported", "This office does not take chat requests.");
+    }
+
+    return opts.chat;
+  }
+
   async function handleRequest(c: Connection, person: string, m: Message) {
     const reply = <T extends MessageType>(type: T, payload: PayloadOf<T>) =>
       send(c, type, payload, m.id);
@@ -228,6 +237,29 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         return reply("work_move_result", {
           item: await source.move(person, m.payload.workItemId, m.payload.status),
         });
+      case "work_place":
+        return reply("work_move_result", {
+          item: await source.place(
+            person,
+            m.payload.workItemId,
+            m.payload.position,
+            m.payload.relativeTo,
+          ),
+        });
+      case "chat_message":
+        return reply("chat_message_result", await desk().message(person, m.payload));
+      case "chat_report":
+        return reply(
+          "chat_report_result",
+          await desk().report(person, m.payload.workItemId, m.payload.kind),
+        );
+      case "work_link":
+        return reply(
+          "work_link_result",
+          await desk().linkTicket(person, m.payload.workItemId, m.payload.ticket),
+        );
+      case "current_work":
+        return reply("current_work_result", { text: await desk().currentWork(person) });
       default:
         throw new ProtocolError("invalid", `Agents do not send "${m.type}".`);
     }

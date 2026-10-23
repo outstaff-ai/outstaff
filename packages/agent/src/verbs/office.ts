@@ -1,3 +1,5 @@
+import type { PayloadOf } from "@outstaff/protocol";
+
 /** What the office tells an agent; the wire protocol is defined separately (the verbs only need this). */
 export interface OfficeWorkItem {
   id: string;
@@ -37,6 +39,12 @@ export interface OfficeAnswer {
   answer?: string;
 }
 
+export type ChatMessageRequest = PayloadOf<"chat_message">;
+export type ChatMessageResult = PayloadOf<"chat_message_result">;
+export type ChatReportKind = PayloadOf<"chat_report">["kind"];
+export type ChatReportResult = PayloadOf<"chat_report_result">;
+export type Placement = Pick<PayloadOf<"work_place">, "position" | "relativeTo">;
+
 export interface OfficeClient {
   /** Ask a teammate a question; the office routes it and may answer later. */
   ask(q: { to: string; question: string; workItemId?: string }): Promise<OfficeAnswer>;
@@ -47,11 +55,30 @@ export interface OfficeClient {
   /** The caller's work items. */
   work(q: { workItemId?: string }): Promise<OfficeWorkItem[]>;
   team(): Promise<OfficeTeam>;
+
+  /** Puts one of the caller's queued items at a place in the queue. */
+  place(workItemId: string, placement: Placement): Promise<OfficeWorkItem>;
+
+  /** A trusted human's chat message: the office decides what becomes of it. */
+  chatMessage(m: ChatMessageRequest): Promise<ChatMessageResult>;
+
+  /** Asks to tell the requester of a chat item how it ended; false in `post` when that was done already. */
+  chatReport(workItemId: string, kind: ChatReportKind): Promise<ChatReportResult>;
+
+  /** The caller's open tickets and pull requests, as text. */
+  currentWork(): Promise<string>;
+
+  /** Makes a ticket the subject of the caller's chat item. Refused when the item already has one. */
+  linkTicket(workItemId: string, ticket: string): Promise<{ url?: string }>;
 }
 
 export interface FakeOffice extends OfficeClient {
   asked: { to: string; question: string; workItemId?: string }[];
   answered: { questionId: string; answer: string }[];
+  placed: { workItemId: string; placement: Placement }[];
+  linked: { workItemId: string; ticket: string }[];
+  chatMessages: ChatMessageRequest[];
+  chatReports: { workItemId: string; kind: ChatReportKind }[];
 }
 
 export function createFakeOffice(
@@ -60,13 +87,56 @@ export function createFakeOffice(
     team?: OfficeTeamMember[];
     humans?: { name: string }[];
     answer?: (to: string, question: string) => string | undefined;
+
+    /** What the office answers a chat message; by default it starts an item. */
+    chatMessage?: (m: ChatMessageRequest) => ChatMessageResult;
+    chatReport?: (workItemId: string, kind: ChatReportKind) => ChatReportResult;
+    currentWork?: string;
   } = {},
 ): FakeOffice {
   const asked: FakeOffice["asked"] = [];
   const answered: FakeOffice["answered"] = [];
+  const placed: FakeOffice["placed"] = [];
+  const linked: FakeOffice["linked"] = [];
+  const chatMessages: ChatMessageRequest[] = [];
+  const chatReports: FakeOffice["chatReports"] = [];
+  const seen = new Set<string>();
   return {
     asked,
     answered,
+    placed,
+    linked,
+    async linkTicket(workItemId, ticket) {
+      linked.push({ workItemId, ticket });
+      return { url: `https://tracker.acme.example/issue/${ticket}` };
+    },
+    chatMessages,
+    chatReports,
+    async place(workItemId, placement) {
+      placed.push({ workItemId, placement });
+      return { id: workItemId, title: workItemId, status: "queued" };
+    },
+    async chatMessage(m) {
+      chatMessages.push(m);
+      const repeated = seen.has(m.messageId);
+      seen.add(m.messageId);
+      const result = opts.chatMessage?.(m) ?? {
+        disposition: "started" as const,
+        repeated: false,
+        item: { id: `chat-${chatMessages.length}`, title: m.text, status: "queued" },
+        links: [],
+        work: [],
+      };
+
+      return { ...result, repeated };
+    },
+    async chatReport(workItemId, kind) {
+      chatReports.push({ workItemId, kind });
+      return opts.chatReport?.(workItemId, kind) ?? { post: true, requester: "U-req", links: [] };
+    },
+    async currentWork() {
+      return opts.currentWork ?? "No open tickets or pull requests.";
+    },
     async answer(questionId, answer) {
       answered.push({ questionId, answer });
     },

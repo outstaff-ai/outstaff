@@ -95,7 +95,7 @@ describe("ost verbs", () => {
     const f = fakeEnv();
     expect((await ost(["me"], f)).out).toContain("Sam Duarte");
     expect((await ost(["ask", "mira", "Ok?"], f)).out).toContain("Yes.");
-    expect((await ost(["work"], f, { OUTSTAFF_WORK_ITEM: "w1" })).out).toContain("* w1");
+    expect((await ost(["work", "list"], f, { OUTSTAFF_WORK_ITEM: "w1" })).out).toContain("* w1");
     expect((await ost(["roster"], f)).out).toContain("mira");
     expect(f.office.asked).toHaveLength(1);
   });
@@ -121,7 +121,7 @@ describe("ost verbs", () => {
   });
 
   it("says when it is not connected to an office", async () => {
-    const r = await ost(["work"], fakeEnv({ office: false }));
+    const r = await ost(["work", "list"], fakeEnv({ office: false }));
     expect(r.err).toContain("not connected to an office");
   });
 

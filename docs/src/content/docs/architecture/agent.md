@@ -72,7 +72,37 @@ One runtime session per work item ([0010](/decisions/0010-context-per-work-item/
 
 It never starts from nothing silently, and it restarts once: if the new session fails too, the item fails as usual.
 
-Chat threads will get their own sessions ([#43](https://github.com/outstaff-ai/outstaff/issues/43)); the session manager has a marked place for them, and until then only work items have sessions.
+A chat request has a second kind of key, the thread (`thread:<channel>:<thread>`). The items of one thread, the request and a follow-up after it was done, share one session; the office stores it with the item like any other and carries it over to the next item of the thread. A thread session is never used for an item that did not come from that thread, and an item session is never used for a thread.
+
+## Chat
+
+Each agent listens on its own chat identity: the chat adapter is created in the agent container from the person's secrets, and `chat.start` hands every message to the chat relay (`createChatRelay`). The adapter applies the trust filter and the relay checks again: a message from anyone but a trusted human, and any message from a bot, is dropped before it reaches the office. Direct messages and mentions are the requests; nothing else is read.
+
+For each message the relay reacts with `eyes`, sends `chat_message` to the office, and posts the answer in the message's thread:
+
+| The office says | The agent posts                                                                                                                                                                                                                                                                  |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `started`       | Nothing yet; the `eyes` reaction shows it was seen. The first reply comes when the agent creates a ticket for the request (below).                                                                                                                                               |
+| `waiting`       | The person is busy: the current work in the order it runs (the active item first, each with its ticket or pull request link), then the ask where the request goes: next, after one of them (by number), last, or the PM when the team has one. The request waits last meanwhile. |
+| `placed`        | Where the request went.                                                                                                                                                                                                                                                          |
+| `asked_pm`      | That the PM was asked, and that it waits until the human says where it goes.                                                                                                                                                                                                     |
+| `unclear`       | The question again, with the list.                                                                                                                                                                                                                                               |
+| `joined`        | Nothing. The message is in the journal of the item of the thread and the item sees it on its next round.                                                                                                                                                                         |
+
+A message the office already handled (`repeated`) gets no second answer, so a redelivery by the chat platform does not post twice. If the office cannot be reached the relay says so in the thread, since the adapter has already marked the message as seen.
+
+**First reply.** Not every message is work, so the office files nothing. A request that is work starts with `ost ticket create`: the ticket is assigned to the agent, the office makes it the chat item's subject (`work_link`; an item that already has a ticket refuses a second one), and the relay posts "On it. Tracked in <ticket>" in the thread, once. A question is answered in the final message with no ticket.
+
+**Context.** A new chat session, one without a stored session, starts with the last messages of the conversation (the thread, and the messages before it in the same direct message or channel; 10 by default, from the adapter's `history`) and the person's current work (`current_work` to the office: tickets and pull requests with status, CI and review). Text from anyone but a trusted human is marked as data. A resumed session already knows the conversation; what was said in the thread since is in the item's journal. A session restarted after a lost one gets the conversation again, like any new chat session. Chat items go through the same rounds as all items, so they also get the lost-session restart and the journal entry on hand-back; the report to the requester comes after that journal step.
+
+**Report back.** When an item with a chat origin ends, the agent asks the office with `chat_report` whether to post, and the office grants each ending once. The post goes to the thread the request came from and mentions the requester (`<@id>`, which the adapter turns into a mention):
+
+- **Done.** The final message of the item, cut to the `policies.messages.max_lines` of the team, followed by links the message does not contain: the pull request, the ticket, documents. The links come from the hand-back and from the office, which knows the item's ticket (if there is one) and the pull requests that implement it.
+- **Failed.** One short note that it could not finish and will be tried again. The next failure of the same item stays quiet.
+- **Blocked.** What is needed, with the links. An item the scheduler blocks (stale twice, loop guard) is reported by the office itself.
+- **Waiting.** Nothing. An item that waits for a teammate's answer, a shutdown hand-back, and the review rounds and questions that grow out of the request report nothing; the requester hears when the requester's own item finishes.
+
+`ost work move <id> next|last|before|after [other]` puts a queued item at a place in the agent's queue. The requester's answer in the thread normally does that without the agent.
 
 ## Journal
 

@@ -66,12 +66,13 @@ export const answer = defineVerb({
 
 export const work = defineVerb({
   name: "work",
+  cli: ["work", "list"],
   summary: "List your work items.",
   description:
     "Lists the work items the office has scheduled for you, with their tickets and pull requests.",
   input: z.strictObject({}),
   args: [],
-  examples: ["ost work"],
+  examples: ["ost work list"],
   async run(env, _input, ctx) {
     const items = await requireOffice(env).work(
       ctx.workItemId ? { workItemId: ctx.workItemId } : {},
@@ -89,6 +90,38 @@ export const work = defineVerb({
       lines.length ? lines : ["No work items."],
       { items: rows },
       rows.flatMap((i) => [i.ticketUrl, i.prUrl].filter((u): u is string => !!u)),
+    );
+  },
+});
+
+export const workMove = defineVerb({
+  name: "work.move",
+  summary: "Put one of your queued work items at a place in your queue.",
+  description:
+    "Moves a queued work item of yours: next (ahead of the other queued items), last, or before or after another queued item. A running item is never interrupted. Use it when a human tells you where a chat request goes.",
+  input: z.strictObject({
+    id: z.string().min(1).describe("Id of the queued work item."),
+    position: z.enum(["next", "last", "before", "after"]).describe("Where it goes."),
+    relativeTo: z
+      .string()
+      .min(1)
+      .optional()
+      .describe("The queued item it goes before or after; needed for before and after."),
+  }),
+  args: ["id", "position", "relativeTo"],
+  examples: ["ost work move 01J9X next", "ost work move 01J9X after 01J9Y"],
+  async run(env, input) {
+    const item = await requireOffice(env).place(input.id, {
+      position: input.position,
+      ...(input.relativeTo ? { relativeTo: input.relativeTo } : {}),
+    });
+
+    return result(
+      [
+        `Work item ${item.id} (${item.title}) goes ${input.position}${input.relativeTo ? ` ${input.relativeTo}` : ""}.`,
+      ],
+      { item },
+      [],
     );
   },
 });
@@ -118,4 +151,4 @@ export const team = defineVerb({
   },
 });
 
-export const officeVerbs = [ask, answer, work, team];
+export const officeVerbs = [ask, answer, work, workMove, team];

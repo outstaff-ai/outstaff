@@ -1,6 +1,6 @@
 import { CANONICAL_STATUSES, PortError, type Issue, type Member } from "@outstaff/core";
 import { z } from "zod";
-import { requireTracker } from "./support.js";
+import { requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
 const key = z
@@ -136,4 +136,55 @@ export const ticketAssign = defineVerb({
   },
 });
 
-export const ticketVerbs = [ticketShow, ticketComment, ticketMove, ticketAssign];
+export const ticketCreate = defineVerb({
+  name: "ticket.create",
+  summary: "Create a ticket assigned to you.",
+  description:
+    "Creates a ticket assigned to you. Inside a chat request, the ticket becomes the request's ticket: the requester is told about it and the work item is tracked by it. A chat request that already has a ticket refuses a second one. Create one only for a request that is work; answer a question directly.",
+  input: z.strictObject({
+    title: z.string().min(1).max(300).describe("Short title."),
+    body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),
+    status: z
+      .enum(["ready", "active"])
+      .optional()
+      .describe("Where it starts; active when you start now (the default inside a work item)."),
+  }),
+  args: [],
+  examples: ['ost ticket create --title "Add a search page" --body "Asked by Dana in chat."'],
+  async run(env, input, ctx) {
+    const tracker = requireTracker(env);
+    if (ctx.workItemId) {
+      const [current] = (await requireOffice(env).work({ workItemId: ctx.workItemId })).filter(
+        (i) => i.id === ctx.workItemId,
+      );
+
+      if (current?.ticketKey) {
+        throw new PortError(
+          "invalid",
+          `This work item already has ticket ${current.ticketKey}; use it instead of creating another.`,
+        );
+      }
+    }
+
+    const handle = env.team.people.find((p) => p.handle === env.person)?.identities?.tracker;
+    const member = handle
+      ? (await tracker.members()).find((m) => m.id === handle || m.username === handle)
+      : undefined;
+
+    const issue = await tracker.createIssue({
+      title: input.title,
+      body: input.body,
+      status: input.status ?? (ctx.workItemId ? "active" : "ready"),
+      ...(member ? { assignee: member.id } : {}),
+    });
+
+    const url = tracker.links.issue(issue.key);
+    if (ctx.workItemId) {
+      await requireOffice(env).linkTicket(ctx.workItemId, issue.key);
+    }
+
+    return result([`Created ${issue.key}.`, ...summary(issue, url)], { issue }, [url]);
+  },
+});
+
+export const ticketVerbs = [ticketShow, ticketComment, ticketMove, ticketAssign, ticketCreate];

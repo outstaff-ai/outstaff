@@ -10,8 +10,10 @@ import type { Link } from "@outstaff/protocol";
 import type { Offer, OfficeConnection } from "../office-client/index.js";
 import type { Workspaces } from "../repos/index.js";
 import { createRuntimeTools } from "../verbs/index.js";
+import type { ChatReportKind } from "../verbs/office.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
+import type { ChatRelay } from "./chat.js";
 import { buildWorkPrompt } from "./prompt.js";
 import type { UsageReporter } from "./usage.js";
 import { createSessionManager, type SessionManager } from "./sessions.js";
@@ -50,6 +52,9 @@ export interface WorkLoopOptions {
 
   /** Gets the usage events of the runtime and learns when the agent is busy. */
   usage?: Pick<UsageReporter, "observe" | "flush" | "setBusy">;
+
+  /** Chat requests: the context a new chat session starts with, and the report to the requester. */
+  chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
   log?: Logger;
 
   /** Least time between two progress messages for an item. Default 30000. */
@@ -113,10 +118,31 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     }
   }
 
+  async function report(
+    offer: Offer,
+    kind: Exclude<ChatReportKind, "ack">,
+    text: string,
+    links: Link[] = [],
+  ) {
+    if (!offer.workItem.origin || !opts.chat) {
+      return;
+    }
+
+    try {
+      await opts.chat.report(offer, kind, text, links);
+    } catch (e) {
+      log.warn("could not tell the requester", { workItemId: offer.workItem.id, error: reason(e) });
+    }
+  }
+
   async function work(offer: Offer, abort: AbortController) {
     const id = offer.workItem.id;
     const sessionId = sessions.resumeFor(offer);
     const workspace = await opts.workspaces?.prepare(offer);
+
+    // A resumed session already knows the conversation; the thread's later messages are in the journal.
+    const chatContext =
+      offer.workItem.origin && !sessionId ? await opts.chat?.context(offer) : undefined;
 
     // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
     let asked = false;
@@ -129,6 +155,17 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
             async ask(q) {
               const r = await base.ask(q);
               asked ||= r.status === "pending";
+              return r;
+            },
+            async linkTicket(workItemId, ticket) {
+              const r = await base.linkTicket(workItemId, ticket);
+              // The first reply in the thread tells the requester what tracks the request.
+              if (workItemId === id && offer.workItem.origin) {
+                await opts.chat?.acknowledge(offer, { key: ticket, ...r }).catch((err) => {
+                  log.warn("could not acknowledge in chat", { workItemId: id, error: reason(err) });
+                });
+              }
+
               return r;
             },
           },
@@ -191,14 +228,15 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       return outcome;
     }
 
-    const prompt = (restarted: boolean) =>
+    const prompt = (restarted: boolean, context: string | undefined) =>
       buildWorkPrompt(offer, {
         resumed: sessionId !== undefined && !restarted,
         restarted,
         ...(workspace ? { workspace } : {}),
+        ...(context ? { chatContext: context } : {}),
       });
 
-    let outcome = await round(requestFor(prompt(false), sessionId));
+    let outcome = await round(requestFor(prompt(false, chatContext), sessionId));
 
     // A stored session the runtime no longer knows is replaced by a new one that starts from the journal and the
     // state in the offer. It never starts from nothing, and the journal says so.
@@ -214,7 +252,9 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
       lastText = "";
       current = undefined;
-      outcome = await round(requestFor(prompt(true), undefined));
+      // The new session knows nothing of the conversation, so it gets it like any new chat session.
+      const restartContext = offer.workItem.origin ? await opts.chat?.context(offer) : undefined;
+      outcome = await round(requestFor(prompt(true, restartContext), undefined));
     }
 
     /** The entry for this hand-back: asked of the runtime in the same session, else taken from the final message. */
@@ -254,11 +294,14 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
     if (!outcome) {
       await opts.office.fail(id, "The runtime ended without a result.");
+      await report(offer, "failed", "The runtime ended without a result.");
       return;
     }
 
     if (!outcome.ok) {
-      await opts.office.fail(id, outcome.error ?? "The run failed.");
+      const why = outcome.error ?? "The run failed.";
+      await opts.office.fail(id, why);
+      await report(offer, "failed", why);
       return;
     }
 
@@ -270,6 +313,11 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       links: linksIn(text),
       status,
     });
+
+    // An item that waits (for a teammate's answer) tells the requester nothing yet; it reports when it is done.
+    if (status === "done") {
+      await report(offer, "result", text || "Done.", linksIn(text));
+    }
 
     // Waiting and blocked items keep their worktree for the next round.
     if (status === "done") {

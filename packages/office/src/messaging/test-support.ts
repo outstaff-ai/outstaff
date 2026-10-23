@@ -119,6 +119,9 @@ export function storeSource(
     move: async () => {
       throw new ProtocolError("unsupported", "not in this test source");
     },
+    place: async () => {
+      throw new ProtocolError("unsupported", "not in this test source");
+    },
   };
 }
 
