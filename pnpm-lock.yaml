@@ -167,22 +167,22 @@ importers:
   .:
     devDependencies:
       '@changesets/cli':
-        specifier: ^3.0.3
+        specifier: 3.0.3
         version: 3.0.3
       '@types/node':
-        specifier: ^24
+        specifier: 24.19.2
         version: 24.19.2
       node:
         specifier: runtime:24.22.1
         version: runtime:24.22.1
       oxlint:
-        specifier: ^1.89.0
+        specifier: 1.89.0
         version: 1.89.0
       typescript:
-        specifier: ^7.0.2
+        specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^5.0.5
+        specifier: 5.0.5
         version: 5.0.5(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(yaml@2.9.1))
 
   packages/agent: {}
