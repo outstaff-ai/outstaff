@@ -13,6 +13,7 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 | `packages/cli`          | The `outstaff` command line (alias `ost`): creates and validates the team config, hires people, sets up credentials.  |
 | `packages/office`       | The office: one container per team. Event intake, work state, workflow engine, scheduler, store (Postgres or SQLite). |
 | `packages/agent`        | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.      |
+| `packages/protocol`     | The agent connection protocol: zod schemas and types shared by the office and the agent.                              |
 | `docs/`                 | The Starlight documentation site (`@outstaff/docs`), published to GitHub Pages at docs.outstaff.work.                 |
 | `docs/scripts/llms.mjs` | Generates `llms.txt` and `llms-full.txt` into `docs/dist` after the docs build.                                       |
 
