@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/logo-dark.svg">
+    <img src="assets/brand/logo.svg" alt="outstaff" width="360">
+  </picture>
+</p>
+
 # Outstaff
 
 Hire a team of AI agents the way you would staff a project with an agency: a project manager, product, architect, designer, developers, reviewer and devops. Each one has a name, a role and their own accounts. They work in your tracker, chat with you in your messenger, and open pull requests in your repositories.
