@@ -28,7 +28,7 @@ body:
       label: Area
       options:
         - Catalog (roles and skills)
-        - Team config (outstaff/team.yaml)
+        - Team config (.outstaff/team.yaml)
         - Office (workflow, scheduling, state)
         - Agent (ost-agent, runtime, verbs)
         - Adapters

@@ -21,6 +21,6 @@ Please include in a report:
 
 - the affected package or container and the version or commit you tested,
 - steps to reproduce, and what an attacker gains,
-- whether the issue needs a particular team configuration (`outstaff/team.yaml`) or grants.
+- whether the issue needs a particular team configuration (`.outstaff/team.yaml`) or grants.
 
 The trust model (which humans and agents can trigger work, how grants are checked, and what the office stores) will be documented alongside the docs site. Until then, treat the office and agent containers as holding every secret they are given.
