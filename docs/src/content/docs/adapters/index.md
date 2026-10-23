@@ -3,4 +3,8 @@ title: Adapters
 description: Integrations for each port.
 ---
 
-Coming soon. One page per adapter package will be added, grouped by the ports listed in the [architecture overview](/architecture/overview/).
+One page per adapter package, grouped by the ports listed in the [architecture overview](/architecture/overview/). More are on the way.
+
+## Chat
+
+- [Slack](/adapters/chat-slack/): each agent in its own Slack app, over Socket Mode.

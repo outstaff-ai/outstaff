@@ -11,7 +11,7 @@ const coreAlias = [
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office"];
-const adapters = ["vcs-github", "runtime-agent-sdk"];
+const adapters = ["vcs-github", "runtime-agent-sdk", "chat-slack"];
 
 export default defineConfig({
   test: {

@@ -204,6 +204,25 @@ importers:
 
   packages/catalog: {}
 
+  packages/chat-slack:
+    dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../core
+      '@slack/socket-mode':
+        specifier: 3.1.0
+        version: 3.1.0(undici@8.12.3)
+      '@slack/web-api':
+        specifier: 8.2.0
+        version: 8.2.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(tsx@4.23.15)(yaml@2.9.1))
+
   packages/cli:
     dependencies:
       '@commander-js/extra-typings':
@@ -1417,6 +1436,24 @@ packages:
   '@shikijs/vscode-textmate@10.1.0':
     resolution: {integrity: sha512-cVBuhDQjBZaNMTwBquYfPydrUP+E3hE6oYGasx8h6ZrODIM7/r+gxLDXdd66oszbrggZHEntdE6j+5gYIVyMWQ==}
 
+  '@slack/logger@5.0.0':
+    resolution: {integrity: sha512-VGXhmmgsAo9shdQYh4tFDndd+7nsgp0Y5h0UPDaUp8K359pBasI6YdkMqFW3mCOxLQkq09qj7o7cq6f3DuXcJQ==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
+
+  '@slack/socket-mode@3.1.0':
+    resolution: {integrity: sha512-F9T+FKbtsYRKV23X8l6WW1fx7ncqsMufg+HLA4ffHf/MvZSCvPunFw576ekmY0Q03kgTAIByTKDJxnM+wn1okg==}
+    engines: {node: '>=20', npm: '>=9.6.4'}
+    peerDependencies:
+      undici: ^7.0.0 || ^8.0.0
+
+  '@slack/types@3.2.0':
+    resolution: {integrity: sha512-IN4gdtlzQt8UJoj+1v+qAHeR4TxHO0KMlIs841SFfDQAcFFnsrWaGsEAE4goxVt8O/JOAFaGGdrFTzhNBop/Fg==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
+
+  '@slack/web-api@8.2.0':
+    resolution: {integrity: sha512-bIW8/8BLD/HLuHLIA2LfA7AhSokzui4swCbMJuwoRJxn/kzHVla6YEKLvN1nCFHK/DfX7g+4Wj3ess/ZSh/tWQ==}
+    engines: {node: '>= 20', npm: '>=9.6.4'}
+
   '@stablelib/base64@1.0.1':
     resolution: {integrity: sha512-1bnPQqSxSuc3Ii6MhBysoWCg58j97aUjuCSZrGSmDxNqtytIi0k8utUenAwTZN4V5mXXYGsVUI9zeBqy+jBOSQ==}
 
@@ -1470,6 +1507,12 @@ packages:
 
   '@types/pg@8.23.1':
     resolution: {integrity: sha512-fKVHpikPdg4GKks3JuLEhvwSyvwzF23hnabPy6DD8ljVbC7+6J5dQzdv4arV6jqq57djnMgs1HKBxX4P8aBI3A==}
+
+  '@types/retry@0.12.0':
+    resolution: {integrity: sha512-wWKOClTTiizcZhXnPY4wikVAwmdYHp8q6DmC+EJUzAMsycb7HB32Kh9RN4+0gExjmPmZSAQjgURXIGATPegAvA==}
+
+  '@types/retry@0.12.5':
+    resolution: {integrity: sha512-3xSjTp3v03X/lSQLkczaN9UIEwJMoMCA1+Nb5HfbJEQWogdeQIyVtTvxPXDQjZ5zws8rFQfVfRdz03ARihPJgw==}
 
   '@types/sax@1.2.7':
     resolution: {integrity: sha512-rO73L89PJxeYM3s3pPPjiPgVVcymqU490g0YO5n5By0k2Erzj6tay/4lr1CHAAU4JyOWd1rpQ8bCf6cZfHU96A==}
@@ -2016,6 +2059,9 @@ packages:
   etag@1.8.1:
     resolution: {integrity: sha512-aIL5Fx7mawVa300al2BnEE4iNvo1qETxLrPI/o05L7z6go7fCw1J6EQmbK4FmJ2AS7kgVF/KEZWufBfdClMcPg==}
     engines: {node: '>= 0.6'}
+
+  eventemitter3@4.0.7:
+    resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
 
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
@@ -2798,6 +2844,10 @@ packages:
       vite-plus:
         optional: true
 
+  p-finally@1.0.0:
+    resolution: {integrity: sha512-LICb2p9CB7FS+0eR1oqWnHhp0FljGLZCWBE9aix0Uye9W8LTQPwMTYVGWQWIw9RdQiDg4+epXQODwIYJtSJaow==}
+    engines: {node: '>=4'}
+
   p-limit@3.1.0:
     resolution: {integrity: sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ==}
     engines: {node: '>=10'}
@@ -2810,9 +2860,21 @@ packages:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
 
+  p-queue@6.6.2:
+    resolution: {integrity: sha512-RwFpb72c/BhQLEXIZ5K2e+AhgNVmIejGlTgiB9MzZ0e93GRvqZ7uSi0dvRF7/XIXDeNkra2fNHBxTyPDGySpjQ==}
+    engines: {node: '>=8'}
+
   p-queue@9.3.5:
     resolution: {integrity: sha512-Lki/zhXFVmDhesBUn/yHRLW9Bte7mE7xoFHzTR8sIomV7a2z+LxYAPkGvdfidNiu4fKSfjtawixxSHcZci5QcQ==}
     engines: {node: '>=20'}
+
+  p-retry@4.6.2:
+    resolution: {integrity: sha512-312Id396EbJdvRONlngUx0NydfrIQ5lsYu0znKVUzVvArzEIt08V1qhtyESbGVd1FGX7UKtiFp5uwKZdM8wIuQ==}
+    engines: {node: '>=8'}
+
+  p-timeout@3.2.0:
+    resolution: {integrity: sha512-rhIwUycgwwKcP9yTOOFK/AKsAopjjCakVqLHePO3CC6Mir1Z99xT+R63jZxAT5lFZLa2inS5h+ZS2GvR99/FBg==}
+    engines: {node: '>=8'}
 
   p-timeout@7.0.2:
     resolution: {integrity: sha512-prbX4Z3YszrFNgH+MW5Zoeq3baXrMtP/MQnFeET90UB/GtGcGDQ5Usg9OCy6ETjTTntOw1SL2z9fMPUppN3Guw==}
@@ -2998,6 +3060,10 @@ packages:
 
   retext-smartypants@6.2.0:
     resolution: {integrity: sha512-kk0jOU7+zGv//kfjXEBjdIryL1Acl4i9XNkHxtM7Tm5lFiCog576fjNC9hjoR7LTKQ0DsPWy09JummSsH1uqfQ==}
+
+  retry@0.13.1:
+    resolution: {integrity: sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg==}
+    engines: {node: '>= 4'}
 
   rolldown@1.2.15:
     resolution: {integrity: sha512-6odND+fel5zVw3I4Yc2e69gvguDnX0CAAGiNDZSq4ik5WUcaLrkD2GLuog0XcODbor31hZ5ayEMgVDno+KPV5g==}
@@ -4301,6 +4367,31 @@ snapshots:
 
   '@shikijs/vscode-textmate@10.1.0': {}
 
+  '@slack/logger@5.0.0':
+    dependencies:
+      '@types/node': 24.19.2
+
+  '@slack/socket-mode@3.1.0(undici@8.12.3)':
+    dependencies:
+      '@slack/logger': 5.0.0
+      '@slack/web-api': 8.2.0
+      '@types/node': 24.19.2
+      eventemitter3: 5.0.4
+      undici: 8.12.3
+
+  '@slack/types@3.2.0': {}
+
+  '@slack/web-api@8.2.0':
+    dependencies:
+      '@slack/logger': 5.0.0
+      '@slack/types': 3.2.0
+      '@types/node': 24.19.2
+      '@types/retry': 0.12.5
+      eventemitter3: 5.0.4
+      p-queue: 6.6.2
+      p-retry: 4.6.2
+      retry: 0.13.1
+
   '@stablelib/base64@1.0.1': {}
 
   '@stylistic/eslint-plugin@5.10.0(eslint@10.13.0(supports-color@10.2.2))':
@@ -4364,6 +4455,10 @@ snapshots:
       '@types/node': 24.19.2
       pg-protocol: 1.16.1
       pg-types: 2.2.0
+
+  '@types/retry@0.12.0': {}
+
+  '@types/retry@0.12.5': {}
 
   '@types/sax@1.2.7':
     dependencies:
@@ -4924,6 +5019,8 @@ snapshots:
   esutils@2.0.3: {}
 
   etag@1.8.1: {}
+
+  eventemitter3@4.0.7: {}
 
   eventemitter3@5.0.4: {}
 
@@ -5770,6 +5867,8 @@ snapshots:
       '@oxlint/binding-win32-ia32-msvc': 1.89.0
       '@oxlint/binding-win32-x64-msvc': 1.89.0
 
+  p-finally@1.0.0: {}
+
   p-limit@3.1.0:
     dependencies:
       yocto-queue: 0.1.0
@@ -5782,10 +5881,24 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
+  p-queue@6.6.2:
+    dependencies:
+      eventemitter3: 4.0.7
+      p-timeout: 3.2.0
+
   p-queue@9.3.5:
     dependencies:
       eventemitter3: 5.0.4
       p-timeout: 7.0.2
+
+  p-retry@4.6.2:
+    dependencies:
+      '@types/retry': 0.12.0
+      retry: 0.13.1
+
+  p-timeout@3.2.0:
+    dependencies:
+      p-finally: 1.0.0
 
   p-timeout@7.0.2: {}
 
@@ -5963,6 +6076,8 @@ snapshots:
       '@types/nlcst': 2.0.3
       nlcst-to-string: 4.0.0
       unist-util-visit: 5.1.0
+
+  retry@0.13.1: {}
 
   rolldown@1.2.15:
     dependencies:
