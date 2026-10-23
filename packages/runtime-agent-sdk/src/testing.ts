@@ -4,7 +4,7 @@ import type { QueryFn } from "./types.js";
 
 const layout = {
   home: "/home/agent",
-  workDir: "/work",
+  workDir: "/work/main",
   reposDir: "/work/repos",
   worktreesDir: "/work/worktrees",
   scratchDir: "/work/scratch",

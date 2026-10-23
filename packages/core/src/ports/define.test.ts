@@ -101,7 +101,7 @@ describe("AdapterRegistry.rulePacks", () => {
       team: { repos: [] },
       layout: {
         home: "/h",
-        workDir: "/w",
+        workDir: "/w/d",
         reposDir: "/w/r",
         worktreesDir: "/w/t",
         scratchDir: "/w/s",

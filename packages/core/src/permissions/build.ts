@@ -243,11 +243,21 @@ export function buildPolicy({
   layout,
   packs = [],
 }: BuildPolicyInput): Policy {
+  for (const [name, dir] of [
+    ["reposDir", layout.reposDir],
+    ["worktreesDir", layout.worktreesDir],
+    ["secretsDir", layout.secretsDir],
+  ] as const) {
+    if (dir === layout.workDir || dir.startsWith(`${layout.workDir}/`)) {
+      throw new Error(`Layout ${name} (${dir}) must not lie inside workDir (${layout.workDir}).`);
+    }
+  }
+
   const spec = PROFILE_SPECS[profile];
   const repos: Policy["git"]["repos"] = {};
   const defaultBranches: Policy["git"]["defaultBranches"] = {};
   const readAllow = [
-    layout.workDir,
+    `${layout.workDir}/**`,
     layout.reposDir,
     layout.worktreesDir,
     `${layout.scratchDir}/**`,

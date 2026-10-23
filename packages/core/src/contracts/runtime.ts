@@ -6,19 +6,19 @@ import { contractSuite, requireCapability, requireSeed, type ContractSetupFn } f
 
 const layout = {
   home: "/home/agent",
-  workDir: "/work",
-  reposDir: "/work/repos",
-  worktreesDir: "/work/worktrees",
-  scratchDir: "/work/scratch",
-  memoryDir: "/work/memory",
-  secretsDir: "/work/secrets",
+  workDir: "/home/agent/work",
+  reposDir: "/home/agent/repos",
+  worktreesDir: "/home/agent/worktrees",
+  scratchDir: "/home/agent/scratch",
+  memoryDir: "/home/agent/memory",
+  secretsDir: "/home/agent/secrets",
 };
 
 export function sampleRunRequest(overrides: Partial<RunRequest> = {}): RunRequest {
   return {
     prompt: "Say hello.",
     systemPrompt: "You are a helpful agent.",
-    workdir: "/work/scratch",
+    workdir: "/home/agent/scratch",
     addDirs: [],
     policy: buildPolicy({
       profile: "readonly",

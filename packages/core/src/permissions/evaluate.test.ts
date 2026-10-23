@@ -13,7 +13,7 @@ import {
 
 const layout: Layout = {
   home: "/home/agent",
-  workDir: "/work",
+  workDir: "/work/main",
   reposDir: "/work/repos",
   worktreesDir: "/work/worktrees",
   scratchDir: "/work/scratch",
@@ -532,6 +532,52 @@ describe("buildPolicy", () => {
     expect(p.git.repos).toEqual({});
     expect(evaluate(p, { kind: "read", path: "/work/repos/app/a.ts" }).effect).toBe("deny");
   });
+
+  describe("reads below the base directories", () => {
+    it.each([
+      "/work/main/references/x.md",
+      "/work/repos/app/README.md",
+      "/work/worktrees/app/feat/src/a.ts",
+    ])("allows reading %s", (path) => {
+      for (const profile of PROFILES) {
+        const d = evaluate(policy(profile), { kind: "read", path });
+        expect(`${d.effect} ${path}`).toBe(`allow ${path}`);
+      }
+    });
+
+    it("denies siblings outside the base directories", () => {
+      const d = evaluate(policy("code"), { kind: "read", path: "/etc/hosts" });
+      expect(d.effect).toBe("deny");
+      expect(d.rule).toBe("paths.read.outside");
+    });
+
+    it.each([
+      ["a secret file", "/work/secrets/token"],
+      ["a .env in a worktree", "/work/worktrees/app/feat/.env"],
+      ["a .env in the workdir", "/work/main/.env"],
+      ["a .env in a repo clone", "/work/repos/app/.env"],
+    ])("still denies %s", (_n, path) => {
+      const d = evaluate(policy("code"), { kind: "read", path });
+      expect(d.effect).toBe("deny");
+      expect(d.rule).toBe("paths.read.deny");
+    });
+  });
+
+  it("denies a path under reposDir that is not a team repo", () => {
+    const d = evaluate(policy("code"), { kind: "read", path: "/work/repos/unknown/a.ts" });
+    expect(d.effect).toBe("deny");
+    expect(d.rule).toBe("paths.read.outside");
+  });
+
+  it.each(["reposDir", "worktreesDir", "secretsDir"] as const)(
+    "refuses a layout with %s inside workDir",
+    (key) => {
+      const bad = { ...layout, [key]: "/work/main/inner" };
+      expect(() => buildPolicy({ profile: "code", person: dev, team, layout: bad })).toThrow(
+        /inside workDir/,
+      );
+    },
+  );
 
   it("readonly caps write grants at read", () => {
     expect(Object.values(policy("readonly").git.repos)).not.toContain("write");
