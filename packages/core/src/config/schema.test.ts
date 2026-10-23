@@ -14,7 +14,7 @@ const valid = (): TeamConfigInput => ({
   version: 1,
   team: { name: "acme", product: "Acme Cloud", description: "The Acme product team." },
   humans: [{ name: "Alex Doe", identities: { vcs: "alex-doe", chat: "U123", email: "alex@acme.example" } }],
-  catalog: { version: "^1.0.0" },
+  catalog: { version: "1.0.0" },
   repos: [
     { name: "app", url: "github.com/acme/app", kind: "primary" },
     { name: "standards", url: "https://github.com/acme/standards", kind: "baseline", default_branch: "trunk" },
@@ -63,7 +63,7 @@ describe("parseTeamConfig", () => {
     const r = parseTeamConfig({
       version: 1,
       team: { name: "acme" },
-      catalog: { version: "1.x" },
+      catalog: { version: "1.0.0" },
       repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
       people: [{ handle: "ada", name: "Ada", role: "r" }],
       integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
@@ -110,10 +110,22 @@ describe("parseTeamConfig", () => {
     expect(bad((c) => (c.humans[0].identities = {}))[0]).toMatchObject({ path: ["humans", 0, "identities"] });
   });
 
-  it("rejects an invalid catalog range", () => {
-    expect(bad((c) => (c.catalog.version = "not a range"))).toEqual([
-      { path: ["catalog", "version"], code: "catalog.invalid_range", message: expect.any(String) },
+  it("rejects an invalid catalog version", () => {
+    expect(bad((c) => (c.catalog.version = "^1.0.0"))).toEqual([
+      { path: ["catalog", "version"], code: "catalog.invalid_version", message: expect.any(String) },
     ]);
+  });
+
+  it("rejects non-exact catalog versions", () => {
+    for (const v of ["v1.0.0", ">=1.0.0", "1.x", "1.0", " 1.0.0"]) {
+      expect(bad((c) => (c.catalog.version = v)).map((i) => i.code)).toEqual(["catalog.invalid_version"]);
+    }
+  });
+
+  it("accepts prerelease catalog versions", () => {
+    const c = valid();
+    c.catalog.version = "1.0.0-rc.1";
+    expect(parseTeamConfig(c).ok).toBe(true);
   });
 
   it("requires at least one repo", () => {

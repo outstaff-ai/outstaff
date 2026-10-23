@@ -1,4 +1,4 @@
-import { validRange } from "semver";
+import { valid } from "semver";
 import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
 import { customIssue } from "./issues.js";
@@ -185,11 +185,11 @@ export const teamConfigSchema = z
         version: z
           .string()
           .min(1)
-          .refine((v) => validRange(v) !== null, {
-            message: "Must be a valid semver range.",
-            params: { code: CONFIG_CODES.catalogInvalidRange },
+          .refine((v) => valid(v) === v, {
+            message: "Must be an exact semver version, for example 1.0.0.",
+            params: { code: CONFIG_CODES.catalogInvalidVersion },
           })
-          .meta(d("Semver range of the catalog release to use, for example \"^1.0.0\".")),
+          .meta(d("Exact catalog release this team uses, for example \"1.0.0\"; must match the catalog in the agent images.")),
         path: z
           .string()
           .min(1)
