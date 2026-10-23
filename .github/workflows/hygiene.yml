@@ -3,6 +3,8 @@ name: Hygiene
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
+  # the merge queue tests each PR combined with everything ahead of it
+  merge_group:
   push:
     branches: [main]
 
@@ -30,6 +32,8 @@ jobs:
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           PUSH_BEFORE: ${{ github.event.before }}
           PUSH_AFTER: ${{ github.sha }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+          MG_HEAD: ${{ github.event.merge_group.head_sha }}
         run: |
           set -euo pipefail
           archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
@@ -38,6 +42,8 @@ jobs:
           tar -xzf "$archive" gitleaks
           if [ "$EVENT_NAME" = "pull_request" ]; then
             range="${PR_BASE}..${PR_HEAD}"
+          elif [ "$EVENT_NAME" = "merge_group" ]; then
+            range="${MG_BASE}..${MG_HEAD}"
           elif [ "${PUSH_BEFORE}" = "0000000000000000000000000000000000000000" ]; then
             range="${PUSH_AFTER}"
           else
