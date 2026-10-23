@@ -28,6 +28,8 @@ pnpm changeset   # record a version bump for a change
 
 Packages live in `packages/*`: `core`, `catalog`, `cli` (published as `outstaff`), `agent` and `office`.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commit and PR rules.
+
 ## License
 
 [MIT](LICENSE)

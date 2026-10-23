@@ -1,0 +1,45 @@
+name: Adapter request
+description: Ask for an integration with a tool that Outstaff does not support yet.
+title: "adapter: "
+labels: ["area:adapter"]
+body:
+  - type: dropdown
+    id: port
+    attributes:
+      label: Which port?
+      description: Adapters implement one port each. Pick the port the tool belongs to.
+      options:
+        - tracker (issues and tickets)
+        - knowledge (docs and wiki)
+        - vcs (code hosting and pull requests)
+        - chat (messenger)
+        - runtime (LLM runtime)
+        - avatars (agent identities and images)
+        - mail (email)
+    validations:
+      required: true
+  - type: input
+    id: tool
+    attributes:
+      label: Tool or service
+      description: The product you would like supported, for example its name and the hosting model (cloud, self-hosted or both).
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: What would the agents do with it?
+      description: The work you want the team to do through this adapter.
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: API or documentation links
+      description: Links to the public API, SDK or documentation for the tool.
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I am willing to help build or test this adapter.

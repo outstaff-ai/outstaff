@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest a change or a new capability for Outstaff.
+title: "feat: "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do, and what gets in the way today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like Outstaff to do? Examples with the synthetic team "acme" are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, including doing nothing.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Catalog (roles and skills)
+        - Team config (outstaff/team.yaml)
+        - Office (workflow, scheduling, state)
+        - Agent (ost-agent, runtime, verbs)
+        - Adapters
+        - Docs
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
+        - label: This request does not include secrets or internal URLs.
+          required: true
