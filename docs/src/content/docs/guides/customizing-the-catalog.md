@@ -70,4 +70,43 @@ RUN ost build
 
 ## Custom roles
 
-You can also add roles the stock catalog does not have, in `.outstaff/catalog/roles/<role>/`. They merge with the stock roles and can `extends` them. Scaffolding with `ost role new` is tracked in [#105](https://github.com/outstaff-ai/outstaff/issues/105).
+You can add roles the stock catalog does not have. A custom role lives next to your ejected files in `.outstaff/catalog/roles/<role>/`, but it is not an ejected copy of anything: there is no stock original, so nothing is recorded in `.ejected.json`, `ost diff` has nothing to compare, and `ost upgrade` never touches it.
+
+```
+ost role new auditor
+ost role new qa --from reviewer --title "QA Engineer"
+ost role new data-engineer --profile code --toolset code
+```
+
+This writes `roles/<name>/role.yaml` and `roles/<name>/SKILL.md`.
+
+- Without `--from`, both files come from a minimal template with `TODO` placeholders for the summary, the modes and the instructions.
+- With `--from <stock-role>`, both files are copies of that stock role with the name and title replaced. The copy stops following stock; if you want future catalog changes merged into it, `ost eject` the role and edit it instead.
+- `--title` sets the display title (the name in title case by default). `--profile` (`readonly`, `docs`, `code` or `infra`) and `--toolset` (`base`, `code` or `infra`) set the permission profile and tool bundle; they default to `docs` and `base`, or to the `--from` role's values.
+
+The name must be a DNS-safe label: lowercase letters, digits and dashes, starting with a letter, at most 63 characters. A name that belongs to a stock role is refused, and the error points to `ost eject`. An existing custom role is only replaced when you pass `--force`.
+
+Fill in the placeholders, then give a person the role in `team.yaml`:
+
+```yaml
+people:
+  - handle: ines
+    name: Ines Moreau
+    role: auditor
+```
+
+`ost validate` accepts the role like any stock one, `ost render` and `ost build` render it, and the template context lists it in `roles[]` and `people.byRole`, so other roles' skills can mention it. A role can also list other roles in `extends` to include their skills.
+
+### A role that needs extra tools
+
+`role.yaml` picks one of the stock tool bundles, and permissions grant commands from those bundles. Tools the base images do not ship go into your own image, built `FROM` the Outstaff image:
+
+```dockerfile
+FROM ghcr.io/outstaff-ai/agent:1.2.0
+RUN apt-get update && apt-get install -y --no-install-recommends shellcheck \
+  && rm -rf /var/lib/apt/lists/*
+COPY .outstaff /opt/outstaff/team/.outstaff
+RUN ost build
+```
+
+Describe the tools in the role's `SKILL.md` so the agent knows to use them. Keep the image tag equal to `catalog.version`.
