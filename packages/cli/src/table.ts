@@ -6,5 +6,6 @@ export function table(header: string[], rows: string[][]): string {
       .map((c, i) => c.padEnd(widths[i] ?? 0))
       .join("  ")
       .trimEnd();
+
   return [line(header), ...rows.map(line)].join("\n");
 }

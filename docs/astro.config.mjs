@@ -7,10 +7,17 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "Outstaff",
-      logo: { light: "./src/assets/brand/logo.svg", dark: "./src/assets/brand/logo-dark.svg", replacesTitle: true, alt: "outstaff" },
+      logo: {
+        light: "./src/assets/brand/logo.svg",
+        dark: "./src/assets/brand/logo-dark.svg",
+        replacesTitle: true,
+        alt: "outstaff",
+      },
       favicon: "/favicon.svg",
       description: "Run a team of AI agents like an outsourcing agency.",
-      social: [{ icon: "github", label: "GitHub", href: "https://github.com/outstaff-ai/outstaff" }],
+      social: [
+        { icon: "github", label: "GitHub", href: "https://github.com/outstaff-ai/outstaff" },
+      ],
       plugins: [starlightLinksValidator()],
       sidebar: [
         { label: "Concepts", items: [{ autogenerate: { directory: "concepts" } }] },

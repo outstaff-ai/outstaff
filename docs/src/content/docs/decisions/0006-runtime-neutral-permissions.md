@@ -10,6 +10,7 @@ sidebar:
 ## Context
 
 Each LLM runtime has its own permission format. Hand-written rule files tend to drift between roles, and the subtle cases are easy to get wrong:
+
 - absolute paths;
 - flags written before a path;
 - the `-C <dir>` form of git commands;

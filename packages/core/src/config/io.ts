@@ -9,6 +9,7 @@ const run = promisify(execFile);
 
 export interface ConfigFs {
   readFile(path: string): Promise<string>;
+
   /** Returns null when the path does not exist. */
   kind(path: string): Promise<"file" | "dir" | null>;
 }
@@ -31,7 +32,9 @@ export const nodeFs: ConfigFs = {
 
 export const nodeGit: GitClient = {
   async sync({ url, ref, dir }) {
-    const git = (...args: string[]) => run("git", args, { cwd: dir, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+    const git = (...args: string[]) =>
+      run("git", args, { cwd: dir, env: { ...process.env, GIT_TERMINAL_PROMPT: "0" } });
+
     await mkdir(dir, { recursive: true });
     if ((await nodeFs.kind(join(dir, ".git"))) === null) {
       await git("init", "-q");
@@ -39,6 +42,7 @@ export const nodeGit: GitClient = {
     } else {
       await git("remote", "set-url", "origin", url);
     }
+
     await git("fetch", "-q", "--depth", "1", "origin", ref ?? "HEAD");
     await git("checkout", "-q", "--force", "--detach", "FETCH_HEAD");
     await git("clean", "-qfdx");
@@ -50,7 +54,10 @@ export function defaultCacheDir(env: NodeJS.ProcessEnv): string {
 }
 
 export function cacheKey(url: string, ref: string | undefined): string {
-  return createHash("sha256").update(`${url}\n${ref ?? ""}`).digest("hex").slice(0, 16);
+  return createHash("sha256")
+    .update(`${url}\n${ref ?? ""}`)
+    .digest("hex")
+    .slice(0, 16);
 }
 
 const GIT_URL = /^(https?:\/\/|ssh:\/\/|git:\/\/|file:\/\/|git@[^:]+:)/;
@@ -59,7 +66,10 @@ const GIT_URL = /^(https?:\/\/|ssh:\/\/|git:\/\/|file:\/\/|git@[^:]+:)/;
 export function parseGitUrl(value: string): { url: string; ref?: string } | null {
   const hash = value.indexOf("#");
   const url = hash === -1 ? value : value.slice(0, hash);
-  if (!GIT_URL.test(url)) return null;
+  if (!GIT_URL.test(url)) {
+    return null;
+  }
+
   const ref = hash === -1 ? "" : value.slice(hash + 1);
   return ref ? { url, ref } : { url };
 }

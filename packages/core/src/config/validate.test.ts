@@ -1,11 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG_CODES, documentedCodes, parseTeamConfig, validateTeam, WARNING_CODES } from "../index.js";
-import type { AdapterInfo, Capability, RoleNeeds, TeamConfigInput, ValidationContext } from "../index.js";
+import {
+  CONFIG_CODES,
+  documentedCodes,
+  parseTeamConfig,
+  validateTeam,
+  WARNING_CODES,
+} from "../index.js";
+import type {
+  AdapterInfo,
+  Capability,
+  RoleNeeds,
+  TeamConfigInput,
+  ValidationContext,
+} from "../index.js";
 
-const adapter = (port: AdapterInfo["port"], name: string, capabilities: Capability[]): [string, AdapterInfo] => [
-  `${port}/${name}`,
-  { port, name, capabilities },
-];
+const adapter = (
+  port: AdapterInfo["port"],
+  name: string,
+  capabilities: Capability[],
+): [string, AdapterInfo] => [`${port}/${name}`, { port, name, capabilities }];
 
 const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
   roles: new Map<string, RoleNeeds>([
@@ -42,9 +55,13 @@ const config = (mutate: (c: any) => void = () => {}) => {
       tracker: { adapter: "linear" },
     },
   };
+
   mutate(c);
   const r = parseTeamConfig(c as TeamConfigInput);
-  if (!r.ok) throw new Error(JSON.stringify(r.issues));
+  if (!r.ok) {
+    throw new Error(JSON.stringify(r.issues));
+  }
+
   return r.config;
 };
 
@@ -56,22 +73,44 @@ describe("validateTeam", () => {
   it("errors on unknown roles only when the catalog is known", () => {
     const c = config((x) => (x.people[0].role = "wizard"));
     expect(validateTeam(c, ctx()).errors).toEqual([
-      { path: ["people", 0, "role"], code: "people.unknown_role", message: 'Role "wizard" is not in the catalog.' },
+      {
+        path: ["people", 0, "role"],
+        code: "people.unknown_role",
+        message: 'Role "wizard" is not in the catalog.',
+      },
     ]);
+
     expect(validateTeam(c, ctx({ roles: new Map() })).errors).toEqual([]);
   });
 
   it("errors on unknown extends entries", () => {
     const c = config((x) => (x.people[0].extends = ["a11y", "nope"]));
     expect(validateTeam(c, ctx()).errors).toEqual([
-      { path: ["people", 0, "extends", 1], code: "people.unknown_extends", message: '"nope" is not a role in the catalog.' },
+      {
+        path: ["people", 0, "extends", 1],
+        code: "people.unknown_extends",
+        message: '"nope" is not a role in the catalog.',
+      },
     ]);
+
     expect(validateTeam(c, ctx({ roles: new Map() })).errors).toEqual([]);
   });
 
   it("errors on write grants without pull request support", () => {
-    const c = config((x) => (x.people[0].repos = { app: "write", "kind:primary": "read", "*": "write" }));
-    const noPr = ctx({ adapters: new Map([adapter("vcs", "github", []), adapter("chat", "slack", []), adapter("runtime", "claude-agent-sdk", []), adapter("knowledge", "notion", ["knowledge.docs"]), adapter("tracker", "linear", [])]) });
+    const c = config(
+      (x) => (x.people[0].repos = { app: "write", "kind:primary": "read", "*": "write" }),
+    );
+
+    const noPr = ctx({
+      adapters: new Map([
+        adapter("vcs", "github", []),
+        adapter("chat", "slack", []),
+        adapter("runtime", "claude-agent-sdk", []),
+        adapter("knowledge", "notion", ["knowledge.docs"]),
+        adapter("tracker", "linear", []),
+      ]),
+    });
+
     expect(validateTeam(c, noPr).errors).toEqual([
       {
         path: ["people", 0, "repos", "app"],
@@ -96,6 +135,7 @@ describe("validateTeam", () => {
         message: 'No knowledge adapter named "confluence" is installed.',
       },
     ]);
+
     // An unknown adapter provides nothing, so the dependent need is also reported.
     expect(report.warnings.map((w) => w.code)).toEqual(["capability.missing"]);
     expect(validateTeam(c, ctx({ adapters: new Map() })).errors).toEqual([]);
@@ -108,7 +148,8 @@ describe("validateTeam", () => {
         path: ["people", 1, "role"],
         code: "capability.missing",
         message: 'Role "architect" needs knowledge.docs, which no configured integration provides.',
-        consequence: "architect marcus cannot write design docs: no knowledge integration provides knowledge.docs.",
+        consequence:
+          "architect marcus cannot write design docs: no knowledge integration provides knowledge.docs.",
       },
     ]);
   });
@@ -119,8 +160,10 @@ describe("validateTeam", () => {
       {
         path: ["people", 1, "role"],
         code: "capability.optional_missing",
-        message: 'Role "architect" can use tracker.issues, which no configured integration provides.',
-        consequence: "architect marcus cannot read or update tickets: no tracker integration provides tracker.issues.",
+        message:
+          'Role "architect" can use tracker.issues, which no configured integration provides.',
+        consequence:
+          "architect marcus cannot read or update tickets: no tracker integration provides tracker.issues.",
       },
     ]);
   });
@@ -130,9 +173,18 @@ describe("validateTeam", () => {
       delete x.integrations.knowledge;
       x.people[0].extends = ["architect"];
     });
+
     expect(validateTeam(c, ctx()).warnings.map((w) => [w.path, w.code, w.consequence])).toEqual([
-      [["people", 0, "role"], "capability.missing", "architect ada cannot write design docs: no knowledge integration provides knowledge.docs."],
-      [["people", 1, "role"], "capability.missing", "architect marcus cannot write design docs: no knowledge integration provides knowledge.docs."],
+      [
+        ["people", 0, "role"],
+        "capability.missing",
+        "architect ada cannot write design docs: no knowledge integration provides knowledge.docs.",
+      ],
+      [
+        ["people", 1, "role"],
+        "capability.missing",
+        "architect marcus cannot write design docs: no knowledge integration provides knowledge.docs.",
+      ],
     ]);
   });
 
@@ -164,8 +216,10 @@ describe("validateTeam", () => {
 
 describe("documentedCodes", () => {
   it("documents every error and warning code", () => {
-    const all = [...Object.values(CONFIG_CODES), ...Object.values(WARNING_CODES)].sort();
-    expect(Object.keys(documentedCodes).sort()).toEqual(all);
-    for (const text of Object.values(documentedCodes)) expect(text.length).toBeGreaterThan(0);
+    const all = [...Object.values(CONFIG_CODES), ...Object.values(WARNING_CODES)].toSorted();
+    expect(Object.keys(documentedCodes).toSorted()).toEqual(all);
+    for (const text of Object.values(documentedCodes)) {
+      expect(text.length).toBeGreaterThan(0);
+    }
   });
 });

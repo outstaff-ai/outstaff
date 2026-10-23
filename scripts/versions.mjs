@@ -17,14 +17,19 @@ export function findRanges(manifest) {
   const out = [];
   for (const field of FIELDS) {
     for (const [name, spec] of Object.entries(manifest[field] ?? {})) {
-      if (!isPinned(spec)) out.push({ field, name, spec });
+      if (!isPinned(spec)) {
+        out.push({ field, name, spec });
+      }
     }
   }
+
   return out;
 }
 
 function projects() {
-  return JSON.parse(execFileSync("pnpm", ["list", "-r", "--depth", "0", "--json"], { encoding: "utf8" }));
+  return JSON.parse(
+    execFileSync("pnpm", ["list", "-r", "--depth", "0", "--json"], { encoding: "utf8" }),
+  );
 }
 
 function main(mode) {
@@ -34,21 +39,39 @@ function main(mode) {
     const manifest = JSON.parse(readFileSync(file, "utf8"));
     const ranges = findRanges(manifest);
     if (mode === "check") {
-      for (const r of ranges) console.error(`${path.relative(process.cwd(), file)}: ${r.field}.${r.name} is "${r.spec}"; pin an exact version`);
+      for (const r of ranges) {
+        console.error(
+          `${path.relative(process.cwd(), file)}: ${r.field}.${r.name} is "${r.spec}"; pin an exact version`,
+        );
+      }
+
       failed += ranges.length;
       continue;
     }
+
     for (const r of ranges) {
       const resolved = project[r.field]?.[r.name]?.version;
-      if (!resolved || !EXACT.test(resolved)) throw new Error(`${file}: cannot resolve ${r.name} (${r.spec})`);
+      if (!resolved || !EXACT.test(resolved)) {
+        throw new Error(`${file}: cannot resolve ${r.name} (${r.spec})`);
+      }
+
       manifest[r.field][r.name] = resolved;
     }
-    if (ranges.length) writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
+
+    if (ranges.length) {
+      writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
+    }
   }
+
   if (failed) {
-    console.error(`${failed} unpinned dependenc${failed === 1 ? "y" : "ies"}. Run: node scripts/versions.mjs pin && pnpm install`);
+    console.error(
+      `${failed} unpinned dependenc${failed === 1 ? "y" : "ies"}. Run: node scripts/versions.mjs pin && pnpm install`,
+    );
+
     process.exit(1);
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main(process.argv[2] === "pin" ? "pin" : "check");
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main(process.argv[2] === "pin" ? "pin" : "check");
+}

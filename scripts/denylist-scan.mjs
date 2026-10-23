@@ -12,7 +12,10 @@ export function parsePatterns(raw) {
   const invalid = [];
   raw.split(/\r?\n/).forEach((line) => {
     const source = line.trim();
-    if (!source) return;
+    if (!source) {
+      return;
+    }
+
     const n = patterns.length + invalid.length + 1;
     try {
       patterns.push({ n, re: new RegExp(source, "i") });
@@ -20,6 +23,7 @@ export function parsePatterns(raw) {
       invalid.push(n);
     }
   });
+
   return { patterns, invalid };
 }
 
@@ -28,8 +32,11 @@ export function scanText(text, patterns) {
   const hits = [];
   text.split(/\r?\n/).forEach((content, i) => {
     const hit = patterns.find(({ re }) => re.test(content));
-    if (hit) hits.push({ line: i + 1, pattern: hit.n });
+    if (hit) {
+      hits.push({ line: i + 1, pattern: hit.n });
+    }
   });
+
   return hits;
 }
 
@@ -43,6 +50,7 @@ function main() {
     console.log("DENYLIST is empty (expected on forks); skipping deny-list scan.");
     return 0;
   }
+
   const { patterns, invalid } = parsePatterns(raw);
   let failed = false;
   for (const n of invalid) {
@@ -61,6 +69,7 @@ function main() {
     .toString()
     .split("\0")
     .filter((f) => f && !SKIP_FILES.has(f));
+
   for (const file of files) {
     let buf;
     try {
@@ -68,14 +77,23 @@ function main() {
     } catch {
       continue;
     }
-    if (isBinary(buf)) continue;
+
+    if (isBinary(buf)) {
+      continue;
+    }
+
     report(file, scanText(buf.toString("utf8"), patterns));
   }
+
   report("PR title", scanText(process.env.PR_TITLE ?? "", patterns));
   report("PR body", scanText(process.env.PR_BODY ?? "", patterns));
 
-  if (failed) console.log("Deny-list scan failed.");
-  else console.log(`Deny-list scan passed (${files.length} files).`);
+  if (failed) {
+    console.log("Deny-list scan failed.");
+  } else {
+    console.log(`Deny-list scan passed (${files.length} files).`);
+  }
+
   return failed ? 1 : 0;
 }
 

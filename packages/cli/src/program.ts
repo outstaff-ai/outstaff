@@ -15,7 +15,13 @@ export function nodeContext(): Context {
     err: (t) => void process.stderr.write(t),
     gitOrigin(cwd) {
       try {
-        return execFileSync("git", ["remote", "get-url", "origin"], { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim() || undefined;
+        return (
+          execFileSync("git", ["remote", "get-url", "origin"], {
+            cwd,
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+          }).trim() || undefined
+        );
       } catch {
         return undefined;
       }
@@ -27,19 +33,31 @@ export function buildProgram(ctx: Context, setExit: (code: number) => void) {
   const program = new Command("ost")
     .description("Run a team of AI agents like an outsourcing agency.")
     .version(version, "-v, --version", "Print the version.")
-    .option("--team <path|git-url>", "Team config: a file, a directory, or a git URL with an optional #ref.")
+    .option(
+      "--team <path|git-url>",
+      "Team config: a file, a directory, or a git URL with an optional #ref.",
+    )
     .option("--json", "Print machine-readable JSON instead of text.")
     .configureOutput({ writeOut: ctx.out, writeErr: ctx.err })
     .exitOverride();
 
   for (const def of commands) {
-    const cmd = program.command(def.name).description(def.summary).exitOverride().configureOutput({ writeOut: ctx.out, writeErr: ctx.err });
-    for (const o of def.options) cmd.option(o.flags, o.description);
+    const cmd = program
+      .command(def.name)
+      .description(def.summary)
+      .exitOverride()
+      .configureOutput({ writeOut: ctx.out, writeErr: ctx.err });
+
+    for (const o of def.options) {
+      cmd.option(o.flags, o.description);
+    }
+
     cmd.action(async (...args: unknown[]) => {
       const self = args.at(-1) as Command;
       setExit(await def.run(ctx, self.optsWithGlobals() as GlobalOptions));
     });
   }
+
   return program;
 }
 
@@ -51,11 +69,16 @@ export async function run(argv: string[], ctx: Context): Promise<number> {
     ctx.out(program.helpInformation());
     return 0;
   }
+
   try {
     await program.parseAsync(argv, { from: "user" });
   } catch (err) {
-    if (err instanceof CommanderError) return err.exitCode;
+    if (err instanceof CommanderError) {
+      return err.exitCode;
+    }
+
     throw err;
   }
+
   return code;
 }

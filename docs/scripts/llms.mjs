@@ -14,9 +14,13 @@ async function listPages(dir) {
   const files = [];
   for (const entry of entries) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...(await listPages(path)));
-    else if (/\.mdx?$/.test(entry.name)) files.push(path);
+    if (entry.isDirectory()) {
+      files.push(...(await listPages(path)));
+    } else if (/\.mdx?$/.test(entry.name)) {
+      files.push(path);
+    }
   }
+
   return files;
 }
 
@@ -31,15 +35,22 @@ export function parsePage(source) {
   if (match) {
     for (const line of match[1].split(/\r?\n/)) {
       const kv = /^(title|description):\s*(.*)$/.exec(line);
-      if (kv) meta[kv[1]] = unquote(kv[2]);
+      if (kv) {
+        meta[kv[1]] = unquote(kv[2]);
+      }
     }
   }
-  return { title: meta.title ?? "", description: meta.description ?? "", body: match ? source.slice(match[0].length) : source };
+
+  return {
+    title: meta.title ?? "",
+    description: meta.description ?? "",
+    body: match ? source.slice(match[0].length) : source,
+  };
 }
 
 export async function generate({ docsDir, outDir, site, base = "" }) {
   const root = site.replace(/\/$/, "") + base.replace(/\/$/, "");
-  const files = (await listPages(docsDir)).sort((a, b) => a.localeCompare(b));
+  const files = (await listPages(docsDir)).toSorted((a, b) => a.localeCompare(b));
   const pages = [];
   for (const file of files) {
     const rel = relative(docsDir, file).split(sep).join("/");
@@ -81,5 +92,6 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     site: "https://docs.outstaff.work",
     base: "",
   });
+
   console.log(`llms.txt and llms-full.txt written for ${pages} pages`);
 }

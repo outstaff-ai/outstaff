@@ -16,28 +16,43 @@ export const team = defineCommand({
   async run(ctx, options) {
     const loaded = await loadTeam(ctx, options);
     if (!loaded.ok) {
-      for (const i of loaded.issues) ctx.err(`error    ${formatIssue(i)}\n`);
+      for (const i of loaded.issues) {
+        ctx.err(`error    ${formatIssue(i)}\n`);
+      }
+
       return 1;
     }
+
     const { config } = loaded;
 
     if (options.json) {
       const { humans, repos, people, integrations } = config;
-      ctx.out(`${JSON.stringify({ file: loaded.source.file, team: config.team, humans: humans ?? null, repos, people, integrations }, null, 2)}\n`);
+      ctx.out(
+        `${JSON.stringify({ file: loaded.source.file, team: config.team, humans: humans ?? null, repos, people, integrations }, null, 2)}\n`,
+      );
+
       return 0;
     }
 
     const out: string[] = [];
     out.push(`Team: ${config.team.name}${config.team.product ? ` (${config.team.product})` : ""}`);
-    if (config.team.description) out.push(config.team.description);
+    if (config.team.description) {
+      out.push(config.team.description);
+    }
 
     out.push("", "Humans");
-    if (config.humans === undefined) out.push(`  Not listed; ${DEFAULT_TRUST}.`);
-    else {
+    if (config.humans === undefined) {
+      out.push(`  Not listed; ${DEFAULT_TRUST}.`);
+    } else {
       out.push(
         ...table(
           ["NAME", "IDENTITIES"],
-          config.humans.map((h) => [h.name, Object.entries(h.identities).map(([k, v]) => `${k}:${v}`).join(", ")]),
+          config.humans.map((h) => [
+            h.name,
+            Object.entries(h.identities)
+              .map(([k, v]) => `${k}:${v}`)
+              .join(", "),
+          ]),
         )
           .split("\n")
           .map((l) => `  ${l}`),
@@ -55,8 +70,9 @@ export const team = defineCommand({
     );
 
     out.push("", "People");
-    if (config.people.length === 0) out.push("  None yet. Add one with `ost hire`.");
-    else {
+    if (config.people.length === 0) {
+      out.push("  None yet. Add one with `ost hire`.");
+    } else {
       out.push(
         ...table(
           ["HANDLE", "NAME", "ROLE", "MODEL", "GRANTS"],

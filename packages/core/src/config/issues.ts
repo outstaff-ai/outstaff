@@ -26,10 +26,16 @@ export function toConfigIssues(error: z.ZodError, prefix: (string | number)[] = 
     const path = [...prefix, ...issue.path.map((p) => (typeof p === "symbol" ? String(p) : p))];
     if (issue.code === "unrecognized_keys") {
       for (const key of issue.keys) {
-        out.push({ path: [...path, key], code: CONFIG_CODES.unknownKey, message: `Unknown key "${key}".` });
+        out.push({
+          path: [...path, key],
+          code: CONFIG_CODES.unknownKey,
+          message: `Unknown key "${key}".`,
+        });
       }
+
       continue;
     }
+
     const custom = (issue as { params?: { code?: string } }).params?.code;
     out.push({
       path,
@@ -37,5 +43,6 @@ export function toConfigIssues(error: z.ZodError, prefix: (string | number)[] = 
       message: issue.message,
     });
   }
+
   return out;
 }

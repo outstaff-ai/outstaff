@@ -1,6 +1,53 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["typescript", "unicorn", "oxc"],
-  "categories": { "correctness": "error" },
-  "ignorePatterns": ["**/dist/**", "**/coverage/**", "node_modules/**"]
+  "plugins": ["typescript", "import", "vitest", "unicorn", "oxc"],
+  "jsPlugins": ["@stylistic/eslint-plugin"],
+  "categories": { "correctness": "error", "suspicious": "warn" },
+  "env": { "builtin": true, "es2024": true, "node": true },
+  "ignorePatterns": ["node_modules", "dist", "build", "coverage", ".astro"],
+  "overrides": [
+    {
+      "files": ["**/*.{test,spec}.{ts,tsx}"],
+      "rules": { "unicorn/consistent-function-scoping": "off" }
+    }
+  ],
+  "rules": {
+    "import/no-unassigned-import": ["warn", { "allow": ["**/*.css"] }],
+    "curly": ["error", "all"],
+    "arrow-body-style": ["error", "as-needed"],
+    "@stylistic/no-multiple-empty-lines": ["error", { "max": 1, "maxBOF": 0, "maxEOF": 0 }],
+    "@stylistic/padding-line-between-statements": [
+      "error",
+      {
+        "blankLine": "always",
+        "prev": ["if", "for", "while", "do", "try", "switch"],
+        "next": "*"
+      },
+      { "blankLine": "always", "prev": "multiline-const", "next": "*" },
+      { "blankLine": "always", "prev": "multiline-let", "next": "*" },
+      { "blankLine": "always", "prev": "multiline-var", "next": "*" },
+      { "blankLine": "always", "prev": "multiline-expression", "next": "*" },
+      { "blankLine": "always", "prev": "multiline-block-like", "next": "*" },
+      { "blankLine": "always", "prev": "multiline-export", "next": "*" },
+      { "blankLine": "always", "prev": "block-like", "next": "return" }
+    ],
+    "@stylistic/lines-around-comment": [
+      "error",
+      {
+        "beforeBlockComment": true,
+        "beforeLineComment": false,
+        "afterBlockComment": false,
+        "afterLineComment": false,
+        "allowBlockStart": true,
+        "allowClassStart": true,
+        "allowObjectStart": true,
+        "allowArrayStart": true,
+        "allowInterfaceStart": true,
+        "allowTypeStart": true,
+        "allowEnumStart": true,
+        "allowModuleStart": true,
+        "applyDefaultIgnorePatterns": true
+      }
+    ]
+  }
 }

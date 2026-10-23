@@ -46,7 +46,9 @@ const repoSchema = z
       .meta(d("Repository location: host/owner/repo, an https URL or a git@ address.")),
     kind: z
       .enum(REPO_KINDS)
-      .meta(d("Role of the repository: primary (the product, at most one), baseline, infra or other.")),
+      .meta(
+        d("Role of the repository: primary (the product, at most one), baseline, infra or other."),
+      ),
     default_branch: z.string().min(1).default("main").meta(d("Branch that pull requests target.")),
   })
   .meta(d("A repository the team works in."));
@@ -63,16 +65,24 @@ const peopleSchema = z
       .meta(d("Unique lowercase handle; used as the agent's hostname label and mention name.")),
     name: z.string().min(1).meta(d("Display name of the agent.")),
     pronouns: z.string().optional().meta(d("Pronouns shown in the agent's profile.")),
-    role: z.string().min(1).meta(d("Catalog role this agent plays, for example \"developer\".")),
-    extends: z.array(z.string().min(1)).optional().meta(d("Extra catalog roles or skill bundles layered on top of the role.")),
-    model: z.string().min(1).optional().meta(d("LLM model for this agent; the runtime adapter's default when omitted.")),
+    role: z.string().min(1).meta(d('Catalog role this agent plays, for example "developer".')),
+    extends: z
+      .array(z.string().min(1))
+      .optional()
+      .meta(d("Extra catalog roles or skill bundles layered on top of the role.")),
+    model: z
+      .string()
+      .min(1)
+      .optional()
+      .meta(d("LLM model for this agent; the runtime adapter's default when omitted.")),
     repos: z
-      .record(
-        z.string(),
-        z.enum(["read", "write"]),
-      )
+      .record(z.string(), z.enum(["read", "write"]))
       .default({})
-      .meta(d('Repository access by repo name, "kind:<primary|baseline|infra|other>" or "*"; values are "read" or "write".')),
+      .meta(
+        d(
+          'Repository access by repo name, "kind:<primary|baseline|infra|other>" or "*"; values are "read" or "write".',
+        ),
+      ),
     avatar: z
       .strictObject({
         seed: z.string().optional().meta(d("Seed for a generated avatar.")),
@@ -85,9 +95,11 @@ const peopleSchema = z
 
 export const adapterRefSchema = z
   .looseObject({
-    adapter: z.string().min(1).meta(d("Name of the adapter package to use, for example \"github\".")),
+    adapter: z.string().min(1).meta(d('Name of the adapter package to use, for example "github".')),
   })
-  .meta(d("Adapter choice; any other keys are options owned by that adapter. Never put secrets here."));
+  .meta(
+    d("Adapter choice; any other keys are options owned by that adapter. Never put secrets here."),
+  );
 
 const integrationsSchema = z
   .strictObject({
@@ -103,12 +115,18 @@ const integrationsSchema = z
 
 const workflowSchema = z
   .strictObject({
-    preset: z.enum(["kanban", "scrum", "minimal"]).default("kanban").meta(d("Built-in workflow to start from.")),
+    preset: z
+      .enum(["kanban", "scrum", "minimal"])
+      .default("kanban")
+      .meta(d("Built-in workflow to start from.")),
     statuses: z
       .partialRecord(z.enum(STATUSES), z.string().min(1))
       .optional()
       .meta(d("Maps canonical statuses to the status names used in your tracker.")),
-    rules: z.array(z.looseObject({})).optional().meta(d("Custom workflow rules; their shape is defined by the workflow engine.")),
+    rules: z
+      .array(z.looseObject({}))
+      .optional()
+      .meta(d("Custom workflow rules; their shape is defined by the workflow engine.")),
   })
   .meta(d("How work moves through the team."));
 
@@ -120,10 +138,18 @@ const policiesSchema = z
           .int()
           .min(1)
           .default(12)
-          .meta(d("Maximum runs per work item per hour triggered by agents or automation; humans are never limited.")),
+          .meta(
+            d(
+              "Maximum runs per work item per hour triggered by agents or automation; humans are never limited.",
+            ),
+          ),
       })
       .default({ max_runs_per_item_per_hour: 12 })
-      .meta(d("Stops agents from triggering each other in endless loops. Limits only runs triggered by agents or automation; humans are never limited.")),
+      .meta(
+        d(
+          "Stops agents from triggering each other in endless loops. Limits only runs triggered by agents or automation; humans are never limited.",
+        ),
+      ),
     usage: z
       .strictObject({
         defer_scheduled_at: z
@@ -154,8 +180,16 @@ const policiesSchema = z
       .meta(d("Thresholds that slow down work as the LLM usage limit approaches.")),
     messages: z
       .strictObject({
-        max_lines: z.int().min(1).max(20).default(3).meta(d("Maximum lines in a chat message from an agent.")),
-        always_link: z.boolean().default(true).meta(d("Link tickets, pull requests and documents instead of mentioning bare ids.")),
+        max_lines: z
+          .int()
+          .min(1)
+          .max(20)
+          .default(3)
+          .meta(d("Maximum lines in a chat message from an agent.")),
+        always_link: z
+          .boolean()
+          .default(true)
+          .meta(d("Link tickets, pull requests and documents instead of mentioning bare ids.")),
         omit: z
           .array(z.enum(["ci", "mergeability", "hashes", "file_lists"]))
           .default(["ci", "mergeability", "hashes"])
@@ -179,7 +213,11 @@ export const teamConfigSchema = z
     humans: z
       .array(humanSchema)
       .optional()
-      .meta(d("Trusted humans. Optional; when omitted, trusted humans are repo writers and full chat-workspace members.")),
+      .meta(
+        d(
+          "Trusted humans. Optional; when omitted, trusted humans are repo writers and full chat-workspace members.",
+        ),
+      ),
     catalog: z
       .strictObject({
         version: z
@@ -189,7 +227,11 @@ export const teamConfigSchema = z
             message: "Must be an exact semver version, for example 1.0.0.",
             params: { code: CONFIG_CODES.catalogInvalidVersion },
           })
-          .meta(d("Exact catalog release this team uses, for example \"1.0.0\"; must match the catalog in the agent images.")),
+          .meta(
+            d(
+              'Exact catalog release this team uses, for example "1.0.0"; must match the catalog in the agent images.',
+            ),
+          ),
         path: z
           .string()
           .min(1)
@@ -214,8 +256,16 @@ export const teamConfigSchema = z
       .meta(d("Email addresses for agents.")),
     office: z
       .strictObject({
-        events: z.enum(["poll", "webhook"]).default("poll").meta(d("How the office learns about changes: polling or webhooks.")),
-        poll_interval_seconds: z.int().min(10).max(3600).default(60).meta(d("Seconds between polls when events is \"poll\".")),
+        events: z
+          .enum(["poll", "webhook"])
+          .default("poll")
+          .meta(d("How the office learns about changes: polling or webhooks.")),
+        poll_interval_seconds: z
+          .int()
+          .min(10)
+          .max(3600)
+          .default(60)
+          .meta(d('Seconds between polls when events is "poll".')),
       })
       .optional()
       .meta(d("Office event intake settings.")),
@@ -227,26 +277,71 @@ export const teamConfigSchema = z
     let primary = -1;
     cfg.repos.forEach((r, i) => {
       if (seenRepos.has(r.name)) {
-        ctx.addIssue(customIssue(CONFIG_CODES.reposDuplicateName, `Repo name "${r.name}" is already used by repos[${seenRepos.get(r.name)}].`, ["repos", i, "name"]));
-      } else seenRepos.set(r.name, i);
+        ctx.addIssue(
+          customIssue(
+            CONFIG_CODES.reposDuplicateName,
+            `Repo name "${r.name}" is already used by repos[${seenRepos.get(r.name)}].`,
+            ["repos", i, "name"],
+          ),
+        );
+      } else {
+        seenRepos.set(r.name, i);
+      }
+
       if (r.kind === "primary") {
         if (primary >= 0) {
-          ctx.addIssue(customIssue(CONFIG_CODES.reposMultiplePrimary, `Only one repo may have kind "primary"; repos[${primary}] already does.`, ["repos", i, "kind"]));
-        } else primary = i;
+          ctx.addIssue(
+            customIssue(
+              CONFIG_CODES.reposMultiplePrimary,
+              `Only one repo may have kind "primary"; repos[${primary}] already does.`,
+              ["repos", i, "kind"],
+            ),
+          );
+        } else {
+          primary = i;
+        }
       }
     });
+
     const seenHandles = new Map<string, number>();
     cfg.people.forEach((p, i) => {
       if (seenHandles.has(p.handle)) {
-        ctx.addIssue(customIssue(CONFIG_CODES.peopleDuplicateHandle, `Handle "${p.handle}" is already used by people[${seenHandles.get(p.handle)}].`, ["people", i, "handle"]));
-      } else seenHandles.set(p.handle, i);
+        ctx.addIssue(
+          customIssue(
+            CONFIG_CODES.peopleDuplicateHandle,
+            `Handle "${p.handle}" is already used by people[${seenHandles.get(p.handle)}].`,
+            ["people", i, "handle"],
+          ),
+        );
+      } else {
+        seenHandles.set(p.handle, i);
+      }
+
       for (const key of Object.keys(p.repos)) {
         if (!GRANT_KEY.test(key)) {
-          ctx.addIssue(customIssue(CONFIG_CODES.peopleInvalidGrantKey, 'Use a repo name, "kind:<primary|baseline|infra|other>" or "*".', ["people", i, "repos", key]));
+          ctx.addIssue(
+            customIssue(
+              CONFIG_CODES.peopleInvalidGrantKey,
+              'Use a repo name, "kind:<primary|baseline|infra|other>" or "*".',
+              ["people", i, "repos", key],
+            ),
+          );
+
           continue;
         }
-        if (key === "*" || key.startsWith("kind:") || seenRepos.has(key)) continue;
-        ctx.addIssue(customIssue(CONFIG_CODES.peopleUnknownRepo, `Grant refers to unknown repo "${key}".`, ["people", i, "repos", key]));
+
+        if (key === "*" || key.startsWith("kind:") || seenRepos.has(key)) {
+          continue;
+        }
+
+        ctx.addIssue(
+          customIssue(CONFIG_CODES.peopleUnknownRepo, `Grant refers to unknown repo "${key}".`, [
+            "people",
+            i,
+            "repos",
+            key,
+          ]),
+        );
       }
     });
   })

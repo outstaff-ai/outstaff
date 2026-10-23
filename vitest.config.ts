@@ -8,7 +8,11 @@ export default defineConfig({
     projects: [
       ...packages.map((pkg) => ({
         // Packages import each other as compiled libs; tests use the sources so they need no build first.
-        resolve: { alias: { "@outstaff/core": fileURLToPath(new URL("packages/core/src/index.ts", import.meta.url)) } },
+        resolve: {
+          alias: {
+            "@outstaff/core": fileURLToPath(new URL("packages/core/src/index.ts", import.meta.url)),
+          },
+        },
         test: {
           name: pkg,
           root: `packages/${pkg}`,

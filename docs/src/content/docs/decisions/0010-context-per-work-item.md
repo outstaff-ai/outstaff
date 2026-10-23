@@ -15,15 +15,16 @@ One agent works on a ticket, then a third review round of another pull request, 
 
 Each work item has its own layers:
 
-| Layer | Scope | What it is |
-| --- | --- | --- |
-| Session | per item | The runtime session id is stored on the item. A later round of the same item resumes it. Other items never see it. |
-| Workspace | per item | Its own git worktree, branch and scratch directory, cleaned up when the item is done. |
-| Journal | per item, in the office store | A short log appended at every hand-back: what was done, decisions, open points, links. If a session is lost, a new one starts from the journal plus the current state. |
-| Current state | per item, rebuilt at every start | The ticket, pull request status, CI, open review threads and stack, taken from the office. |
-| Memory | per person, shared | Lasting lessons and preferences only, never item details. |
+| Layer         | Scope                            | What it is                                                                                                                                                             |
+| ------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Session       | per item                         | The runtime session id is stored on the item. A later round of the same item resumes it. Other items never see it.                                                     |
+| Workspace     | per item                         | Its own git worktree, branch and scratch directory, cleaned up when the item is done.                                                                                  |
+| Journal       | per item, in the office store    | A short log appended at every hand-back: what was done, decisions, open points, links. If a session is lost, a new one starts from the journal plus the current state. |
+| Current state | per item, rebuilt at every start | The ticket, pull request status, CI, open review threads and stack, taken from the office.                                                                             |
+| Memory        | per person, shared               | Lasting lessons and preferences only, never item details.                                                                                                              |
 
 **Chat:**
+
 - A reply in a thread the agent opened for an item joins that item.
 - A new top-level message starts its own chat session. That session gets recent conversation history and the person's current work, and the agent can link it to an existing item.
 

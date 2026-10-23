@@ -10,6 +10,7 @@ export type AdapterInfo = { port: AdapterPort; name: string; capabilities: Capab
 export type ValidationContext = {
   /** Catalog roles by name. An empty map means the catalog is unknown and role names are not checked. */
   roles: Map<string, RoleNeeds>;
+
   /** Installed adapters keyed by `<port>/<adapter>`. An empty map means adapter names are not checked. */
   adapters: Map<string, AdapterInfo>;
 };
@@ -71,10 +72,13 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "integrations.invalid_options": "An integration's options are rejected by its adapter.",
   "people.unknown_role": "A person's role is not in the catalog.",
   "people.unknown_extends": "An extends entry names a role that is not in the catalog.",
-  "people.write_without_vcs": "A person has a write grant but no vcs integration supports pull requests.",
-  "integrations.unknown_adapter": "An integration names an adapter that is not installed for that port.",
+  "people.write_without_vcs":
+    "A person has a write grant but no vcs integration supports pull requests.",
+  "integrations.unknown_adapter":
+    "An integration names an adapter that is not installed for that port.",
   "capability.missing": "A role needs a capability that no configured integration provides.",
-  "capability.optional_missing": "A role can use a capability that no configured integration provides.",
+  "capability.optional_missing":
+    "A role can use a capability that no configured integration provides.",
   "trust.default": "humans is omitted, so the default trust rule applies.",
   "people.no_repos": "A person has no repo grants.",
 };
@@ -89,7 +93,10 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
   const provided = new Set<Capability>();
   for (const port of ADAPTER_PORTS) {
     const ref = config.integrations[port];
-    if (!ref) continue;
+    if (!ref) {
+      continue;
+    }
+
     const info = ctx.adapters.get(adapterKey(port, ref.adapter));
     if (!info) {
       if (ctx.adapters.size > 0) {
@@ -99,9 +106,13 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
           message: `No ${port} adapter named "${ref.adapter}" is installed.`,
         });
       }
+
       continue;
     }
-    for (const c of info.capabilities) provided.add(c);
+
+    for (const c of info.capabilities) {
+      provided.add(c);
+    }
   }
 
   // Without an adapter registry nothing is known, so capability-based checks are skipped rather than guessed.
@@ -117,6 +128,7 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
         message: `Role "${person.role}" is not in the catalog.`,
       });
     }
+
     person.extends?.forEach((name, j) => {
       if (checkRoles && !ctx.roles.has(name)) {
         errors.push({
@@ -129,7 +141,10 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
 
     if (!canWrite) {
       for (const [key, level] of Object.entries(person.repos)) {
-        if (level !== "write") continue;
+        if (level !== "write") {
+          continue;
+        }
+
         errors.push({
           path: ["people", i, "repos", key],
           code: CONFIG_CODES.peopleWriteWithoutVcs,
@@ -155,10 +170,16 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
     ] as const) {
       for (const roleName of roleNames) {
         const needs = ctx.roles.get(roleName);
-        if (!needs) continue;
+        if (!needs) {
+          continue;
+        }
+
         for (const cap of (optional ? needs.optionalNeeds : needs.needs) ?? []) {
           const dedupe = `${code}:${cap}`;
-          if (!adaptersKnown || provided.has(cap) || seen.has(dedupe)) continue;
+          if (!adaptersKnown || provided.has(cap) || seen.has(dedupe)) {
+            continue;
+          }
+
           seen.add(dedupe);
           const port = CAPABILITY_PORT[cap];
           warnings.push({

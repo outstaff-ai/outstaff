@@ -5,6 +5,9 @@ export type ParseResult = { ok: true; config: TeamConfig } | { ok: false; issues
 
 export function parseTeamConfig(value: unknown): ParseResult {
   const result = teamConfigSchema.safeParse(value);
-  if (result.success) return { ok: true, config: result.data };
+  if (result.success) {
+    return { ok: true, config: result.data };
+  }
+
   return { ok: false, issues: toConfigIssues(result.error) };
 }

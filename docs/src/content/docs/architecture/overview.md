@@ -21,14 +21,14 @@ Outstaff has five kinds of component. The hosting of the containers and the stor
 
 ## Ports
 
-| Port | Purpose |
-| --- | --- |
-| Tracker (optional) | Reads and updates tickets in the issue tracker. |
-| Knowledge (optional) | Reads and writes the team's documents and notes. |
-| Vcs | Works with the code host: repositories, branches, pull requests, CI and reviews. |
-| Chat | Sends and receives messages in the team's chat workspace. |
-| Runtime | Runs an agent session on an LLM runtime. |
-| Avatars | Provides profile images for people (generated or from a chosen source). |
-| Mail | Optional inbox per person for verification and notification email. |
+| Port                 | Purpose                                                                          |
+| -------------------- | -------------------------------------------------------------------------------- |
+| Tracker (optional)   | Reads and updates tickets in the issue tracker.                                  |
+| Knowledge (optional) | Reads and writes the team's documents and notes.                                 |
+| Vcs                  | Works with the code host: repositories, branches, pull requests, CI and reviews. |
+| Chat                 | Sends and receives messages in the team's chat workspace.                        |
+| Runtime              | Runs an agent session on an LLM runtime.                                         |
+| Avatars              | Provides profile images for people (generated or from a chosen source).          |
+| Mail                 | Optional inbox per person for verification and notification email.               |
 
 Adapter packages for each port will be documented under [Adapters](/adapters/).

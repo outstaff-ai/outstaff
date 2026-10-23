@@ -20,6 +20,7 @@ There are two simpler ways to start agents, and both break down.
 Each team runs one **office** container.
 
 **Intake.** The office takes in events from the code host, the tracker and chat:
+
 - by **polling** (the default, which works behind NAT);
 - or by **webhooks**, when the office is reachable.
 
@@ -30,6 +31,7 @@ Each team runs one **office** container.
 **Work items.** Anything that needs a person becomes a **work item**: an assignment, a review round, a conflict, failing CI, a question from another agent, a chat request, or a scheduled job.
 
 **Scheduling.** The office schedules work items per person:
+
 - human chat first, then human-triggered work, then agent-triggered work, then scheduled work;
 - a **loop guard** limits only runs triggered by agents or automation;
 - a **usage policy** defers scheduled work, then pauses automatic work, as LLM usage limits approach;
