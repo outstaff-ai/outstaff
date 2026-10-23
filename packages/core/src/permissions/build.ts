@@ -224,8 +224,9 @@ export function commandRules(spec: ProfileSpec): CommandRule[] {
   return rules;
 }
 
-function grantFor(
-  person: PermissionPerson,
+/** The grant a person has on a repo: by name, then `kind:<kind>`, then `*`. */
+export function repoGrant(
+  person: Pick<PermissionPerson, "repos">,
   repo: PermissionTeam["repos"][number],
 ): GitMode | undefined {
   return person.repos[repo.name] ?? person.repos[`kind:${repo.kind}`] ?? person.repos["*"];
@@ -256,7 +257,7 @@ export function buildPolicy({
   }
 
   for (const repo of team.repos) {
-    const granted = grantFor(person, repo);
+    const granted = repoGrant(person, repo);
     if (!granted) {
       continue;
     }

@@ -1,6 +1,7 @@
 export {
   buildPolicy,
   commandRules,
+  repoGrant,
   PROFILE_SPECS,
   type BuildPolicyInput,
   type PermissionPerson,
