@@ -22,7 +22,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "./clock.js";
 import { createOffice, type Office } from "./office.js";
-import { openStore } from "./store/index.js";
+import { openStore, type Store } from "./store/index.js";
 
 const REPO: RepoRef = { host: "git.acme.example", owner: "acme", name: "app" };
 const SAM_LOGIN = "acme-sam[bot]";
@@ -71,6 +71,7 @@ function team(): TeamConfig {
 describe("createOffice", () => {
   const clock = manualClock();
   let office: Office;
+  let store: Store;
   let server: { port: number };
   let conns: OfficeConnection[];
   let vcs: ReturnType<typeof createFakeVcs>;
@@ -127,6 +128,7 @@ describe("createOffice", () => {
     await tracker.seed.member({ name: "Sam", kind: "agent" });
     await vcs.seed.permission(REPO, "dana", "write");
 
+    store = await openStore("sqlite::memory:", { now: () => clock.now() });
     office = await createOffice({
       team: team(),
       registry,
@@ -134,7 +136,7 @@ describe("createOffice", () => {
         { OUTSTAFF_AGENT_TOKEN_SAM: "sam-token", OUTSTAFF_AGENT_TOKEN_MIRA: "mira-token" },
         "/nonexistent",
       ),
-      store: await openStore("sqlite::memory:", { now: () => clock.now() }),
+      store,
       clock,
       catalog: {
         roles: { architect: { title: "Architect", summary: "Designs the system." } },
@@ -308,6 +310,31 @@ describe("createOffice", () => {
     const again = connect("sam");
     await again.whenConnected();
     expect(again.resume()).toEqual([offer.workItem.id]);
+  });
+
+  it("keeps the session of an item and offers it again after the agent drops the item", async () => {
+    const sam = connect("sam");
+    await sam.whenConnected();
+    await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "ticket",
+      title: "Task",
+      trigger: "human",
+    });
+
+    const offer = await next(sam);
+    await sam.accept(offer.workItem.id);
+    await sam.session(offer.workItem.id, "sess-1");
+    const before = await office.parts.scheduler.next("sam");
+    expect(before).toBeNull();
+    const attempts = (await store.getItem(offer.workItem.id))!.attempts;
+    await sam.decline(offer.workItem.id, "agent restarted");
+
+    const again = await next(sam);
+    expect(again.workItem.id).toBe(offer.workItem.id);
+    expect(again.sessionId).toBe("sess-1");
+    expect(again.context.journal.map((j) => j.text).join("\n")).toContain("agent restarted");
+    expect((await store.getItem(offer.workItem.id))!.attempts).toBe(attempts);
   });
 });
 
