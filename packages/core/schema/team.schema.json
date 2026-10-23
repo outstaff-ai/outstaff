@@ -1,0 +1,536 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "number",
+      "const": 1,
+      "description": "Schema version of this file; currently 1."
+    },
+    "team": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 40,
+          "pattern": "^[a-z][a-z0-9-]*$",
+          "description": "Team slug: lowercase letters, digits and dashes, starting with a letter."
+        },
+        "product": {
+          "description": "Name of the product the team builds.",
+          "type": "string"
+        },
+        "description": {
+          "description": "One-line description of the team.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "description": "Who the team is."
+    },
+    "humans": {
+      "description": "Trusted humans. Optional; when omitted, trusted humans are repo writers and full chat-workspace members.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the trusted human."
+          },
+          "identities": {
+            "type": "object",
+            "properties": {
+              "vcs": {
+                "description": "Username on the VCS host.",
+                "type": "string",
+                "minLength": 1
+              },
+              "tracker": {
+                "description": "Username or id in the issue tracker.",
+                "type": "string",
+                "minLength": 1
+              },
+              "chat": {
+                "description": "Username or id in the chat workspace.",
+                "type": "string",
+                "minLength": 1
+              },
+              "email": {
+                "description": "Email address.",
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false,
+            "description": "How this human is known on each connected system; at least one is required."
+          }
+        },
+        "required": [
+          "name",
+          "identities"
+        ],
+        "additionalProperties": false,
+        "description": "A trusted human."
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semver range of the catalog release to use, for example \"^1.0.0\"."
+        },
+        "path": {
+          "default": "catalog",
+          "description": "Directory of ejected catalog files, relative to this file.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "version"
+      ],
+      "additionalProperties": false,
+      "description": "Which catalog of roles and skills the team uses."
+    },
+    "repos": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Short name used to refer to this repository in grants."
+          },
+          "url": {
+            "type": "string",
+            "pattern": "^(https?:\\/\\/\\S+|git@\\S+:\\S+|[A-Za-z0-9.-]+\\/[\\w.-]+\\/[\\w.-]+)$",
+            "description": "Repository location: host/owner/repo, an https URL or a git@ address."
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "primary",
+              "baseline",
+              "infra",
+              "other"
+            ],
+            "description": "Role of the repository: primary (the product, at most one), baseline, infra or other."
+          },
+          "default_branch": {
+            "default": "main",
+            "description": "Branch that pull requests target.",
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "description": "A repository the team works in."
+      },
+      "description": "Repositories the team works in; at least one."
+    },
+    "people": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30,
+            "pattern": "^[a-z][a-z0-9-]*$",
+            "description": "Unique lowercase handle; used as the agent's hostname label and mention name."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Display name of the agent."
+          },
+          "pronouns": {
+            "description": "Pronouns shown in the agent's profile.",
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Catalog role this agent plays, for example \"developer\"."
+          },
+          "extends": {
+            "description": "Extra catalog roles or skill bundles layered on top of the role.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "model": {
+            "description": "LLM model for this agent; the runtime adapter's default when omitted.",
+            "type": "string",
+            "minLength": 1
+          },
+          "repos": {
+            "default": {},
+            "description": "Repository access by repo name, \"kind:<primary|baseline|infra|other>\" or \"*\"; values are \"read\" or \"write\".",
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write"
+              ]
+            }
+          },
+          "avatar": {
+            "description": "Avatar settings.",
+            "type": "object",
+            "properties": {
+              "seed": {
+                "description": "Seed for a generated avatar.",
+                "type": "string"
+              },
+              "url": {
+                "description": "Image URL to use as the avatar.",
+                "type": "string",
+                "format": "uri"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "handle",
+          "name",
+          "role"
+        ],
+        "additionalProperties": false,
+        "description": "An AI agent on the team."
+      },
+      "description": "The agents on the team; may be empty."
+    },
+    "integrations": {
+      "type": "object",
+      "properties": {
+        "chat": {
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {},
+          "description": "Chat adapter where humans and agents talk."
+        },
+        "vcs": {
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {},
+          "description": "Version control adapter (repositories and pull requests)."
+        },
+        "runtime": {
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {},
+          "description": "LLM runtime adapter that runs the agents."
+        },
+        "tracker": {
+          "description": "Issue tracker adapter.",
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {}
+        },
+        "knowledge": {
+          "description": "Knowledge base adapter.",
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {}
+        },
+        "avatars": {
+          "description": "Avatar generation adapter.",
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {}
+        },
+        "mail": {
+          "description": "Mailbox adapter.",
+          "type": "object",
+          "properties": {
+            "adapter": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Name of the adapter package to use, for example \"github\"."
+            }
+          },
+          "required": [
+            "adapter"
+          ],
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "chat",
+        "vcs",
+        "runtime"
+      ],
+      "additionalProperties": false,
+      "description": "Which adapters connect Outstaff to your tools."
+    },
+    "email": {
+      "description": "Email addresses for agents.",
+      "type": "object",
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "description": "Address pattern for agents, for example \"{handle}@acme.example\"."
+        }
+      },
+      "required": [
+        "pattern"
+      ],
+      "additionalProperties": false
+    },
+    "office": {
+      "description": "Office event intake settings.",
+      "type": "object",
+      "properties": {
+        "events": {
+          "default": "poll",
+          "description": "How the office learns about changes: polling or webhooks.",
+          "type": "string",
+          "enum": [
+            "poll",
+            "webhook"
+          ]
+        },
+        "poll_interval_seconds": {
+          "default": 60,
+          "description": "Seconds between polls when events is \"poll\".",
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 3600
+        }
+      },
+      "additionalProperties": false
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "preset": {
+          "default": "kanban",
+          "description": "Built-in workflow to start from.",
+          "type": "string",
+          "enum": [
+            "kanban",
+            "scrum",
+            "minimal"
+          ]
+        },
+        "statuses": {
+          "description": "Maps canonical statuses to the status names used in your tracker.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "enum": [
+              "backlog",
+              "ready",
+              "active",
+              "review",
+              "blocked",
+              "done",
+              "canceled"
+            ]
+          },
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rules": {
+          "description": "Custom workflow rules; their shape is defined by the workflow engine.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+          }
+        }
+      },
+      "additionalProperties": false,
+      "description": "How work moves through the team."
+    },
+    "policies": {
+      "type": "object",
+      "properties": {
+        "agent_loop_guard": {
+          "default": {
+            "max_runs_per_item_per_hour": 12
+          },
+          "description": "Stops agents from triggering each other in endless loops. Limits only runs triggered by agents or automation; humans are never limited.",
+          "type": "object",
+          "properties": {
+            "max_runs_per_item_per_hour": {
+              "default": 12,
+              "description": "Maximum runs per work item per hour triggered by agents or automation; humans are never limited.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "usage": {
+          "default": {
+            "defer_scheduled_at": 0.85,
+            "pause_automatic_at": 0.95
+          },
+          "description": "Thresholds that slow down work as the LLM usage limit approaches.",
+          "type": "object",
+          "properties": {
+            "defer_scheduled_at": {
+              "default": 0.85,
+              "description": "Fraction of the usage limit at which scheduled work is deferred.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pause_automatic_at": {
+              "default": 0.95,
+              "description": "Fraction of the usage limit at which all automatic work pauses.",
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "messages": {
+          "default": {
+            "max_lines": 3,
+            "always_link": true,
+            "omit": [
+              "ci",
+              "mergeability",
+              "hashes"
+            ]
+          },
+          "description": "How agents write chat messages.",
+          "type": "object",
+          "properties": {
+            "max_lines": {
+              "default": 3,
+              "description": "Maximum lines in a chat message from an agent.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "always_link": {
+              "default": true,
+              "description": "Link tickets, pull requests and documents instead of mentioning bare ids.",
+              "type": "boolean"
+            },
+            "omit": {
+              "default": [
+                "ci",
+                "mergeability",
+                "hashes"
+              ],
+              "description": "Details left out of chat messages.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ci",
+                  "mergeability",
+                  "hashes",
+                  "file_lists"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "description": "Team-wide guardrails and message style."
+    }
+  },
+  "required": [
+    "version",
+    "team",
+    "catalog",
+    "repos",
+    "people",
+    "integrations"
+  ],
+  "additionalProperties": false,
+  "description": "Outstaff team configuration (outstaff/team.yaml).",
+  "title": "Outstaff team.yaml"
+}
