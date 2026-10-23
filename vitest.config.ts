@@ -2,6 +2,7 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 const packages = ["core", "catalog", "cli", "agent", "office"];
+const src = (path: string) => fileURLToPath(new URL(`packages/core/src/${path}`, import.meta.url));
 
 export default defineConfig({
   test: {
@@ -19,6 +20,17 @@ export default defineConfig({
           include: ["src/**/*.test.ts"],
         },
       })),
+      {
+        // Adapters test against core's source so `pnpm test` works before `pnpm build`.
+        resolve: {
+          alias: [
+            { find: /^@outstaff\/core\/contracts$/, replacement: src("contracts/index.ts") },
+            { find: /^@outstaff\/core\/fakes$/, replacement: src("fakes/index.ts") },
+            { find: /^@outstaff\/core$/, replacement: src("index.ts") },
+          ],
+        },
+        test: { name: "vcs-github", root: "packages/vcs-github", include: ["src/**/*.test.ts"] },
+      },
       { test: { name: "scripts", root: "scripts", include: ["*.test.ts"] } },
       { test: { name: "docs", root: "docs", include: ["scripts/**/*.test.mjs"] } },
     ],
