@@ -13,10 +13,10 @@ Teams use different issue trackers, docs tools, messengers, code hosts and LLM r
 
 ## Decision
 
-- Core code depends only on **ports**: TypeScript interfaces for Tracker, Knowledge, Vcs, Chat, Runtime, Avatars and Mail.
+- Core code depends only on **ports**: TypeScript interfaces for Tracker, Knowledge, Vcs, Chat, Runtime and Avatars. Email is an office feature rather than a port (see issue #76).
 - Each integration is a separate **adapter package** that implements one port (for example `@outstaff/tracker-itsaplan`, `@outstaff/chat-slack`).
 - Every port ships a **contract test kit**. An adapter is correct when it passes the kit, and the in-memory fakes used by core tests pass the same kits.
-- Adapters declare **capabilities** (for example `tracker.webhooks`, `chat.homeView`).
+- Adapters declare **capabilities** (for example `tracker.webhooks`, `chat.agentProfile`).
   - `ost validate` compares them with what the team's roles need.
   - When something is missing it **warns** and explains what will not work. It never picks a fallback silently.
 - Adapters expose **link templates** (issue, document, pull request and commit URLs), so agents always send links instead of bare ids.

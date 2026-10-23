@@ -25,7 +25,7 @@ export type PersonContext = {
   model: string;
 };
 
-export const PORTS = ["tracker", "knowledge", "vcs", "chat", "runtime", "avatars", "mail"] as const;
+export const PORTS = ["tracker", "knowledge", "vcs", "chat", "runtime", "avatars"] as const;
 type Port = (typeof PORTS)[number];
 
 export type CatalogContext = {

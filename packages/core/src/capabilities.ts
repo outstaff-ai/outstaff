@@ -10,11 +10,10 @@ export const CAPABILITIES = [
   "vcs.webhooks",
   "chat.messages",
   "chat.history",
-  "chat.homeView",
+  "chat.agentProfile",
   "runtime.sessions",
   "runtime.usage",
   "avatars.generate",
-  "mail.inbox",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -30,9 +29,8 @@ export const CAPABILITY_PORT: Record<Capability, AdapterPort> = {
   "vcs.webhooks": "vcs",
   "chat.messages": "chat",
   "chat.history": "chat",
-  "chat.homeView": "chat",
+  "chat.agentProfile": "chat",
   "runtime.sessions": "runtime",
   "runtime.usage": "runtime",
   "avatars.generate": "avatars",
-  "mail.inbox": "mail",
 };

@@ -29,6 +29,5 @@ Outstaff has five kinds of component. The hosting of the containers and the stor
 | Chat                 | Sends and receives messages in the team's chat workspace.                        |
 | Runtime              | Runs an agent session on an LLM runtime.                                         |
 | Avatars              | Provides profile images for people (generated or from a chosen source).          |
-| Mail                 | Optional inbox per person for verification and notification email.               |
 
 Adapter packages for each port will be documented under [Adapters](/adapters/).

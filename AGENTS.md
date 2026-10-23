@@ -16,7 +16,7 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 | `docs/`                 | The Starlight documentation site (`@outstaff/docs`), published to GitHub Pages at docs.outstaff.work.                 |
 | `docs/scripts/llms.mjs` | Generates `llms.txt` and `llms-full.txt` into `docs/dist` after the docs build.                                       |
 
-Adapters (tracker, knowledge, vcs, chat, runtime, avatars, mail) are separate packages, one per integration, each implementing a port and checked by a shared contract test kit. They land under `packages/` as the milestones progress.
+Adapters (tracker, knowledge, vcs, chat, runtime, avatars) are separate packages, one per integration, each implementing a port and checked by a shared contract test kit. They land under `packages/` as the milestones progress.
 
 ## Commands
 

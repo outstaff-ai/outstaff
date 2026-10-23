@@ -3,15 +3,7 @@ import { CONFIG_CODES } from "./codes.js";
 import { toConfigIssues, type ConfigIssue } from "./issues.js";
 import type { TeamConfig } from "./schema.js";
 
-export const ADAPTER_PORTS = [
-  "chat",
-  "vcs",
-  "runtime",
-  "tracker",
-  "knowledge",
-  "avatars",
-  "mail",
-] as const;
+export const ADAPTER_PORTS = ["chat", "vcs", "runtime", "tracker", "knowledge", "avatars"] as const;
 
 export type AdapterPort = (typeof ADAPTER_PORTS)[number];
 
