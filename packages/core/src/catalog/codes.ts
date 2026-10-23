@@ -8,6 +8,7 @@ export const CATALOG_CODES = {
   missingFile: "catalog.missing_file",
   nameMismatch: "catalog.name_mismatch",
   unknownExtends: "catalog.unknown_extends",
+  unknownRole: "catalog.unknown_role",
   extendsCycle: "catalog.extends_cycle",
   unknownPlaceholder: "catalog.unknown_placeholder",
   invalidTag: "catalog.invalid_tag",
