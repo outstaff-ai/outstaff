@@ -240,7 +240,11 @@ describe("ost init", () => {
 
 describe("cli reference", () => {
   it("matches the committed page (run `pnpm --filter outstaff run docs:cli`)", () => {
-    const committed = readFileSync(new URL("../cli-reference.md", import.meta.url), "utf8");
+    const committed = readFileSync(
+      new URL("../../../docs/src/content/docs/reference/cli.md", import.meta.url),
+      "utf8",
+    );
+
     expect(committed).toBe(renderCliReference());
   });
 });

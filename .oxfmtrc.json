@@ -6,7 +6,9 @@
   "printWidth": 100,
   "sortPackageJson": false,
   "ignorePatterns": [
-    "packages/cli/cli-reference.md",
+    "docs/src/content/docs/reference/cli.md",
+    "docs/src/content/docs/reference/team-yaml.md",
+    "docs/src/content/docs/reference/validation-codes.md",
     "**/__golden__",
     "**/__snapshots__",
     "packages/core/schema",
