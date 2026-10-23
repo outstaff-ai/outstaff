@@ -1,0 +1,13 @@
+name: reviewer
+title: Reviewer
+summary: Reviews pull requests for correctness, security and consistency, and gives a verdict.
+toolset: base
+permissions: readonly
+needs:
+  - vcs.pullRequests
+  - vcs.reviewThreads
+modes:
+  - name: review
+    when: A pull request is waiting for a review.
+  - name: re-review
+    when: The author answered your threads or pushed changes.

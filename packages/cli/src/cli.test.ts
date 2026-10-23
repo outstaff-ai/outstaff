@@ -45,7 +45,7 @@ function catalogDir(name: string, files: Record<string, string>, withVersion = t
   return dir;
 }
 
-/** A stock catalog with the roles the acme team uses; the shipped package has only an example role. */
+/** A stock catalog with the roles the acme team uses; a stand-in so the tests do not depend on the shipped text. */
 const ACME_ROLES = ["pm", "product", "architect", "designer", "developer", "reviewer", "devops"];
 const stockFixture = catalogDir(
   "stock",
@@ -295,15 +295,11 @@ describe("ost render", () => {
   });
 
   it("renders from the installed package root", async () => {
-    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
-      /role: (?!example)\w+/g,
-      "role: example",
-    );
-
+    const team = readFileSync(ACME_TEAM_FILE, "utf8");
     const r = await ost(project(undefined, team), sam, undefined, "");
     expect(r.err).toBe("");
     expect(r.code).toBe(0);
-    expect(r.out).toContain("skills/example/SKILL.md");
+    expect(r.out).toContain("skills/developer/SKILL.md");
   });
 
   it("lets an ejected role replace the stock one", async () => {

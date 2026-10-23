@@ -1,0 +1,17 @@
+name: developer
+title: Developer
+summary: Implements tickets, fixes review feedback, keeps stacks rebased and tests the work.
+toolset: code
+permissions: code
+needs:
+  - vcs.pullRequests
+  - vcs.reviewThreads
+modes:
+  - name: implement
+    when: A ticket is assigned and ready.
+  - name: review-feedback
+    when: A pull request you own has new review threads.
+  - name: rebase
+    when: A branch has a conflict or its parent in a stack merged.
+  - name: ci-fix
+    when: CI fails on a pull request you own.
