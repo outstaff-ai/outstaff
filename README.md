@@ -13,6 +13,21 @@ You run the containers wherever you like (Docker Compose, Kubernetes, anything t
 
 > Status: early development. Nothing is released yet. Follow the [milestones](https://github.com/outstaff-ai/outstaff/milestones) for progress.
 
+## Development
+
+Requirements: pnpm 12. The Node.js version is pinned in `package.json` (`devEngines.runtime`), and pnpm downloads it on install if it is missing.
+
+```sh
+pnpm install
+pnpm lint        # oxlint
+pnpm typecheck   # TypeScript 7, no emit, in every package
+pnpm test        # vitest, one project per package
+pnpm build       # TypeScript 7: compiled ESM, declarations and source maps in each package's dist/
+pnpm changeset   # record a version bump for a change
+```
+
+Packages live in `packages/*`: `core`, `catalog`, `cli` (published as `outstaff`), `agent` and `office`.
+
 ## License
 
 [MIT](LICENSE)
