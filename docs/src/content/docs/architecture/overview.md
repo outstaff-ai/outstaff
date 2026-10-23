@@ -31,4 +31,4 @@ Outstaff has five kinds of component. The hosting of the containers and the stor
 | Avatars | Provides profile images for people (generated or from a chosen source). |
 | Mail | Optional inbox per person for verification and notification email. |
 
-Adapter packages for each port will be documented under [Adapters](/outstaff/adapters/).
+Adapter packages for each port will be documented under [Adapters](/adapters/).
