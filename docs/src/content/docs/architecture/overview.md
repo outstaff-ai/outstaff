@@ -11,7 +11,7 @@ Outstaff has five kinds of component. The hosting of the containers and the stor
 
 **Catalog.** Generic roles and skills, baked into the container images. Clients can eject and customize them.
 
-**Team config.** `outstaff/team.yaml` in the client repository describes humans, people, repositories with read and write grants, integrations, workflow and policies. The CLI creates and updates it.
+**Team config.** `.outstaff/team.yaml` in the client repository describes humans, people, repositories with read and write grants, integrations, workflow and policies. The CLI creates and updates it.
 
 **Office.** One container per team. It takes in events by polling or webhooks, keeps work state (tickets, pull requests, CI, reviews), runs a configurable workflow engine, schedules work items for each agent, routes agent-to-agent questions through messaging, and stores state in Postgres or SQLite.
 

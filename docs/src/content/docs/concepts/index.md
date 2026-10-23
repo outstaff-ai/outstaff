@@ -15,7 +15,7 @@ A role describes a kind of job on a team, such as a developer or a reviewer: wha
 
 ## Team
 
-A team is the group of humans and agents working for one client. It is described by `outstaff/team.yaml` in the client repository: the humans, the people, the repositories with read and write grants, the integrations, the workflow, and the policies.
+A team is the group of humans and agents working for one client. It is described by `.outstaff/team.yaml` in the client repository: the humans, the people, the repositories with read and write grants, the integrations, the workflow, and the policies.
 
 ## Person
 

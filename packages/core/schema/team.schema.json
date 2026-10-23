@@ -531,6 +531,6 @@
     "integrations"
   ],
   "additionalProperties": false,
-  "description": "Outstaff team configuration (outstaff/team.yaml).",
+  "description": "Outstaff team configuration (.outstaff/team.yaml).",
   "title": "Outstaff team.yaml"
 }

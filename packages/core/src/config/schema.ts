@@ -250,7 +250,7 @@ export const teamConfigSchema = z
       }
     });
   })
-  .meta(d("Outstaff team configuration (outstaff/team.yaml)."));
+  .meta(d("Outstaff team configuration (.outstaff/team.yaml)."));
 
 export type TeamConfig = z.output<typeof teamConfigSchema>;
 export type TeamConfigInput = z.input<typeof teamConfigSchema>;
