@@ -4,14 +4,20 @@ import type { TeamConfig } from "../config/schema.js";
  * The values a template can use. Every key below always exists, so a template
  * may test it with {{#if}}; an absent value is "" (or null for objects).
  *
+ * Role-level files (SKILL.md, process, references, templates) get the team
+ * context, which is the same for every person. Agent definitions (agent.md)
+ * get the person context: the team context plus `person`.
+ *
  *   team.name, team.product
- *   person.handle, person.name, person.pronouns, person.role, person.model
  *   repos.list[] {name,url,kind,default_branch}, repos.primary (null when none)
  *   people.list[] {handle,name,pronouns,role,model}, people.byRole.<role>[]
  *   integrations.has.<port> (boolean), integrations.adapter.<port> (name or "")
  *   links.<name>   url templates with {key} slots, for example "{base}/{key}";
  *                  adapters fill them later. issue, pr and doc always exist.
  *   policies.messages.{max_lines,always_link,omit[]}
+ *
+ * Person context only:
+ *   person.handle, person.name, person.pronouns, person.role, person.model
  */
 export type RepoContext = { name: string; url: string; kind: string; default_branch: string };
 export type PersonContext = {
@@ -25,15 +31,16 @@ export type PersonContext = {
 export const PORTS = ["tracker", "knowledge", "vcs", "chat", "runtime", "avatars", "mail"] as const;
 type Port = (typeof PORTS)[number];
 
-export type CatalogContext = {
+export type TeamContext = {
   team: { name: string; product: string };
-  person: PersonContext;
   repos: { list: RepoContext[]; primary: RepoContext | null };
   people: { list: PersonContext[]; byRole: Record<string, PersonContext[]> };
   integrations: { has: Record<Port, boolean>; adapter: Record<Port, string> };
   links: Record<string, string>;
   policies: { messages: { max_lines: number; always_link: boolean; omit: string[] } };
 };
+
+export type CatalogContext = TeamContext & { person: PersonContext };
 
 export type ContextExtras = {
   /** URL templates by name; merged over empty `issue`, `pr` and `doc`. */
@@ -42,33 +49,23 @@ export type ContextExtras = {
   /** Catalog role ids; each gets a (possibly empty) `people.byRole` list. */
   roles?: string[];
 
-  /** Model used for people who have none, usually the role's `default_model`. */
-  defaultModel?: string;
+  /** Model for people who have none, by role id; usually each role's `default_model`. */
+  defaultModels?: Record<string, string>;
 };
 
 const DEFAULT_OMIT = ["ci", "mergeability", "hashes"];
 
-export function buildContext(
-  team: TeamConfig,
-  handle: string,
-  extras: ContextExtras = {},
-): CatalogContext {
-  const person = (p: TeamConfig["people"][number]): PersonContext => ({
-    handle: p.handle,
-    name: p.name,
-    pronouns: p.pronouns ?? "",
-    role: p.role,
-    model: p.model ?? extras.defaultModel ?? "",
-  });
+const toPerson = (p: TeamConfig["people"][number], extras: ContextExtras): PersonContext => ({
+  handle: p.handle,
+  name: p.name,
+  pronouns: p.pronouns ?? "",
+  role: p.role,
+  model: p.model ?? extras.defaultModels?.[p.role] ?? "",
+});
 
-  const list = team.people.map(person);
-  const me = list.find((p) => p.handle === handle);
-  if (!me) {
-    throw new Error(
-      `Unknown person "${handle}"; the team has: ${list.map((p) => p.handle).join(", ") || "nobody"}.`,
-    );
-  }
-
+/** Everything except `person`; identical for every person in the team. */
+export function buildTeamContext(team: TeamConfig, extras: ContextExtras = {}): TeamContext {
+  const list = team.people.map((p) => toPerson(p, extras));
   const byRole: Record<string, PersonContext[]> = {};
   for (const role of extras.roles ?? []) {
     byRole[role] = [];
@@ -96,7 +93,6 @@ export function buildContext(
 
   return {
     team: { name: team.team.name, product: team.team.product ?? "" },
-    person: me,
     repos: { list: repos, primary: repos.find((r) => r.kind === "primary") ?? null },
     people: { list, byRole },
     integrations: { has, adapter },
@@ -109,4 +105,21 @@ export function buildContext(
       },
     },
   };
+}
+
+/** The team context plus `person`, for agent definitions. */
+export function buildPersonContext(
+  team: TeamConfig,
+  handle: string,
+  extras: ContextExtras = {},
+): CatalogContext {
+  const context = buildTeamContext(team, extras);
+  const person = context.people.list.find((p) => p.handle === handle);
+  if (!person) {
+    throw new Error(
+      `Unknown person "${handle}"; the team has: ${context.people.list.map((p) => p.handle).join(", ") || "nobody"}.`,
+    );
+  }
+
+  return { ...context, person };
 }

@@ -1,7 +1,7 @@
 import type { Capability } from "../capabilities.js";
 import { CAPABILITY_PORT } from "../capabilities.js";
 import { CATALOG_CODES, CatalogError, type CatalogIssue } from "../catalog/codes.js";
-import { buildContext } from "../catalog/context.js";
+import { buildPersonContext, buildTeamContext } from "../catalog/context.js";
 import type { Catalog, CatalogDoc, CatalogRole } from "../catalog/load.js";
 import { render } from "../catalog/template.js";
 import type { TeamConfig } from "../config/schema.js";
@@ -33,6 +33,11 @@ export type RenderPersonOptions = {
   links?: Record<string, string>;
 };
 
+export type RenderTeamOptions = Omit<RenderPersonOptions, "handle">;
+
+/** Role-level output by path: rendered text, or the issues that rendering it raised. */
+type RoleCache = Map<string, string | CatalogIssue[]>;
+
 export const RENDER_WARNING_CODES = { missingCapability: "render.missing_capability" } as const;
 
 /** All problems found while rendering, as one error. */
@@ -55,10 +60,45 @@ const normalize = (text: string): string => text.replace(/\r\n?/g, "\n").replace
 
 /**
  * Renders the working files of one person: skills, agent definition,
- * references, templates and process documents. Throws RenderError listing
- * every problem (file:line:column) instead of stopping at the first.
+ * references, templates and process documents. Skills, references, templates
+ * and process documents render with the team context and so are the same for
+ * everyone; only the agent definition sees `person`. Throws RenderError
+ * listing every problem (file:line:column) instead of stopping at the first.
  */
 export function renderPerson(options: RenderPersonOptions): RenderedWorkdir {
+  return renderWith(options, new Map());
+}
+
+/**
+ * Renders every person of the team. Role-level files are rendered once and
+ * shared, so people with the same role get byte-identical skills.
+ */
+export function renderTeam(options: RenderTeamOptions): Map<string, RenderedWorkdir> {
+  const cache: RoleCache = new Map();
+  const result = new Map<string, RenderedWorkdir>();
+  const issues = new Map<string, CatalogIssue>();
+  for (const person of options.team.people) {
+    try {
+      result.set(person.handle, renderWith({ ...options, handle: person.handle }, cache));
+    } catch (e) {
+      if (!(e instanceof RenderError)) {
+        throw e;
+      }
+
+      for (const issue of e.issues) {
+        issues.set(JSON.stringify(issue), issue);
+      }
+    }
+  }
+
+  if (issues.size) {
+    throw new RenderError([...issues.values()]);
+  }
+
+  return result;
+}
+
+function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWorkdir {
   const { team, handle, catalog, ejected, links } = options;
   const merged = merge(catalog, ejected);
   const person = team.people.find((p) => p.handle === handle);
@@ -113,22 +153,44 @@ export function renderPerson(options: RenderPersonOptions): RenderedWorkdir {
     queue.push(...(found.extends ?? []));
   }
 
-  const context = buildContext(team, handle, {
+  const extras = {
     ...(links ? { links } : {}),
     roles: Object.keys(merged.roles).toSorted(),
-    ...(role.default_model ? { defaultModel: role.default_model } : {}),
-  });
+    defaultModels: Object.fromEntries(
+      Object.entries(merged.roles).flatMap(([id, r]) =>
+        r.default_model ? [[id, r.default_model]] : [],
+      ),
+    ),
+  };
+
+  const teamContext = buildTeamContext(team, extras);
+  const personContext = buildPersonContext(team, handle, extras);
 
   const out = new Map<string, string>();
-  const put = (path: string, doc: CatalogDoc) => {
-    try {
-      out.set(path, normalize(render(doc.text, context, { file: doc.file })));
-    } catch (e) {
-      if (e instanceof CatalogError) {
-        issues.push(...e.issues);
-      } else {
-        throw e;
+  const put = (path: string, doc: CatalogDoc, personLevel = false) => {
+    let hit = personLevel ? undefined : cache.get(path);
+    if (hit === undefined) {
+      try {
+        hit = normalize(
+          render(doc.text, personLevel ? personContext : teamContext, { file: doc.file }),
+        );
+      } catch (e) {
+        if (!(e instanceof CatalogError)) {
+          throw e;
+        }
+
+        hit = e.issues;
       }
+
+      if (!personLevel) {
+        cache.set(path, hit);
+      }
+    }
+
+    if (typeof hit === "string") {
+      out.set(path, hit);
+    } else {
+      issues.push(...hit);
     }
   };
 
@@ -139,7 +201,7 @@ export function renderPerson(options: RenderPersonOptions): RenderedWorkdir {
     }
   }
 
-  put(`agents/${person.role}.md`, role.agent);
+  put(`agents/${person.role}.md`, role.agent, true);
   for (const kind of ["references", "templates", "process"] as const) {
     for (const [name, doc] of Object.entries(merged[kind])) {
       put(`${kind}/${name}.md`, doc);
@@ -151,7 +213,7 @@ export function renderPerson(options: RenderPersonOptions): RenderedWorkdir {
   }
 
   const warnings: RenderWarning[] = [];
-  const has = context.integrations.has;
+  const has = teamContext.integrations.has;
   for (const need of role.needs) {
     const port = CAPABILITY_PORT[need as Capability];
     if (!has[port]) {

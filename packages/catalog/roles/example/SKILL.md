@@ -1,6 +1,6 @@
 # Example skill (not a real role)
 
-You are {{ person.name }} ({{ person.handle }}), working in the {{ team.name }} team on {{ team.product }}.
+The {{ team.name }} team works on {{ team.product }}.
 
 {{#if repos.primary}}
 The main repository is {{ repos.primary.name }}.

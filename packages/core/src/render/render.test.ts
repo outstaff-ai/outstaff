@@ -16,7 +16,7 @@ import { loadCatalog } from "../catalog/load.js";
 import { parseTeamConfig } from "../config/parse.js";
 import type { TeamConfig } from "../config/schema.js";
 import { readAcmeTeam } from "../testing/fixtures.js";
-import { renderPerson, RenderError } from "./render.js";
+import { renderPerson, renderTeam, RenderError } from "./render.js";
 import { renderToDir } from "./write.js";
 
 const CATALOG_PKG = fileURLToPath(new URL("../../../catalog", import.meta.url));
@@ -134,13 +134,13 @@ describe("renderPerson", () => {
   it("lets ejected files win over stock files with the same path", () => {
     const ejected = loadCatalog(
       make({
-        ...roleFiles("example", "", "ejected {{ person.handle }}"),
+        ...roleFiles("example", "", "ejected {{ team.name }}"),
         "references/guide.md": "ref {{ team.name }}",
       }),
     );
 
     const r = renderPerson({ team: asExample, handle: "sam", catalog: stock, ejected });
-    expect(r.files.get("skills/example/SKILL.md")).toBe("ejected sam\n");
+    expect(r.files.get("skills/example/SKILL.md")).toBe("ejected acme\n");
     expect(r.files.get("agents/example.md")).toBe("agent example\n");
     expect(r.files.get("references/guide.md")).toBe("ref acme\n");
     expect(r.files.get("process/example-lifecycle.md")).toContain("acme");
@@ -198,7 +198,7 @@ describe("renderPerson", () => {
       make({
         ...roleFiles("example", "", "ok\n{{ nope.one }}\n"),
         "references/a.md": "line1\n  {{ team.nme }}",
-        "templates/b.md": "{{ person.handle }} {{ missing }}",
+        "templates/b.md": "{{ team.name }} {{ missing }}",
       }),
     );
 
@@ -217,8 +217,76 @@ describe("renderPerson", () => {
     expect(issues).toEqual([
       'example/SKILL.md:2:1 Unknown placeholder "nope.one".',
       'references/a.md:2:3 Unknown placeholder "team.nme".',
-      'templates/b.md:1:21 Unknown placeholder "missing".',
+      'templates/b.md:1:17 Unknown placeholder "missing".',
     ]);
+  });
+});
+
+describe("role-level skills", () => {
+  it("fails a person placeholder in a skill with a located error", () => {
+    const catalog = loadCatalog(
+      make({
+        ...roleFiles("example", "", "ok\nHi {{ person.name }}\n"),
+        "references/r.md": "{{ person.handle }}",
+      }),
+    );
+
+    let error: unknown;
+    try {
+      renderPerson({ team: asExample, handle: "sam", catalog });
+    } catch (e) {
+      error = e;
+    }
+
+    expect(error).toBeInstanceOf(RenderError);
+    expect(
+      (error as RenderError).issues.map(
+        (i) => `${i.file.split("/").slice(-2).join("/")}:${i.line}:${i.column} ${i.code}`,
+      ),
+    ).toEqual([
+      "example/SKILL.md:2:4 catalog.unknown_placeholder",
+      "references/r.md:1:1 catalog.unknown_placeholder",
+    ]);
+  });
+
+  it("renders identity in agent.md", () => {
+    const r = renderPerson({ team: asExample, handle: "sam", catalog: stock });
+    expect(r.files.get("agents/example.md")).toContain(
+      "You are Sam Duarte (sam), the example on acme.",
+    );
+
+    expect(r.files.get("skills/example/SKILL.md")).not.toContain("Sam");
+  });
+
+  it("gives people with the same role identical skills and their own agent.md", () => {
+    const team = renderTeam({ team: asExample, catalog: stock });
+    const sam = team.get("sam")!;
+    const noor = team.get("noor")!;
+    const shared = [...sam.files.keys()].filter((path) => !path.startsWith("agents/"));
+    expect(shared.length).toBeGreaterThan(0);
+    expect(shared.map((path) => noor.files.get(path))).toEqual(
+      shared.map((path) => sam.files.get(path)),
+    );
+
+    expect(noor.files.get("agents/example.md")).not.toBe(sam.files.get("agents/example.md"));
+    expect(team.size).toBe(acme.people.length);
+    expect(team.get("sam")).toEqual(
+      renderPerson({ team: asExample, handle: "sam", catalog: stock }),
+    );
+  });
+
+  it("reports a role-level error once for the whole team", () => {
+    const catalog = loadCatalog(make(roleFiles("example", "", "{{ person.name }}")));
+    expect(() => renderTeam({ team: asExample, catalog })).toThrow(RenderError);
+
+    let error: unknown;
+    try {
+      renderTeam({ team: asExample, catalog });
+    } catch (e) {
+      error = e;
+    }
+
+    expect((error as RenderError).issues).toHaveLength(1);
   });
 });
 

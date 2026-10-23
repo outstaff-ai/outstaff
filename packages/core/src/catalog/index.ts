@@ -17,10 +17,12 @@ export {
 
 export { parseTemplate, render, type RenderOptions, type Template } from "./template.js";
 export {
-  buildContext,
+  buildPersonContext,
+  buildTeamContext,
   PORTS,
   type CatalogContext,
   type ContextExtras,
   type PersonContext,
   type RepoContext,
+  type TeamContext,
 } from "./context.js";

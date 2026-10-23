@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseTeamConfig } from "../config/parse.js";
 import { readAcmeTeam } from "../testing/fixtures.js";
 import { parse } from "yaml";
-import { buildContext } from "./context.js";
+import { buildPersonContext, buildTeamContext } from "./context.js";
 import { render } from "./template.js";
 
 const acme = (() => {
@@ -14,11 +14,11 @@ const acme = (() => {
   return r.config;
 })();
 
-describe("buildContext", () => {
-  const ctx = buildContext(acme, "mira", {
+describe("buildPersonContext", () => {
+  const ctx = buildPersonContext(acme, "mira", {
     roles: ["pm", "tester"],
     links: { issue: "https://t.example/{key}" },
-    defaultModel: "m1",
+    defaultModels: { architect: "m1" },
   });
 
   it("describes team, person and repos", () => {
@@ -59,7 +59,7 @@ describe("buildContext", () => {
   });
 
   it("rejects an unknown handle", () => {
-    expect(() => buildContext(acme, "nobody")).toThrow(/Unknown person "nobody"/);
+    expect(() => buildPersonContext(acme, "nobody")).toThrow(/Unknown person "nobody"/);
   });
 
   it("renders a template end to end and keeps typos strict", () => {
@@ -76,7 +76,24 @@ describe("buildContext", () => {
 
   it("uses null for a missing primary repo", () => {
     const noPrimary = { ...acme, repos: acme.repos.map((r) => ({ ...r, kind: "other" as const })) };
-    const c = buildContext(noPrimary, "sam");
+    const c = buildTeamContext(noPrimary);
     expect(render("{{#if repos.primary}}p{{else}}none{{/if}}", c)).toBe("none");
+  });
+});
+
+describe("buildTeamContext", () => {
+  it("has no person, and does not depend on who is rendered", () => {
+    const team = buildTeamContext(acme, { defaultModels: { architect: "m1" } });
+    expect("person" in team).toBe(false);
+    expect(render("{{#if team.name}}ok{{/if}}", team)).toBe("ok");
+    expect(() => render("{{ person.name }}", team, { file: "s.md" })).toThrow(
+      /unknown_placeholder/,
+    );
+
+    const { person: _, ...rest } = buildPersonContext(acme, "mira", {
+      defaultModels: { architect: "m1" },
+    });
+
+    expect(rest).toEqual(team);
   });
 });

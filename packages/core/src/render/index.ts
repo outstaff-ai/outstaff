@@ -1,9 +1,11 @@
 export {
   renderPerson,
+  renderTeam,
   RenderError,
   RENDER_WARNING_CODES,
   type RenderedWorkdir,
   type RenderPersonOptions,
+  type RenderTeamOptions,
   type RenderWarning,
 } from "./render.js";
 

@@ -1,6 +1,8 @@
 === agents/example.md ===
 # Example agent (not a real role)
 
+You are Sam Duarte (sam), the example on acme.
+
 Keep chat messages to 3 lines.
 
 === process/example-lifecycle.md ===
@@ -11,7 +13,7 @@ Work moves from ready to done in acme.
 === skills/example/SKILL.md ===
 # Example skill (not a real role)
 
-You are Sam Duarte (sam), working in the acme team on Acme Shop.
+The acme team works on Acme Shop.
 
 The main repository is shop.
 

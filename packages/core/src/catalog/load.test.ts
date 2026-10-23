@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { buildContext } from "./context.js";
+import { buildTeamContext } from "./context.js";
 import { parseTeamConfig } from "../config/parse.js";
 import { CatalogError, type CatalogIssue } from "./codes.js";
 import { loadCatalog } from "./load.js";
@@ -78,12 +78,12 @@ describe("loadCatalog on the example role", () => {
       throw new Error("acme invalid");
     }
 
-    const ctx = buildContext(parsed.config, "sam", { roles: Object.keys(catalog.roles) });
+    const ctx = buildTeamContext(parsed.config, { roles: Object.keys(catalog.roles) });
     const out = render(catalog.roles.example!.skill.text, ctx, {
       file: catalog.roles.example!.skill.file,
     });
 
-    expect(out).toContain("You are Sam Duarte (sam), working in the acme team on Acme Shop.");
+    expect(out).toContain("The acme team works on Acme Shop.");
     expect(out).toContain("The main repository is shop.");
     expect(out).toContain("- 0: shop\n- 1: infra");
   });
