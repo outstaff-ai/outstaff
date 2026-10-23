@@ -21,6 +21,8 @@ export {
   PORTS,
   type CatalogContext,
   type ContextExtras,
+  type HumanContext,
+  type RoleInfo,
   type PersonContext,
   type RepoContext,
 } from "./context.js";

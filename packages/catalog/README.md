@@ -22,7 +22,14 @@ The catalog version is the `version` of this package. Markdown files may use tea
 
 Which values a file sees depends on its kind:
 
-Every file gets the same context: `team`, `repos`, `people` (and `people.byRole`), `integrations`, `links` and `policies`. There is no `person`: a skill describes how a role works, so it reads the same for everyone in that role. Who the agent is (name, handle, role, team) is built from data by the runtime when the agent starts, not templated here. Using `{{ person.* }}` anywhere is an error.
+Every file gets the same context: `team`, `repos`, `people` (and `people.byRole`), `integrations`, `links` and `policies`. Beyond the basics:
+
+- `people.list[]` and `people.byRole.<role>[]` entries have `handle`, `name`, `pronouns`, `role`, `role_title`, `role_summary` (from the role's `role.yaml`, empty if the role is not in the catalog) and `model`.
+- `people.byRole` has a key, possibly an empty list, for every role in the catalog in use (stock plus ejected). A role that is not in the catalog is still an error.
+- `roles[]` lists every catalog role with `name`, `title`, `summary` and `people` (the same list as `people.byRole.<name>`).
+- `humans.list[]` has the `name` of each trusted human, `humans.has` says whether there are any, and `humans.default_trust` is true when `team.yaml` has no `humans:` list (trust then follows repo write access and workspace membership). Identities and ids are never in the context.
+
+There is no `person`: a skill describes how a role works, so it reads the same for everyone in that role. Who the agent is (name, handle, role, team) is built from data by the runtime when the agent starts, not templated here. Using `{{ person.* }}` anywhere is an error.
 
 Rendering is strict: an unknown path (also in `#if`), a bad tag or an unbalanced block fails with `file:line:column`. The full list of values is the `CatalogContext` type in `@outstaff/core`. `packages/catalog/roles/example` is a tiny example for tests, not a real role.
 

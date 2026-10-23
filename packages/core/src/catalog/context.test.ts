@@ -16,7 +16,11 @@ const acme = (() => {
 
 describe("buildContext", () => {
   const ctx = buildContext(acme, {
-    roles: ["pm", "tester"],
+    roles: [
+      { name: "pm", title: "Project Manager", summary: "Plans the work." },
+      { name: "tester", title: "Tester", summary: "Tests it." },
+      { name: "developer", title: "Developer", summary: "Writes code." },
+    ],
     links: { issue: "https://t.example/{key}" },
   });
 
@@ -36,6 +40,30 @@ describe("buildContext", () => {
     expect(ctx.people.byRole.developer?.map((p) => p.handle)).toEqual(["sam", "noor"]);
     expect(ctx.people.byRole.tester).toEqual([]);
     expect(ctx.people.list).toHaveLength(8);
+  });
+
+  it("adds role title and summary to people and lists catalog roles", () => {
+    expect(ctx.people.byRole.developer?.[0]).toMatchObject({
+      role_title: "Developer",
+      role_summary: "Writes code.",
+    });
+
+    const unknown = ctx.people.list.find((p) => p.role === "designer");
+    expect(unknown).toMatchObject({ role_title: "", role_summary: "" });
+    expect(ctx.roles.map((r) => r.name)).toEqual(["pm", "tester", "developer"]);
+    expect(ctx.people.byRole.tester).toEqual([]);
+    expect(ctx.roles[2]?.people.map((p) => p.handle)).toEqual(["sam", "noor"]);
+    expect(render("{{#each roles}}{{this.title}};{{/each}}", ctx)).toBe(
+      "Project Manager;Tester;Developer;",
+    );
+  });
+
+  it("lists humans by name only, and flags default trust", () => {
+    expect(ctx.humans.has).toBe(true);
+    expect(ctx.humans.default_trust).toBe(false);
+    expect(ctx.humans.list[0]).toEqual({ name: "Ada Admin" });
+    const none = buildContext({ ...acme, humans: undefined });
+    expect(none.humans).toEqual({ list: [], has: false, default_trust: true });
   });
 
   it("reports integrations, links and policies", () => {
