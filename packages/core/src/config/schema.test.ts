@@ -256,6 +256,37 @@ describe("parseTeamConfig", () => {
     ]);
   });
 
+  it("checks the shared usage groups", () => {
+    const people = (c: any) => c.people.map((p: any) => p.handle);
+    const ok = parseTeamConfig(
+      (() => {
+        const c: any = valid();
+        c.policies = { usage: { shared: [people(c)] } };
+        return c;
+      })(),
+    );
+
+    expect(ok.ok).toBe(true);
+
+    expect(bad((c) => (c.policies = { usage: { shared: [[people(c)[0], "ghost"]] } }))).toEqual([
+      {
+        path: ["policies", "usage", "shared", 0, 1],
+        code: "policies.usage_shared_unknown_person",
+        message: expect.any(String),
+      },
+    ]);
+
+    expect(
+      bad(
+        (c) => (c.policies = { usage: { shared: [people(c), [people(c)[0], people(c)[1]]] } }),
+      )[0],
+    ).toMatchObject({ code: "policies.usage_shared_overlap" });
+
+    expect(bad((c) => (c.policies = { usage: { shared: [[people(c)[0]]] } }))[0]).toMatchObject({
+      code: "schema.too_small",
+    });
+  });
+
   it("requires the {handle} placeholder in the email pattern", () => {
     expect(bad((c) => (c.email.pattern = "team@acme.example"))).toEqual([
       {

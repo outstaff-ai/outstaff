@@ -146,8 +146,8 @@ export interface RunBlock {
   reason: string;
 }
 
-export function peakWindow(windows: readonly UsageWindow[]): UsageWindow | undefined {
-  let peak: UsageWindow | undefined;
+export function peakWindow<T extends UsageWindow>(windows: readonly T[]): T | undefined {
+  let peak: T | undefined;
   for (const w of windows) {
     if (!peak || w.utilization > peak.utilization) {
       peak = w;

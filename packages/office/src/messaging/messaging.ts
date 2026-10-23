@@ -29,6 +29,7 @@ export interface MessagingOptions {
   channel?: string;
   roles?: RosterOptions["roles"];
   humans?: RosterOptions["humans"];
+  usage?: RosterOptions["usage"];
 
   /** Questions asked while answering questions, at most this deep. Default 3. */
   maxDepth?: number;
@@ -235,6 +236,7 @@ export function createMessaging(
         team: opts.team,
         ...(opts.roles ? { roles: opts.roles } : {}),
         ...(opts.humans ? { humans: opts.humans } : {}),
+        ...(opts.usage ? { usage: opts.usage } : {}),
       }),
   };
 

@@ -210,6 +210,14 @@ const policiesSchema = z
           .max(1)
           .default(0.95)
           .meta(d("Fraction of the usage limit at which all automatic work pauses.")),
+        shared: z
+          .array(z.array(z.string().min(1)).min(2))
+          .optional()
+          .meta(
+            d(
+              "Groups of people who use one LLM subscription, as lists of handles. A usage report from any member applies to all of them.",
+            ),
+          ),
       })
       .superRefine((v, ctx) => {
         if (v.defer_scheduled_at > v.pause_automatic_at) {
@@ -367,6 +375,33 @@ export const teamConfigSchema = z
         ctx.addIssue(customIssue(i.code, i.message, i.path));
       }
     }
+
+    const handles = new Set(cfg.people.map((p) => p.handle));
+    const grouped = new Set<string>();
+    cfg.policies?.usage.shared?.forEach((group, g) => {
+      group.forEach((handle, n) => {
+        const path = ["policies", "usage", "shared", g, n];
+        if (!handles.has(handle)) {
+          ctx.addIssue(
+            customIssue(
+              CONFIG_CODES.usageSharedUnknownPerson,
+              `Usage group refers to unknown person "${handle}".`,
+              path,
+            ),
+          );
+        } else if (grouped.has(handle)) {
+          ctx.addIssue(
+            customIssue(
+              CONFIG_CODES.usageSharedOverlap,
+              `"${handle}" is in more than one usage group (or twice in one); a person has one subscription.`,
+              path,
+            ),
+          );
+        }
+
+        grouped.add(handle);
+      });
+    });
 
     const seenHandles = new Map<string, number>();
     cfg.people.forEach((p, i) => {

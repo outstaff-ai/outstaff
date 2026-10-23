@@ -106,7 +106,7 @@ export const team = defineVerb({
     const lines = members.length
       ? members.map(
           (m) =>
-            `${m.handle} (${m.name}), ${m.title ?? m.role}: ${m.status}${m.current ? `, ${m.current}` : ""}`,
+            `${m.handle} (${m.name}), ${m.title ?? m.role}: ${m.status}${m.current ? `, ${m.current}` : ""}${m.usage ? `, usage ${Math.round(m.usage.utilization * 100)}% of ${m.usage.window}${m.usage.resetsAt ? ` (resets ${m.usage.resetsAt})` : ""}` : ""}`,
         )
       : ["No team members."];
 

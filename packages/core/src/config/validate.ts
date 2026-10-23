@@ -79,6 +79,9 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "people.unknown_repo": "A repo grant names a repo that is not listed in repos.",
   "email.missing_placeholder": "email.pattern does not contain {handle}.",
   "policies.usage_threshold_order": "defer_scheduled_at is higher than pause_automatic_at.",
+  "policies.usage_shared_unknown_person":
+    "A policies.usage.shared group names someone who is not in people.",
+  "policies.usage_shared_overlap": "A person appears in more than one policies.usage.shared group.",
   "policies.command_program":
     "A policies.commands entry names git, which repository grants govern.",
   "tools.invalid_version":
