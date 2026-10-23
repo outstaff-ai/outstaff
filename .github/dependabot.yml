@@ -8,3 +8,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    versioning-strategy: increase
+    ignore:
+      # @types/node follows the pinned Node.js major (devEngines.runtime); bump both together by hand
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]

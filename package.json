@@ -12,7 +12,8 @@
     "build": "pnpm -r run build",
     "docs:build": "pnpm --filter @outstaff/docs build",
     "docs:dev": "pnpm --filter @outstaff/docs dev",
-    "changeset": "changeset"
+    "changeset": "changeset",
+    "check:versions": "node scripts/versions.mjs check"
   },
   "devDependencies": {
     "@changesets/cli": "3.0.3",
