@@ -125,3 +125,24 @@ Agents connect out to the office over a WebSocket, so an agent needs no inbound 
 **Liveness.** The office tells the agent how often to send a heartbeat, and drops a connection that is silent for three times that long. The agent drops a connection when the office stops answering and reconnects with exponential backoff and jitter, starting from one second up to thirty.
 
 **Boundaries.** The server depends on the scheduler only through the small `WorkSource` interface, and on question routing only through the optional `Messaging` interface. Frames are limited to 1 MiB, malformed or unknown messages get an `error` reply and never close the connection, and unexpected failures reach the agent as a generic `failed` error, with the detail only in the office log.
+
+## Work state
+
+The work state is the office's picture of the world: every live ticket and pull request, who owns it, whether CI is green, whether it merges cleanly, how many review threads are open, and which pull requests are stacked on which. It is built from intake events and from reading the ports, and it implements the read-only `WorkflowState` the workflow engine evaluates rules against.
+
+**Source of truth.** The latest state of each ticket and pull request is stored as a subject (`ticket` / `pr`) and the relations as links: `pr implements ticket`, `pr authored_by person`, `pr stacked_on pr`, `ticket assigned_to person`. A `workstate/index tracks ...` link marks the records the work state keeps. On start the state is rebuilt from the store. Losing the store only costs a `rescan()`.
+
+**Applying events.** `apply(event, meta)` is registered as an intake handler. It is idempotent: it re-reads the pull request (details, mergeability, checks, review threads) or the ticket through the ports, so applying an event twice, or out of date, converges on the same state. Reading what the ports say now, not what the event said, is what makes at-least-once delivery safe.
+
+**Links.** A pull request belongs to the first ticket key the tracker knows among: a closing reference in the body (`Closes ACME-12`), the branch name, the title, then any other key in the body. Keys the tracker does not know are ignored. The author is matched to a person through `people[].identities.vcs`, the assignee through `identities.tracker`. A pull request whose base branch is the head branch of another open pull request is stacked on it; `stackedOn(repo, branch)` returns everything above the branch, bottom first.
+
+**Derived events.** Two things happen without a platform event, so the work state raises them itself, as `pr.conflicted` and `pr.ci_failed` from the actor `workstate`:
+
+- after `pr.merged`, every other open pull request in the repository is re-read waiting for the host to compute mergeability; one that now conflicts (including one that was still `unknown` before) raises `pr.conflicted`. If the host still has not decided, the next rescan catches it;
+- when the checks of an open pull request turn to failure, it raises `pr.ci_failed`.
+
+Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`), so each is raised once per head commit. They are recorded with `store.recordEvent` before the new state is saved, then handed to the handlers registered with `onEvent` (the engine); a handler failure leaves the event unprocessed, and intake redelivers it. The first rescan of a pull request the work state did not know only sets a baseline and raises nothing.
+
+**Polling.** CI results and mergeability arrive without events, so `start()` rescans open pull requests every `refreshIntervalMs` (default 60 seconds) and `rescan()` does it on demand. A rescan also finds pull requests that were merged or closed while the office was down, and the tickets assigned to the team's people. Finished tickets and closed pull requests are forgotten after 14 days.
+
+**Queries.** Besides the `WorkflowState` methods, the last agent who worked on a ticket comes from the work item history (items whose subject is the ticket, or one of its pull requests, that have left the queue), and the requester is the trusted human who created the ticket or first assigned it. `currentWork(person)` returns the person's tickets and pull requests with status, CI, mergeability, unresolved threads and links, and `formatCurrentWork` renders it as a few lines for the agent's session context.
