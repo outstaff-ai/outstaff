@@ -13,19 +13,56 @@ import {
 const valid = (): TeamConfigInput => ({
   version: 1,
   team: { name: "acme", product: "Acme Cloud", description: "The Acme product team." },
-  humans: [{ name: "Alex Doe", identities: { vcs: "alex-doe", chat: "U123", email: "alex@acme.example" } }],
+  humans: [
+    { name: "Alex Doe", identities: { vcs: "alex-doe", chat: "U123", email: "alex@acme.example" } },
+  ],
   catalog: { version: "1.0.0" },
   repos: [
     { name: "app", url: "github.com/acme/app", kind: "primary" },
-    { name: "standards", url: "https://github.com/acme/standards", kind: "baseline", default_branch: "trunk" },
+    {
+      name: "standards",
+      url: "https://github.com/acme/standards",
+      kind: "baseline",
+      default_branch: "trunk",
+    },
     { name: "infra", url: "git@github.com:acme/infra.git", kind: "infra" },
   ],
   people: [
-    { handle: "ada", name: "Ada", pronouns: "she/her", role: "backend-engineer", repos: { app: "write", "kind:baseline": "read" } },
-    { handle: "bo", name: "Bo", role: "frontend-engineer", extends: ["a11y"], model: "sonnet", repos: { app: "write" } },
-    { handle: "cy", name: "Cy", role: "qa-engineer", repos: { "*": "read" }, avatar: { seed: "cy" } },
-    { handle: "di", name: "Di", role: "devops-engineer", repos: { infra: "write", "kind:infra": "write" } },
-    { handle: "ed", name: "Ed", role: "tech-writer", repos: {}, avatar: { url: "https://acme.example/ed.png" } },
+    {
+      handle: "ada",
+      name: "Ada",
+      pronouns: "she/her",
+      role: "backend-engineer",
+      repos: { app: "write", "kind:baseline": "read" },
+    },
+    {
+      handle: "bo",
+      name: "Bo",
+      role: "frontend-engineer",
+      extends: ["a11y"],
+      model: "sonnet",
+      repos: { app: "write" },
+    },
+    {
+      handle: "cy",
+      name: "Cy",
+      role: "qa-engineer",
+      repos: { "*": "read" },
+      avatar: { seed: "cy" },
+    },
+    {
+      handle: "di",
+      name: "Di",
+      role: "devops-engineer",
+      repos: { infra: "write", "kind:infra": "write" },
+    },
+    {
+      handle: "ed",
+      name: "Ed",
+      role: "tech-writer",
+      repos: {},
+      avatar: { url: "https://acme.example/ed.png" },
+    },
   ],
   integrations: {
     chat: { adapter: "slack" },
@@ -50,7 +87,10 @@ const bad = (mutate: (c: any) => void) => {
   const c: any = valid();
   mutate(c);
   const r = parseTeamConfig(c);
-  if (r.ok) throw new Error("expected failure");
+  if (r.ok) {
+    throw new Error("expected failure");
+  }
+
   return r.issues;
 };
 
@@ -71,7 +111,11 @@ describe("parseTeamConfig", () => {
       workflow: {},
       policies: {},
     });
-    if (!r.ok) throw new Error(JSON.stringify(r.issues));
+
+    if (!r.ok) {
+      throw new Error(JSON.stringify(r.issues));
+    }
+
     expect(r.config.catalog.path).toBe("catalog");
     expect(r.config.repos[0]?.default_branch).toBe("main");
     expect(r.config.people[0]?.repos).toEqual({});
@@ -91,7 +135,10 @@ describe("parseTeamConfig", () => {
   });
 
   it("rejects unsupported versions", () => {
-    expect(bad((c) => (c.version = 2))[0]).toMatchObject({ path: ["version"], code: "schema.invalid_value" });
+    expect(bad((c) => (c.version = 2))[0]).toMatchObject({
+      path: ["version"],
+      code: "schema.invalid_value",
+    });
   });
 
   it("reports unknown keys one by one", () => {
@@ -101,24 +148,43 @@ describe("parseTeamConfig", () => {
   });
 
   it("rejects bad slugs and URLs", () => {
-    expect(bad((c) => (c.team.name = "1Acme"))[0]).toMatchObject({ path: ["team", "name"], code: "schema.invalid_format" });
-    expect(bad((c) => (c.people[0].handle = "x".repeat(31)))[0]).toMatchObject({ path: ["people", 0, "handle"], code: "schema.too_big" });
-    expect(bad((c) => (c.repos[0].url = "nonsense"))[0]).toMatchObject({ path: ["repos", 0, "url"], code: "schema.invalid_format" });
+    expect(bad((c) => (c.team.name = "1Acme"))[0]).toMatchObject({
+      path: ["team", "name"],
+      code: "schema.invalid_format",
+    });
+
+    expect(bad((c) => (c.people[0].handle = "x".repeat(31)))[0]).toMatchObject({
+      path: ["people", 0, "handle"],
+      code: "schema.too_big",
+    });
+
+    expect(bad((c) => (c.repos[0].url = "nonsense"))[0]).toMatchObject({
+      path: ["repos", 0, "url"],
+      code: "schema.invalid_format",
+    });
   });
 
   it("requires at least one identity per human", () => {
-    expect(bad((c) => (c.humans[0].identities = {}))[0]).toMatchObject({ path: ["humans", 0, "identities"] });
+    expect(bad((c) => (c.humans[0].identities = {}))[0]).toMatchObject({
+      path: ["humans", 0, "identities"],
+    });
   });
 
   it("rejects an invalid catalog version", () => {
     expect(bad((c) => (c.catalog.version = "^1.0.0"))).toEqual([
-      { path: ["catalog", "version"], code: "catalog.invalid_version", message: expect.any(String) },
+      {
+        path: ["catalog", "version"],
+        code: "catalog.invalid_version",
+        message: expect.any(String),
+      },
     ]);
   });
 
   it("rejects non-exact catalog versions", () => {
     for (const v of ["v1.0.0", ">=1.0.0", "1.x", "1.0", " 1.0.0"]) {
-      expect(bad((c) => (c.catalog.version = v)).map((i) => i.code)).toEqual(["catalog.invalid_version"]);
+      expect(bad((c) => (c.catalog.version = v)).map((i) => i.code)).toEqual([
+        "catalog.invalid_version",
+      ]);
     }
   });
 
@@ -129,14 +195,19 @@ describe("parseTeamConfig", () => {
   });
 
   it("requires at least one repo", () => {
-    expect(bad((c) => (c.repos = []))[0]).toMatchObject({ path: ["repos"], code: "schema.too_small" });
+    expect(bad((c) => (c.repos = []))[0]).toMatchObject({
+      path: ["repos"],
+      code: "schema.too_small",
+    });
   });
 
   it("rejects duplicate repo names", () => {
-    expect(bad((c) => {
-      c.repos[2].name = "app";
-      c.people[3].repos = {};
-    })).toEqual([
+    expect(
+      bad((c) => {
+        c.repos[2].name = "app";
+        c.people[3].repos = {};
+      }),
+    ).toEqual([
       { path: ["repos", 2, "name"], code: "repos.duplicate_name", message: expect.any(String) },
     ]);
   });
@@ -149,14 +220,23 @@ describe("parseTeamConfig", () => {
 
   it("rejects duplicate handles", () => {
     expect(bad((c) => (c.people[3].handle = "ada"))).toEqual([
-      { path: ["people", 3, "handle"], code: "people.duplicate_handle", message: expect.any(String) },
+      {
+        path: ["people", 3, "handle"],
+        code: "people.duplicate_handle",
+        message: expect.any(String),
+      },
     ]);
   });
 
   it("rejects malformed grant keys and values", () => {
     expect(bad((c) => (c.people[0].repos = { "kind:other2": "read" }))).toEqual([
-      { path: ["people", 0, "repos", "kind:other2"], code: "people.invalid_grant_key", message: expect.any(String) },
+      {
+        path: ["people", 0, "repos", "kind:other2"],
+        code: "people.invalid_grant_key",
+        message: expect.any(String),
+      },
     ]);
+
     expect(bad((c) => (c.people[0].repos = { app: "admin" }))[0]).toMatchObject({
       path: ["people", 0, "repos", "app"],
       code: "schema.invalid_value",
@@ -165,13 +245,21 @@ describe("parseTeamConfig", () => {
 
   it("rejects grants to unknown repos", () => {
     expect(bad((c) => (c.people[1].repos = { nope: "read" }))).toEqual([
-      { path: ["people", 1, "repos", "nope"], code: "people.unknown_repo", message: expect.any(String) },
+      {
+        path: ["people", 1, "repos", "nope"],
+        code: "people.unknown_repo",
+        message: expect.any(String),
+      },
     ]);
   });
 
   it("requires the {handle} placeholder in the email pattern", () => {
     expect(bad((c) => (c.email.pattern = "team@acme.example"))).toEqual([
-      { path: ["email", "pattern"], code: "email.missing_placeholder", message: expect.any(String) },
+      {
+        path: ["email", "pattern"],
+        code: "email.missing_placeholder",
+        message: expect.any(String),
+      },
     ]);
   });
 
@@ -183,16 +271,27 @@ describe("parseTeamConfig", () => {
   });
 
   it("checks status names and loop guard bounds", () => {
-    expect(bad((c) => (c.workflow.statuses = { wip: "x" }))[0]).toMatchObject({ path: ["workflow", "statuses", "wip"] });
-    expect(bad((c) => (c.policies.agent_loop_guard.max_runs_per_item_per_hour = 0))[0]).toMatchObject({
+    expect(bad((c) => (c.workflow.statuses = { wip: "x" }))[0]).toMatchObject({
+      path: ["workflow", "statuses", "wip"],
+    });
+
+    expect(
+      bad((c) => (c.policies.agent_loop_guard.max_runs_per_item_per_hour = 0))[0],
+    ).toMatchObject({
       path: ["policies", "agent_loop_guard", "max_runs_per_item_per_hour"],
       code: "schema.too_small",
     });
   });
 
   it("requires defer threshold <= pause threshold", () => {
-    expect(bad((c) => (c.policies.usage = { defer_scheduled_at: 0.99, pause_automatic_at: 0.9 }))).toEqual([
-      { path: ["policies", "usage", "defer_scheduled_at"], code: "policies.usage_threshold_order", message: expect.any(String) },
+    expect(
+      bad((c) => (c.policies.usage = { defer_scheduled_at: 0.99, pause_automatic_at: 0.9 })),
+    ).toEqual([
+      {
+        path: ["policies", "usage", "defer_scheduled_at"],
+        code: "policies.usage_threshold_order",
+        message: expect.any(String),
+      },
     ]);
   });
 
@@ -209,39 +308,70 @@ describe("adapter options", () => {
 
   it("passes unknown adapters and validates registered ones", () => {
     const r = parseTeamConfig(valid());
-    if (!r.ok) throw new Error("invalid");
+    if (!r.ok) {
+      throw new Error("invalid");
+    }
+
     expect(validateAdapterOptions(r.config)).toEqual([]);
 
-    registerAdapterOptions("tracker", "linear", z.strictObject({ project: z.string(), team_id: z.string() }));
+    registerAdapterOptions(
+      "tracker",
+      "linear",
+      z.strictObject({ project: z.string(), team_id: z.string() }),
+    );
+
     expect(validateAdapterOptions(r.config)).toEqual([
-      { path: ["integrations", "tracker", "team_id"], code: "integrations.invalid_options", message: expect.any(String) },
+      {
+        path: ["integrations", "tracker", "team_id"],
+        code: "integrations.invalid_options",
+        message: expect.any(String),
+      },
     ]);
   });
 
   it("reports wrongly typed options at their path", () => {
     registerAdapterOptions("tracker", "linear", z.object({ project: z.number() }));
     const r = parseTeamConfig(valid());
-    if (!r.ok) throw new Error("invalid");
-    expect(validateAdapterOptions(r.config)[0]).toMatchObject({ path: ["integrations", "tracker", "project"] });
+    if (!r.ok) {
+      throw new Error("invalid");
+    }
+
+    expect(validateAdapterOptions(r.config)[0]).toMatchObject({
+      path: ["integrations", "tracker", "project"],
+    });
   });
 });
 
 describe("JSON Schema", () => {
   it("committed team.schema.json is up to date (run `pnpm --filter @outstaff/core run schema`)", () => {
-    const committed = readFileSync(new URL("../../schema/team.schema.json", import.meta.url), "utf8");
+    const committed = readFileSync(
+      new URL("../../schema/team.schema.json", import.meta.url),
+      "utf8",
+    );
+
     expect(committed).toBe(`${JSON.stringify(buildTeamJsonSchema(), null, 2)}\n`);
   });
 
   it("describes every property", () => {
     const missing: string[] = [];
     const walk = (node: any, path: string) => {
-      if (!node || typeof node !== "object") return;
+      if (!node || typeof node !== "object") {
+        return;
+      }
+
       for (const [k, v] of Object.entries<any>(node.properties ?? {})) {
-        if (!v.description) missing.push(`${path}.${k}`);
+        if (!v.description) {
+          missing.push(`${path}.${k}`);
+        }
+
         walk(v, `${path}.${k}`);
       }
-      if (node.items) walk(node.items, `${path}[]`);
+
+      if (node.items) {
+        walk(node.items, `${path}[]`);
+      }
     };
+
     walk(buildTeamJsonSchema(), "$");
     expect(missing).toEqual([]);
   });

@@ -5,7 +5,10 @@ import { defineCommand, type Context } from "../define.js";
 
 /** Exact version of the catalog release this CLI ships with. */
 export const catalogVersion = (): string => {
-  const { version } = createRequire(import.meta.url)("@outstaff/catalog/package.json") as { version: string };
+  const { version } = createRequire(import.meta.url)("@outstaff/catalog/package.json") as {
+    version: string;
+  };
+
   return version;
 };
 
@@ -18,17 +21,28 @@ export function slugify(input: string, fallback: string): string {
     .replace(/^-+|-+$/g, "")
     .slice(0, 40)
     .replace(/-+$/g, "");
-  if (s === "") return fallback;
+
+  if (s === "") {
+    return fallback;
+  }
+
   return /^[a-z]/.test(s) ? s : `team-${s}`.slice(0, 40).replace(/-+$/g, "");
 }
 
 /** Turns an origin URL into `host/owner/repo`, or undefined when it has no recognisable shape. */
 export function normalizeRemote(remote: string): string | undefined {
-  const t = remote.trim().replace(/\.git$/, "").replace(/\/+$/, "");
+  const t = remote
+    .trim()
+    .replace(/\.git$/, "")
+    .replace(/\/+$/, "");
+
   const scp = /^[\w.-]+@([\w.-]+):(.+)$/.exec(t);
   const url = /^(?:https?|ssh|git):\/\/(?:[^@/]+@)?([\w.-]+)(?::\d+)?\/(.+)$/.exec(t);
   const m = scp ?? url;
-  if (!m) return undefined;
+  if (!m) {
+    return undefined;
+  }
+
   const path = m[2] as string;
   return /^[\w.-]+\/[\w.-]+$/.test(path) ? `${m[1]}/${path}` : undefined;
 }
@@ -42,6 +56,7 @@ export function renderTemplate(i: TemplateInput): string {
 # should work in it too.`
     : `# The repository that holds this file. \`kind: primary\` marks the product repo
 # (at most one). Other kinds: baseline, infra, other.`;
+
   return `# Outstaff team configuration. Run \`ost validate\` after editing.
 version: 1
 
@@ -83,10 +98,16 @@ integrations:
 
 function detectRepo(ctx: Context, separateRepo: boolean): { url: string; name: string } {
   const placeholder = { url: "github.com/your-org/your-repo", name: "product" };
-  if (separateRepo) return placeholder;
+  if (separateRepo) {
+    return placeholder;
+  }
+
   const origin = ctx.gitOrigin(ctx.cwd);
   const url = origin ? normalizeRemote(origin) : undefined;
-  if (!url) return placeholder;
+  if (!url) {
+    return placeholder;
+  }
+
   return { url, name: slugify(url.split("/").at(-1) ?? "", "product") };
 }
 
@@ -95,7 +116,10 @@ function updateGitignore(dir: string): string[] {
   const existing = existsSync(file) ? readFileSync(file, "utf8") : "";
   const have = new Set(existing.split(/\r?\n/).map((l) => l.trim()));
   const missing = GITIGNORE_RULES.filter((r) => !have.has(r));
-  if (missing.length === 0) return [];
+  if (missing.length === 0) {
+    return [];
+  }
+
   const lead = existing === "" || existing.endsWith("\n") ? "" : "\n";
   const header = have.has("# Outstaff secrets") ? "" : "# Outstaff secrets\n";
   writeFileSync(file, `${existing}${lead}${header}${missing.join("\n")}\n`);
@@ -110,12 +134,16 @@ export const init = defineCommand<{ separateRepo?: boolean; force?: boolean }>({
   options: [
     {
       flags: "--separate-repo",
-      description: "Write team.yaml at the repository root, for a repository that holds only the team config. The product repo then goes in `repos` as `kind: primary`.",
+      description:
+        "Write team.yaml at the repository root, for a repository that holds only the team config. The product repo then goes in `repos` as `kind: primary`.",
     },
     { flags: "--force", description: "Overwrite an existing team file." },
   ],
   examples: ["ost init", "ost init --separate-repo", "ost init --force"],
-  exitCodes: ["0: files written", "1: the team file already exists (use --force) or could not be written"],
+  exitCodes: [
+    "0: files written",
+    "1: the team file already exists (use --force) or could not be written",
+  ],
   async run(ctx, options) {
     const relFile = options.separateRepo ? "team.yaml" : join(".outstaff", "team.yaml");
     const file = join(ctx.cwd, relFile);
@@ -123,6 +151,7 @@ export const init = defineCommand<{ separateRepo?: boolean; force?: boolean }>({
       ctx.err(`${relFile} already exists. Use --force to overwrite it.\n`);
       return 1;
     }
+
     const repo = detectRepo(ctx, options.separateRepo === true);
     const text = renderTemplate({
       team: slugify(basename(ctx.cwd), "my-team"),
@@ -130,6 +159,7 @@ export const init = defineCommand<{ separateRepo?: boolean; force?: boolean }>({
       repoName: repo.name,
       separateRepo: options.separateRepo === true,
     });
+
     try {
       mkdirSync(dirname(file), { recursive: true });
       writeFileSync(file, text);
@@ -137,9 +167,13 @@ export const init = defineCommand<{ separateRepo?: boolean; force?: boolean }>({
       ctx.err(`Cannot write ${relFile}: ${(err as Error).message}\n`);
       return 1;
     }
+
     const added = updateGitignore(ctx.cwd);
     ctx.out(`Wrote ${relFile}\n`);
-    if (added.length > 0) ctx.out(`Added to .gitignore: ${added.join(", ")}\n`);
+    if (added.length > 0) {
+      ctx.out(`Added to .gitignore: ${added.join(", ")}\n`);
+    }
+
     ctx.out(`Next: edit ${relFile}, then run \`ost validate\`.\n`);
     return 0;
   },

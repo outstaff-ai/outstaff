@@ -6,7 +6,11 @@ export type Position = { line: number; column: number };
 export type LocatedIssue = ConfigIssue & { file: string; line: number; column: number };
 
 /** These issues are about a key itself, so they point at the key rather than its value. */
-const KEY_CODES: string[] = [CONFIG_CODES.unknownKey, CONFIG_CODES.peopleUnknownRepo, CONFIG_CODES.peopleInvalidGrantKey];
+const KEY_CODES: string[] = [
+  CONFIG_CODES.unknownKey,
+  CONFIG_CODES.peopleUnknownRepo,
+  CONFIG_CODES.peopleInvalidGrantKey,
+];
 
 export type ParsedYaml = {
   value: unknown;
@@ -21,7 +25,9 @@ export function parseYaml(text: string): ParsedYaml {
     const { line, col } = lineCounter.linePos(offset);
     return { line, column: col };
   };
-  const start = (node: Node | null | undefined): Position | undefined => (node?.range ? at(node.range[0]) : undefined);
+
+  const start = (node: Node | null | undefined): Position | undefined =>
+    node?.range ? at(node.range[0]) : undefined;
 
   const syntaxErrors = doc.errors.map((e) => ({
     message: e.message.split("\n")[0] ?? e.message,
@@ -35,14 +41,20 @@ export function parseYaml(text: string): ParsedYaml {
     for (const seg of issue.path) {
       if (isMap(node)) {
         const pair = node.items.find((p) => isScalar(p.key) && String(p.key.value) === String(seg));
-        if (!pair) return best;
+        if (!pair) {
+          return best;
+        }
+
         keyPos = start(pair.key as Node) ?? best;
         const next = pair.value as Node | null;
         best = (isCollection(next) || !next ? keyPos : start(next)) ?? keyPos;
         node = next;
       } else if (isSeq(node) && typeof seg === "number") {
         const next = node.items[seg] as Node | undefined;
-        if (!next) return best;
+        if (!next) {
+          return best;
+        }
+
         keyPos = undefined;
         best = start(next) ?? best;
         node = next;
@@ -50,10 +62,13 @@ export function parseYaml(text: string): ParsedYaml {
         return best;
       }
     }
-    if (keyPos && typeof issue.path.at(-1) === "string" && KEY_CODES.includes(issue.code)) return keyPos;
+
+    if (keyPos && typeof issue.path.at(-1) === "string" && KEY_CODES.includes(issue.code)) {
+      return keyPos;
+    }
+
     return best;
   };
 
   return { value: doc.errors.length ? undefined : doc.toJS(), syntaxErrors, locate };
 }
-

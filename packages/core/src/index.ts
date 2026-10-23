@@ -2,7 +2,13 @@ export const name = "@outstaff/core";
 
 export { CONFIG_CODES, type ConfigCode } from "./config/codes.js";
 export { type ConfigIssue } from "./config/issues.js";
-export { teamConfigSchema, adapterRefSchema, type TeamConfig, type TeamConfigInput } from "./config/schema.js";
+export {
+  teamConfigSchema,
+  adapterRefSchema,
+  type TeamConfig,
+  type TeamConfigInput,
+} from "./config/schema.js";
+
 export { parseTeamConfig, type ParseResult } from "./config/parse.js";
 export { buildTeamJsonSchema } from "./config/json-schema.js";
 export {
@@ -12,6 +18,7 @@ export {
   clearAdapterOptions,
   type AdapterPort,
 } from "./config/adapters.js";
+
 export {
   loadTeamConfig,
   formatIssue,
@@ -20,6 +27,7 @@ export {
   type LocatedIssue,
   type ConfigSource,
 } from "./config/load.js";
+
 export { type ConfigFs, type GitClient } from "./config/io.js";
 export { CAPABILITIES, CAPABILITY_PORT, type Capability } from "./capabilities.js";
 export {
@@ -33,4 +41,5 @@ export {
   type ValidationReport,
   type ConfigWarning,
 } from "./config/validate.js";
+
 export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";

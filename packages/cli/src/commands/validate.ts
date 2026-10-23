@@ -11,7 +11,10 @@ export const validate = defineCommand({
     "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Catalog roles and adapters are not checked yet, so role names and adapter names are accepted as written.",
   options: [],
   examples: ["ost validate", "ost validate --team ../acme-team", "ost validate --json"],
-  exitCodes: ["0: no errors (warnings are allowed)", "1: the config has errors or could not be loaded"],
+  exitCodes: [
+    "0: no errors (warnings are allowed)",
+    "1: the config has errors or could not be loaded",
+  ],
   async run(ctx, options) {
     const loaded = await loadTeam(ctx, options);
     let errors: LocatedIssue[];
@@ -22,7 +25,10 @@ export const validate = defineCommand({
     } else {
       const report = validateTeam(loaded.config, { roles: new Map(), adapters: new Map() });
       errors = report.errors.map(loaded.locate);
-      warnings = report.warnings.map((w: ConfigWarning) => ({ ...loaded.locate(w), consequence: w.consequence }));
+      warnings = report.warnings.map((w: ConfigWarning) => ({
+        ...loaded.locate(w),
+        consequence: w.consequence,
+      }));
     }
 
     const ok = errors.length === 0;
@@ -39,11 +45,18 @@ export const validate = defineCommand({
           2,
         )}\n`,
       );
+
       return ok ? 0 : 1;
     }
 
-    for (const e of errors) ctx.out(`error    ${formatIssue(e)}\n`);
-    for (const w of warnings) ctx.out(`warning  ${formatIssue(w)}\n         Consequence: ${w.consequence}\n`);
+    for (const e of errors) {
+      ctx.out(`error    ${formatIssue(e)}\n`);
+    }
+
+    for (const w of warnings) {
+      ctx.out(`warning  ${formatIssue(w)}\n         Consequence: ${w.consequence}\n`);
+    }
+
     const name = loaded.ok ? `${loaded.config.team.name}: ` : "";
     ctx.out(`${name}${plural(errors.length, "error")}, ${plural(warnings.length, "warning")}\n`);
     return ok ? 0 : 1;

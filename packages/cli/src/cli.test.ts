@@ -19,7 +19,10 @@ let n = 0;
 function project(name = `p${n++}`, team?: string) {
   const dir = join(root, name);
   mkdirSync(join(dir, ".outstaff"), { recursive: true });
-  if (team !== undefined) writeFileSync(join(dir, ".outstaff", "team.yaml"), team);
+  if (team !== undefined) {
+    writeFileSync(join(dir, ".outstaff", "team.yaml"), team);
+  }
+
   return dir;
 }
 
@@ -33,6 +36,7 @@ async function ost(cwd: string, args: string[], origin?: string) {
     err: (t) => void (err += t),
     gitOrigin: () => origin,
   };
+
   const code = await run(args, ctx);
   return { code, out: out.replaceAll(root, "<tmp>"), err: err.replaceAll(root, "<tmp>") };
 }
@@ -52,7 +56,10 @@ describe("ost validate", () => {
       undefined,
       readFileSync(ACME_TEAM_FILE, "utf8")
         .replace(/humans:[\s\S]*?\ncatalog:/, "catalog:")
-        .replace('    repos:\n      "*": read\n  - handle: kofi', "    repos: {}\n  - handle: kofi"),
+        .replace(
+          '    repos:\n      "*": read\n  - handle: kofi',
+          "    repos: {}\n  - handle: kofi",
+        ),
     );
 
   it("accepts the acme team cleanly", async () => {
@@ -73,7 +80,10 @@ describe("ost validate", () => {
     expect(r.code).toBe(0);
     const report = JSON.parse(r.out);
     expect(report).toMatchObject({ ok: true, errors: [] });
-    expect(report.warnings.find((w: { code: string }) => w.code === "trust.default")).toMatchObject({ code: "trust.default", line: expect.any(Number), consequence: expect.any(String) });
+    expect(report.warnings.find((w: { code: string }) => w.code === "trust.default")).toMatchObject(
+      { code: "trust.default", line: expect.any(Number), consequence: expect.any(String) },
+    );
+
     expect(r.out).toMatchSnapshot();
   });
 
@@ -94,7 +104,14 @@ describe("ost validate", () => {
     expect(r.code).toBe(1);
     expect(JSON.parse(r.out)).toMatchObject({
       ok: false,
-      errors: [{ code: "people.duplicate_handle", file: ".outstaff/team.yaml", line: expect.any(Number), column: expect.any(Number) }],
+      errors: [
+        {
+          code: "people.duplicate_handle",
+          file: ".outstaff/team.yaml",
+          line: expect.any(Number),
+          column: expect.any(Number),
+        },
+      ],
     });
   });
 
@@ -118,7 +135,11 @@ describe("ost team", () => {
   });
 
   it("notes the default trust rule when humans is omitted", async () => {
-    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(/humans:[\s\S]*?\ncatalog:/, "catalog:");
+    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
+      /humans:[\s\S]*?\ncatalog:/,
+      "catalog:",
+    );
+
     const r = await ost(project(undefined, team), ["team"]);
     expect(r.out).toContain("Not listed; default rule");
   });
@@ -126,7 +147,15 @@ describe("ost team", () => {
   it("prints JSON", async () => {
     const r = await ost(acme(), ["team", "--json"]);
     const json = JSON.parse(r.out);
-    expect(Object.keys(json)).toEqual(["file", "team", "humans", "repos", "people", "integrations"]);
+    expect(Object.keys(json)).toEqual([
+      "file",
+      "team",
+      "humans",
+      "repos",
+      "people",
+      "integrations",
+    ]);
+
     expect(json.people).toHaveLength(8);
   });
 
@@ -147,9 +176,12 @@ describe("ost init", () => {
     expect(text).toContain("name: acme-shop");
     expect(text).toContain("ost hire");
     expect(text).toContain("github.com/your-org/your-repo");
-    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("# Outstaff secrets\n.outstaff/people/*/.env\n.env\n*.pem\n");
-    expect(r.out).toMatchSnapshot();
-    expect(text).toMatchSnapshot();
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
+      "# Outstaff secrets\n.outstaff/people/*/.env\n.env\n*.pem\n",
+    );
+
+    expect(r.out).toMatchSnapshot("init --separate-repo output");
+    expect(text).toMatchSnapshot("init --separate-repo team.yaml");
     expect((await ost(dir, ["validate"])).code).toBe(0);
   });
 
@@ -159,15 +191,23 @@ describe("ost init", () => {
     const r = await ost(dir, ["init"], "git@github.com:acme-example/shop-app.git");
     expect(r.code).toBe(0);
     const text = readFileSync(join(dir, ".outstaff", "team.yaml"), "utf8");
-    expect(text).toContain("name: shop-app\n    url: github.com/acme-example/shop-app\n    kind: primary");
-    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe("node_modules/\n.env\n# Outstaff secrets\n.outstaff/people/*/.env\n*.pem\n");
+    expect(text).toContain(
+      "name: shop-app\n    url: github.com/acme-example/shop-app\n    kind: primary",
+    );
+
+    expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
+      "node_modules/\n.env\n# Outstaff secrets\n.outstaff/people/*/.env\n*.pem\n",
+    );
+
     expect((await ost(dir, ["validate"])).code).toBe(0);
   });
 
   it("accepts https origins", async () => {
     const dir = project();
     await ost(dir, ["init"], "https://github.com/acme-example/shop.git");
-    expect(readFileSync(join(dir, ".outstaff", "team.yaml"), "utf8")).toContain("url: github.com/acme-example/shop\n");
+    expect(readFileSync(join(dir, ".outstaff", "team.yaml"), "utf8")).toContain(
+      "url: github.com/acme-example/shop\n",
+    );
   });
 
   it("refuses to overwrite without --force", async () => {
@@ -183,7 +223,12 @@ describe("ost init", () => {
 
   it("--separate-repo writes team.yaml at the root", async () => {
     const dir = project("acme-team");
-    const r = await ost(dir, ["init", "--separate-repo"], "git@github.com:acme-example/acme-team.git");
+    const r = await ost(
+      dir,
+      ["init", "--separate-repo"],
+      "git@github.com:acme-example/acme-team.git",
+    );
+
     expect(r.code).toBe(0);
     const text = readFileSync(join(dir, "team.yaml"), "utf8");
     expect(text).toContain("`kind: primary`");

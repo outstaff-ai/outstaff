@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "printWidth": 100,
+  "sortPackageJson": false,
+  "ignorePatterns": [
+    "packages/cli/cli-reference.md",
+    "**/__golden__",
+    "**/__snapshots__",
+    "packages/core/schema",
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    ".astro",
+    "pnpm-lock.yaml",
+    "LICENSE",
+    "CHANGELOG.md"
+  ]
+}

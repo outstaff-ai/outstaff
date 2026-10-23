@@ -6,10 +6,12 @@ export type Context = {
   env: NodeJS.ProcessEnv;
   out: (text: string) => void;
   err: (text: string) => void;
+
   /** Overrides for the team loader (tests only). */
   fs?: ConfigFs;
   git?: GitClient;
   cacheDir?: string;
+
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;
 };
@@ -27,8 +29,10 @@ export type CommandDef<O = Record<string, unknown>> = {
   description: string;
   options: OptionDef[];
   examples: string[];
+
   /** One line per exit code. */
   exitCodes: string[];
+
   /** Resolves to the process exit code. */
   run: (ctx: Context, options: O & GlobalOptions) => Promise<number>;
 };

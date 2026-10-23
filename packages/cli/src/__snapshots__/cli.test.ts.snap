@@ -42,14 +42,14 @@ integrations:
 "
 `;
 
-exports[`ost init > scaffolds a valid team in an empty directory 1`] = `
+exports[`ost init > scaffolds a valid team in an empty directory > init --separate-repo output 1`] = `
 "Wrote .outstaff/team.yaml
 Added to .gitignore: .outstaff/people/*/.env, .env, *.pem
 Next: edit .outstaff/team.yaml, then run \`ost validate\`.
 "
 `;
 
-exports[`ost init > scaffolds a valid team in an empty directory 2`] = `
+exports[`ost init > scaffolds a valid team in an empty directory > init --separate-repo team.yaml 1`] = `
 "# Outstaff team configuration. Run \`ost validate\` after editing.
 version: 1
 

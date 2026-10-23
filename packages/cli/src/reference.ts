@@ -2,7 +2,11 @@ import { commands } from "./commands/index.js";
 import { GLOBAL_OPTIONS, type OptionDef } from "./define.js";
 
 const options = (list: OptionDef[]) =>
-  ["| Option | Description |", "| --- | --- |", ...list.map((o) => `| \`${o.flags}\` | ${o.description} |`)].join("\n");
+  [
+    "| Option | Description |",
+    "| --- | --- |",
+    ...list.map((o) => `| \`${o.flags}\` | ${o.description} |`),
+  ].join("\n");
 
 /** Markdown for the CLI reference page, generated from the command definitions. */
 export function renderCliReference(): string {
@@ -24,11 +28,28 @@ export function renderCliReference(): string {
     "",
     options(GLOBAL_OPTIONS),
   ];
+
   for (const c of commands) {
-    out.push("", `## ost ${c.name}`, "", c.summary, "", c.description, "", "```", `ost ${c.name}${c.options.length ? " [options]" : ""}`, "```");
-    if (c.options.length) out.push("", options(c.options));
+    out.push(
+      "",
+      `## ost ${c.name}`,
+      "",
+      c.summary,
+      "",
+      c.description,
+      "",
+      "```",
+      `ost ${c.name}${c.options.length ? " [options]" : ""}`,
+      "```",
+    );
+
+    if (c.options.length) {
+      out.push("", options(c.options));
+    }
+
     out.push("", "Exit codes:", "", ...c.exitCodes.map((e) => `- ${e}`));
     out.push("", "Examples:", "", "```sh", ...c.examples, "```");
   }
+
   return `${out.join("\n")}\n`;
 }

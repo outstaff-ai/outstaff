@@ -10,6 +10,7 @@ sidebar:
 ## Context
 
 The office keeps durable state:
+
 - intake cursors and deduplication;
 - the work-state graph;
 - work items and runs;

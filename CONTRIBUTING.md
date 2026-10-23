@@ -17,15 +17,15 @@ pnpm install
 
 Run these from the repository root.
 
-| Command | What it does |
-| --- | --- |
-| `pnpm lint` | oxlint over the whole repository |
-| `pnpm typecheck` | `tsc --noEmit` in every package |
-| `pnpm test` | vitest, one project per package |
-| `pnpm build` | tsc, ESM output and type declarations |
+| Command          | What it does                                           |
+| ---------------- | ------------------------------------------------------ |
+| `pnpm lint`      | oxlint over the whole repository                       |
+| `pnpm typecheck` | `tsc --noEmit` in every package                        |
+| `pnpm test`      | vitest, one project per package                        |
+| `pnpm build`     | tsc, ESM output and type declarations                  |
 | `pnpm changeset` | record a version bump and changelog entry for a change |
 
-Before you open a pull request, run `pnpm lint && pnpm typecheck && pnpm test && pnpm build`. CI runs the same checks, plus secret and hygiene scans.
+Before you open a pull request, run `pnpm format && pnpm lint && pnpm typecheck && pnpm test && pnpm build`. Formatting is oxfmt (`.oxfmtrc.json`: double quotes, semicolons, trailing commas, 100 columns); linting is oxlint with the stylistic rules in `.oxlintrc.json`. CI runs `pnpm format:check`. CI runs the same checks, plus secret and hygiene scans.
 
 ## Branches and pull requests
 
