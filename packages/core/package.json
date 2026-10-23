@@ -23,6 +23,15 @@
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "schema": "tsx scripts/gen-schema.ts"
+  },
+  "dependencies": {
+    "semver": "7.8.5",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/semver": "7.8.0",
+    "tsx": "4.23.15"
   }
 }
