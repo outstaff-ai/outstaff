@@ -203,3 +203,39 @@ After a `move` or `assign` the engine refreshes the ticket in the work state str
 **Idempotent under redelivery.** Before applying anything the engine stores the plan (the evaluated effects) under the event's `source:externalId` as a subject of type `engine`, and records each effect's outcome (`applied`, `skipped` or `failed`, with a note and a time) as soon as it is done. A redelivered event, whether from intake's retry or from a synthetic event arriving through both intake and `workState.onEvent`, replays the stored plan and does only what is left. The state has usually moved on by then, so re-evaluating could change the effects and their positions. Transient port errors (`rate_limited`, `unavailable`) fail the handler so intake redelivers with backoff; other port errors are recorded as `failed` and do not hold back the remaining effects. If the office dies between performing an effect and recording it, that single effect can run again; moves and assignments are naturally repeatable, and a comment can be posted twice.
 
 **Explaining a rule.** `ost workflow explain '<event-json>' --state '<json>'` runs `explainWorkflow` against the team's workflow and a static snapshot and prints, for every rule, whether it matched and why. See the [CLI reference](/reference/cli/).
+
+## Running the office
+
+`createOffice` assembles the parts above into one process, and `outstaff-office` (the `bin` of `@outstaff/office`) starts it from the environment. The office image runs that command.
+
+**Wiring.** The office creates its ports from `integrations` in team.yaml through the adapter registry, with the office-scope secrets. Version control is required; the tracker and chat are used when configured. An adapter that is configured but not installed in the image stops the start with a message naming it. Events then flow in one fixed order: intake records an event, the work state applies it, the engine evaluates the workflow. The work state's own `pr.conflicted` and `pr.ci_failed` go straight to the engine. Every item the engine, the messaging or an agent queues goes through the scheduler, which tells the protocol server so the agent is offered the work at once. An item of kind `conflict` starts with the rebase steps for its pull request, including the pull requests stacked above it, in its journal.
+
+**Offers.** What was offered and what the agent accepted is stored (as `offer` subjects), so a restart offers again only what was not accepted. The offer carries the item's journal, the ticket and pull requests it concerns with their links, and `ost work` shows the agent's open items. When an agent hands an item back as `done`, the office raises `agent.handed_back` for the ticket, so the workflow moves it to review and tells the requester; a repeated hand-back repeats nothing. The runtime session an agent reports for an item is stored with it and goes on the next offer. An agent that restarts gives back the items it had accepted with `decline`: they stay as they are (same run, journal and session, no new attempt) and are offered again. Usage is not reported by agents yet, so the usage policy sees no limits until the protocol carries it.
+
+**Start and stop.** `start()` opens the agent connection, then the work state (with one rescan) and intake, which redelivers any events that were recorded but not handled. `stop()` stops intake, lets running handlers finish, closes connections and the store. `SIGTERM` and `SIGINT` do this.
+
+### Environment
+
+| Variable                                         | Meaning                                                                                                              |
+| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `OUTSTAFF_TEAM_FILE`                             | Path to team.yaml (or the folder holding it). Alternatively `OUTSTAFF_TEAM_REPO` and `OUTSTAFF_TEAM_REF`.            |
+| `OUTSTAFF_STORE_URL`                             | `postgres://user:pass@host/db`, `sqlite:///var/lib/outstaff/office.db` (the default) or `sqlite::memory:` for tests. |
+| `OUTSTAFF_AGENT_PORT`                            | Port agents connect to, path `/agent`. Default 8080.                                                                 |
+| `OUTSTAFF_WEBHOOK_PORT`                          | Port of the webhook receiver when `office.events` is `webhook`. Default 8082.                                        |
+| `OUTSTAFF_HEALTH_PORT`                           | Port of the health endpoints. Default 8081.                                                                          |
+| `OUTSTAFF_AGENT_TOKEN_<HANDLE>`                  | One token per person, as a secret.                                                                                   |
+| `OUTSTAFF_SECRETS_DIR`                           | Directory of secret files, default `/run/secrets/outstaff`; the environment is the fallback.                         |
+| Adapter secrets (for example `GH_OFFICE_APP_ID`) | Whatever the configured adapters declare for the office scope.                                                       |
+
+The SQLite file's folder is created when missing; mount a volume there. Use Postgres to run the office on a platform without persistent disks. Migrations run on start.
+
+### Health
+
+- `GET /healthz` is liveness: 200 while the office is starting or running and its parts (store, agent connection, work state, intake, scheduler) are up, 503 once something fails or it is stopping.
+- `GET /readyz` is readiness: 200 only while the office is running.
+
+Both answer with JSON: `{ "ok": true, "state": "running", "components": { "store": { "ok": true, "detail": "sqlite" }, … } }`. The same data is available in code as `office.health()`.
+
+### Logs
+
+One JSON object per line on standard output, with `time`, `level` and `message`.

@@ -26,15 +26,22 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@outstaff/catalog": "workspace:*",
+    "@outstaff/chat-slack": "workspace:*",
     "@outstaff/core": "workspace:*",
+    "@outstaff/protocol": "workspace:*",
+    "@outstaff/tracker-itsaplan": "workspace:*",
+    "@outstaff/vcs-github": "workspace:*",
     "kysely": "0.29.7",
     "pg": "8.23.1",
-    "@outstaff/protocol": "workspace:*",
     "ws": "8.22.0"
   },
   "devDependencies": {
     "@types/pg": "8.23.1",
     "@types/ws": "8.18.2",
     "@outstaff/agent": "workspace:*"
+  },
+  "bin": {
+    "outstaff-office": "./dist/main.js"
   }
 }
