@@ -1,8 +1,17 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
+const core = (path: string) => fileURLToPath(new URL(`packages/core/src/${path}`, import.meta.url));
+
+// Adapter packages test against the source of core, so tests and typecheck run without a prior build.
+const coreAlias = [
+  { find: /^@outstaff\/core\/contracts$/, replacement: core("contracts/index.ts") },
+  { find: /^@outstaff\/core\/fakes$/, replacement: core("fakes/index.ts") },
+  { find: /^@outstaff\/core$/, replacement: core("index.ts") },
+];
+
 const packages = ["core", "catalog", "cli", "agent", "office"];
-const src = (path: string) => fileURLToPath(new URL(`packages/core/src/${path}`, import.meta.url));
+const adapters = ["vcs-github", "runtime-agent-sdk"];
 
 export default defineConfig({
   test: {
@@ -20,17 +29,10 @@ export default defineConfig({
           include: ["src/**/*.test.ts"],
         },
       })),
-      {
-        // Adapters test against core's source so `pnpm test` works before `pnpm build`.
-        resolve: {
-          alias: [
-            { find: /^@outstaff\/core\/contracts$/, replacement: src("contracts/index.ts") },
-            { find: /^@outstaff\/core\/fakes$/, replacement: src("fakes/index.ts") },
-            { find: /^@outstaff\/core$/, replacement: src("index.ts") },
-          ],
-        },
-        test: { name: "vcs-github", root: "packages/vcs-github", include: ["src/**/*.test.ts"] },
-      },
+      ...adapters.map((pkg) => ({
+        resolve: { alias: coreAlias },
+        test: { name: pkg, root: `packages/${pkg}`, include: ["src/**/*.test.ts"] },
+      })),
       { test: { name: "scripts", root: "scripts", include: ["*.test.ts"] } },
       { test: { name: "docs", root: "docs", include: ["scripts/**/*.test.mjs"] } },
     ],
