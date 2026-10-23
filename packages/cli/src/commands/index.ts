@@ -1,8 +1,12 @@
 import type { CommandDef } from "../define.js";
+import { build } from "./build.js";
+import { diff } from "./diff.js";
+import { eject } from "./eject.js";
 import { gitCredential } from "./git-credential.js";
 import { init } from "./init.js";
 import { render } from "./render.js";
 import { team } from "./team.js";
+import { upgrade } from "./upgrade.js";
 import { validate } from "./validate.js";
 import { verbCommands } from "./verbs.js";
 import { explain } from "./workflow.js";
@@ -13,6 +17,10 @@ export const commands: CommandDef[] = [
   validate,
   team,
   render,
+  eject,
+  diff,
+  upgrade,
+  build,
   init,
   explain,
   gitCredential,

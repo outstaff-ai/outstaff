@@ -94,6 +94,107 @@ ost render sam --out ./work/sam --force
 ost render sam --json
 ```
 
+## ost eject
+
+Copy stock catalog files into the team repository to customize them.
+
+Copies stock catalog files into the ejected catalog (catalog.path next to the team file, .outstaff/catalog by default) and records, per file, the catalog version and hash they came from in .ejected.json, with a copy of the original under .base/. Ejected files win over stock files with the same path. Targets (one or more): a role name (all its files), process/<name>, references/<name>, templates/<name>, toolsets/<name>, or --all. Existing files are never overwritten unless --force is given. Use ost diff to see your changes and ost upgrade to merge a newer catalog.
+
+```
+ost eject [targets...] [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--all` | Eject every stock role, process, reference, template and toolset. |
+| `--force` | Overwrite files that already exist and reset their recorded base. |
+
+Exit codes:
+
+- 0: the files were copied
+- 1: the team could not be loaded, the target is unknown, or a file exists and --force was not given
+
+Examples:
+
+```sh
+ost eject developer
+ost eject references/git
+ost eject process/review-loop
+ost eject --all
+ost eject developer --force
+```
+
+## ost diff
+
+Show how ejected catalog files differ from the stock version they came from.
+
+Prints a unified diff of each ejected file against its recorded base (the copy stored under .base/ when it was ejected or last upgraded). Without a path it covers every ejected file; with one it covers that file or every file below that folder, for example roles/developer. Files without changes are not listed.
+
+```
+ost diff [path]
+```
+
+Exit codes:
+
+- 0: the diff was printed (including when there are no changes)
+- 1: the team could not be loaded or the path is not an ejected file
+
+Examples:
+
+```sh
+ost diff
+ost diff roles/developer
+ost diff references/git.md
+```
+
+## ost upgrade
+
+Merge a newer stock catalog into the ejected files.
+
+For every ejected file, merges three ways: the recorded base, the installed stock file and your copy (git merge-file). Clean merges are written. Conflicts are written with standard conflict markers (client, base, stock) and listed; resolve them by editing the files. Recorded bases move to the new stock version and catalog.version in the team file is set to it. A file that no longer exists in the stock catalog is reported and left alone. A file you deleted is dropped from the record, so it follows stock again. The catalog is the one installed with this CLI; install the release you want first, then run this. --to must name that version.
+
+```
+ost upgrade [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--to <version>` | Expected target version; must equal the installed catalog version. |
+
+Exit codes:
+
+- 0: every file merged cleanly
+- 1: the team could not be loaded, --to does not match the installed catalog, or there are conflicts
+
+Examples:
+
+```sh
+ost upgrade
+ost upgrade --to 1.2.0
+```
+
+## ost build
+
+Validate the team and render every person strictly; for client image builds.
+
+Checks the team config, loads the stock and ejected catalogs, rejects ejected files that still contain conflict markers from ost upgrade, and renders every person's working files. Fails on any error, so a broken customization stops the image build. Intended for a client Dockerfile: FROM ghcr.io/outstaff-ai/agent:<version>, COPY .outstaff /opt/outstaff/team/.outstaff, RUN ost build.
+
+```
+ost build
+```
+
+Exit codes:
+
+- 0: the team validates and every person renders
+- 1: any error
+
+Examples:
+
+```sh
+ost build
+ost build --team /opt/outstaff/team
+```
+
 ## ost init
 
 Scaffold .outstaff/team.yaml and .gitignore rules in the current directory.

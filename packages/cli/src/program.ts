@@ -85,7 +85,7 @@ export function buildProgram(ctx: Context, setExit: (code: number) => void) {
       const positional = args
         .slice(0, -2)
         .filter((a) => a !== undefined)
-        .map(String);
+        .flatMap((a) => (Array.isArray(a) ? a.map(String) : [String(a)]));
 
       setExit(await def.run(ctx, self.optsWithGlobals() as GlobalOptions, positional));
     });
