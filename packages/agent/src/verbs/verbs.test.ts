@@ -9,6 +9,7 @@ import { z } from "zod";
 import {
   VERBS,
   createAgentEnv,
+  createFakeOffice,
   createRuntimeTools,
   describeVerb,
   findVerb,
@@ -300,7 +301,6 @@ describe("office verbs", () => {
   it("validates who can be asked", async () => {
     const { env } = fakeEnv();
     await rejects(run("ask", env, { to: "sam", question: "Me?" }), "invalid");
-    await rejects(run("ask", env, { to: "nobody", question: "Hi?" }), "not_found");
     await rejects(run("ask", env, { to: "mira" }), "invalid");
   });
 
@@ -316,6 +316,36 @@ describe("office verbs", () => {
     expect((await run("team", fakeEnv().env)).text).toContain(
       "mira (Mira Okafor), architect: idle",
     );
+  });
+
+  it("answers a question", async () => {
+    const f = fakeEnv();
+    const r = await run("question.answer", f.env, { question: "q1", answer: "Yes." });
+    expect(r.text).toContain("Answered question q1");
+    expect(f.office.answered).toEqual([{ questionId: "q1", answer: "Yes." }]);
+    await rejects(run("question.answer", f.env, { question: "q1" }), "invalid");
+  });
+
+  it("passes a role to the office and shows titles and humans in the team", async () => {
+    const f = fakeEnv();
+    await run("ask", f.env, { to: "architect", question: "Ok?" });
+    expect(f.office.asked[0]?.to).toBe("architect");
+    const office = createFakeOffice({
+      team: [
+        {
+          handle: "mira",
+          name: "Mira Okafor",
+          role: "architect",
+          title: "Architect",
+          status: "working",
+        },
+      ],
+      humans: [{ name: "Dana Reyes" }],
+    });
+
+    const r = await run("team", { ...f.env, office });
+    expect(r.text).toContain("mira (Mira Okafor), Architect: working");
+    expect(r.text).toContain("Humans: Dana Reyes");
   });
 
   it.each([
@@ -414,6 +444,7 @@ describe("verb catalogue", () => {
       "pr.resolve",
       "me",
       "ask",
+      "question.answer",
       "work",
       "team",
     ]);

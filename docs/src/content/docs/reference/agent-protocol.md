@@ -224,14 +224,18 @@ The team.
 
 Sent by: office.
 
-| Field               | Type                                         | Required | Description                    |
-| ------------------- | -------------------------------------------- | -------- | ------------------------------ |
-| `members`           | list of objects                              | yes      |                                |
-| `members[].handle`  | string                                       | yes      |                                |
-| `members[].name`    | string                                       | yes      |                                |
-| `members[].role`    | string                                       | yes      |                                |
-| `members[].status`  | `idle` or `working` or `paused` or `offline` | yes      |                                |
-| `members[].current` | string                                       | no       | What the person is working on. |
+| Field               | Type                                         | Required | Description                                       |
+| ------------------- | -------------------------------------------- | -------- | ------------------------------------------------- |
+| `members`           | list of objects                              | yes      |                                                   |
+| `members[].handle`  | string                                       | yes      |                                                   |
+| `members[].name`    | string                                       | yes      |                                                   |
+| `members[].role`    | string                                       | yes      |                                                   |
+| `members[].title`   | string                                       | no       | Display title of the role, for example Developer. |
+| `members[].summary` | string                                       | no       | One line on what the role does.                   |
+| `members[].status`  | `idle` or `working` or `paused` or `offline` | yes      |                                                   |
+| `members[].current` | string                                       | no       | What the person is working on.                    |
+| `humans`            | list of objects                              | no       | The trusted humans of the team.                   |
+| `humans[].name`     | string                                       | yes      |                                                   |
 
 ### `work_list`
 

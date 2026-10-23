@@ -171,6 +171,7 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       case "handback": {
         const { workItemId, ...result } = m.payload;
         await source.handBack(person, workItemId, result);
+        await opts.messaging?.onHandBack?.(workItemId, result.status);
         reply("ack", {});
         return deliver(person);
       }
@@ -197,7 +198,12 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       }
 
       case "roster":
-        return reply("roster_result", { members: await source.roster() });
+        return reply(
+          "roster_result",
+          opts.messaging?.roster
+            ? await opts.messaging.roster()
+            : { members: await source.roster() },
+        );
       case "work_list":
         return reply("work_list_result", {
           items: await source.list(

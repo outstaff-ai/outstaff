@@ -313,9 +313,9 @@ ost me
 
 ## ask
 
-Ask a teammate a question through the office.
+Ask a teammate, or anyone with a role, a question through the office.
 
-Asks another person of the team a question. The office routes it; the answer may come later, as a new message in your work item.
+Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. A role nobody has gets an explicit reply: ask a human.
 
 ```
 ost ask <to> <question>
@@ -325,13 +325,37 @@ Runtime tool: `ask`
 
 | Input | Type | Required | Description |
 | --- | --- | --- | --- |
-| `to` | string | yes | Handle of the teammate. |
+| `to` | string | yes | Handle of a teammate, or a role such as architect. |
 | `question` | string | yes | The question, with enough context to answer it. |
 
 Examples:
 
 ```sh
 ost ask mira "Should the cart survive a deploy?"
+ost ask architect "Should the cart survive a deploy?"
+```
+
+## question.answer
+
+Answer a question a teammate asked you.
+
+Answers a question that the office gave you as a work item. The asker continues their work with your answer. Only the person who was asked can answer, once.
+
+```
+ost answer <question> <answer>
+```
+
+Runtime tool: `question_answer`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `question` | string | yes | Id of the question, from the work item. |
+| `answer` | string | yes | The answer, complete enough to act on. |
+
+Examples:
+
+```sh
+ost answer 01J9X "Use the fast queue; orders must not wait on mail."
 ```
 
 ## work

@@ -91,6 +91,7 @@ const toConversation = (r: Selectable<Database["conversations"]>): Conversation 
   depth: Number(r.depth),
   createdAt: r.created_at,
   answeredAt: r.answered_at,
+  deliveredAt: r.delivered_at,
 });
 
 export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
@@ -575,6 +576,7 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
           depth: input.depth ?? 0,
           created_at: iso(at),
           answered_at: null,
+          delivered_at: null,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
@@ -606,6 +608,29 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
         .executeTakeFirst();
 
       return row ? toConversation(row) : undefined;
+    },
+
+    async listUndelivered(askerItemId) {
+      const rows = await db
+        .selectFrom("conversations")
+        .selectAll()
+        .where("asker_item_id", "=", askerItemId)
+        .where("status", "=", "answered")
+        .where("delivered_at", "is", null)
+        .orderBy("answered_at", "asc")
+        .orderBy("id", "asc")
+        .execute();
+
+      return rows.map(toConversation);
+    },
+
+    async markDelivered(id) {
+      await db
+        .updateTable("conversations")
+        .set({ delivered_at: stamp() })
+        .where("id", "=", id)
+        .where("delivered_at", "is", null)
+        .execute();
     },
 
     async close() {

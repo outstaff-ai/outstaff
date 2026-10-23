@@ -310,6 +310,15 @@ export const teamConfigSchema = z
           .max(3600)
           .default(60)
           .meta(d('Seconds between polls when events is "poll".')),
+        channel: z
+          .string()
+          .min(1)
+          .optional()
+          .meta(
+            d(
+              "Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.",
+            ),
+          ),
       })
       .optional()
       .meta(d("Office event intake settings.")),

@@ -5,11 +5,11 @@ import { defineVerb, result } from "./types.js";
 
 export const ask = defineVerb({
   name: "ask",
-  summary: "Ask a teammate a question through the office.",
+  summary: "Ask a teammate, or anyone with a role, a question through the office.",
   description:
-    "Asks another person of the team a question. The office routes it; the answer may come later, as a new message in your work item.",
+    "Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. A role nobody has gets an explicit reply: ask a human.",
   input: z.strictObject({
-    to: z.string().min(1).max(30).describe("Handle of the teammate."),
+    to: z.string().min(1).max(30).describe("Handle of a teammate, or a role such as architect."),
     question: z
       .string()
       .min(1)
@@ -17,16 +17,16 @@ export const ask = defineVerb({
       .describe("The question, with enough context to answer it."),
   }),
   args: ["to", "question"],
-  examples: ['ost ask mira "Should the cart survive a deploy?"'],
+  examples: [
+    'ost ask mira "Should the cart survive a deploy?"',
+    'ost ask architect "Should the cart survive a deploy?"',
+  ],
   async run(env, input, ctx) {
     if (input.to === env.person) {
       throw new PortError("invalid", "You cannot ask yourself.");
     }
 
-    if (!env.team.people.some((p) => p.handle === input.to)) {
-      throw new PortError("not_found", `${input.to} is not a person of this team.`);
-    }
-
+    // Roles and handles are resolved by the office, which knows the live team and says so when nobody fits.
     const office = requireOffice(env);
     const r = await office.ask({
       to: input.to,
@@ -43,6 +43,24 @@ export const ask = defineVerb({
       r,
       [],
     );
+  },
+});
+
+export const answer = defineVerb({
+  name: "question.answer",
+  cli: ["answer"],
+  summary: "Answer a question a teammate asked you.",
+  description:
+    "Answers a question that the office gave you as a work item. The asker continues their work with your answer. Only the person who was asked can answer, once.",
+  input: z.strictObject({
+    question: z.string().min(1).describe("Id of the question, from the work item."),
+    answer: z.string().min(1).max(10_000).describe("The answer, complete enough to act on."),
+  }),
+  args: ["question", "answer"],
+  examples: ['ost answer 01J9X "Use the fast queue; orders must not wait on mail."'],
+  async run(env, input) {
+    await requireOffice(env).answer(input.question, input.answer);
+    return result([`Answered question ${input.question}.`], { question: input.question }, []);
   },
 });
 
@@ -84,18 +102,20 @@ export const team = defineVerb({
   args: [],
   examples: ["ost roster"],
   async run(env) {
-    const members = await requireOffice(env).team();
-    return result(
-      members.length
-        ? members.map(
-            (m) =>
-              `${m.handle} (${m.name}), ${m.role}: ${m.status}${m.current ? `, ${m.current}` : ""}`,
-          )
-        : ["No team members."],
-      { members },
-      [],
-    );
+    const { members, humans } = await requireOffice(env).team();
+    const lines = members.length
+      ? members.map(
+          (m) =>
+            `${m.handle} (${m.name}), ${m.title ?? m.role}: ${m.status}${m.current ? `, ${m.current}` : ""}`,
+        )
+      : ["No team members."];
+
+    if (humans.length) {
+      lines.push(`Humans: ${humans.map((h) => h.name).join(", ")}`);
+    }
+
+    return result(lines, { members, humans }, []);
   },
 });
 
-export const officeVerbs = [ask, work, team];
+export const officeVerbs = [ask, answer, work, team];

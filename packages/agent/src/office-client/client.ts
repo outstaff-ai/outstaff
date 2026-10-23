@@ -13,6 +13,7 @@ import { WebSocket } from "ws";
 import type {
   OfficeAnswer,
   OfficeClient,
+  OfficeTeam,
   OfficeTeamMember,
   OfficeWorkItem,
 } from "../verbs/office.js";
@@ -479,9 +480,12 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       return r.items.map((i) => compact(i) as OfficeWorkItem);
     },
 
-    async team(): Promise<OfficeTeamMember[]> {
+    async team(): Promise<OfficeTeam> {
       const r = await call("roster", {}, "roster_result");
-      return r.members.map((m) => compact(m) as OfficeTeamMember);
+      return {
+        members: r.members.map((m) => compact(m) as OfficeTeamMember),
+        humans: r.humans ?? [],
+      };
     },
   };
 }

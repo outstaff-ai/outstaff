@@ -8,7 +8,14 @@ import type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 
 export { createAgentEnv, type CreateAgentEnvOptions } from "./env.js";
 export { createFakeOffice, type FakeOffice } from "./office.js";
-export type { OfficeAnswer, OfficeClient, OfficeTeamMember, OfficeWorkItem } from "./office.js";
+export type {
+  OfficeAnswer,
+  OfficeClient,
+  OfficeTeam,
+  OfficeTeamMember,
+  OfficeWorkItem,
+} from "./office.js";
+
 export { cliPath, describeVerb, kebab, type VerbField } from "./describe.js";
 export { renderVerbsReference } from "./reference.js";
 export type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
