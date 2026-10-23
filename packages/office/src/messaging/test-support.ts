@@ -55,6 +55,7 @@ export function storeSource(
       trigger: item.trigger,
       ...(item.parentId ? { parentId: item.parentId } : {}),
     },
+    ...(item.sessionId ? { sessionId: item.sessionId } : {}),
     context: {
       journal: (await store.readJournal(item.id)).map((j) => ({
         at: j.at,
@@ -90,6 +91,10 @@ export function storeSource(
       return started.started ? offerOf(started.item) : undefined;
     },
     accept: async () => {},
+    async setSession(person, id, sessionId) {
+      await own(person, id);
+      await store.updateItem(id, { sessionId });
+    },
     decline: async () => {},
     heartbeat: async () => {},
     progress: async () => {},

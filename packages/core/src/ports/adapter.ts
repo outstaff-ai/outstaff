@@ -34,5 +34,11 @@ export interface AdapterDefinition<P extends PortName, Options, Impl> {
    * Command rules for the adapter's own CLI, for example a read-only `pr view` allow and a mutating `api` deny.
    * Merged into agents' policies as an `adapter` rule pack; deny wins over allow whatever the source.
    */
+  /**
+   * Runtime adapters only: where the runtime expects the rendered working files (skills, references, templates,
+   * process documents), as a map from rendered path to path below the working directory. Without it they stay as rendered.
+   */
+  workdirLayout?: (files: ReadonlyMap<string, string>) => Map<string, string>;
+
   permissions?: (scope: "person" | "office") => CommandRule[];
 }

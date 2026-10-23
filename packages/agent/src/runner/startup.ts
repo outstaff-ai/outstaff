@@ -1,0 +1,281 @@
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import {
+  PROFILE_SPECS,
+  buildPolicy,
+  envSecretSource,
+  formatCatalogIssue,
+  formatIssue,
+  loadCatalog,
+  loadTeamConfig,
+  loadToolset,
+  renderPerson,
+  silentLogger,
+  teamCommandsToPack,
+  toolsetToPack,
+  CatalogError,
+  RenderError,
+  type AdapterRegistry,
+  type Catalog,
+  type Logger,
+  type Policy,
+  type RenderedWorkdir,
+  type RulePack,
+  type Runtime,
+  type SecretSource,
+  type TeamConfig,
+} from "@outstaff/core";
+import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
+import { createAgentEnv } from "../verbs/env.js";
+import type { AgentEnv } from "../verbs/types.js";
+import { buildIdentityPrompt } from "./identity.js";
+import { agentLayout } from "./layout.js";
+import { createWorkLoop, type WorkLoop } from "./loop.js";
+
+export interface StartupOptions {
+  /** The container environment: OUTSTAFF_PERSON, OUTSTAFF_OFFICE_URL and the team location variables. */
+  env: NodeJS.ProcessEnv;
+
+  /** The agent's home directory; the working files render into `<home>/work`. */
+  home: string;
+  registry: AdapterRegistry;
+
+  /** Root of the installed stock catalog package. */
+  stockCatalogDir: string;
+  agentVersion: string;
+  cwd?: string;
+
+  /** Defaults to `envSecretSource(env)`. */
+  secrets?: SecretSource;
+  log?: Logger;
+
+  /** Replaces the WebSocket connection (tests only). */
+  connection?: OfficeConnection;
+}
+
+export interface PreparedAgent {
+  person: string;
+  team: TeamConfig;
+  connection: OfficeConnection;
+  loop: WorkLoop;
+  env: AgentEnv;
+  runtime: Runtime;
+  rendered: RenderedWorkdir;
+  policy: Policy;
+  systemPrompt: string;
+  workdir: string;
+}
+
+/** Why the agent cannot start, in words an operator can act on. */
+export class StartupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StartupError";
+  }
+}
+
+const present = (env: NodeJS.ProcessEnv, key: string): string => {
+  const v = env[key];
+  if (!v) {
+    throw new StartupError(`${key} is not set.`);
+  }
+
+  return v;
+};
+
+function loadCatalogs(
+  stockDir: string,
+  team: TeamConfig,
+  teamDir: string,
+): { stock: Catalog; ejected?: Catalog } {
+  try {
+    const stock = loadCatalog(stockDir);
+    const dir = resolve(teamDir, team.catalog.path);
+    const ejected =
+      existsSync(dir) && statSync(dir).isDirectory()
+        ? loadCatalog(dir, { version: team.catalog.version })
+        : undefined;
+
+    return { stock, ...(ejected ? { ejected } : {}) };
+  } catch (e) {
+    if (e instanceof CatalogError) {
+      throw new StartupError(
+        `The catalog cannot be loaded:\n${e.issues.map(formatCatalogIssue).join("\n")}`,
+      );
+    }
+
+    throw e;
+  }
+}
+
+/**
+ * Everything the agent needs before it takes work: the team, the person's rendered working files, the permission
+ * policy, the runtime and the office connection. Nothing connects until the caller starts the connection.
+ */
+export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent> {
+  const log = opts.log ?? silentLogger;
+  const person = present(opts.env, "OUTSTAFF_PERSON");
+  const secrets = opts.secrets ?? envSecretSource(opts.env);
+
+  const loaded = await loadTeamConfig({
+    env: opts.env,
+    ...(opts.cwd ? { cwd: opts.cwd } : {}),
+  });
+
+  if (!loaded.ok) {
+    throw new StartupError(
+      `The team config is invalid:\n${loaded.issues.map(formatIssue).join("\n")}`,
+    );
+  }
+
+  const { config: team, source } = loaded;
+  const me = team.people.find((p) => p.handle === person);
+  if (!me) {
+    throw new StartupError(`${person} is not a person of team ${team.team.name}.`);
+  }
+
+  const connection =
+    opts.connection ??
+    createOfficeConnection({
+      url: present(opts.env, "OUTSTAFF_OFFICE_URL"),
+      person,
+      token: secrets.require("OUTSTAFF_AGENT_TOKEN"),
+      agentVersion: opts.agentVersion,
+      logger: log,
+    });
+
+  const env = await createAgentEnv({
+    team,
+    person,
+    registry: opts.registry,
+    secrets,
+    office: connection,
+    log,
+  });
+
+  // Working files: stock catalog plus the team's ejected one, laid out the way the runtime expects them.
+  const catalogs = loadCatalogs(opts.stockCatalogDir, team, source.dir);
+  let rendered: RenderedWorkdir;
+  try {
+    rendered = renderPerson({
+      team,
+      handle: person,
+      catalog: catalogs.stock,
+      ...(catalogs.ejected ? { ejected: catalogs.ejected } : {}),
+    });
+  } catch (e) {
+    if (e instanceof RenderError) {
+      throw new StartupError(
+        `The working files cannot be rendered:\n${e.issues.map(formatCatalogIssue).join("\n")}`,
+      );
+    }
+
+    throw e;
+  }
+
+  for (const w of rendered.warnings) {
+    log.warn(w.message);
+  }
+
+  const runtimeRef = team.integrations.runtime;
+  const runtimeDef = opts.registry.get("runtime", runtimeRef.adapter);
+  if (!runtimeDef) {
+    throw new StartupError(
+      `The runtime adapter "${runtimeRef.adapter}" is not installed in this build.`,
+    );
+  }
+
+  const layout = agentLayout(
+    opts.home,
+    opts.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
+  );
+
+  for (const dir of [
+    layout.workDir,
+    layout.reposDir,
+    layout.worktreesDir,
+    layout.scratchDir,
+    layout.memoryDir,
+  ]) {
+    mkdirSync(dir, { recursive: true });
+  }
+
+  const files = runtimeDef.workdirLayout
+    ? runtimeDef.workdirLayout(rendered.files)
+    : rendered.files;
+
+  for (const [path, text] of files) {
+    const target = join(layout.workDir, path);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, text);
+  }
+
+  const { adapter: _adapter, ...rawOptions } = runtimeRef;
+  const runtime = (await runtimeDef.create({
+    options: runtimeDef.options.parse(rawOptions),
+    secrets,
+    secretKeys: [
+      ...new Set([
+        "OUTSTAFF_AGENT_TOKEN",
+        ...opts.registry.list().flatMap((d) => d.secrets("person").map((s) => s.key)),
+      ]),
+    ],
+    team,
+    log,
+    fetch,
+    now: () => new Date(),
+  })) as Runtime;
+
+  const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
+  const role = roles[me.role];
+  const toolsets = [
+    ...new Set([me.role, ...rendered.extends].map((r) => roles[r]?.toolset).filter((t) => t)),
+  ] as string[];
+
+  const packs: RulePack[] = [...opts.registry.rulePacks("person", team)];
+  for (const name of toolsets) {
+    const file = join(opts.stockCatalogDir, "toolsets", `${name}.yaml`);
+    if (existsSync(file)) {
+      packs.push(toolsetToPack(loadToolset(file)));
+    }
+  }
+
+  const teamPack = teamCommandsToPack(team.policies?.commands);
+  if (teamPack) {
+    packs.push(teamPack);
+  }
+
+  const policy = buildPolicy({ profile: rendered.profile, person: me, team, layout, packs });
+  const systemPrompt = buildIdentityPrompt({
+    team,
+    handle: person,
+    ...(role ? { role: { title: role.title, summary: role.summary } } : {}),
+  });
+
+  const model = me.model ?? role?.default_model;
+  const loop = createWorkLoop({
+    office: connection,
+    runtime,
+    env,
+    systemPrompt,
+    policy,
+    builtinTools: [...PROFILE_SPECS[rendered.profile].tools],
+    workdir: layout.workDir,
+    addDirs: [layout.reposDir, layout.worktreesDir, layout.scratchDir, layout.memoryDir],
+    ...(model ? { model } : {}),
+    log,
+  });
+
+  return {
+    person,
+    team,
+    connection,
+    loop,
+    env,
+    runtime,
+    rendered,
+    policy,
+    systemPrompt,
+    workdir: layout.workDir,
+  };
+}

@@ -36,10 +36,16 @@ export interface WorkSource {
   /** Idempotent. */
   accept(person: string, workItemId: string): Promise<void>;
 
-  /** Puts an offered item back in the queue. */
+  /**
+   * Puts an offered item back in the queue, untouched: no failure is counted, and the journal and stored session
+   * stay. Also used for an accepted, unfinished item after the agent restarted.
+   */
   decline(person: string, workItemId: string, reason: string): Promise<void>;
   heartbeat(person: string, workItemId: string | undefined): Promise<void>;
   progress(person: string, workItemId: string, text: string): Promise<void>;
+
+  /** Stores the runtime session of the item; the offer of a later round carries it. */
+  setSession(person: string, workItemId: string, sessionId: string): Promise<void>;
   journal(person: string, workItemId: string, text: string): Promise<void>;
   handBack(
     person: string,

@@ -165,6 +165,9 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       case "progress":
         await source.progress(person, m.payload.workItemId, m.payload.text);
         return reply("ack", {});
+      case "session":
+        await source.setSession(person, m.payload.workItemId, m.payload.sessionId);
+        return reply("ack", {});
       case "journal":
         await source.journal(person, m.payload.workItemId, m.payload.text);
         return reply("ack", {});

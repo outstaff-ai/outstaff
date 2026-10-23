@@ -134,6 +134,12 @@ export const messageSchema = z.discriminatedUnion("type", [
     z.strictObject({
       workItem: workItemSchema.describe("The item to work on."),
       context: offerContextSchema.describe("What the agent needs to start."),
+      sessionId: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("Runtime session of this item from an earlier round; resume it when present."),
     }),
   ),
   message("accept", z.strictObject({ workItemId: itemId })),
@@ -149,6 +155,13 @@ export const messageSchema = z.discriminatedUnion("type", [
     z.strictObject({ workItemId: itemId.optional().describe("The item being worked on, if any.") }),
   ),
   message("progress", z.strictObject({ workItemId: itemId, text: text })),
+  message(
+    "session",
+    z.strictObject({
+      workItemId: itemId,
+      sessionId: z.string().min(1).max(200).describe("Id of the runtime session working the item."),
+    }),
+  ),
   message("journal", z.strictObject({ workItemId: itemId, text: text })),
   message(
     "handback",

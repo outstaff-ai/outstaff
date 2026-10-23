@@ -17,6 +17,7 @@ export interface FakeSource extends WorkSource {
 
   /** Every call the server made, as `method:person:id`. */
   calls: string[];
+  sessions: Map<string, string>;
   journalLines: { id: string; text: string }[];
   handBacks: { id: string; summary: string; links: Link[]; status: string }[];
   failNext(error: Error): void;
@@ -25,6 +26,7 @@ export interface FakeSource extends WorkSource {
 export function createFakeSource(members: Member[] = []): FakeSource {
   const items = new Map<string, { person: string; offer: Offer; state: State; title: string }>();
   const calls: string[] = [];
+  const sessions = new Map<string, string>();
   const journalLines: FakeSource["journalLines"] = [];
   const handBacks: FakeSource["handBacks"] = [];
   let failure: Error | undefined;
@@ -55,6 +57,7 @@ export function createFakeSource(members: Member[] = []): FakeSource {
 
   return {
     calls,
+    sessions,
     journalLines,
     handBacks,
     failNext: (e) => {
@@ -103,6 +106,15 @@ export function createFakeSource(members: Member[] = []): FakeSource {
     },
     async progress(person, id) {
       record("progress", person, id);
+    },
+    async setSession(person, id, sessionId) {
+      record("session", person, id);
+      find(person, id);
+      sessions.set(id, sessionId);
+      const it = items.get(id);
+      if (it) {
+        it.offer = { ...it.offer, sessionId };
+      }
     },
     async journal(person, id, text) {
       record("journal", person, id);
