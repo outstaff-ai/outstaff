@@ -7,7 +7,7 @@ export const CONFIG_CODES = {
   tooBig: "schema.too_big",
   unknownKey: "schema.unknown_key",
   invalid: "schema.invalid",
-  catalogInvalidRange: "catalog.invalid_range",
+  catalogInvalidVersion: "catalog.invalid_version",
   reposDuplicateName: "repos.duplicate_name",
   reposMultiplePrimary: "repos.multiple_primary",
   peopleDuplicateHandle: "people.duplicate_handle",

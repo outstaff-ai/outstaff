@@ -85,7 +85,7 @@
         "version": {
           "type": "string",
           "minLength": 1,
-          "description": "Semver range of the catalog release to use, for example \"^1.0.0\"."
+          "description": "Exact catalog release this team uses, for example \"1.0.0\"; must match the catalog in the agent images."
         },
         "path": {
           "default": "catalog",
