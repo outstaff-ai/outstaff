@@ -3,8 +3,7 @@ import starlight from "@astrojs/starlight";
 import starlightLinksValidator from "starlight-links-validator";
 
 export default defineConfig({
-  site: "https://outstaff-ai.github.io",
-  base: "/outstaff",
+  site: "https://docs.outstaff.work",
   integrations: [
     starlight({
       title: "Outstaff",
