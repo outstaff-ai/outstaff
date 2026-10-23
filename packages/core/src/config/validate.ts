@@ -77,6 +77,13 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
     "A person has a write grant but no vcs integration supports pull requests.",
   "integrations.unknown_adapter":
     "An integration names an adapter that is not installed for that port.",
+  "workflow.duplicate_rule_id": "Two workflow rules share the same id.",
+  "workflow.unknown_rule": "A rule is disabled by id but the preset has no rule with that id.",
+  "workflow.unknown_template":
+    "A rule refers to a template that is neither built in nor defined in workflow.templates.",
+  "workflow.unknown_placeholder":
+    "A workflow template is malformed or uses a variable that does not exist.",
+  "workflow.duplicate_status_name": "Two canonical statuses map to the same tracker status name.",
   "capability.missing": "A role needs a capability that no configured integration provides.",
   "capability.optional_missing":
     "A role can use a capability that no configured integration provides.",
