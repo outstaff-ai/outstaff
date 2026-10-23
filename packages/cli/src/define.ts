@@ -1,4 +1,5 @@
-import type { ConfigFs, GitClient } from "@outstaff/core";
+import type { AgentEnv, OfficeClient } from "@outstaff/agent";
+import type { AdapterRegistry, ConfigFs, GitClient } from "@outstaff/core";
 
 /** Everything a command touches outside its own arguments, so tests can run commands in-process. */
 export type Context = {
@@ -15,6 +16,15 @@ export type Context = {
   /** Overrides the installed `@outstaff/catalog` package root (tests only). */
   stockCatalogDir?: string;
 
+  /** Adapters available to agent verbs; defaults to the ones this build ships. */
+  registry?: AdapterRegistry;
+
+  /** The office connection for `ask`, `work` and `roster`; none until the office protocol exists. */
+  office?: OfficeClient;
+
+  /** Replaces building the agent environment from the team file (tests only). */
+  agentEnv?: () => Promise<AgentEnv>;
+
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;
 };
@@ -28,6 +38,9 @@ export type OptionDef = {
 
 export type CommandDef<O = Record<string, unknown>> = {
   name: string;
+
+  /** Makes the command `ost <group> <name>`. */
+  group?: string;
   summary: string;
   description: string;
 

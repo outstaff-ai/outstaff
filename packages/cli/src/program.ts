@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { Command, CommanderError } from "@commander-js/extra-typings";
-import { commands } from "./commands/index.js";
+import { commands, groupSummaries } from "./commands/index.js";
 import type { Context, GlobalOptions } from "./define.js";
 
 const pkgUrl = new URL("../package.json", import.meta.url);
@@ -41,8 +41,28 @@ export function buildProgram(ctx: Context, setExit: (code: number) => void) {
     .configureOutput({ writeOut: ctx.out, writeErr: ctx.err })
     .exitOverride();
 
+  const groups = new Map<string, Command>();
+  const parentOf = (group: string | undefined) => {
+    if (!group) {
+      return program;
+    }
+
+    let g = groups.get(group);
+    if (!g) {
+      g = program
+        .command(group)
+        .description(groupSummaries[group] ?? group)
+        .exitOverride()
+        .configureOutput({ writeOut: ctx.out, writeErr: ctx.err });
+
+      groups.set(group, g as unknown as Command);
+    }
+
+    return g;
+  };
+
   for (const def of commands) {
-    const cmd = program
+    const cmd = parentOf(def.group)
       .command(def.args ? `${def.name} ${def.args}` : def.name)
       .description(def.summary)
       .exitOverride()
@@ -54,7 +74,11 @@ export function buildProgram(ctx: Context, setExit: (code: number) => void) {
 
     cmd.action(async (...args: unknown[]) => {
       const self = args.at(-1) as Command;
-      const positional = args.slice(0, -2).map(String);
+      const positional = args
+        .slice(0, -2)
+        .filter((a) => a !== undefined)
+        .map(String);
+
       setExit(await def.run(ctx, self.optsWithGlobals() as GlobalOptions, positional));
     });
   }

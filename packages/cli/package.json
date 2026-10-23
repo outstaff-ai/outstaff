@@ -24,8 +24,10 @@
   },
   "dependencies": {
     "@commander-js/extra-typings": "15.0.0",
+    "@outstaff/agent": "workspace:*",
     "@outstaff/catalog": "workspace:*",
     "@outstaff/core": "workspace:*",
+    "@outstaff/vcs-github": "workspace:*",
     "commander": "15.0.0"
   },
   "devDependencies": {

@@ -121,3 +121,370 @@ ost init
 ost init --separate-repo
 ost init --force
 ```
+
+## ost ticket show
+
+Show a ticket with its description and comments.
+
+Shows a ticket: title, status, assignee, labels, description and its comments, with the ticket URL.
+
+```
+ost ticket show <key>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket show ACME-12
+ost ticket show ACME-12 --json
+```
+
+## ost ticket comment
+
+Add a comment to a ticket.
+
+Adds a comment to a ticket and returns the link to it.
+
+```
+ost ticket comment <key> <body>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket comment ACME-12 "Pull request is up for review."
+ost ticket comment ACME-12 "Pull request is up for review." --json
+```
+
+## ost ticket move
+
+Move a ticket to another status.
+
+Moves a ticket to a canonical status (backlog, ready, active, review, blocked, done, canceled). The tracker's own status names are mapped by the team's workflow settings.
+
+```
+ost ticket move <key> <to>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket move ACME-12 review
+ost ticket move ACME-12 review --json
+```
+
+## ost ticket assign
+
+Assign a ticket to a member, to yourself or to nobody.
+
+Assigns a ticket. "to" is a tracker member (username, name or id), "me" for yourself, or "none" to unassign.
+
+```
+ost ticket assign <key> <to>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket assign ACME-12 me
+ost ticket assign ACME-12 none
+ost ticket assign ACME-12 me --json
+```
+
+## ost doc search
+
+Search the knowledge base.
+
+Searches documents by text and lists the matches with their URLs.
+
+```
+ost doc search <query> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--limit <limit>` | Maximum number of results. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost doc search "checkout flow"
+ost doc search "checkout flow" --json
+```
+
+## ost doc show
+
+Show a document and its comments.
+
+Shows a document's text and its comment threads, with ids you can reply to or resolve.
+
+```
+ost doc show <id>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost doc show specs/checkout.md
+ost doc show specs/checkout.md --json
+```
+
+## ost doc create
+
+Create a document.
+
+Creates a new document. It never overwrites: an existing path is a conflict.
+
+```
+ost doc create <path> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--title <title>` | Document title. |
+| `--body <body>` | Document text, Markdown. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"
+ost doc create specs/checkout.md --title "Checkout" --body "# Checkout" --json
+```
+
+## ost doc reply
+
+Reply to a comment on a document.
+
+Replies to a comment thread on a document.
+
+```
+ost doc reply <doc> <commentId> <body>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost doc reply specs/checkout.md c-3 "Done, see the new section."
+ost doc reply specs/checkout.md c-3 "Done, see the new section." --json
+```
+
+## ost doc resolve
+
+Resolve a comment thread on a document.
+
+Marks a comment thread on a document as resolved.
+
+```
+ost doc resolve <doc> <commentId>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost doc resolve specs/checkout.md c-3
+ost doc resolve specs/checkout.md c-3 --json
+```
+
+## ost pr status
+
+Show a pull request's state, checks and open review threads.
+
+Shows a pull request: state, mergeability, checks and how many review threads are still open, with URLs.
+
+```
+ost pr status <repo> <number>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr status shop 42
+ost pr status shop 42 --json
+```
+
+## ost pr threads
+
+List the review threads of a pull request.
+
+Lists the review threads of a pull request with their ids, locations, comments and URLs. Open threads only unless all is set.
+
+```
+ost pr threads <repo> <number> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--all` | Include resolved threads. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr threads shop 42
+ost pr threads shop 42 --all
+ost pr threads shop 42 --json
+```
+
+## ost pr resolve
+
+Resolve a review thread whose last comment is yours.
+
+Resolves a review thread after you have replied. It refuses when the last comment in the thread is not yours; the reviewer resolves those.
+
+```
+ost pr resolve <repo> <number> <thread>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr resolve shop 42 PRT_abc123
+ost pr resolve shop 42 PRT_abc123 --json
+```
+
+## ost me
+
+Show who you are on this team.
+
+Shows your handle, role, repository grants and which integrations this team has connected.
+
+```
+ost me
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost me
+ost me --json
+```
+
+## ost ask
+
+Ask a teammate a question through the office.
+
+Asks another person of the team a question. The office routes it; the answer may come later, as a new message in your work item.
+
+```
+ost ask <to> <question>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ask mira "Should the cart survive a deploy?"
+ost ask mira "Should the cart survive a deploy?" --json
+```
+
+## ost work
+
+List your work items.
+
+Lists the work items the office has scheduled for you, with their tickets and pull requests.
+
+```
+ost work
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost work
+ost work --json
+```
+
+## ost roster
+
+List the team and what everyone is doing.
+
+Lists the people of the team with their roles and current status.
+
+```
+ost roster
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost roster
+ost roster --json
+```

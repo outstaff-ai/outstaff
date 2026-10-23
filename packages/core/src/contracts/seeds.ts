@@ -37,6 +37,9 @@ export interface NewSeedPullRequest {
 
 export interface VcsSeed {
   repo: RepoRef;
+
+  /** The login the subject acts as when `resolveThread` gets no login; the kit skips that case when unset. */
+  selfLogin?: string;
   pullRequest(repo: RepoRef, pr: NewSeedPullRequest): Promise<PullRequest>;
 
   /** Push a new commit to the PR branch (emits `pr.synchronize`). */

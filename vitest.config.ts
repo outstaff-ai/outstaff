@@ -8,6 +8,14 @@ const coreAlias = [
   { find: /^@outstaff\/core\/contracts$/, replacement: core("contracts/index.ts") },
   { find: /^@outstaff\/core\/fakes$/, replacement: core("fakes/index.ts") },
   { find: /^@outstaff\/core$/, replacement: core("index.ts") },
+  {
+    find: /^@outstaff\/agent$/,
+    replacement: fileURLToPath(new URL("packages/agent/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@outstaff\/vcs-github$/,
+    replacement: fileURLToPath(new URL("packages/vcs-github/src/index.ts", import.meta.url)),
+  },
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office"];
@@ -18,11 +26,7 @@ export default defineConfig({
     projects: [
       ...packages.map((pkg) => ({
         // Packages import each other as compiled libs; tests use the sources so they need no build first.
-        resolve: {
-          alias: {
-            "@outstaff/core": fileURLToPath(new URL("packages/core/src/index.ts", import.meta.url)),
-          },
-        },
+        resolve: { alias: coreAlias },
         test: {
           name: pkg,
           root: `packages/${pkg}`,

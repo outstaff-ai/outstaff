@@ -7,6 +7,7 @@
   "sortPackageJson": false,
   "ignorePatterns": [
     "docs/src/content/docs/reference/cli.md",
+    "docs/src/content/docs/reference/agent-verbs.md",
     "docs/src/content/docs/reference/team-yaml.md",
     "docs/src/content/docs/reference/validation-codes.md",
     "**/__golden__",
