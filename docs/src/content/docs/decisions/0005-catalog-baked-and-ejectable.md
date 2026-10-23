@@ -17,7 +17,7 @@ Most teams want working roles out of the box. Some need to change a skill, or re
 - **Eject:** `ost eject <role|skill|reference|--all>` copies files to `.outstaff/catalog/` in the client repository and records the catalog version each file came from.
   - Ejected files win over stock files with the same path.
   - The client builds their own image `FROM` the outstaff image and runs `ost build`, which validates and renders the ejected content.
-- **Custom roles:** a client can add roles the stock catalog doesn't have, in `.outstaff/catalog/roles/<role>/` (`role.yaml`, `SKILL.md`, `agent.md`). They merge with the stock roles. A custom role can `extends` stock roles to reuse their skills. `ost role new <name> [--from <role>]` scaffolds one. A role that needs tools beyond the stock toolsets runs on the client's own image, built `FROM` the outstaff image.
+- **Custom roles:** a client can add roles the stock catalog doesn't have, in `.outstaff/catalog/roles/<role>/` (`role.yaml`, `SKILL.md`). They merge with the stock roles. A custom role can `extends` stock roles to reuse their skills. `ost role new <name> [--from <role>]` scaffolds one. A role that needs tools beyond the stock toolsets runs on the client's own image, built `FROM` the outstaff image.
 - **Upgrade:** `ost upgrade` merges each ejected file three ways: its recorded base, the new catalog and the client's copy. Conflicts appear as ordinary conflict markers. `ost diff` shows what an ejected file changed.
 - **Placeholders are strict.** Rendering fails on an unknown placeholder, so typos never reach an agent.
 

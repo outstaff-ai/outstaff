@@ -1,0 +1,14 @@
+# EXAMPLE ONLY: a tiny role used by the loader tests. Real roles are added separately.
+name: example
+title: Example Role
+summary: Shows the catalog format; not a real role.
+toolset: base
+permissions: readonly
+needs:
+  - tracker.issues
+optional_needs:
+  - knowledge.docs
+default_model: example-model
+modes:
+  - name: review
+    when: A pull request needs a second pair of eyes.

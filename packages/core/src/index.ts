@@ -43,3 +43,5 @@ export {
 } from "./config/validate.js";
 
 export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";
+
+export * from "./catalog/index.js";
