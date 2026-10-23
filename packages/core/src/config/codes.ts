@@ -15,6 +15,7 @@ export const CONFIG_CODES = {
   peopleUnknownRepo: "people.unknown_repo",
   emailMissingPlaceholder: "email.missing_placeholder",
   usageThresholdOrder: "policies.usage_threshold_order",
+  policiesCommandProgram: "policies.command_program",
   adapterInvalidOptions: "integrations.invalid_options",
   notFound: "config.not_found",
   yamlSyntax: "config.yaml_syntax",

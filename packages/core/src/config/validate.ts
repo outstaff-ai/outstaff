@@ -69,6 +69,8 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "people.unknown_repo": "A repo grant names a repo that is not listed in repos.",
   "email.missing_placeholder": "email.pattern does not contain {handle}.",
   "policies.usage_threshold_order": "defer_scheduled_at is higher than pause_automatic_at.",
+  "policies.command_program":
+    "A policies.commands entry names git, which repository grants govern.",
   "integrations.invalid_options": "An integration's options are rejected by its adapter.",
   "people.unknown_role": "A person's role is not in the catalog.",
   "people.unknown_extends": "An extends entry names a role that is not in the catalog.",

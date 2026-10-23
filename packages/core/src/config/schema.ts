@@ -1,6 +1,7 @@
 import { valid } from "semver";
 import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
+import { teamCommandsSchema } from "../permissions/schema.js";
 import { customIssue } from "./issues.js";
 
 const d = (description: string) => ({ description });
@@ -197,6 +198,7 @@ const policiesSchema = z
       })
       .default({ max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] })
       .meta(d("How agents write chat messages.")),
+    commands: teamCommandsSchema.optional(),
   })
   .meta(d("Team-wide guardrails and message style."));
 

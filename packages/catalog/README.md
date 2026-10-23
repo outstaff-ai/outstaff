@@ -25,3 +25,7 @@ Which values a file sees depends on its kind:
 Every file gets the same context: `team`, `repos`, `people` (and `people.byRole`), `integrations`, `links` and `policies`. There is no `person`: a skill describes how a role works, so it reads the same for everyone in that role. Who the agent is (name, handle, role, team) is built from data by the runtime when the agent starts, not templated here. Using `{{ person.* }}` anywhere is an error.
 
 Rendering is strict: an unknown path (also in `#if`), a bad tag or an unbalanced block fails with `file:line:column`. The full list of values is the `CatalogContext` type in `@outstaff/core`. `packages/catalog/roles/example` is a tiny example for tests, not a real role.
+
+## Toolsets
+
+`toolsets/<name>.yaml` holds command permission rules for a family of tools, matching the image variants: `code` (language toolchains) and `infra` (read-only terraform, kubectl and helm verbs). Core loads them with `loadToolset()` and `toolsetToPack()` and merges the result into `buildPolicy({ packs })`. Teams add their own tools under `policies.commands` in `team.yaml`.
