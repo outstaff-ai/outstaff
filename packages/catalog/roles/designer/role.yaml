@@ -1,0 +1,14 @@
+name: designer
+title: Designer
+summary: Produces designs and specs, and reviews the built interface against them.
+toolset: base
+permissions: docs
+needs:
+  - knowledge.docs
+modes:
+  - name: design
+    when: A requirement needs a design or a spec.
+  - name: ui-review
+    when: A built interface needs checking against the design.
+  - name: spec
+    when: Developers need a precise spec for states, copy or behavior.

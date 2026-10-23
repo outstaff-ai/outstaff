@@ -15,7 +15,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { loadCatalog } from "../catalog/load.js";
 import { parseTeamConfig } from "../config/parse.js";
 import type { TeamConfig } from "../config/schema.js";
-import { readAcmeTeam } from "../testing/fixtures.js";
+import { EXAMPLE_CATALOG_DIR, readAcmeTeam } from "../testing/fixtures.js";
 import { renderPerson, renderTeam, RenderError } from "./render.js";
 import { renderToDir } from "./write.js";
 
@@ -33,13 +33,14 @@ const acme: TeamConfig = (() => {
   return r.config;
 })();
 
-/** The stock catalog only ships the example role, so every acme person plays it. */
+/** The fixture catalog only has the example role, so every acme person plays it. */
 const asExample: TeamConfig = {
   ...acme,
   people: acme.people.map((p) => ({ ...p, role: "example", extends: undefined })),
 };
 
-const stock = loadCatalog(CATALOG_PKG);
+const real = loadCatalog(CATALOG_PKG);
+const stock = loadCatalog(EXAMPLE_CATALOG_DIR);
 
 let n = 0;
 const make = (files: Record<string, string>): string => {
@@ -66,7 +67,7 @@ const dump = (files: Map<string, string>): string =>
 describe("golden output per acme person", () => {
   for (const person of acme.people) {
     it(`${person.handle}`, () => {
-      const result = renderPerson({ team: asExample, handle: person.handle, catalog: stock });
+      const result = renderPerson({ team: acme, handle: person.handle, catalog: real });
       const file = join(GOLDEN, `${person.handle}.txt`);
       const actual = dump(result.files);
       if (process.env.UPDATE_GOLDEN === "1") {

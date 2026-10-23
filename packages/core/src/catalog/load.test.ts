@@ -9,7 +9,8 @@ import { CatalogError, type CatalogIssue } from "./codes.js";
 import { loadCatalog } from "./load.js";
 import { render } from "./template.js";
 import { parse } from "yaml";
-import { readAcmeTeam } from "../testing/fixtures.js";
+import { CAPABILITIES } from "../capabilities.js";
+import { EXAMPLE_CATALOG_DIR, readAcmeTeam } from "../testing/fixtures.js";
 
 const CATALOG_PKG = fileURLToPath(new URL("../../../catalog", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "outstaff-catalog-"));
@@ -53,7 +54,7 @@ const issuesOf = (dir: string, opts = {}): CatalogIssue[] => {
 };
 
 describe("loadCatalog on the example role", () => {
-  const catalog = loadCatalog(CATALOG_PKG);
+  const catalog = loadCatalog(EXAMPLE_CATALOG_DIR);
   it("reads the version, role fields and defaults", () => {
     expect(catalog.version).toBe("0.0.0");
     const r = catalog.roles.example;
@@ -89,6 +90,51 @@ describe("loadCatalog on the example role", () => {
     expect(out).toContain("The main repository is shop.");
     expect(out).toContain("- 0: shop\n- 1: infra");
   });
+});
+
+describe("the stock roles", () => {
+  const catalog = loadCatalog(CATALOG_PKG);
+  const LAUNCH = ["pm", "product", "architect", "designer", "developer", "reviewer", "devops"];
+
+  it("ships exactly the seven launch roles", () => {
+    expect(Object.keys(catalog.roles).toSorted()).toEqual(LAUNCH.toSorted());
+  });
+
+  it("validates every role.yaml against real capabilities and roles", () => {
+    for (const r of Object.values(catalog.roles)) {
+      for (const need of [...r.needs, ...r.optional_needs]) {
+        expect(CAPABILITIES, `${r.name} needs ${need}`).toContain(need);
+      }
+
+      for (const e of r.extends ?? []) {
+        expect(catalog.roles[e], `${r.name} extends ${e}`).toBeDefined();
+      }
+
+      expect(r.skill.text.length).toBeGreaterThan(200);
+    }
+  });
+
+  const parsed = parseTeamConfig(parse(readAcmeTeam()));
+  if (!parsed.ok) {
+    throw new Error("acme invalid");
+  }
+
+  for (const withTracker of [true, false]) {
+    it(`renders every role skill strictly (tracker: ${withTracker})`, () => {
+      const base = buildContext(parsed.config, { roles: infos(catalog) });
+      const ctx = {
+        ...base,
+        integrations: {
+          ...base.integrations,
+          has: { ...base.integrations.has, tracker: withTracker },
+        },
+      };
+
+      for (const r of Object.values(catalog.roles)) {
+        expect(() => render(r.skill.text, ctx, { file: r.skill.file })).not.toThrow();
+      }
+    });
+  }
 });
 
 describe("shared catalog files", () => {

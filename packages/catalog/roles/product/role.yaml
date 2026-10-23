@@ -1,0 +1,14 @@
+name: product
+title: Product
+summary: Writes requirements and acceptance criteria, and reviews solutions against them.
+toolset: base
+permissions: docs
+needs:
+  - knowledge.docs
+modes:
+  - name: requirements
+    when: A request needs requirements and acceptance criteria.
+  - name: solution-review
+    when: A design or solution needs checking against the requirements.
+  - name: clarify
+    when: Someone asks what is in or out of scope.

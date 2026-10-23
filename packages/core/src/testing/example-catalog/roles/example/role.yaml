@@ -1,4 +1,4 @@
-# EXAMPLE ONLY: a tiny role used by the loader tests. Real roles are added separately.
+# A tiny role used by the loader and render tests (test fixture, not a real role).
 name: example
 title: Example Role
 summary: Shows the catalog format; not a real role.

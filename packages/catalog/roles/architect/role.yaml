@@ -1,0 +1,20 @@
+name: architect
+title: Architect
+summary: Owns architecture docs and solution design, reviews designs and builds the core work.
+toolset: code
+permissions: code
+needs:
+  - vcs.pullRequests
+optional_needs:
+  - knowledge.docs
+extends:
+  - developer
+modes:
+  - name: design
+    when: A change needs a solution design before anyone builds it.
+  - name: design-review
+    when: A design or an architecture-affecting pull request needs review.
+  - name: docs
+    when: Architecture documentation is missing, wrong or out of date.
+  - name: implement
+    when: Core or critical work is assigned to you; follow the developer skill.
