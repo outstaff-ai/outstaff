@@ -13,6 +13,7 @@ export default defineConfig({
         },
       })),
       { test: { name: "scripts", root: "scripts", include: ["*.test.ts"] } },
+      { test: { name: "docs", root: "docs", include: ["scripts/**/*.test.mjs"] } },
     ],
   },
 });
