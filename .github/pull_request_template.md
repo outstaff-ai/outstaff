@@ -10,10 +10,10 @@ Closes #
 
 <!-- Commands you ran and what you checked by hand. -->
 
-- [ ] `pnpm lint && pnpm typecheck && pnpm test && pnpm build`
+- [ ] `pnpm format && pnpm lint && pnpm typecheck && pnpm test && pnpm build`
 
 ## Checklist
 
 - [ ] Docs updated under `docs/` (or not needed for this change)
-- [ ] Changeset added with `pnpm changeset` (or not needed for this change)
+- [ ] Title and commit subject are conventional commits (`type(scope): summary`); they drive the release notes
 - [ ] The PR is one commit (amended, pushed with `--force-with-lease`)

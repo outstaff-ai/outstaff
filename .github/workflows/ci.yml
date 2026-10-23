@@ -47,25 +47,31 @@ jobs:
             exit 1
           fi
 
-  changeset:
+  conventional:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6.1.0
-      - uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: package.json
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Changed published packages have a changeset
+      - name: PR title and commit subjects are conventional commits
         env:
-          BASE: ${{ github.base_ref }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
-          pnpm changeset status --since="origin/$BASE" || {
-            echo "::error::This PR changes a published package without a changeset. Run 'pnpm changeset' (or 'pnpm changeset --empty' when no release is needed) and amend your commit."
-            exit 1
-          }
+          pattern='^(feat|fix|perf|docs|style|refactor|test|build|ci|chore|revert)(\([a-z0-9./-]+\))?!?: .+'
+          bad=0
+          if ! printf '%s' "$TITLE" | grep -Eq "$pattern"; then
+            echo "::error::PR title must be a conventional commit, e.g. 'feat(core): add the loader'. Got: $TITLE"
+            bad=1
+          fi
+          for subject in $(git log --format='%s' "$BASE..$HEAD" | tr ' ' '\001'); do
+            subject=$(printf '%s' "$subject" | tr '\001' ' ')
+            if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
+              echo "::error::Commit subject must be a conventional commit. Got: $subject"
+              bad=1
+            fi
+          done
+          exit $bad

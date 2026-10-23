@@ -30,7 +30,6 @@ pnpm lint        # oxlint
 pnpm typecheck   # TypeScript 7, no emit, in every package
 pnpm test        # vitest, one project per package
 pnpm build       # TypeScript 7: compiled ESM, declarations and source maps in each package's dist/
-pnpm changeset   # record a version bump for a change
 ```
 
 Packages live in `packages/*`: `core`, `catalog`, `cli` (published as `outstaff`), `agent` and `office`.

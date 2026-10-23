@@ -15,7 +15,6 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 | `packages/agent`        | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.      |
 | `docs/`                 | The Starlight documentation site (`@outstaff/docs`), published to GitHub Pages at docs.outstaff.work.                 |
 | `docs/scripts/llms.mjs` | Generates `llms.txt` and `llms-full.txt` into `docs/dist` after the docs build.                                       |
-| `.changeset/`           | Pending version bumps.                                                                                                |
 
 Adapters (tracker, knowledge, vcs, chat, runtime, avatars, mail) are separate packages, one per integration, each implementing a port and checked by a shared contract test kit. They land under `packages/` as the milestones progress.
 
@@ -31,7 +30,6 @@ pnpm test         # vitest, one project per package
 pnpm build        # tsc, ESM + type declarations
 pnpm docs:dev     # docs site with live reload
 pnpm docs:build   # docs site + llms.txt into docs/dist
-pnpm changeset    # record a version bump
 ```
 
 Run lint, typecheck, test and build before opening a PR.
@@ -41,7 +39,7 @@ Run lint, typecheck, test and build before opening a PR.
 - **Code:** TypeScript strict, ESM, no default exports, small modules, tests beside code (`*.test.ts`, vitest). Comments only where the why is not obvious. Match the existing code.
 - **Commits and PRs:** one commit per PR, message `<type>(<scope>): <summary>`. Large changes are split into stacked PRs, each based on the previous one. Do not push to `main` or merge your own PRs.
 - **Docs ship with features:** a change that adds user-facing behaviour adds or updates a page under `docs/src/content/docs/`. The docs build validates internal links.
-- **Changesets:** a change to a published package includes a changeset (`pnpm changeset`).
+- **Releases:** conventional commits drive the version and release notes; all packages share one version. No changeset files.
 - **Public hygiene:** this repo is public. No personal names, usernames, emails, hostnames, internal URLs, or references to other projects or companies. Examples use the synthetic team "acme". Refer to people as "human" or "trusted human"; there is no owner role.
 - **Hosting and secrets are the client's choice.** Do not add host or secret-store adapters. Outstaff defines a container contract and ships guides.
 - **Do not invent commands or flags** in docs. Mark anything not yet implemented as planned, with its milestone.

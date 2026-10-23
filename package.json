@@ -12,13 +12,11 @@
     "build": "pnpm -r run build",
     "docs:build": "pnpm --filter @outstaff/docs build",
     "docs:dev": "pnpm --filter @outstaff/docs dev",
-    "changeset": "changeset",
     "check:versions": "node scripts/versions.mjs check",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "@changesets/cli": "3.0.3",
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "24.19.2",
     "oxfmt": "0.71.0",
