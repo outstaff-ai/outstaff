@@ -13,6 +13,14 @@ export function nodeContext(): Context {
     env: process.env,
     out: (t) => void process.stdout.write(t),
     err: (t) => void process.stderr.write(t),
+    async stdin() {
+      let text = "";
+      for await (const chunk of process.stdin) {
+        text += String(chunk);
+      }
+
+      return text;
+    },
     gitOrigin(cwd) {
       try {
         return (

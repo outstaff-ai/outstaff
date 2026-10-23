@@ -147,6 +147,28 @@ Examples:
 ost workflow explain '{"type":"ticket.assigned","subject":{"ticket":"ACME-1"},"actor":{"kind":"human","id":"dana"}}' --state '{"tickets":{"ACME-1":{"status":"ready","assignee":{"id":"sam","kind":"agent"}}}}'
 ```
 
+## ost git-credential
+
+Git credential helper: gives git a short-lived token for one repository.
+
+Speaks git's credential helper protocol on standard input and output. For `get` it finds the team repository git is talking to, checks the person's grant on it and prints a short-lived token scoped to that repository and grant. `store` and `erase` do nothing, so no token is kept anywhere. Agents set it up per clone (credential.helper); you rarely run it by hand.
+
+```
+ost git-credential <operation>
+```
+
+Exit codes:
+
+- 0: done; for `get` the answer is on standard output, empty when the request is not for a repository the person has a grant on
+- 1: the operation is unknown or the token could not be issued
+
+Examples:
+
+```sh
+git config credential.helper '!ost git-credential'
+printf 'protocol=https\nhost=github.com\npath=acme-example/shop.git\n' | ost git-credential get
+```
+
 ## ost ticket show
 
 Show a ticket with its description and comments.

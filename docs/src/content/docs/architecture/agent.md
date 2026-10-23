@@ -56,3 +56,34 @@ Heartbeats are sent by the office connection itself, at the interval the office 
 One runtime session per work item ([0010](/decisions/0010-context-per-work-item/)). When the runtime starts a session the agent stores its id with the item by sending `session`; the office keeps it and puts it in `sessionId` on every later offer of that item. The agent resumes that session when present and starts a new one otherwise. A session is never used for another item, and nothing is kept on the agent's disk, so a replaced container loses nothing.
 
 Chat threads will get their own sessions ([#43](https://github.com/outstaff-ai/outstaff/issues/43)); the session manager has a marked place for them, and until then only work items have sessions.
+
+## Repositories and credentials
+
+**Cloning.** At startup the agent clones every team repository the person has a grant on into `~/repos/<name>`, or fetches it when the clone is already there. A repository without a grant is never cloned. A repository that cannot be reached is logged and skipped; the others carry on.
+
+**Credentials never sit in the environment or on disk.** Git does not get a token from `GH_TOKEN`, `GITHUB_TOKEN` or a stored file (Claude Code deliberately keeps those two variables when it scrubs subprocess environments, so the agent never relies on them). Each clone is configured with a credential helper, `ost git-credential`. When git needs to authenticate, the helper reads git's request on standard input, finds the team repository it is for, and asks the VCS adapter for a short-lived token for that one repository at the access the person's grant gives. `store` and `erase` do nothing. The clone also resets the helper list first, so a keychain or other global helper never sees the token. Pull request operations go through the `ost pr` verbs, not a `gh` that holds a token.
+
+**Secrets for the helper are files.** Git starts the helper from inside the agent's shell, where Claude Code's subprocess scrub has removed credential-looking variables. So the helper depends only on non-secret environment (`OUTSTAFF_PERSON`, `OUTSTAFF_TEAM_FILE`, `OUTSTAFF_TEAM_REPO`, `OUTSTAFF_TEAM_REF`, `OUTSTAFF_SECRETS_DIR`, `HOME`) and reads every secret it needs, such as the App keys, from files in the secrets directory. It does not fall back to the environment. If a file is missing it fails with: secrets must be provided as files under the secrets directory; env-only secrets are not visible to git's credential helper. Operators therefore mount the secrets they give an agent container as files (the container contract's secrets directory), not only as environment variables.
+
+**The role profile caps the access.** The token is never more than the person's role profile allows. The `readonly` profile gets read tokens even with a write grant, and its clones are read-only for the `pre-push` hook too; `docs`, `code` and `infra` follow the grant (a docs role's file-level limits are enforced by the policy's path rules). Whether a profile honours write grants comes from one place, the profile specs in core. The clone and the helper use the same cap.
+
+**The agent can see a token.** The agent can run `ost git-credential get` itself and read the token. That token is scoped to one repository, at the person's capped grant, and short-lived, so it gives no more than `git push` with the helper already can. Keeping it inside the container is the job of the egress rules, not of the helper.
+
+**Identity.** A write grant uses the person's own App: commits and pushes come from the person's bot, and `user.name` and `user.email` of the clone are taken from the author the credentials report. A read grant uses the office's read-only App, which holds no write permission on any repository.
+
+**Why read access exists.** An agent that reviews, plans or writes documents needs to read code it may not change: the design system a feature follows, the infrastructure repository behind a question, a baseline it must stay compatible with. Giving each person a write App on all of those would be far too much. The safeguards:
+
+- the token comes from a read-only App and is limited to one repository and the `contents: read` permission;
+- the person's grant must cover the repository, and the policy treats the clone as read-only (no commit-changing git commands are allowed in it);
+- a `pre-push` hook in the clone refuses every push from a read repository;
+- what the agent reads there is data, not instructions, like any text that did not come from a trusted human.
+
+**Never the default branch.** The policy already denies pushing to a repository's default branch. As defence in depth every writable clone also has a `pre-push` hook that refuses it. The token's scope is the last line: branch protection on the host is still the client's job.
+
+**Worktree per work item** ([0010](/decisions/0010-context-per-work-item/)). Before each item the agent fetches the repository the item concerns (the one a subject or link names, otherwise the primary repository, otherwise the first one the person may write). Then:
+
+1. On the first round it creates a worktree at `~/worktrees/<repo>/<item>` on a branch named `<kind>/<item-id>-<slug>`, from the up-to-date default branch. If someone has already pushed a branch of that name, the worktree starts from it, so their work is built on and never overwritten. The worktree sits below `~/worktrees/<repo>` because that is where the permission policy allows writes.
+2. On later rounds it reuses the same worktree, with the unfinished work still in it.
+3. When the item is handed back as `done`, the worktree and the scratch directory `~/scratch/<item>` are removed. An item that is `waiting` or blocked keeps both. The branch is never deleted, so commits that were not merged are not lost.
+
+The worktree and scratch directory are added to the runtime's directories, and the prompt names them. The runtime's working directory stays `~/work`, where the rendered skills are.

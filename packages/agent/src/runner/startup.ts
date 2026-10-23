@@ -26,6 +26,12 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
+import {
+  syncRepositories,
+  createWorkspaces,
+  type ClonedRepo,
+  type SyncRepositoriesOptions,
+} from "../repos/index.js";
 import { createAgentEnv } from "../verbs/env.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { buildIdentityPrompt } from "./identity.js";
@@ -51,6 +57,9 @@ export interface StartupOptions {
 
   /** Replaces the WebSocket connection (tests only). */
   connection?: OfficeConnection;
+
+  /** Overrides for cloning: the remote of each repo, the credential helper command, the git runner (tests only). */
+  repositories?: Pick<SyncRepositoriesOptions, "remoteUrl" | "helper" | "git">;
 }
 
 export interface PreparedAgent {
@@ -64,6 +73,9 @@ export interface PreparedAgent {
   policy: Policy;
   systemPrompt: string;
   workdir: string;
+
+  /** The repos cloned for the person, one per grant. */
+  repos: ClonedRepo[];
 }
 
 /** Why the agent cannot start, in words an operator can act on. */
@@ -200,6 +212,21 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     mkdirSync(dir, { recursive: true });
   }
 
+  let repos: ClonedRepo[] = [];
+  if (env.vcs) {
+    repos = await syncRepositories({
+      team,
+      person,
+      vcs: env.vcs,
+      profile: rendered.profile,
+      reposDir: layout.reposDir,
+      log,
+      ...opts.repositories,
+    });
+  } else {
+    log.warn("no vcs adapter, so no repositories are cloned", { reason: env.unavailable?.vcs });
+  }
+
   const files = runtimeDef.workdirLayout
     ? runtimeDef.workdirLayout(rendered.files)
     : rendered.files;
@@ -261,6 +288,12 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     policy,
     builtinTools: [...PROFILE_SPECS[rendered.profile].tools],
     workdir: layout.workDir,
+    workspaces: createWorkspaces({
+      layout,
+      repos,
+      log,
+      ...(opts.repositories?.git ? { git: opts.repositories.git } : {}),
+    }),
     addDirs: [layout.reposDir, layout.worktreesDir, layout.scratchDir, layout.memoryDir],
     ...(model ? { model } : {}),
     log,
@@ -277,5 +310,6 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     policy,
     systemPrompt,
     workdir: layout.workDir,
+    repos,
   };
 }

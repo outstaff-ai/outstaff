@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
 import { FakeSocket, createManualClock, type ManualClientClock } from "../office-client/testing.js";
 import { fakeEnv } from "../verbs/testing.js";
+import type { Workspaces } from "../repos/index.js";
 import { createWorkLoop, linksIn, type WorkLoop } from "./loop.js";
 
 /** An office that acknowledges everything and says a question is still open. */
@@ -109,7 +110,10 @@ describe("work loop", () => {
     await conn.whenConnected();
   }
 
-  function start(runtime: Runtime, extra: { progressEveryMs?: number } = {}) {
+  function start(
+    runtime: Runtime,
+    extra: { progressEveryMs?: number; workspaces?: Workspaces } = {},
+  ) {
     const { env } = fakeEnv();
     const policy = buildPolicy({
       profile: "readonly",
@@ -189,6 +193,71 @@ describe("work loop", () => {
     await loop.stop();
     await conn.stop();
     await running;
+  });
+
+  it("works in the item's worktree and removes it only when the item is done", async () => {
+    await connect();
+    const released: string[] = [];
+    const workspaces: Workspaces = {
+      async prepare(o) {
+        return {
+          repo: "shop",
+          worktree: `/home/sam/worktrees/shop/${o.workItem.id}`,
+          branch: `ticket/${o.workItem.id}`,
+          scratch: `/home/sam/scratch/${o.workItem.id}`,
+        };
+      },
+      async release(id) {
+        released.push(id);
+      },
+    };
+
+    const asks: Runtime = {
+      async *run(req) {
+        if (req.workItemId === "w2") {
+          await req.tools
+            .find((t) => t.name === "ask")!
+            .handler({ to: "mira", question: "Which queue?" }, { workItemId: "w2" });
+        }
+
+        yield { type: "finished", ok: true, text: "ok" };
+      },
+    };
+
+    const requests: RunRequest[] = [];
+    const runtime: Runtime = {
+      run(req) {
+        requests.push(req);
+        return asks.run(req);
+      },
+    };
+
+    start(runtime, { workspaces });
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+    socket.offerWith("w2");
+    await until(() => sentOf("handback").length === 2);
+
+    expect(requests[0]?.workdir).toBe("/home/sam/work");
+    expect(requests[0]?.addDirs).toEqual([
+      "/home/sam/repos",
+      "/home/sam/worktrees/shop/w1",
+      "/home/sam/scratch/w1",
+    ]);
+
+    expect(requests[0]?.prompt).toContain(
+      "worktree for this item is /home/sam/worktrees/shop/w1 (repository shop, branch ticket/w1)",
+    );
+
+    expect(sentOf("handback").map((m) => (m.payload as { status: string }).status)).toEqual([
+      "done",
+      "waiting",
+    ]);
+
+    // w2 is waiting for an answer, so its worktree stays for the next round.
+    expect(released).toEqual(["w1"]);
+    await loop.stop();
+    await conn.stop();
   });
 
   it("exposes the verbs as tools, including ask and answer", async () => {
