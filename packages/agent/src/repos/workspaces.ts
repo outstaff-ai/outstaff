@@ -1,0 +1,155 @@
+import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { parseRepoUrl, silentLogger, type Layout, type Logger } from "@outstaff/core";
+import type { OfferedWorkItem } from "@outstaff/protocol";
+import type { Offer } from "../office-client/index.js";
+import type { ClonedRepo } from "./clone.js";
+import { runGit, type RunGit } from "./git.js";
+
+/** The places one work item works in. */
+export interface Workspace {
+  repo: string;
+  worktree: string;
+  branch: string;
+  scratch: string;
+}
+
+export interface Workspaces {
+  /** Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when no repo fits. */
+  prepare(offer: Offer): Promise<Workspace | undefined>;
+
+  /** Removes the item's worktree and scratch directory. The branch stays, so unmerged commits are not lost. */
+  release(workItemId: string): Promise<void>;
+}
+
+const slugify = (text: string, max: number) =>
+  text
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "")
+    .slice(0, max)
+    .replaceAll(/-+$/g, "");
+
+/** Path-safe form of an item id. */
+export const safeId = (id: string) => id.replaceAll(/[^\w.-]/g, "-").replace(/^\.+/, "_");
+
+/** `<kind>/<item-id>-<slug of the title>`, for example `ticket/w42-fix-checkout`. */
+export function branchName(item: Pick<OfferedWorkItem, "id" | "kind" | "title">): string {
+  const kind = slugify(item.kind, 20) || "work";
+  const id = slugify(item.id, 40) || "item";
+  const slug = slugify(item.title, 40);
+  return `${kind}/${id}${slug ? `-${slug}` : ""}`;
+}
+
+/** The repo an item is about: one named by a subject or link, else the primary repo or the first one that can be written. */
+export function repoForItem(offer: Offer, repos: ClonedRepo[]): ClonedRepo | undefined {
+  const urls = [
+    ...offer.context.subjects.map((s) => s.url),
+    ...offer.context.links.map((l) => l.url),
+  ];
+
+  for (const url of urls) {
+    if (!url) {
+      continue;
+    }
+
+    try {
+      const ref = parseRepoUrl(url.replace(/^(https?:\/\/[^/]+\/[^/]+\/[^/]+).*$/, "$1"));
+      const hit = repos.find(
+        (r) =>
+          r.ref.host === ref.host &&
+          r.ref.owner.toLowerCase() === ref.owner.toLowerCase() &&
+          r.ref.name.toLowerCase() === ref.name.toLowerCase(),
+      );
+
+      if (hit) {
+        return hit;
+      }
+    } catch {
+      // Not a repository URL.
+    }
+  }
+
+  const writable = repos.filter((r) => r.access === "write");
+  return writable.find((r) => r.kind === "primary") ?? writable[0];
+}
+
+export interface WorkspacesOptions {
+  layout: Pick<Layout, "worktreesDir" | "scratchDir">;
+  repos: ClonedRepo[];
+  git?: RunGit;
+  log?: Logger;
+}
+
+export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
+  const git = opts.git ?? runGit;
+  const log = opts.log ?? silentLogger;
+  const worktreeOf = (repo: string, id: string) => join(opts.layout.worktreesDir, repo, safeId(id));
+  const scratchOf = (id: string) => join(opts.layout.scratchDir, safeId(id));
+  const has = (cwd: string, ref: string) =>
+    git(["show-ref", "--verify", "--quiet", ref], { cwd }).then(
+      () => true,
+      () => false,
+    );
+
+  return {
+    async prepare(offer) {
+      const item = offer.workItem;
+      const repo = repoForItem(offer, opts.repos);
+      if (!repo) {
+        return undefined;
+      }
+
+      // Fetch first, so a branch someone else updated is built on and never overwritten.
+      await git(["fetch", "--prune", "origin"], { cwd: repo.dir });
+
+      const worktree = worktreeOf(repo.name, item.id);
+      const scratch = scratchOf(item.id);
+      mkdirSync(scratch, { recursive: true });
+
+      if (existsSync(worktree)) {
+        const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })).trim();
+        return { repo: repo.name, worktree, branch, scratch };
+      }
+
+      const branch = branchName(item);
+      mkdirSync(join(opts.layout.worktreesDir, repo.name), { recursive: true });
+      await git(["worktree", "prune"], { cwd: repo.dir });
+      if (await has(repo.dir, `refs/remotes/origin/${branch}`)) {
+        await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${branch}`], {
+          cwd: repo.dir,
+        });
+      } else if (await has(repo.dir, `refs/heads/${branch}`)) {
+        await git(["worktree", "add", worktree, branch], { cwd: repo.dir });
+      } else {
+        await git(
+          ["worktree", "add", "--no-track", "-b", branch, worktree, `origin/${repo.defaultBranch}`],
+          { cwd: repo.dir },
+        );
+      }
+
+      return { repo: repo.name, worktree, branch, scratch };
+    },
+
+    async release(workItemId) {
+      for (const repo of opts.repos) {
+        const worktree = worktreeOf(repo.name, workItemId);
+        if (!existsSync(worktree)) {
+          continue;
+        }
+
+        try {
+          await git(["worktree", "remove", "--force", worktree], { cwd: repo.dir });
+        } catch (e) {
+          log.warn("could not remove a worktree", {
+            workItemId,
+            worktree,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
+      rmSync(scratchOf(workItemId), { recursive: true, force: true });
+    },
+  };
+}

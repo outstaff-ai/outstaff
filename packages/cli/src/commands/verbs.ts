@@ -23,9 +23,9 @@ export const groupSummaries: Record<string, string> = {
 /** The adapters this build can create; teams using others get a clear message from the verbs that need them. */
 export const defaultRegistry = () => new AdapterRegistry().register(githubVcs);
 
-class Failure extends Error {}
+export class Failure extends Error {}
 
-async function buildEnv(ctx: Context, options: GlobalOptions): Promise<AgentEnv> {
+export async function buildEnv(ctx: Context, options: GlobalOptions): Promise<AgentEnv> {
   if (ctx.agentEnv) {
     return ctx.agentEnv();
   }

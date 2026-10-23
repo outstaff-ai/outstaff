@@ -8,6 +8,9 @@ export type Context = {
   out: (text: string) => void;
   err: (text: string) => void;
 
+  /** Everything on standard input; used by `git-credential`. */
+  stdin?: () => Promise<string>;
+
   /** Overrides for the team loader (tests only). */
   fs?: ConfigFs;
   git?: GitClient;

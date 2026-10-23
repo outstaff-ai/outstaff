@@ -8,6 +8,7 @@ import {
 } from "@outstaff/core";
 import type { Link } from "@outstaff/protocol";
 import type { Offer, OfficeConnection } from "../office-client/index.js";
+import type { Workspaces } from "../repos/index.js";
 import { createRuntimeTools } from "../verbs/index.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { buildWorkPrompt } from "./prompt.js";
@@ -30,6 +31,9 @@ export interface WorkLoopOptions {
   builtinTools: ToolKind[];
   workdir: string;
   addDirs: string[];
+
+  /** Per-item worktree and scratch directory. Without it items run in `workdir` alone. */
+  workspaces?: Workspaces;
   model?: string;
   maxTurns?: number;
   sessions?: SessionManager;
@@ -90,6 +94,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   async function work(offer: Offer, abort: AbortController) {
     const id = offer.workItem.id;
     const sessionId = sessions.resumeFor(offer);
+    const workspace = await opts.workspaces?.prepare(offer);
 
     // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
     let asked = false;
@@ -111,10 +116,13 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     const request: RunRequest = {
       ...(sessionId ? { sessionId } : {}),
       workItemId: id,
-      prompt: buildWorkPrompt(offer, { resumed: sessionId !== undefined }),
+      prompt: buildWorkPrompt(offer, {
+        resumed: sessionId !== undefined,
+        ...(workspace ? { workspace } : {}),
+      }),
       systemPrompt: opts.systemPrompt,
       workdir: opts.workdir,
-      addDirs: opts.addDirs,
+      addDirs: workspace ? [...opts.addDirs, workspace.worktree, workspace.scratch] : opts.addDirs,
       policy: opts.policy,
       tools: createRuntimeTools(env),
       builtinTools: opts.builtinTools,
@@ -173,11 +181,19 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     }
 
     const text = outcome.text || lastText;
+    const status = asked ? "waiting" : "done";
     await opts.office.handBack(id, {
       summary: text || "Finished without a message.",
       links: linksIn(text),
-      status: asked ? "waiting" : "done",
+      status,
     });
+
+    // Waiting and blocked items keep their worktree for the next round.
+    if (status === "done") {
+      await opts.workspaces?.release(id).catch((err) => {
+        log.warn("could not clean up after an item", { workItemId: id, error: reason(err) });
+      });
+    }
   }
 
   async function handle(offer: Offer) {

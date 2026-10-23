@@ -1,13 +1,16 @@
-import { PortError } from "@outstaff/core";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { AdapterRegistry, PortError } from "@outstaff/core";
 import { VERBS, cliPath, createAgentEnv, createFakeOffice } from "@outstaff/agent";
-import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
+import { createFakeAdapterRegistry, createFakeVcs } from "@outstaff/core/fakes";
 import { envSecretSource } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { acmeTeam, fakeEnv } from "../../agent/src/verbs/testing.js";
 import type { Context } from "./define.js";
 import { run } from "./program.js";
 
-async function ost(args: string[], f = fakeEnv(), env: Record<string, string> = {}) {
+async function ost(args: string[], f = fakeEnv(), env: Record<string, string> = {}, stdin = "") {
   let out = "";
   let err = "";
   const ctx: Context = {
@@ -16,6 +19,7 @@ async function ost(args: string[], f = fakeEnv(), env: Record<string, string> = 
     out: (t) => void (out += t),
     err: (t) => void (err += t),
     gitOrigin: () => undefined,
+    stdin: async () => stdin,
     agentEnv: async () => f.env,
   };
 
@@ -159,5 +163,122 @@ describe("ost verbs", () => {
     });
 
     expect(PortError).toBeTypeOf("function");
+  });
+
+  describe("git-credential", () => {
+    const request = (path: string) => `protocol=https\nhost=github.com\npath=${path}\n\n`;
+    const repo = (name: string) => ({ host: "github.com", owner: "acme-example", name });
+    const team = (role: string) => `
+version: 1
+team: { name: acme, product: Acme Shop }
+humans:
+  - { name: Ada Admin, identities: { chat: U1 } }
+catalog: { version: 0.0.0 }
+repos:
+  - { name: shop, url: github.com/acme-example/shop, kind: primary }
+  - { name: infra, url: github.com/acme-example/infra, kind: infra }
+  - { name: design-system, url: github.com/acme-example/design-system, kind: baseline }
+people:
+  - { handle: sam, name: Sam Duarte, role: ${role}, repos: { shop: write, "kind:baseline": read } }
+integrations:
+  chat: { adapter: fake }
+  vcs: { adapter: fake }
+  runtime: { adapter: fake }
+`;
+
+    /** The real command path: team file on disk, a vcs adapter that needs a secret, secrets only as files. */
+    async function helper(
+      op: string,
+      stdin: string,
+      o: { role?: string; files?: boolean; env?: Record<string, string> } = {},
+    ) {
+      const dir = mkdtempSync(join(tmpdir(), "ost-gc-"));
+      mkdirSync(join(dir, "team", ".outstaff"), { recursive: true });
+      writeFileSync(join(dir, "team", ".outstaff", "team.yaml"), team(o.role ?? "developer"));
+      mkdirSync(join(dir, "secrets"));
+      if (o.files !== false) {
+        writeFileSync(join(dir, "secrets", "FAKE_APP_KEY"), "k\n");
+      }
+
+      const vcs = createFakeVcs({ host: "github.com" });
+      await vcs.seed.permission(repo("shop"), "sam", "write");
+      await vcs.seed.permission(repo("design-system"), "sam", "read");
+      const fake = createFakeAdapterRegistry().get("vcs", "fake")!;
+      const registry = new AdapterRegistry().register({
+        ...fake,
+        create: async ({ secrets }) => {
+          secrets.require("FAKE_APP_KEY");
+          return vcs;
+        },
+      });
+
+      let out = "";
+      let err = "";
+      const code = await run(["git-credential", op], {
+        cwd: dir,
+        env: {
+          OUTSTAFF_PERSON: "sam",
+          OUTSTAFF_TEAM_FILE: join(dir, "team"),
+          OUTSTAFF_SECRETS_DIR: join(dir, "secrets"),
+          ...o.env,
+        },
+        out: (t) => void (out += t),
+        err: (t) => void (err += t),
+        gitOrigin: () => undefined,
+        stdin: async () => stdin,
+        registry,
+      });
+
+      return { code, out, err };
+    }
+
+    it("prints a token scoped to the granted repo for get", async () => {
+      const r = await helper("get", request("acme-example/shop.git"));
+      expect(r.code).toBe(0);
+      expect(r.out).toContain("username=x-access-token\npassword=fake-token-sam-write\n");
+    });
+
+    it("works with none of the secret keys in the environment, only the files", async () => {
+      // The env has no FAKE_APP_KEY; the file under the secrets directory is enough.
+      const r = await helper("get", request("acme-example/design-system.git"), { env: {} });
+      expect(r.out).toContain("password=fake-token-sam-read\n");
+    });
+
+    it("does not take secrets from the environment and says what to do", async () => {
+      const r = await helper("get", request("acme-example/shop.git"), {
+        files: false,
+        env: { FAKE_APP_KEY: "from-env" },
+      });
+
+      expect(r.code).toBe(1);
+      expect(r.out).toBe("");
+      expect(r.err).toContain("secrets must be provided as files under");
+      expect(r.err).toContain("env-only secrets are not visible to git's credential helper");
+    });
+
+    it("caps a write grant by the role profile", async () => {
+      // reviewer is a readonly role in the stock catalog; pm is docs and follows the grant.
+      const readonly = await helper("get", request("acme-example/shop.git"), { role: "reviewer" });
+      expect(readonly.out).toContain("password=fake-token-sam-read\n");
+
+      const docs = await helper("get", request("acme-example/shop.git"), { role: "pm" });
+      expect(docs.out).toContain("password=fake-token-sam-write\n");
+    });
+
+    it("prints nothing for a repo without a grant, and nothing for store or erase", async () => {
+      expect(await helper("get", request("acme-example/infra.git"))).toMatchObject({
+        code: 0,
+        out: "",
+      });
+
+      for (const op of ["store", "erase"]) {
+        const r = await helper(op, `${request("acme-example/shop")}password=x\n`);
+        expect(r).toMatchObject({ code: 0, out: "", err: "" });
+      }
+    });
+
+    it("fails when the operation is unknown", async () => {
+      expect((await helper("frobnicate", "")).code).toBe(1);
+    });
   });
 });

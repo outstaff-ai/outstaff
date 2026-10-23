@@ -103,6 +103,10 @@ describe("prepareAgent", () => {
       expect(existsSync(join(home, d))).toBe(true);
     }
 
+    // The fake host grants sam nothing, so nothing is cloned.
+    expect(agent.repos).toEqual([]);
+    expect(existsSync(join(home, "repos/shop"))).toBe(false);
+
     expect(agent.systemPrompt).toContain("You are Sam Duarte (@sam, they/them), the Developer");
     expect(agent.policy.profile).toBe("code");
     expect(agent.policy.git.repos[join(home, "worktrees/shop")]).toBe("write");

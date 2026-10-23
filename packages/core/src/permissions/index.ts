@@ -3,6 +3,7 @@ export {
   commandRules,
   repoGrant,
   PROFILE_SPECS,
+  profileAllowsWrite,
   type BuildPolicyInput,
   type PermissionPerson,
   type PermissionTeam,

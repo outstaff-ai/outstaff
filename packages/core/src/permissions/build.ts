@@ -224,6 +224,10 @@ export function commandRules(spec: ProfileSpec): CommandRule[] {
   return rules;
 }
 
+/** Whether a profile honours write grants; the one place that decides it. */
+export const profileAllowsWrite = (profile: Profile): boolean =>
+  PROFILE_SPECS[profile].honoursWrite;
+
 /** The grant a person has on a repo: by name, then `kind:<kind>`, then `*`. */
 export function repoGrant(
   person: Pick<PermissionPerson, "repos">,

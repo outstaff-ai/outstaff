@@ -1,7 +1,11 @@
 import type { Offer } from "../office-client/index.js";
+import type { Workspace } from "../repos/index.js";
 
 /** The user prompt of a run, from what the office sent with the offer. */
-export function buildWorkPrompt(offer: Offer, opts: { resumed: boolean }): string {
+export function buildWorkPrompt(
+  offer: Offer,
+  opts: { resumed: boolean; workspace?: Workspace },
+): string {
   const { workItem: item, context } = offer;
   const lines = [
     `Work item ${item.id} (${item.kind}): ${item.title}`,
@@ -33,6 +37,14 @@ export function buildWorkPrompt(offer: Offer, opts: { resumed: boolean }): strin
     for (const j of context.journal) {
       lines.push(`- ${j.at} ${j.author}: ${j.text}`);
     }
+  }
+
+  if (opts.workspace) {
+    const w = opts.workspace;
+    lines.push(
+      "",
+      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, branch ${w.branch}). Commit there and push that branch; never push to the default branch. Scratch space: ${w.scratch}.`,
+    );
   }
 
   lines.push(
