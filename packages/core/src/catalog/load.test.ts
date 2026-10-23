@@ -97,7 +97,14 @@ describe("loadCatalog errors", () => {
   });
 
   it("rejects a directory that is not a catalog", () => {
-    expect(issuesOf(make({}))[0]).toMatchObject({ code: "catalog.not_found" });
+    expect(issuesOf(join(root, "missing"))[0]).toMatchObject({ code: "catalog.not_found" });
+  });
+
+  it("accepts a catalog with only some folders", () => {
+    const c = loadCatalog(make({ "references/r.md": "ref" }));
+    expect(Object.keys(c.roles)).toEqual([]);
+    expect(Object.keys(c.references)).toEqual(["r"]);
+    expect(Object.keys(loadCatalog(make({})).roles)).toEqual([]);
   });
 
   it("requires a version", () => {

@@ -12,6 +12,9 @@ export type Context = {
   git?: GitClient;
   cacheDir?: string;
 
+  /** Overrides the installed `@outstaff/catalog` package root (tests only). */
+  stockCatalogDir?: string;
+
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;
 };
@@ -27,6 +30,9 @@ export type CommandDef<O = Record<string, unknown>> = {
   name: string;
   summary: string;
   description: string;
+
+  /** Positional arguments in commander syntax, for example "<handle>". */
+  args?: string;
   options: OptionDef[];
   examples: string[];
 
@@ -34,7 +40,7 @@ export type CommandDef<O = Record<string, unknown>> = {
   exitCodes: string[];
 
   /** Resolves to the process exit code. */
-  run: (ctx: Context, options: O & GlobalOptions) => Promise<number>;
+  run: (ctx: Context, options: O & GlobalOptions, args: string[]) => Promise<number>;
 };
 
 export function defineCommand<O>(def: CommandDef<O>): CommandDef {

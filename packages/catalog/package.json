@@ -22,6 +22,10 @@
   },
   "files": [
     "dist",
+    "process",
+    "references",
+    "roles",
+    "templates",
     "toolsets"
   ],
   "scripts": {

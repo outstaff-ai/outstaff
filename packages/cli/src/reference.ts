@@ -39,7 +39,7 @@ export function renderCliReference(): string {
       c.description,
       "",
       "```",
-      `ost ${c.name}${c.options.length ? " [options]" : ""}`,
+      `ost ${c.name}${c.args ? ` ${c.args}` : ""}${c.options.length ? " [options]" : ""}`,
       "```",
     );
 

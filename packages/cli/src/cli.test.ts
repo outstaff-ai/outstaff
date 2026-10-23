@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ACME_TEAM_FILE,
@@ -26,7 +26,40 @@ function project(name = `p${n++}`, team?: string) {
   return dir;
 }
 
-async function ost(cwd: string, args: string[], origin?: string) {
+const roleFiles = (name: string) => ({
+  [`roles/${name}/role.yaml`]: `name: ${name}\ntitle: ${name}\nsummary: s\ntoolset: base\npermissions: docs\n`,
+  [`roles/${name}/SKILL.md`]: `Skill of ${name} at {{team.name}}.\n`,
+});
+
+/** Writes a catalog from {relative path: text}. */
+function catalogDir(name: string, files: Record<string, string>, withVersion = true) {
+  const dir = join(root, name);
+  for (const [rel, text] of Object.entries({
+    ...(withVersion ? { "package.json": '{"version":"0.0.0"}' } : {}),
+    ...files,
+  })) {
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    writeFileSync(join(dir, rel), text);
+  }
+
+  return dir;
+}
+
+/** A stock catalog with the roles the acme team uses; the shipped package has only an example role. */
+const ACME_ROLES = ["pm", "product", "architect", "designer", "developer", "reviewer", "devops"];
+const stockFixture = catalogDir(
+  "stock",
+  Object.assign({}, ...ACME_ROLES.map(roleFiles), {
+    "references/style.md": "Style at {{team.name}}.\n",
+  }),
+);
+
+async function ost(
+  cwd: string,
+  args: string[],
+  origin?: string,
+  stockCatalogDir: string | undefined = stockFixture,
+) {
   let out = "";
   let err = "";
   const ctx: Context = {
@@ -35,6 +68,7 @@ async function ost(cwd: string, args: string[], origin?: string) {
     out: (t) => void (out += t),
     err: (t) => void (err += t),
     gitOrigin: () => origin,
+    ...(stockCatalogDir ? { stockCatalogDir } : {}),
   };
 
   const code = await run(args, ctx);
@@ -246,5 +280,120 @@ describe("cli reference", () => {
     );
 
     expect(committed).toBe(renderCliReference());
+  });
+});
+
+describe("ost render", () => {
+  const sam = ["render", "sam"];
+
+  it("lists the files with sizes", async () => {
+    const r = await ost(acme(), sam);
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("skills/developer/SKILL.md");
+    expect(r.out).toContain("references/style.md");
+    expect(r.out).toMatch(/\d+ files \(pass --out/);
+  });
+
+  it("renders from the installed package root", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
+      /role: (?!example)\w+/g,
+      "role: example",
+    );
+
+    const r = await ost(project(undefined, team), sam, undefined, "");
+    expect(r.err).toBe("");
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("skills/example/SKILL.md");
+  });
+
+  it("lets an ejected role replace the stock one", async () => {
+    const cwd = acme();
+    catalogDir(join(cwd.slice(root.length + 1), ".outstaff", "catalog"), {
+      ...roleFiles("developer"),
+      "roles/developer/SKILL.md": "Ejected developer.\n",
+    });
+
+    const r = await ost(cwd, [...sam, "--json"]);
+    const files = (JSON.parse(r.out) as { files: { path: string; content: string }[] }).files;
+    expect(files.find((f) => f.path.endsWith("developer/SKILL.md"))?.content).toBe(
+      "Ejected developer.\n",
+    );
+  });
+
+  it("accepts an ejected dir with only some folders", async () => {
+    const cwd = acme();
+    catalogDir(join(cwd.slice(root.length + 1), ".outstaff", "catalog"), {
+      "references/extra.md": "Extra.\n",
+    });
+
+    const r = await ost(cwd, [...sam, "--json"]);
+    expect(r.code).toBe(0);
+    const paths = (JSON.parse(r.out) as { files: { path: string }[] }).files.map((f) => f.path);
+    expect(paths).toContain("references/extra.md");
+    expect(paths).toContain("references/style.md");
+  });
+
+  it("writes to --out and refuses a non-empty directory without --force", async () => {
+    const cwd = acme();
+    const first = await ost(cwd, [...sam, "--out", "work"]);
+    expect(first.code).toBe(0);
+    expect(readFileSync(join(cwd, "work", "references", "style.md"), "utf8")).toBe(
+      "Style at acme.\n",
+    );
+
+    const again = await ost(cwd, [...sam, "--out", "work"]);
+    expect(again.code).toBe(1);
+    expect(again.err).toContain("not empty");
+    expect((await ost(cwd, [...sam, "--out", "work", "--force"])).code).toBe(0);
+  });
+
+  it("prints paths and contents with --json", async () => {
+    const r = await ost(acme(), [...sam, "--json"]);
+    const json = JSON.parse(r.out) as Record<string, unknown> & {
+      files: { path: string; bytes: number; content: string }[];
+    };
+
+    expect(Object.keys(json).toSorted()).toEqual(
+      ["extends", "files", "handle", "out", "role", "warnings"].toSorted(),
+    );
+
+    expect(json).toMatchObject({ handle: "sam", out: null });
+    const f = json.files.find((x) => x.path === "references/style.md");
+    expect(f).toEqual({
+      path: "references/style.md",
+      bytes: 15,
+      content: "Style at acme.\n",
+    });
+  });
+
+  it("fails for an unknown person", async () => {
+    const r = await ost(acme(), ["render", "nobody"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain('Unknown person "nobody"');
+  });
+});
+
+describe("roles from the merged catalog", () => {
+  const withRole = (role: string) =>
+    project(
+      undefined,
+      readFileSync(ACME_TEAM_FILE, "utf8").replace("role: reviewer", `role: ${role}`),
+    );
+
+  it("knows a client-only role from the ejected catalog", async () => {
+    const cwd = withRole("auditor");
+    catalogDir(join(cwd.slice(root.length + 1), ".outstaff", "catalog"), roleFiles("auditor"));
+    expect((await ost(cwd, ["validate"])).code).toBe(0);
+    expect((await ost(cwd, ["team"])).code).toBe(0);
+  });
+
+  it("rejects an unknown role in validate and team", async () => {
+    const cwd = withRole("auditor");
+    const v = await ost(cwd, ["validate"]);
+    expect(v.code).toBe(1);
+    expect(v.out).toContain('Role "auditor" is not in the catalog.');
+    const t = await ost(cwd, ["team"]);
+    expect(t.code).toBe(1);
+    expect(t.err).toContain('Role "auditor" is not in the catalog.');
   });
 });

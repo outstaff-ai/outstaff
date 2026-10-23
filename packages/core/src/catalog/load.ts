@@ -29,7 +29,8 @@ const subdirs = (dir: string): string[] =>
 
 /**
  * Loads a catalog directory: `roles/<role>/{role.yaml,SKILL.md}`,
- * `process/*.md`, `references/*.md`, `templates/*.md`. `profiles/` is reserved
+ * `process/*.md`, `references/*.md`, `templates/*.md`. Every folder is optional,
+ * so an ejected catalog may hold only some of them. `profiles/` is reserved
  * and ignored. Throws CatalogError listing every problem with file:line:column.
  */
 export function loadCatalog(dir: string, options: LoadCatalogOptions = {}): Catalog {
@@ -65,8 +66,8 @@ export function loadCatalog(dir: string, options: LoadCatalogOptions = {}): Cata
     return { name, file, text };
   };
 
-  if (!existsSync(join(dir, "roles"))) {
-    add(CATALOG_CODES.notFound, 'Not a catalog: no "roles" directory.', dir);
+  if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+    add(CATALOG_CODES.notFound, "Not a catalog: the directory does not exist.", dir);
     throw new CatalogError(issues);
   }
 
