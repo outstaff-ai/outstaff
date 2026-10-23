@@ -1,0 +1,12 @@
+name: code
+description: Language toolchains for build, test and lint. Matches the code image variant.
+profiles: [code, infra]
+rules:
+  - program: [pnpm, npm, yarn]
+    verbs: [install, ci, test, run, lint, build, typecheck]
+    reason: Package manager script or install.
+  - program: npx
+    verbs: [tsc, vitest, oxlint, eslint, prettier]
+    reason: Runs a local build, test or lint tool.
+  - program: [node, tsc, vitest, oxlint, eslint, prettier, cargo, go, python3, make]
+    reason: Build, test or lint tool.

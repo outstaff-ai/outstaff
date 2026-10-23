@@ -46,3 +46,5 @@ export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";
 
 export * from "./catalog/index.js";
 export * from "./render/index.js";
+
+export * from "./permissions/index.js";

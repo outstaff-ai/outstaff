@@ -1,0 +1,13 @@
+name: infra
+description: Read-only infrastructure CLIs. Applying changes goes through a pull request. Matches the infra image variant.
+profiles: [infra]
+rules:
+  - program: terraform
+    verbs: [init, validate, fmt, plan, show]
+    reason: Does not change infrastructure.
+  - program: kubectl
+    verbs: [get, describe, logs, diff]
+    reason: Read-only.
+  - program: helm
+    verbs: [template, lint]
+    reason: Local rendering only.

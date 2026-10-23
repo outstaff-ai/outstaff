@@ -516,6 +516,307 @@
             }
           },
           "additionalProperties": false
+        },
+        "commands": {
+          "type": "object",
+          "properties": {
+            "allow": {
+              "description": "Commands agents may run.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "program": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[^\\s/]+$",
+                    "description": "Program name, for example make. Git is governed by repository grants."
+                  },
+                  "subcommand": {
+                    "description": "Leading positional words, for example [\"pr\", \"view\"].",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "args": {
+                    "description": "Every condition must hold for the rule to apply.",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "flag"
+                            },
+                            "names": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": "Flag spellings, for example [-X, --method]."
+                            },
+                            "present": {
+                              "type": "boolean",
+                              "description": "Whether one of the flags must (true) or must not (false) be present."
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "names",
+                            "present"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "flag-value"
+                            },
+                            "names": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": "Flag spellings whose value is checked."
+                            },
+                            "values": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "Values compared case-insensitively."
+                            },
+                            "match": {
+                              "type": "string",
+                              "enum": [
+                                "in",
+                                "not-in"
+                              ],
+                              "description": "Whether the flag value is in or not in `values`."
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "names",
+                            "values",
+                            "match"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "positional"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Position after the subcommand words, from 0."
+                            },
+                            "pattern": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Case-insensitive regular expression the argument matches."
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "index",
+                            "pattern"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "description": "A condition on the command arguments."
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Why the rule exists; shown when it decides a call."
+                  },
+                  "requires_repo": {
+                    "description": "The working repository must have at least this grant.",
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "write"
+                    ]
+                  }
+                },
+                "required": [
+                  "program",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "description": "A command rule."
+              }
+            },
+            "deny": {
+              "description": "Commands agents may never run. Deny always wins over allow.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "program": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "^[^\\s/]+$",
+                    "description": "Program name, for example make. Git is governed by repository grants."
+                  },
+                  "subcommand": {
+                    "description": "Leading positional words, for example [\"pr\", \"view\"].",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "args": {
+                    "description": "Every condition must hold for the rule to apply.",
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "flag"
+                            },
+                            "names": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": "Flag spellings, for example [-X, --method]."
+                            },
+                            "present": {
+                              "type": "boolean",
+                              "description": "Whether one of the flags must (true) or must not (false) be present."
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "names",
+                            "present"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "flag-value"
+                            },
+                            "names": {
+                              "minItems": 1,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": "Flag spellings whose value is checked."
+                            },
+                            "values": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              },
+                              "description": "Values compared case-insensitively."
+                            },
+                            "match": {
+                              "type": "string",
+                              "enum": [
+                                "in",
+                                "not-in"
+                              ],
+                              "description": "Whether the flag value is in or not in `values`."
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "names",
+                            "values",
+                            "match"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "positional"
+                            },
+                            "index": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Position after the subcommand words, from 0."
+                            },
+                            "pattern": {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "Case-insensitive regular expression the argument matches."
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "index",
+                            "pattern"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ],
+                      "description": "A condition on the command arguments."
+                    }
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Why the rule exists; shown when it decides a call."
+                  },
+                  "requires_repo": {
+                    "description": "The working repository must have at least this grant.",
+                    "type": "string",
+                    "enum": [
+                      "read",
+                      "write"
+                    ]
+                  }
+                },
+                "required": [
+                  "program",
+                  "reason"
+                ],
+                "additionalProperties": false,
+                "description": "A command rule."
+              }
+            }
+          },
+          "additionalProperties": false,
+          "description": "Extra commands for this team's own tools, on top of the built-in and toolset rules."
         }
       },
       "additionalProperties": false,
