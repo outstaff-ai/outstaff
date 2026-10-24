@@ -1,0 +1,117 @@
+name: Release
+
+# Run by hand from main. Versions, notes and the changelog come from the conventional commits
+# since the last v* tag (scripts/release.ts). Order: verify, commit and tag locally, publish
+# to npm, then push. A failed publish leaves main and the tags untouched. The tag push starts
+# the Images workflow, which publishes the ghcr images for the same version.
+# Setup and recovery: docs/src/content/docs/guides/releasing.md
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: "Bump level. auto follows the commits since the last v* tag."
+        type: choice
+        options: [auto, patch, minor, major]
+        default: auto
+      dry_run:
+        description: "Work out the version and notes and verify, but change and publish nothing."
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  id-token: write # npm trusted publishing and provenance
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      LEVEL: ${{ inputs.level }}
+      DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      # RELEASE_TOKEN must be allowed past the main ruleset (see the guide). Using it here
+      # makes the release push and the tag push start other workflows, which GITHUB_TOKEN does not.
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_TOKEN }}
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - run: pnpm install --frozen-lockfile
+
+      - name: Work out the version and notes
+        id: release
+        run: |
+          args=(--level "$LEVEL" --notes-file "$RUNNER_TEMP/notes.md")
+          if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          node scripts/release.ts "${args[@]}" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Nothing to release
+        if: steps.release.outputs.skip == 'true'
+        run: echo "No feat, fix, perf or breaking commits since the last tag." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify
+        if: steps.release.outputs.skip != 'true'
+        run: |
+          pnpm check:versions
+          pnpm format:check
+          pnpm lint
+          pnpm typecheck
+          pnpm test
+          pnpm build
+
+      - name: Commit and tag locally
+        if: steps.release.outputs.skip != 'true' && inputs.dry_run != true
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md packages/*/package.json
+          git commit -m "chore(release): v$VERSION"
+          git tag -a "v$VERSION" -m "v$VERSION"
+
+      - name: Pack
+        if: steps.release.outputs.skip != 'true'
+        run: pnpm -r --filter "./packages/*" pack --pack-destination "$RUNNER_TEMP/tarballs"
+
+      # Re-running after a partial failure is safe: versions already on npm are skipped.
+      - name: Publish to npm
+        if: steps.release.outputs.skip != 'true' && inputs.dry_run != true
+        run: |
+          for tarball in "$RUNNER_TEMP"/tarballs/*.tgz; do
+            name=$(tar -xOzf "$tarball" package/package.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).name')
+            if npm view "$name@${{ steps.release.outputs.version }}" version > /dev/null 2>&1; then
+              echo "$name@${{ steps.release.outputs.version }} is already on npm, skipping"
+              continue
+            fi
+            npm publish "$tarball" --provenance --access public
+          done
+
+      - name: Push the release commit and tag
+        if: steps.release.outputs.skip != 'true' && inputs.dry_run != true
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: git push --atomic origin HEAD:main "refs/tags/$TAG"
+
+      - name: GitHub release
+        if: steps.release.outputs.skip != 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          TAG: ${{ steps.release.outputs.tag }}
+          PRERELEASE: ${{ steps.release.outputs.prerelease }}
+        run: |
+          flags=()
+          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md" "${flags[@]}"
