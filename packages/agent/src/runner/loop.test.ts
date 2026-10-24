@@ -8,6 +8,7 @@ import { fakeEnv } from "../verbs/testing.js";
 import type { Workspaces } from "../repos/index.js";
 import { JOURNAL_PROMPT } from "./journal.js";
 import { createWorkLoop, linksIn, type WorkLoop } from "./loop.js";
+import { createUsageReporter, type UsageReporter } from "./usage.js";
 
 /** An office that acknowledges everything and says a question is still open. */
 class OfficeSocket extends FakeSocket {
@@ -124,7 +125,7 @@ describe("work loop", () => {
 
   function start(
     runtime: Runtime,
-    extra: { progressEveryMs?: number; workspaces?: Workspaces } = {},
+    extra: { progressEveryMs?: number; workspaces?: Workspaces; usage?: UsageReporter } = {},
   ) {
     const { env } = fakeEnv();
     const policy = buildPolicy({
@@ -201,6 +202,46 @@ describe("work loop", () => {
     expect(req.prompt).toContain("Work item w1 (ticket): Fix w1");
     expect(req.prompt).toContain("ticket SHOP-1 Checkout (https://t.acme.example/SHOP-1)");
     expect(req.prompt).toContain("sam: Plan: a");
+
+    await loop.stop();
+    await conn.stop();
+    await running;
+  });
+
+  it("forwards runtime usage events to the office, throttled, and the held one when the item ends", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    const w = (utilization: number) => ({
+      name: "five_hour",
+      utilization,
+      resetsAt: "2030-01-01T05:00:00Z",
+    });
+
+    runtime.enqueue([
+      { type: "usage", windows: [w(0.1)] },
+      { type: "usage", windows: [w(0.2)] },
+      { type: "usage", windows: [w(0.3)] },
+      { type: "usage", windows: [w(0.9)] },
+      { type: "usage", windows: [w(0.92)] },
+      { type: "finish", text: "Done." },
+    ]);
+
+    const reporter = createUsageReporter({
+      send: (windows) => conn.usage(windows),
+      clock,
+    });
+
+    start(runtime, { usage: reporter });
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+
+    // 0.1 goes out; 0.2 and 0.3 are held; 0.9 crosses the defer threshold and goes at once; 0.92 is held and
+    // sent when the item ends.
+    expect(
+      sentOf("usage").map(
+        (m) => (m.payload as { windows: { utilization: number }[] }).windows[0]!.utilization,
+      ),
+    ).toEqual([0.1, 0.9, 0.92]);
 
     await loop.stop();
     await conn.stop();

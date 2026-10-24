@@ -1021,6 +1021,25 @@ Fraction of the usage limit at which all automatic work pauses.
 - Minimum 0
 - Maximum 1
 
+#### policies.usage.shared
+
+Groups of people who use one LLM subscription, as lists of handles. A usage report from any member applies to all of them.
+
+- Type: `list of list of string`
+- Optional
+
+#### policies.usage.shared[]
+
+- Type: `list of string`
+- Optional
+- Minimum items 2
+
+#### policies.usage.shared[][]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 ### policies.messages
 
 How agents write chat messages.

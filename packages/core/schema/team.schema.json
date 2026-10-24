@@ -1125,6 +1125,18 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1
+            },
+            "shared": {
+              "description": "Groups of people who use one LLM subscription, as lists of handles. A usage report from any member applies to all of them.",
+              "type": "array",
+              "items": {
+                "minItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
             }
           },
           "additionalProperties": false

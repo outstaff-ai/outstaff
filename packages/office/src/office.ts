@@ -19,6 +19,7 @@ import {
   type ProtocolServer,
 } from "./protocol/index.js";
 import { recipeFor } from "./recipes.js";
+import { createUsageTracker, type UsageTracker } from "./usage/index.js";
 import { createScheduler, type Scheduler } from "./scheduler/index.js";
 import type { Store, WorkItem } from "./store/types.js";
 import { schedulerWorkSource } from "./work-source.js";
@@ -40,6 +41,9 @@ export interface OfficeOptions {
   /** How often the work state rescans open pull requests. */
   refreshIntervalMs?: number;
   staleAfterMinutes?: number;
+
+  /** Minutes after which a usage report counts as unknown. Default 30. */
+  usageStaleAfterMinutes?: number;
   officeVersion?: string;
 }
 
@@ -84,6 +88,7 @@ export interface Office {
     workState: WorkState;
     engine: Engine;
     scheduler: Scheduler;
+    usage: UsageTracker;
     server: ProtocolServer;
     ports: OfficePorts;
   };
@@ -131,12 +136,23 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       : {}),
   });
 
-  // TODO: the agent protocol has no usage report yet; until the runtime sends one, the usage policy sees no windows.
+  // Agents report their runtime's usage windows over the protocol; the scheduler reads them back from here.
+  const usage = createUsageTracker({
+    store,
+    team,
+    clock,
+    logger: log,
+    ...(o.usageStaleAfterMinutes === undefined
+      ? {}
+      : { staleAfterMinutes: o.usageStaleAfterMinutes }),
+  });
+
   const baseScheduler = createScheduler({
     store,
     team,
     clock,
     logger: log,
+    usage,
     ...(o.staleAfterMinutes === undefined ? {} : { staleAfterMinutes: o.staleAfterMinutes }),
   });
 
@@ -270,6 +286,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     logger: log,
     roles,
     humans,
+    usage: (person) => usage.summary(person),
     notify,
     ...(ports.chat ? { chat: ports.chat } : {}),
     ...(ports.tracker ? { tracker: ports.tracker } : {}),
@@ -278,6 +295,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   server = createProtocolServer({
     source,
     messaging,
+    usage,
     auth: agentAuthFromSecrets(
       input.secrets,
       team.people.map((p) => p.handle),
@@ -323,7 +341,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const stop = () => (stopping ??= halt());
 
   return {
-    parts: { intake, workState, engine, scheduler, server: protocol, ports },
+    parts: { intake, workState, engine, scheduler, usage, server: protocol, ports },
 
     async start() {
       if (state !== "created") {

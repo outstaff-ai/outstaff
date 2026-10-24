@@ -103,6 +103,9 @@ export interface OfficeConnection extends OfficeClient {
     result: { summary: string; links?: Link[]; status: "done" | "waiting" | "blocked" },
   ): Promise<void>;
   fail(workItemId: string, reason: string): Promise<void>;
+
+  /** Reports the runtime's usage windows; the office keeps the latest. */
+  usage(windows: PayloadOf<"usage">["windows"]): Promise<void>;
   answer(questionId: string, answer: string): Promise<void>;
 }
 
@@ -467,6 +470,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
     },
 
+    usage: (windows) => ack("usage", { windows }),
     answer: (questionId, answer) => ack("answer", { questionId, answer }),
 
     async ask(q): Promise<OfficeAnswer> {

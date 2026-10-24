@@ -18,6 +18,9 @@ export interface OfficeTeamMember {
   summary?: string;
   status: "idle" | "working" | "paused" | "offline";
   current?: string;
+
+  /** The busiest recent LLM usage window, when the office knows it. */
+  usage?: { window: string; utilization: number; resetsAt?: string };
 }
 
 export interface OfficeTeam {

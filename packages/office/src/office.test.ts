@@ -293,6 +293,51 @@ describe("createOffice", () => {
     expect(await office.health()).toMatchObject({ ok: false, state: "stopped" });
   });
 
+  it("holds agent-triggered work above pause_automatic_at while a human chat request still runs", async () => {
+    const sam = connect("sam");
+    await sam.whenConnected();
+    await sam.usage([{ name: "five_hour", utilization: 0.97, resetsAt: "2030-01-01T03:00:00Z" }]);
+
+    await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "review",
+      title: "Review from a teammate",
+      trigger: "agent",
+    });
+
+    await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "chat",
+      title: "Quick question from Dana",
+      trigger: "human",
+    });
+
+    const offer = await next(sam);
+    expect(offer.workItem).toMatchObject({ kind: "chat", trigger: "human" });
+    await sam.accept(offer.workItem.id);
+    await sam.handBack(offer.workItem.id, { summary: "Answered.", status: "done" });
+
+    // The automatic item is still held, and says why.
+    const held = (await store.listItems({ person: "sam", status: "queued" }))[0]!;
+    expect(held.trigger).toBe("agent");
+    expect(await office.parts.scheduler.isPausedFor("sam", held)).toMatchObject({
+      code: "usage_pause",
+    });
+
+    const roster = await sam.team();
+    expect(roster.members.find((m) => m.handle === "sam")?.usage).toEqual({
+      window: "five_hour",
+      utilization: 0.97,
+      resetsAt: "2030-01-01T03:00:00Z",
+    });
+
+    expect(roster.members.find((m) => m.handle === "mira")?.usage).toBeUndefined();
+
+    // Lower usage lets it through.
+    await sam.usage([{ name: "five_hour", utilization: 0.2 }]);
+    expect(await office.parts.scheduler.isPausedFor("sam", held)).toBeNull();
+  });
+
   it("keeps whether an item was accepted across a reconnect", async () => {
     const sam = connect("sam");
     await sam.whenConnected();

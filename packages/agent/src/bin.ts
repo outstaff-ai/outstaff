@@ -47,6 +47,7 @@ try {
 
     stopping = true;
     log.info("stopping", { signal });
+    agent.usage.stop();
     agent.loop
       .stop()
       .then(() => agent.connection.stop())
@@ -60,6 +61,7 @@ try {
   log.info("connecting to the office", { person: agent.person });
   await agent.connection.whenConnected();
   log.info("connected");
+  agent.usage.start();
   await agent.loop.run();
   await agent.connection.stop();
   process.exitCode = agent.connection.rejection() ? 1 : 0;

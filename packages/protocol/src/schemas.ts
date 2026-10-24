@@ -77,6 +77,18 @@ export const workSummarySchema = z.strictObject({
   current: z.boolean().optional().describe("True for the item the caller asked about."),
 });
 
+export const usageWindowSchema = z.strictObject({
+  name: z.string().min(1).max(50).describe("Which limit, for example five_hour or seven_day."),
+  utilization: z.number().min(0).describe("Fraction of the limit used; 1 is the limit."),
+  resetsAt: z.string().optional().describe("ISO-8601 time at which the window resets."),
+});
+
+export const memberUsageSchema = z.strictObject({
+  window: z.string().describe("The busiest window."),
+  utilization: z.number().describe("Fraction of that window's limit used."),
+  resetsAt: z.string().optional().describe("ISO-8601 time at which that window resets."),
+});
+
 export const memberSchema = z.strictObject({
   handle: z.string(),
   name: z.string(),
@@ -85,6 +97,9 @@ export const memberSchema = z.strictObject({
   summary: z.string().optional().describe("One line on what the role does."),
   status: z.enum(MEMBER_STATUSES),
   current: z.string().optional().describe("What the person is working on."),
+  usage: memberUsageSchema
+    .optional()
+    .describe("The person's busiest LLM usage window, when it was reported recently."),
 });
 
 export const humanSchema = z.strictObject({
@@ -162,6 +177,15 @@ export const messageSchema = z.discriminatedUnion("type", [
       sessionId: z.string().min(1).max(200).describe("Id of the runtime session working the item."),
     }),
   ),
+  message(
+    "usage",
+    z.strictObject({
+      windows: z
+        .array(usageWindowSchema)
+        .max(20)
+        .describe("The runtime's current LLM usage windows; replaces the earlier report."),
+    }),
+  ),
   message("journal", z.strictObject({ workItemId: itemId, text: text })),
   message(
     "handback",
@@ -227,6 +251,8 @@ export type JournalLine = z.infer<typeof journalEntrySchema>;
 export type OfferedWorkItem = z.infer<typeof workItemSchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
+export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
+export type MemberUsage = z.infer<typeof memberUsageSchema>;
 export type Human = z.infer<typeof humanSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type AnswerState = z.infer<typeof answerStateSchema>;

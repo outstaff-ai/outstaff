@@ -34,6 +34,15 @@ describe("protocol", () => {
     expect(decode(encode(m))).toEqual({ ok: true, message: m });
   });
 
+  it("carries usage windows and refuses malformed ones", () => {
+    const windows = [{ name: "five_hour", utilization: 0.4, resetsAt: "2030-01-01T05:00:00Z" }];
+    const m = { id: "1", type: "usage", payload: { windows } } as const;
+    expect(decode(encode(m))).toEqual({ ok: true, message: m });
+    expect(
+      decode('{"id":"1","type":"usage","payload":{"windows":[{"name":"x","utilization":-1}]}}'),
+    ).toMatchObject({ ok: false, code: "invalid_message" });
+  });
+
   it.each([
     ["not json", "{", "malformed", undefined],
     ["an array", "[]", "malformed", undefined],

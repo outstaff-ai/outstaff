@@ -41,6 +41,7 @@ import type { AgentEnv } from "../verbs/types.js";
 import { buildIdentityPrompt } from "./identity.js";
 import { agentLayout } from "./layout.js";
 import { createWorkLoop, type WorkLoop } from "./loop.js";
+import { createUsageReporter, type UsageReporter } from "./usage.js";
 
 export interface StartupOptions {
   /** The container environment: OUTSTAFF_PERSON, OUTSTAFF_OFFICE_URL and the team location variables. */
@@ -59,6 +60,9 @@ export interface StartupOptions {
   secrets?: SecretSource;
   log?: Logger;
 
+  /** Milliseconds between usage probes while idle. Default 600000 (10 minutes). */
+  usageProbeEveryMs?: number;
+
   /** Replaces the WebSocket connection (tests only). */
   connection?: OfficeConnection;
 
@@ -74,6 +78,9 @@ export interface PreparedAgent {
   team: TeamConfig;
   connection: OfficeConnection;
   loop: WorkLoop;
+
+  /** Forwards usage to the office. Not started by `prepareAgent`: call `start()` once connected. */
+  usage: UsageReporter;
   env: AgentEnv;
   runtime: Runtime;
   rendered: RenderedWorkdir;
@@ -326,8 +333,25 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   });
 
   const model = me.model ?? role?.default_model;
+  const thresholds = team.policies?.usage;
+  const usage = createUsageReporter({
+    send: (windows) => connection.usage(windows),
+    runtime,
+    ...(thresholds
+      ? {
+          thresholds: {
+            defer_scheduled_at: thresholds.defer_scheduled_at,
+            pause_automatic_at: thresholds.pause_automatic_at,
+          },
+        }
+      : {}),
+    ...(opts.usageProbeEveryMs === undefined ? {} : { probeEveryMs: opts.usageProbeEveryMs }),
+    log,
+  });
+
   const loop = createWorkLoop({
     office: connection,
+    usage,
     runtime,
     env,
     systemPrompt,
@@ -350,6 +374,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     team,
     connection,
     loop,
+    usage,
     env,
     runtime,
     rendered,

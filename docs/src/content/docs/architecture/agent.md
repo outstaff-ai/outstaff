@@ -52,6 +52,14 @@ Heartbeats are sent by the office connection itself, at the interval the office 
 
 **Restarts.** The office lists accepted, unfinished items when the agent reconnects, but it cannot re-send their context. At startup the agent sends `decline` for each of them. That puts the item back in the queue untouched: no failure or attempt is counted, and the next offer carries the journal and the stored session.
 
+## Usage
+
+The runtime knows how close the person's LLM subscription is to its limits; the office does not. The agent forwards that to the office with the `usage` message so the [usage policy](/architecture/office/#usage-policy) can hold automatic work:
+
+- Every usage event of a running item is forwarded, but at most once a minute. A report that would be skipped is held and sent when the item ends. A report that moves the busiest window across `policies.usage.defer_scheduled_at` or `pause_automatic_at`, up or down, is sent at once.
+- While no item is running the agent asks the runtime's `probeUsage` (capability `runtime.usage`) when it connects and then every 10 minutes (`usageProbeEveryMs`), and forwards the result. A runtime without it only reports during work.
+- A failed report is logged and dropped; the next one replaces it.
+
 ## Sessions
 
 One runtime session per work item ([0010](/decisions/0010-context-per-work-item/)). When the runtime starts a session the agent stores its id with the item by sending `session`; the office keeps it and puts it in `sessionId` on every later offer of that item. The agent resumes that session when present and starts a new one otherwise. A session is never used for another item, and nothing is kept on the agent's disk, so a replaced container loses nothing.

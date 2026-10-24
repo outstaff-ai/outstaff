@@ -1,4 +1,4 @@
-import type { Human, Member } from "@outstaff/protocol";
+import type { Human, Member, MemberUsage } from "@outstaff/protocol";
 import type { TeamConfig } from "@outstaff/core";
 import type { Store } from "../store/types.js";
 
@@ -16,6 +16,9 @@ export interface RosterOptions {
 
   /** Trusted humans when team.yaml lists none (then they come from repo writers and chat members). */
   humans?: () => Promise<Human[]>;
+
+  /** The person's busiest recent usage window, when known. */
+  usage?: (person: string) => Promise<MemberUsage | undefined>;
 }
 
 export interface Roster {
@@ -43,10 +46,21 @@ export async function readRoster(opts: RosterOptions): Promise<Roster> {
   const active = await opts.store.listItems({ status: "active" });
   const pauses = await opts.store.listPauses();
   const teamPaused = pauses.some((p) => p.scope === "team");
+  const usages = new Map<string, MemberUsage>();
+  if (opts.usage) {
+    for (const p of opts.team.people) {
+      const usage = await opts.usage(p.handle);
+      if (usage) {
+        usages.set(p.handle, usage);
+      }
+    }
+  }
+
   const members = opts.team.people.map((p): Member => {
     const item = active.find((i) => i.person === p.handle);
     const paused = teamPaused || pauses.some((x) => x.scope === `person:${p.handle}`);
     const info = infoOf(opts.roles, p.role);
+    const usage = usages.get(p.handle);
     return {
       handle: p.handle,
       name: p.name,
@@ -55,6 +69,7 @@ export async function readRoster(opts: RosterOptions): Promise<Roster> {
       ...(info ? { summary: info.summary } : {}),
       status: item ? "working" : paused ? "paused" : "idle",
       ...(item ? { current: item.title } : {}),
+      ...(usage ? { usage } : {}),
     };
   });
 

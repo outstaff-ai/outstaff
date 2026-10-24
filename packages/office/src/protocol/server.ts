@@ -23,6 +23,9 @@ export const CLOSE_REPLACED = 4409;
 export interface ProtocolServerOptions {
   source: WorkSource;
   messaging?: Messaging;
+
+  /** Receives the usage windows agents report. Without it a report is refused as unsupported. */
+  usage?: { report(person: string, windows: PayloadOf<"usage">["windows"]): Promise<void> };
   auth: AgentAuth;
   clock: Clock;
   logger?: Logger;
@@ -164,6 +167,13 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         return reply("ack", {});
       case "progress":
         await source.progress(person, m.payload.workItemId, m.payload.text);
+        return reply("ack", {});
+      case "usage":
+        if (!opts.usage) {
+          throw new ProtocolError("unsupported", "This office does not take usage reports.");
+        }
+
+        await opts.usage.report(person, m.payload.windows);
         return reply("ack", {});
       case "session":
         await source.setSession(person, m.payload.workItemId, m.payload.sessionId);

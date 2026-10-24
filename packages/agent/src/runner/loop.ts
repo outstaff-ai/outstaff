@@ -13,6 +13,7 @@ import { createRuntimeTools } from "../verbs/index.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import { buildWorkPrompt } from "./prompt.js";
+import type { UsageReporter } from "./usage.js";
 import { createSessionManager, type SessionManager } from "./sessions.js";
 
 /** What the loop uses of the office connection. Heartbeats are sent by the connection itself while an item is accepted. */
@@ -46,6 +47,9 @@ export interface WorkLoopOptions {
   model?: string;
   maxTurns?: number;
   sessions?: SessionManager;
+
+  /** Gets the usage events of the runtime and learns when the agent is busy. */
+  usage?: Pick<UsageReporter, "observe" | "flush" | "setBusy">;
   log?: Logger;
 
   /** Least time between two progress messages for an item. Default 30000. */
@@ -174,6 +178,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
                 log.warn("could not send progress", { workItemId: id, error: reason(err) });
               });
             }
+          } else if (e.type === "usage") {
+            opts.usage?.observe(e);
           } else if (e.type === "finished") {
             outcome = e;
           }
@@ -288,6 +294,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       abort.abort();
     }
 
+    opts.usage?.setBusy(true);
     try {
       await work(offer, abort);
     } catch (e) {
@@ -295,6 +302,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       await opts.office.fail(id, reason(e)).catch(() => {});
     } finally {
       active = undefined;
+      opts.usage?.setBusy(false);
+      opts.usage?.flush();
     }
   }
 

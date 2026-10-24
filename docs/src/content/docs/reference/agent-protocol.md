@@ -149,6 +149,19 @@ Sent by: agent. Answered by: `ack`, `error`.
 | `workItemId` | string | yes      | Id of the work item.                        |
 | `sessionId`  | string | yes      | Id of the runtime session working the item. |
 
+### `usage`
+
+Reports the LLM usage windows the runtime sees. The office keeps the latest report per person (and for people who share a subscription) and uses it for the usage policy.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field                   | Type            | Required | Description                                                           |
+| ----------------------- | --------------- | -------- | --------------------------------------------------------------------- |
+| `windows`               | list of objects | yes      | The runtime's current LLM usage windows; replaces the earlier report. |
+| `windows[].name`        | string          | yes      | Which limit, for example five_hour or seven_day.                      |
+| `windows[].utilization` | number          | yes      | Fraction of the limit used; 1 is the limit.                           |
+| `windows[].resetsAt`    | string          | no       | ISO-8601 time at which the window resets.                             |
+
 ### `journal`
 
 Appends a line to the item's journal, which later rounds start from.
@@ -236,18 +249,22 @@ The team.
 
 Sent by: office.
 
-| Field               | Type                                         | Required | Description                                       |
-| ------------------- | -------------------------------------------- | -------- | ------------------------------------------------- |
-| `members`           | list of objects                              | yes      |                                                   |
-| `members[].handle`  | string                                       | yes      |                                                   |
-| `members[].name`    | string                                       | yes      |                                                   |
-| `members[].role`    | string                                       | yes      |                                                   |
-| `members[].title`   | string                                       | no       | Display title of the role, for example Developer. |
-| `members[].summary` | string                                       | no       | One line on what the role does.                   |
-| `members[].status`  | `idle` or `working` or `paused` or `offline` | yes      |                                                   |
-| `members[].current` | string                                       | no       | What the person is working on.                    |
-| `humans`            | list of objects                              | no       | The trusted humans of the team.                   |
-| `humans[].name`     | string                                       | yes      |                                                   |
+| Field                         | Type                                         | Required | Description                                                           |
+| ----------------------------- | -------------------------------------------- | -------- | --------------------------------------------------------------------- |
+| `members`                     | list of objects                              | yes      |                                                                       |
+| `members[].handle`            | string                                       | yes      |                                                                       |
+| `members[].name`              | string                                       | yes      |                                                                       |
+| `members[].role`              | string                                       | yes      |                                                                       |
+| `members[].title`             | string                                       | no       | Display title of the role, for example Developer.                     |
+| `members[].summary`           | string                                       | no       | One line on what the role does.                                       |
+| `members[].status`            | `idle` or `working` or `paused` or `offline` | yes      |                                                                       |
+| `members[].current`           | string                                       | no       | What the person is working on.                                        |
+| `members[].usage`             | object                                       | no       | The person's busiest LLM usage window, when it was reported recently. |
+| `members[].usage.window`      | string                                       | yes      | The busiest window.                                                   |
+| `members[].usage.utilization` | number                                       | yes      | Fraction of that window's limit used.                                 |
+| `members[].usage.resetsAt`    | string                                       | no       | ISO-8601 time at which that window resets.                            |
+| `humans`                      | list of objects                              | no       | The trusted humans of the team.                                       |
+| `humans[].name`               | string                                       | yes      |                                                                       |
 
 ### `work_list`
 

@@ -28,6 +28,8 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `people.unknown_role` | A person's role is not in the catalog. |
 | `people.write_without_vcs` | A person has a write grant but no vcs integration supports pull requests. |
 | `policies.command_program` | A policies.commands entry names git, which repository grants govern. |
+| `policies.usage_shared_overlap` | A person appears in more than one policies.usage.shared group. |
+| `policies.usage_shared_unknown_person` | A policies.usage.shared group names someone who is not in people. |
 | `policies.usage_threshold_order` | defer_scheduled_at is higher than pause_automatic_at. |
 | `repos.duplicate_name` | Two repos share the same name. |
 | `repos.multiple_primary` | More than one repo has kind primary. |

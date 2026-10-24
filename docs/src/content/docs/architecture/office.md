@@ -104,6 +104,15 @@ An injected `UsageSource` reports the 5-hour and 7-day utilization. The busiest 
 
 Humans are always answered. `isPausedFor(person, item)` tells why an item cannot run. If the usage source fails, the policy is skipped rather than blocking people.
 
+#### Where the windows come from
+
+Only an agent's runtime sees its usage limits, so agents report them with the `usage` message. The office keeps the latest windows of each person (name, utilization, reset time) as a `usage` subject in the store; a new report replaces the old one. The scheduler reads them through a `UsageSource` that `createOffice` wires up:
+
+- A report older than 30 minutes (`usageStaleAfterMinutes`) is unknown, like a person who never reported. Unknown usage fails open: the policy is skipped and the office logs one warning per person until fresh data arrives.
+- A window whose reset time has passed counts as reset and is ignored.
+- Limits apply per credential. When several people share one subscription, list them in `policies.usage.shared` (for example `[[sam, kim]]`); a report from any member is stored for all of them. A person can be in one group only.
+- `ost roster` shows each person's busiest window and when it resets, as long as the report is fresh.
+
 ### Stale runs
 
 An active item with no heartbeat for `staleAfterMinutes` (default 10) is sent back to the queue once. If the retry also goes stale, the item is blocked with a reason. A good run in between resets the allowance. `heartbeat(itemId)` marks activity; `tick()` does the sweep, and `start()` runs it on the clock.
@@ -224,7 +233,7 @@ The office acts under its own name on every system it uses, named `<team>-outsta
 
 **Wiring.** The office creates its ports from `integrations` in team.yaml through the adapter registry, with the office-scope secrets. Version control is required; the tracker and chat are used when configured. An adapter that is configured but not installed in the image stops the start with a message naming it. Events then flow in one fixed order: intake records an event, the work state applies it, the engine evaluates the workflow. The work state's own `pr.conflicted` and `pr.ci_failed` go straight to the engine. Every item the engine, the messaging or an agent queues goes through the scheduler, which tells the protocol server so the agent is offered the work at once. An item of kind `conflict` starts with the rebase steps for its pull request, including the pull requests stacked above it, in its journal.
 
-**Offers.** What was offered and what the agent accepted is stored (as `offer` subjects), so a restart offers again only what was not accepted. The offer carries the item's journal, the ticket and pull requests it concerns with their links, and `ost work` shows the agent's open items. When an agent hands an item back as `done`, the office raises `agent.handed_back` for the ticket, so the workflow moves it to review and tells the requester; a repeated hand-back repeats nothing. The runtime session an agent reports for an item is stored with it and goes on the next offer. An agent that restarts gives back the items it had accepted with `decline`: they stay as they are (same run, journal and session, no new attempt) and are offered again. Usage is not reported by agents yet, so the usage policy sees no limits until the protocol carries it.
+**Offers.** What was offered and what the agent accepted is stored (as `offer` subjects), so a restart offers again only what was not accepted. The offer carries the item's journal, the ticket and pull requests it concerns with their links, and `ost work` shows the agent's open items. When an agent hands an item back as `done`, the office raises `agent.handed_back` for the ticket, so the workflow moves it to review and tells the requester; a repeated hand-back repeats nothing. The runtime session an agent reports for an item is stored with it and goes on the next offer. An agent that restarts gives back the items it had accepted with `decline`: they stay as they are (same run, journal and session, no new attempt) and are offered again. Agents report their usage windows with `usage`; see the usage policy above.
 
 **Start and stop.** `start()` opens the agent connection, then the work state (with one rescan) and intake, which redelivers any events that were recorded but not handled. `stop()` stops intake, lets running handlers finish, closes connections and the store. `SIGTERM` and `SIGINT` do this.
 

@@ -53,6 +53,12 @@ export const MESSAGE_META = {
       "Stores the runtime session of an item, so a later round of the item resumes it. One session per item; sessions are never shared between items.",
     replies: ["ack", "error"],
   },
+  usage: {
+    from: "agent",
+    summary:
+      "Reports the LLM usage windows the runtime sees. The office keeps the latest report per person (and for people who share a subscription) and uses it for the usage policy.",
+    replies: ["ack", "error"],
+  },
   journal: {
     from: "agent",
     summary: "Appends a line to the item's journal, which later rounds start from.",
