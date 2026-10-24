@@ -25,7 +25,7 @@ export const secretMap = (values: Record<string, string>): SecretSource => ({
 export const team = {
   repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
   people: [
-    { handle: "sam", repos: { app: "write" } },
+    { handle: "sam", identities: { vcs: "sam[bot]" }, repos: { app: "write" } },
     { handle: "noor", repos: { "kind:primary": "read" } },
     { handle: "kit", repos: { "*": "read" } },
     { handle: "lee", repos: {} },
@@ -83,12 +83,13 @@ export function build(
   deps: GithubDeps = {},
   c: Clock = clock(),
   options: Record<string, unknown> = { apiUrl: ORIGIN },
+  teamConfig: TeamConfig = team,
 ) {
   const stub = createStubFetch(routes, ORIGIN);
   const ctx: AdapterContext<ReturnType<typeof githubOptions.parse>> = {
     options: githubOptions.parse(options),
     secrets: secretMap(secrets),
-    team,
+    team: teamConfig,
     log: silentLogger,
     fetch: stub.fetch,
     now: c.now,

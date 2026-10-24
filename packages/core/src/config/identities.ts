@@ -36,3 +36,15 @@ export function identityWarning(
 ): ConfigWarning {
   return { path: ref.path, code, message, consequence };
 }
+
+/** Lower-cased vcs login to person handle, by exact match on `identities.vcs`. */
+export function vcsAgentLogins(team: Pick<TeamConfig, "people">): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const p of team.people) {
+    if (p.identities?.vcs) {
+      out.set(p.identities.vcs.toLowerCase(), p.handle);
+    }
+  }
+
+  return out;
+}

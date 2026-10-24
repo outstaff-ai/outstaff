@@ -43,7 +43,12 @@ export {
   type ConfigWarning,
 } from "./config/validate.js";
 
-export { identitiesOf, identityWarning, type IdentityRef } from "./config/identities.js";
+export {
+  identitiesOf,
+  identityWarning,
+  vcsAgentLogins,
+  type IdentityRef,
+} from "./config/identities.js";
 
 export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";
 

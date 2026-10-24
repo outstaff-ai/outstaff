@@ -9,6 +9,7 @@ import {
   secretMap,
   team,
   REPO,
+  ORIGIN,
   appRoutes,
   build,
   clock,
@@ -337,21 +338,59 @@ describe("pull requests", () => {
     expect(stub.called("GET", "/repos/acme/app/pulls")).toHaveLength(4);
   });
 
-  it("lets the caller decide which bots are agents", async () => {
-    const { vcs } = build(
-      [
-        ...base,
-        {
-          method: "GET",
-          path: "/repos/acme/app/pulls/1",
-          handler: () => pull({ user: { login: "robo[bot]" } }),
-        },
-      ],
-      officeSecrets,
-      { isAgentSlug: (s) => s === "robo" },
-    );
+  describe("author kind", () => {
+    const withTeam = (people: Record<string, unknown>[], vcs: Record<string, unknown> = {}) =>
+      ({
+        repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
+        people,
+        integrations: { vcs: { adapter: "github", ...vcs } },
+      }) as unknown as typeof team;
 
-    expect((await vcs.getPullRequest(REPO, 1)).author.kind).toBe("agent");
+    const kindOf = async (login: string, t: typeof team, options: Record<string, unknown> = {}) => {
+      const { vcs } = build(
+        [
+          ...base,
+          {
+            method: "GET",
+            path: "/repos/acme/app/pulls/1",
+            handler: () => pull({ user: { login } }),
+          },
+        ],
+        officeSecrets,
+        {},
+        clock(),
+        { apiUrl: ORIGIN, ...options },
+        t,
+      );
+
+      return (await vcs.getPullRequest(REPO, 1)).author;
+    };
+
+    const byIdentity = withTeam([{ handle: "sam", identities: { vcs: "acme-sam[bot]" } }]);
+
+    it("maps an App bot login to the person that declares it, whatever the handle", async () => {
+      expect(await kindOf("acme-sam[bot]", byIdentity)).toEqual({
+        login: "acme-sam[bot]",
+        kind: "agent",
+      });
+
+      expect((await kindOf("ACME-Sam[bot]", byIdentity)).kind).toBe("agent");
+    });
+
+    it("never guesses from the handle: an unknown author is a bot or a human", async () => {
+      expect((await kindOf("sam[bot]", byIdentity)).kind).toBe("bot");
+      expect((await kindOf("other-app[bot]", byIdentity)).kind).toBe("bot");
+      expect((await kindOf("sam", byIdentity)).kind).toBe("human");
+    });
+
+    it("keeps humans' logins as humans, identity or not", async () => {
+      const t = withTeam(byIdentity.people as never);
+      (t as unknown as { humans: unknown }).humans = [
+        { name: "Alex", identities: { vcs: "alex" } },
+      ];
+
+      expect(await kindOf("alex", t)).toEqual({ login: "alex", kind: "human" });
+    });
   });
 
   it("maps mergeable_state to clean | conflicting | unknown", async () => {
