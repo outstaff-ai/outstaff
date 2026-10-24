@@ -1,4 +1,10 @@
-import { formatIssue, validateTeam, type ConfigWarning, type LocatedIssue } from "@outstaff/core";
+import {
+  formatIssue,
+  validateAdapterOptions,
+  validateTeam,
+  type ConfigWarning,
+  type LocatedIssue,
+} from "@outstaff/core";
 import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
 import { issueJson, loadTeam } from "../load.js";
@@ -9,7 +15,7 @@ export const validate = defineCommand({
   name: "validate",
   summary: "Check the team config for errors and warnings.",
   description:
-    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written.",
+    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written, but the options of adapters this build ships are checked against that adapter's schema.",
   options: [],
   examples: ["ost validate", "ost validate --team ../acme-team", "ost validate --json"],
   exitCodes: [
@@ -33,7 +39,7 @@ export const validate = defineCommand({
           adapters: new Map(),
         });
 
-        errors = report.errors.map(loaded.locate);
+        errors = [...report.errors, ...validateAdapterOptions(loaded.config)].map(loaded.locate);
         warnings = report.warnings.map((w: ConfigWarning) => ({
           ...loaded.locate(w),
           consequence: w.consequence,

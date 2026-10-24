@@ -139,7 +139,6 @@ integrations:
     adapter: slack
   vcs:
     adapter: github
-    owner: acme-example
   runtime:
     adapter: claude-agent-sdk
   tracker:
