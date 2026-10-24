@@ -4,7 +4,7 @@ import { githubVcs } from "./index.js";
 
 const layout: Layout = {
   home: "/home/agent",
-  workDir: "/work",
+  workDir: "/work/main",
   reposDir: "/work/repos",
   worktreesDir: "/work/worktrees",
   scratchDir: "/work/scratch",

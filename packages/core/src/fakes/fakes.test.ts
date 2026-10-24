@@ -13,8 +13,16 @@ describe("fake runtime", () => {
   it("judges scripted tool calls with the request policy and records requests", async () => {
     const rt = createFakeRuntime();
     rt.enqueue([
-      { type: "tool_call", tool: "Read", call: { kind: "read", path: "/work/scratch/notes.md" } },
-      { type: "tool_call", tool: "Write", call: { kind: "write", path: "/work/scratch/notes.md" } },
+      {
+        type: "tool_call",
+        tool: "Read",
+        call: { kind: "read", path: "/home/agent/scratch/notes.md" },
+      },
+      {
+        type: "tool_call",
+        tool: "Write",
+        call: { kind: "write", path: "/home/agent/scratch/notes.md" },
+      },
       { type: "finish", text: "done" },
     ]);
 
