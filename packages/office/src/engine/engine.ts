@@ -9,6 +9,7 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
+import { feedbackOf, FEEDBACK_SUBJECT } from "./feedback.js";
 import { clip, prLabel, subjectLabel } from "../log.js";
 import { PRIORITY, priorityFor } from "../scheduler/index.js";
 import type { WorkItem, WorkItemTrigger } from "../store/index.js";
@@ -324,6 +325,11 @@ export function createEngine(opts: EngineOptions): Engine {
       ...(related ? { parentId: related.id } : {}),
       ...(subject ? { subject } : {}),
     });
+
+    const feedback = feedbackOf(event);
+    if (feedback) {
+      await store.upsertSubject(FEEDBACK_SUBJECT, item.id, feedback);
+    }
 
     return `queued work item ${item.id} for ${e.person}`;
   };

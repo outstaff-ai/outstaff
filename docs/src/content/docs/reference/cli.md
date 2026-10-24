@@ -856,6 +856,38 @@ ost pr reply 42 PRT_abc123 --body "Renamed, thanks."
 ost pr reply 42 PRT_abc123 --body "Renamed, thanks." --json
 ```
 
+## ost pr comment
+
+Comment on the conversation of a pull request.
+
+Posts a top-level comment on the pull request as you. Use it to answer a review summary or a conversation comment, quoting or linking what it answers. Answer an inline thread with pr reply instead.
+
+```
+ost pr comment <number> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `--body <body>` | Text, Markdown. Or pass body-file. |
+| `--body-file <bodyFile>` | File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr comment 42 --body "> Please rename it.
+
+Renamed in the last push."
+ost pr comment 42 --body "> Please rename it.
+
+Renamed in the last push." --json
+```
+
 ## ost pr diff
 
 Show the unified diff of a pull request.

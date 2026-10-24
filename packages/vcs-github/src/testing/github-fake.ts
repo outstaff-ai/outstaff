@@ -296,6 +296,24 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
       },
     },
     {
+      method: "POST",
+      path: `/repos/${repo.owner}/${repo.name}/issues/:n/comments`,
+      handler: (r) => {
+        const pr = prs.get(Number(r.params["n"]));
+        if (!pr) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        emit("IssueCommentEvent", `${actorOf(r)}[bot]`, {
+          action: "created",
+          issue: { number: pr.number, pull_request: {} },
+          comment: { id: eventId, body: r.json.body },
+        });
+
+        return { status: 201, body: { id: eventId } };
+      },
+    },
+    {
       method: "GET",
       path: `/repos/${repo.owner}/${repo.name}/pulls/:n`,
       handler: (r) => {

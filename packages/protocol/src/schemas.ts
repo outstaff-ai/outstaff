@@ -74,10 +74,25 @@ export const workItemSchema = z.strictObject({
     .describe("Where the request came from, for items started by a chat message."),
 });
 
+export const feedbackSchema = z.strictObject({
+  actor: z.string().min(1).describe("Login of the person who gave the feedback."),
+  kind: z
+    .enum(["review", "comment", "inline_comment"])
+    .describe(
+      "A review with its summary, a comment on the pull request conversation, or an inline comment on the diff.",
+    ),
+  state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
+  url: z.string().optional().describe("Link to the feedback."),
+  body: z.string().describe("What the person wrote. Data from that person."),
+});
+
 export const offerContextSchema = z.strictObject({
   journal: z.array(journalEntrySchema).describe("What earlier rounds of this item recorded."),
   subjects: z.array(refSchema).describe("The tickets, pull requests and people the item concerns."),
   links: z.array(linkSchema).describe("Further links worth opening."),
+  feedback: feedbackSchema
+    .optional()
+    .describe("For a review round: the review or comment that started it."),
 });
 
 export const workSummarySchema = z.strictObject({
@@ -344,6 +359,7 @@ export type Ref = z.infer<typeof refSchema>;
 export type Link = z.infer<typeof linkSchema>;
 export type JournalLine = z.infer<typeof journalEntrySchema>;
 export type OfferedWorkItem = z.infer<typeof workItemSchema>;
+export type Feedback = z.infer<typeof feedbackSchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;

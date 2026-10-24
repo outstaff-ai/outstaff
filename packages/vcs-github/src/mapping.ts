@@ -176,6 +176,7 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
           state: String(p["review"]?.state ?? "").toLowerCase(),
           body: p["review"]?.body ?? "",
           reviewId: p["review"]?.id,
+          url: p["review"]?.html_url,
         },
       };
     case "PullRequestReviewCommentEvent":
@@ -192,6 +193,7 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
           body: p["comment"]?.body ?? "",
           path: p["comment"]?.path,
           commentId: p["comment"]?.id,
+          url: p["comment"]?.html_url,
         },
       };
     case "IssueCommentEvent":
@@ -203,7 +205,12 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
         ...base,
         type: "pr.comment",
         number: p["issue"].number,
-        data: { kind: "comment", body: p["comment"]?.body ?? "", commentId: p["comment"]?.id },
+        data: {
+          kind: "comment",
+          body: p["comment"]?.body ?? "",
+          commentId: p["comment"]?.id,
+          url: p["comment"]?.html_url,
+        },
       };
     default:
       return undefined;

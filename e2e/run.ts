@@ -1,5 +1,5 @@
 // The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
-// request, a human asks for changes, the agent fixes and resolves the thread, the human merges, a second pull
+// request, a human asks for changes, the agent fixes and resolves the thread, a review with only a summary gets a pull request comment, the human merges, a second pull
 // request now conflicts and the agent rebases it and pushes with a lease. The office, Postgres and the agent are the
 // real images; GitHub, the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
@@ -438,6 +438,29 @@ async function main() {
   assertIncludes(rounds, "In Review>In Progress", "the review sent the ticket back to active");
   step(
     `review: changes requested on #${pr1.pr.number} -> ticket active again, fix pushed, thread replied and resolved, back in review`,
+  );
+
+  // ---- 3b. a review with only a summary: the agent answers it on the pull request before handing back
+  const summary = "Also keep the greeting on one line.";
+  const sha2 = fixed.pr.head.sha;
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, {
+    state: "commented",
+    body: summary,
+  });
+
+  const answered = await until(
+    "the summary-only review answered on the pull request, the ticket back in review",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === first);
+      const reply = pr.conversation.find((c: Json) => c.body.includes(summary));
+      return reply && pr.head.sha !== sha2 && t.status === "In Review" ? { reply } : undefined;
+    },
+  );
+
+  assertEq(answered.reply.author, "acme-sam[bot]", "the agent replied on the pull request");
+  step(
+    `summary: a review with only a body on #${pr1.pr.number} -> answered with a pull request comment, back in review`,
   );
 
   // ---- 4. the human merges; the ticket is done; the other pull request now conflicts and the agent rebases it

@@ -164,7 +164,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
       },
       async comment(repo, number, actor, body) {
         need(repo, number);
-        emit("pr.comment", repo, number, actor, { body });
+        emit("pr.comment", repo, number, actor, { kind: "comment", body });
       },
       async thread(repo, number, t) {
         const s = need(repo, number);
@@ -348,6 +348,11 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
 
       thread.comments.push({ id: `rc${++commentCounter}`, author: self, body });
       emit("pr.comment", repo, number, self, { kind: "review_comment", body });
+    },
+    async commentOnPullRequest(repo, number, body) {
+      grant(repo, "write");
+      need(repo, number);
+      emit("pr.comment", repo, number, self, { kind: "comment", body });
     },
     async diff(repo, number) {
       grant(repo, "read");

@@ -18,6 +18,9 @@ interface Pr {
 
   /** Pushes that did not build on the previous head. */
   forcePushes: number;
+
+  /** Top-level comments on the conversation. */
+  conversation: { author: string; body: string }[];
   state: "open" | "closed";
   merged: boolean;
   draft: boolean;
@@ -188,7 +191,12 @@ export function createGithub(opts: GithubOptions) {
     emit("PullRequestReviewEvent", actor, {
       action: "submitted",
       pull_request: { number: pr.number },
-      review: { id: eventId + 1, state: REVIEW_STATE[event], body },
+      review: {
+        id: eventId + 1,
+        state: REVIEW_STATE[event],
+        body,
+        html_url: `https://github.example/${full}/pull/${pr.number}#pullrequestreview-${eventId + 1}`,
+      },
     });
   }
 
@@ -359,6 +367,7 @@ export function createGithub(opts: GithubOptions) {
           base: b.base,
           lastSha: sha,
           forcePushes: 0,
+          conversation: [],
           state: "open",
           merged: false,
           draft: b.draft === true,
@@ -428,6 +437,27 @@ export function createGithub(opts: GithubOptions) {
 
         await submitReview(pr, actor, r.json.event, r.json.body ?? "", r.json.comments);
         return { id: eventId, state: REVIEW_STATE[r.json.event] };
+      },
+    },
+    {
+      method: "POST",
+      path: `${API}/repos/${full}/issues/:n/comments`,
+      handler: (r) => {
+        const pr = need(r.params["n"]!);
+        const actor = botOf(r);
+        if (!pr || !actor) {
+          return pr ? unauthorized : notFound;
+        }
+
+        pr.conversation.push({ author: actor, body: r.json.body });
+        pr.updatedAt = now();
+        emit("IssueCommentEvent", actor, {
+          action: "created",
+          issue: { number: pr.number, pull_request: {} },
+          comment: { id: eventId + 1, body: r.json.body },
+        });
+
+        return { id: eventId };
       },
     },
     {
@@ -537,6 +567,7 @@ export function createGithub(opts: GithubOptions) {
               mergeable: r.mergeable,
               forcePushes: p.forcePushes,
               containsMain: await repo.isAncestor(p.base, p.head),
+              conversation: p.conversation,
               threads: [...threads.values()]
                 .filter((t) => t.prNumber === p.number)
                 .map((t) => ({ id: t.id, resolved: t.resolved, comments: t.comments })),

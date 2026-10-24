@@ -90,7 +90,7 @@ export async function* assigned(ctx: ItemContext): Script {
   return `Opened ${url}`;
 }
 
-/** A human asked for changes: fix on the pull request's own branch, answer and resolve every open thread. */
+/** A human gave feedback: fix on the pull request's own branch, answer every open thread and a summary or comment. */
 export async function* reviewFeedback(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const number = need(ctx.pr, "the pull request");
@@ -99,8 +99,10 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const branch = yield* branchOf(ctx, key);
   const threads = yield { type: "tool", tool: "pr_threads", input: { repo, number } };
   const ids = [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
-  if (ids.length === 0) {
-    throw new Error("The review left no open thread.");
+  const feedback = ctx.feedback;
+  const conversational = feedback !== undefined && feedback.kind !== "inline_comment";
+  if (ids.length === 0 && !conversational) {
+    throw new Error("The feedback left no open thread and no summary or comment to answer.");
   }
 
   // The item's worktree starts from the default branch; the pull request lives on its own.
@@ -124,6 +126,24 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
     };
 
     yield { type: "tool", tool: "pr_resolve", input: { repo, number, thread } };
+  }
+
+  // A summary or a conversation comment has no thread: answer it on the pull request, quoting what it says.
+  if (conversational && feedback.body) {
+    const quote = feedback.body
+      .split("\n")
+      .map((l) => `> ${l}`)
+      .join("\n");
+
+    yield {
+      type: "tool",
+      tool: "pr_comment",
+      input: {
+        repo,
+        number,
+        body: `${quote}\n\n${feedback.url ? `${feedback.url}\n\n` : ""}Fixed in ${sha}.`,
+      },
+    };
   }
 
   return `Addressed ${ids.length} thread${ids.length === 1 ? "" : "s"} on pull request ${number} (${sha}).`;
