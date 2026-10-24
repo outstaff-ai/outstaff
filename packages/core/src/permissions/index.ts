@@ -1,6 +1,7 @@
 export {
   buildPolicy,
   commandRules,
+  repoAccess,
   repoGrant,
   PROFILE_SPECS,
   profileAllowsWrite,

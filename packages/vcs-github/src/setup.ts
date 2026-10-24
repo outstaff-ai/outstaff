@@ -85,19 +85,26 @@ export function githubSetupGuide(ctx: SetupContext): SetupStep[] {
   }
 
   const granted = grantedRepos(team, person);
+  if (granted.length === 0) {
+    return [
+      {
+        title: `${person.name} needs no GitHub credentials`,
+        body: "This person has no repository grants, so they need neither their own GitHub App nor the office App's keys, and their agent starts without a code host. Give them a grant under `people[].repos` if they should read or change code.",
+      },
+    ];
+  }
+
   const writes = granted.some((g) => g.level === "write");
-  const list = granted.length
-    ? granted.map((g) => `\`${g.repo.url}\` (${g.level})`).join(", ")
-    : "none yet; add grants under `people[].repos` first";
+  const list = granted.map((g) => `\`${g.repo.url}\` (${g.level})`).join(", ");
 
   return [
     createStep(
-      `Create ${person.name}'s GitHub App`,
+      `${writes ? "Create" : "Optionally create"} ${person.name}'s GitHub App`,
       slugOf(team, person.handle),
       writes ? WRITE : READ,
       writes
         ? "metadata, checks and commit statuses read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API)."
-        : "metadata, contents, pull requests, issues, checks and commit statuses, all read-only, since this person has no write grant.",
+        : "metadata, contents, pull requests, issues, checks and commit statuses, all read-only. This person has only read grants, so their own App is optional: it lets them comment on or review pull requests as themselves.",
     ),
     {
       title: "Install it on exactly the repositories this person is granted",

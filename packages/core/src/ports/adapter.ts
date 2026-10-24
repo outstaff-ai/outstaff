@@ -9,6 +9,12 @@ import type { SecretSource, SecretSpec } from "./secrets.js";
 
 export type PortName = AdapterPort;
 
+/** The person a secret list is asked for; without it the list is every key the adapter can ever need. */
+export interface SecretsContext {
+  team: TeamConfig;
+  person: TeamConfig["people"][number];
+}
+
 export interface AdapterContext<Options> {
   options: Options;
   secrets: SecretSource;
@@ -75,8 +81,20 @@ export interface AdapterDefinition<P extends PortName, Options, Impl> {
   name: string;
   capabilities: Capability[];
   options: ZodType<Options>;
-  secrets: (scope: "person" | "office") => SecretSpec[];
+
+  /**
+   * The keys the adapter reads. For a person, `ctx` narrows the list to what that person needs (a person without
+   * repository grants needs no GitHub keys); without it, every key either scope can use, which is what secret
+   * scrubbing and the container-contract table want.
+   */
+  secrets: (scope: "person" | "office", ctx?: SecretsContext) => SecretSpec[];
   create(ctx: AdapterContext<Options>): Impl | Promise<Impl>;
+
+  /**
+   * A person-scope adapter the person has no use for returns why here, in words an agent can pass on; the agent
+   * then starts without that port and the verbs that need it refuse with this message.
+   */
+  unavailableFor?: (ctx: SecretsContext) => string | undefined;
 
   /** Step-by-step instructions for `ost setup`. Never include secret values. */
   setupGuide?: (ctx: SetupContext) => SetupStep[];

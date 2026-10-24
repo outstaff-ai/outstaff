@@ -288,7 +288,9 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
       ...opts.repositories,
     });
   } else {
-    log.warn("no vcs adapter, so no repositories are cloned", { reason: env.unavailable?.vcs });
+    log.info("no code host for this person, so no repositories are cloned", {
+      reason: env.unavailable?.vcs ?? "no vcs integration is configured",
+    });
   }
 
   const files = runtimeDef.workdirLayout

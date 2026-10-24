@@ -95,11 +95,6 @@ people:
     name: Leo Fischer
     pronouns: he/him
     role: designer
-    identities:
-      vcs: acme-leo[bot]
-    repos:
-      design-system: write
-      shop: read
   - handle: sam
     name: Sam Duarte
     pronouns: they/them

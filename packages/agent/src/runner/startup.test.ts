@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AdapterRegistry, defineAdapter, evaluate } from "@outstaff/core";
+import { AdapterRegistry, defineAdapter, evaluate, repoAccess } from "@outstaff/core";
 import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -131,6 +131,35 @@ describe("prepareAgent", () => {
     expect(run("pnpm test").effect).toBe("allow");
     expect(run("acme-lint src").effect).toBe("allow");
     expect(run("curl https://example.com").effect).toBe("deny");
+  });
+
+  it("starts a person without repository grants with no vcs port", async () => {
+    const team = TEAM.replace(
+      "integrations:",
+      "  - { handle: leo, name: Leo Fischer, pronouns: he/him, role: designer }\nintegrations:",
+    );
+
+    const { options } = setup({ OUTSTAFF_PERSON: "leo" }, team);
+    const fakeVcs = options.registry.get("vcs", "fake")!;
+    const noVcs = new AdapterRegistry();
+    for (const def of options.registry.list()) {
+      noVcs.register(
+        def.port === "vcs"
+          ? defineAdapter({
+              ...fakeVcs,
+              unavailableFor: ({ team: t, person }) =>
+                repoAccess(t, person) === "none"
+                  ? `${person.handle} has no GitHub identity`
+                  : undefined,
+            })
+          : def,
+      );
+    }
+
+    const agent = await prepareAgent({ ...options, registry: noVcs });
+    expect(agent.repos).toEqual([]);
+    expect(agent.systemPrompt).toContain("Leo Fischer");
+    expect(agent.policy.git.repos).toEqual({});
   });
 
   it("explains a missing person or an unknown one", async () => {

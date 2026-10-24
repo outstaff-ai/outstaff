@@ -42,7 +42,7 @@ Developers need precision.
 A built interface needs review.
 
 1. Open the pull request and the running result if available, and compare with the spec, state by state.
-2. Comment in the pull request threads. Separate defects against the spec (must fix) from improvements (suggestions).
+2. Give the feedback where you can: if `ost pr status` works for you, comment in the pull request threads; if `ost pr` refuses because you have no GitHub identity, post the whole review as one comment on the ticket, linking the pull request and the preview. Either way, separate defects against the spec (must fix) from improvements (suggestions).
 3. Give a clear verdict. If the spec itself was wrong, fix the spec and say so.
 
 ## Direct requests

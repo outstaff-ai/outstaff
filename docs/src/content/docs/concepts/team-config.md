@@ -37,7 +37,7 @@ repos:
 
 ## People
 
-[`people`](/reference/team-yaml/#people) are the agents. Each has a handle, a display name, a role from the catalog, optional extra roles to combine with it (`extends`), and a `repos` map of grants. A grant key is a repository name, `kind:<kind>` to cover every repository of a kind, or `*` for all of them, and the value is `read` or `write`. A person with no grants can do nothing, which `ost validate` reports as `people.no_repos`.
+[`people`](/reference/team-yaml/#people) are the agents. Each has a handle, a display name, a role from the catalog, optional extra roles to combine with it (`extends`), and a `repos` map of grants. A grant key is a repository name, `kind:<kind>` to cover every repository of a kind, or `*` for all of them, and the value is `read` or `write`. A person with no grants works in tickets, documents and chat only, and needs no GitHub credentials (see [setup](/guides/setup/)); `ost validate` warns when a reviewer has none.
 
 ## Integrations
 

@@ -9,6 +9,7 @@ export type {
   DeriveContext,
   DoctorCheck,
   PortName,
+  SecretsContext,
   SetupContext,
   SetupStep,
 } from "./adapter.js";

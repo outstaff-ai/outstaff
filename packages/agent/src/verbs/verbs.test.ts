@@ -1,6 +1,6 @@
 // Assertions live in the `rejects` and `expectLinks` helpers.
 /* oxlint-disable vitest/expect-expect */
-import { PortError, buildPolicy } from "@outstaff/core";
+import { AdapterRegistry, PortError, buildPolicy, defineAdapter, repoAccess } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { envSecretSource } from "@outstaff/core";
 import { execFileSync } from "node:child_process";
@@ -935,6 +935,41 @@ describe("createAgentEnv", () => {
     );
 
     await rejects(run("ticket.show", env, { key: "A-1" }), "unsupported", /itsaplan/);
+  });
+
+  it("leaves the vcs port absent for a person the adapter has no use for", async () => {
+    const team = fakeTeam();
+    const fake = createFakeAdapterRegistry().get("vcs", "fake")!;
+    const registry = new AdapterRegistry().register(
+      defineAdapter({
+        ...fake,
+        unavailableFor: ({ team: t, person }) =>
+          repoAccess(t, person) === "none"
+            ? `${person.handle} has no GitHub identity; ask a human or a teammate with repository access`
+            : undefined,
+      }),
+    );
+
+    for (const port of ["tracker", "knowledge", "chat"] as const) {
+      delete team.integrations[port];
+    }
+
+    const base = { team, registry, secrets: envSecretSource({}, "/nonexistent") };
+    const without = await createAgentEnv({ ...base, person: "leo" });
+    expect(without.vcs).toBeUndefined();
+    expect(without.unavailable?.vcs).toBe(
+      "leo has no GitHub identity; ask a human or a teammate with repository access",
+    );
+
+    await rejects(
+      run("pr.status", without, { repo: "shop", number: 1 }),
+      "unsupported",
+      /^leo has no GitHub identity; ask a human or a teammate with repository access$/,
+    );
+
+    const granted = await createAgentEnv({ ...base, person: "sam" });
+    expect(granted.vcs).toBeTruthy();
+    expect(granted.unavailable).toBeUndefined();
   });
 
   it("refuses an unknown person and carries the office", async () => {

@@ -53,6 +53,16 @@ export async function createAgentEnv(opts: CreateAgentEnvOptions): Promise<Agent
       continue;
     }
 
+    const skip = def.unavailableFor?.({
+      team,
+      person: team.people.find((p) => p.handle === person)!,
+    });
+
+    if (skip) {
+      unavailable[port] = skip;
+      continue;
+    }
+
     try {
       const { adapter: _adapter, ...raw } = ref;
       const impl = await def.create({

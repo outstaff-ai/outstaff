@@ -219,7 +219,7 @@ async function runDerive(
 
     const allowed = new Set(
       def
-        .secrets(scope)
+        .secrets(scope, person ? { team, person } : undefined)
         .filter((s) => s.derivable)
         .map((s) => s.key),
     );
@@ -364,7 +364,7 @@ export const setup = defineCommand<{
     }
 
     const defs = found.map((f) => f.def);
-    const list = sections(config, defs, scope);
+    const list = sections(config, defs, scope, person);
     const text = renderEnvExample(config, scope, target, list, secretsDir);
     const file = join(out, `${envFile}.example`);
     mkdirSync(join(file, ".."), { recursive: true });

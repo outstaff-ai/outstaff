@@ -13,6 +13,9 @@ export interface SecretSpec {
 
   /** The adapter works without it (for example when another credential is supplied instead). */
   optional?: boolean;
+
+  /** The condition that makes it needed, when the adapter asks for it only for some people; shown in the contract table. */
+  when?: string;
 }
 
 export interface SecretSource {

@@ -25,6 +25,7 @@ const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
     ["developer", { needs: ["vcs.pullRequests"] }],
     ["architect", { needs: ["knowledge.docs"], optionalNeeds: ["tracker.issues"] }],
     ["a11y", { needs: [] }],
+    ["reviewer", { needs: [] }],
   ]),
   adapters: new Map([
     adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads"]),
@@ -220,16 +221,48 @@ describe("validateTeam", () => {
     ]);
   });
 
-  it("warns about people without grants", () => {
+  it("accepts a person without grants whose role does not review", () => {
     const c = config((x) => (x.people[1].repos = {}));
+    expect(validateTeam(c, ctx()).warnings).toEqual([]);
+  });
+
+  it("warns about a reviewer without grants", () => {
+    const c = config((x) => {
+      x.people[1].role = "reviewer";
+      x.people[1].repos = {};
+    });
+
     expect(validateTeam(c, ctx()).warnings).toEqual([
       {
         path: ["people", 1, "repos"],
-        code: "people.no_repos",
-        message: "marcus has no repo grants.",
-        consequence: "marcus cannot read or change any repository.",
+        code: "people.reviewer_without_github",
+        message: "marcus is a reviewer but has no repo grants.",
+        consequence:
+          "marcus cannot review pull requests as themselves; give them a read or write grant and their own GitHub App.",
       },
     ]);
+  });
+
+  it("warns about a reviewer without an own App", () => {
+    const c = config((x) => (x.people[1].role = "reviewer"));
+    expect(validateTeam(c, ctx()).warnings).toEqual([
+      {
+        path: ["people", 1, "identities", "vcs"],
+        code: "people.reviewer_without_github",
+        message: "marcus is a reviewer but has no identities.vcs (no GitHub App of their own).",
+        consequence:
+          "marcus cannot review pull requests as themselves; give them a read or write grant and their own GitHub App.",
+      },
+    ]);
+  });
+
+  it("does not warn about a reviewer with a grant and an own App", () => {
+    const c = config((x) => {
+      x.people[1].role = "reviewer";
+      x.people[1].identities = { vcs: "acme-marcus[bot]" };
+    });
+
+    expect(validateTeam(c, ctx()).warnings).toEqual([]);
   });
 });
 

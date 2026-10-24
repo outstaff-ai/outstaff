@@ -35,7 +35,12 @@ export function coreSpecs(team: TeamConfig, scope: Scope): SecretSpec[] {
 }
 
 /** One section per adapter, the same key listed once even when several adapters (tracker and knowledge) share it. */
-export function sections(team: TeamConfig, defs: AnyDef[], scope: Scope): Section[] {
+export function sections(
+  team: TeamConfig,
+  defs: AnyDef[],
+  scope: Scope,
+  person?: TeamConfig["people"][number],
+): Section[] {
   const seen = new Set<string>();
   const out: Section[] = [{ title: "outstaff", specs: coreSpecs(team, scope) }];
   for (const s of out[0]!.specs) {
@@ -43,7 +48,10 @@ export function sections(team: TeamConfig, defs: AnyDef[], scope: Scope): Sectio
   }
 
   for (const def of defs) {
-    const specs = def.secrets(scope).filter((s) => !seen.has(s.key));
+    const specs = def
+      .secrets(scope, person ? { team, person } : undefined)
+      .filter((s) => !seen.has(s.key));
+
     for (const s of specs) {
       seen.add(s.key);
     }
