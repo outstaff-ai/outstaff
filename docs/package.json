@@ -6,12 +6,15 @@
   "type": "module",
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/llms.mjs",
+    "build": "node scripts/sponsors.mjs && astro build && node scripts/llms.mjs",
     "preview": "astro preview"
   },
   "dependencies": {
     "@astrojs/starlight": "0.42.6",
     "astro": "7.4.2",
     "starlight-links-validator": "0.27.0"
+  },
+  "devDependencies": {
+    "sponsorkit": "19.0.0"
   }
 }
