@@ -12,6 +12,10 @@ const CURSOR_KEY = "events";
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_STALE_POLL_MINUTES = 10;
 
+/** The adapters re-read the last 5 minutes of each feed, so an id older than that no longer comes back. */
+const UNMAPPED_MEMORY_MS = 5 * 60_000;
+const UNMAPPED_MEMORY_CAP = 5_000;
+
 interface StoredPayload {
   raw: { externalId: string; type: string };
   event: WorkflowEvent;
@@ -31,6 +35,28 @@ export function createIntake(opts: IntakeOptions): Intake {
     const { host, owner, name } = parseRepoUrl(r.url);
     return { host, owner, name };
   });
+
+  // Feeds are re-read with an overlap, so an unmapped event comes back on every poll. It is logged at info
+  // once per event id and at debug after that. Kept in memory: after a restart it may be logged at info again.
+  const seenUnmapped = new Map<string, number>();
+  const firstSighting = (source: string, externalId: string): boolean => {
+    const now = clock.now().getTime();
+    for (const [key, at] of seenUnmapped) {
+      if (now - at <= UNMAPPED_MEMORY_MS && seenUnmapped.size < UNMAPPED_MEMORY_CAP) {
+        break;
+      }
+
+      seenUnmapped.delete(key);
+    }
+
+    const key = `${source}:${externalId}`;
+    if (seenUnmapped.has(key)) {
+      return false;
+    }
+
+    seenUnmapped.set(key, now);
+    return true;
+  };
 
   const trust = createTrust({
     store,
@@ -131,8 +157,8 @@ export function createIntake(opts: IntakeOptions): Intake {
     subject: string,
     normalize: () => Promise<{ event: WorkflowEvent; trusted: boolean } | undefined>,
   ) => {
-    const dropped = (reason: string) =>
-      logger.info(`intake: dropped ${source} ${raw.type} on ${subject}: ${reason}`, {
+    const dropped = (reason: string, level: "info" | "debug" = "debug") =>
+      logger[level](`intake: dropped ${source} ${raw.type} on ${subject}: ${reason}`, {
         source,
         type: raw.type,
         subject,
@@ -142,7 +168,11 @@ export function createIntake(opts: IntakeOptions): Intake {
 
     const result = await normalize();
     if (!result) {
-      dropped("the office does not map this event type");
+      dropped(
+        "the office does not map this event type",
+        firstSighting(source, raw.externalId) ? "info" : "debug",
+      );
+
       return;
     }
 
@@ -179,7 +209,8 @@ export function createIntake(opts: IntakeOptions): Intake {
   const logUnmapped = (source: IntakeMeta["source"], page: { unmapped?: UnmappedEvent[] }) => {
     for (const u of page.unmapped ?? []) {
       const subject = u.repo ? `${u.repo.owner}/${u.repo.name}` : source;
-      logger.info(
+      const level = firstSighting(source, u.externalId) ? "info" : "debug";
+      logger[level](
         `intake: dropped ${source} ${u.type} on ${subject}: the adapter does not map this event type`,
         {
           source,

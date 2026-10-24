@@ -24,12 +24,35 @@ export const DEFAULT_STORE_URL = "sqlite:///var/lib/outstaff/office.db";
 
 type Env = Record<string, string | undefined>;
 
-/** One JSON object per line, which every log collector reads. */
+const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+export type LogLevel = (typeof LOG_LEVELS)[number];
+
+/** `OUTSTAFF_LOG_LEVEL`: the lowest level written. Defaults to `info`, which hides debug. */
+export function logLevel(env: Env): LogLevel {
+  const raw = env["OUTSTAFF_LOG_LEVEL"];
+  if (raw === undefined || raw === "") {
+    return "info";
+  }
+
+  const level = LOG_LEVELS.find((l) => l === raw);
+  if (!level) {
+    throw new Error(`OUTSTAFF_LOG_LEVEL must be one of ${LOG_LEVELS.join(", ")}, got "${raw}".`);
+  }
+
+  return level;
+}
+
+/** One JSON object per line, which every log collector reads. Lines below `level` are not written. */
 export function jsonLogger(
   write: (line: string) => void = (l) => process.stdout.write(`${l}\n`),
+  level: LogLevel = "info",
 ): Logger {
-  const at = (level: string) => (message: string, fields?: Record<string, unknown>) =>
-    write(JSON.stringify({ time: new Date().toISOString(), level, message, ...fields }));
+  const min = LOG_LEVELS.indexOf(level);
+  const at = (lvl: LogLevel) => (message: string, fields?: Record<string, unknown>) => {
+    if (LOG_LEVELS.indexOf(lvl) >= min) {
+      write(JSON.stringify({ time: new Date().toISOString(), level: lvl, message, ...fields }));
+    }
+  };
 
   return { debug: at("debug"), info: at("info"), warn: at("warn"), error: at("error") };
 }
@@ -99,12 +122,13 @@ export interface StartDeps {
  * - `OUTSTAFF_TEAM_FILE` / `OUTSTAFF_TEAM_REPO` (+ `OUTSTAFF_TEAM_REF`): where team.yaml is (see the team loader)
  * - `OUTSTAFF_STORE_URL`: `postgres://…`, `sqlite:///path` or `sqlite::memory:`
  * - `OUTSTAFF_AGENT_PORT` (8080), `OUTSTAFF_WEBHOOK_PORT` (8082), `OUTSTAFF_HEALTH_PORT` (8081)
+ * - `OUTSTAFF_LOG_LEVEL`: `debug`, `info` (default), `warn` or `error`
  */
 export async function startOffice(
   env: Env = process.env,
   deps: StartDeps = {},
 ): Promise<RunningOffice> {
-  const log = deps.logger ?? jsonLogger();
+  const log = deps.logger ?? jsonLogger(undefined, logLevel(env));
   const loaded = await loadTeamConfig({ env });
   if (!loaded.ok) {
     throw new Error(`team.yaml is not valid:\n${loaded.issues.map(formatIssue).join("\n")}`);
@@ -170,7 +194,15 @@ async function main() {
     return;
   }
 
-  const log = jsonLogger();
+  let log: Logger;
+  try {
+    log = jsonLogger(undefined, logLevel(process.env));
+  } catch (error) {
+    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+    process.exitCode = 1;
+    return;
+  }
+
   let running: RunningOffice;
   try {
     running = await startOffice(process.env, { logger: log });

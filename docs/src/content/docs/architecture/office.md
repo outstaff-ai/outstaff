@@ -18,12 +18,23 @@ Intake turns activity in your repositories and tracker into deduplicated, normal
 
 ### What the logs say
 
-Intake and the engine log at info level, so "the agent did not react" can be answered from the logs:
+Intake and the engine log at info level by default, so "the agent did not react" can be answered from the logs. Feeds are re-read with a 5-minute overlap, so the same events come back on every poll; those repeats are kept out of the info level.
 
-- `intake: recorded <source> <type> on <repo#n or ticket> by <actor> (trusted|untrusted)` for every event kept.
+- `intake: recorded <source> <type> on <repo#n or ticket> by <actor> (trusted|untrusted)` for every event kept. Info.
 - `intake: dropped <source> <type> on <subject>: <reason>` for every event read but not kept. The reason is that the adapter does not map the event type, that the office does not map it (for example `pr.synchronize`), or that it is a duplicate.
-- `engine: rule <id> matched <type> on <subject>: <effects>` for each rule that matched, then `engine: scheduled review_feedback for sam on acme/app#8` (or moved, assigned, commented, notified) for each effect that was applied, and `engine: no rule matched <type> on <subject>` when none did. Effects that were skipped or failed are warnings.
+  - An unmapped event (either reason) is logged at info the first time per event id, then at debug. The office remembers ids in memory for the overlap window, so after a restart a repeat can show at info once more.
+  - A duplicate of an event already recorded is always debug.
+- `engine: rule <id> matched <type> on <subject>: <effects>` for each rule that matched, then `engine: scheduled review_feedback for sam on acme/app#8` (or moved, assigned, commented, notified) for each effect that was applied, and `engine: no rule matched <type> on <subject>` when none did. Info. Effects that were skipped or failed are warnings.
 - A failed poll is an error. When a polled source has had no successful poll for `office.poll_warn_after_minutes` (default 10), each further failure also logs a warning with the minutes.
+
+| Level | Lines                                                                                                                                  |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| debug | duplicates of recorded events; unmapped events after their first sighting                                                              |
+| info  | recorded events; first sighting of an unmapped event; rule matches, no-match and applied effects; baseline set                         |
+| warn  | effects not applied; failing event handlers (before they are given up on); polls with no success past `office.poll_warn_after_minutes` |
+| error | failed polls; failed event delivery; events given up on                                                                                |
+
+The office writes `info` and above. Set `OUTSTAFF_LOG_LEVEL` to `debug` to see the repeats as well (`info`, `warn` or `error` are the other values).
 
 Logs never carry message or comment bodies; error text is cut to a short length.
 
@@ -311,4 +322,4 @@ Both answer with JSON: `{ "ok": true, "state": "running", "components": { "store
 
 ### Logs
 
-One JSON object per line on standard output, with `time`, `level` and `message`.
+One JSON object per line on standard output, with `time`, `level` and `message`. `OUTSTAFF_LOG_LEVEL` sets the lowest level written (`debug`, `info`, `warn` or `error`; default `info`). See [What the logs say](#what-the-logs-say) for which lines appear at which level.
