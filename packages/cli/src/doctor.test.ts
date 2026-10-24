@@ -25,10 +25,10 @@ import { run } from "./program.js";
 const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-doctor-")));
 let n = 0;
 
-function project() {
+function project(edit: (team: string) => string = (t) => t) {
   const dir = join(root, `p${n++}`);
   mkdirSync(join(dir, ".outstaff"), { recursive: true });
-  writeFileSync(join(dir, ".outstaff", "team.yaml"), readFileSync(ACME_TEAM_FILE, "utf8"));
+  writeFileSync(join(dir, ".outstaff", "team.yaml"), edit(readFileSync(ACME_TEAM_FILE, "utf8")));
   execFileSync("git", ["init", "-q"], { cwd: dir });
   return dir;
 }
@@ -259,12 +259,12 @@ describe("ost doctor with the shipped adapters", () => {
         return json(
           opts.slackOk === false
             ? { ok: false, error: "invalid_auth" }
-            : { ok: true, user_id: office ? "U0OFFICE" : "U0MIRA" },
+            : { ok: true, user_id: office ? "U0OFFICE" : "U0MIRA005" },
         );
       }
 
       if (u.host === "api.tracker.acme.example") {
-        return json({ id: 5 });
+        return json({ id: 5, username: "mira.okafor" });
       }
 
       const bearer = String((init!.headers as Record<string, string>)["authorization"]).slice(7);
@@ -305,8 +305,11 @@ describe("ost doctor with the shipped adapters", () => {
     ANTHROPIC_API_KEY: "fake-anthropic-key",
   };
 
-  it("passes for a complete person, warning only about unset identities", async () => {
-    const dir = project();
+  it("passes for a complete person, printing the derived value of each unset identity", async () => {
+    const dir = project((t) =>
+      t.replace("      chat: U0MIRA005\n      tracker: mira.okafor\n", ""),
+    );
+
     secretFiles(dir, allSecrets);
     const r = await ost(dir, ["doctor", "mira"], { fetch: router(), now: () => new Date() });
     expect(r.out).not.toMatch(/^ {2}fail/m);
@@ -314,6 +317,8 @@ describe("ost doctor with the shipped adapters", () => {
     expect(r.out).toContain("ok    GitHub App: repositories");
     expect(r.out).toContain("warn  Its a Plan identity");
     expect(r.out).toContain("warn  Slack identity");
+    expect(r.out).toContain("Fix: Set identities.chat to U0MIRA005 for mira in team.yaml.");
+    expect(r.out).toContain("Fix: Set identities.tracker to 5 for mira in team.yaml.");
     // Ids and slugs are public; every credential must stay out of the output.
     for (const [, v] of Object.entries(allSecrets).filter(([key]) => !/_ID$|SLUG/.test(key))) {
       expect(r.out + r.err).not.toContain(v);

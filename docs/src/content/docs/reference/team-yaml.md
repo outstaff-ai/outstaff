@@ -69,6 +69,8 @@ people:
     role: pm
     identities:
       vcs: acme-priya[bot]
+      chat: U0PRIYA03
+      tracker: priya.raman
     repos:
       "*": read
       docs-site: write
@@ -78,6 +80,8 @@ people:
     role: product
     identities:
       vcs: acme-tomas[bot]
+      chat: U0TOMAS04
+      tracker: tomas.novak
     repos:
       "*": read
       docs-site: write
@@ -88,6 +92,8 @@ people:
     extends: [developer]
     identities:
       vcs: acme-mira[bot]
+      chat: U0MIRA005
+      tracker: mira.okafor
     repos:
       shop: write
       "kind:baseline": read
@@ -95,12 +101,17 @@ people:
     name: Leo Fischer
     pronouns: he/him
     role: designer
+    identities:
+      chat: U0LEO0006
+      tracker: leo.fischer
   - handle: sam
     name: Sam Duarte
     pronouns: they/them
     role: developer
     identities:
       vcs: acme-sam[bot]
+      chat: U0SAM0007
+      tracker: sam.duarte
     repos:
       shop: write
       "kind:baseline": read
@@ -110,6 +121,8 @@ people:
     role: developer
     identities:
       vcs: acme-noor[bot]
+      chat: U0NOOR008
+      tracker: noor.haddad
     repos:
       shop: write
       "kind:baseline": read
@@ -119,6 +132,8 @@ people:
     role: reviewer
     identities:
       vcs: acme-ines[bot]
+      chat: U0INES009
+      tracker: ines.varga
     repos:
       "*": read
   - handle: kofi
@@ -127,6 +142,8 @@ people:
     role: devops
     identities:
       vcs: acme-kofi[bot]
+      chat: U0KOFI010
+      tracker: kofi.mensah
     repos:
       infra: write
       shop: read

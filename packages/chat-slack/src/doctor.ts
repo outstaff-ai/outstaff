@@ -154,14 +154,14 @@ export async function doctorSlack(
       name: "Slack identity",
       status: "warn",
       detail: `identities.chat is not set for ${ctx.person.handle}, so the office cannot recognise its messages.`,
-      fix: `Set identities.chat to ${body.user_id} in the team file.`,
+      fix: `Set identities.chat to ${body.user_id} for ${ctx.person.handle} in team.yaml.`,
     });
   } else if (wanted !== body.user_id && wanted !== body.user) {
     out.push({
       name: "Slack identity",
       status: "fail",
       detail: `identities.chat is "${wanted}" but the bot token belongs to ${body.user_id}.`,
-      fix: `Set identities.chat to ${body.user_id}, or use the token of the right app.`,
+      fix: `Set identities.chat to ${body.user_id} for ${ctx.person.handle} in team.yaml, or use the token of the right app.`,
     });
   } else {
     out.push({

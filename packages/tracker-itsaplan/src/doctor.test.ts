@@ -78,6 +78,14 @@ describe("doctorItsaplan", () => {
     expect((await doctorItsaplan(secrets(), ctx(me({ id: 17 })))).at(-1)!.status).toBe("warn");
   });
 
+  it("prints the member id to put in team.yaml when identities.tracker is missing", async () => {
+    const checks = await doctorItsaplan(secrets(), ctx(me({ id: 17 })));
+    expect(checks.at(-1)).toMatchObject({
+      status: "warn",
+      fix: "Set identities.tracker to 17 for sam in team.yaml.",
+    });
+  });
+
   it("does not compare an identity for the office", async () => {
     const checks = await doctorItsaplan(secrets(), ctx(me({ id: 17 }), undefined, "office"));
     expect(checks).toHaveLength(1);
