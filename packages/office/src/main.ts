@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -156,7 +156,20 @@ export async function startOffice(
   };
 }
 
+function packageVersion(): string {
+  const manifest = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  ) as { version: string };
+
+  return manifest.version;
+}
+
 async function main() {
+  if (process.argv.slice(2).some((a) => a === "--version" || a === "-v")) {
+    process.stdout.write(`${packageVersion()}\n`);
+    return;
+  }
+
   const log = jsonLogger();
   let running: RunningOffice;
   try {
@@ -190,6 +203,7 @@ async function main() {
   process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// The bin is a symlink (npm, the images), so compare real paths.
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   void main();
 }

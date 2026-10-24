@@ -8,5 +8,5 @@ rules:
   - program: npx
     verbs: [tsc, vitest, oxlint, eslint, prettier]
     reason: Runs a local build, test or lint tool.
-  - program: [node, tsc, vitest, oxlint, eslint, prettier, cargo, go, python3, make]
+  - program: [node, tsc, vitest, oxlint, eslint, prettier, python3, make]
     reason: Build, test or lint tool.
