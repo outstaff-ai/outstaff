@@ -206,6 +206,15 @@ function variables(ctx: Ctx): Record<string, string> {
 
 type Resolved<T> = { value: T } | { skip: string };
 
+/** The recorded requester, else the first listed human. */
+const requesterOf = (ctx: Ctx): string | undefined =>
+  (ctx.ticket ? ctx.state.requester(ctx.ticket) : undefined) ?? ctx.opts.fallbackRequester;
+
+const noRequester = (ctx: Ctx) =>
+  ctx.ticket
+    ? `ticket ${ctx.ticket} has no known requester and the team lists no humans`
+    : "event has no linked ticket";
+
 function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {
   if (spec === "none") {
     return { value: null };
@@ -226,8 +235,8 @@ function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {
   }
 
   if (spec === "requester") {
-    const r = ctx.ticket ? ctx.state.requester(ctx.ticket) : undefined;
-    return r ? { value: { kind: "human", id: r } } : { skip: "ticket has no known requester" };
+    const r = requesterOf(ctx);
+    return r ? { value: { kind: "human", id: r } } : { skip: noRequester(ctx) };
   }
 
   if (spec.startsWith("human:")) {
@@ -346,9 +355,9 @@ function perform(a: Action, ctx: Ctx): Resolved<Effect> {
 
   let to: Extract<Effect, { type: "notify" }>["to"];
   if (a.notify.to === "requester") {
-    const r = ticket ? ctx.state.requester(ticket) : undefined;
+    const r = requesterOf(ctx);
     if (!r) {
-      return { skip: "ticket has no known requester" };
+      return { skip: noRequester(ctx) };
     }
 
     to = { kind: "human", id: r };

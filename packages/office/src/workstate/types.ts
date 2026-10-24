@@ -22,8 +22,11 @@ export interface TicketRecord {
   assignee?: { id: string; kind: "human" | "agent" };
   labels: string[];
 
-  /** The human who asked for the work: the creator, or whoever first assigned it to an agent. */
+  /** The human waiting on the work: the latest trusted human to assign the ticket or send it back with feedback. */
   requester?: string;
+
+  /** When the requester was recorded; a later human assignment or send-back replaces it. */
+  requesterAt?: string;
   updatedAt: string;
 }
 

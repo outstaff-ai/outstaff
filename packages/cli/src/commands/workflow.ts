@@ -99,7 +99,7 @@ export const explain = defineCommand<{ state?: string }>({
       return 1;
     }
 
-    const workflow = resolveWorkflow(loaded.config.workflow);
+    const workflow = resolveWorkflow(loaded.config.workflow, loaded.config.humans);
     const explanation = explainWorkflow(
       event,
       createStaticWorkflowState(data),
