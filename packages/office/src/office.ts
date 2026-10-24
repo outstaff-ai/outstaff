@@ -43,6 +43,9 @@ export interface OfficeOptions {
   refreshIntervalMs?: number;
   staleAfterMinutes?: number;
 
+  /** Seconds the agent has to post a chat result after its hand-back before the office posts it. Default 60. */
+  chatReportGraceSeconds?: number;
+
   /** Minutes after which a usage report counts as unknown. Default 30. */
   usageStaleAfterMinutes?: number;
   officeVersion?: string;
@@ -277,7 +280,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ports: { ...(ports.tracker ? { tracker: ports.tracker } : {}), vcs: ports.vcs },
     roles,
     notify,
-    onHandedBack: (item) => handedBack(item),
+    onHandedBack: async (item, result) => {
+      await chatDesk.handedBack(item, result);
+      await handedBack(item);
+    },
   });
 
   const messaging = createMessaging({
@@ -305,6 +311,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     workState,
     messaging,
     notify,
+    clock,
+    ...(o.chatReportGraceSeconds === undefined ? {} : { graceSeconds: o.chatReportGraceSeconds }),
     logger: log,
     ...(ports.tracker ? { tracker: ports.tracker } : {}),
     ...(ports.chat ? { chat: ports.chat } : {}),
@@ -350,6 +358,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       await workState.stop();
     }
 
+    chatDesk.stop();
     if (up.scheduler) {
       baseScheduler.stop();
     }
@@ -397,6 +406,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
         });
 
         up.scheduler = true;
+        await chatDesk.resume();
         state = "running";
         log.info("office started", { team: team.team.name, agentPort: protocol.port() });
       } catch (error) {

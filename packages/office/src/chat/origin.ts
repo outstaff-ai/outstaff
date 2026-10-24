@@ -1,4 +1,4 @@
-import type { ChatOrigin } from "@outstaff/protocol";
+import type { ChatOrigin, Link } from "@outstaff/protocol";
 import type { Store } from "../store/types.js";
 
 /** Subject types that keep chat state in the store; none of them needs a migration. */
@@ -12,6 +12,18 @@ export interface ChatOriginRecord extends ChatOrigin {
 
   /** What was already reported to the requester, so a retry does not post again. */
   claimed: string[];
+
+  /** The last hand-back, kept so the office can post the result itself if the agent never does, even after a restart. */
+  handBack?: {
+    /** The claim key the result is posted under. */
+    key: string;
+    kind: "result" | "blocked";
+    summary: string;
+    links: Link[];
+
+    /** When the office recorded it; the grace period counts from here. */
+    at: string;
+  };
 }
 
 export const threadKey = (channel: string, thread: string) => `${channel}:${thread}`;
