@@ -25,7 +25,7 @@ describe("githubSetupGuide", () => {
 
     expect(steps.map((s) => s.title)).toEqual([
       "Create Sam's GitHub App",
-      "Install it on exactly the repositories this person is granted",
+      "Install it on exactly the repositories this person can write",
       "Generate a private key and copy the keys",
       "Add the office App's keys",
     ]);
@@ -36,8 +36,9 @@ describe("githubSetupGuide", () => {
       checks: "read",
     });
 
-    expect(steps[1]!.body).toContain("`github.com/acme-example/shop` (write)");
-    expect(steps[1]!.body).toContain("`github.com/acme-example/infra` (read)");
+    expect(steps[1]!.body).toContain("`github.com/acme-example/shop`");
+    expect(steps[1]!.body).not.toContain("infra");
+    expect(steps[1]!.body).toContain("office App");
     expect(steps[2]!.body).toContain("GH_APP_SLUG");
   });
 

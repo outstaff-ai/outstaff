@@ -19,6 +19,7 @@ import {
   type SetupStep,
   type TeamConfig,
 } from "@outstaff/core";
+import { loadCatalogs, roleProfile } from "../catalogs.js";
 import { defineCommand, type Context } from "../define.js";
 import { loadTeam } from "../load.js";
 import { projectRoot, secretsLocation, shown, type SecretsLocation } from "../project.js";
@@ -371,12 +372,22 @@ export const setup = defineCommand<{
     mkdirSync(join(file, ".."), { recursive: true });
     writeFileSync(file, text);
 
+    const catalogs = loadCatalogs(ctx, config, loaded.source.dir);
+    const profile = person
+      ? roleProfile(catalogs.ok ? catalogs.catalogs : undefined, person.role)
+      : {};
+
     const seen = new Set<string>();
     const guides: { adapter: string; steps: SetupStep[] }[] = [];
     for (const { def, options: opts } of found) {
       const steps =
-        def.setupGuide?.({ team: config, scope, options: opts, ...(person ? { person } : {}) }) ??
-        [];
+        def.setupGuide?.({
+          team: config,
+          scope,
+          options: opts,
+          ...(person ? { person } : {}),
+          ...profile,
+        }) ?? [];
 
       const key = JSON.stringify([def.name, steps]);
       if (steps.length > 0 && !seen.has(key)) {

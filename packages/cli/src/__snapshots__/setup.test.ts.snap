@@ -417,9 +417,9 @@ Secret files go in .outstaff/secrets/mira/, one file per key.
    }
    \`\`\`
 
-2. Install it on exactly the repositories this person is granted
+2. Install it on exactly the repositories this person can write
 
-   Install App, pick the owning account, "Only select repositories": \`github.com/acme-example/shop\` (write), \`github.com/acme-example/design-system\` (read). A GitHub App's permissions are per installation, not per repository; Outstaff narrows every token to the grant (write only where \`write\` is granted), so the repository list is the real boundary.
+   Install App, pick the owning account, "Only select repositories": \`github.com/acme-example/shop\`. Nothing else: the App carries write permissions, and a GitHub App's permissions are per installation, not per repository, so the repository list is the real boundary. Read access comes from the office App, so read-only repositories do not belong on this installation.
 
 3. Generate a private key and copy the keys
 

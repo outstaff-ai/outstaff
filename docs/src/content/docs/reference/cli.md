@@ -351,7 +351,7 @@ ost fire sam --yes --json
 
 Verify the secrets and the setup of the office and of each person.
 
-Validates the team file, then for each scope checks that every required secret is present (as a file in the secrets directory or in the environment, the same way the containers read them), that secret files are mode 0600, and each adapter's live checks: the GitHub App key signs and the installation covers the granted repositories with the right permissions, the office App is read-only, the Slack bot token and ids match, the Its a Plan key works and belongs to the configured member, and a Claude credential is supplied. Every finding names the value to fix and never prints a secret. Without a handle it checks the office and every person from one secrets directory.
+Validates the team file, then for each scope checks that every required secret is present (as a file in the secrets directory or in the environment, the same way the containers read them), that secret files are mode 0600, and each adapter's live checks: the GitHub App key signs and the office App covers the granted repositories and the person's own App exactly the ones they can write, with the right permissions, the office App is read-only, the Slack bot token and ids match, the Its a Plan key works and belongs to the configured member, and a Claude credential is supplied. Every finding names the value to fix and never prints a secret. Without a handle it checks the office and every person from one secrets directory.
 
 ```
 ost doctor [handle|office] [options]

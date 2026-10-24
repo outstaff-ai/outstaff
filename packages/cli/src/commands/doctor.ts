@@ -9,7 +9,13 @@ import {
   type SecretSource,
   type TeamConfig,
 } from "@outstaff/core";
-import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
+import {
+  catalogIssue,
+  loadCatalogs,
+  roleProfile,
+  roleRegistry,
+  type TeamCatalogs,
+} from "../catalogs.js";
 import { defineCommand, type Context } from "../define.js";
 import { loadTeam } from "../load.js";
 import { projectRoot, secretsLocation } from "../project.js";
@@ -273,6 +279,7 @@ async function checkScope(
   handle: string,
   dir: string,
   registry: Awaited<ReturnType<typeof shippedRegistry>>,
+  catalogs: TeamCatalogs | undefined,
 ): Promise<ScopeReport> {
   const scope: Scope = handle === "office" ? "office" : "person";
   const person = scope === "person" ? team.people.find((p) => p.handle === handle) : undefined;
@@ -319,7 +326,7 @@ async function checkScope(
         team,
         scope,
         options,
-        ...(person ? { person } : {}),
+        ...(person ? { person, ...roleProfile(catalogs, person.role) } : {}),
         fetch: ctx.fetch ?? fetch,
         now: ctx.now ?? (() => new Date()),
         warn: (m) => warnings.push(m),
@@ -369,7 +376,7 @@ export const doctor = defineCommand<{ secretsDir?: string }>({
   name: "doctor",
   summary: "Verify the secrets and the setup of the office and of each person.",
   description:
-    "Validates the team file, then for each scope checks that every required secret is present (as a file in the secrets directory or in the environment, the same way the containers read them), that secret files are mode 0600, and each adapter's live checks: the GitHub App key signs and the installation covers the granted repositories with the right permissions, the office App is read-only, the Slack bot token and ids match, the Its a Plan key works and belongs to the configured member, and a Claude credential is supplied. Every finding names the value to fix and never prints a secret. Without a handle it checks the office and every person from one secrets directory.",
+    "Validates the team file, then for each scope checks that every required secret is present (as a file in the secrets directory or in the environment, the same way the containers read them), that secret files are mode 0600, and each adapter's live checks: the GitHub App key signs and the office App covers the granted repositories and the person's own App exactly the ones they can write, with the right permissions, the office App is read-only, the Slack bot token and ids match, the Its a Plan key works and belongs to the configured member, and a Claude credential is supplied. Every finding names the value to fix and never prints a secret. Without a handle it checks the office and every person from one secrets directory.",
   args: "[handle|office]",
   options: [
     {
@@ -433,7 +440,14 @@ export const doctor = defineCommand<{ secretsDir?: string }>({
     const reports: ScopeReport[] = [];
     for (const h of handles) {
       reports.push(
-        await checkScope(ctx, config, h, secretsLocation(ctx, options, root, h).dir, registry),
+        await checkScope(
+          ctx,
+          config,
+          h,
+          secretsLocation(ctx, options, root, h).dir,
+          registry,
+          found.ok ? found.catalogs : undefined,
+        ),
       );
     }
 

@@ -121,7 +121,7 @@ describe("ost setup template", () => {
 
     expect(by["slack"]!.some((s) => s.manifest?.includes("socket_mode_enabled: true"))).toBe(true);
     expect(by["github"]![0]!.manifest).toContain('"contents": "write"');
-    expect(by["github"]![1]!.body).toContain("github.com/acme-example/shop` (write)");
+    expect(by["github"]![1]!.body).toContain("github.com/acme-example/shop`");
     expect(by["claude-agent-sdk"]![0]!.body).toContain("claude setup-token");
     expect(by["itsaplan"]!.map((s) => s.title)).toContain("A human accepts the invite");
 

@@ -8,6 +8,7 @@ import {
   type Catalog,
   type CatalogIssue,
   type LocatedIssue,
+  type Profile,
   type RoleNeeds,
   type TeamConfig,
 } from "@outstaff/core";
@@ -58,6 +59,17 @@ export function roleRegistry({ stock, ejected }: TeamCatalogs): Map<string, Role
 
   return roles;
 }
+
+/** The permission profile of a role in the merged catalog; a client role replaces a stock one of the same name. */
+export const roleProfile = (
+  catalogs: TeamCatalogs | undefined,
+  role: string,
+): { profile: Profile } | Record<string, never> => {
+  const profile =
+    catalogs && { ...catalogs.stock.roles, ...catalogs.ejected?.roles }[role]?.permissions;
+
+  return profile ? { profile } : {};
+};
 
 export const catalogIssue = (i: CatalogIssue): LocatedIssue => ({
   path: [],
