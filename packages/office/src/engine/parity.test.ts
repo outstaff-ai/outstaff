@@ -200,7 +200,7 @@ describe("kanban parity", () => {
       expect((await h.items("sam")).map((i) => i.kind)).toEqual(["review_feedback"]);
     });
 
-    it("ignores an approval", async () => {
+    it("ignores an approval with nothing written in it", async () => {
       const key = await ticket();
       const pr = await openPr(key);
       await h.poll();
@@ -208,6 +208,67 @@ describe("kanban parity", () => {
       await h.poll();
       expect(await status(key)).toBe("review");
       expect(await h.items()).toEqual([]);
+    });
+
+    it("treats an approval with a body as feedback", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "Fine, but rename the flag.");
+      await h.poll();
+      expect((await h.items("sam")).map((i) => i.kind)).toEqual(["review_feedback"]);
+    });
+
+    it("reaches the author while the ticket is active, without moving it", async () => {
+      const key = await ticket({ status: "active" });
+      const pr = await openPr(key, { draft: true });
+      await h.poll();
+      await h.vcs.seed.comment(REPO, pr.number, "dana", "wip looks off");
+      await h.poll();
+      expect(await status(key)).toBe("active");
+      expect((await h.items("sam")).map((i) => i.kind)).toEqual(["review_feedback"]);
+    });
+
+    it("reaches the author of a pull request with no ticket", async () => {
+      const pr = await h.vcs.seed.pullRequest(REPO, {
+        title: "Tidy up",
+        head: { ref: "sam/tidy" },
+        author: { login: SAM, kind: "agent" },
+      });
+
+      await h.poll();
+      await h.vcs.seed.comment(REPO, pr.number, "dana", "one question");
+      await h.poll();
+      expect((await h.items("sam")).map((i) => i.kind)).toEqual(["review_feedback"]);
+    });
+
+    it("does nothing for feedback on a closed pull request", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      await h.vcs.seed.close(REPO, pr.number, "dana");
+      await h.poll();
+      await h.vcs.seed.comment(REPO, pr.number, "dana", "too late");
+      await h.poll();
+      expect(await h.items("sam")).toEqual([]);
+    });
+
+    it("looks up a ticket the office never saw, so its status is known", async () => {
+      // Created in the tracker before the office existed: no ticket.created event ever reached it.
+      const issue = await h.tracker.createIssue({
+        title: "Old work",
+        body: "",
+        status: "review",
+        assignee: "u-sam",
+      });
+
+      const pr = await openPr(issue.key);
+      await h.poll();
+      expect(h.ws.ticketStatus(issue.key)).toBe("review");
+      await h.vcs.seed.comment(REPO, pr.number, "dana", "please change this");
+      await h.poll();
+      expect(await status(issue.key)).toBe("active");
+      expect((await h.items("sam")).map((i) => i.kind)).toEqual(["review_feedback"]);
     });
 
     it("ignores feedback from a human without write access", async () => {

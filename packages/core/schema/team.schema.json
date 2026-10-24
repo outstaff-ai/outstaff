@@ -1732,6 +1732,32 @@
         {
           "type": "object",
           "properties": {
+            "pr_open": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pr_open"
+          ],
+          "additionalProperties": false,
+          "description": "The pull request is (or is not) open."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "has_body": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "has_body"
+          ],
+          "additionalProperties": false,
+          "description": "The review or comment in the event has (or lacks) a non-blank body."
+        },
+        {
+          "type": "object",
+          "properties": {
             "review_state": {
               "minItems": 1,
               "type": "array",

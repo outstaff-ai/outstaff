@@ -19,6 +19,8 @@ export type Condition =
   | { has_label: string }
   | { pr_author_kind: "human" | "agent" | "bot" }
   | { pr_draft: boolean }
+  | { pr_open: boolean }
+  | { has_body: boolean }
   | { review_state: string[] };
 
 export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
@@ -47,6 +49,10 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .strictObject({ pr_author_kind: z.enum(["human", "agent", "bot"]) })
       .meta(d("Who authored the pull request.")),
     z.strictObject({ pr_draft: z.boolean() }).meta(d("The pull request is (or is not) a draft.")),
+    z.strictObject({ pr_open: z.boolean() }).meta(d("The pull request is (or is not) open.")),
+    z
+      .strictObject({ has_body: z.boolean() })
+      .meta(d("The review or comment in the event has (or lacks) a non-blank body.")),
     z
       .strictObject({ review_state: z.array(z.string().min(1)).min(1) })
       .meta(d('The review state in the event, for example "approved".')),

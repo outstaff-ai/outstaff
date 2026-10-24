@@ -542,6 +542,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     headRef: p.headRef,
     baseRef: p.baseRef,
     draft: p.draft,
+    state: p.state,
     author: { ...p.author },
   });
 
