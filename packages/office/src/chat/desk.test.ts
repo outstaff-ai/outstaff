@@ -459,6 +459,72 @@ describe("chat requests", () => {
     });
   });
 
+  describe("a reply in the thread of a blocked item", () => {
+    const blocked = async () => {
+      const r = await say("Add a search page");
+      await scheduler.markActive(r.item.id);
+      await desk.linkTicket("sam", r.item.id, "ACME-1");
+      await store.updateItem(r.item.id, {
+        sessionId: "s1",
+        failures: 3,
+        notBefore: "2999-01-01T00:00:00.000Z",
+      });
+
+      await store.recordLoopGuard(r.item.id);
+      await scheduler.block(r.item.id, "stuck");
+      notified.length = 0;
+      return r.item.id;
+    };
+
+    it("retries it with a clean count and says so in the thread", async () => {
+      const id = await blocked();
+      const reply = await say("try again please", "m1");
+      expect(reply.disposition).toBe("joined");
+      expect(await store.getItem(id)).toMatchObject({
+        status: "queued",
+        failures: 0,
+        notBefore: null,
+        sessionId: "s1",
+      });
+
+      expect(await store.countLoopGuard(id, 60 * 60_000)).toBe(0);
+      const journal = (await store.readJournal(id)).map((j) => j.text);
+      expect(journal).toContain("Retried on request by Dana (chat reply).");
+      expect(journal).toContain("In the chat thread: try again please");
+      expect(chat.posts.at(-1)).toMatchObject({
+        channel: "D1",
+        thread: "m1",
+        text: "Retrying ACME-1 on request",
+      });
+
+      expect(notified).toEqual(["sam"]);
+    });
+
+    it("works for an item of any kind the thread is linked to", async () => {
+      const item = await scheduler.enqueue({
+        person: "sam",
+        kind: "implement",
+        title: "Implement: Search",
+        trigger: "agent",
+        subject: { type: "ticket", ref: "ACME-2" },
+      });
+
+      await store.upsertSubject("chat_thread", "D1:t9", { itemId: item.id });
+      await scheduler.block(item.id, "stuck");
+      await say("go on", "t9");
+      expect((await store.getItem(item.id))?.status).toBe("queued");
+      expect(chat.posts.at(-1)?.text).toBe("Retrying ACME-2 on request");
+    });
+
+    it("leaves a waiting item as it was, without a note", async () => {
+      const r = await say("Add a search page");
+      await store.updateItem(r.item.id, { status: "waiting" });
+      await say("here is more", "m1");
+      expect((await store.getItem(r.item.id))?.status).toBe("queued");
+      expect(chat.posts).toHaveLength(0);
+    });
+  });
+
   it("gives the person's current work as text", async () => {
     expect(await desk.currentWork("sam")).toContain("Ticket ACME-9");
   });

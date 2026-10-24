@@ -16,7 +16,7 @@ import type { WorkState, WorkstateMeta } from "../workstate/index.js";
 export interface EngineOptions {
   store: Store;
   workState: WorkState;
-  scheduler: Pick<Scheduler, "enqueue">;
+  scheduler: Pick<Scheduler, "enqueue" | "retry">;
   team: TeamConfig;
   clock: Clock;
   logger: Logger;

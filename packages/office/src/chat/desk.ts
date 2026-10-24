@@ -32,7 +32,7 @@ export interface ChatDeskOptions {
   store: Store;
 
   /** The scheduler without the notifying wrapper: the desk stores the origin first and then calls `notify`. */
-  scheduler: Pick<Scheduler, "enqueue" | "move">;
+  scheduler: Pick<Scheduler, "enqueue" | "move" | "retry">;
   team: Pick<TeamConfig, "people" | "policies">;
   workState: Pick<WorkState, "currentWork">;
   tracker?: Pick<Tracker, "links">;
@@ -224,6 +224,20 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     return { disposition: "placed", placement, ...(await base()) };
   }
 
+  async function retryNote(item: WorkItem, m: Message) {
+    if (!opts.chat) {
+      return;
+    }
+
+    try {
+      await opts.chat.post(m.channel, `Retrying ${item.subject?.ref ?? item.title} on request`, {
+        thread: m.thread ?? m.messageId,
+      });
+    } catch (error) {
+      log.warn("could not post the retry note", { item: item.id, error: String(error) });
+    }
+  }
+
   async function replyInThread(
     person: string,
     item: WorkItem,
@@ -263,7 +277,13 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     );
 
     let current = item;
-    if (item.status === "waiting" || item.status === "blocked") {
+    if (item.status === "blocked") {
+      // Whatever kind of work the thread is linked to; the human's reply is the request to try again.
+      const by = m.author.name ?? m.author.id;
+      current = (await scheduler.retry(item.id, { by, signal: "chat reply" })) ?? item;
+      opts.notify(person);
+      await retryNote(item, m);
+    } else if (item.status === "waiting") {
       current = await store.updateItem(item.id, { status: "queued" });
       opts.notify(person);
     }

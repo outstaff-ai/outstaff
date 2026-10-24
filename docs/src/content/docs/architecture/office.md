@@ -114,6 +114,20 @@ When an agent reports that a run failed, `fail(itemId, error)` ends the run as `
 
 After `policies.retry.max_failures` failures in a row (default 3) the item is blocked with the reason `failed N times: <first line of the last error>`. It goes through the same path as a loop-guard block: the reason is written to the journal and the office announces it to the requester and the person's chat. A successful hand-back (`done` or `waiting`) resets the count, and so does blocking, so a human who unblocks the item starts with a clean count. A stale run is not a failure; it keeps its own retry-once rule.
 
+### Blocked work
+
+An item is blocked when it failed `policies.retry.max_failures` times in a row, when the loop guard tripped, when its run went stale twice, or when its person blocked it. Nothing brings it back by itself, and there is no command for it: a trusted human retries it through the tools they already use.
+
+| Signal       | What brings the item back                                                                        |
+| ------------ | ------------------------------------------------------------------------------------------------ |
+| Ticket       | A human moves the ticket to `ready` or `active`, or assigns it to the item's person.             |
+| Pull request | A human reviews or comments on the pull request the item is about (or whose ticket it is about). |
+| Chat         | A human replies in the thread the item is linked to, whatever kind of item it is.                |
+
+The item is queued again with no failures, no backoff and a fresh loop-guard count. Its session and journal stay, so the agent continues where it was. The journal gets a line saying who asked and how; the office comments on the ticket, or in the chat thread, with `Retrying <subject> on request`, and logs `retried <item> for <human> on <subject> (signal: ...)`. Pull requests have no comment port yet, so a pull request signal is noted on the ticket of the pull request, when it has one.
+
+Only trusted humans retry: an agent, a bot or a human without write access never does. Review feedback and the retry do not run side by side: when a pull request signal retries a blocked item, the review feedback rule queues no second item for that person, and the comment text is added to the retried item's journal.
+
 ### Usage policy
 
 An injected `UsageSource` reports the 5-hour and 7-day utilization. The busiest window counts:
@@ -202,7 +216,7 @@ A trusted human asks an agent for something in chat; the agent's chat relay (see
 
 **The answer** is a reply in the thread of the waiting request. The office reads it with a small set of rules, not a model: _next_ (or _first_, _now_, _urgent_), _last_ (or _later_, _no rush_), _after_ a number from the list, a ticket key, a work item id or a title (after the running item means next, since a running item is never interrupted), and _PM_ or _prioritize_. A match moves the item with the scheduler's `move`; the agent's `ost work move` (`work_place`) does the same. _PM_ asks the team's `pm` role through the question routing with the request and the queue, and the item keeps waiting: the PM's answer reaches the item's journal but does not move it, the requester's answer does. An answer that matches nothing gets the question again. The item runs when its turn comes, so nothing is dropped.
 
-**A reply in the thread of an item** attaches to it: the text goes to the item's journal and a waiting or blocked item is queued again, so the message joins the session on the next round. A reply to a finished item starts a new chat item in the same thread that takes over the finished item's session and ticket. A reply in a thread the office does not know is a new request in that thread. Messages are remembered by id, so a message the platform delivers twice is handled once.
+**A reply in the thread of an item** attaches to it: the text goes to the item's journal and a waiting item is queued again, and a blocked item is retried as described in [Blocked work](#blocked-work), so the message joins the session on the next round. A reply to a finished item starts a new chat item in the same thread that takes over the finished item's session and ticket. A reply in a thread the office does not know is a new request in that thread. Messages are remembered by id, so a message the platform delivers twice is handled once.
 
 **Report back.** `chat_report` is a claim: the office answers whether the agent should post, once for each ending of an item (`result` for a finished item, `blocked`, `failed` once per item), together with the requester and the links of the item: its ticket, if the agent made one, and the pull requests that implement it. The first reply is a claim of its own (`ack`), made when the ticket is linked. A retried hand-back or a restart cannot post twice. An item the scheduler blocks on its own is announced by the office through its chat port, with the same claim, so the thread is not left in silence. Follow-ups are items of their own without a chat origin, so a review round or a question reports nothing until the requester's item finishes.
 

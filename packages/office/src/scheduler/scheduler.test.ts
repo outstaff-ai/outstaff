@@ -384,6 +384,61 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
     });
   });
 
+  describe("retry on request", () => {
+    it("brings a blocked item back clean, keeping its session and journal, and logs it", async () => {
+      const lines: string[] = [];
+      sched = createScheduler({
+        store,
+        team,
+        clock,
+        logger: { debug() {}, info: (m) => void lines.push(m), warn() {}, error() {} },
+      });
+
+      const a = await sched.enqueue({
+        person: "ann",
+        kind: "task",
+        title: "a",
+        trigger: "agent",
+        subject: { type: "ticket", ref: "ACME-1" },
+      });
+
+      await store.updateItem(a.id, { sessionId: "s1" });
+      for (let i = 0; i < 3; i++) {
+        const res = await sched.markActive(a.id);
+        expect(res.started).toBe(true);
+        await sched.finish(a.id, { outcome: "ok", status: "queued" });
+      }
+
+      expect(await sched.markActive(a.id)).toMatchObject({ reason: "loop_guard" });
+      await store.updateItem(a.id, { failures: 2, notBefore: "2999-01-01T00:00:00.000Z" });
+
+      const back = await sched.retry(a.id, { by: "dana", signal: "ticket moved" });
+      expect(back).toMatchObject({
+        status: "queued",
+        failures: 0,
+        notBefore: null,
+        sessionId: "s1",
+      });
+
+      expect(await store.countLoopGuard(a.id, 60 * 60_000)).toBe(0);
+      expect((await store.readJournal(a.id)).at(-1)?.text).toBe(
+        "Retried on request by dana (ticket moved).",
+      );
+
+      expect(lines).toContain(`retried ${a.id} for dana on ACME-1 (signal: ticket moved)`);
+
+      // The loop guard no longer holds it back.
+      expect((await sched.markActive(a.id)).started).toBe(true);
+    });
+
+    it("does nothing for an item that is not blocked", async () => {
+      const a = await add("a");
+      expect(await sched.retry(a.id, { by: "dana", signal: "chat reply" })).toBeNull();
+      expect(await sched.retry("missing", { by: "dana", signal: "chat reply" })).toBeNull();
+      expect((await store.getItem(a.id))?.status).toBe("queued");
+    });
+  });
+
   describe("usage policy", () => {
     it("defers scheduled work, then pauses automatic work, always answering humans", async () => {
       await add("sched", "schedule");

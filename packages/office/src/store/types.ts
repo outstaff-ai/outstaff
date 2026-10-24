@@ -206,6 +206,9 @@ export interface Store {
   /** Number of guarded runs of the item in the last `windowMs`. */
   countLoopGuard(workItemId: string, windowMs: number): Promise<number>;
 
+  /** Forgets the item's guarded runs, so a human's retry starts with a clean count. */
+  clearLoopGuard(workItemId: string): Promise<void>;
+
   /** Idempotent: pausing a paused scope keeps the first pause. */
   setPause(scope: string, reason?: string): Promise<void>;
 
