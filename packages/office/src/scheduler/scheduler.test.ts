@@ -567,15 +567,21 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       const a = await add("a");
       await sched.markActive(a.id);
       const seen: number[] = [];
-      sched.start((r) => seen.push(r.retried.length));
+      let ticked!: () => void;
+      const firstTick = new Promise<void>((resolve) => (ticked = resolve));
+      sched.start((r) => {
+        seen.push(r.retried.length);
+        ticked();
+      });
+
       clock.advance(11 * 60_000);
-      await new Promise((r) => setTimeout(r, 100));
-      expect(seen[0]).toBe(1);
+      await firstTick;
+      expect(seen).toEqual([1]);
+
       sched.stop();
-      const n = seen.length;
+      expect(clock.pending()).toBe(0);
       clock.advance(60 * 60_000);
-      await new Promise((r) => setTimeout(r, 50));
-      expect(seen).toHaveLength(n);
+      expect(seen).toEqual([1]);
     });
   });
 
