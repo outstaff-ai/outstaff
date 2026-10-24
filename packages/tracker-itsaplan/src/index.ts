@@ -1,6 +1,7 @@
 import { defineAdapter, type SecretSpec } from "@outstaff/core";
 import { validateItsaplanIdentities } from "./identities.js";
 import { createItsaplanKnowledge } from "./knowledge.js";
+import { deriveItsaplan, itsaplanSetupGuide } from "./setup.js";
 import { knowledgeOptions, trackerOptions } from "./options.js";
 import { createItsaplanTracker } from "./tracker.js";
 
@@ -26,6 +27,13 @@ const apiKey = (scope: "person" | "office"): SecretSpec[] => [
     where:
       "Its a Plan > Account settings > API keys, signed in as that member (the key is shown once)",
   },
+  {
+    key: "ITSAPLAN_MEMBER_ID",
+    description: "Member id of the account the API key belongs to",
+    where: "Let ost setup --derive look it up (/me)",
+    derivable: true,
+    optional: true,
+  },
 ];
 
 export const itsaplanTracker = defineAdapter({
@@ -36,6 +44,8 @@ export const itsaplanTracker = defineAdapter({
   secrets: apiKey,
   create: (ctx) => createItsaplanTracker(ctx),
   validateIdentities: validateItsaplanIdentities,
+  setupGuide: itsaplanSetupGuide,
+  derive: deriveItsaplan,
 });
 
 export const itsaplanKnowledge = defineAdapter({
@@ -45,4 +55,6 @@ export const itsaplanKnowledge = defineAdapter({
   options: knowledgeOptions,
   secrets: apiKey,
   create: (ctx) => createItsaplanKnowledge(ctx),
+  setupGuide: itsaplanSetupGuide,
+  derive: deriveItsaplan,
 });

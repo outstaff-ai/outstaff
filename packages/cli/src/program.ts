@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createInterface } from "node:readline/promises";
 import { Command, CommanderError } from "@commander-js/extra-typings";
 import { commands, groupSummaries } from "./commands/index.js";
 import type { Context, GlobalOptions } from "./define.js";
@@ -21,6 +22,18 @@ export function nodeContext(): Context {
 
       return text;
     },
+    ...(process.stdin.isTTY && process.stdout.isTTY
+      ? {
+          async confirm(question: string) {
+            const rl = createInterface({ input: process.stdin, output: process.stdout });
+            try {
+              return /^y(es)?$/i.test((await rl.question(`${question} [y/N] `)).trim());
+            } finally {
+              rl.close();
+            }
+          },
+        }
+      : {}),
     gitOrigin(cwd) {
       try {
         return (

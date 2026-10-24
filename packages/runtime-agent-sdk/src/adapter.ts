@@ -1,4 +1,4 @@
-import { defineAdapter, type SecretSpec } from "@outstaff/core";
+import { defineAdapter, type SecretSpec, type SetupStep } from "@outstaff/core";
 import { workdirFiles } from "./layout.js";
 import { agentSdkOptions } from "./options.js";
 import { createAgentSdkRuntime } from "./runtime.js";
@@ -22,12 +22,31 @@ const secrets: SecretSpec[] = [
   },
 ];
 
+const setupGuide = (ctx: { scope: "person" | "office" }): SetupStep[] =>
+  ctx.scope === "office"
+    ? []
+    : [
+        {
+          title: "Choose how this agent signs in to Claude",
+          body: [
+            "Outstaff never asks for, stores or brokers model credentials. Supply exactly one of these to the agent container:",
+            "",
+            "- **API key**: create it in the Anthropic Console and keep it as `ANTHROPIC_API_KEY`.",
+            "- **Cloud provider**: Amazon Bedrock, Google Vertex AI or Microsoft Foundry. Set the provider's switch and region as plain environment variables (for example `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_REGION`) and give its credentials as secret files.",
+            "- **Your own subscription token**: run `claude setup-token` on a machine signed in to your subscription and keep the result as `CLAUDE_CODE_OAUTH_TOKEN`. Use it only within the provider's terms (https://www.anthropic.com/legal/consumer-terms and https://www.anthropic.com/legal/commercial-terms); a subscription is meant for its owner, not for a fleet of agents.",
+            "",
+            "The Claude Code binary may leave the subscription token visible to the agent's shell, so narrow its reach and the container's egress.",
+          ].join("\n"),
+        },
+      ];
+
 export const claudeAgentSdk = defineAdapter({
   port: "runtime",
   name: "claude-agent-sdk",
   capabilities: ["runtime.sessions", "runtime.usage"],
   options: agentSdkOptions,
   secrets: () => secrets,
+  setupGuide,
   workdirLayout: workdirFiles,
   create: (ctx) =>
     createAgentSdkRuntime({

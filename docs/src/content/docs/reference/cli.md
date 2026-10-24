@@ -254,6 +254,37 @@ ost init --separate-repo
 ost init --force
 ```
 
+## ost setup
+
+Prepare the credentials of one person or of the office.
+
+Without --derive, writes `.outstaff/people/<handle>/.env.example` (or `.outstaff/office/.env.example`), which lists every secret the configured adapters need for that scope with where to get it, and prints a step-by-step guide per adapter. It never writes a real value. With --derive, reads the secrets already provided (files in the secrets directory first, then the environment), looks up the values that can be computed, such as GitHub App slug and installation id, the chat bot's user id and the tracker member id, and writes them as files into the secrets directory without printing them. If a `<app slug>.*.pem` was just downloaded to ~/Downloads, offers to move it there as the App's private key. Refuses to run unless the `.env` file and the secrets directory are ignored by git.
+
+```
+ost setup <handle|office> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--out <dir>` | Project directory to write `.outstaff/...` into. Defaults to the current directory. |
+| `--derive` | Fill derivable secrets from the ones already provided instead of writing the template. |
+| `--secrets-dir <dir>` | Directory of secret files, for the layout hint and for --derive. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+| `--yes` | Do not ask before moving a downloaded private key. |
+
+Exit codes:
+
+- 0: the template was written, or values were derived
+- 1: the team could not be loaded, the person is unknown, or the git ignore rules are missing
+
+Examples:
+
+```sh
+ost setup sam
+ost setup office --out .
+ost setup sam --derive --secrets-dir ./secrets
+ost setup sam --derive --yes --json
+```
+
 ## ost workflow explain
 
 Show which workflow rules an event triggers, and why.

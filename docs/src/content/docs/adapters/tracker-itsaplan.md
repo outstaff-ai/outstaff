@@ -7,7 +7,7 @@ The `itsaplan` adapter implements two ports from one package, `@outstaff/tracker
 
 ## Agents are members
 
-Create every agent as a normal **member** of your Its a Plan instance, not as an "AI agent" object. Then people assign work to an agent in the UI exactly as they would to a colleague, and the agent acts with its own API key. Tracking issue: [#52](https://github.com/outstaff-ai/outstaff/issues/52).
+Create every agent as a normal **member** of your Its a Plan instance, not as an "AI agent" object. Then people assign work to an agent in the UI exactly as they would to a colleague, and the agent acts with its own API key. `ost setup <handle>` prints these steps with your team's address scheme and `--derive` fills `ITSAPLAN_MEMBER_ID` ([Set up credentials](/guides/setup/)). Tracking issue: [#52](https://github.com/outstaff-ai/outstaff/issues/52).
 
 For each person in `team.people`:
 

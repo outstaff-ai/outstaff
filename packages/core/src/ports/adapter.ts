@@ -24,6 +24,36 @@ export interface AdapterContext<Options> {
   now: () => Date;
 }
 
+/** One step of an adapter's setup guide, printed by `ost setup`. */
+export interface SetupStep {
+  title: string;
+
+  /** Markdown. */
+  body: string;
+
+  /** Text to paste into the provider, for example an app manifest. */
+  manifest?: string;
+}
+
+export interface SetupContext {
+  team: TeamConfig;
+
+  /** The person being set up; absent for the office. */
+  person?: TeamConfig["people"][number];
+  scope: "person" | "office";
+
+  /** The options of this adapter's integration in the team file. */
+  options: unknown;
+}
+
+export interface DeriveContext extends SetupContext {
+  fetch: typeof fetch;
+  now: () => Date;
+
+  /** Reports something the person should know, for example that an App is not installed yet. Never put secrets in it. */
+  warn: (message: string) => void;
+}
+
 export interface AdapterDefinition<P extends PortName, Options, Impl> {
   port: P;
 
@@ -33,6 +63,15 @@ export interface AdapterDefinition<P extends PortName, Options, Impl> {
   options: ZodType<Options>;
   secrets: (scope: "person" | "office") => SecretSpec[];
   create(ctx: AdapterContext<Options>): Impl | Promise<Impl>;
+
+  /** Step-by-step instructions for `ost setup`. Never include secret values. */
+  setupGuide?: (ctx: SetupContext) => SetupStep[];
+
+  /**
+   * Looks up the values the person's primary secrets make available (the `derivable` keys of `secrets`). Returns only
+   * keys it could compute; `ost setup --derive` writes them as secret files and never prints them.
+   */
+  derive?: (secrets: SecretSource, ctx: DeriveContext) => Promise<Record<string, string>>;
 
   /**
    * Command rules for the adapter's own CLI, for example a read-only `pr view` allow and a mutating `api` deny.

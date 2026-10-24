@@ -3,7 +3,15 @@ export type { Links } from "./links.js";
 export { PORT_ERROR_CODES, PortError, type PortErrorCode } from "./errors.js";
 export { envSecretSource, scrubEnv, type SecretSource, type SecretSpec } from "./secrets.js";
 export { silentLogger, type Logger } from "./logger.js";
-export type { AdapterContext, AdapterDefinition, PortName } from "./adapter.js";
+export type {
+  AdapterContext,
+  AdapterDefinition,
+  DeriveContext,
+  PortName,
+  SetupContext,
+  SetupStep,
+} from "./adapter.js";
+
 export type { EventPage } from "./events.js";
 
 export { AdapterRegistry, defineAdapter, type PortImpls } from "./define.js";
