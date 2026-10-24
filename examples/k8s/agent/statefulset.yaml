@@ -1,5 +1,5 @@
 # Secret names below are for the acme example's adapters; generate yours with `ost setup`.
-# The template of one agent. people/<handle> sets the person and the Secret and gives it its name.
+# The template of one agent. people/<handle> sets the name, the person, the Secret and the volume.
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -53,32 +53,19 @@ spec:
             - { name: home, mountPath: /home/outstaff }
             - { name: tmp, mountPath: /tmp }
       volumes:
-        # The person's own Secret plus the team-wide GitHub office app keys from the office Secret, in one
-        # directory. The first source is replaced per person; keep it first.
+        # The person's own Secret, generated in the top kustomization. It holds only the keys that person
+        # needs, including the office GitHub App keys when they have repository grants. Replaced per person.
         - name: secrets
-          projected:
+          secret:
+            secretName: outstaff-agent-PERSON
             defaultMode: 0440
-            sources:
-              - secret:
-                  name: outstaff-agent-PERSON
-              - secret:
-                  name: outstaff-office
-                  items:
-                    - { key: GH_OFFICE_APP_ID, path: GH_OFFICE_APP_ID }
-                    - { key: GH_OFFICE_APP_INSTALLATION_ID, path: GH_OFFICE_APP_INSTALLATION_ID }
-                    - { key: GH_OFFICE_APP_PRIVATE_KEY, path: GH_OFFICE_APP_PRIVATE_KEY }
-                    - { key: GH_OFFICE_APP_SLUG, path: GH_OFFICE_APP_SLUG }
         - name: team
           configMap:
             name: outstaff-team
+        # HOME of the agent: worktrees, memory and the tools mise installed. A plain PVC named
+        # <handle>-home (agent/pvc.yaml), so the name is predictable and an existing volume can be adopted.
+        - name: home
+          persistentVolumeClaim:
+            claimName: PERSON-home
         - name: tmp
           emptyDir: { sizeLimit: 512Mi }
-  # HOME of the agent: worktrees, memory and the tools mise installed. Size it for your repositories.
-  volumeClaimTemplates:
-    - metadata:
-        name: home
-      spec:
-        accessModes: [ReadWriteOnce]
-        resources:
-          requests:
-            storage: 20Gi

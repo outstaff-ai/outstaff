@@ -112,7 +112,7 @@ In Kubernetes you can also keep complete Secret manifests encrypted (`sops encry
 
 ## Kubernetes Secrets
 
-Kubernetes mounts every key of a Secret as a file, which is exactly the shape the containers read. The [Kubernetes guide](/guides/kubernetes/) lists the Secrets the example manifests expect and the `kubectl create secret generic --from-file` commands that build them from the folder above. The key names are the file names.
+Kubernetes mounts every key of a Secret as a file, which is exactly the shape the containers read. The [Kubernetes example](/guides/kubernetes/) generates its Secrets with a kustomize `secretGenerator` from one file per key under `secrets/<scope>/KEY`, which is the layout above. The key names are the file names.
 
 Hold the line on three things:
 
@@ -143,7 +143,7 @@ spec:
       }
 ```
 
-The target Secret has the name the StatefulSet mounts, so nothing else changes. A pod reads its files when it starts: after a rotation, restart the pod (`kubectl rollout restart sts/outstaff-agent-sam`).
+Remove that Secret's entry from the `secretGenerator` of the example. The StatefulSet then mounts the Secret named `outstaff-agent-sam`, which is the target name, so nothing else changes. A pod reads its files when it starts: after a rotation, restart the pod (`kubectl rollout restart sts/outstaff-agent-sam`).
 
 ## Rotating and revoking
 
