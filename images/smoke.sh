@@ -38,13 +38,17 @@ smoke_agent() {
   expect "$image" '^20[0-9]{2}\.' mise --version
   # The pinned Claude Code binary the SDK launches.
   expect "$image" 'Claude Code' sh -c 'exec /opt/outstaff/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-*/node_modules/@anthropic-ai/claude-agent-sdk-linux-*/claude --version'
+  # Claude Code's sandbox for the agent's commands: bubblewrap (never setuid) and socat.
+  expect "$image" '^bubblewrap [0-9]' bwrap --version
+  expect "$image" '^not setuid$' sh -c 'test -u "$(command -v bwrap)" && echo setuid || echo not setuid'
+  expect "$image" 'socat version' socat -V
 }
 
 smoke_office() {
   local image=office name="ost-smoke-office-$$" dir
   expect "$image" '^[0-9]+\.[0-9]+\.[0-9]+' outstaff-office --version
   # The office carries no agent tooling.
-  expect "$image" '^none$' sh -c 'for c in mise gh claude; do command -v "$c" >/dev/null && { echo "$c on PATH"; exit 1; }; done; echo none'
+  expect "$image" '^none$' sh -c 'for c in mise gh claude bwrap socat; do command -v "$c" >/dev/null && { echo "$c on PATH"; exit 1; }; done; echo none'
 
   dir="$(mktemp -d)"
   chmod 755 "$dir"

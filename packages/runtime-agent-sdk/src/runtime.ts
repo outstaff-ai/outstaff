@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { query as sdkQuery, type Options } from "@anthropic-ai/claude-agent-sdk";
 import {
   PortError,
@@ -35,6 +37,9 @@ export interface AgentSdkRuntimeConfig {
 
   /** Every secret key any adapter declares; removed from the child's environment. */
   scrubKeys?: Iterable<string>;
+
+  /** The folder of secret files. Defaults to `OUTSTAFF_SECRETS_DIR` in `env`, then `/run/secrets/outstaff`. */
+  secretsDir?: string;
 }
 
 const PROBE_MODEL = "haiku";
@@ -84,12 +89,38 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     return env;
   }
 
+  /**
+   * With sandbox: bubblewrap, Claude Code's credential files, hidden from the sandbox its commands run in. The sandbox
+   * mounts the whole filesystem read-only, so a mounted secret would otherwise be one `cat` away. Other secret files
+   * stay readable: `ost git-credential` runs inside the sandbox and reads the GitHub App keys.
+   */
+  function credentialFiles(): string[] {
+    if (config.options.sandbox !== "bubblewrap") {
+      return [];
+    }
+
+    const env = config.env ?? process.env;
+    const dir = config.secretsDir ?? env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff";
+    return CREDENTIAL_KEYS.map((k) => join(dir, k)).filter((p) => existsSync(p));
+  }
+
   function isolated(): Options {
+    const files = credentialFiles();
     return {
       settingSources: ["project"],
       strictMcpConfig: true,
-      // Claude Code's own skills are removed; the `skills` allowlist in run() then limits the rest to the rendered ones.
-      settings: { disableClaudeAiConnectors: true, disableBundledSkills: true },
+      settings: {
+        // Claude Code's own skills are removed; the `skills` allowlist in run() then limits the rest to the rendered ones.
+        disableClaudeAiConnectors: true,
+        disableBundledSkills: true,
+        ...(files.length > 0
+          ? {
+              sandbox: {
+                credentials: { files: files.map((path) => ({ path, mode: "deny" as const })) },
+              },
+            }
+          : {}),
+      },
       env: childEnv(),
       ...(config.options.claudeCodePath
         ? { pathToClaudeCodeExecutable: config.options.claudeCodePath }
