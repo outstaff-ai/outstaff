@@ -102,19 +102,27 @@ describe("ost validate", () => {
     expect(r.out).toMatchSnapshot();
   });
 
-  it("rejects an option the adapter does not know, at its line", async () => {
+  // One case per shipped adapter: acme configures all of them.
+  it.each([
+    ["chat", "slack"],
+    ["vcs", "github"],
+    ["runtime", "claude-agent-sdk"],
+    ["tracker", "itsaplan"],
+    ["knowledge", "itsaplan"],
+    ["avatars", "dicebear"],
+  ])("rejects an option %s/%s does not know, at its line", async (port, adapter) => {
     const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
-      "    adapter: github\n",
-      "    adapter: github\n    owner: acme-example\n",
+      new RegExp(`(\\n  ${port}:\\n    adapter: ${adapter}\\n)`),
+      "$1    bogus_option: true\n",
     );
 
-    const r = await ost(project(undefined, team), ["validate", "--json"]);
+    const r = await ost(project(`bogus-${port}`, team), ["validate", "--json"]);
     expect(r.code).toBe(1);
-    const line = team.split("\n").findIndex((l) => l.includes("owner: acme-example")) + 1;
+    const line = team.split("\n").findIndex((l) => l.includes("bogus_option")) + 1;
     expect(JSON.parse(r.out).errors).toEqual([
       expect.objectContaining({
         code: "integrations.invalid_options",
-        path: ["integrations", "vcs", "owner"],
+        path: ["integrations", port, "bogus_option"],
         line,
       }),
     ]);

@@ -4,11 +4,28 @@ import {
   validateAdapterOptions,
   validateTeam,
   type ConfigWarning,
+  type AdapterPort,
   type LocatedIssue,
+  type TeamConfig,
 } from "@outstaff/core";
 import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
 import { issueJson, loadTeam } from "../load.js";
+
+/** Importing an adapter package registers its option schema; load only the packages the team uses. */
+const OPTION_SCHEMAS: Record<AdapterPort, () => Promise<unknown>> = {
+  chat: () => import("@outstaff/chat-slack"),
+  vcs: () => import("@outstaff/vcs-github"),
+  tracker: () => import("@outstaff/tracker-itsaplan"),
+  knowledge: () => import("@outstaff/tracker-itsaplan"),
+  runtime: () => import("@outstaff/runtime-agent-sdk"),
+  avatars: () => import("@outstaff/avatars-dicebear"),
+};
+
+async function loadOptionSchemas(config: TeamConfig): Promise<void> {
+  const ports = Object.keys(config.integrations) as AdapterPort[];
+  await Promise.all(ports.map((port) => OPTION_SCHEMAS[port]?.()));
+}
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
@@ -35,6 +52,7 @@ export const validate = defineCommand({
       if (!found.ok) {
         errors = found.issues.map(catalogIssue);
       } else {
+        await loadOptionSchemas(loaded.config);
         const report = validateTeam(loaded.config, {
           roles: roleRegistry(found.catalogs),
           adapters: new Map(),
