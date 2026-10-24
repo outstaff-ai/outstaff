@@ -22,7 +22,7 @@ The [container contract](/reference/container-contract/) lists every key with th
 
 `ost setup` writes a template that lists these keys with a note on where each value comes from, and fills in the ones it can look up. Creating the apps and accounts stays manual.
 
-The methods below use one layout, the one `examples/compose/secrets/` uses: `secrets/office/<KEY>` and `secrets/<handle>/<KEY>`. The Compose example mounts these files directly, and the Kubernetes guide builds Secrets from them.
+The methods below use one layout, the one `ost setup` and `ost doctor` use by default (in your repository under `.outstaff/secrets/`, git-ignored) and `examples/compose/secrets/` uses: `secrets/office/<KEY>` and `secrets/<handle>/<KEY>`. The paths below are relative to that secrets root: run them from `.outstaff/`, or set Compose's `SECRETS_DIR` to `.outstaff/secrets`. The Compose example mounts these files directly, and the Kubernetes guide builds Secrets from them.
 
 ## Docker Compose secrets
 

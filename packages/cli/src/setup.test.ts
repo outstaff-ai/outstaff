@@ -21,7 +21,7 @@ const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-setup-")));
 let n = 0;
 
 /** A git repository holding the acme team; `ignored` are the lines of its .gitignore. */
-function project(ignored: string[] = [".env", "secrets/"]) {
+function project(ignored: string[] = [".outstaff/**/.env", ".outstaff/secrets/"]) {
   const dir = join(root, `p${n++}`);
   mkdirSync(join(dir, ".outstaff"), { recursive: true });
   writeFileSync(join(dir, ".outstaff", "team.yaml"), readFileSync(ACME_TEAM_FILE, "utf8"));
@@ -152,13 +152,14 @@ describe("ost setup gitignore check", () => {
     const dir = project([]);
     const r = await ost(dir, ["setup", "mira"]);
     expect(r.code).toBe(1);
-    expect(r.err).toContain(".outstaff/people/*/.env");
-    expect(r.err).toContain("  secrets/");
+    expect(r.err).toContain("  .outstaff/**/.env");
+    expect(r.err).toContain("  .outstaff/secrets/\n");
+    expect(r.err).not.toContain("mira/");
     expect(existsSync(join(dir, ".outstaff/people/mira/.env.example"))).toBe(false);
   });
 
   it("refuses when only the secrets directory is missing from .gitignore", async () => {
-    const r = await ost(project([".env"]), ["setup", "mira", "--secrets-dir", "keys"]);
+    const r = await ost(project([".outstaff/**/.env"]), ["setup", "mira", "--secrets-dir", "keys"]);
     expect(r.code).toBe(1);
     expect(r.err).toContain("  keys/");
     expect(r.err).not.toContain(".outstaff/people");
@@ -166,8 +167,77 @@ describe("ost setup gitignore check", () => {
 
   it("does not mind a secrets directory outside the repository", async () => {
     const outside = join(root, "elsewhere");
-    const r = await ost(project([".env"]), ["setup", "mira", "--secrets-dir", outside]);
+    const r = await ost(project([".outstaff/**/.env"]), [
+      "setup",
+      "mira",
+      "--secrets-dir",
+      outside,
+    ]);
+
     expect(r.code).toBe(0);
+  });
+});
+
+describe("ost setup project layout", () => {
+  it("finds the team file from a subdirectory and writes to the project root", async () => {
+    const dir = project();
+    const sub = join(dir, "packages", "app");
+    mkdirSync(sub, { recursive: true });
+    const r = await ost(sub, ["setup", "mira"]);
+    expect(r.code).toBe(0);
+    expect(existsSync(join(dir, ".outstaff/people/mira/.env.example"))).toBe(true);
+    expect(existsSync(join(sub, ".outstaff"))).toBe(false);
+    expect(r.out).toContain("Secret files go in <tmp>/");
+    expect(r.out).toContain(`${join(dir, ".outstaff", "secrets", "mira").replace(root, "<tmp>")}/`);
+    expect(example(dir, ".outstaff/people/mira/.env.example")).toContain(
+      `#   ${join(dir, ".outstaff", "secrets", "mira")}/`,
+    );
+  });
+
+  it("shows the default secrets directory relative to the current directory", async () => {
+    const dir = project();
+    const r = await ost(dir, ["setup", "mira"]);
+    expect(r.out).toContain("Secret files go in .outstaff/secrets/mira/, one file per key.");
+  });
+
+  it("keeps --out as an override of the project root", async () => {
+    const dir = project();
+    const elsewhere = join(root, `o${n++}`);
+    mkdirSync(elsewhere);
+    const r = await ost(dir, ["setup", "mira", "--out", elsewhere]);
+    expect(r.code).toBe(0);
+    expect(existsSync(join(elsewhere, ".outstaff/people/mira/.env.example"))).toBe(true);
+  });
+
+  it("derives into the default directory and honours both overrides", async () => {
+    const dir = project();
+    const registry = fakes();
+    const home = join(root, `home${n++}`);
+    const base = ["setup", "mira", "--derive"];
+    mkdirSync(join(dir, ".outstaff", "secrets", "mira"), { recursive: true });
+    writeFileSync(join(dir, ".outstaff", "secrets", "mira", "GITHUB_TOKEN"), "tok\n");
+    const a = await ost(dir, base, { registry, home });
+    expect(a.code).toBe(0);
+    expect(existsSync(join(dir, ".outstaff", "secrets", "mira", "GITHUB_ID"))).toBe(true);
+
+    writeFileSync(join(dir, ".gitignore"), ".outstaff/**/.env\nkeys/\n");
+    mkdirSync(join(dir, "keys"));
+    writeFileSync(join(dir, "keys", "GITHUB_TOKEN"), "tok\n");
+    const b = await ost(dir, [...base, "--secrets-dir", "keys"], { registry, home });
+    expect(b.code).toBe(0);
+    expect(existsSync(join(dir, "keys", "GITHUB_ID"))).toBe(true);
+  });
+
+  it("checks the actual directory, so an unrelated ignore of secrets/ does not count", async () => {
+    const dir = project([".outstaff/**/.env", "/secrets/"]);
+    const r = await ost(dir, ["setup", "mira"]);
+    expect(r.code).toBe(1);
+    expect(r.err).toContain("  .outstaff/secrets/\n");
+  });
+
+  it("asks for nothing when .outstaff/secrets/ is ignored by a parent rule", async () => {
+    const dir = project([".outstaff/**/.env", ".outstaff/"]);
+    expect((await ost(dir, ["setup", "mira"])).code).toBe(0);
   });
 });
 
@@ -213,7 +283,7 @@ describe("ost setup --derive", () => {
 
   it("writes derived values as files and prints no value", async () => {
     const dir = project();
-    withTokens(dir, "secrets");
+    withTokens(dir, join(".outstaff", "secrets", "mira"));
     const registry = fakes();
     const r = await ost(dir, ["setup", "mira", "--derive"], { registry });
     expect(r.code).toBe(0);
@@ -223,10 +293,13 @@ describe("ost setup --derive", () => {
     expect(r.out + r.err).not.toContain(SECRET_VALUE);
     expect(r.out + r.err).not.toContain("tok-");
 
-    const file = join(dir, "secrets", "GITHUB_ID");
+    const file = join(dir, ".outstaff", "secrets", "mira", "GITHUB_ID");
     expect(readFileSync(file, "utf8")).toBe(`tok-${SECRET_VALUE}\n`);
     expect(statSync(file).mode & 0o777).toBe(0o600);
-    expect(readFileSync(join(dir, "secrets", "GITHUB_TOKEN"), "utf8")).toBe("tok\n");
+    expect(readFileSync(join(dir, ".outstaff", "secrets", "mira", "GITHUB_TOKEN"), "utf8")).toBe(
+      "tok\n",
+    );
+
     expect(existsSync(join(dir, ".outstaff/people/mira/.env.example"))).toBe(false);
   });
 
@@ -241,7 +314,7 @@ describe("ost setup --derive", () => {
     // "keys/" is inside the repository and not ignored.
     expect(r.code).toBe(1);
 
-    writeFileSync(join(dir, ".gitignore"), ".env\nkeys/\n");
+    writeFileSync(join(dir, ".gitignore"), ".outstaff/**/.env\nkeys/\n");
     const ok = await ost(dir, ["setup", "mira", "--derive", "--json"], {
       registry: fakes(),
       env: { OUTSTAFF_SECRETS_DIR: join(dir, "keys") },
@@ -261,7 +334,9 @@ describe("ost setup --derive", () => {
     });
 
     expect(r.code).toBe(0);
-    expect(readFileSync(join(dir, "secrets", "GITHUB_ID"), "utf8")).toContain("from-env-");
+    expect(readFileSync(join(dir, ".outstaff", "secrets", "mira", "GITHUB_ID"), "utf8")).toContain(
+      "from-env-",
+    );
   });
 
   describe("downloaded private key", () => {
@@ -269,8 +344,8 @@ describe("ost setup --derive", () => {
       const dir = project();
       const home = join(root, `home${n++}`);
       mkdirSync(join(home, "Downloads"), { recursive: true });
-      mkdirSync(join(dir, "secrets"));
-      writeFileSync(join(dir, "secrets", "GH_APP_SLUG"), "acme-mira\n");
+      mkdirSync(join(dir, ".outstaff", "secrets", "mira"), { recursive: true });
+      writeFileSync(join(dir, ".outstaff", "secrets", "mira", "GH_APP_SLUG"), "acme-mira\n");
       const pem = join(home, "Downloads", "acme-mira.2026-01-01.private-key.pem");
       writeFileSync(pem, "-----BEGIN KEY-----\nabc\n");
       writeFileSync(join(home, "Downloads", "other-app.2026-01-01.private-key.pem"), "x");
@@ -289,7 +364,10 @@ describe("ost setup --derive", () => {
       expect(r.code).toBe(0);
       expect(r.out).toContain("GH_APP_PRIVATE_KEY");
       expect(r.out).not.toContain("BEGIN KEY");
-      expect(readFileSync(join(dir, "secrets", "GH_APP_PRIVATE_KEY"), "utf8")).toContain("abc");
+      expect(
+        readFileSync(join(dir, ".outstaff", "secrets", "mira", "GH_APP_PRIVATE_KEY"), "utf8"),
+      ).toContain("abc");
+
       expect(existsSync(pem)).toBe(false);
       expect(existsSync(join(home, "Downloads", "other-app.2026-01-01.private-key.pem"))).toBe(
         true,

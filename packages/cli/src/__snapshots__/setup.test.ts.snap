@@ -6,7 +6,7 @@ exports[`ost setup template > lists no GitHub keys for a person without reposito
 # Preferred: one file per key in a secrets directory, named after the key, holding only the value.
 # The container reads them from /run/secrets/outstaff or from OUTSTAFF_SECRETS_DIR.
 #
-#   secrets/
+#   .outstaff/secrets/leo/
 #     OUTSTAFF_AGENT_TOKEN
 #     SLACK_BOT_TOKEN
 #     SLACK_APP_TOKEN
@@ -75,7 +75,7 @@ exports[`ost setup template > lists the keys a person needs, with a comment each
 # Preferred: one file per key in a secrets directory, named after the key, holding only the value.
 # The container reads them from /run/secrets/outstaff or from OUTSTAFF_SECRETS_DIR.
 #
-#   secrets/
+#   .outstaff/secrets/mira/
 #     OUTSTAFF_AGENT_TOKEN
 #     SLACK_BOT_TOKEN
 #     SLACK_APP_TOKEN
@@ -218,7 +218,7 @@ exports[`ost setup template > lists the office's keys, one agent token per perso
 # Preferred: one file per key in a secrets directory, named after the key, holding only the value.
 # The container reads them from /run/secrets/outstaff or from OUTSTAFF_SECRETS_DIR.
 #
-#   secrets/
+#   .outstaff/secrets/office/
 #     OUTSTAFF_AGENT_TOKEN_PRIYA
 #     OUTSTAFF_AGENT_TOKEN_TOMAS
 #     OUTSTAFF_AGENT_TOKEN_MIRA
@@ -337,7 +337,7 @@ ITSAPLAN_MEMBER_ID=
 
 exports[`ost setup template > prints a guide for each configured adapter 1`] = `
 "Wrote .outstaff/people/mira/.env.example
-Secret files go in secrets/, one file per key.
+Secret files go in .outstaff/secrets/mira/, one file per key.
 
 ## slack (chat)
 

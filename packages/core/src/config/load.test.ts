@@ -76,6 +76,30 @@ describe("discovery", () => {
     expect(teamName(await loadTeamConfig({ cwd, env }))).toBe("flat");
   });
 
+  it("walks up from a subdirectory to the repository root", async () => {
+    const repo = tmp();
+    mkdirSync(join(repo, ".git"));
+    put(repo, ".outstaff/team.yaml", marked("root"));
+    const cwd = join(repo, "packages", "app");
+    mkdirSync(cwd, { recursive: true });
+    const result = await loadTeamConfig({ cwd, env });
+    expect(teamName(result)).toBe("root");
+    expect(result.ok && result.source.dir).toBe(join(repo, ".outstaff"));
+  });
+
+  it("takes the nearest team file and stops at the repository root", async () => {
+    const outer = tmp();
+    put(outer, ".outstaff/team.yaml", marked("outer"));
+    const repo = join(outer, "repo");
+    mkdirSync(join(repo, ".git"), { recursive: true });
+    const cwd = join(repo, "sub");
+    mkdirSync(cwd);
+    const [issue] = issues(await loadTeamConfig({ cwd, env }));
+    expect(issue?.code).toBe("config.not_found");
+    put(repo, "sub/team.yaml", marked("near"));
+    expect(teamName(await loadTeamConfig({ cwd, env }))).toBe("near");
+  });
+
   it("reports config.not_found with the places tried", async () => {
     const cwd = tmp();
     const [issue] = issues(await loadTeamConfig({ cwd, env }));

@@ -292,7 +292,7 @@ describe("ost init", () => {
     expect(text).toContain("ost hire");
     expect(text).toContain("github.com/your-org/your-repo");
     expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
-      "# Outstaff secrets\n.outstaff/people/*/.env\n.env\n*.pem\n",
+      "# Outstaff secrets\n.outstaff/secrets/\n.outstaff/**/.env\n.env\n*.pem\n",
     );
 
     expect(r.out).toMatchSnapshot("init --separate-repo output");
@@ -311,7 +311,7 @@ describe("ost init", () => {
     );
 
     expect(readFileSync(join(dir, ".gitignore"), "utf8")).toBe(
-      "node_modules/\n.env\n# Outstaff secrets\n.outstaff/people/*/.env\n*.pem\n",
+      "node_modules/\n.env\n# Outstaff secrets\n.outstaff/secrets/\n.outstaff/**/.env\n*.pem\n",
     );
 
     expect((await ost(dir, ["validate"])).code).toBe(0);
