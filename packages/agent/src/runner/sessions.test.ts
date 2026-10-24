@@ -65,6 +65,19 @@ describe("sessions", () => {
     expect(stored).toEqual([["c1", "chat-s1"]]);
   });
 
+  it("gives work that a chat session filed a session of its own", async () => {
+    const { manager } = setup();
+    const filed = (id: string): Offer => ({
+      ...offer(id, { thread: "t1" }),
+      workItem: { ...offer(id, { thread: "t1" }).workItem, kind: "assigned" },
+    });
+
+    expect(sessionKey(filed("w1"))).toBe("item:w1");
+    manager.resumeFor(offer("c1", { thread: "t1" }));
+    await manager.started("c1", "chat-s1");
+    expect(manager.resumeFor(filed("w1"))).toBeUndefined();
+  });
+
   it("does not use a work item's session for a chat thread", async () => {
     const { manager } = setup();
     manager.resumeFor(offer("w1"));

@@ -138,6 +138,20 @@ export const workSummarySchema = z.strictObject({
   current: z.boolean().optional().describe("True for the item the caller asked about."),
 });
 
+/** What the office did with work a chat session filed: a ticket or a request, and where the work stands. */
+export const filedSchema = z.strictObject({
+  url: z.string().optional().describe("Link to the ticket."),
+  item: workSummarySchema.describe("The work item that carries the filed work."),
+  waiting: z
+    .boolean()
+    .describe(
+      "True when the person is busy: the item waits at the end until the requester says where it goes. False when it starts now.",
+    ),
+  work: z
+    .array(workSummarySchema)
+    .describe("The person's other open items in the order they run, for the placement question."),
+});
+
 export const usageWindowSchema = z.strictObject({
   name: z.string().min(1).max(50).describe("Which limit, for example five_hour or seven_day."),
   utilization: z.number().min(0).describe("Fraction of the limit used; 1 is the limit."),
@@ -307,10 +321,16 @@ export const messageSchema = z.discriminatedUnion("type", [
       ticket: z.string().min(1).max(200).describe("Key of the ticket the agent created."),
     }),
   ),
+  message("work_link_result", filedSchema),
   message(
-    "work_link_result",
-    z.strictObject({ url: z.string().optional().describe("Link to the ticket.") }),
+    "work_queue",
+    z.strictObject({
+      workItemId: itemId,
+      title: z.string().min(1).max(300).describe("Short title of the work."),
+      body: z.string().max(20_000).default("").describe("What is asked and why."),
+    }),
   ),
+  message("work_queue_result", filedSchema),
   message(
     "chat_message",
     z.strictObject({
@@ -333,9 +353,9 @@ export const messageSchema = z.discriminatedUnion("type", [
     "chat_message_result",
     z.strictObject({
       disposition: z
-        .enum(["started", "waiting", "joined", "placed", "asked_pm", "unclear"])
+        .enum(["started", "limited", "joined", "placed", "asked_pm", "unclear"])
         .describe(
-          "What the office did: `started` a new item for an idle person, queued it as `waiting` for an answer about where it goes, `joined` an item of the thread, `placed` the waiting item, `asked_pm` to prioritize it, or could not read the answer (`unclear`).",
+          "What the office did: `started` a chat session for the message, or held it as `limited` until a chat session is free, `joined` an item of the thread, `placed` the item waiting for its place, `asked_pm` to prioritize it, or could not read the answer (`unclear`).",
         ),
       repeated: z.boolean().describe("True when the office already handled this message."),
       item: workSummarySchema.describe("The item the message belongs to."),
@@ -344,9 +364,7 @@ export const messageSchema = z.discriminatedUnion("type", [
         .describe("What the office created for the request, for example the ticket."),
       work: z
         .array(workSummarySchema)
-        .describe(
-          "The person's other open items in the order they run, for `waiting` and `unclear`.",
-        ),
+        .describe("The person's other open items in the order they run, for `unclear`."),
       placement: z.string().optional().describe("For `placed`: where the item goes, in words."),
     }),
   ),
@@ -397,6 +415,7 @@ export type InlineComment = z.infer<typeof inlineCommentSchema>;
 export type Feedback = z.infer<typeof feedbackSchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
+export type Filed = z.infer<typeof filedSchema>;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
 export type MemberUsage = z.infer<typeof memberUsageSchema>;
 export type ChatOrigin = z.infer<typeof chatOriginSchema>;

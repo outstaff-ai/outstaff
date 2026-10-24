@@ -35,8 +35,13 @@ export function toToolCall(name: string, input: unknown, cwd: string): ToolCall 
     case "Task":
     case "Agent":
       return { kind: "subagent", cwd };
-    default:
-      return name.startsWith(`mcp__${OST_SERVER}__`) ? { kind: "ost", cwd } : undefined;
+    default: {
+      const prefix = `mcp__${OST_SERVER}__`;
+      // A verb's tool name is its name with the dots as underscores (`ticket_create` for `ticket.create`).
+      return name.startsWith(prefix)
+        ? { kind: "ost", cwd, command: name.slice(prefix.length).replaceAll("_", ".") }
+        : undefined;
+    }
   }
 }
 

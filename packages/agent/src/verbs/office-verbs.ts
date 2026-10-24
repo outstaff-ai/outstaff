@@ -1,7 +1,7 @@
 import { PortError } from "@outstaff/core";
 import { formatWorkGroups, groupWork } from "@outstaff/protocol";
 import { z } from "zod";
-import { requireOffice } from "./support.js";
+import { filedLine, requireOffice } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
 export const ask = defineVerb({
@@ -129,6 +129,31 @@ export const workMove = defineVerb({
   },
 });
 
+export const workQueue = defineVerb({
+  name: "work.queue",
+  summary: "File a chat request as work when there is no tracker.",
+  description:
+    "Files the request of a chat session as a work item of yours. Use it for a message that is work on a team without a tracker (with a tracker, create a ticket). The requester is told, and when you are busy they are asked where it goes. A chat session files one request. A question is answered directly: file nothing.",
+  input: z.strictObject({
+    title: z.string().min(1).max(300).describe("Short title of the work."),
+    body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),
+  }),
+  args: ["title", "body"],
+  examples: ['ost work queue "Add a search page" "Asked by Dana in chat."'],
+  async run(env, input, ctx) {
+    if (!ctx.workItemId) {
+      throw new PortError("invalid", "Only a chat session files work; there is no work item here.");
+    }
+
+    const filed = await requireOffice(env).queueWork(ctx.workItemId, {
+      title: input.title,
+      body: input.body,
+    });
+
+    return result([`Queued "${input.title}".`, filedLine(filed)], { filed }, []);
+  },
+});
+
 export const team = defineVerb({
   name: "team",
   cli: ["roster"],
@@ -154,4 +179,4 @@ export const team = defineVerb({
   },
 });
 
-export const officeVerbs = [ask, answer, work, workMove, team];
+export const officeVerbs = [ask, answer, work, workMove, workQueue, team];

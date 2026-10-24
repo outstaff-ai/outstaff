@@ -1,5 +1,6 @@
 export {
   buildPolicy,
+  CHAT_VERBS,
   commandRules,
   repoAccess,
   repoGrant,

@@ -1,6 +1,7 @@
 import type {
   AnswerState,
   ErrorCode,
+  Filed,
   Human,
   Link,
   Member,
@@ -85,8 +86,18 @@ export interface ChatDesk {
   /** The person's open tickets and pull requests, as text. */
   currentWork(person: string): Promise<string>;
 
-  /** Makes the ticket the agent created the subject of its chat item. */
-  linkTicket(person: string, workItemId: string, ticket: string): Promise<{ url?: string }>;
+  /**
+   * Files the ticket a chat session created as work: a work item for the ticket, in the session's thread. It starts
+   * when the person is idle and otherwise waits last until the requester says where it goes.
+   */
+  linkTicket(person: string, workItemId: string, ticket: string): Promise<Filed>;
+
+  /** Files work that has no tracker: a work item for the request, in the session's thread. Like `linkTicket`. */
+  queueWork(
+    person: string,
+    workItemId: string,
+    request: { title: string; body: string },
+  ): Promise<Filed>;
 }
 
 /** Agent-to-agent questions. Optional until the messaging component exists; without it `ask` is unsupported. */

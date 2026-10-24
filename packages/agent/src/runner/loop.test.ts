@@ -1,15 +1,21 @@
 import {
   buildPolicy,
   type Logger,
+  type Policy,
   type RunRequest,
   type Runtime,
   type RuntimeEvent,
+  type ToolKind,
   type Vcs,
 } from "@outstaff/core";
 import { createFakeRuntime, type FakeVcs } from "@outstaff/core/fakes";
 import type { Message } from "@outstaff/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
+import {
+  createOfficeConnection,
+  type Offer,
+  type OfficeConnection,
+} from "../office-client/index.js";
 import { FakeSocket, createManualClock, type ManualClientClock } from "../office-client/testing.js";
 import { fakeEnv } from "../verbs/testing.js";
 import type { Workspaces } from "../repos/index.js";
@@ -35,9 +41,19 @@ class OfficeSocket extends FakeSocket {
       } else if (m.type === "journal" && this.failJournal) {
         this.reply(m, "error", { code: "invalid", message: "No journal today." });
       } else if (m.type === "work_list") {
-        this.reply(m, "work_list_result", { items: [] });
-      } else if (m.type === "work_link") {
-        this.reply(m, "work_link_result", {});
+        // The chat sessions of these tests are the items called c*.
+        const id = m.payload.workItemId;
+        this.reply(m, "work_list_result", {
+          items: id?.startsWith("c")
+            ? [{ id, title: "Chat", status: "active", kind: "chat", current: true }]
+            : [],
+        });
+      } else if (m.type === "work_link" || m.type === "work_queue") {
+        this.reply(m, m.type === "work_link" ? "work_link_result" : "work_queue_result", {
+          item: { id: "w9", title: "Filed", status: "queued" },
+          waiting: false,
+          work: [],
+        });
       } else {
         this.reply(m, "ack");
       }
@@ -172,6 +188,7 @@ describe("work loop", () => {
       chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
       vcs?: Vcs;
       log?: Logger;
+      chatSession?: { policy: Policy; builtinTools: ToolKind[] };
     } = {},
   ) {
     const { env, vcs } = fakeEnv();
@@ -632,28 +649,128 @@ describe("work loop", () => {
     await conn.stop();
   });
 
-  describe("chat requests", () => {
-    const relay = () => {
-      const reports: { kind: string; text: string; links: unknown; item: string }[] = [];
-      const acks: { item: string; key: string }[] = [];
-      const chat: Pick<ChatRelay, "context" | "report" | "acknowledge"> = {
-        async context() {
-          return "Recent messages:\n- Dana: add search\n\nYour current work:\nTicket ACME-9";
-        },
-        async acknowledge(offer, ticket) {
-          acks.push({ item: offer.workItem.id, key: ticket.key });
-        },
-        async report(offer, kind, text, links) {
-          reports.push({ kind, text, links, item: offer.workItem.id });
+  const relay = () => {
+    const reports: { kind: string; text: string; links: unknown; item: string }[] = [];
+    const acks: { item: string; key: string }[] = [];
+    const chat: Pick<ChatRelay, "context" | "report" | "acknowledge"> = {
+      async context() {
+        return "Recent messages:\n- Dana: add search\n\nYour current work:\nTicket ACME-9";
+      },
+      async acknowledge(offer, what) {
+        acks.push({ item: offer.workItem.id, key: what.key ?? what.title });
+      },
+      async report(offer, kind, text, links) {
+        reports.push({ kind, text, links, item: offer.workItem.id });
+      },
+    };
+
+    return { chat, reports, acks };
+  };
+
+  describe("chat sessions beside a work item", () => {
+    const layout = {
+      home: "/home/sam",
+      workDir: "/home/sam/work",
+      reposDir: "/home/sam/repos",
+      worktreesDir: "/home/sam/worktrees",
+      scratchDir: "/home/sam/scratch",
+      memoryDir: "/home/sam/memory",
+      secretsDir: "/run/secrets",
+    };
+
+    const sessionFor = () => {
+      const { env } = fakeEnv();
+      const policy = buildPolicy({
+        profile: "chat",
+        person: env.team.people[0]!,
+        team: env.team,
+        layout,
+      });
+
+      return { policy, builtinTools: ["read", "search", "shell", "ost"] as ToolKind[] };
+    };
+
+    it("runs a chat session while the work item runs, under the chat policy and without a worktree", async () => {
+      await connect();
+      const requests: RunRequest[] = [];
+      let releaseWork: (() => void) | undefined;
+      const runtime: Runtime = {
+        async *run(req) {
+          requests.push(req);
+          yield { type: "started", sessionId: `s-${req.workItemId}` };
+          if (req.prompt === JOURNAL_PROMPT) {
+            yield { type: "finished", ok: true, text: "" };
+            return;
+          }
+
+          if (req.workItemId === "w1") {
+            await new Promise<void>((resolve) => {
+              releaseWork = resolve;
+            });
+          }
+
+          yield { type: "finished", ok: true, text: "Answered." };
         },
       };
 
-      return { chat, reports, acks };
-    };
+      const prepared: string[] = [];
+      const workspaces = {
+        async prepare(offer: Offer) {
+          prepared.push(offer.workItem.id);
+          return undefined;
+        },
+        async release() {},
+      } as unknown as Workspaces;
 
-    it("acknowledges in the thread when the agent creates a ticket for the request", async () => {
+      const { chat, reports } = relay();
+      start(runtime, { chat, workspaces, chatSession: sessionFor() });
+      socket.offerWith("w1");
+      await until(() => requests.some((r) => r.workItemId === "w1"));
+
+      // The work item is still running when the chat message arrives.
+      socket.offerWith("c1", { origin: true });
+      await until(() => reports.length === 1);
+      expect(reports[0]).toMatchObject({ kind: "result", item: "c1", text: "Answered." });
+      expect(
+        sentOf("handback").map((m) => (m.payload as { workItemId: string }).workItemId),
+      ).toEqual(["c1"]);
+
+      const chatRun = requests.find((r) => r.workItemId === "c1")!;
+      const workRun = requests.find((r) => r.workItemId === "w1")!;
+      expect(chatRun.policy.profile).toBe("chat");
+      expect(workRun.policy.profile).toBe("readonly");
+      expect(prepared).toEqual(["w1"]);
+      expect(chatRun.tools.map((t) => t.name)).toContain("ticket_create");
+      expect(chatRun.tools.map((t) => t.name)).toContain("work_queue");
+      expect(chatRun.tools.map((t) => t.name)).not.toContain("pr_open");
+      expect(chatRun.tools.map((t) => t.name)).not.toContain("work_move");
+      expect(workRun.tools.map((t) => t.name)).toContain("pr_open");
+
+      releaseWork?.();
+      await until(() => sentOf("handback").length === 2);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("keeps every running item alive and stops them all on shutdown", async () => {
       await connect();
-      const { chat, acks } = relay();
+      const { runtime } = blockingRuntime();
+      start(runtime, { chatSession: sessionFor() });
+      socket.offerWith("w1");
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("accept").length === 2);
+      await until(() => sentOf("progress").length === 2);
+      await loop.stop();
+      await conn.stop();
+      await running;
+      expect(sentOf("handback")).toHaveLength(2);
+    });
+  });
+
+  describe("chat requests", () => {
+    it("acknowledges in the thread when a chat session files its request, and reports no result of its own", async () => {
+      await connect();
+      const { chat, acks, reports } = relay();
       const runtime: Runtime = {
         async *run(req) {
           yield { type: "started", sessionId: "s" };
@@ -670,6 +787,7 @@ describe("work loop", () => {
       await until(() => sentOf("handback").length === 1);
       expect(sentOf("work_link")[0]?.payload).toMatchObject({ workItemId: "c1" });
       expect(acks).toEqual([{ item: "c1", key: expect.stringMatching(/^SHOP-/) as string }]);
+      expect(reports).toEqual([]);
       await loop.stop();
       await conn.stop();
     });
@@ -684,7 +802,7 @@ describe("work loop", () => {
       await until(() => reports.length === 1);
 
       const prompt = runtime.requests[0]!.prompt;
-      expect(prompt).toContain("request from Dana, a trusted human, in chat");
+      expect(prompt).toContain("message from Dana, a trusted human, in chat");
       expect(prompt).toContain("Recent messages:\n- Dana: add search");
       expect(prompt).toContain("Ticket ACME-9");
       expect(reports).toEqual([

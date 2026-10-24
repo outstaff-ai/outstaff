@@ -129,6 +129,7 @@ describe("parseTeamConfig", () => {
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
       retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
+      chat: { parallel_sessions: 2 },
     });
   });
 

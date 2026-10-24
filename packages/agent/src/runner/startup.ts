@@ -332,6 +332,9 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   }
 
   const policy = buildPolicy({ profile: rendered.profile, person: me, team, layout, packs });
+
+  // Chat sessions run beside the active item, so they get a profile that cannot disturb it.
+  const chatPolicy = buildPolicy({ profile: "chat", person: me, team, layout, packs });
   const systemPrompt = buildIdentityPrompt({
     team,
     handle: person,
@@ -370,7 +373,9 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   }
 
   const loop = createWorkLoop({
-    ...(chat ? { chat } : {}),
+    ...(chat
+      ? { chat, chatSession: { policy: chatPolicy, builtinTools: [...PROFILE_SPECS.chat.tools] } }
+      : {}),
     office: connection,
     usage,
     runtime,

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   assigned,
+  chat,
   conflict,
   keepBoth,
   mergedFeedback,
+  reviewFeedback,
   withGreeting,
   type Action,
 } from "./scripts.js";
@@ -176,5 +178,21 @@ describe("mergedFeedback", () => {
       tool: "pr_comment",
       input: { number: 1, body: "Follow-up: https://git.example/acme/shop/pull/3" },
     });
+  });
+});
+
+describe("chat", () => {
+  it("looks at the person's work and answers, filing nothing", async () => {
+    const { seen, text } = await play(chat(), () => "1. [SHOP-1 Add a greeting](x) (running)\n");
+    expect(seen).toEqual([{ type: "tool", tool: "work", input: {} }]);
+    expect(text).toContain("greeting.txt");
+    expect(text).toContain("SHOP-1 Add a greeting");
+  });
+});
+
+describe("reviewFeedback", () => {
+  it("starts at the review gate, so a driver can hold the round", async () => {
+    const script = reviewFeedback({ ...ctx, kind: "review_feedback", pr: 1 });
+    expect((await script.next()).value).toEqual({ type: "gate", name: "review" });
   });
 });

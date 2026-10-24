@@ -71,6 +71,60 @@ const rows: Row[] = [
   ["readonly has no web_fetch", "readonly", { kind: "web_fetch" }, "deny", "tools.allow"],
   ["code may use subagents", "code", { kind: "subagent" }, "allow"],
   ["ost is available to everyone", "readonly", { kind: "ost", command: "ticket.comment" }, "allow"],
+  // chat sessions: read the repositories and the office, change nothing but comments and new tickets
+  ["chat reads a granted worktree", "chat", { kind: "read", path: `${APP}/src/a.ts` }, "allow"],
+  ["chat reads a granted clone", "chat", { kind: "read", path: "/work/repos/site/a.ts" }, "allow"],
+  ["chat has no write tool", "chat", { kind: "write", path: `${APP}/a.ts` }, "deny", "tools.allow"],
+  ["chat has no edit tool", "chat", { kind: "edit", path: `${APP}/a.ts` }, "deny", "tools.allow"],
+  ["chat has no subagents", "chat", { kind: "subagent" }, "deny", "tools.allow"],
+  ["chat may list files", "chat", sh("ls src"), "allow"],
+  ["chat may read git history", "chat", sh("git log --oneline"), "allow"],
+  ["chat may not push", "chat", sh("git push origin HEAD"), "deny"],
+  ["chat may not commit", "chat", sh("git commit -m x"), "deny"],
+  // Not covered by the policy: an unattended runtime treats `ask` as a refusal.
+  ["chat may not touch files", "chat", sh("touch a.txt"), "ask"],
+  ["chat may not redirect into a file", "chat", sh("echo hi > a.txt"), "deny"],
+  ["chat may comment on a ticket", "chat", { kind: "ost", command: "ticket.comment" }, "allow"],
+  ["chat may create a ticket", "chat", { kind: "ost", command: "ticket.create" }, "allow"],
+  ["chat may file a request", "chat", { kind: "ost", command: "work.queue" }, "allow"],
+  ["chat may comment on a pull request", "chat", { kind: "ost", command: "pr.comment" }, "allow"],
+  [
+    "chat may not open a pull request",
+    "chat",
+    { kind: "ost", command: "pr.open" },
+    "deny",
+    "ost.verbs",
+  ],
+  [
+    "chat may not review a pull request",
+    "chat",
+    { kind: "ost", command: "pr.review" },
+    "deny",
+    "ost.verbs",
+  ],
+  [
+    "chat may not move a ticket",
+    "chat",
+    { kind: "ost", command: "ticket.move" },
+    "deny",
+    "ost.verbs",
+  ],
+  [
+    "chat may not assign a ticket",
+    "chat",
+    { kind: "ost", command: "ticket.assign" },
+    "deny",
+    "ost.verbs",
+  ],
+  ["chat may not move work", "chat", { kind: "ost", command: "work.move" }, "deny", "ost.verbs"],
+  [
+    "chat may not write a document",
+    "chat",
+    { kind: "ost", command: "doc.create" },
+    "deny",
+    "ost.verbs",
+  ],
+  ["chat needs a verb name", "chat", { kind: "ost" }, "deny", "ost.verbs"],
   // read paths
   [
     "read a file in a granted worktree",
@@ -472,6 +526,38 @@ const rows: Row[] = [
     "allow",
   ],
 ];
+
+describe("chat profile", () => {
+  const chatPolicy = policy("chat");
+
+  it("grants no write even where the person has one", () => {
+    expect(chatPolicy.git.repos["/work/worktrees/app"]).toBe("read");
+    expect(chatPolicy.paths.write.allow).toEqual([]);
+  });
+
+  it("takes only the rule packs that name it", () => {
+    const pack = (profiles?: Profile[]) => ({
+      id: "p",
+      source: "toolset" as const,
+      ...(profiles ? { profiles } : {}),
+      rules: [
+        {
+          id: "pnpm",
+          program: "pnpm",
+          effect: "allow" as const,
+          reason: "builds",
+        },
+      ],
+    });
+
+    const run = (packs: ReturnType<typeof pack>[]) =>
+      evaluate(buildPolicy({ profile: "chat", person: dev, team, layout, packs }), sh("pnpm test"));
+
+    expect(run([pack()]).effect).not.toBe("allow");
+    expect(run([pack(["code"])]).effect).not.toBe("allow");
+    expect(run([pack(["chat"])]).effect).toBe("allow");
+  });
+});
 
 describe("evaluate", () => {
   it("has at least 60 table cases", () => {

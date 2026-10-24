@@ -217,16 +217,40 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       expect((await sched.next("ann"))?.id).toBe(chat.id);
     });
 
-    it("starts chat immediately when idle and queues it last when busy", async () => {
+    it("runs chat sessions beside the active item, up to the configured number", async () => {
       const work = await add("work");
       await add("later");
       await runNext();
-      const chat = await add("chat", "human", { kind: "chat" });
-      expect(await titles()).toEqual(["later", "chat"]);
+      const [c1, c2, c3] = [
+        await add("c1", "human", { kind: "chat" }),
+        await add("c2", "human", { kind: "chat" }),
+        await add("c3", "human", { kind: "chat" }),
+      ];
+
+      // Sessions go first among the queued items and do not wait for the active one.
+      expect(await titles()).toEqual(["c1", "c2", "c3", "later"]);
+      expect((await sched.next("ann"))?.id).toBe(c1.id);
+      expect(await sched.markActive(c1.id)).toMatchObject({ started: true });
+      expect(await sched.markActive(c2.id)).toMatchObject({ started: true });
+      expect((await store.getItem(work.id))!.status).toBe("active");
+
+      // Two sessions run (the default); the third waits for a free one, and the work item still holds its lane.
+      expect(await sched.markActive(c3.id)).toMatchObject({ started: false, reason: "busy" });
+      expect(await sched.next("ann")).toBeNull();
+      await sched.finish(c1.id, { outcome: "answered" });
+      expect((await sched.next("ann"))?.id).toBe(c3.id);
+
+      // The sessions do not hold the lane of work items.
       await sched.finish(work.id, { outcome: "ok" });
+      await sched.markActive(c3.id);
       expect((await sched.next("ann"))?.title).toBe("later");
-      await sched.move(chat.id, { before: (await sched.next("ann"))!.id });
+    });
+
+    it("answers humans in a chat session whatever the usage", async () => {
+      usage.windows = [{ name: "5h", utilization: 0.99 }];
+      const chat = await add("c", "human", { kind: "chat" });
       expect((await sched.next("ann"))?.id).toBe(chat.id);
+      expect(await sched.markActive(chat.id)).toMatchObject({ started: true });
     });
 
     it("honors the position the human chose", async () => {
@@ -650,8 +674,11 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       await store.close();
       store = await h.open(() => clock.now());
       sched = build();
-      expect(await sched.next("ann")).toBeNull();
+      // The chat session runs beside the active item; the next work item waits for it.
+      expect((await sched.next("ann"))?.title).toBe("chat");
       await sched.finish(active.id, { outcome: "ok" });
+      const chat = (await sched.next("ann"))!;
+      await sched.markActive(chat.id);
       expect((await sched.next("ann"))?.title).toBe("later");
     });
   });

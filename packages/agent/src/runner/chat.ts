@@ -6,7 +6,13 @@ import {
   type TeamConfig,
   type Tracker,
 } from "@outstaff/core";
-import { formatWorkGroups, groupWork, type Link, type WorkSummary } from "@outstaff/protocol";
+import {
+  formatWorkGroups,
+  groupWork,
+  type Filed,
+  type Link,
+  type WorkSummary,
+} from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
 import type { ChatMessageResult, ChatReportKind, OfficeClient } from "../verbs/office.js";
 
@@ -33,8 +39,11 @@ export interface ChatRelay {
   /** What a new chat session starts with: the recent conversation and the person's current work. */
   context(offer: Offer): Promise<string | undefined>;
 
-  /** First reply in the thread, once the agent made a ticket for the request. Posted once per item. */
-  acknowledge(offer: Offer, ticket: { key: string; url?: string }): Promise<void>;
+  /**
+   * First reply in the thread, once the chat session filed the request as work: what tracks it, and when the person
+   * is busy the work in the order it runs and the question where it goes. Posted once per item.
+   */
+  acknowledge(offer: Offer, what: { key?: string; title: string }, filed: Filed): Promise<void>;
 
   /**
    * Tells the requester how a chat item ended, in the thread it came from. Nothing is posted for an item without
@@ -77,23 +86,26 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   /** The numbered list the requester picks a place from: one line per piece of work. */
   const describe = (work: WorkSummary[]) => formatWorkGroups(groupWork(work), ticketUrl);
 
+  /** The question where filed work goes, when the person is busy. */
+  const placementQuestion = (work: WorkSummary[]) => {
+    const where = hasPm
+      ? "next, after one of these (say its number), last, or ask the PM"
+      : "next, after one of these (say its number), or last";
+
+    return [
+      `I'm busy right now. My work, in the order it runs:`,
+      ...describe(work),
+      `Where does this go: ${where}? It waits at the end until you say.`,
+    ].join("\n");
+  };
+
   function replyFor(r: ChatMessageResult): string | undefined {
     switch (r.disposition) {
       case "started":
         // The reaction shows it was seen; the first reply comes with the ticket, when the request is work.
         return undefined;
-      case "waiting": {
-        const where = hasPm
-          ? "next, after one of these (say its number), last, or ask the PM"
-          : "next, after one of these (say its number), or last";
-
-        return [
-          `I'm busy right now. My work, in the order it runs:`,
-          ...describe(r.work),
-          `Where does this go: ${where}? It waits at the end until you say.`,
-        ].join("\n");
-      }
-
+      case "limited":
+        return "I am answering other chats right now. Yours is next in line.";
       case "placed":
         return `Got it, this goes ${r.placement ?? "where you said"}.`;
       case "asked_pm":
@@ -208,7 +220,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       return sections.length ? sections.join("\n") : undefined;
     },
 
-    async acknowledge(offer, ticket) {
+    async acknowledge(offer, what, filed) {
       const origin = offer.workItem.origin;
       if (!origin) {
         return;
@@ -219,11 +231,15 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         return;
       }
 
-      const url = ticket.url ?? opts.tracker?.links.issue(ticket.key);
+      const url = what.key ? (filed.url ?? opts.tracker?.links.issue(what.key)) : undefined;
+      const tracked = what.key
+        ? `Tracked in ${url ? `[${what.key}](${url})` : what.key}.`
+        : `Queued: ${what.title}.`;
+
       await post(
         origin.channel,
         origin.thread,
-        `On it. Tracked in ${url ? `[${ticket.key}](${url})` : ticket.key}.`,
+        [`On it. ${tracked}`, ...(filed.waiting ? [placementQuestion(filed.work)] : [])].join("\n"),
       );
     },
 

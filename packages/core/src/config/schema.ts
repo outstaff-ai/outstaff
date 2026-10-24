@@ -296,6 +296,21 @@ const policiesSchema = z
       })
       .default({ max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] })
       .meta(d("How agents write chat messages.")),
+    chat: z
+      .strictObject({
+        parallel_sessions: z
+          .int()
+          .min(1)
+          .max(10)
+          .default(2)
+          .meta(
+            d(
+              "How many chat sessions an agent runs at once, beside its active work item. A message beyond that waits for a free session.",
+            ),
+          ),
+      })
+      .default({ parallel_sessions: 2 })
+      .meta(d("How agents take chat messages.")),
     commands: teamCommandsSchema.optional(),
   })
   .meta(d("Team-wide guardrails and message style."));

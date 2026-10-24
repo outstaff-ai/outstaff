@@ -42,18 +42,41 @@ const USAGE: UsageEvent = {
 function callOf(a: Action): ToolCall {
   switch (a.type) {
     case "tool":
-      return { kind: "ost" };
+      return { kind: "ost", command: a.tool.replaceAll("_", ".") };
     case "shell":
       return { kind: "shell", command: a.command, cwd: a.cwd };
     case "write":
       return { kind: "write", path: a.path };
     case "read":
       return { kind: "read", path: a.path };
+    case "gate":
+      throw new Error("A gate is not judged by the policy.");
   }
 }
 
 const nameOf = (a: Action) =>
-  a.type === "tool" ? a.tool : a.type === "shell" ? "Bash" : a.type === "write" ? "Write" : "Read";
+  a.type === "tool"
+    ? a.tool
+    : a.type === "shell"
+      ? "Bash"
+      : a.type === "write"
+        ? "Write"
+        : a.type === "gate"
+          ? "Gate"
+          : "Read";
+
+/** Holds the round while the driver keeps the gate closed (see e2e/stubs/chat.ts). Open unless it was closed. */
+async function waitAtGate(name: string, signal?: AbortSignal): Promise<void> {
+  const base = process.env["E2E_STUB_URL"] ?? "http://tracker.acme.example:8081";
+  for (let i = 0; i < 300 && !signal?.aborted; i++) {
+    const res = await fetch(`${base}/gates/${encodeURIComponent(name)}`);
+    if (res.ok && ((await res.json()) as { open: boolean }).open) {
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+}
 
 export interface ScriptedConfig {
   log?: Logger;
@@ -101,6 +124,12 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
       let step = await steps.next();
       while (!step.done) {
         const action = step.value;
+        if (action.type === "gate") {
+          await waitAtGate(action.name, req.signal);
+          step = await steps.next("");
+          continue;
+        }
+
         const decision: Decision = evaluate(req.policy, callOf(action));
         yield {
           type: "tool_call",

@@ -1236,6 +1236,23 @@
           },
           "additionalProperties": false
         },
+        "chat": {
+          "default": {
+            "parallel_sessions": 2
+          },
+          "description": "How agents take chat messages.",
+          "type": "object",
+          "properties": {
+            "parallel_sessions": {
+              "default": 2,
+              "description": "How many chat sessions an agent runs at once, beside its active work item. A message beyond that waits for a free session.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "additionalProperties": false
+        },
         "commands": {
           "type": "object",
           "properties": {

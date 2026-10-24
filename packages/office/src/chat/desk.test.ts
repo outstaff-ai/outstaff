@@ -89,6 +89,17 @@ describe("chat requests", () => {
       .toSorted((a, b) => a.priority - b.priority || a.position - b.position)
       .map((i) => i.title);
 
+  /** A chat session that decided its message is work and filed it: the session, and the item it filed. */
+  const fileWork = async (text = "Fix the footer", ticket?: string) => {
+    const session = await say(text);
+    await scheduler.markActive(session.item.id);
+    const filed = ticket
+      ? await desk.linkTicket("sam", session.item.id, ticket)
+      : await desk.queueWork("sam", session.item.id, { title: text, body: "Asked in chat." });
+
+    return { session: session.item, filed, item: filed.item };
+  };
+
   beforeEach(async () => {
     n = 0;
     notified = [];
@@ -194,6 +205,13 @@ describe("chat requests", () => {
       expect(chat.posts).toHaveLength(1);
     });
 
+    it("posts nothing for a session that filed its request as work", async () => {
+      const { session } = await fileWork("please add a search page", "ACME-1");
+      const done = await scheduler.finish(session.id, { outcome: "filed", status: "done" });
+      await desk.handedBack(done, { summary: "Filed ACME-1.", links: [] });
+      expect(clock.pending()).toBe(0);
+    });
+
     it("leaves the result alone without a chat port", async () => {
       desk = makeDesk(false);
       await finished();
@@ -226,21 +244,50 @@ describe("chat requests", () => {
     expect((await store.readJournal(item.id))[0]!.text).toContain("why is CI failing?");
   });
 
-  describe("ticket", () => {
-    it("becomes the subject of the chat item, once", async () => {
-      const r = await say("Add a search page");
-      await scheduler.markActive(r.item.id);
-      expect(await desk.linkTicket("sam", r.item.id, "ACME-5")).toEqual({
-        url: tracker.links.issue("ACME-5"),
+  describe("filing work", () => {
+    it("creates a work item for the ticket in the session's thread, once", async () => {
+      const { session, filed, item } = await fileWork("Add a search page", "ACME-5");
+      expect(filed).toMatchObject({ url: tracker.links.issue("ACME-5"), waiting: false, work: [] });
+
+      const created = (await store.getItem(item.id))!;
+      expect(created).toMatchObject({
+        kind: "assigned",
+        parentId: session.id,
+        subject: { type: "ticket", ref: "ACME-5" },
+        status: "queued",
       });
 
-      expect((await store.getItem(r.item.id))!.subject).toEqual({ type: "ticket", ref: "ACME-5" });
-      await expect(desk.linkTicket("sam", r.item.id, "ACME-6")).rejects.toMatchObject({
+      expect((await store.getItem(session.id))!.subject).toEqual({ type: "chat", ref: "D1:m1" });
+      expect(await readOrigin(store, created.id)).toMatchObject({
+        thread: "m1",
+        requester: DANA,
+        awaitingPlacement: false,
+      });
+
+      expect(await readOrigin(store, session.id)).toMatchObject({ filed: created.id });
+      expect((await store.getSubject("chat_thread", "D1:m1"))?.data).toEqual({
+        itemId: created.id,
+      });
+
+      await expect(desk.linkTicket("sam", session.id, "ACME-6")).rejects.toMatchObject({
         code: "invalid",
       });
     });
 
-    it("is refused for other people's items and for items that are not chat requests", async () => {
+    it("files work without a tracker as a request", async () => {
+      const { filed } = await fileWork("Add a search page");
+      expect(filed.url).toBeUndefined();
+      expect(await store.getItem(filed.item.id)).toMatchObject({
+        kind: "request",
+        title: "Add a search page",
+      });
+
+      expect((await store.readJournal(filed.item.id)).map((j) => j.text).join("\n")).toContain(
+        "Asked in chat.",
+      );
+    });
+
+    it("is refused for other people's items and for items that are not chat sessions", async () => {
       const r = await say("Add a search page");
       await expect(desk.linkTicket("pat", r.item.id, "ACME-5")).rejects.toMatchObject({
         code: "unknown_item",
@@ -257,40 +304,72 @@ describe("chat requests", () => {
         code: "invalid",
       });
     });
+
+    it("lists the busy person's work and waits last, for the placement question", async () => {
+      await busyWith("Running thing", "Queued thing");
+      const { filed, item } = await fileWork();
+      expect(filed.waiting).toBe(true);
+      expect(filed.work.map((w) => [w.title, w.status])).toEqual([
+        ["Running thing", "active"],
+        ["Queued thing", "queued"],
+      ]);
+
+      expect(await queueOrder()).toEqual(["Queued thing", "Fix the footer"]);
+      expect(await readOrigin(store, item.id)).toMatchObject({ awaitingPlacement: true });
+    });
+
+    it("starts at once for an idle person and asks nothing", async () => {
+      const { item, filed } = await fileWork();
+      expect(filed).toMatchObject({ waiting: false, work: [] });
+      expect((await scheduler.next("sam"))?.id).toBe(item.id);
+    });
   });
 
-  it("queues a busy person's request last and lists their work", async () => {
-    const [running, queued] = await busyWith("Running thing", "Queued thing");
-    await store.updateItem(running!.id, {});
-    const r = await say("Fix the footer");
-    expect(r.disposition).toBe("waiting");
-    expect(r.work.map((w) => [w.title, w.status])).toEqual([
-      ["Running thing", "active"],
-      ["Queued thing", "queued"],
-    ]);
+  it("starts a chat session beside the active item and queues nothing behind it", async () => {
+    const [running] = await busyWith("Running thing", "Queued thing");
+    const r = await say("would X be integrated in Y?");
+    expect(r).toMatchObject({ disposition: "started", work: [] });
+    expect(await readOrigin(store, r.item.id)).toMatchObject({ awaitingPlacement: false });
 
-    expect(queued).toBeDefined();
-    expect(await queueOrder()).toEqual(["Queued thing", "Chat: Fix the footer"]);
-    expect(await readOrigin(store, r.item.id)).toMatchObject({ awaitingPlacement: true });
+    // The office offers the session while the work item runs.
+    expect((await scheduler.next("sam"))?.id).toBe(r.item.id);
+    expect(await scheduler.markActive(r.item.id)).toMatchObject({ started: true });
+    expect((await store.getItem(running!.id))!.status).toBe("active");
+    expect(await tracker.listIssues({})).toEqual([]);
+  });
+
+  it("holds a message when all chat sessions are taken, and says so", async () => {
+    await busyWith("Running thing");
+    const first = await say("one");
+    const second = await say("two");
+    await scheduler.markActive(first.item.id);
+    await scheduler.markActive(second.item.id);
+
+    const third = await say("three");
+    expect(third.disposition).toBe("limited");
+    expect(await scheduler.next("sam")).toBeNull();
+
+    await scheduler.finish(first.item.id, { outcome: "answered" });
+    expect((await scheduler.next("sam"))?.id).toBe(third.item.id);
   });
 
   it.each([
-    ["next", ["Chat: Fix the footer", "Queued A", "Queued B"], "next"],
-    ["put it first please", ["Chat: Fix the footer", "Queued A", "Queued B"], "next"],
-    ["last", ["Queued A", "Queued B", "Chat: Fix the footer"], "last"],
-    ["after 2", ["Queued A", "Chat: Fix the footer", "Queued B"], "after Queued A"],
-    ["after Queued B", ["Queued A", "Queued B", "Chat: Fix the footer"], "after Queued B"],
-    ["after the current one", ["Chat: Fix the footer", "Queued A", "Queued B"], "next"],
+    ["next", ["Fix the footer", "Queued A", "Queued B"], "next"],
+    ["put it first please", ["Fix the footer", "Queued A", "Queued B"], "next"],
+    ["last", ["Queued A", "Queued B", "Fix the footer"], "last"],
+    ["after 2", ["Queued A", "Fix the footer", "Queued B"], "after Queued A"],
+    ["after Queued B", ["Queued A", "Queued B", "Fix the footer"], "after Queued B"],
+    ["after the current one", ["Fix the footer", "Queued A", "Queued B"], "next"],
   ])("places the waiting request when the requester says %j", async (answer, order, placement) => {
     await busyWith("Running thing", "Queued A", "Queued B");
-    const first = await say("Fix the footer");
-    expect(await queueOrder()).toEqual(["Queued A", "Queued B", "Chat: Fix the footer"]);
+    const { item } = await fileWork();
+    expect(await queueOrder()).toEqual(["Queued A", "Queued B", "Fix the footer"]);
     notified.length = 0;
 
     const r = await say(answer, "m1");
     expect(r).toMatchObject({ disposition: "placed", placement });
     expect(await queueOrder()).toEqual(order);
-    expect(await readOrigin(store, first.item.id)).toMatchObject({ awaitingPlacement: false });
+    expect(await readOrigin(store, item.id)).toMatchObject({ awaitingPlacement: false });
     expect(notified).toEqual(["sam"]);
   });
 
@@ -309,30 +388,23 @@ describe("chat requests", () => {
     await add("review feedback: Checkout", "review_feedback", "ACME-5");
     await scheduler.markActive(running.id);
 
-    const first = await say("Fix the footer");
-    expect(first.work).toHaveLength(3);
+    const { filed } = await fileWork();
+    expect(filed.work).toHaveLength(3);
     notified.length = 0;
 
     const r = await say("after 1", "m1");
     expect(r).toMatchObject({ disposition: "placed", placement: "after Checkout" });
-    expect(await queueOrder()).toEqual([
-      "Search",
-      "review feedback: Checkout",
-      "Chat: Fix the footer",
-    ]);
-
-    const second = await say("Another", "m9x");
-    expect(second.disposition).toBe("waiting");
+    expect(await queueOrder()).toEqual(["Search", "review feedback: Checkout", "Fix the footer"]);
   });
 
   it("asks the PM to prioritize when the requester wants that", async () => {
     await busyWith("Running thing", "Queued A");
-    await say("Fix the footer");
+    await fileWork();
     const r = await say("can you ask the PM to prioritize it?", "m1");
     expect(r.disposition).toBe("asked_pm");
     expect(asked[0]).toMatchObject({ to: "pm" });
     expect(asked[0]!.question).toContain("Queued A");
-    expect(await queueOrder()).toEqual(["Queued A", "Chat: Fix the footer"]);
+    expect(await queueOrder()).toEqual(["Queued A", "Fix the footer"]);
   });
 
   it("does not offer the PM when the team has none, and asks again when the answer is unclear", async () => {
@@ -346,7 +418,15 @@ describe("chat requests", () => {
     });
 
     await busyWith("Running thing");
-    await noPm.message("sam", { messageId: "a", channel: "D1", text: "Hi", author: DANA });
+    const session = await noPm.message("sam", {
+      messageId: "a",
+      channel: "D1",
+      text: "Hi",
+      author: DANA,
+    });
+
+    await scheduler.markActive(session.item.id);
+    await noPm.queueWork("sam", session.item.id, { title: "Hi", body: "" });
     const pm = await noPm.message("sam", {
       messageId: "b",
       channel: "D1",
@@ -390,25 +470,35 @@ describe("chat requests", () => {
     expect(notified).toEqual(["sam"]);
   });
 
-  it("continues a finished item's thread in a new item with the same session", async () => {
-    const started = await say("Add a search page");
+  it("continues a finished chat session's thread in a new session with the same conversation", async () => {
+    const started = await say("Is search planned?");
     await scheduler.markActive(started.item.id);
-    await desk.linkTicket("sam", started.item.id, "ACME-1");
     await store.updateItem(started.item.id, { sessionId: "sess-1" });
-    await scheduler.finish(started.item.id, { outcome: "done", status: "done" });
+    await scheduler.finish(started.item.id, { outcome: "yes", status: "done" });
 
-    const r = await say("one more thing: dark mode", "m1");
+    const r = await say("and dark mode?", "m1");
     expect(r.disposition).toBe("started");
     expect(r.item.id).not.toBe(started.item.id);
     const next = (await store.getItem(r.item.id))!;
     expect(next).toMatchObject({
+      kind: "chat",
       parentId: started.item.id,
       sessionId: "sess-1",
-      subject: { type: "ticket", ref: "ACME-1" },
+      subject: { type: "chat", ref: "D1:m1" },
     });
 
     expect(await readOrigin(store, next.id)).toMatchObject({ thread: "m1" });
-    // The ticket of the first request stays with the thread.
+  });
+
+  it("answers a reply in the thread of finished filed work with a new chat session", async () => {
+    const { item } = await fileWork("Add a search page", "ACME-1");
+    await scheduler.markActive(item.id);
+    await scheduler.finish(item.id, { outcome: "done", status: "done" });
+
+    const r = await say("one more thing: dark mode", "m1");
+    expect(r.disposition).toBe("started");
+    expect(await store.getItem(r.item.id)).toMatchObject({ kind: "chat", parentId: item.id });
+    expect((await store.getItem(r.item.id))!.sessionId).toBeNull();
   });
 
   it("treats a reply in an unknown thread as a new request in that thread", async () => {
@@ -426,16 +516,15 @@ describe("chat requests", () => {
 
   describe("report", () => {
     const finished = async (status: "done" | "blocked" = "done") => {
-      const r = await say("Add a search page");
-      await scheduler.markActive(r.item.id);
-      await desk.linkTicket("sam", r.item.id, "ACME-1");
+      const { item } = await fileWork("Add a search page", "ACME-1");
+      await scheduler.markActive(item.id);
       if (status === "blocked") {
-        await scheduler.block(r.item.id, "stuck");
+        await scheduler.block(item.id, "stuck");
       } else {
-        await scheduler.finish(r.item.id, { outcome: "ok", status: "done" });
+        await scheduler.finish(item.id, { outcome: "ok", status: "done" });
       }
 
-      return r.item.id;
+      return item.id;
     };
 
     it("grants the result once per ending, with the ticket link", async () => {
@@ -492,19 +581,18 @@ describe("chat requests", () => {
 
   describe("a reply in the thread of a blocked item", () => {
     const blocked = async () => {
-      const r = await say("Add a search page");
-      await scheduler.markActive(r.item.id);
-      await desk.linkTicket("sam", r.item.id, "ACME-1");
-      await store.updateItem(r.item.id, {
+      const { item } = await fileWork("Add a search page", "ACME-1");
+      await scheduler.markActive(item.id);
+      await store.updateItem(item.id, {
         sessionId: "s1",
         failures: 3,
         notBefore: "2999-01-01T00:00:00.000Z",
       });
 
-      await store.recordLoopGuard(r.item.id);
-      await scheduler.block(r.item.id, "stuck");
+      await store.recordLoopGuard(item.id);
+      await scheduler.block(item.id, "stuck");
       notified.length = 0;
-      return r.item.id;
+      return item.id;
     };
 
     it("retries it with a clean count and says so in the thread", async () => {

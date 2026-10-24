@@ -311,9 +311,17 @@ export function evaluate(policy: Policy, call: ToolCall): Decision {
 
     case "shell":
       return evaluateShell(policy, call);
+    case "ost":
+      if (policy.ost && !policy.ost.allow.includes(call.command ?? "")) {
+        return deny(
+          `The ost verb ${call.command ?? "(unknown)"} is not available to the ${policy.profile} profile.`,
+          "ost.verbs",
+        );
+      }
+
+      return allow("ost is allowed.", "tools.allow");
     case "web_fetch":
     case "subagent":
-    case "ost":
       return allow(`${call.kind} is allowed.`, "tools.allow");
   }
 }

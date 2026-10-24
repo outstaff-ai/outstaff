@@ -109,8 +109,9 @@ describe("chat relay", () => {
 
     expect(chat.posts).toEqual([]);
 
-    await relay.acknowledge(offerOf(), { key: "ACME-1" });
-    await relay.acknowledge(offerOf(), { key: "ACME-1", url: tracker.links.issue("ACME-1") });
+    const idle = { item: { id: "w1", title: "x", status: "queued" }, waiting: false, work: [] };
+    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, idle);
+    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, idle);
     expect(office.chatReports.map((r) => r.kind)).toEqual(["ack", "ack"]);
     expect(chat.posts[0]).toMatchObject({ channel: "D-U0DANA0001", thread: "m1" });
     expect(chat.posts[0]!.text).toContain("On it. Tracked in");
@@ -127,19 +128,28 @@ describe("chat relay", () => {
       },
     });
 
-    await relay.acknowledge(offerOf(), { key: "ACME-1", url: tracker.links.issue("ACME-1") });
-    await relay.acknowledge(offerOf(), { key: "ACME-1", url: tracker.links.issue("ACME-1") });
+    const filed = {
+      url: tracker.links.issue("ACME-1"),
+      item: { id: "w1", title: "x", status: "queued" },
+      waiting: false,
+      work: [],
+    };
+
+    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, filed);
+    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, filed);
     expect(chat.posts).toHaveLength(1);
     expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
   });
 
-  it("tells a busy person's requester the current work with links and asks where it goes", async () => {
-    await setup({
-      chatMessage: () => ({
-        disposition: "waiting",
-        repeated: false,
-        item: { id: "c1", title: "Chat: fix footer", status: "queued" },
-        links: [],
+  it("answers a request filed while busy with the grouped work and asks where it goes", async () => {
+    await setup();
+    await relay.acknowledge(
+      offerOf(),
+      { key: "ACME-2", title: "Fix the footer" },
+      {
+        url: tracker.links.issue("ACME-2"),
+        item: { id: "w3", title: "assigned: ACME-2", status: "queued" },
+        waiting: true,
         work: [
           { id: "w1", title: "Checkout bug", status: "active", ticketKey: "ACME-1" },
           {
@@ -150,11 +160,11 @@ describe("chat relay", () => {
             prUrl: "https://git.acme.example/acme/app/pull/4",
           },
         ],
-      }),
-    });
+      },
+    );
 
-    await dana("fix the footer");
     const text = chat.posts[0]!.text;
+    expect(text).toContain(`On it. Tracked in [ACME-2](${tracker.links.issue("ACME-2")}).`);
     expect(text).toContain("busy");
     expect(text).toContain(`1. [ACME-1 Checkout bug](${tracker.links.issue("ACME-1")}) (running)`);
     expect(text).toContain("2. [Search page](https://git.acme.example/acme/app/pull/4)");
@@ -162,21 +172,36 @@ describe("chat relay", () => {
     expect(text).toContain("waits at the end");
   });
 
+  it("says so briefly when all chat sessions are taken, and posts no busy reply otherwise", async () => {
+    await setup({
+      chatMessage: () => ({
+        disposition: "limited",
+        repeated: false,
+        item: { id: "c1", title: "Chat: x", status: "queued" },
+        links: [],
+        work: [],
+      }),
+    });
+
+    await dana("a question");
+    expect(chat.posts).toHaveLength(1);
+    expect(chat.posts[0]!.text).toContain("next in line");
+    expect(chat.posts[0]!.text).not.toContain("busy");
+  });
+
   it("offers the PM only when the team has one", async () => {
-    await setup(
+    await setup(undefined, false);
+    await relay.acknowledge(
+      offerOf(),
+      { title: "Fix the footer" },
       {
-        chatMessage: () => ({
-          disposition: "waiting",
-          repeated: false,
-          item: { id: "c1", title: "x", status: "queued" },
-          links: [],
-          work: [{ id: "w1", title: "Checkout bug", status: "active" }],
-        }),
+        item: { id: "w3", title: "Fix the footer", status: "queued" },
+        waiting: true,
+        work: [{ id: "w1", title: "Checkout bug", status: "active" }],
       },
-      false,
     );
 
-    await dana("fix the footer");
+    expect(chat.posts[0]!.text).toContain("Queued: Fix the footer.");
     expect(chat.posts[0]!.text).not.toContain("PM");
   });
 
@@ -251,11 +276,11 @@ describe("chat relay", () => {
   it("does not answer a message the office already handled (redelivery)", async () => {
     await setup({
       chatMessage: () => ({
-        disposition: "waiting",
+        disposition: "limited",
         repeated: false,
         item: { id: "c1", title: "x", status: "queued" },
         links: [],
-        work: [{ id: "w1", title: "Checkout bug", status: "active" }],
+        work: [],
       }),
     });
 

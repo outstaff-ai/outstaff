@@ -1,13 +1,14 @@
 import { readFileSync } from "node:fs";
 import { createServer as createHttp, type IncomingMessage, type ServerResponse } from "node:http";
 import { createServer as createHttps } from "node:https";
+import { createChat } from "./chat.ts";
 import { BareRepo } from "./git.ts";
 import { createGithub } from "./github.ts";
 import { readBody, router, type Route } from "./http.ts";
 import { createTracker } from "./tracker.ts";
 
 /**
- * Stand-ins for GitHub (API and git remote) and the tracker, for the end-to-end test. Configuration comes from the
+ * Stand-ins for GitHub (API and git remote), the tracker and a chat workspace, for the end-to-end test. Configuration comes from the
  * environment so the same file runs in a container and on a laptop:
  *
  *   STUB_DATA_DIR      where the bare repository lives
@@ -73,13 +74,18 @@ const tracker = createTracker({
   human: "ada.admin",
 });
 
+const chat = createChat();
 const ok = (body: unknown = { ok: true }) => body;
 const control: Route[] = [
   { method: "GET", path: "/_test/healthz", handler: () => ok() },
   {
     method: "GET",
     path: "/_test/state",
-    handler: async () => ({ github: await github.state(), tickets: tracker.state() }),
+    handler: async () => ({
+      github: await github.state(),
+      tickets: tracker.state(),
+      chat: chat.state(),
+    }),
   },
   {
     method: "POST",
@@ -142,7 +148,7 @@ const control: Route[] = [
   },
 ];
 
-const route = router([...control, ...github.routes, ...tracker.routes]);
+const route = router([...control, ...chat.routes, ...github.routes, ...tracker.routes]);
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const started = Date.now();

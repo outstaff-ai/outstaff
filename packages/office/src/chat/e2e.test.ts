@@ -98,27 +98,28 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       ...(thread ? { thread } : {}),
     });
 
+  const layout = {
+    home: "/h",
+    workDir: "/h/work",
+    reposDir: "/h/repos",
+    worktreesDir: "/h/worktrees",
+    scratchDir: "/h/scratch",
+    memoryDir: "/h/memory",
+    secretsDir: "/run/secrets",
+  };
+
   const loopOptions = (rt: Runtime = runtime): WorkLoopOptions => {
     const t = team();
     return {
+      chatSession: {
+        policy: buildPolicy({ profile: "chat", person: t.people[0]!, team: t, layout }),
+        builtinTools: ["read", "search", "shell", "ost"],
+      },
       office: conn,
       runtime: rt,
       env,
       systemPrompt: "IDENTITY",
-      policy: buildPolicy({
-        profile: "readonly",
-        person: t.people[0]!,
-        team: t,
-        layout: {
-          home: "/h",
-          workDir: "/h/work",
-          reposDir: "/h/repos",
-          worktreesDir: "/h/worktrees",
-          scratchDir: "/h/scratch",
-          memoryDir: "/h/memory",
-          secretsDir: "/run/secrets",
-        },
-      }),
+      policy: buildPolicy({ profile: "readonly", person: t.people[0]!, team: t, layout }),
       builtinTools: ["read"],
       workdir: "/h/work",
       addDirs: [],
@@ -191,59 +192,73 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     await office.stop();
   });
 
-  /** A run that does what a developer does with a request that is work: ticket first, then the result. */
-  const worksOnIt = (result: string): Runtime => ({
+  /**
+   * What the agent does with a chat message that is work: the chat session files a ticket, and the work item for it
+   * ends with the result. `onWork` can hold the work item back.
+   */
+  const filesAndWorks = (result: string, onWork?: () => Promise<void>): Runtime => ({
     async *run(req) {
       runtime.requests.push(req);
-      yield { type: "started", sessionId: "chat-session-1" };
-      await req.tools
-        .find((t) => t.name === "ticket_create")!
-        .handler(
-          { title: "Add a search page", body: "Dana asked in chat." },
-          { workItemId: req.workItemId! },
-        );
+      yield { type: "started", sessionId: `session-${req.workItemId}` };
+      if (req.policy.profile === "chat") {
+        await req.tools
+          .find((t) => t.name === "ticket_create")!
+          .handler(
+            { title: "Add a search page", body: "Dana asked in chat." },
+            { workItemId: req.workItemId! },
+          );
 
+        yield { type: "finished", ok: true, text: "Filed it." };
+        return;
+      }
+
+      await onWork?.();
       yield { type: "finished", ok: true, text: result };
     },
   });
 
-  it("starts an idle agent's request, links the ticket the agent made, and reports the result in the thread", async () => {
+  it("files work from a chat session, starts it as today for an idle agent, and reports the result in the thread", async () => {
     const sent = await dana("please add a search page to the shop");
-    await until(async () => (await store.listItems({ person: "sam" })).length === 1);
-    expect(agentChat.posts).toEqual([]);
-    expect(agentChat.reactions[0]).toMatchObject({ messageId: sent.id, name: "eyes" });
-
     startLoop(
-      worksOnIt("The search page is up for review: https://git.acme.example/acme/app/pull/4"),
+      filesAndWorks("The search page is up for review: https://git.acme.example/acme/app/pull/4"),
     );
 
     await until(() => agentChat.posts.length === 2);
     const ticket = tracker.links.issue("ACME-1");
     const [ack, result] = agentChat.posts;
+    expect(agentChat.reactions[0]).toMatchObject({ messageId: sent.id, name: "eyes" });
     expect(ack).toMatchObject({ channel: DM, thread: sent.id });
     expect(ack!.text).toContain(ticket);
+    expect(ack!.text).not.toContain("busy");
     expect(result).toMatchObject({ channel: DM, thread: sent.id });
     expect(result!.text).toContain(`<@${DANA}>`);
     expect(result!.text).toContain("https://git.acme.example/acme/app/pull/4");
     expect(result!.text).toContain(ticket);
 
-    // The agent made the ticket for itself and the office linked it; the hand-back workflow moves it on.
-    const issue = await tracker.getIssue("ACME-1");
-    expect(issue.status.canonical).toBe("review");
-    const [item] = await store.listItems({ person: "sam" });
-    expect(item).toMatchObject({ kind: "chat", status: "done", subject: { ref: "ACME-1" } });
+    // The session ended without a report of its own; the work item ran for the ticket and the workflow moved it on.
+    await until(async () => (await tracker.getIssue("ACME-1")).status.canonical === "review");
+    const items = await store.listItems({ person: "sam" });
+    expect(items.map((i) => [i.kind, i.status])).toEqual([
+      ["chat", "done"],
+      ["assigned", "done"],
+    ]);
 
-    // The tracker reports the agent's own creation and self-assignment, long after the item finished.
-    // The events carry the agent as actor, so they start nothing.
+    expect(items[1]).toMatchObject({ subject: { ref: "ACME-1" }, parentId: items[0]!.id });
+
+    // The tracker reports the agent's own creation and self-assignment; they start nothing.
     await office.parts.intake.pollOnce();
     await office.parts.intake.pollOnce();
-    expect(await store.listItems({ person: "sam" })).toHaveLength(1);
+    expect(await store.listItems({ person: "sam" })).toHaveLength(2);
 
     // A new chat session starts with the conversation and the person's current work.
     const prompt = runtime.requests[0]!.prompt;
     expect(prompt).toContain("please add a search page to the shop");
     expect(prompt).toContain("Your current work, one line per ticket or pull request:");
     expect(runtime.requests[0]!.sessionId).toBeUndefined();
+
+    // The filed work runs under its own permissions in a session of its own, not in the chat session.
+    const workRun = runtime.requests.find((r) => r.policy.profile === "readonly" && r.tools.length);
+    expect(workRun?.sessionId).toBeUndefined();
   });
 
   it("answers a question in the thread without a ticket", async () => {
@@ -259,17 +274,17 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
 
   it("does not post twice when the message or the hand-back is delivered again", async () => {
     const sent = await dana("please add a search page");
-    startLoop(worksOnIt("Done: https://git.acme.example/acme/app/pull/4"));
+    startLoop(filesAndWorks("Done: https://git.acme.example/acme/app/pull/4"));
     await until(() => agentChat.posts.length === 2);
 
     // The hand-back is retried, and the event arrives again.
-    const [item] = await store.listItems({ person: "sam" });
-    await conn.handBack(item!.id, { summary: "Done again.", status: "done" });
+    const item = (await store.listItems({ person: "sam" })).find((i) => i.kind === "assigned")!;
+    await conn.handBack(item.id, { summary: "Done again.", status: "done" });
     await relay.report(
       {
         workItem: {
-          id: item!.id,
-          kind: "chat",
+          id: item.id,
+          kind: "assigned",
           title: "x",
           priority: 0,
           trigger: "human",
@@ -290,12 +305,12 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
 
     expect(dup.repeated).toBe(true);
     expect(agentChat.posts).toHaveLength(2);
-    expect(await store.listItems({ person: "sam" })).toHaveLength(1);
+    expect(await store.listItems({ person: "sam" })).toHaveLength(2);
     expect((await tracker.listIssues({})).length).toBe(1);
   });
 
-  it("tells a requester the busy agent's work with links, and puts the request where they say", async () => {
-    const running1 = await office.parts.scheduler.enqueue({
+  it("answers right away while a work item runs, and asks where filed work goes only once it is work", async () => {
+    const main = await office.parts.scheduler.enqueue({
       person: "sam",
       kind: "ticket",
       title: "Checkout bug",
@@ -303,7 +318,6 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       subject: { type: "ticket", ref: "ACME-77" },
     });
 
-    await office.parts.scheduler.markActive(running1.id);
     await office.parts.scheduler.enqueue({
       person: "sam",
       kind: "ticket",
@@ -312,41 +326,122 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       subject: { type: "ticket", ref: "ACME-78" },
     });
 
+    let releaseMain: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      releaseMain = resolve;
+    });
+
+    // The agent works on the checkout bug; the question is answered by a chat session beside it.
+    const answers: Runtime = {
+      async *run(req) {
+        runtime.requests.push(req);
+        yield { type: "started", sessionId: `s-${req.workItemId}` };
+        if (req.workItemId === main.id) {
+          await held;
+          yield { type: "finished", ok: true, text: "Fixed." };
+          return;
+        }
+
+        yield { type: "finished", ok: true, text: "Yes, X would be integrated in Y." };
+      },
+    };
+
+    await office.parts.scheduler.markActive(main.id);
+    startLoop(answers);
+    await until(() => runtime.requests.some((r) => r.workItemId === main.id));
+
+    const question = await dana("would X be integrated in Y?");
+    await until(() => agentChat.posts.length === 1);
+    expect(agentChat.posts[0]).toMatchObject({ thread: question.id });
+    expect(agentChat.posts[0]!.text).toContain("Yes, X would be integrated in Y.");
+    expect(agentChat.posts[0]!.text).not.toContain("busy");
+    expect((await store.getItem(main.id))!.status).toBe("active");
+
+    // A question files nothing: no ticket, no work item beyond the session.
+    expect(await tracker.listIssues({})).toEqual([]);
+    const items = await store.listItems({ person: "sam" });
+    expect(items.map((i) => i.kind).toSorted()).toEqual(["chat", "ticket", "ticket"]);
+
+    releaseMain?.();
+    await until(async () => (await store.getItem(main.id))!.status === "done");
+  });
+
+  it("asks where work goes when the agent is busy, and puts it where the requester says", async () => {
+    const main = await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "ticket",
+      title: "Checkout bug",
+      trigger: "human",
+      subject: { type: "ticket", ref: "ACME-77" },
+    });
+
+    await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "ticket",
+      title: "Search page",
+      trigger: "agent",
+      subject: { type: "ticket", ref: "ACME-78" },
+    });
+
+    let releaseMain: (() => void) | undefined;
+    const held = new Promise<void>((resolve) => {
+      releaseMain = resolve;
+    });
+
+    const base = filesAndWorks("Done: https://git.acme.example/acme/app/pull/8", () => held);
+    await office.parts.scheduler.markActive(main.id);
+    startLoop({
+      run: (req) => {
+        if (req.workItemId === main.id) {
+          return (async function* () {
+            yield { type: "started", sessionId: "main" } as const;
+            await held;
+            yield { type: "finished", ok: true, text: "Fixed." } as const;
+          })();
+        }
+
+        return base.run(req);
+      },
+    });
+
     const sent = await dana("fix the footer");
     await until(() => agentChat.posts.length === 1);
-    const busy = agentChat.posts[0]!;
-    expect(busy.thread).toBe(sent.id);
-    expect(busy.text).toContain("busy");
-    expect(busy.text).toContain(
+    const asked = agentChat.posts[0]!;
+    expect(asked.thread).toBe(sent.id);
+    expect(asked.text).toContain("On it. Tracked in");
+    expect(asked.text).toContain("busy");
+    expect(asked.text).toContain(
       `1. [ACME-77 Checkout bug](${tracker.links.issue("ACME-77")}) (running)`,
     );
 
-    expect(busy.text).toContain(`2. [ACME-78 Search page](${tracker.links.issue("ACME-78")})`);
-    expect(busy.text).toContain("Where does this go");
+    expect(asked.text).toContain(`2. [ACME-78 Search page](${tracker.links.issue("ACME-78")})`);
+    expect(asked.text).toContain("Where does this go");
 
     const titles = async () =>
       (await store.listItems({ person: "sam", status: "queued" }))
         .toSorted((a, b) => a.priority - b.priority || a.position - b.position)
         .map((i) => i.title);
 
-    // Nothing started: the request waits last.
-    expect(await titles()).toEqual(["Search page", "Chat: fix the footer"]);
+    // The filed work waits last until the requester says.
+    expect(await titles()).toEqual(["Search page", expect.stringContaining("ACME-")]);
 
     await dana("next please", sent.id);
     await until(() => agentChat.posts.length === 2);
     expect(agentChat.posts[1]!.text).toContain("this goes next");
-    expect(await titles()).toEqual(["Chat: fix the footer", "Search page"]);
+    expect((await titles())[0]).toContain("ACME-");
 
     // The agent can move it too, with the verb.
-    const chatItem = (await store.listItems({ person: "sam", status: "queued" })).find(
-      (i) => i.kind === "chat",
+    const filed = (await store.listItems({ person: "sam", status: "queued" })).find(
+      (i) => i.kind === "assigned",
     )!;
 
-    await runVerb(findVerb("work.move")!, env, { id: chatItem.id, position: "last" });
-    expect(await titles()).toEqual(["Search page", "Chat: fix the footer"]);
+    await runVerb(findVerb("work.move")!, env, { id: filed.id, position: "last" });
+    expect((await titles()).at(-1)).toContain("ACME-");
     await expect(
-      runVerb(findVerb("work.move")!, env, { id: chatItem.id, position: "after" }),
+      runVerb(findVerb("work.move")!, env, { id: filed.id, position: "after" }),
     ).rejects.toMatchObject({ code: "invalid" });
+
+    releaseMain?.();
   });
 
   it("adds a reply in the thread to the item and ignores people who are not trusted", async () => {

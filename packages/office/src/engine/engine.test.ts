@@ -133,7 +133,7 @@ describe("engine", () => {
     expect(items.find((i) => i.status === "queued")!.parentId).toBe(item!.id);
   });
 
-  it("does not queue an item for a subject a chat request is already working on", async () => {
+  it("does not queue a second item of the same kind for a subject that has one", async () => {
     h = await harness();
     const { conflicted } = await conflictSetup();
     await h.engine.handle(conflicted("1"), { source: "workstate", externalId: "a", trusted: true });
@@ -141,8 +141,8 @@ describe("engine", () => {
     await h.store.updateItem(first!.id, { status: "done" });
     await h.store.enqueue({
       person: "sam",
-      kind: "chat",
-      title: "Chat: fix the conflict",
+      kind: "conflict",
+      title: "conflict: fix it",
       trigger: "human",
       subject: first!.subject!,
     });
