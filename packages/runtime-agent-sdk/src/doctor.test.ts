@@ -1,11 +1,22 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { claudeAgentSdk } from "./adapter.js";
+import { probeSubprocessSandbox, type SandboxProbe } from "./sandbox.js";
 
-const ctx = (scope: "person" | "office"): DeriveContext => ({
+vi.mock("./sandbox.js", () => ({ probeSubprocessSandbox: vi.fn<() => SandboxProbe>() }));
+const probe = vi.mocked(probeSubprocessSandbox);
+const realPlatform = process.platform;
+const onPlatform = (p: NodeJS.Platform) => Object.defineProperty(process, "platform", { value: p });
+beforeEach(() => probe.mockReturnValue({ ok: true, detail: "bubblewrap runs." }));
+afterEach(() => {
+  onPlatform(realPlatform);
+  probe.mockReset();
+});
+
+const ctx = (scope: "person" | "office", options: unknown = {}): DeriveContext => ({
   team: {} as TeamConfig,
   scope,
-  options: {},
+  options,
   fetch: (() => {
     throw new Error("no network expected");
   }) as unknown as typeof fetch,
@@ -13,8 +24,19 @@ const ctx = (scope: "person" | "office"): DeriveContext => ({
   warn: () => {},
 });
 
-const run = (env: Record<string, string>, scope: "person" | "office" = "person") =>
-  claudeAgentSdk.doctor!(envSecretSource(env, "/nonexistent"), ctx(scope));
+const run = (
+  env: Record<string, string>,
+  scope: "person" | "office" = "person",
+  options: unknown = {},
+) => claudeAgentSdk.doctor!(envSecretSource(env, "/nonexistent"), ctx(scope, options));
+
+const KEY = { ANTHROPIC_API_KEY: "fake-api-key" };
+const BWRAP = { sandbox: "bubblewrap" };
+const create = (options: unknown) =>
+  claudeAgentSdk.create({
+    options: claudeAgentSdk.options.parse(options),
+    secrets: envSecretSource({}, "/nonexistent"),
+  } as never);
 
 describe("claude-agent-sdk doctor", () => {
   it.each([
@@ -33,6 +55,52 @@ describe("claude-agent-sdk doctor", () => {
     expect(check).toMatchObject({ status: "fail" });
     expect(check!.detail).toContain("ANTHROPIC_API_KEY");
     expect(check!.detail).toContain("CLAUDE_CODE_USE_BEDROCK");
+  });
+
+  it("adds the subprocess sandbox check with sandbox: bubblewrap on Linux, where the agent runs", async () => {
+    onPlatform("linux");
+    probe.mockReturnValue({
+      ok: false,
+      detail: "/proc is masked.",
+      fix: "Set procMount: Unmasked.",
+    });
+
+    const checks = await run(KEY, "person", BWRAP);
+    expect(checks[1]).toEqual({
+      name: "Subprocess sandbox",
+      status: "fail",
+      detail: "/proc is masked.",
+      fix: "Set procMount: Unmasked.",
+    });
+
+    probe.mockReturnValue({ ok: true, detail: "bubblewrap runs." });
+    expect((await run(KEY, "person", BWRAP))[1]).toMatchObject({ status: "ok" });
+  });
+
+  it("skips the sandbox check with sandbox: off, and off Linux", async () => {
+    onPlatform("linux");
+    expect(await run(KEY)).toHaveLength(1);
+    onPlatform("darwin");
+    expect(await run(KEY, "person", BWRAP)).toHaveLength(1);
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it("refuses to create the runtime with sandbox: bubblewrap when the sandbox cannot run", () => {
+    probe.mockReturnValue({
+      ok: false,
+      detail: "bwrap is not installed.",
+      fix: "Use the agent image.",
+    });
+
+    expect(() => create({ sandbox: "bubblewrap" })).toThrow(
+      /^sandbox: bubblewrap cannot run in this container\. bwrap is not installed\. Fix: Use the agent image\.$/,
+    );
+  });
+
+  it("does not probe at all with sandbox: off", () => {
+    probe.mockReturnValue({ ok: false, detail: "bwrap is not installed." });
+    expect(() => create({})).not.toThrow();
+    expect(probe).not.toHaveBeenCalled();
   });
 
   it("needs nothing for the office", async () => {

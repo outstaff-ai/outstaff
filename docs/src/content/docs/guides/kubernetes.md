@@ -29,6 +29,7 @@ examples/k8s/
   office/                   Deployment, Service, PVC
   agent/                    the template of one agent: StatefulSet and home PVC
   people/<handle>/          person label and patches for the names, the person, the Secret and the volume
+examples/k8s-sandbox/       optional overlay: the agents with the subprocess sandbox, and its two node profiles
 ```
 
 A person is a folder with a `kustomization.yaml` that reuses `agent/` and patches the StatefulSet name, `OUTSTAFF_PERSON`, the name of the person's Secret and volume, and the PVC name. To add or remove a person, copy or delete a folder, edit the list in the top `kustomization.yaml` and add or remove the person's entry in its `secretGenerator`.
@@ -87,6 +88,67 @@ A StatefulSet's `selector` and `serviceName` are immutable, so `kubectl apply` c
 - `terminationGracePeriodSeconds` is 45 for the office and 60 for an agent. Both stop on `SIGTERM`: the office finishes its running handlers and an agent hands its work item back, so rolling either is safe.
 - The office has a startup probe on `/healthz` with a generous window (three minutes), then a liveness probe on `/healthz` and a readiness probe on `/readyz`. The agent has no port, so no probes: it exits when it cannot run and the StatefulSet restarts it.
 
+## Subprocess sandbox (optional)
+
+By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/packages/runtime-agent-sdk#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap` in the team file, Claude Code removes the credential from the environment of every command, hook and MCP server and runs each command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`, so a command cannot read it from another process either. The runtime also hides the credential files under `/run/secrets/outstaff` inside that sandbox; the other secret files stay readable, because `ost git-credential` runs there.
+
+```yaml
+integrations:
+  runtime: { adapter: claude-agent-sdk, sandbox: bubblewrap }
+```
+
+The agent image has bubblewrap and socat; they do nothing until the option is on. A hardened pod blocks what bubblewrap needs, so the overlay in [`examples/k8s-sandbox`](https://github.com/outstaff-ai/outstaff/tree/main/examples/k8s-sandbox) changes four things on the agents, and each is needed. The office runs no commands and keeps the base settings.
+
+| Setting                                                                      | Why                                                                                                                                                                                                                                      |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seccompProfile: { type: Localhost, localhostProfile: outstaff/bwrap.json }` | The runtime's default profile refuses `clone` and `unshare` with namespace flags, `mount`, `umount2` and `pivot_root`. This profile is Docker's default plus exactly those, without IPC, UTS or cgroup namespaces.                       |
+| `appArmorProfile: { type: Localhost, localhostProfile: outstaff-agent }`     | containerd's default AppArmor profile denies every mount, and Ubuntu 24.04 denies user namespaces to any process without a profile that grants them. This profile is containerd's default plus `userns` and the mounts bubblewrap makes. |
+| `hostUsers: false`                                                           | The pod gets its own user namespace: uid 0 in the pod is an unprivileged uid on the node. Kubernetes allows the next setting only with it.                                                                                               |
+| `procMount: Unmasked` (agent container)                                      | bubblewrap mounts a fresh `/proc` for each command, which the kernel refuses while parts of the container's `/proc` are masked.                                                                                                          |
+
+Turn it on:
+
+1. Check the nodes and install the two profiles (below).
+2. Set `sandbox: bubblewrap` under `integrations.runtime` in `team.yaml`.
+3. `kubectl apply -k examples/k8s-sandbox` instead of `examples/k8s`.
+
+When the pod lacks one of these, the agent stops at start with one error that names the missing piece and its fix, for example `/proc is masked, so bubblewrap cannot mount a fresh /proc ...`. Read it with `kubectl -n outstaff-acme logs sts/outstaff-agent-sam`. `ost doctor <handle>` run inside the agent container shows the same check.
+
+### What the nodes need
+
+| Requirement                  | Check on a node                                                                                            |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Kubernetes 1.33 or later     | `kubectl version`. On 1.30 to 1.32, turn on the `UserNamespacesSupport` and `ProcMountType` feature gates. |
+| containerd 2.0 or later      | `kubectl get nodes -o wide` (CONTAINER-RUNTIME column)                                                     |
+| runc 1.2 or later            | `runc --version` (k3s: `/var/lib/rancher/k3s/data/current/bin/runc --version`)                             |
+| Linux 6.3 or later           | `uname -r`                                                                                                 |
+| Unprivileged user namespaces | `cat /proc/sys/user/max_user_namespaces` is above 0                                                        |
+| Volumes with idmapped mounts | The agent's home volume and `/var/lib/kubelet` on ext4, xfs, btrfs or tmpfs. NFS does not work.            |
+| AppArmor                     | `cat /sys/module/apparmor/parameters/enabled`; `Y` means the AppArmor profile must be loaded               |
+
+Managed clusters often do not let you add node profiles or user namespaces; there, leave the sandbox off.
+
+### Install the profiles on each node
+
+The kubelet reads Localhost seccomp profiles from `<kubelet root>/seccomp/`, by default `/var/lib/kubelet/seccomp/` (k3s uses the same path unless `--kubelet-arg=root-dir` changes it). AppArmor profiles are loaded into the kernel by name. On every node that may run an agent:
+
+```sh
+sudo install -D -m 0644 examples/k8s-sandbox/seccomp/outstaff-bwrap.json /var/lib/kubelet/seccomp/outstaff/bwrap.json
+sudo install -m 0644 examples/k8s-sandbox/apparmor/outstaff-agent /etc/apparmor.d/outstaff-agent
+sudo apparmor_parser -r -W /etc/apparmor.d/outstaff-agent    # only where AppArmor is enabled
+sudo aa-status | grep outstaff-agent                          # loaded, in enforce mode
+```
+
+Files under `/etc/apparmor.d/` load again at boot. Use your configuration management, or a DaemonSet with a `hostPath` mount, to keep the files on new nodes. A pod whose profile is missing on its node does not start (`CreateContainerError`).
+
+**Ubuntu 24.04 nodes** enable AppArmor, run pods under containerd's `cri-containerd.apparmor.d` profile and set `kernel.apparmor_restrict_unprivileged_userns=1`, so without the `outstaff-agent` profile even an unconfined process cannot create the user namespace bubblewrap needs. Load the profile there. Every rule it adds to containerd's default was checked to be needed on Ubuntu 24.04 with that setting.
+
+If your nodes do not enable AppArmor, drop the `appArmorProfile` patch from `examples/k8s-sandbox/kustomization.yaml`. If the AppArmor profile does not work on your nodes, read the kernel's denials (`sudo journalctl -k | grep 'apparmor="DENIED"'`, or `dmesg`) and open an issue with them. `appArmorProfile: { type: Unconfined }` is the last resort: it lifts every AppArmor restriction on the agent, not only the ones bubblewrap needs.
+
+### Pod Security
+
+`procMount: Unmasked` is not allowed by the `restricted` Pod Security level, even with `hostUsers: false`, so the overlay makes the namespace enforce `baseline` and still warn and audit against `restricted`, which the rest of the manifests meet. A namespace without Pod Security labels enforces nothing and needs no change. An unmasked `/proc` shows read-only kernel information such as `/proc/timer_list`; writes under `/proc/sys` need capabilities on the node that a pod with its own user namespace does not have.
+
 ## Network policy
 
 `network-policy.yaml` denies all traffic in the namespace, then allows:
@@ -117,4 +179,5 @@ CI runs this for every pull request that touches `examples/`:
 ```sh
 cp examples/acme/.outstaff/team.yaml examples/k8s/team.yaml
 kustomize build examples/k8s | kubeconform -strict -summary -kubernetes-version 1.33.0 -
+kustomize build examples/k8s-sandbox | kubeconform -strict -summary -kubernetes-version 1.33.0 -
 ```

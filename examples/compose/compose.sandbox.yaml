@@ -1,0 +1,26 @@
+# The optional subprocess sandbox for the agents, on top of compose.yaml:
+#   docker compose -f compose.yaml -f compose.sandbox.yaml up -d
+# Also set `sandbox: bubblewrap` under integrations.runtime in team.yaml, and on a host that enforces AppArmor (Ubuntu,
+# Debian) load apparmor/outstaff-agent first. See the Compose guide, "Subprocess sandbox (optional)".
+#
+# Claude Code then runs each of the agent's commands in a bubblewrap sandbox, which Docker's defaults block:
+#   seccomp       Docker's default profile plus clone/unshare for user, mount, PID and network namespaces, mount,
+#                 umount2 and pivot_root
+#   systempaths   bubblewrap mounts a fresh /proc, which the kernel refuses while parts of /proc are masked
+#   apparmor      Docker's default profile denies every mount; ignored on a host without AppArmor
+# Compose appends these to the security_opt of compose.yaml (no-new-privileges stays).
+x-sandbox: &sandbox
+  security_opt:
+    - "seccomp=./seccomp/outstaff-bwrap.json"
+    - "systempaths=unconfined"
+    - "apparmor=outstaff-agent"
+
+services:
+  priya: *sandbox
+  tomas: *sandbox
+  mira: *sandbox
+  leo: *sandbox
+  sam: *sandbox
+  noor: *sandbox
+  ines: *sandbox
+  kofi: *sandbox

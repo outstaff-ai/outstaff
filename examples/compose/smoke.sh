@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Brings up the office, Postgres and one agent from compose.yaml with dummy secrets, and checks that
-# the office is healthy and the agent connects to it. Nothing here reaches a real service.
+# the office is healthy and the agent connects to it, then starts the agent again with the optional subprocess
+# sandbox (compose.sandbox.yaml, sandbox: bubblewrap) and checks it too. Nothing here reaches a real service.
 #   examples/compose/smoke.sh     (builds the images from the repository; SMOKE_PREBUILT=1 uses outstaff/{office,agent}:local)
 set -euo pipefail
 
@@ -11,7 +12,8 @@ export COMPOSE_PROJECT_NAME="ost-compose-smoke-$$"
 export POSTGRES_PASSWORD=smoke
 export OUTSTAFF_TEAM_DIR="$work/team"
 export SECRETS_DIR="$work/secrets"
-compose() { docker compose -f "$here/compose.yaml" "$@"; }
+files=(-f "$here/compose.yaml")
+compose() { docker compose "${files[@]}" "$@"; }
 fail() { echo "FAIL: $*" >&2; compose logs --no-color >&2 || true; exit 1; }
 trap 'compose down -v --remove-orphans >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 
@@ -48,13 +50,45 @@ build=(--build); [ "${SMOKE_PREBUILT:-}" = 1 ] && build=()
 compose up -d "${build[@]}" --wait --wait-timeout 180 postgres office || fail "office did not become healthy"
 echo "ok   office: healthy with Postgres on a read-only root"
 
+# Waits until the office logs that sam connected for the <n>th time, or sam stops.
+await_sam() {
+  local n="$1"
+  for _ in $(seq 1 45); do
+    [ "$(compose logs --no-color office 2>&1 | grep -c '"agent connected","person":"sam"')" -ge "$n" ] && return 0
+    [ "$(compose ps --status running --services | grep -cx sam)" = 1 ] || return 1
+    sleep 2
+  done
+  return 1
+}
+
 compose up -d --no-deps sam
-connected=""
-for _ in $(seq 1 30); do
-  if compose logs --no-color office 2>&1 | grep -q '"agent connected","person":"sam"'; then connected=yes; break; fi
-  [ "$(compose ps --status running --services | grep -cx sam)" = 1 ] || break
-  sleep 2
-done
-[ -n "$connected" ] || fail "the agent never showed up in the office log"
+await_sam 1 || fail "the agent never showed up in the office log"
 echo "ok   sam: connected to the office"
+
+# The optional subprocess sandbox. An AppArmor host (Ubuntu, Debian) needs the agents' profile loaded first.
+if [ "$(cat /sys/module/apparmor/parameters/enabled 2>/dev/null)" = Y ]; then
+  if ! sudo -n true 2>/dev/null; then
+    echo "::notice::AppArmor is enforced here and loading the outstaff-agent profile needs sudo; the sandbox part of the smoke is skipped."
+    echo "smoke: all passed (sandbox skipped)"
+    exit 0
+  fi
+
+  sudo apparmor_parser -r -W "$here/apparmor/outstaff-agent" || fail "could not load the outstaff-agent AppArmor profile"
+  echo "ok   host: outstaff-agent AppArmor profile loaded"
+fi
+
+sed -i.bak 's/runtime: { adapter: claude-agent-sdk }/runtime: { adapter: claude-agent-sdk, sandbox: bubblewrap }/' "$work/team/team.yaml"
+grep -q 'sandbox: bubblewrap' "$work/team/team.yaml" || fail "could not turn the sandbox on in the smoke team"
+files+=(-f "$here/compose.sandbox.yaml")
+compose up -d --no-deps --force-recreate sam
+await_sam 2 || fail "the agent with sandbox: bubblewrap never showed up in the office log"
+echo "ok   sam: connected with sandbox: bubblewrap"
+
+# The agent started, so the runtime's start-up probe passed; run it once more to show what it found.
+probe="$(compose exec -T sam node --input-type=module -e '
+  const m = await import("/opt/outstaff/node_modules/@outstaff/runtime-agent-sdk/dist/index.js");
+  const p = m.probeSubprocessSandbox();
+  console.log(p.detail + (p.fix ? " Fix: " + p.fix : ""));
+  process.exit(p.ok ? 0 : 1);' 2>&1)" || fail "subprocess sandbox: $probe"
+echo "ok   sam: $probe"
 echo "smoke: all passed"

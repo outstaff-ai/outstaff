@@ -1,0 +1,59 @@
+# AppArmor profile for Outstaff agents with the optional subprocess sandbox (sandbox: bubblewrap).
+# containerd's default container profile (cri-containerd.apparmor.d, contrib/apparmor/template.go) plus what
+# bubblewrap needs for Claude Code's sandbox; every added rule was checked to be needed on Ubuntu 24.04 (AppArmor 4,
+# kernel.apparmor_restrict_unprivileged_userns=1).
+# Load on every node or host that runs agents and enforces AppArmor:
+#   sudo install -m 0644 outstaff-agent /etc/apparmor.d/outstaff-agent
+#   sudo apparmor_parser -r -W /etc/apparmor.d/outstaff-agent
+abi <abi/4.0>,
+#include <tunables/global>
+
+profile outstaff-agent flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  network,
+  deny network alg,
+  deny network vsock,
+  capability,
+  file,
+  umount,
+  signal (receive) peer=unconfined,
+  signal (receive) peer=runc,
+  signal (receive) peer=crun,
+  signal (send,receive) peer=outstaff-agent,
+
+  # bwrap, the sandbox Claude Code runs the agent's commands in. The kernel lets these mounts succeed only inside the
+  # user namespace bwrap creates; in the container's own namespace the dropped capabilities still refuse them.
+  userns,
+  mount options=(rw, silent, rslave) -> /,
+  mount fstype=tmpfs options=(rw, nosuid, nodev) -> /tmp/,
+  mount options=(rw, rbind) -> /tmp/newroot/,
+  pivot_root /tmp/,
+  mount options in (rw, bind, rbind, silent) -> /newroot/{,**},
+  remount /newroot/{,**},
+  mount fstype=proc -> /newroot/proc/,
+  mount fstype=tmpfs -> /newroot/{,**},
+  mount fstype=devpts -> /newroot/dev/pts/,
+  pivot_root /newroot/,
+  mount options=(rw, silent, rprivate) -> /oldroot/,
+
+  deny @{PROC}/* w,
+  deny @{PROC}/{[^1-9/],[^1-9/][^0-9/],[^1-9s/][^0-9y/][^0-9s/],[^1-9/][^0-9/][^0-9/][^0-9/]*}/** w,
+  # bwrap: --disable-userns writes /proc/sys/user/max_user_namespaces in the sandbox's own /proc. containerd's
+  # default denies /proc/sys/[^k]**; "user" is the only other entry starting with u.
+  deny @{PROC}/sys/[^ku]** w,
+  deny @{PROC}/sys/kernel/{?,??,[^s][^h][^m]**} w,
+  deny @{PROC}/sysrq-trigger rwklx,
+  deny @{PROC}/kcore rwklx,
+
+  deny /sys/[^f]*/** wklx,
+  deny /sys/f[^s]*/** wklx,
+  deny /sys/fs/[^c]*/** wklx,
+  deny /sys/fs/c[^g]*/** wklx,
+  deny /sys/fs/cg[^r]*/** wklx,
+  deny /sys/firmware/** rwklx,
+  deny /sys/devices/virtual/powercap/** rwklx,
+  deny /sys/kernel/security/** rwklx,
+
+  ptrace (trace,tracedby,read,readby) peer=outstaff-agent,
+}

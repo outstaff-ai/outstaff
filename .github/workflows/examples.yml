@@ -35,9 +35,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Compose file is valid
-        run: docker compose -f examples/compose/compose.yaml config --quiet
+        run: |
+          docker compose -f examples/compose/compose.yaml config --quiet
+          docker compose -f examples/compose/compose.yaml -f examples/compose/compose.sandbox.yaml config --quiet
         env:
           POSTGRES_PASSWORD: validate
+      - name: Sandbox profiles parse and are the same in both examples
+        run: |
+          cmp examples/k8s-sandbox/seccomp/outstaff-bwrap.json examples/compose/seccomp/outstaff-bwrap.json
+          cmp examples/k8s-sandbox/apparmor/outstaff-agent examples/compose/apparmor/outstaff-agent
+          node -e 'JSON.parse(require("fs").readFileSync("examples/k8s-sandbox/seccomp/outstaff-bwrap.json", "utf8"))'
+          sudo apparmor_parser -Q -K examples/k8s-sandbox/apparmor/outstaff-agent
       - name: Install kustomize and kubeconform (pinned, checksum verified)
         run: |
           set -euo pipefail
@@ -61,6 +69,7 @@ jobs:
           done
           cd ../..
           kustomize build examples/k8s | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" -
+          kustomize build examples/k8s-sandbox | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" -
 
   compose-smoke:
     name: compose smoke

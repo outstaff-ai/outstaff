@@ -10,7 +10,7 @@ import {
 import { workdirFiles } from "./layout.js";
 import { agentSdkOptions } from "./options.js";
 import { createAgentSdkRuntime } from "./runtime.js";
-import { bubblewrapMissing } from "./sandbox.js";
+import { probeSubprocessSandbox } from "./sandbox.js";
 
 // The operator supplies credentials to the container; outstaff never reads or stores them (decision 0009).
 // None is required by outstaff itself, and exactly one way of signing in has to be present.
@@ -57,31 +57,60 @@ const PROVIDER_SWITCHES = [
 ];
 
 // No network call: the runtime reads none of these, and a provider switch is only a flag.
+function credentialCheck(secrets: SecretSource): DoctorCheck {
+  const found = [...SIGN_IN, ...PROVIDER_SWITCHES].filter((k) => secrets.get(k));
+  if (found.length > 0) {
+    return {
+      key: found[0]!,
+      name: "Claude credential",
+      status: "ok",
+      detail: `${found.join(", ")} ${found.length === 1 ? "is" : "are"} set.`,
+    };
+  }
+
+  return {
+    name: "Claude credential",
+    status: "fail",
+    detail: `None of ${SIGN_IN.join(", ")} or a cloud provider switch (${PROVIDER_SWITCHES.join(", ")}) is set.`,
+    fix: "Supply one of them to the agent container; see the setup guide for the options.",
+  };
+}
+
+// With sandbox: bubblewrap only, and only on Linux, where the agent runs: run `ost doctor <handle>` in its container.
+function sandboxCheck(options: unknown): DoctorCheck[] {
+  const parsed = agentSdkOptions.safeParse(options ?? {});
+  if (!parsed.success || parsed.data.sandbox !== "bubblewrap" || process.platform !== "linux") {
+    return [];
+  }
+
+  const probe = probeSubprocessSandbox();
+  return [
+    {
+      name: "Subprocess sandbox",
+      status: probe.ok ? "ok" : "fail",
+      detail: probe.detail,
+      ...(probe.fix ? { fix: probe.fix } : {}),
+    },
+  ];
+}
+
 async function doctor(secrets: SecretSource, ctx: DeriveContext): Promise<DoctorCheck[]> {
   if (ctx.scope === "office") {
     return [];
   }
 
-  const found = [...SIGN_IN, ...PROVIDER_SWITCHES].filter((k) => secrets.get(k));
-  if (found.length > 0) {
-    return [
-      {
-        key: found[0]!,
-        name: "Claude credential",
-        status: "ok",
-        detail: `${found.join(", ")} ${found.length === 1 ? "is" : "are"} set.`,
-      },
-    ];
-  }
+  return [credentialCheck(secrets), ...sandboxCheck(ctx.options)];
+}
 
-  return [
-    {
-      name: "Claude credential",
-      status: "fail",
-      detail: `None of ${SIGN_IN.join(", ")} or a cloud provider switch (${PROVIDER_SWITCHES.join(", ")}) is set.`,
-      fix: "Supply one of them to the agent container; see the setup guide for the options.",
-    },
-  ];
+/** With sandbox: bubblewrap, stops the agent at start, once, when the sandbox cannot run; Claude Code would fail every command instead. */
+function requireSandbox(): void {
+  const probe = probeSubprocessSandbox();
+  if (!probe.ok) {
+    throw new PortError(
+      "unavailable",
+      `sandbox: bubblewrap cannot run in this container. ${probe.detail} Fix: ${probe.fix}`,
+    );
+  }
 }
 
 export const claudeAgentSdk = defineAdapter({
@@ -94,9 +123,8 @@ export const claudeAgentSdk = defineAdapter({
   doctor,
   workdirLayout: workdirFiles,
   create: (ctx) => {
-    const missing = ctx.options.sandbox === "bubblewrap" ? bubblewrapMissing() : undefined;
-    if (missing) {
-      throw new PortError("unavailable", missing);
+    if (ctx.options.sandbox === "bubblewrap") {
+      requireSandbox();
     }
 
     return createAgentSdkRuntime({

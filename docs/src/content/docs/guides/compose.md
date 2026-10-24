@@ -51,17 +51,45 @@ On first start the office doesn't pick up existing tickets or pull requests; ass
 
 ## Day-two tasks
 
-| Task                         | Command                                                                                                                      |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Update to a new release      | Change the image tags, then `docker compose pull && docker compose up -d`.                                                   |
-| Rotate a secret              | Replace the file, then `docker compose up -d --force-recreate <service>`.                                                    |
-| Add a person                 | Add the person to `team.yaml`, add a service, a volume and secrets, `docker compose up -d`.                                  |
-| Restart one agent            | `docker compose restart sam`. The office hands its work item back to the queue.                                              |
-| Why does an agent not start? | `docker compose logs sam`. It prints the reason: a missing secret, an invalid team file, or a person who is not on the team. |
+| Task                         | Command                                                                                                                                                                           |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Update to a new release      | Change the image tags, then `docker compose pull && docker compose up -d`.                                                                                                        |
+| Rotate a secret              | Replace the file, then `docker compose up -d --force-recreate <service>`.                                                                                                         |
+| Add a person                 | Add the person to `team.yaml`, add a service, a volume and secrets, `docker compose up -d`.                                                                                       |
+| Restart one agent            | `docker compose restart sam`. The office hands its work item back to the queue.                                                                                                   |
+| Why does an agent not start? | `docker compose logs sam`. It prints the reason: a missing secret, an invalid team file, a person who is not on the team, or (with the sandbox on) a host that does not allow it. |
+
+## Subprocess sandbox (optional)
+
+By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/packages/runtime-agent-sdk#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap`, Claude Code removes the credential from each command's environment and runs the command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`; the runtime also hides the credential files under `/run/secrets/outstaff` there. The [Kubernetes guide](/guides/kubernetes/#subprocess-sandbox-optional) explains each part.
+
+Docker's defaults block bubblewrap, so `compose.sandbox.yaml` adds three `security_opt` entries to every agent; the office keeps the defaults:
+
+| Option                                  | Why                                                                                                                                                                                    |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `seccomp=./seccomp/outstaff-bwrap.json` | Docker's default seccomp profile plus `clone` and `unshare` for user, mount, PID and network namespaces, `mount`, `umount2` and `pivot_root`.                                          |
+| `systempaths=unconfined`                | bubblewrap mounts a fresh `/proc`, which the kernel refuses while parts of `/proc` are masked. The agent is non-root with no capabilities, so the unmasked paths stay read-only to it. |
+| `apparmor=outstaff-agent`               | Docker's default AppArmor profile denies every mount, and Ubuntu 24.04 denies user namespaces to processes without a profile that grants them. Ignored on a host without AppArmor.     |
+
+Turn it on:
+
+1. On a host that enforces AppArmor (`cat /sys/module/apparmor/parameters/enabled` prints `Y`, as on Ubuntu and Debian), load the profile once; it loads again at boot from `/etc/apparmor.d/`. Until it is loaded, Docker refuses to start the agents.
+
+   ```sh
+   sudo install -m 0644 examples/compose/apparmor/outstaff-agent /etc/apparmor.d/outstaff-agent
+   sudo apparmor_parser -r -W /etc/apparmor.d/outstaff-agent
+   ```
+
+2. Set `sandbox: bubblewrap` under `integrations.runtime` in `team.yaml`.
+3. Start with both files: `docker compose -f compose.yaml -f compose.sandbox.yaml up -d`.
+
+When the host blocks the sandbox in another way, the agent stops at start with one error that names what is missing and how to fix it.
+
+Docker has no user namespace per container unless the daemon runs with `userns-remap` or rootless. Either makes `systempaths=unconfined` safer still, because the container's root is then not the host's root; consider it on a shared host. If the AppArmor profile does not work on your host, read the denials with `sudo journalctl -k | grep 'apparmor="DENIED"'` and open an issue with them; `apparmor=unconfined` is the last resort and lifts every AppArmor restriction on the agent.
 
 ## Check it works
 
-The example has a smoke test that you can run too. It starts Postgres, the office and one agent with dummy secrets and a one-person team, then waits for the office to be healthy and for the agent to connect:
+The example has a smoke test that you can run too. It starts Postgres, the office and one agent with dummy secrets and a one-person team, then waits for the office to be healthy and for the agent to connect. Then it starts the agent again with the subprocess sandbox and checks that too; on an AppArmor host it loads the agents' profile with `sudo` first, and skips that part with a notice when it cannot:
 
 ```sh
 examples/compose/smoke.sh

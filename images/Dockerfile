@@ -60,6 +60,15 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # ---------------------------------------------------------------- agent
 FROM base AS agent
+ARG BUBBLEWRAP_VERSION=0.8.0-2+deb12u1
+ARG SOCAT_VERSION=1.7.4.4-2
+# Claude Code runs each of the agent's commands in a bubblewrap sandbox (user and PID namespaces, a fresh /proc) so
+# they cannot read its credential; it needs socat for that sandbox too. bwrap must not be setuid: it works through an
+# unprivileged user namespace, which the container's seccomp and AppArmor profiles allow (examples/k8s).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends "bubblewrap=${BUBBLEWRAP_VERSION}" "socat=${SOCAT_VERSION}" \
+ && rm -rf /var/lib/apt/lists/* \
+ && test ! -u /usr/bin/bwrap
 # mise installs the tools a team's toolsets ask for at agent start; keep its data on the home volume.
 ENV MISE_DATA_DIR=/home/outstaff/.local/share/mise \
     MISE_CACHE_DIR=/home/outstaff/.cache/mise \

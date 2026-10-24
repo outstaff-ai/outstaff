@@ -1,0 +1,43 @@
+# The acme example with the optional subprocess sandbox: kubectl apply -k examples/k8s-sandbox
+# Also set `sandbox: bubblewrap` under integrations.runtime in team.yaml, and install the two profiles in this folder
+# on every node that runs agents first: see the Kubernetes guide, "Subprocess sandbox (optional)".
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../k8s
+
+patches:
+  # Agents only: the pod's own user namespace, an unmasked /proc, and seccomp and AppArmor profiles that allow
+  # bubblewrap. The office runs no commands and keeps the base settings.
+  - target:
+      kind: StatefulSet
+      labelSelector: app.kubernetes.io/name=outstaff-agent
+    patch: |-
+      - op: add
+        path: /spec/template/spec/hostUsers
+        value: false
+      - op: replace
+        path: /spec/template/spec/securityContext/seccompProfile
+        value: { type: Localhost, localhostProfile: outstaff/bwrap.json }
+      - op: add
+        path: /spec/template/spec/securityContext/appArmorProfile
+        value: { type: Localhost, localhostProfile: outstaff-agent }
+      - op: add
+        path: /spec/template/spec/containers/0/securityContext/procMount
+        value: Unmasked
+  # restricted forbids procMount Unmasked even with hostUsers: false. Everything else still meets restricted, and
+  # warn/audit keep reporting any other departure from it.
+  - target:
+      kind: Namespace
+      name: outstaff-acme
+    patch: |-
+      - op: replace
+        path: /metadata/labels/pod-security.kubernetes.io~1enforce
+        value: baseline
+      - op: add
+        path: /metadata/labels/pod-security.kubernetes.io~1warn
+        value: restricted
+      - op: add
+        path: /metadata/labels/pod-security.kubernetes.io~1audit
+        value: restricted
