@@ -51,6 +51,9 @@ export async function setup(
     teamExtra?: Record<string, unknown>;
     trackerActor?: Member;
     noHandler?: boolean;
+
+    /** Skip the baseline poll, to exercise the first poll itself. */
+    noBaseline?: boolean;
   } = {},
 ) {
   const clock = manualClock();
@@ -70,6 +73,11 @@ export async function setup(
     logger: { debug() {}, info() {}, warn() {}, error() {} },
     ...over,
   });
+
+  // The first poll only sets the baseline; seeding after it makes events count as new.
+  if (!over.noBaseline && (await store.getCursor("vcs", "events")) === undefined) {
+    await intake.pollOnce();
+  }
 
   if (!over.noHandler) {
     intake.onEvent((event, meta) => void events.push({ event, meta }));

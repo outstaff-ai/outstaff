@@ -157,6 +157,12 @@ export function createIntake(opts: IntakeOptions): Intake {
       return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
     });
 
+  // With no stored cursor the source returns its recent history; that is not news, so only remember where "now" is.
+  const setBaseline = async (source: IntakeMeta["source"], cursor: string) => {
+    await store.setCursor(source, CURSOR_KEY, cursor);
+    logger.info(`intake: baseline set for ${source}`);
+  };
+
   interface Source {
     name: "vcs" | "tracker";
     poll(): Promise<void>;
@@ -168,6 +174,11 @@ export function createIntake(opts: IntakeOptions): Intake {
       async poll() {
         const cursor = await store.getCursor("vcs", CURSOR_KEY);
         const page = await ports.vcs.events(repos, cursor);
+        if (cursor === undefined) {
+          await setBaseline("vcs", page.cursor);
+          return;
+        }
+
         for (const event of page.events) {
           await ingestVcs(event);
         }
@@ -184,6 +195,11 @@ export function createIntake(opts: IntakeOptions): Intake {
       async poll() {
         const cursor = await store.getCursor("tracker", CURSOR_KEY);
         const page = await tracker.events(cursor);
+        if (cursor === undefined) {
+          await setBaseline("tracker", page.cursor);
+          return;
+        }
+
         for (const event of page.events) {
           await ingestTracker(event);
         }

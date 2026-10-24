@@ -97,6 +97,8 @@ export async function harness(o: HarnessOptions = {}) {
     },
   };
 
+  // The first poll only sets the baseline; whatever a test seeds afterwards is new.
+  await intake.pollOnce();
   await vcs.seed.permission(REPO, "dana", "write");
   await vcs.seed.permission(REPO, "grace", "write");
   return h;

@@ -37,6 +37,8 @@ docker compose logs -f office      # look for "agent connected" lines, one per p
 
 To run released images instead of building from the repository, set `OUTSTAFF_OFFICE_IMAGE` and `OUTSTAFF_AGENT_IMAGE` in `.env` (for example `ghcr.io/outstaff-ai/office:1.2.3`) and use `docker compose pull && docker compose up -d`. Pin a version; do not follow `latest`.
 
+On first start the office doesn't pick up existing tickets or pull requests; assign or move a ticket to start work.
+
 ## How the pieces fit
 
 **Secrets** use the Compose `secrets:` section with file sources. Each file is mounted read-only at `/run/secrets/outstaff/<KEY>`, which is where the containers look. A person's `OUTSTAFF_AGENT_TOKEN` file is mounted into that agent, and into the office as `OUTSTAFF_AGENT_TOKEN_<HANDLE>`, so the two always match. Compose bind-mounts the files with the permissions they have on the host: they must be readable by uid 10001, the user in the images. Nothing secret is in an `environment:` entry, because an agent's shell inherits its container's environment. The one exception is the office's Postgres URL, which the office reads from the environment only; keep `.env` out of git (the example's `.gitignore` does) and out of reach of other users.

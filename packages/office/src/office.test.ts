@@ -145,6 +145,8 @@ describe("createOffice", () => {
     });
 
     await office.start();
+    // The first poll only sets the baseline; whatever a test seeds afterwards is new.
+    await office.parts.intake.pollOnce();
     server = { port: office.agentPort() };
   });
 

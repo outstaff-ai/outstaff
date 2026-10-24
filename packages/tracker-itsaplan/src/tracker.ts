@@ -303,7 +303,9 @@ function buildTracker(api: Itsaplan): Tracker {
       const fresh: ApiActivityItem[] = [];
       let next: string | undefined;
       // The feed is newest first: page back until what we have already seen (or the page budget) is reached.
-      for (let page = 0; page < EVENT_PAGES; page++) {
+      // Without a cursor only the newest page is needed: the caller just wants to know where "now" is.
+      const pageLimit = cursor === undefined ? 1 : EVENT_PAGES;
+      for (let page = 0; page < pageLimit; page++) {
         const res = await api.http.request<Page<ApiActivityItem>>(
           "GET",
           `${api.projectPath}/analytics/activity`,
