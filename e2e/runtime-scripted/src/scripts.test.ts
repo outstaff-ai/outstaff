@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { assigned, conflict, keepBoth, withGreeting, type Action } from "./scripts.js";
+import {
+  assigned,
+  conflict,
+  keepBoth,
+  mergedFeedback,
+  withGreeting,
+  type Action,
+} from "./scripts.js";
 
 const ctx = {
   itemId: "w1",
@@ -120,6 +127,50 @@ describe("conflict", () => {
     expect(commands).toContain("git rebase --continue");
     expect(seen.find((a) => a.type === "write")).toMatchObject({
       text: "hello from SHOP-1\nhello from SHOP-2\nworld\n",
+    });
+  });
+});
+
+describe("mergedFeedback", () => {
+  const merged = {
+    ...ctx,
+    kind: "merged_feedback",
+    pr: 1,
+    branch: "merged_feedback/w5-follow-up",
+    feedback: {
+      kind: "comment" as const,
+      url: "https://git.example/acme/shop/pull/1#c1",
+      body: "Add a goodbye.",
+    },
+  };
+
+  it("answers on the merged pull request, opens a follow-up from the default branch and links it", async () => {
+    const { seen } = await play(mergedFeedback(merged), (a) =>
+      a.type === "read"
+        ? "hello\nworld\n"
+        : a.type === "tool" && a.tool === "pr_open"
+          ? "Opened acme/shop#3\nhttps://git.example/acme/shop/pull/3"
+          : "",
+    );
+
+    const steps = seen.map((a) =>
+      a.type === "tool" ? a.tool : a.type === "shell" ? a.command : a.type,
+    );
+
+    expect(steps.slice(0, 3)).toEqual([
+      "pr_comment",
+      "git fetch --prune origin",
+      "git checkout -B 'merged_feedback/w5-follow-up' origin/main",
+    ]);
+
+    expect(steps.at(-2)).toBe("pr_open");
+    expect(seen.find((a) => a.type === "tool" && a.tool === "pr_open")).toMatchObject({
+      input: { body: expect.stringContaining("Follows up on #1, which is merged.") },
+    });
+
+    expect(seen.at(-1)).toMatchObject({
+      tool: "pr_comment",
+      input: { number: 1, body: "Follow-up: https://git.example/acme/shop/pull/3" },
     });
   });
 });

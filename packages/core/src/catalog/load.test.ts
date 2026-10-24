@@ -160,6 +160,7 @@ describe("shared catalog files", () => {
         "ticket-lifecycle",
         "work-items",
         "review-loop",
+        "merged-feedback",
         "hand-back",
         "direct-requests",
       ]),

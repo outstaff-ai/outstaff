@@ -126,6 +126,14 @@ const control: Route[] = [
   },
   {
     method: "POST",
+    path: "/_test/pulls/:n/comment",
+    handler: async (r) => {
+      await github.comment(Number(r.params["n"]), "grace-lead", r.json.body ?? "");
+      return ok();
+    },
+  },
+  {
+    method: "POST",
     path: "/_test/pulls/:n/merge",
     handler: async (r) => {
       await github.merge(Number(r.params["n"]), "grace-lead");

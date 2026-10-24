@@ -2,7 +2,7 @@
 
 For the person who builds: implements tickets, answers review feedback, keeps stacked branches rebased and proves the work with tests.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
 
 ## Non-negotiables
 
@@ -38,6 +38,12 @@ If the change depends on an unmerged one, stack it (below).
 A pull request you own has new review threads.
 
 Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or disagree, amend one commit, push, reply in each thread, resolve only what you fixed and last spoke in.
+
+### merged-feedback
+
+A trusted human commented on a pull request of yours that is already merged.
+
+Follow `process/merged-feedback.md`: answer on the pull request, and open a follow-up pull request only if a change is asked for.
 
 ### rebase
 

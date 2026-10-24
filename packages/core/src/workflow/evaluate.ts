@@ -135,6 +135,14 @@ function check(c: Condition, ctx: Ctx): Check {
     };
   }
 
+  if ("pr_merged" in c) {
+    const state = ctx.pr?.state;
+    return {
+      ok: state !== undefined && (state === "merged") === c.pr_merged,
+      detail: `pull request is ${state ?? "unknown"}, wanted ${c.pr_merged ? "merged" : "not merged"}`,
+    };
+  }
+
   if ("has_body" in c) {
     const body = ctx.event.data["body"];
     const has = typeof body === "string" && body.trim() !== "";

@@ -2,7 +2,7 @@
 
 For the person who owns how the system fits together: architecture documents, solution designs, design reviews, and the core or critical implementation. This skill is layered on the developer skill; for building, branching, pull requests and review feedback, follow it.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/hand-back.md`.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/hand-back.md`.
 
 ## Non-negotiables
 

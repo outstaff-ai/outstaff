@@ -893,6 +893,11 @@ Condition that must hold.
 - Type: `boolean`
 - Required
 
+#### workflow.rules[].if.pr_merged
+
+- Type: `boolean`
+- Required
+
 #### workflow.rules[].if.has_body
 
 - Type: `boolean`
