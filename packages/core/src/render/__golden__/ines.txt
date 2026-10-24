@@ -56,7 +56,7 @@ In a chat thread, reply in the same thread that started the work. Link the resul
 Use this each time a pull request you own gets review feedback.
 
 1. Read every open thread before changing anything.
-2. For each thread, decide: fix, answer, or disagree. Reply in that thread, never in a new top-level comment.
+2. For each thread, decide: fix, answer, or disagree. Reply in that thread with `ost pr reply <n> <thread-id> --body "..."`, never in a new top-level comment.
 3. Make the fixes in one commit amended onto your branch (see `references/git.md`) and push.
 4. After the push, reply in each thread you fixed: say what changed.
 5. Resolve a thread only when both are true: you fixed it, and the last word in it is yours. If the reviewer replied last, or you did not change anything, leave it open for them.
@@ -192,13 +192,28 @@ Memory is shared across all of your work items and survives restarts. Keep it sm
 | ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `ost ticket` | Read, create, comment on, assign and move tickets. Statuses are the canonical ones in `process/ticket-lifecycle.md`. |
 | `ost doc`    | Read and write documents in the team's knowledge store.                                                              |
-| `ost pr`     | Open and update pull requests; read review threads, reply to them and resolve them.                                  |
+| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                    |
 | `ost ask`    | Ask another person, by handle or role. See `references/team.md`.                                                     |
 | `ost work`   | `list` your current work item and queue; `move` a queued item next, last, before or after another.                   |
 | `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                 |
 | `ost me`     | Show who you are: your handle, role and team.                                                                        |
 
 Run any verb with `--help` for its options.
+
+## Pull requests
+
+Every `ost pr` write acts as you, with your own identity, and only in repositories you have a write grant on (a review and a diff need only read access). Long text goes in a file in your scratch directory (or worktree): `--body-file <path>`. Only files your read policy allows are accepted, never secrets.
+
+| Command                                                                                               | What it does                                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ost pr open --title <t> --body-file <f> [--draft] [--head <b>] [--base <b>] [--repo <r>]`            | Opens a pull request. The head is your current branch, the base the default branch. Never from the default branch. |
+| `ost pr update <n> [--title <t>] [--body-file <f>] [--base <b>] [--draft\|--ready]`                   | Changes a pull request you own.                                                                                    |
+| `ost pr review <n> --approve\|--request-changes\|--comment [--body-file <f>] [--comment-file <json>]` | Submits a review. `--comment-file` is a JSON array of `{ "path", "line", "body" }`. Not on your own pull request.  |
+| `ost pr reply <n> <thread-id> --body <text>`                                                          | Replies in a review thread of that pull request.                                                                   |
+| `ost pr diff <n>`                                                                                     | Prints the unified diff. Use it instead of `gh pr diff`.                                                           |
+| `ost pr status <repo> <n>`, `ost pr threads <repo> <n>`, `ost pr resolve <repo> <n> <thread-id>`      | Read state, checks and threads; resolve a thread you fixed and spoke last in.                                      |
+
+`--repo` defaults to the repository your worktree's origin points at.
 
 ## Habits
 
@@ -301,21 +316,21 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 
 A pull request is waiting for a review.
 
-1. Read the ticket and requirements first, then the description, then the diff. Check the tests: do they prove the acceptance criteria?
+1. Read the ticket and requirements first, then the description, then the diff (`ost pr diff <n>`). Check the tests: do they prove the acceptance criteria?
 2. Look for, in this order:
    - correctness: wrong logic, missed cases, errors that are swallowed, races;
    - security: untrusted input, secrets, access, new dependencies;
    - consistency: names, structure, patterns and error handling that match the code around it;
    - maintainability: size, clarity, dead code, missing docs for behavior that changed.
-3. Comment in the thread of the line it concerns. One issue per thread; say why it matters and, when it helps, show a fix.
+3. Comment on the line it concerns. One issue per comment; say why it matters and, when it helps, show a fix. Collect them in a JSON file of `{ "path", "line", "body" }` items, submitted with the review.
 4. Do not repeat what linters and CI already check.
-5. Give a verdict with `ost pr`: approve, request changes, or comment only. State it in the first line, with the must-fix count.
+5. Give a verdict with `ost pr review <n> --approve`, `--request-changes` or `--comment`, plus `--body-file <file>` and, for inline comments, `--comment-file <json>`. State the verdict in the first line of the body, with the must-fix count. You cannot review your own pull request.
 
 ### re-review
 
 The author answered or pushed.
 
-- Read the new changes and every reply. Resolve a thread only when the fix is right and you are the one who opened it; otherwise reply and leave it open.
+- Read the new changes and every reply (`ost pr threads <repo> <n>`; answer with `ost pr reply`). Resolve a thread only when the fix is right and you are the one who opened it; otherwise reply and leave it open.
 - Re-check that earlier must-fix items are gone and that the fixes did not break anything else.
 - Update your verdict.
 

@@ -1,5 +1,6 @@
 import {
   VERBS,
+  agentLayout,
   cliPath,
   createAgentEnv,
   describeVerb,
@@ -8,7 +9,14 @@ import {
   type AgentEnv,
   type Verb,
 } from "@outstaff/agent";
-import { AdapterRegistry, PortError, envSecretSource, formatIssue } from "@outstaff/core";
+import { homedir } from "node:os";
+import {
+  AdapterRegistry,
+  PortError,
+  buildPolicy,
+  envSecretSource,
+  formatIssue,
+} from "@outstaff/core";
 import { githubVcs } from "@outstaff/vcs-github";
 import { defineCommand, type CommandDef, type Context, type GlobalOptions } from "../define.js";
 import { loadTeam } from "../load.js";
@@ -16,7 +24,7 @@ import { loadTeam } from "../load.js";
 export const groupSummaries: Record<string, string> = {
   ticket: "Read and update tickets in the team's tracker.",
   doc: "Read, write and discuss documents in the team's knowledge base.",
-  pr: "Inspect pull requests and resolve your own review threads.",
+  pr: "Open, update, review and diff pull requests, and work their review threads.",
   role: "Add custom roles to the team's catalog.",
   workflow: "Inspect how the team workflow reacts to events.",
 };
@@ -41,13 +49,27 @@ export async function buildEnv(ctx: Context, options: GlobalOptions): Promise<Ag
     throw new Failure(loaded.issues.map(formatIssue).join("\n"));
   }
 
-  return createAgentEnv({
+  const env = await createAgentEnv({
     team: loaded.config,
     person,
     registry: ctx.registry ?? defaultRegistry(),
     secrets: envSecretSource(ctx.env),
     ...(ctx.office ? { office: ctx.office } : {}),
   });
+
+  // The same read rules the agent's Read tool gets (the profile only changes what may be written).
+  const me = loaded.config.people.find((p) => p.handle === person);
+  if (me) {
+    const layout = agentLayout(
+      ctx.env["HOME"] ?? homedir(),
+      ctx.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
+    );
+
+    env.layout = layout;
+    env.policy = buildPolicy({ profile: "readonly", person: me, team: loaded.config, layout });
+  }
+
+  return env;
 }
 
 /** Positional arguments and options (commander's camelCase keys) -> the verb's input object. */
@@ -109,7 +131,7 @@ function command(verb: Verb): CommandDef {
           verb,
           env,
           toInput(verb, args, options as Record<string, unknown>),
-          workItemId ? { workItemId } : {},
+          { cwd: ctx.cwd, ...(workItemId ? { workItemId } : {}) },
         );
 
         ctx.out(json ? `${JSON.stringify(result, null, 2)}\n` : `${result.text}\n`);

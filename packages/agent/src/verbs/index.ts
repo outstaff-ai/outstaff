@@ -51,13 +51,17 @@ export async function runVerb(
 export const toolName = (verb: Verb) => verb.name.replaceAll(".", "_");
 
 /** The verbs as in-process tools for a runtime adapter. A failing verb rejects; the adapter reports it to the model. */
-export function createRuntimeTools(env: AgentEnv, verbs: readonly Verb[] = VERBS): RuntimeTool[] {
+export function createRuntimeTools(
+  env: AgentEnv,
+  verbs: readonly Verb[] = VERBS,
+  base: VerbContext = {},
+): RuntimeTool[] {
   return verbs.map((verb) => ({
     name: toolName(verb),
     description: verb.description,
     input: verb.input,
     async handler(input, ctx) {
-      return (await runVerb(verb, env, input, ctx)).text;
+      return (await runVerb(verb, env, input, { ...base, ...ctx })).text;
     },
   }));
 }

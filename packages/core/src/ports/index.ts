@@ -19,7 +19,20 @@ export { AdapterRegistry, defineAdapter, type PortImpls } from "./define.js";
 export { parseRepoUrl, repoKey, type RepoRef } from "./repo.js";
 export type { Comment, Issue, Member, NewIssue, Tracker, TrackerEvent } from "./tracker.js";
 export type { Doc, DocComment, Knowledge } from "./knowledge.js";
-export type { Check, PullRequest, ReviewThread, Vcs, VcsEvent, VcsPermission } from "./vcs.js";
+export type {
+  Check,
+  NewPullRequest,
+  PullRequest,
+  PullRequestUpdate,
+  Review,
+  ReviewComment,
+  ReviewThread,
+  ReviewVerdict,
+  Vcs,
+  VcsEvent,
+  VcsPermission,
+} from "./vcs.js";
+
 export { splitAtLines, type Chat, type ChatMessage, type AgentProfile } from "./chat.js";
 export type { RunRequest, Runtime, RuntimeEvent, RuntimeTool, UsageEvent } from "./runtime.js";
 export type { Avatars } from "./avatars.js";

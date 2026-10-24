@@ -372,7 +372,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     office: connection,
     usage,
     runtime,
-    env,
+    env: { ...env, policy, layout },
     systemPrompt,
     policy,
     builtinTools: [...PROFILE_SPECS[rendered.profile].tools],

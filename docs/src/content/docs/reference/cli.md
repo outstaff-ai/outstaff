@@ -666,6 +666,159 @@ ost pr resolve shop 42 PRT_abc123
 ost pr resolve shop 42 PRT_abc123 --json
 ```
 
+## ost pr open
+
+Open a pull request from a pushed branch.
+
+Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch. Push the branch first. Pass draft to open it as a draft.
+
+```
+ost pr open [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `--head <head>` | Branch with the changes. Default: the branch checked out in the worktree. |
+| `--base <base>` | Branch to merge into. Default: the repository's default branch. |
+| `--title <title>` | Pull request title. |
+| `--body <body>` | Text, Markdown. Or pass body-file. |
+| `--body-file <bodyFile>` | File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+| `--draft` | Open as a draft. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr open --title "feat(cart): add coupons" --body-file .scratch/pr.md
+ost pr open --repo shop --head feat/coupons --title "feat(cart): add coupons" --body "Closes #12" --draft
+ost pr open --title "feat(cart): add coupons" --body-file .scratch/pr.md --json
+```
+
+## ost pr update
+
+Change the title, body, base or draft state of a pull request.
+
+Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review.
+
+```
+ost pr update <number> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `--title <title>` | New title. |
+| `--body <body>` | Text, Markdown. Or pass body-file. |
+| `--body-file <bodyFile>` | File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+| `--base <base>` | New base branch. |
+| `--draft` | Convert to a draft. |
+| `--ready` | Mark a draft ready for review. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr update 42 --title "feat(cart): add coupon codes"
+ost pr update 42 --body-file .scratch/pr.md --ready
+ost pr update 42 --title "feat(cart): add coupon codes" --json
+```
+
+## ost pr review
+
+Submit a review: approve, request changes or comment.
+
+Submits a review of a pull request as you, with an optional summary and inline comments. Pass exactly one of approve, request-changes or comment. Inline comments come from comment-file, a JSON array of { path, line, body } on the new side of the diff. Refuses to review your own pull request.
+
+```
+ost pr review <number> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `--approve` | Approve the pull request. |
+| `--request-changes` | Request changes. |
+| `--comment` | Comment without a verdict. |
+| `--body <body>` | Text, Markdown. Or pass body-file. |
+| `--body-file <bodyFile>` | File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+| `--comment-file <commentFile>` | JSON file with inline comments: an array of { path, line, body }. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr review 42 --approve --body "Looks good."
+ost pr review 42 --request-changes --body-file .scratch/review.md --comment-file .scratch/inline.json
+ost pr review 42 --approve --body "Looks good." --json
+```
+
+## ost pr reply
+
+Reply to a review thread of a pull request.
+
+Replies to a review thread of the pull request as you. The thread id comes from pr threads; threads of other pull requests are refused. Resolve it afterwards with pr resolve.
+
+```
+ost pr reply <number> <thread> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `--body <body>` | Text, Markdown. Or pass body-file. |
+| `--body-file <bodyFile>` | File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr reply 42 PRT_abc123 --body "Renamed, thanks."
+ost pr reply 42 PRT_abc123 --body "Renamed, thanks." --json
+```
+
+## ost pr diff
+
+Show the unified diff of a pull request.
+
+Prints the unified diff of a pull request after its link. Needs only read access; use it instead of gh pr diff.
+
+```
+ost pr diff <number> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr diff 42
+ost pr diff 42 --json
+```
+
 ## ost me
 
 Show who you are on this team.

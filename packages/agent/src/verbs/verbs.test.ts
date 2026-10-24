@@ -1,9 +1,13 @@
 // Assertions live in the `rejects` and `expectLinks` helpers.
 /* oxlint-disable vitest/expect-expect */
-import { PortError } from "@outstaff/core";
+import { PortError, buildPolicy } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { envSecretSource } from "@outstaff/core";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
@@ -17,6 +21,7 @@ import {
   runVerb,
   toolName,
 } from "./index.js";
+import { agentLayout } from "../runner/layout.js";
 import { acmeTeam, fakeEnv } from "./testing.js";
 
 const verb = (name: string) => findVerb(name)!;
@@ -273,6 +278,363 @@ describe("pr verbs", () => {
   });
 });
 
+describe("pr write verbs", () => {
+  async function setup(level: "write" | "read" = "write") {
+    const f = fakeEnv();
+    const repo = f.vcs.seed.repo;
+    f.env.team.repos[0]!.url = `${repo.host}/${repo.owner}/${repo.name}`;
+    await f.vcs.seed.permission(repo, "sam", level);
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-pr-")));
+    const layout = agentLayout(root, join(root, "secrets"));
+    const dir = join(layout.worktreesDir, "shop");
+    const scratch = join(layout.scratchDir, "w1");
+    for (const d of [dir, scratch, layout.secretsDir]) {
+      mkdirSync(d, { recursive: true });
+    }
+
+    f.env.layout = layout;
+    f.env.policy = buildPolicy({
+      profile: "code",
+      person: f.env.team.people.find((p) => p.handle === "sam")!,
+      team: f.env.team,
+      layout,
+    });
+
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir });
+    git("init", "-q", "-b", "feat/coupons");
+    git("remote", "add", "origin", `https://${repo.host}/${repo.owner}/${repo.name}.git`);
+
+    /** A file in the item's scratch directory; returns its path. */
+    const file = (name: string, text: string) => {
+      writeFileSync(join(scratch, name), text);
+      return join(scratch, name);
+    };
+
+    const theirs = () =>
+      f.vcs.seed.pullRequest(repo, {
+        title: "Theirs",
+        author: { login: "noor", kind: "agent" },
+      });
+
+    return {
+      ...f,
+      repo,
+      dir,
+      git,
+      file,
+      theirs,
+      layout,
+      scratch,
+      ctx: { cwd: dir, workItemId: "w1" },
+    };
+  }
+
+  it("opens from the worktree's branch and origin, with the body from a file, and links it", async () => {
+    const f = await setup();
+    const r = await run(
+      "pr.open",
+      f.env,
+      { title: "feat(cart): coupons", bodyFile: f.file("pr.md", "Closes #1"), draft: true },
+      f.ctx,
+    );
+
+    const pr = await f.vcs.getPullRequest(f.repo, 1);
+    expect(pr).toMatchObject({
+      title: "feat(cart): coupons",
+      body: "Closes #1",
+      draft: true,
+      head: { ref: "feat/coupons" },
+      base: { ref: "main" },
+      author: { login: "sam" },
+    });
+
+    expect(r.links).toEqual([pr.url]);
+    expect(r.text).toContain(pr.url);
+    expect((await f.vcs.events([f.repo])).events.at(-1)).toMatchObject({
+      type: "pr.opened",
+      actor: "sam",
+    });
+  });
+
+  describe("files the caller names", () => {
+    const body = (path: string) => ({ title: "x", bodyFile: path });
+
+    it("reads a normal file in the item's scratch directory or worktree", async () => {
+      const f = await setup();
+      writeFileSync(join(f.dir, "notes.md"), "from the worktree");
+      await run("pr.open", f.env, body(f.file("pr.md", "from scratch")), f.ctx);
+      await run("pr.open", f.env, { ...body("notes.md"), head: "feat/b" }, f.ctx);
+      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("from scratch");
+      expect((await f.vcs.getPullRequest(f.repo, 2)).body).toBe("from the worktree");
+    });
+
+    it("refuses a file in the secrets directory without leaking it", async () => {
+      const f = await setup();
+      const secret = join(f.layout.secretsDir, "GH_APP_PRIVATE_KEY");
+      writeFileSync(secret, "TOP-SECRET");
+      const e = await run("pr.open", f.env, body(secret), f.ctx).catch((err: unknown) => err);
+      expect(e).toBeInstanceOf(PortError);
+      expect((e as PortError).message).not.toContain("TOP-SECRET");
+      expect((e as PortError).message).toMatch(/Refusing to read body file/);
+      expect(await f.vcs.listPullRequests(f.repo)).toEqual([]);
+    });
+
+    it("refuses a .env in the worktree", async () => {
+      const f = await setup();
+      writeFileSync(join(f.dir, ".env"), "TOKEN=abc");
+      await rejects(run("pr.open", f.env, body(".env"), f.ctx), "invalid", /read policy/);
+    });
+
+    it("refuses a symlink in scratch that points at a secret", async () => {
+      const f = await setup();
+      const secret = join(f.layout.secretsDir, "key");
+      writeFileSync(secret, "TOP-SECRET");
+      symlinkSync(secret, join(f.scratch, "innocent.md"));
+      await rejects(
+        run("pr.open", f.env, body(join(f.scratch, "innocent.md")), f.ctx),
+        "invalid",
+        /Refusing to read/,
+      );
+
+      const outside = join(f.layout.home, "elsewhere.md");
+      writeFileSync(outside, "x");
+      symlinkSync(outside, join(f.scratch, "link.md"));
+      await rejects(run("pr.open", f.env, body(join(f.scratch, "link.md")), f.ctx), "invalid");
+    });
+
+    it("refuses a path outside the worktree and the scratch directory, and the comment file too", async () => {
+      const f = await setup();
+      const outside = join(f.layout.memoryDir, "notes.md");
+      mkdirSync(f.layout.memoryDir, { recursive: true });
+      writeFileSync(outside, "memory");
+      await rejects(run("pr.open", f.env, body(outside), f.ctx), "invalid", /outside the worktree/);
+      await rejects(run("pr.open", f.env, body("../../scratch/other/x.md"), f.ctx), "invalid");
+
+      const pr = await f.theirs();
+      await rejects(
+        run("pr.review", f.env, { number: pr.number, comment: true, commentFile: outside }, f.ctx),
+        "invalid",
+        /outside the worktree/,
+      );
+    });
+
+    it("refuses every file when the environment has no policy", async () => {
+      const f = await setup();
+      delete f.env.policy;
+      await rejects(
+        run("pr.open", f.env, body(f.file("pr.md", "x")), f.ctx),
+        "invalid",
+        /not available/,
+      );
+    });
+  });
+
+  it("takes repo, head and base explicitly and needs no worktree for them", async () => {
+    const f = await setup();
+    const r = await run("pr.open", f.env, {
+      repo: "shop",
+      head: "feat/x",
+      base: "release",
+      title: "x",
+      body: "y",
+    });
+
+    expect(await f.vcs.getPullRequest(f.repo, 1)).toMatchObject({ base: { ref: "release" } });
+    expectLinks(r);
+    await rejects(
+      run("pr.open", f.env, { repo: "shop", title: "x", body: "y" }),
+      "invalid",
+      /--head/,
+    );
+  });
+
+  it("refuses the default branch, a missing or doubled body and a reader's write", async () => {
+    const f = await setup();
+    f.git("checkout", "-q", "-b", "main");
+    await rejects(
+      run("pr.open", f.env, { title: "x", body: "y" }, f.ctx),
+      "invalid",
+      /default branch/,
+    );
+
+    f.git("checkout", "-q", "-b", "feat/z");
+    await rejects(run("pr.open", f.env, { title: "x" }, f.ctx), "invalid", /body/);
+    await rejects(
+      run("pr.open", f.env, { title: "x", body: "y", bodyFile: "pr.md" }, f.ctx),
+      "invalid",
+      /not both/,
+    );
+
+    await rejects(run("pr.open", f.env, { title: "x", bodyFile: "missing.md" }, f.ctx), "invalid");
+    const reader = await setup("read");
+    await rejects(
+      run("pr.open", reader.env, { title: "x", body: "y" }, reader.ctx),
+      "forbidden",
+      /write grant/,
+    );
+  });
+
+  it("updates the pull request and refuses an empty or contradictory update", async () => {
+    const f = await setup();
+    await run("pr.open", f.env, { title: "Before", body: "old", draft: true }, f.ctx);
+    const r = await run("pr.update", f.env, { number: 1, title: "After", ready: true }, f.ctx);
+    expect(await f.vcs.getPullRequest(f.repo, 1)).toMatchObject({ title: "After", draft: false });
+    expectLinks(r);
+    await run(
+      "pr.update",
+      f.env,
+      { number: 1, bodyFile: f.file("b.md", "new"), draft: true },
+      f.ctx,
+    );
+
+    expect(await f.vcs.getPullRequest(f.repo, 1)).toMatchObject({ body: "new", draft: true });
+    await rejects(run("pr.update", f.env, { number: 1 }, f.ctx), "invalid", /Nothing to update/);
+    await rejects(
+      run("pr.update", f.env, { number: 1, draft: true, ready: true }, f.ctx),
+      "invalid",
+    );
+  });
+
+  it("reviews with a verdict, a body file and inline comments from a JSON file", async () => {
+    const f = await setup("read");
+    const pr = await f.theirs();
+    const r = await run(
+      "pr.review",
+      f.env,
+      {
+        number: pr.number,
+        requestChanges: true,
+        bodyFile: f.file("review.md", "2 must-fix"),
+        commentFile: f.file(
+          "inline.json",
+          JSON.stringify([{ path: "src/a.ts", line: 4, body: "rename" }]),
+        ),
+      },
+      f.ctx,
+    );
+
+    expect(r.text).toContain("request changes");
+    expect(r.links).toEqual([pr.url]);
+    expect((await f.vcs.events([f.repo])).events.at(-1)).toMatchObject({
+      type: "pr.review_submitted",
+      actor: "sam",
+      data: { state: "changes_requested", body: "2 must-fix" },
+    });
+
+    expect((await f.vcs.reviewThreads(f.repo, pr.number))[0]).toMatchObject({
+      path: "src/a.ts",
+      line: 4,
+    });
+  });
+
+  it("insists on exactly one verdict, a body unless approving, and well-formed comments", async () => {
+    const f = await setup();
+    const pr = await f.theirs();
+    const n = pr.number;
+    await rejects(
+      run("pr.review", f.env, { number: n, body: "x" }, f.ctx),
+      "invalid",
+      /exactly one/,
+    );
+
+    await rejects(
+      run("pr.review", f.env, { number: n, approve: true, comment: true }, f.ctx),
+      "invalid",
+    );
+
+    await rejects(run("pr.review", f.env, { number: n, comment: true }, f.ctx), "invalid", /body/);
+    await run("pr.review", f.env, { number: n, approve: true }, f.ctx);
+    await rejects(
+      run(
+        "pr.review",
+        f.env,
+        { number: n, comment: true, commentFile: f.file("bad.json", '[{"path":"a"}]') },
+        f.ctx,
+      ),
+      "invalid",
+      /array of/,
+    );
+
+    await rejects(
+      run(
+        "pr.review",
+        f.env,
+        { number: n, comment: true, commentFile: f.file("n.json", "nope") },
+        f.ctx,
+      ),
+      "invalid",
+      /not JSON/,
+    );
+  });
+
+  it("refuses reviewing one's own pull request", async () => {
+    const f = await setup();
+    await run("pr.open", f.env, { title: "Mine", body: "x" }, f.ctx);
+    await rejects(
+      run("pr.review", f.env, { number: 1, approve: true }, f.ctx),
+      "forbidden",
+      /own pull request/,
+    );
+  });
+
+  it("replies to a thread of that pull request and links it", async () => {
+    const f = await setup();
+    const pr = await f.theirs();
+    const other = await f.theirs();
+    const thread = await f.vcs.seed.thread(f.repo, pr.number, {
+      comments: [{ author: "noor", body: "Why?" }],
+    });
+
+    const foreign = await f.vcs.seed.thread(f.repo, other.number, {
+      comments: [{ author: "noor", body: "And?" }],
+    });
+
+    const r = await run("pr.reply", f.env, { number: pr.number, thread, body: "Because." }, f.ctx);
+    expect((await f.vcs.reviewThreads(f.repo, pr.number))[0]!.comments.at(-1)).toMatchObject({
+      author: "sam",
+      body: "Because.",
+    });
+
+    expect(r.links).toContain(f.vcs.links.thread(f.repo, pr.number, thread));
+    await rejects(
+      run("pr.reply", f.env, { number: pr.number, thread: foreign, body: "x" }, f.ctx),
+      "not_found",
+    );
+
+    await rejects(
+      run("pr.reply", f.env, { number: pr.number, thread, body: "  " }, f.ctx),
+      "invalid",
+    );
+  });
+
+  it("prints the diff after the link, needing only a read grant", async () => {
+    const f = await setup("read");
+    const pr = await f.theirs();
+    const r = await run("pr.diff", f.env, { number: pr.number }, f.ctx);
+    expect(r.text.split("\n")[1]).toBe(pr.url);
+    expect(r.text).toContain("diff --git");
+    expect(r.links).toEqual([pr.url]);
+  });
+
+  it("fails clearly outside a worktree and in a directory that is not one", async () => {
+    const f = await setup();
+    await rejects(run("pr.diff", f.env, { number: 1 }), "invalid", /--repo/);
+    await rejects(run("pr.diff", f.env, { number: 1 }, { cwd: tmpdir() }), "invalid", /--repo/);
+  });
+
+  it("is exposed as runtime tools that run in the item's worktree", async () => {
+    const f = await setup();
+    const tools = createRuntimeTools(f.env, VERBS, f.ctx);
+    expect(tools.map((t) => t.name)).toEqual(
+      expect.arrayContaining(["pr_open", "pr_update", "pr_review", "pr_reply", "pr_diff"]),
+    );
+
+    const open = tools.find((t) => t.name === "pr_open")!;
+    expect(await open.handler({ title: "t", body: "b" }, {})).toContain("Opened");
+    expect((await f.vcs.getPullRequest(f.repo, 1)).head.ref).toBe("feat/coupons");
+  });
+});
+
 describe("me", () => {
   it("shows the person", async () => {
     const r = await run("me", fakeEnv().env);
@@ -493,6 +855,11 @@ describe("verb catalogue", () => {
       "pr.status",
       "pr.threads",
       "pr.resolve",
+      "pr.open",
+      "pr.update",
+      "pr.review",
+      "pr.reply",
+      "pr.diff",
       "me",
       "ask",
       "question.answer",

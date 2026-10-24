@@ -22,21 +22,21 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 
 A pull request is waiting for a review.
 
-1. Read the ticket and requirements first, then the description, then the diff. Check the tests: do they prove the acceptance criteria?
+1. Read the ticket and requirements first, then the description, then the diff (`ost pr diff <n>`). Check the tests: do they prove the acceptance criteria?
 2. Look for, in this order:
    - correctness: wrong logic, missed cases, errors that are swallowed, races;
    - security: untrusted input, secrets, access, new dependencies;
    - consistency: names, structure, patterns and error handling that match the code around it;
    - maintainability: size, clarity, dead code, missing docs for behavior that changed.
-3. Comment in the thread of the line it concerns. One issue per thread; say why it matters and, when it helps, show a fix.
+3. Comment on the line it concerns. One issue per comment; say why it matters and, when it helps, show a fix. Collect them in a JSON file of `{ "path", "line", "body" }` items, submitted with the review.
 4. Do not repeat what linters and CI already check.
-5. Give a verdict with `ost pr`: approve, request changes, or comment only. State it in the first line, with the must-fix count.
+5. Give a verdict with `ost pr review <n> --approve`, `--request-changes` or `--comment`, plus `--body-file <file>` and, for inline comments, `--comment-file <json>`. State the verdict in the first line of the body, with the must-fix count. You cannot review your own pull request.
 
 ### re-review
 
 The author answered or pushed.
 
-- Read the new changes and every reply. Resolve a thread only when the fix is right and you are the one who opened it; otherwise reply and leave it open.
+- Read the new changes and every reply (`ost pr threads <repo> <n>`; answer with `ost pr reply`). Resolve a thread only when the fix is right and you are the one who opened it; otherwise reply and leave it open.
 - Re-check that earlier must-fix items are gone and that the fixes did not break anything else.
 - Update your verdict.
 

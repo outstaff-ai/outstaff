@@ -1,5 +1,6 @@
 import { PortError } from "@outstaff/core";
 import { z } from "zod";
+import { prWriteVerbs } from "./pr-write.js";
 import { repoLabel, requireVcs, resolveRepo } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
@@ -128,4 +129,4 @@ export const prResolve = defineVerb({
   },
 });
 
-export const prVerbs = [prStatus, prThreads, prResolve];
+export const prVerbs = [prStatus, prThreads, prResolve, ...prWriteVerbs];

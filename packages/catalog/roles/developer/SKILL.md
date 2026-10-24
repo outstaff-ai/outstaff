@@ -28,7 +28,7 @@ A ticket is assigned and ready.
 1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code.
 2. Fetch, branch from the up-to-date default branch and write the change in small, readable steps that match the code around it.
 3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the tests, lint and type checks the repository uses; fix what you broke.
-4. One commit, `type(scope): summary`, then open the pull request with `ost pr` using `templates/pull-request.md`.
+4. One commit, `type(scope): summary`. Push the branch, write the description from `templates/pull-request.md` to a file in your scratch directory and open the pull request: `ost pr open --title "type(scope): summary" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review).
 5. Hand back.
 
 If the change depends on an unmerged one, stack it (below).
@@ -44,7 +44,7 @@ Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or
 A branch has a conflict, or its parent in a stack merged.
 
 1. Fetch. Rebase onto the base; never merge the base into the branch.
-2. For a stack, go bottom-up with `git rebase --onto` as in `references/git.md`, push each branch with `--force-with-lease`, and retarget each pull request.
+2. For a stack, go bottom-up with `git rebase --onto` as in `references/git.md`, push each branch with `--force-with-lease`, and retarget each pull request with `ost pr update <n> --base <branch>`.
 3. If resolving a conflict changes what the code means, say so in the pull request.
 4. Run the tests again before you hand back.
 

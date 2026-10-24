@@ -36,6 +36,12 @@ const appOf = (req: StubRequest): number => {
   return Number(JSON.parse(Buffer.from(token.split(".")[1]!, "base64url").toString()).iss);
 };
 
+/** Installation tokens are issued as `tok_<person>`; the office's is `tok_office`. */
+const actorOf = (req: StubRequest): string => {
+  const token = req.headers.get("authorization")!.slice("Bearer ".length);
+  return token.startsWith("tok_") ? token.slice(4) : "unknown";
+};
+
 const personOf = (appId: number) => (appId === OWN_APP ? "sam" : undefined);
 
 const toNode = (t: Thread) => ({
@@ -84,6 +90,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     const next = pr.mergeable.length > 1 ? pr.mergeable.shift()! : (pr.mergeable[0] ?? "unknown");
     return {
       number: pr.number,
+      node_id: `PR_${pr.number}`,
       title: pr.title,
       body: pr.body,
       user: { login: pr.login },
@@ -196,10 +203,112 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     },
     {
       method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}`,
+      handler: () => ({ default_branch: "main" }),
+    },
+    {
+      method: "POST",
+      path: `/repos/${repo.owner}/${repo.name}/pulls`,
+      handler: (r) => {
+        const b = r.json;
+        const number = prs.size + 1;
+        const pr: Pr = {
+          number,
+          title: b.title,
+          body: b.body ?? "",
+          login: `${actorOf(r)}[bot]`,
+          head: { ref: b.head, sha: (++sha).toString(16).padStart(40, "0") },
+          base: { ref: b.base },
+          state: "open",
+          merged: false,
+          draft: b.draft === true,
+          mergeable: ["clean"],
+          updatedAt: clockIso(),
+        };
+
+        prs.set(number, pr);
+        emit("PullRequestEvent", pr.login, prPayload(pr, "opened"));
+        return { status: 201, body: rest(pr) };
+      },
+    },
+    {
+      method: "PATCH",
       path: `/repos/${repo.owner}/${repo.name}/pulls/:n`,
       handler: (r) => {
         const pr = prs.get(Number(r.params["n"]));
-        return pr ? rest(pr) : { status: 404, body: { message: "Not Found" } };
+        if (!pr) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        for (const k of ["title", "body"] as const) {
+          if (typeof r.json[k] === "string") {
+            pr[k] = r.json[k];
+          }
+        }
+
+        if (typeof r.json.base === "string") {
+          pr.base = { ref: r.json.base };
+        }
+
+        touch(pr);
+        return rest(pr);
+      },
+    },
+    {
+      method: "POST",
+      path: `/repos/${repo.owner}/${repo.name}/pulls/:n/reviews`,
+      handler: (r) => {
+        const pr = prs.get(Number(r.params["n"]));
+        if (!pr) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        const actor = `${actorOf(r)}[bot]`;
+        const state = {
+          APPROVE: "APPROVED",
+          REQUEST_CHANGES: "CHANGES_REQUESTED",
+          COMMENT: "COMMENTED",
+        }[r.json.event as string];
+
+        if (!state) {
+          return { status: 422, body: { message: "Unprocessable: bad event" } };
+        }
+
+        for (const c of r.json.comments ?? []) {
+          const id = `PRRT_${++thread}`;
+          threads.set(id, {
+            id,
+            prNumber: pr.number,
+            resolved: false,
+            path: c.path,
+            line: c.line,
+            comments: [{ id: `${id}_c0`, author: actor, body: c.body }],
+          });
+        }
+
+        emit("PullRequestReviewEvent", actor, {
+          action: "submitted",
+          pull_request: { number: pr.number },
+          review: { id: eventId, state, body: r.json.body },
+        });
+
+        return { status: 200, body: { id: eventId, state } };
+      },
+    },
+    {
+      method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}/pulls/:n`,
+      handler: (r) => {
+        const pr = prs.get(Number(r.params["n"]));
+        if (!pr) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        return r.headers.get("accept") === "application/vnd.github.diff"
+          ? {
+              text: `diff --git a/${pr.head.ref}.txt b/${pr.head.ref}.txt\n--- a/${pr.head.ref}.txt\n+++ b/${pr.head.ref}.txt\n@@ -1 +1 @@\n-old\n+new\n`,
+            }
+          : rest(pr);
       },
     },
     {
@@ -251,6 +360,36 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
           };
         }
 
+        if (query.includes("addPullRequestReviewThreadReply")) {
+          const t = threads.get(variables["id"]);
+          if (!t) {
+            return {
+              data: null,
+              errors: [{ type: "NOT_FOUND", message: "Could not resolve to a node" }],
+            };
+          }
+
+          t.comments.push({
+            id: `${t.id}_c${t.comments.length}`,
+            author: `${actorOf(r)}[bot]`,
+            body: variables["body"],
+          });
+
+          return { data: { addPullRequestReviewThreadReply: { comment: { id: t.id } } } };
+        }
+
+        if (
+          query.includes("PullRequestForReview") ||
+          /markPullRequestReadyForReview|convertPullRequestToDraft/.test(query)
+        ) {
+          const pr = prs.get(Number(String(variables["id"]).slice("PR_".length)));
+          if (pr) {
+            pr.draft = query.includes("convertPullRequestToDraft");
+          }
+
+          return { data: { pullRequest: { id: variables["id"], isDraft: pr?.draft ?? false } } };
+        }
+
         if (query.startsWith("mutation")) {
           const t = threads.get(variables["id"]);
           if (t) {
@@ -283,6 +422,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
 
   const seed: VcsSeed = {
     repo,
+    selfLogin: "sam",
     async pullRequest(_repo, p: NewSeedPullRequest) {
       const number = prs.size + 1;
       const login = (p.author?.login ?? "sam") + (p.author?.kind === "agent" ? "[bot]" : "");

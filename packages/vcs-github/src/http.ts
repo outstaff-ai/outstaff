@@ -18,6 +18,9 @@ export interface RequestOptions {
 export interface HttpResult<T> {
   status: number;
   data: T;
+
+  /** The raw body, for media types that are not JSON (a diff). */
+  text: string;
   headers: Headers;
 }
 
@@ -130,7 +133,7 @@ export class GithubHttp {
     }
 
     if (res.status === 304) {
-      return { status: 304, data: undefined as T, headers: res.headers };
+      return { status: 304, data: undefined as T, text: "", headers: res.headers };
     }
 
     const text = await res.text();
@@ -142,7 +145,7 @@ export class GithubHttp {
     }
 
     if (res.ok) {
-      return { status: res.status, data: data as T, headers: res.headers };
+      return { status: res.status, data: data as T, text, headers: res.headers };
     }
 
     throw this.toError(method, url, res, data, text);

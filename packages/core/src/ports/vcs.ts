@@ -31,6 +31,38 @@ export interface ReviewThread {
   comments: { id: string; author: string; body: string }[];
 }
 
+export interface NewPullRequest {
+  /** Branch with the changes; it must already be pushed. */
+  head: string;
+
+  /** Defaults to the repo's default branch. */
+  base?: string;
+  title: string;
+  body: string;
+  draft?: boolean;
+}
+
+export interface PullRequestUpdate {
+  title?: string;
+  body?: string;
+  base?: string;
+  draft?: boolean;
+}
+
+export type ReviewVerdict = "approve" | "request_changes" | "comment";
+
+export interface ReviewComment {
+  path: string;
+  line: number;
+  body: string;
+}
+
+export interface Review {
+  verdict: ReviewVerdict;
+  body: string;
+  comments?: ReviewComment[];
+}
+
 export type VcsPermission = "admin" | "write" | "read" | "none";
 
 export interface VcsEvent {
@@ -81,6 +113,23 @@ export interface Vcs {
     threadId: string,
     asLogin?: string,
   ): Promise<{ resolved: boolean; reason?: string }>;
+
+  /**
+   * The write operations act as the person this port instance belongs to (an agent's own identity, never the
+   * office's) and refuse with `forbidden` when that person lacks a write grant on the repo.
+   * Refuses (`invalid`) a `head` equal to the default branch.
+   */
+  openPullRequest(repo: RepoRef, input: NewPullRequest): Promise<PullRequest>;
+  updatePullRequest(repo: RepoRef, number: number, patch: PullRequestUpdate): Promise<PullRequest>;
+
+  /** A read grant is enough. Refuses (`forbidden`) reviewing one's own pull request. */
+  submitReview(repo: RepoRef, number: number, review: Review): Promise<void>;
+
+  /** Needs a write grant. `not_found` unless the thread belongs to that pull request. */
+  replyToThread(repo: RepoRef, number: number, threadId: string, body: string): Promise<void>;
+
+  /** The unified diff of the pull request (read grant). */
+  diff(repo: RepoRef, number: number): Promise<string>;
 
   /** For the trust model. */
   permission(repo: RepoRef, login: string): Promise<VcsPermission>;
