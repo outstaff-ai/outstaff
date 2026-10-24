@@ -124,6 +124,37 @@ ost eject --all
 ost eject developer --force
 ```
 
+## ost role new
+
+Scaffold a custom role in the team's catalog.
+
+Creates roles/<name>/role.yaml and SKILL.md in the ejected catalog (catalog.path next to the team file, .outstaff/catalog by default). Without --from, both files come from a minimal template with TODO placeholders; with --from <stock-role>, they are copies of that stock role with the name and title replaced. A custom role is not ejected: it is not recorded in .ejected.json, has no stock original, and ost upgrade leaves it alone. People can then use it as their role, and it can be extended by other roles. The name must be DNS-safe (lowercase letters, digits and dashes, starting with a letter, at most 63 characters) and must not be a stock role; to customize a stock role use ost eject. An existing custom role is only replaced with --force.
+
+```
+ost role new <name> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--from <stock-role>` | Start from the text of this stock role. |
+| `--title <title>` | Display title; defaults to the name in title case. |
+| `--profile <profile>` | Permission profile: readonly, docs, code, infra. Defaults to docs, or the --from role's. |
+| `--toolset <toolset>` | Tool bundle: base, code, infra. Defaults to base, or the --from role's. |
+| `--force` | Replace a custom role that already exists. |
+
+Exit codes:
+
+- 0: the role was created
+- 1: the team could not be loaded, the name is invalid or a stock role, the role exists and --force was not given, or an option is unknown
+
+Examples:
+
+```sh
+ost role new auditor
+ost role new qa --from reviewer --title "QA Engineer"
+ost role new data-engineer --profile code --toolset code
+```
+
 ## ost diff
 
 Show how ejected catalog files differ from the stock version they came from.
