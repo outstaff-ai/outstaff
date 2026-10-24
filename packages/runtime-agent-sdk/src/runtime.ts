@@ -73,8 +73,14 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     }
 
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false";
-    // Claude Code strips its own credentials from the environment of the Bash tool, hooks and stdio MCP servers.
-    env["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] = "1";
+    // The `sandbox` option decides, not an inherited value. With bubblewrap, Claude Code strips its own credentials
+    // from the environment of the Bash tool, hooks and stdio MCP servers, and on Linux runs each command in bubblewrap
+    // so it cannot read them from another process either.
+    delete env["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"];
+    if (config.options.sandbox === "bubblewrap") {
+      env["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] = "1";
+    }
+
     return env;
   }
 

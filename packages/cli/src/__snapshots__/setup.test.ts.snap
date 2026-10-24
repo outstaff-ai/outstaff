@@ -439,7 +439,7 @@ Secret files go in .outstaff/secrets/mira/, one file per key.
    - **Cloud provider**: Amazon Bedrock, Google Vertex AI or Microsoft Foundry. Set the provider's switch and region as plain environment variables (for example \`CLAUDE_CODE_USE_BEDROCK=1\`, \`AWS_REGION\`) and give its credentials as secret files.
    - **Your own subscription token**: run \`claude setup-token\` on a machine signed in to your subscription and keep the result as \`CLAUDE_CODE_OAUTH_TOKEN\`. Use it only within the provider's terms (https://www.anthropic.com/legal/consumer-terms and https://www.anthropic.com/legal/commercial-terms); a subscription is meant for its owner, not for a fleet of agents.
 
-   The Claude Code binary may leave the subscription token visible to the agent's shell, so narrow its reach and the container's egress.
+   Commands the agent runs can read this credential unless the runtime's \`sandbox\` option is \`bubblewrap\`, so use a dedicated key with a spend limit and rotate it if it leaks.
 
 ## itsaplan (tracker)
 

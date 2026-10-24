@@ -23,4 +23,8 @@ Please include in a report:
 - steps to reproduce, and what an attacker gains,
 - whether the issue needs a particular team configuration (`.outstaff/team.yaml`) or grants.
 
+## The Claude credential and the agent's commands
+
+By default (`sandbox: off` in the runtime options), commands an agent runs can read the Claude credential from their environment, the same as Claude Code on a developer's machine. Other adapters' secrets are removed from that environment. To limit the risk: only trusted humans direct work; deny network tools in the team's command policies if you want; give each team a dedicated API key with a spend limit; rotate it if it leaks. `sandbox: bubblewrap` keeps the credential out of the commands' reach where the containers allow user namespaces; see the [runtime adapter](packages/runtime-agent-sdk/README.md#sandbox) and decision 0013. With `bubblewrap` on, a way for a command to read the credential is a vulnerability; with `off`, it is the documented trade-off.
+
 The trust model (which humans and agents can trigger work, how grants are checked, and what the office stores) will be documented alongside the docs site. Until then, treat the office and agent containers as holding every secret they are given.

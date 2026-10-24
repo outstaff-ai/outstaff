@@ -441,7 +441,11 @@ describe("probeUsage", () => {
 });
 
 describe("child process environment", () => {
-  const envOf = async (config: { env: Record<string, string>; scrubKeys?: string[] }) => {
+  const envOf = async (config: {
+    env: Record<string, string>;
+    scrubKeys?: string[];
+    options?: typeof options;
+  }) => {
     const { query, calls } = fakeQuery(() => [init("s1"), result()]);
     await collect(createAgentSdkRuntime({ options, query, ...config }).run(req()));
     return calls[0]!.options.env!;
@@ -456,6 +460,26 @@ describe("child process environment", () => {
     expect(env).toEqual({
       PATH: "/bin",
       HOME: "/home/agent",
+      ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+    });
+  });
+
+  it("leaves Claude Code's subprocess scrub off by default, so the credential reaches its commands", async () => {
+    const env = await envOf({
+      env: { ANTHROPIC_API_KEY: "key", CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" },
+    });
+
+    expect(env).toEqual({ ANTHROPIC_API_KEY: "key", ENABLE_CLAUDEAI_MCP_SERVERS: "false" });
+  });
+
+  it("turns the scrub on with sandbox: bubblewrap", async () => {
+    const env = await envOf({
+      env: { ANTHROPIC_API_KEY: "key" },
+      options: agentSdkOptions.parse({ sandbox: "bubblewrap" }),
+    });
+
+    expect(env).toEqual({
+      ANTHROPIC_API_KEY: "key",
       ENABLE_CLAUDEAI_MCP_SERVERS: "false",
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1",
     });

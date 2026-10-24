@@ -9,6 +9,12 @@ export const agentSdkOptions = z.strictObject({
 
   /** Upper bound on agent turns per run; a run request can lower or replace it. */
   maxTurns: z.number().int().positive().optional(),
+
+  /**
+   * `bubblewrap`: Claude Code scrubs its credential from the environment of commands, hooks and MCP servers and runs
+   * each command in a bubblewrap sandbox; the container must allow it. `off`: commands can read the credential.
+   */
+  sandbox: z.enum(["off", "bubblewrap"]).default("off"),
 });
 
 export type AgentSdkOptions = z.infer<typeof agentSdkOptions>;
