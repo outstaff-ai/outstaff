@@ -55,6 +55,10 @@ Statuses come from `workflow.statuses`. A canonical status without a name defaul
 
 Either set `ca_file` on the integration, or start the office and agent processes with `NODE_EXTRA_CA_CERTS=/path/to/ca.pem`. `ca_file` adds the CA to the system roots for this adapter's requests only.
 
+## Rate limit
+
+Its a Plan answers HTTP 500 (not 429) once a key has made about 100 requests in close succession, until the key has been idle for about a second. The adapter paces each key to 80 requests per burst, waiting for the idle time when the budget is used, and retries a `GET` once after 1.2 s if a 500 arrives mid-burst anyway (logged at warn as `rate limited`). `POST` and `PATCH` are never retried.
+
 ## Secrets
 
 | Key                | Scope          | Meaning                                       |

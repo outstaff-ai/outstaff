@@ -257,6 +257,7 @@ export async function createClient(
       apiUrl: conn.api_url,
       webUrl: conn.url,
       apiKey: ctx.secrets.require("ITSAPLAN_API_KEY"),
+      log: ctx.log,
     }),
     conn,
     ctx,
