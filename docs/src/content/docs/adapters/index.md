@@ -12,3 +12,7 @@ One page per adapter package, grouped by the ports listed in the [architecture o
 ## Tracker and knowledge
 
 - [Its a Plan](/adapters/tracker-itsaplan/): issues, columns, members and documents, with one member account per agent.
+
+## Avatars
+
+- [DiceBear](/adapters/avatars-dicebear/): deterministic avatars per person, rendered locally, plus directory and URL sources.

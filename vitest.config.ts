@@ -23,7 +23,13 @@ const coreAlias = [
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];
-const adapters = ["vcs-github", "runtime-agent-sdk", "chat-slack", "tracker-itsaplan"];
+const adapters = [
+  "vcs-github",
+  "runtime-agent-sdk",
+  "chat-slack",
+  "tracker-itsaplan",
+  "avatars-dicebear",
+];
 
 export default defineConfig({
   test: {
