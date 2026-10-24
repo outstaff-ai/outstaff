@@ -2,7 +2,6 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - ../../agent
-nameSuffix: -kofi
 labels:
   - pairs:
       outstaff.work/person: kofi
@@ -11,5 +10,10 @@ labels:
 patches:
   - target: { kind: StatefulSet }
     patch: |-
+      - { op: replace, path: /metadata/name, value: outstaff-agent-kofi }
       - { op: replace, path: /spec/template/spec/containers/0/env/0/value, value: kofi }
-      - { op: replace, path: /spec/template/spec/volumes/0/projected/sources/0/secret/name, value: outstaff-agent-kofi }
+      - { op: replace, path: /spec/template/spec/volumes/0/secret/secretName, value: outstaff-agent-kofi }
+      - { op: replace, path: /spec/template/spec/volumes/2/persistentVolumeClaim/claimName, value: kofi-home }
+  - target: { kind: PersistentVolumeClaim }
+    patch: |-
+      - { op: replace, path: /metadata/name, value: kofi-home }

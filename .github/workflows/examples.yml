@@ -53,6 +53,13 @@ jobs:
       - name: Kubernetes manifests build and validate
         run: |
           cp examples/acme/.outstaff/team.yaml examples/k8s/team.yaml
+          # the secretGenerator reads one file per key; dummy values are enough to build
+          cd examples/k8s
+          grep -ohE 'secrets/[a-z]+/[A-Z_]+' kustomization.yaml | sort -u | while read -r f; do
+            mkdir -p "$(dirname "$f")"
+            echo dummy > "$f"
+          done
+          cd ../..
           kustomize build examples/k8s | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSION" -
 
   compose-smoke:
