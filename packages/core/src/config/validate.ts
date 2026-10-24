@@ -34,6 +34,8 @@ export const WARNING_CODES = {
   capabilityOptionalMissing: "capability.optional_missing",
   trustDefault: "trust.default",
   peopleMissingVcsIdentity: "people.missing_vcs_identity",
+  peopleMissingChatIdentity: "people.missing_chat_identity",
+  peopleMissingTrackerIdentity: "people.missing_tracker_identity",
   peopleReviewerWithoutGithub: "people.reviewer_without_github",
   identityChatNotMemberId: "identities.chat_not_member_id",
   identityVcsNotLogin: "identities.vcs_not_login",
@@ -108,7 +110,12 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "capability.optional_missing":
     "A role can use a capability that no configured integration provides.",
   "trust.default": "humans is omitted, so the default trust rule applies.",
-  "people.missing_vcs_identity": "A person has a write grant but no identities.vcs.",
+  "people.missing_vcs_identity":
+    "A person has a write grant but no identities.vcs, while a vcs integration is configured.",
+  "people.missing_chat_identity":
+    "A person has no identities.chat while a chat integration is configured.",
+  "people.missing_tracker_identity":
+    "A person has no identities.tracker while a tracker integration is configured.",
   "people.reviewer_without_github":
     "A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves.",
   "identities.chat_not_member_id":
@@ -190,17 +197,35 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       }
     }
 
-    if (!person.identities?.vcs && Object.values(person.repos).includes("write")) {
+    const access = repoAccess(config, person);
+    const fix = `run \`ost setup ${person.handle} --derive\` and copy the value into team.yaml`;
+    // Read-only people need only the office App, so their own bot login is optional.
+    const needsVcs = access === "write";
+    if (config.integrations.vcs && needsVcs && !person.identities?.vcs) {
       warnings.push({
         path: ["people", i, "identities", "vcs"],
         code: WARNING_CODES.peopleMissingVcsIdentity,
         message: `${person.handle} has a write grant but no identities.vcs.`,
-        consequence: `${person.handle}'s pull requests and comments are treated as an unknown human's, not as the agent's own.`,
+        consequence: `the office won't recognise ${person.handle}'s pull requests and comments as the agent's own; ${fix}.`,
       });
     }
 
+    for (const [port, code] of [
+      ["chat", WARNING_CODES.peopleMissingChatIdentity],
+      ["tracker", WARNING_CODES.peopleMissingTrackerIdentity],
+    ] as const) {
+      if (config.integrations[port] && !person.identities?.[port]) {
+        warnings.push({
+          path: ["people", i, "identities", port],
+          code,
+          message: `${person.handle} has no identities.${port}.`,
+          consequence: `the office won't recognise ${person.handle}'s ${port === "chat" ? "chat messages" : "tracker activity"}; ${fix}.`,
+        });
+      }
+    }
+
     if (person.role === "reviewer") {
-      const noGrant = repoAccess(config, person) === "none";
+      const noGrant = access === "none";
       if (noGrant || !person.identities?.vcs) {
         warnings.push({
           path: noGrant ? ["people", i, "repos"] : ["people", i, "identities", "vcs"],

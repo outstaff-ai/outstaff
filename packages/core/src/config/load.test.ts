@@ -245,7 +245,7 @@ describe("issue positions", () => {
     const [i] = await load(text);
     expect(i).toMatchObject({
       path: ["integrations", "tracker", "adapter"],
-      line: lineOf(text, "tracker:", 1),
+      line: text.split("\n").indexOf("  tracker:") + 1,
       column: 3,
     });
   });
