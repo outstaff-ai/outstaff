@@ -22,6 +22,7 @@ import { createWorkLoop } from "./loop.js";
 class OfficeSocket extends FakeSocket {
   override send(data: string) {
     super.send(data);
+    this.settle();
     const m = this.last();
     if (m.type === "hello") {
       return;
@@ -34,6 +35,27 @@ class OfficeSocket extends FakeSocket {
     );
   }
 
+  private waiters: { type: string; count: number; resolve: () => void }[] = [];
+
+  /** Resolves once the client has sent `count` messages of a type, so tests await the event itself. */
+  whenSent(type: string, count: number) {
+    return new Promise<void>((resolve) => {
+      this.waiters.push({ type, count, resolve });
+      this.settle();
+    });
+  }
+
+  private settle() {
+    this.waiters = this.waiters.filter((w) => {
+      const done = this.sentOf(w.type).length >= w.count;
+      if (done) {
+        w.resolve();
+      }
+
+      return !done;
+    });
+  }
+
   offer(id: string, sessionId?: string) {
     this.receive({
       id: `offer-${id}-${this.sent.length}`,
@@ -44,17 +66,6 @@ class OfficeSocket extends FakeSocket {
         ...(sessionId ? { sessionId } : {}),
       },
     });
-  }
-}
-
-const tick = () => new Promise((resolve) => setImmediate(resolve));
-async function until(cond: () => boolean) {
-  for (let i = 0; i < 400 && !cond(); i++) {
-    await tick();
-  }
-
-  if (!cond()) {
-    throw new Error("condition not reached");
   }
 }
 
@@ -114,6 +125,8 @@ describe("isolation between work items", () => {
     await conn.whenConnected();
 
     // Directories on disk, one per item, like the real workspaces.
+    const released = new Map<string, () => void>();
+    const whenReleased = (id: string) => new Promise<void>((resolve) => released.set(id, resolve));
     const workspaces: Workspaces = {
       async prepare(o) {
         const id = o.workItem.id;
@@ -126,6 +139,7 @@ describe("isolation between work items", () => {
       async release(id) {
         rmSync(join(layout.worktreesDir, "shop", id), { recursive: true, force: true });
         rmSync(join(layout.scratchDir, id), { recursive: true, force: true });
+        released.get(id)?.();
       },
     };
 
@@ -187,7 +201,7 @@ describe("isolation between work items", () => {
     const play = async (id: string) => {
       socket.offer(id, stored.get(id));
       handBacks += 1;
-      await until(() => sent("handback").length === handBacks);
+      await socket.whenSent("handback", handBacks);
       for (const m of sent("session")) {
         const p = m.payload as { workItemId: string; sessionId: string };
         stored.set(p.workItemId, p.sessionId);
@@ -206,9 +220,12 @@ describe("isolation between work items", () => {
     expect(readdirSync(sc("a1")).toSorted()).toEqual(["a1-0.md", "a1-1.md"]);
     expect(readdirSync(sc("b1"))).toEqual(["b1-0.md"]);
 
+    // The workspace is released after the hand-back, so await that event too.
+    const gone = [whenReleased("a1"), whenReleased("b1")];
     await play("b1");
     await play("a1");
     await play("b1");
+    await Promise.all(gone);
 
     // Done items lose their workspaces, and only theirs.
     expect(existsSync(wt("a1")) || existsSync(wt("b1"))).toBe(false);
@@ -230,7 +247,18 @@ describe("isolation between work items", () => {
     // Each round's directories are its item's own.
     for (const r of work) {
       expect(r.addDirs.slice(-2)).toEqual([wt(r.workItemId!), sc(r.workItemId!)]);
-      expect(r.prompt).not.toContain(r.workItemId === "a1" ? "b1" : "a1");
+      // The home directory is random, so "b1" can occur in any path by chance: compare
+      // the item's own words and paths, not bare substrings.
+      const id = r.workItemId!;
+      const other = id === "a1" ? "b1" : "a1";
+      expect(r.prompt).toContain(`Work item ${id} (ticket): Fix ${id}`);
+      expect(r.prompt).toContain(wt(id));
+      expect(r.prompt).toContain(sc(id));
+      expect(r.prompt).not.toContain(`Work item ${other}`);
+      expect(r.prompt).not.toContain(`Fix ${other}`);
+      expect(r.prompt).not.toContain(wt(other));
+      expect(r.prompt).not.toContain(sc(other));
+      expect(r.prompt).not.toContain(`session-${other}`);
     }
 
     // Journals: one per hand-back, each naming only its own item.
@@ -293,7 +321,7 @@ describe("memory", () => {
 
     const running = loop.run();
     socket.offer("a1");
-    await until(() => socket.sentOf("handback").length === 1);
+    await socket.whenSent("handback", 1);
     expect(readdirSync(layout.memoryDir)).toEqual([]);
     await loop.stop();
     await conn.stop();
