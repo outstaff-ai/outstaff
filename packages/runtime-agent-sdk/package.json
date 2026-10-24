@@ -2,7 +2,7 @@
   "name": "@outstaff/runtime-agent-sdk",
   "version": "0.0.0",
   "description": "Claude Agent SDK runtime adapter for Outstaff.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -19,11 +19,13 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.308",

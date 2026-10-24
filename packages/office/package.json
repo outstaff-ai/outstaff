@@ -2,7 +2,7 @@
   "name": "@outstaff/office",
   "version": "0.0.0",
   "description": "The Outstaff office scheduler service.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -19,12 +19,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "docs:contract": "tsx scripts/gen-contract-docs.ts"
+    "docs:contract": "tsx scripts/gen-contract-docs.ts",
+    "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "dependencies": {
     "@outstaff/catalog": "workspace:*",

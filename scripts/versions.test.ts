@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain ESM script without types
-import { findRanges, isPinned } from "./versions.mjs";
+import { findRanges, isPinned, licenseIssue } from "./versions.mjs";
 
 describe("version pinning", () => {
   it("accepts exact versions and workspace links", () => {
@@ -26,5 +26,11 @@ describe("version pinning", () => {
       { field: "dependencies", name: "b", spec: "^2.0.0" },
       { field: "devDependencies", name: "c", spec: "~3.0.0" },
     ]);
+  });
+
+  it("requires the Apache-2.0 licence", () => {
+    expect(licenseIssue({ license: "Apache-2.0" })).toBeNull();
+    expect(licenseIssue({ license: "MIT" })).not.toBeNull();
+    expect(licenseIssue({})).not.toBeNull();
   });
 });

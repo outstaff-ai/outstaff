@@ -9,3 +9,5 @@ coverage/
 !.env.example
 *.pem
 .outstaff/people/*/.env
+packages/*/LICENSE
+packages/*/NOTICE

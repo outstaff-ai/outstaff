@@ -2,7 +2,7 @@
   "name": "@outstaff/agent",
   "version": "0.0.0",
   "description": "Runtime for a single Outstaff agent container.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -19,12 +19,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "docs:verbs": "tsx scripts/gen-verbs-docs.ts"
+    "docs:verbs": "tsx scripts/gen-verbs-docs.ts",
+    "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "dependencies": {
     "@outstaff/catalog": "workspace:*",
