@@ -1,0 +1,47 @@
+{
+  "id": "25000000001",
+  "type": "PullRequestEvent",
+  "actor": {
+    "id": 1001,
+    "login": "marcus",
+    "display_login": "marcus"
+  },
+  "repo": {
+    "id": 1,
+    "name": "acme/app",
+    "url": "https://api.github.com/repos/acme/app"
+  },
+  "payload": {
+    "action": "opened",
+    "number": 8,
+    "pull_request": {
+      "url": "https://api.github.com/repos/acme/app/pulls/8",
+      "id": 4000000008,
+      "number": 8,
+      "head": {
+        "ref": "feat/login",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "repo": {
+          "id": 1,
+          "url": "https://api.github.com/repos/acme/app",
+          "name": "app"
+        }
+      },
+      "base": {
+        "ref": "main",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "repo": {
+          "id": 1,
+          "url": "https://api.github.com/repos/acme/app",
+          "name": "app"
+        }
+      }
+    }
+  },
+  "public": true,
+  "created_at": "2026-01-05T10:00:00Z",
+  "org": {
+    "id": 2,
+    "login": "acme"
+  }
+}

@@ -150,6 +150,9 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
           return { ...base, type: "pr.opened", number, data };
         case "reopened":
           return { ...base, type: "pr.opened", number, data: { ...data, reopened: true } };
+        // The events feed reports a merge as its own action; webhooks send `closed` with `merged: true`.
+        case "merged":
+          return { ...base, type: "pr.merged", number, data };
         case "closed":
           return { ...base, type: pr?.merged ? "pr.merged" : "pr.closed", number, data };
         case "synchronize":
@@ -160,7 +163,8 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
     }
 
     case "PullRequestReviewEvent":
-      if (p["action"] !== "submitted") {
+      // Webhooks say `submitted`; the repository events feed says `created`.
+      if (p["action"] !== "submitted" && p["action"] !== "created") {
         return undefined;
       }
 

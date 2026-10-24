@@ -1,0 +1,59 @@
+{
+  "id": "25000000004",
+  "type": "PullRequestReviewEvent",
+  "actor": {
+    "id": 1004,
+    "login": "noor",
+    "display_login": "noor"
+  },
+  "repo": {
+    "id": 1,
+    "name": "acme/app",
+    "url": "https://api.github.com/repos/acme/app"
+  },
+  "payload": {
+    "action": "created",
+    "review": {
+      "id": 5600000004,
+      "user": {
+        "login": "noor",
+        "type": "User"
+      },
+      "body": null,
+      "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "state": "approved",
+      "html_url": "https://github.com/acme/app/pull/8#pullrequestreview-1",
+      "pull_request_url": "https://api.github.com/repos/acme/app/pulls/8",
+      "submitted_at": "2026-01-05T10:00:00Z"
+    },
+    "pull_request": {
+      "url": "https://api.github.com/repos/acme/app/pulls/8",
+      "id": 4000000008,
+      "number": 8,
+      "head": {
+        "ref": "feat/login",
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "repo": {
+          "id": 1,
+          "url": "https://api.github.com/repos/acme/app",
+          "name": "app"
+        }
+      },
+      "base": {
+        "ref": "main",
+        "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "repo": {
+          "id": 1,
+          "url": "https://api.github.com/repos/acme/app",
+          "name": "app"
+        }
+      }
+    }
+  },
+  "public": true,
+  "created_at": "2026-01-05T10:00:00Z",
+  "org": {
+    "id": 2,
+    "login": "acme"
+  }
+}
