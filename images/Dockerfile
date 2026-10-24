@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.24
 
-# One file, one target per image: agent, office. Tools beyond these come from the toolsets at start (mise).
+# One file, one target per image: agent, office. The agent-e2e and e2e-stubs targets are for the end-to-end test only (e2e/) and are never published. Tools beyond these come from the toolsets at start (mise).
 # Build from the repository root:  docker build -f images/Dockerfile --target agent .
 #
 # Every input is pinned: the base image by version and digest, tools by version and sha256,
@@ -92,3 +92,20 @@ VOLUME ["/var/lib/outstaff", "/tmp"]
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:'+process.env.OUTSTAFF_HEALTH_PORT+'/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
 CMD ["outstaff-office"]
+
+# ---------------------------------------------------------------- end-to-end test only (e2e/), never published
+# The agent with the scripted runtime (a fixed script of tool calls instead of a model) added next to it.
+FROM builder AS builder-e2e
+RUN pnpm --filter @outstaff/runtime-scripted... run build \
+ && pnpm --filter @outstaff/runtime-scripted deploy --prod /out/e2e
+
+FROM agent AS agent-e2e
+COPY --from=builder-e2e /out/e2e /opt/outstaff-e2e
+CMD ["node", "/opt/outstaff-e2e/dist/bin.js"]
+
+# Stand-ins for GitHub (API and git remote) and the tracker. It binds port 443 for git, so it runs as root.
+FROM base AS e2e-stubs
+COPY e2e/stubs /opt/stubs
+USER root
+EXPOSE 443 8081
+CMD ["node", "/opt/stubs/server.ts"]

@@ -1,0 +1,161 @@
+# The acme loop on one Docker host, with nothing outside it: the office and its Postgres, one agent (sam, a
+# developer) on the agent-e2e image, and `stubs`, which stands in for GitHub (API and git remote) and the tracker.
+# The agent's model is a fixed script (e2e/runtime-scripted), so no model is called. Run it with `node e2e/run.ts`,
+# which writes the team file, the secrets and the TLS files into $E2E_DIR first. See CONTRIBUTING.md.
+name: ${E2E_PROJECT:-outstaff-e2e}
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp"]
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: outstaff
+      POSTGRES_DB: outstaff
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set by e2e/run.ts}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outstaff -d outstaff"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [backend]
+
+  stubs:
+    image: ${OUTSTAFF_STUBS_IMAGE:-outstaff/e2e-stubs:local}
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: e2e-stubs
+    environment:
+      STUB_DATA_DIR: /data
+      STUB_APPS: ${STUB_APPS:?set by e2e/run.ts}
+      STUB_APP_PUBLIC_KEY: /tls/app.pub
+      STUB_TRACKER_KEYS: ${STUB_TRACKER_KEYS:?set by e2e/run.ts}
+      STUB_TLS_CERT: /tls/server.pem
+      STUB_TLS_KEY: /tls/server.key
+    volumes:
+      - ${E2E_DIR:?set by e2e/run.ts}/tls:/tls:ro
+    tmpfs: ["/data", "/tmp"]
+    ports:
+      - "127.0.0.1:${E2E_STUB_PORT:-18081}:8081"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8081/_test/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks:
+      default:
+        aliases: [github.acme.example, tracker.acme.example]
+
+  office:
+    <<: *hardening
+    image: ${OUTSTAFF_OFFICE_IMAGE:-outstaff/office:local}
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: office
+    depends_on:
+      postgres: { condition: service_healthy }
+      stubs: { condition: service_healthy }
+    environment:
+      OUTSTAFF_TEAM_FILE: /team/team.yaml
+      OUTSTAFF_STORE_URL: postgres://outstaff:${POSTGRES_PASSWORD}@postgres:5432/outstaff
+    volumes:
+      - { type: bind, source: "${E2E_DIR}/team", target: /team, read_only: true }
+      - office-data:/var/lib/outstaff
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8081/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 3s
+      timeout: 3s
+      start_period: 20s
+      retries: 20
+    networks: [backend, default]
+    secrets:
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - {
+          source: office_SLACK_OFFICE_BOT_TOKEN,
+          target: /run/secrets/outstaff/SLACK_OFFICE_BOT_TOKEN,
+        }
+      - { source: sam_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_SAM }
+
+  sam:
+    <<: *hardening
+    image: ${OUTSTAFF_AGENT_E2E_IMAGE:-outstaff/agent-e2e:local}
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: agent-e2e
+    depends_on:
+      office: { condition: service_healthy }
+    environment:
+      OUTSTAFF_OFFICE_URL: ws://office:8080/agent
+      OUTSTAFF_TEAM_FILE: /team/team.yaml
+      OUTSTAFF_PERSON: sam
+      # git reaches the stub over https, with a certificate the test's own CA signed.
+      GIT_SSL_CAINFO: /tls/ca.pem
+    volumes:
+      - { type: bind, source: "${E2E_DIR}/team", target: /team, read_only: true }
+      - { type: bind, source: "${E2E_DIR}/tls", target: /tls, read_only: true }
+      - sam-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: sam_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: sam_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - { source: sam_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: sam_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+
+networks:
+  # Postgres is only reachable from the office, as in the example.
+  backend:
+    internal: true
+  default: {}
+
+volumes:
+  office-data:
+  sam-home:
+
+secrets:
+  office_GH_OFFICE_APP_ID:
+    file: ${E2E_DIR}/secrets/office/GH_OFFICE_APP_ID
+  office_GH_OFFICE_APP_PRIVATE_KEY:
+    file: ${E2E_DIR}/secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+  office_ITSAPLAN_API_KEY:
+    file: ${E2E_DIR}/secrets/office/ITSAPLAN_API_KEY
+  office_SLACK_OFFICE_BOT_TOKEN:
+    file: ${E2E_DIR}/secrets/office/SLACK_OFFICE_BOT_TOKEN
+  office_OUTSTAFF_AGENT_TOKEN_MIRA:
+    file: ${E2E_DIR}/secrets/office/OUTSTAFF_AGENT_TOKEN_MIRA
+  sam_OUTSTAFF_AGENT_TOKEN:
+    file: ${E2E_DIR}/secrets/sam/OUTSTAFF_AGENT_TOKEN
+  sam_GH_APP_ID:
+    file: ${E2E_DIR}/secrets/sam/GH_APP_ID
+  sam_GH_APP_PRIVATE_KEY:
+    file: ${E2E_DIR}/secrets/sam/GH_APP_PRIVATE_KEY
+  sam_ITSAPLAN_API_KEY:
+    file: ${E2E_DIR}/secrets/sam/ITSAPLAN_API_KEY

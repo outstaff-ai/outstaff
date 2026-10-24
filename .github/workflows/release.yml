@@ -28,8 +28,14 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # The full loop runs before anything is published. A dry run publishes nothing and skips it.
+  e2e:
+    if: github.ref == 'refs/heads/main' && inputs.dry_run != true
+    uses: ./.github/workflows/e2e.yml
+
   release:
-    if: github.ref == 'refs/heads/main'
+    needs: e2e
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && (needs.e2e.result == 'success' || needs.e2e.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:

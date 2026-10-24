@@ -1,0 +1,82 @@
+name: End-to-end
+
+# The acme loop on Docker Compose with the real office and agent images and stand-ins for GitHub, the tracker and
+# the model (e2e/). It takes a few minutes and needs no secrets, so it runs every night, by hand, as a gate of the
+# Release workflow, and on pull requests that touch the code, the images or the test.
+# How it works: CONTRIBUTING.md, "End-to-end test".
+
+on:
+  # Only the parts that make up this test, so changing it is tested; the nightly run covers everything else.
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - e2e/**
+      - images/**
+      - packages/**
+      - pnpm-lock.yaml
+      - .github/workflows/e2e.yml
+  # the merge queue tests each PR combined with everything ahead of it (not a required check yet)
+  merge_group:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      # The test runs the real `ost hire` from the built CLI.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter outstaff... run build
+      - uses: docker/setup-buildx-action@v4.4.1
+      # The tags are the defaults of e2e/compose.e2e.yaml, so the run starts exactly these images.
+      - name: Build office
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: images/Dockerfile
+          target: office
+          load: true
+          tags: outstaff/office:local
+          cache-from: type=gha,scope=office
+          cache-to: type=gha,mode=max,scope=office
+      - name: Build agent with the scripted runtime
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: images/Dockerfile
+          target: agent-e2e
+          load: true
+          tags: outstaff/agent-e2e:local
+          cache-from: type=gha,scope=agent
+          cache-to: type=gha,mode=max,scope=agent
+      - name: Build the GitHub and tracker stand-ins
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: images/Dockerfile
+          target: e2e-stubs
+          load: true
+          tags: outstaff/e2e-stubs:local
+          cache-from: type=gha,scope=e2e-stubs
+          cache-to: type=gha,mode=max,scope=e2e-stubs
+      - name: The acme loop
+        run: node e2e/run.ts
+        env:
+          E2E_PREBUILT: "1"
+          E2E_TIMEOUT_MS: "900000"

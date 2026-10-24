@@ -1,0 +1,496 @@
+// The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
+// request, a human asks for changes, the agent fixes and resolves the thread, the human merges, a second pull
+// request now conflicts and the agent rebases it and pushes with a lease. The office, Postgres and the agent are the
+// real images; GitHub, the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
+//
+//   node e2e/run.ts
+//
+// E2E_PREBUILT=1   use the images that are already tagged (outstaff/{office,agent-e2e,e2e-stubs}:local)
+// E2E_KEEP=1       leave the stack and its files up after the run, for a look around
+// E2E_TIMEOUT_MS   bound of the whole run (default 600000)
+import { execFileSync, spawnSync } from "node:child_process";
+import { generateKeyPairSync, randomBytes } from "node:crypto";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const here = dirname(fileURLToPath(import.meta.url));
+const root = join(here, "..");
+const compose = join(here, "compose.e2e.yaml");
+const cli = join(root, "packages/cli/dist/cli.js");
+
+const started = Date.now();
+const deadline = started + Number(process.env["E2E_TIMEOUT_MS"] ?? 600_000);
+const project = `outstaff-e2e-${process.pid}`;
+const port = process.env["E2E_STUB_PORT"] ?? String(18_000 + (process.pid % 1000));
+const work = mkdtempSync(join(tmpdir(), "outstaff-e2e-"));
+chmodSync(work, 0o755);
+
+const timings: [string, number][] = [];
+let last = started;
+const log = (line: string) =>
+  process.stdout.write(`[${((Date.now() - started) / 1000).toFixed(0).padStart(4)}s] ${line}\n`);
+
+const step = (name: string) => {
+  const now = Date.now();
+  timings.push([name, now - last]);
+  last = now;
+  log(`ok   ${name}`);
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ---------------------------------------------------------------- the world the stack runs in
+
+type Json = Record<string, any>; // oxlint-disable-line no-explicit-any
+
+const stub = async (method: string, path: string, body?: unknown): Promise<Json> => {
+  const res = await fetch(`http://127.0.0.1:${port}${path}`, {
+    method,
+    ...(body === undefined
+      ? {}
+      : { headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`${method} ${path} -> ${res.status}: ${await res.text()}`);
+  }
+
+  return (await res.json()) as Json;
+};
+
+const state = () => stub("GET", "/_test/state");
+
+/** Polls until `check` returns a value that is not undefined or false; the failure says what was waited for. */
+async function until<T>(
+  what: string,
+  check: (s: Json) => T | undefined | false,
+  ms = 150_000,
+): Promise<T> {
+  const limit = Math.min(Date.now() + ms, deadline);
+  let s: Json = {};
+  while (Date.now() < limit) {
+    s = await state();
+    const hit = check(s);
+    if (hit !== undefined && hit !== false) {
+      return hit;
+    }
+
+    await sleep(1_000);
+  }
+
+  throw new Error(`Timed out waiting for: ${what}\nstub state: ${JSON.stringify(s, null, 2)}`);
+}
+
+const dc = (...args: string[]) =>
+  spawnSync("docker", ["compose", "-p", project, "-f", compose, ...args], {
+    env: composeEnv,
+    encoding: "utf8",
+    timeout: 300_000,
+    maxBuffer: 256 * 1024 * 1024,
+  });
+
+const buildImage = (target: string, tag: string) =>
+  spawnSync(
+    "docker",
+    ["build", "-f", join(root, "images/Dockerfile"), "--target", target, "-t", tag, root],
+    { encoding: "utf8", timeout: 900_000, maxBuffer: 256 * 1024 * 1024 },
+  );
+
+const logs = (service: string) => dc("logs", "--no-color", "--no-log-prefix", service).stdout;
+
+let composeEnv: NodeJS.ProcessEnv = process.env;
+
+function fail(e: unknown): never {
+  process.stderr.write(`\nFAIL: ${e instanceof Error ? e.message : String(e)}\n`);
+  for (const service of ["stubs", "office", "sam"]) {
+    process.stderr.write(
+      `\n---------------- ${service} log (tail)\n${logs(service).split("\n").slice(-120).join("\n")}\n`,
+    );
+  }
+
+  return teardown(1);
+}
+
+function teardown(code: number): never {
+  if (process.env["E2E_KEEP"] === "1") {
+    log(`left running: project ${project}, files in ${work}, stub at http://127.0.0.1:${port}`);
+  } else {
+    dc("down", "-v", "--remove-orphans");
+    rmSync(work, { recursive: true, force: true });
+  }
+
+  process.exit(code);
+}
+
+// ---------------------------------------------------------------- inputs: keys, certificates, team, secrets
+
+function write(path: string, text: string) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, text);
+  chmodSync(path, 0o644);
+}
+
+const openssl = (...args: string[]) => execFileSync("openssl", args, { stdio: "pipe" });
+
+/** A throwaway key for the GitHub Apps and a CA with a certificate for the stub's host name (git needs https). */
+function prepareKeys() {
+  const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: "spki", format: "pem" },
+    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+  });
+
+  const tls = join(work, "tls");
+  mkdirSync(tls, { recursive: true });
+  chmodSync(tls, 0o755);
+  write(join(tls, "app.pub"), publicKey);
+  const ca = ["-keyout", join(tls, "ca.key"), "-out", join(tls, "ca.pem")];
+  openssl(
+    "req",
+    "-x509",
+    "-newkey",
+    "rsa:2048",
+    "-nodes",
+    ...ca,
+    "-days",
+    "2",
+    "-subj",
+    "/CN=outstaff-e2e-ca",
+  );
+
+  openssl(
+    "req",
+    "-newkey",
+    "rsa:2048",
+    "-nodes",
+    "-keyout",
+    join(tls, "server.key"),
+    "-out",
+    join(tls, "server.csr"),
+    "-subj",
+    "/CN=github.acme.example",
+  );
+
+  write(join(tls, "ext.cnf"), "subjectAltName=DNS:github.acme.example\n");
+  openssl(
+    "x509",
+    "-req",
+    "-in",
+    join(tls, "server.csr"),
+    "-CA",
+    join(tls, "ca.pem"),
+    "-CAkey",
+    join(tls, "ca.key"),
+    "-CAcreateserial",
+    "-out",
+    join(tls, "server.pem"),
+    "-days",
+    "2",
+    "-extfile",
+    join(tls, "ext.cnf"),
+  );
+
+  rmSync(join(tls, "ca.key"));
+  for (const f of ["server.key", "server.pem", "ca.pem"]) {
+    chmodSync(join(tls, f), 0o644);
+  }
+
+  return privateKey;
+}
+
+function prepareSecrets(privateKey: string, keys: { office: string; sam: string }) {
+  const s = join(work, "secrets");
+  const token = randomBytes(24).toString("hex");
+  write(join(s, "office/GH_OFFICE_APP_ID"), "100");
+  write(join(s, "office/GH_OFFICE_APP_PRIVATE_KEY"), privateKey);
+  write(join(s, "office/ITSAPLAN_API_KEY"), keys.office);
+  write(join(s, "office/SLACK_OFFICE_BOT_TOKEN"), "dummy-not-used");
+  write(join(s, "sam/OUTSTAFF_AGENT_TOKEN"), token);
+  write(join(s, "office/OUTSTAFF_AGENT_TOKEN_MIRA"), randomBytes(24).toString("hex"));
+  write(join(s, "sam/GH_APP_ID"), "201");
+  write(join(s, "sam/GH_APP_PRIVATE_KEY"), privateKey);
+  write(join(s, "sam/ITSAPLAN_API_KEY"), keys.sam);
+}
+
+const TEAM = `version: 1
+team: { name: acme, product: Acme Shop }
+humans:
+  - name: Ada Admin
+    identities: { vcs: ada-admin, tracker: ada.admin }
+  - name: Grace Lead
+    identities: { vcs: grace-lead }
+catalog: { version: 0.0.0 }
+repos:
+  - { name: shop, url: github.acme.example/acme/shop, kind: primary }
+people: []
+integrations:
+  chat: { adapter: slack }
+  vcs:
+    adapter: github
+    apiUrl: http://github.acme.example:8081/api/v3
+    webUrl: https://github.acme.example
+  runtime: { adapter: scripted }
+  tracker:
+    adapter: itsaplan
+    url: http://tracker.acme.example:8081/tracker
+    api_url: http://tracker.acme.example:8081/tracker
+    project: SHOP
+workflow:
+  preset: kanban
+  statuses:
+    backlog: Backlog
+    ready: Ready
+    active: In Progress
+    review: In Review
+    blocked: Blocked
+    done: Done
+    canceled: Canceled
+office: { events: poll, poll_interval_seconds: 10 }
+`;
+
+/**
+ * The hires are `ost hire`, the real command, against a team file in a temp directory. It leaves the platform
+ * identities for the person to fill in (the next step of its own checklist), so they are added to the file here.
+ */
+function hire() {
+  const dir = join(work, "team");
+  const file = join(dir, ".outstaff/team.yaml");
+  write(file, TEAM);
+  for (const p of [
+    { role: "developer", handle: "sam", name: "Sam Duarte", pronouns: "they/them" },
+    { role: "architect", handle: "mira", name: "Mira Okafor", pronouns: "she/her" },
+  ]) {
+    const out = spawnSync(
+      "node",
+      [
+        cli,
+        "hire",
+        p.role,
+        "--name",
+        p.name,
+        "--handle",
+        p.handle,
+        "--pronouns",
+        p.pronouns,
+        "--repos",
+        "shop=write",
+        "--yes",
+        "--out",
+        dir,
+      ],
+      { cwd: dir, encoding: "utf8" },
+    );
+
+    if (out.status !== 0) {
+      throw new Error(`ost hire ${p.role} failed:\n${out.stdout}${out.stderr}`);
+    }
+
+    const text = readFileSync(file, "utf8");
+    const patched = text.replace(
+      new RegExp(`(\\n {4}role: ${p.role}\\n)`),
+      `$1    identities:\n      vcs: acme-${p.handle}[bot]\n      tracker: ${p.handle}\n`,
+    );
+
+    if (patched === text) {
+      throw new Error(`ost hire did not produce the expected entry for ${p.handle}:\n${text}`);
+    }
+
+    writeFileSync(file, patched);
+  }
+
+  write(join(dir, "team.yaml"), readFileSync(file, "utf8"));
+  const check = spawnSync("node", [cli, "validate"], { cwd: dir, encoding: "utf8" });
+  if (check.status !== 0) {
+    throw new Error(`The team file does not validate:\n${check.stdout}${check.stderr}`);
+  }
+}
+
+// ---------------------------------------------------------------- the run
+
+async function main() {
+  hire();
+  step("hire: ost hire developer sam and architect mira, team file validates");
+
+  const privateKey = prepareKeys();
+  const keys = { office: randomBytes(12).toString("hex"), sam: randomBytes(12).toString("hex") };
+  prepareSecrets(privateKey, keys);
+  composeEnv = {
+    ...process.env,
+    E2E_DIR: work,
+    E2E_PROJECT: project,
+    E2E_STUB_PORT: port,
+    POSTGRES_PASSWORD: randomBytes(12).toString("hex"),
+    STUB_APPS: "100=acme-office,201=acme-sam",
+    STUB_TRACKER_KEYS: `${keys.office}=office,${keys.sam}=sam`,
+  };
+
+  if (process.env["E2E_PREBUILT"] !== "1") {
+    // The tags are the defaults of compose.e2e.yaml.
+    for (const [target, tag] of [
+      ["office", "outstaff/office:local"],
+      ["agent-e2e", "outstaff/agent-e2e:local"],
+      ["e2e-stubs", "outstaff/e2e-stubs:local"],
+    ] as const) {
+      // Docker Hub answers the frontend lookup with a gateway error now and then; a build is worth a retry.
+      let build = buildImage(target, tag);
+      for (let attempt = 1; build.status !== 0 && attempt < 3; attempt++) {
+        await sleep(5_000);
+        build = buildImage(target, tag);
+      }
+
+      if (build.status !== 0) {
+        throw new Error(`The ${target} image did not build:\n${build.stdout}${build.stderr}`);
+      }
+    }
+
+    step("images: built office, agent-e2e and stubs");
+  }
+
+  const up = dc("up", "-d", "--wait", "--wait-timeout", "240", "stubs", "office");
+  if (up.status !== 0) {
+    throw new Error(`The stack did not come up:\n${up.stdout}${up.stderr}`);
+  }
+
+  step("stack: stubs, Postgres and the office are healthy");
+  const sam = dc("up", "-d", "--no-deps", "sam");
+  if (sam.status !== 0) {
+    throw new Error(`The agent did not start:\n${sam.stdout}${sam.stderr}`);
+  }
+
+  for (let i = 0; i < 60 && !/"agent connected","person":"sam"/.test(logs("office")); i++) {
+    await sleep(1_000);
+  }
+
+  if (!/"agent connected","person":"sam"/.test(logs("office"))) {
+    throw new Error("The agent never connected to the office.");
+  }
+
+  step("agent: sam connected to the office");
+
+  // ---- 1. a human assigns a ticket; the office schedules it; the agent clones, commits, pushes, opens a pull request
+  const { key: first } = await stub("POST", "/_test/tickets", { title: "Add a greeting" });
+  await stub("POST", `/_test/tickets/${first}/assign`, { to: "sam" });
+  const pr1 = await until("a pull request for the first ticket, ticket in review", (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${first}`));
+    const t = s.tickets.find((x: Json) => x.key === first);
+    return pr && t.status === "In Review" ? { pr, t } : undefined;
+  });
+
+  assertEq(pr1.pr.author, "acme-sam[bot]", "the pull request is opened by the agent's own App");
+  assertEq(pr1.pr.state, "open", "the pull request is open");
+  assertEq(pr1.t.assignee, "ada.admin", "the ticket went back to the human who asked");
+  const moved = pr1.t.moves.map((m: Json) => `${m.from}>${m.to}`);
+  assertIncludes(moved, "Ready>In Progress", "sam moved the ticket to active");
+  assertIncludes(moved, "In Progress>In Review", "the ticket went to review");
+  step(
+    `assignment: ${first} -> sam cloned, committed, pushed and opened pull request #${pr1.pr.number}; ticket in review`,
+  );
+
+  // ---- 2. the same for a second ticket, which also asks the architect; its pull request edits the same line
+  const { key: second } = await stub("POST", "/_test/tickets", {
+    title: "Add a second greeting",
+    description:
+      "Greet the shop's second visitor.\n\nask architect: Should greetings be one file or one per visitor?",
+  });
+
+  await stub("POST", `/_test/tickets/${second}/assign`, { to: "sam" });
+  const pr2 = await until(
+    "a pull request for the second ticket and the question on the ticket",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${second}`));
+      const t = s.tickets.find((x: Json) => x.key === second);
+      const asked = t.comments.find((c: Json) => c.body.includes("Should greetings be one file"));
+      return pr && asked ? { pr, t, asked } : undefined;
+    },
+  );
+
+  step(
+    `ask: ${second} opened pull request #${pr2.pr.number}; the question to the architect is mirrored on the ticket`,
+  );
+
+  // ---- 3. a human asks for changes; the ticket goes back to the author, who fixes, replies and resolves
+  const before = pr1.pr.head.sha;
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, {
+    state: "changes_requested",
+    body: "Please greet properly.",
+    comments: [{ path: "greeting.txt", line: 1, body: "Say hello to someone." }],
+  });
+
+  const fixed = await until(
+    "a fix pushed, the thread answered and resolved, the ticket back in review",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === first);
+      const thread = pr.threads[0];
+      return pr.head.sha !== before &&
+        thread?.resolved &&
+        thread.comments.length > 1 &&
+        t.status === "In Review"
+        ? { pr, t, thread }
+        : undefined;
+    },
+  );
+
+  assertEq(fixed.thread.comments.at(-1).author, "acme-sam[bot]", "the agent replied in the thread");
+  const rounds = fixed.t.moves.map((m: Json) => `${m.from}>${m.to}`);
+  assertIncludes(rounds, "In Review>In Progress", "the review sent the ticket back to active");
+  step(
+    `review: changes requested on #${pr1.pr.number} -> ticket active again, fix pushed, thread replied and resolved, back in review`,
+  );
+
+  // ---- 4. the human merges; the ticket is done; the other pull request now conflicts and the agent rebases it
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/merge`);
+  await until(
+    `${first} done`,
+    (s) => s.tickets.find((x: Json) => x.key === first).status === "Done",
+  );
+
+  step(`merge: #${pr1.pr.number} merged -> ${first} is done`);
+
+  const rebased = await until(`#${pr2.pr.number} rebased on main and pushed with a lease`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.number === pr2.pr.number);
+    return pr.forcePushes > 0 && pr.containsMain && pr.mergeable === true ? pr : undefined;
+  });
+
+  assertEq(rebased.state, "open", "the rebased pull request is still open");
+  step(
+    `conflict: #${pr2.pr.number} conflicted with main -> follow-up item, rebased, force-pushed with a lease, merges cleanly`,
+  );
+
+  const final = await state();
+  const t2 = final.tickets.find((x: Json) => x.key === second);
+  assertEq(t2.status, "In Review", "the second ticket waits in review");
+  log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
+
+function assertEq(actual: unknown, expected: unknown, what: string) {
+  if (actual !== expected) {
+    throw new Error(`${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+  }
+}
+
+function assertIncludes(list: string[], item: string, what: string) {
+  if (!list.includes(item)) {
+    throw new Error(`${what}: ${JSON.stringify(item)} not in ${JSON.stringify(list)}`);
+  }
+}
+
+const bound = setTimeout(() => {
+  fail(new Error(`The run took longer than ${(deadline - started) / 1000}s.`));
+}, deadline - started);
+
+try {
+  await main();
+  clearTimeout(bound);
+  log(
+    "timings: " +
+      timings.map(([n, ms]) => `${n.split(":")[0]} ${(ms / 1000).toFixed(0)}s`).join(", "),
+  );
+
+  teardown(0);
+} catch (e) {
+  clearTimeout(bound);
+  fail(e);
+}
