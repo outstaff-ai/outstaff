@@ -41,6 +41,9 @@ export type Context = {
   /** Asks a yes/no question; absent when there is no terminal to ask on. */
   confirm?: (question: string) => Promise<boolean>;
 
+  /** Asks for a line of text and returns `fallback` when the answer is empty; absent when there is no terminal to ask on. */
+  ask?: (question: string, fallback: string) => Promise<string>;
+
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;
 };
