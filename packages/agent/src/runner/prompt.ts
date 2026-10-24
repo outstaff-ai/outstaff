@@ -47,6 +47,7 @@ export function buildWorkPrompt(
       review: `a review${fb.state ? ` (${fb.state.replaceAll("_", " ")})` : ""}`,
       comment: "a comment on the pull request conversation",
       inline_comment: "an inline comment",
+      chat: "a message in chat",
     }[fb.kind];
 
     lines.push("", `Triggered by ${what} from ${fb.actor}${fb.url ? `: ${fb.url}` : "."}`);

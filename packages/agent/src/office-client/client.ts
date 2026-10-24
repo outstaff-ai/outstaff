@@ -496,6 +496,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       call("chat_report", { workItemId, kind }, "chat_report_result"),
     linkTicket: (workItemId, ticket) =>
       call("work_link", { workItemId, ticket }, "work_link_result"),
+    attachWork: (workItemId, request) =>
+      call("work_attach", { workItemId, ...request }, "work_attach_result"),
     queueWork: (workItemId, request) =>
       call("work_queue", { workItemId, ...request }, "work_queue_result"),
     async currentWork() {

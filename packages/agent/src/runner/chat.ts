@@ -9,6 +9,7 @@ import {
 import {
   formatWorkGroups,
   groupWork,
+  type Attached,
   type Filed,
   type Link,
   type WorkSummary,
@@ -18,6 +19,13 @@ import type { ChatMessageResult, ChatReportKind, OfficeClient } from "../verbs/o
 
 /** What the relay uses of the office connection. */
 export type ChatOffice = Pick<OfficeClient, "chatMessage" | "chatReport" | "currentWork" | "work">;
+
+/** What a chat session filed, for the first reply: a new ticket, a request, or the existing work it joined. */
+export interface FiledWhat {
+  key?: string;
+  title: string;
+  attached?: Attached["attached"];
+}
 
 export interface ChatRelayOptions {
   chat: Chat;
@@ -43,7 +51,7 @@ export interface ChatRelay {
    * First reply in the thread, once the chat session filed the request as work: what tracks it, and when the person
    * is busy the work in the order it runs and the question where it goes. Posted once per item.
    */
-  acknowledge(offer: Offer, what: { key?: string; title: string }, filed: Filed): Promise<void>;
+  acknowledge(offer: Offer, what: FiledWhat, filed: Filed): Promise<void>;
 
   /**
    * Tells the requester how a chat item ended, in the thread it came from. Nothing is posted for an item without
@@ -232,14 +240,38 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       }
 
       const url = what.key ? (filed.url ?? opts.tracker?.links.issue(what.key)) : undefined;
-      const tracked = what.key
-        ? `Tracked in ${url ? `[${what.key}](${url})` : what.key}.`
-        : `Queued: ${what.title}.`;
+      const a = what.attached;
+      const link = (r: { ref: string; url?: string | undefined }, text: string) =>
+        r.url ? `[${text}](${r.url})` : text;
+
+      const joined = a
+        ? [
+            a.pr ? link(a.pr, `PR ${a.pr.ref}`) : undefined,
+            a.ticket
+              ? link(
+                  {
+                    ref: a.ticket.ref,
+                    url: a.ticket.url ?? opts.tracker?.links.issue(a.ticket.ref),
+                  },
+                  a.ticket.ref,
+                )
+              : undefined,
+          ].filter(Boolean)
+        : [];
+
+      const tracked = a
+        ? `Adding this to ${joined.join(" for ")}.`
+        : what.key
+          ? `Tracked in ${url ? `[${what.key}](${url})` : what.key}.`
+          : `Queued: ${what.title}.`;
 
       await post(
         origin.channel,
         origin.thread,
-        [`On it. ${tracked}`, ...(filed.waiting ? [placementQuestion(filed.work)] : [])].join("\n"),
+        [
+          a ? tracked : `On it. ${tracked}`,
+          ...(filed.waiting ? [placementQuestion(filed.work)] : []),
+        ].join("\n"),
       );
     },
 

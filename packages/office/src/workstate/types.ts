@@ -118,4 +118,8 @@ export interface WorkState extends WorkflowState {
 
   /** Subject ref of a pull request in the store (also what work items use as `subject.ref`). */
   prSubject(pr: PrRef): string;
+
+  /** The pull requests with this number, in any state, from every repository. */
+  pullRequests(number: number): PrRecord[];
+  ticket(key: string): TicketRecord | undefined;
 }

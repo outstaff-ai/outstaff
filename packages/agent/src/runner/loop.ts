@@ -7,6 +7,7 @@ import {
   type ToolKind,
 } from "@outstaff/core";
 import type { Filed, Link } from "@outstaff/protocol";
+import type { FiledWhat } from "./chat.js";
 import type { Offer, OfficeConnection } from "../office-client/index.js";
 import type { Workspaces } from "../repos/index.js";
 import { VERBS, createRuntimeTools } from "../verbs/index.js";
@@ -163,7 +164,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
     // A chat session that filed its request as work tells the requester in the thread. The work reports its own result.
     let filedWork = false;
-    const filed = async (workItemId: string, what: { key?: string; title: string }, f: Filed) => {
+    const filed = async (workItemId: string, what: FiledWhat, f: Filed) => {
       if (workItemId !== id || !offer.workItem.origin) {
         return;
       }
@@ -190,6 +191,11 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
             async linkTicket(workItemId, ticket) {
               const r = await base.linkTicket(workItemId, ticket);
               await filed(workItemId, { key: ticket, title: ticket }, r);
+              return r;
+            },
+            async attachWork(workItemId, request) {
+              const r = await base.attachWork(workItemId, request);
+              await filed(workItemId, { attached: r.attached, title: r.item.title }, r);
               return r;
             },
             async queueWork(workItemId, request) {

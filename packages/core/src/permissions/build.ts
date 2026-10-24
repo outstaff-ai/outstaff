@@ -40,6 +40,7 @@ export const CHAT_VERBS = [
   "team",
   "work",
   "work.queue",
+  "work.attach",
   "doc.search",
   "doc.show",
   "ticket.show",

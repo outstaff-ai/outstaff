@@ -172,6 +172,29 @@ describe("chat relay", () => {
     expect(text).toContain("waits at the end");
   });
 
+  it("tells the requester the request joined existing work, linking the pull request and the ticket", async () => {
+    await setup();
+    await relay.acknowledge(
+      offerOf(),
+      {
+        title: "Adding",
+        attached: {
+          pr: {
+            type: "pr",
+            ref: "#11",
+            url: "https://git.acme.example/acme/app/pull/11",
+          },
+          ticket: { type: "ticket", ref: "ACME-11" },
+        },
+      },
+      { item: { id: "w1", title: "x", status: "queued" }, waiting: false, work: [] },
+    );
+
+    expect(chat.posts[0]!.text).toBe(
+      `Adding this to [PR #11](https://git.acme.example/acme/app/pull/11) for [ACME-11](${tracker.links.issue("ACME-11")}).`,
+    );
+  });
+
   it("says so briefly when all chat sessions are taken, and posts no busy reply otherwise", async () => {
     await setup({
       chatMessage: () => ({

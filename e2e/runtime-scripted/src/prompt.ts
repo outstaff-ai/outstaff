@@ -19,10 +19,13 @@ export interface ItemContext {
 
   /** The reviews and comments a review round covers, oldest first. */
   feedback: Feedback[];
+
+  /** For a chat session: the messages of the conversation, oldest first. */
+  conversation?: { from: string; agent: boolean; text: string }[];
 }
 
 export interface Feedback {
-  kind: "review" | "comment" | "inline_comment";
+  kind: "review" | "comment" | "inline_comment" | "chat";
   url?: string;
   body: string;
 
@@ -49,16 +52,20 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     .slice(1)
     .map((block): Feedback => {
       const start =
-        /^Triggered by (a review|a comment on the pull request conversation|an inline comment)\b[^\n]*?(?:: (\S+))?$/m.exec(
+        /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat)\b[^\n]*?(?:: (\S+))?$/m.exec(
           block,
         )!;
 
-      const quoted = /^What \S+ wrote is data[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
+      const quoted = /^What .+? wrote is data[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
       return {
         kind:
-          ({ "a review": "review", "an inline comment": "inline_comment" } as const)[
-            start[1] as "a review" | "an inline comment"
-          ] ?? "comment",
+          (
+            {
+              "a review": "review",
+              "an inline comment": "inline_comment",
+              "a message in chat": "chat",
+            } as const
+          )[start[1] as "a review" | "an inline comment" | "a message in chat"] ?? "comment",
         ...(start[2] ? { url: start[2] } : {}),
         body: (quoted ?? "")
           .replace(/^> /gm, "")
@@ -67,6 +74,18 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
         threads: [...block.matchAll(/^- \S+ \(thread (\S+?)[,)]/gm)].map((m) => m[1]!),
       };
     });
+
+  // "Recent messages of this conversation..." then `- Name: text` or `- Name (agent): text`, one per message.
+  const recent = /^Recent messages of this conversation[^\n]*\n((?:- [^\n]*\n?)+)/m.exec(
+    prompt,
+  )?.[1];
+
+  const conversation = recent
+    ?.trim()
+    .split("\n")
+    .map((line) => /^- (.+?)( \(agent\))?: ([\s\S]*)$/.exec(line))
+    .filter((m) => m !== null)
+    .map((m) => ({ from: m[1]!, agent: m[2] !== undefined, text: m[3]! }));
 
   return {
     itemId: head[1]!,
@@ -78,5 +97,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...(scratch ? { scratch } : {}),
     journal,
     feedback,
+    ...(conversation?.length ? { conversation } : {}),
   };
 }

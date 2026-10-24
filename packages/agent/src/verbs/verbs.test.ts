@@ -738,6 +738,45 @@ describe("office verbs", () => {
     expect(r.text).toContain("Filed as work item");
   });
 
+  it("attaches a chat request to the caller's own work, with the links in the answer", async () => {
+    const f = fakeEnv();
+    const r = await run("work.attach", f.env, { target: "11" }, { workItemId: "c1" });
+    expect(f.office.attached).toEqual([{ workItemId: "c1", target: "11", confirmed: false }]);
+    expect(r.text).toContain("PR #11 for SHOP-11");
+    expect(r.links).toEqual([
+      "https://git.acme.example/acme/app/pull/11",
+      "https://tracker.acme.example/issue/SHOP-11",
+    ]);
+
+    expectLinks(r);
+    await run("work.attach", f.env, { target: "11", confirmed: true }, { workItemId: "c1" });
+    expect(f.office.attached[1]).toMatchObject({ confirmed: true });
+  });
+
+  it("passes the office's refusal on: someone else's work, or a pull request in review without confirmation", async () => {
+    const f = fakeEnv();
+    f.office.attachWork = async (_id, request) => {
+      throw new PortError(
+        "invalid",
+        request.confirmed ? "Not yours." : "PR #11 is in review. Ask the requester first.",
+      );
+    };
+
+    await rejects(
+      run("work.attach", f.env, { target: "11" }, { workItemId: "c1" }),
+      "invalid",
+      /in review/,
+    );
+
+    await rejects(
+      run("work.attach", f.env, { target: "11", confirmed: true }, { workItemId: "c1" }),
+      "invalid",
+      /Not yours/,
+    );
+
+    await rejects(run("work.attach", f.env, { target: "11" }), "invalid", /chat session/);
+  });
+
   it("files a request without a tracker from a chat session, and only from one", async () => {
     const f = fakeEnv({ tracker: false });
     const r = await run(
@@ -909,6 +948,7 @@ describe("verb catalogue", () => {
       "work",
       "work.move",
       "work.queue",
+      "work.attach",
       "team",
     ]);
 

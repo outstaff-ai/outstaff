@@ -264,6 +264,15 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
             body: m.payload.body,
           }),
         );
+      case "work_attach":
+        return reply(
+          "work_attach_result",
+          await desk().attachWork(person, m.payload.workItemId, {
+            target: m.payload.target,
+            confirmed: m.payload.confirmed,
+            ...(m.payload.request ? { request: m.payload.request } : {}),
+          }),
+        );
       case "current_work":
         return reply("current_work_result", { text: await desk().currentWork(person) });
       default:

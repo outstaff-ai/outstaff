@@ -106,7 +106,14 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const feedback = ctx.feedback;
   // A review's prompt lists its inline comments with their threads; otherwise every open thread is meant.
   const listed = feedback.flatMap((f) => f.threads);
-  const ids = listed.length > 0 ? listed : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
+  // A message from chat has no thread: it is answered on the pull request.
+  const chatOnly = feedback.length > 0 && feedback.every((f) => f.kind === "chat");
+  const ids = chatOnly
+    ? []
+    : listed.length > 0
+      ? listed
+      : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
+
   const conversational = feedback.filter((f) => f.kind !== "inline_comment");
   if (ids.length === 0 && conversational.length === 0) {
     throw new Error("The feedback left no open thread and no summary or comment to answer.");
@@ -256,14 +263,54 @@ export async function* conflict(ctx: ItemContext): Script {
   return `Rebased pull request ${number} on main and pushed ${branch} with a lease.`;
 }
 
+const QUESTION = /in review, or do it as a follow-up\?/;
+
 /**
- * A chat message in a chat session, beside a running round: look at the person's work in the office and answer.
- * Nothing is filed, so no ticket and no work item.
+ * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
+ * view of it; a request about an open pull request is attached to it, after asking when the pull request is in
+ * review. Nothing is ever filed as a new ticket.
  */
-export async function* chat(): Script {
-  const work = yield { type: "tool", tool: "work", input: {} };
-  const first = work.split("\n")[0] ?? "";
-  return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;
+export async function* chat(ctx: ItemContext): Script {
+  const talk = ctx.conversation ?? [];
+  const humans = talk.filter((m) => !m.agent);
+  const latest = humans.at(-1)?.text ?? "";
+  const asked = talk.find((m) => m.agent && QUESTION.test(m.text));
+  const pr = /PR #(\d+)/i.exec(asked ? asked.text : latest)?.[1];
+  if (!pr) {
+    const work = yield { type: "tool", tool: "work", input: {} };
+    const first = work.split("\n")[0] ?? "";
+    return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;
+  }
+
+  if (asked) {
+    // The human answered: this pull request, or a follow-up. The request is what they said first.
+    const request = humans.find((m) => /PR #\d+/i.test(m.text))?.text ?? latest;
+    if (/follow-?up/i.test(latest)) {
+      yield {
+        type: "tool",
+        tool: "ticket_create",
+        input: { title: request.slice(0, 80), body: request },
+      };
+
+      return "Filed a follow-up.";
+    }
+
+    yield {
+      type: "tool",
+      tool: "work_attach",
+      input: { target: pr, confirmed: true, request },
+    };
+
+    return `Added to PR #${pr}.`;
+  }
+
+  // Without the human's word the verb refuses a pull request in review: ask in the thread, linking both options.
+  try {
+    yield { type: "tool", tool: "work_attach", input: { target: pr } };
+    return `Added to PR #${pr}.`;
+  } catch {
+    return `Add this to PR #${pr}, which is in review, or do it as a follow-up?`;
+  }
 }
 
 export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {

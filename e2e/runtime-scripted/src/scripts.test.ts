@@ -182,11 +182,68 @@ describe("mergedFeedback", () => {
 });
 
 describe("chat", () => {
-  it("looks at the person's work and answers, filing nothing", async () => {
-    const { seen, text } = await play(chat(), () => "1. [SHOP-1 Add a greeting](x) (running)\n");
+  const talk = (...lines: [boolean, string][]) => ({
+    ...ctx,
+    kind: "chat",
+    conversation: lines.map(([agent, text]) => ({ from: agent ? "Sam" : "Ada", agent, text })),
+  });
+
+  it("looks at the person's work and answers a question, filing nothing", async () => {
+    const { seen, text } = await play(
+      chat(talk([false, "Where do the greetings live?"])),
+      () => "1. [SHOP-1 Add a greeting](x) (running)\n",
+    );
+
     expect(seen).toEqual([{ type: "tool", tool: "work", input: {} }]);
     expect(text).toContain("greeting.txt");
     expect(text).toContain("SHOP-1 Add a greeting");
+  });
+
+  it("asks first when the pull request is in review, because the verb refuses", async () => {
+    const { seen, text } = await play(
+      chat(talk([false, "For PR #1, also say goodbye."])),
+      () => "",
+      (a) => a.type === "tool" && a.tool === "work_attach",
+    );
+
+    expect(seen).toEqual([{ type: "tool", tool: "work_attach", input: { target: "1" } }]);
+    expect(text).toBe("Add this to PR #1, which is in review, or do it as a follow-up?");
+  });
+
+  it("attaches with the human's word, restating the request they made first", async () => {
+    const { seen } = await play(
+      chat(
+        talk(
+          [false, "For PR #1, also say goodbye."],
+          [true, "<@U1> Add this to PR #1, which is in review, or do it as a follow-up?"],
+          [false, "This PR."],
+        ),
+      ),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: { target: "1", confirmed: true, request: "For PR #1, also say goodbye." },
+      },
+    ]);
+  });
+
+  it("files a ticket for a follow-up, and never attaches", async () => {
+    const { seen } = await play(
+      chat(
+        talk(
+          [false, "For PR #1, also say goodbye."],
+          [true, "Add this to PR #1, which is in review, or do it as a follow-up?"],
+          [false, "A follow-up please."],
+        ),
+      ),
+      () => "",
+    );
+
+    expect(seen.map((a) => (a.type === "tool" ? a.tool : a.type))).toEqual(["ticket_create"]);
   });
 });
 
