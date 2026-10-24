@@ -36,7 +36,7 @@ Both secrets are declared `optional` in the adapter definition so that `ost setu
 The agent's shell must not see secrets with `printenv`, so the child environment is built, not inherited:
 
 1. start from the process environment;
-2. remove every secret key declared by any registered adapter (the host passes them as `ctx.secretKeys`; `scrubEnv` from `@outstaff/core`), and always `GH_TOKEN` and `GITHUB_TOKEN`: git and gh get credentials from a credential helper, never the environment;
+2. remove every secret key declared by any registered adapter (the host passes them as `ctx.secretKeys`; `scrubEnv` from `@outstaff/core`), and always `GH_TOKEN` and `GITHUB_TOKEN`: git gets credentials from the `ost git-credential` helper, never the environment;
 3. add back only the runtime credential the operator supplied, read through the secret source, so it can come from `/run/secrets/outstaff/<KEY>` or `OUTSTAFF_SECRETS_DIR`: `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_OAUTH_REFRESH_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_AUTH_TOKEN`;
 4. set `ENABLE_CLAUDEAI_MCP_SERVERS=false` and `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`. The latter makes Claude Code strip credentials from the environment of the Bash tool, hooks and stdio MCP servers. Checked with a live run: a fake `AWS_SECRET_ACCESS_KEY` and `ANTHROPIC_FOUNDRY_API_KEY` given to the process were absent from `printenv` in the Bash tool, while a plain variable was present.
 

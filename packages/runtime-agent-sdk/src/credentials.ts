@@ -14,5 +14,5 @@ export const CREDENTIAL_KEYS = [
   "ANTHROPIC_FOUNDRY_AUTH_TOKEN",
 ] as const;
 
-// Claude Code's own scrub keeps these on purpose; git and gh get credentials from a credential helper, never the environment.
+// Claude Code's own scrub keeps these on purpose; git gets credentials from the `ost git-credential` helper, never the environment.
 export const ALWAYS_DROPPED = ["GH_TOKEN", "GITHUB_TOKEN"] as const;
