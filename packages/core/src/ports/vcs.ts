@@ -95,6 +95,16 @@ export interface VcsEvent {
   data: Record<string, unknown>;
 }
 
+/** What a reaction goes on: a comment of the pull request conversation or an inline comment of a review. */
+export interface ReactionTarget {
+  kind: "conversation_comment" | "inline_comment";
+
+  /** The comment id the host reports, as in `ReviewInlineComment.id` and the `commentId` of `pr.comment` events. */
+  id: string;
+}
+
+export type Reaction = "eyes";
+
 export interface Vcs {
   links: Pick<Links, "pr" | "commit" | "thread">;
   credentials(
@@ -148,6 +158,12 @@ export interface Vcs {
 
   /** A top-level comment on the pull request conversation. Needs a write grant. */
   commentOnPullRequest(repo: RepoRef, number: number, body: string): Promise<void>;
+
+  /**
+   * Adds the reaction as the person this port instance belongs to. Adding one that is already there is not an
+   * error and adds nothing. Needs a write grant; `not_found` for an unknown comment.
+   */
+  react(repo: RepoRef, target: ReactionTarget, reaction: Reaction): Promise<void>;
 
   /** The unified diff of the pull request (read grant). */
   diff(repo: RepoRef, number: number): Promise<string>;

@@ -37,11 +37,20 @@ interface Seen {
   bodies: Record<string, unknown>;
   auth: Record<string, string>;
   accept: string[];
+  reactions: { path: string; body: unknown; auth: string | null }[];
   graphql: { query: string; variables: Record<string, unknown> }[];
 }
 
 function setup(person: string, over: { pull?: Record<string, unknown>; threads?: string[] } = {}) {
-  const seen: Seen = { tokenRequests: [], bodies: {}, auth: {}, accept: [], graphql: [] };
+  const seen: Seen = {
+    tokenRequests: [],
+    bodies: {},
+    auth: {},
+    accept: [],
+    reactions: [],
+    graphql: [],
+  };
+
   const routes: Route[] = [
     ...appRoutes(),
     {
@@ -106,6 +115,19 @@ function setup(person: string, over: { pull?: Record<string, unknown>; threads?:
         return {};
       },
     },
+    ...(["issues", "pulls"] as const).map((kind): Route => ({
+      method: "POST",
+      path: `/repos/acme/app/${kind}/comments/:id/reactions`,
+      handler: (r) => {
+        seen.reactions.push({
+          path: `${kind}/comments/${r.params["id"]}`,
+          body: r.json,
+          auth: r.headers.get("authorization"),
+        });
+
+        return { status: 201, body: {} };
+      },
+    })),
     {
       method: "POST",
       path: "/graphql",
@@ -312,6 +334,28 @@ describe("reviews, replies and diffs", () => {
     await vcs.commentOnPullRequest(REPO, 7, "Thanks, done.");
     expect(seen.bodies["comment"]).toEqual({ body: "Thanks, done." });
     expect(seen.auth["comment"]).toBe("Bearer ghs_own");
+  });
+
+  it("reacts on the endpoint of each target kind as the own App", async () => {
+    const { vcs, seen } = setup("sam");
+    await vcs.react(REPO, { kind: "conversation_comment", id: "41" }, "eyes");
+    await vcs.react(REPO, { kind: "inline_comment", id: "42" }, "eyes");
+    expect(seen.reactions).toEqual([
+      { path: "issues/comments/41", body: { content: "eyes" }, auth: "Bearer ghs_own" },
+      { path: "pulls/comments/42", body: { content: "eyes" }, auth: "Bearer ghs_own" },
+    ]);
+  });
+
+  it("refuses to react in a container that is not the person's own", async () => {
+    const { vcs, seen } = setup("sam");
+    const other = build([...appRoutes()], officeSecrets).vcs;
+    await expectPortError(
+      other.react(REPO, { kind: "inline_comment", id: "42" }, "eyes"),
+      "forbidden",
+    );
+
+    expect(seen.reactions).toEqual([]);
+    expect(vcs).toBeDefined();
   });
 
   it("reads the diff with the diff media type and a read grant", async () => {

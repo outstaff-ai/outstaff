@@ -85,6 +85,11 @@ describe("feedback during a review round", () => {
 
     const offer = await source().next("sam");
     expect(bodies(offer?.context.feedback)).toEqual(["Rename the flag.", "And add a test."]);
+    expect(offer?.context.feedback?.map((f) => [f.kind, typeof f.commentId])).toEqual([
+      ["comment", "string"],
+      ["comment", "string"],
+    ]);
+
     expect(lines.filter((l) => l.level === "warn")).toEqual([]);
     expect(
       lines.some((l) => /attached to work item .* \(review_feedback, queued\)/.test(l.message)),

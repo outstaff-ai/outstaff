@@ -40,17 +40,29 @@ The identity prompt is built from data, not from a template, and appended to the
 For each offer the agent:
 
 1. accepts it;
-2. builds the prompt from the offer: item kind and title, subjects and links, and the journal of earlier rounds;
-3. runs it through the runtime with the identity prompt, the policy, the built-in tools of the profile and the `ost` verbs as in-process tools (`createRuntimeTools`, including `ask` and `question answer`);
-4. sends `progress` from the runtime's text events, at most once per interval (30 seconds by default);
-5. appends a journal entry (see [Journal](#journal));
-6. hands back with the final message as the summary, the links found in it, and a status: `done`, or `waiting` when a question the agent asked is still open. A failed run, or a runtime that throws, sends `fail` with the reason.
+2. for a `review_feedback` or `merged_feedback` item, reacts with `eyes` on the code host (see [Acknowledgements](#acknowledgements));
+3. builds the prompt from the offer: item kind and title, subjects and links, and the journal of earlier rounds;
+4. runs it through the runtime with the identity prompt, the policy, the built-in tools of the profile and the `ost` verbs as in-process tools (`createRuntimeTools`, including `ask` and `question answer`);
+5. sends `progress` from the runtime's text events, at most once per interval (30 seconds by default);
+6. appends a journal entry (see [Journal](#journal));
+7. hands back with the final message as the summary, the links found in it, and a status: `done`, or `waiting` when a question the agent asked is still open. A failed run, or a runtime that throws, sends `fail` with the reason.
 
 Heartbeats are sent by the office connection itself, at the interval the office asks for, with the id of the item being worked on. Items run one at a time. A second offer waits in the connection until the first is handed back.
 
 **Stopping.** On `SIGTERM` or `SIGINT` the agent interrupts the runtime, hands the item back as `waiting` with the last message, and closes the connection. The office queues the item again and a later round resumes its session.
 
 **Restarts.** The office lists accepted, unfinished items when the agent reconnects, but it cannot re-send their context. At startup the agent sends `decline` for each of them. That puts the item back in the queue untouched: no failure or attempt is counted, and the next offer carries the journal and the stored session.
+
+## Acknowledgements
+
+Every surface shows that the agent took a request before it answers, with the same `eyes` reaction:
+
+| Surface   | Where the acknowledgement appears                                                                                                                                                                                                                                                                                                                                    |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat      | An `eyes` reaction on the person's message, added by the chat relay as soon as the message arrives (see [Chat](#chat)).                                                                                                                                                                                                                                              |
+| Code host | An `eyes` reaction on each comment that triggered a `review_feedback` or `merged_feedback` item: the comment itself for a comment on the pull request conversation or an inline comment, and every inline comment of a submitted review. The host has no reactions on a review body, so a review with only a summary gets none; its reply comes when the round ends. |
+
+The agent runner adds the code host reaction when it accepts the offer, before the run starts, not the model, so it always happens and costs no tokens. It acts as the person, with the agent's own `Vcs` port (the person's own App, which has Pull requests and Issues write); the office's App is read-only. The comment ids come from the feedback in the offer. The same reaction is never added twice to one comment, and a failure (for example a comment that was deleted meanwhile) is logged as a warning and never blocks the round.
 
 ## Usage
 

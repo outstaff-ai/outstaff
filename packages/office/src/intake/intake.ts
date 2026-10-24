@@ -246,6 +246,7 @@ export function createIntake(opts: IntakeOptions): Intake {
       const found = await ports.vcs.reviewComments(event.repo, event.number, String(id));
       if (found.length > 0) {
         mapped.data["comments"] = found.map((c) => ({
+          id: c.id,
           path: c.path,
           ...(c.line === undefined ? {} : { line: c.line }),
           body: c.body,

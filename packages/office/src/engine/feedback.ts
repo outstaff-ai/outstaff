@@ -24,6 +24,10 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
   const url = text("url");
   const at = text("at");
   const body = text("body") ?? "";
+  const rawId = event.data["commentId"];
+  const commentId =
+    typeof rawId === "string" || typeof rawId === "number" ? String(rawId) : undefined;
+
   const base = { actor: event.actor.id, body, ...(url ? { url } : {}), ...(at ? { at } : {}) };
   if (event.type === "pr.review_submitted") {
     const state = text("state");
@@ -39,7 +43,11 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
   }
 
   if (event.type === "pr.comment") {
-    return { ...base, kind: event.data["kind"] === "comment" ? "comment" : "inline_comment" };
+    return {
+      ...base,
+      kind: event.data["kind"] === "comment" ? "comment" : "inline_comment",
+      ...(commentId ? { commentId } : {}),
+    };
   }
 
   return undefined;

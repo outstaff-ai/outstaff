@@ -1,5 +1,12 @@
-import { buildPolicy, type RunRequest, type Runtime, type RuntimeEvent } from "@outstaff/core";
-import { createFakeRuntime } from "@outstaff/core/fakes";
+import {
+  buildPolicy,
+  type Logger,
+  type RunRequest,
+  type Runtime,
+  type RuntimeEvent,
+  type Vcs,
+} from "@outstaff/core";
+import { createFakeRuntime, type FakeVcs } from "@outstaff/core/fakes";
 import type { Message } from "@outstaff/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
@@ -37,14 +44,26 @@ class OfficeSocket extends FakeSocket {
     });
   }
 
-  offerWith(id: string, extra: { sessionId?: string; journal?: boolean; origin?: boolean } = {}) {
+  offerWith(
+    id: string,
+    extra: {
+      sessionId?: string;
+      journal?: boolean;
+      origin?: boolean;
+      kind?: string;
+      feedback?: Record<string, unknown>[];
+    } = {},
+  ) {
     this.receive({
       id: `offer-${id}`,
       type: "offer",
       payload: {
         workItem: {
           id,
-          kind: extra.origin ? "chat" : "ticket",
+          kind: extra.kind ?? (extra.origin ? "chat" : "ticket"),
+          ...(extra.feedback
+            ? { subject: { type: "pr", ref: "git.acme.example/acme/app#1" } }
+            : {}),
           title: `Fix ${id}`,
           priority: 1,
           trigger: "human",
@@ -71,6 +90,7 @@ class OfficeSocket extends FakeSocket {
             },
           ],
           links: [],
+          ...(extra.feedback ? { feedback: extra.feedback } : {}),
         },
         ...(extra.sessionId ? { sessionId: extra.sessionId } : {}),
       },
@@ -150,9 +170,12 @@ describe("work loop", () => {
       workspaces?: Workspaces;
       usage?: UsageReporter;
       chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
+      vcs?: Vcs;
+      log?: Logger;
     } = {},
   ) {
-    const { env } = fakeEnv();
+    const { env, vcs } = fakeEnv();
+    const { vcs: ownVcs, ...rest } = extra;
     const policy = buildPolicy({
       profile: "readonly",
       person: env.team.people[0]!,
@@ -171,7 +194,7 @@ describe("work loop", () => {
     loop = createWorkLoop({
       office: conn,
       runtime,
-      env: { ...env, office: conn },
+      env: { ...env, vcs: ownVcs ?? vcs, office: conn },
       systemPrompt: "IDENTITY",
       policy,
       builtinTools: ["read", "ost"],
@@ -179,7 +202,7 @@ describe("work loop", () => {
       addDirs: ["/home/sam/repos"],
       model: "sonnet",
       now: () => clock.now().getTime(),
-      ...extra,
+      ...rest,
     });
 
     running = loop.run();
@@ -805,6 +828,123 @@ describe("work loop", () => {
     expect(sentOf("fail")).toHaveLength(0);
     await loop.stop();
     await conn.stop();
+  });
+
+  describe("acknowledging feedback", () => {
+    const REPO = { host: "git.acme.example", owner: "acme", name: "app" };
+
+    async function prWithComments() {
+      const { vcs } = fakeEnv();
+      await vcs.seed.permission(REPO, "sam", "write");
+      const pr = await vcs.seed.pullRequest(REPO, {
+        title: "Search",
+        author: { login: "sam", kind: "agent" },
+      });
+
+      const conversation = await vcs.seed.comment(REPO, pr.number, "dana", "Why this way?");
+      const reviewId = await vcs.seed.review(REPO, pr.number, "dana", "changes_requested", "", [
+        { path: "src/a.ts", line: 1, body: "rename" },
+        { path: "src/b.ts", line: 2, body: "and this" },
+      ]);
+
+      const inline = await vcs.reviewComments(REPO, pr.number, reviewId);
+      return { vcs, conversation, inline };
+    }
+
+    const eyes = (vcs: FakeVcs, conversation: string, inline: string[]) =>
+      Promise.all([
+        vcs.seed.reactions!(REPO, { kind: "conversation_comment", id: conversation }),
+        ...inline.map((id) => vcs.seed.reactions!(REPO, { kind: "inline_comment", id })),
+      ]);
+
+    it("reacts once to each comment of the feedback before the run starts", async () => {
+      await connect();
+      const { vcs, conversation, inline } = await prWithComments();
+      let reactedBeforeRun: unknown[] = [];
+      const runtime: Runtime = {
+        async *run() {
+          reactedBeforeRun = await eyes(vcs, conversation, [inline[0]!.id, inline[1]!.id]);
+          yield { type: "finished", ok: true, text: "Done." } satisfies RuntimeEvent;
+        },
+      };
+
+      start(runtime, { vcs });
+      socket.offerWith("w1", {
+        kind: "review_feedback",
+        feedback: [
+          { actor: "dana", kind: "comment", body: "Why this way?", commentId: conversation },
+          {
+            actor: "dana",
+            kind: "review",
+            body: "",
+            comments: inline.map((c) => ({ id: c.id, path: c.path, body: c.body })),
+          },
+          // The same comment twice (a repeated delivery) is one reaction.
+          { actor: "dana", kind: "inline_comment", body: "rename", commentId: inline[0]!.id },
+        ],
+      });
+
+      await until(() => types().includes("handback"));
+      expect(reactedBeforeRun).toEqual([
+        [{ user: "sam", reaction: "eyes" }],
+        [{ user: "sam", reaction: "eyes" }],
+        [{ user: "sam", reaction: "eyes" }],
+      ]);
+    });
+
+    it("also reacts for merged_feedback, and not for other kinds of work", async () => {
+      await connect();
+      const { vcs, conversation } = await prWithComments();
+      const calls: string[] = [];
+      const react = vcs.react.bind(vcs);
+      vcs.react = (repo, target, reaction) => {
+        calls.push(`${target.kind}:${target.id}`);
+        return react(repo, target, reaction);
+      };
+
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Done." }]);
+      runtime.enqueue([{ type: "finish", text: "Done." }]);
+      start(runtime, { vcs });
+      const feedback = [
+        { actor: "dana", kind: "comment", body: "Late thought.", commentId: conversation },
+      ];
+
+      socket.offerWith("w1", { kind: "merged_feedback", feedback });
+      await until(() => types().includes("handback"));
+      socket.offerWith("w2", { kind: "ticket", feedback });
+      await until(() => sentOf("handback").length === 2);
+      expect(calls).toEqual([`conversation_comment:${conversation}`]);
+    });
+
+    it("logs a warning when a reaction fails and still runs the round", async () => {
+      await connect();
+      const { vcs, conversation } = await prWithComments();
+      vcs.react = async () => {
+        throw new Error("Resource not accessible by integration");
+      };
+
+      const warnings: string[] = [];
+      const log: Logger = {
+        debug() {},
+        info() {},
+        warn: (message, fields) => void warnings.push(`${message} ${JSON.stringify(fields)}`),
+        error() {},
+      };
+
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Answered." }]);
+      start(runtime, { vcs, log });
+      socket.offerWith("w1", {
+        kind: "review_feedback",
+        feedback: [{ actor: "dana", kind: "comment", body: "Hm", commentId: conversation }],
+      });
+
+      await until(() => types().includes("handback"));
+      expect(runtime.requests.length).toBeGreaterThan(0);
+      expect(warnings).toEqual([expect.stringContaining("Resource not accessible")]);
+      expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "done" });
+    });
   });
 });
 
