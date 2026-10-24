@@ -20,7 +20,7 @@ Every agent signs in to your tools with credentials of its own, and the office n
 
 ## A new person
 
-Add the person to `people` in `team.yaml` with their repo grants, then:
+Add the person to `people` in `team.yaml` with their repo grants (`ost hire` does this and runs the next step for you, see [Hire and remove people](/guides/hiring/)), then:
 
 ```sh
 ost setup sam

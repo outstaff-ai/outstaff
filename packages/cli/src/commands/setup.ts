@@ -117,7 +117,7 @@ export function missingIgnores(out: string, envFile: string, secretsDir: string)
   return missing;
 }
 
-function renderGuide(title: string, steps: SetupStep[]): string {
+export function renderGuide(title: string, steps: SetupStep[]): string {
   const lines = [`## ${title}`, ""];
   steps.forEach((step, i) => {
     lines.push(`${i + 1}. ${step.title}`, "");

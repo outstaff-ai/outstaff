@@ -4,6 +4,8 @@ import { diff } from "./diff.js";
 import { doctor } from "./doctor.js";
 import { eject } from "./eject.js";
 import { gitCredential } from "./git-credential.js";
+import { fire } from "./fire.js";
+import { hire } from "./hire.js";
 import { init } from "./init.js";
 import { render } from "./render.js";
 import { roleNew } from "./role.js";
@@ -27,6 +29,8 @@ export const commands: CommandDef[] = [
   build,
   init,
   setup,
+  hire,
+  fire,
   doctor,
   explain,
   gitCredential,

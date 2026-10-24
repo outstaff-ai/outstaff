@@ -285,6 +285,68 @@ ost setup sam --derive --secrets-dir ./secrets
 ost setup sam --derive --yes --json
 ```
 
+## ost hire
+
+Add a person to the team and prepare them to start.
+
+Adds one person with the given role (stock or custom) to `people` in the team file, keeping its comments and quoting. Anything not given is generated: the name from a small built-in list of neutral names, the handle from the name (a DNS label, made unique with a numeric suffix), the pronouns they/them, the repo grants (write on the primary repository for code roles and on the infra repository for infra roles, read everywhere else), the avatar seed (the handle) and the model (left out, so the runtime adapter's default applies). In a terminal it asks about each generated value, shows a summary and asks to confirm; without a terminal it needs --yes. Then it renders the avatar to `.outstaff/people/<handle>/avatar.png|svg` when the team configures an avatars adapter and the avatar is not a URL, does what `ost setup <handle>` does, prints what is left to do by hand (the person's identities in the team file, the compose service or the Kubernetes folder to add) and runs `ost validate`. Nothing is created in GitHub, the chat workspace or the tracker.
+
+```
+ost hire <role> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--name <name>` | Display name. Generated when omitted. |
+| `--handle <handle>` | Handle (lowercase letters, digits and dashes, at most 30). Derived from the name when omitted. |
+| `--pronouns <pronouns>` | Pronouns. Asked for, default they/them. |
+| `--model <model>` | LLM model. Omitted from the file by default, so the runtime's default applies. |
+| `--avatar <seed|url>` | Avatar seed, or an https image URL. Defaults to the handle as the seed. |
+| `--repos <grants>` | Repo grants as "repo=read|write" separated by commas, for example "shop=write,*=read". Defaults by role. |
+| `--yes` | Do not ask to confirm; write what was given or generated. |
+| `--out <dir>` | Project directory to write `.outstaff/people/<handle>/...` into. Defaults to the current directory. |
+| `--secrets-dir <dir>` | Directory of secret files, for the layout hint. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+
+Exit codes:
+
+- 0: the person was added and the team file validates
+- 1: the team could not be loaded, the role or an option is invalid, the person was not confirmed, the git ignore rules for setup are missing, or the team file has errors after the change
+
+Examples:
+
+```sh
+ost hire developer
+ost hire reviewer --name "Ines Varga" --pronouns she/her --yes
+ost hire developer --repos "shop=write,*=read" --avatar sam --yes --json
+```
+
+## ost fire
+
+Remove a person from the team file and list what to clean up.
+
+Removes the person from `people` in the team file, keeping its comments and quoting. If `policies.usage.shared` lists the person, the person is removed from the group too (a group left with one member is dropped), and any other place that still mentions the handle is listed and left alone. It asks to confirm in a terminal and needs --yes without one. It changes nothing outside the team file: it prints the checklist of what to remove by hand (the person's GitHub App, chat app and tracker member, the secrets, the compose service or Kubernetes folder, and the work still assigned to them in the office), then runs `ost validate`.
+
+```
+ost fire <handle> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--yes` | Do not ask to confirm. |
+| `--secrets-dir <dir>` | Directory of secret files, named in the checklist. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+
+Exit codes:
+
+- 0: the person was removed and the team file validates
+- 1: the team could not be loaded, the handle is unknown, the removal was not confirmed, or the team file has errors afterwards
+
+Examples:
+
+```sh
+ost fire sam
+ost fire sam --yes --json
+```
+
 ## ost doctor
 
 Verify the secrets and the setup of the office and of each person.

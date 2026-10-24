@@ -11,3 +11,4 @@ Every deployment guide builds on the [container contract](/reference/container-c
 - [Docker Compose](/guides/compose/): the acme team on one Docker host, with Postgres.
 - [Kubernetes](/guides/kubernetes/): the same team as plain manifests, with secrets, a network policy and resource sizing.
 - [Secrets](/guides/secrets/): keep the secret files in 1Password, SOPS, Kubernetes Secrets or Compose secrets.
+- [Hire and remove people](/guides/hiring/): add a person with `ost hire`, which generates what you leave out, and remove one with `ost fire`.

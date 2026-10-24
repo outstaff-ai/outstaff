@@ -32,6 +32,14 @@ export function nodeContext(): Context {
               rl.close();
             }
           },
+          async ask(question: string, fallback: string) {
+            const rl = createInterface({ input: process.stdin, output: process.stdout });
+            try {
+              return (await rl.question(`${question} [${fallback}] `)).trim() || fallback;
+            } finally {
+              rl.close();
+            }
+          },
         }
       : {}),
     gitOrigin(cwd) {
