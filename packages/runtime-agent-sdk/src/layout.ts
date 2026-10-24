@@ -1,3 +1,6 @@
+import { readdirSync } from "node:fs";
+import { join } from "node:path";
+
 const SKILLS = /^skills\/([^/]+)\/SKILL\.md$/;
 
 /**
@@ -12,4 +15,16 @@ export function workdirFiles(files: ReadonlyMap<string, string>): Map<string, st
   }
 
   return out;
+}
+
+/** Names of the skills rendered into a workdir; the only skills a session may use. */
+export function renderedSkillNames(workdir: string): string[] {
+  try {
+    return readdirSync(join(workdir, ".claude", "skills"), { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .toSorted();
+  } catch {
+    return [];
+  }
 }

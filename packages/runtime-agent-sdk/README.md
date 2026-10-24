@@ -19,7 +19,7 @@ adapters:
 | `claudeCodePath` | the binary bundled with the SDK | Path to a pinned Claude Code binary (`pathToClaudeCodeExecutable`). Authentication is unchanged. |
 | `maxTurns`       | none                            | Upper bound on turns per run. A run request's `maxTurns` takes precedence.                       |
 
-The SDK version is pinned exactly in `package.json`. Pin the binary as well when you need a fixed Claude Code version, and re-check that skills, settings, agents and hooks load after every upgrade.
+The SDK version is pinned exactly in `package.json`. Pin the binary as well when you need a fixed Claude Code version, and re-check that skills, settings, agents and hooks load after every upgrade (the runtime upgrade test below does).
 
 ## Credentials
 
@@ -51,7 +51,8 @@ A session loads only what Outstaff rendered into its workdir:
 - `settingSources: ["project"]`, so the workdir's `.claude/` (settings, skills, agents, hooks) applies and user or local settings do not;
 - `strictMcpConfig`, so no other MCP configuration is read;
 - claude.ai account connectors off (`disableClaudeAiConnectors` and `ENABLE_CLAUDEAI_MCP_SERVERS=false` in the process environment);
-- no plugins.
+- no plugins beyond the ones built into Claude Code;
+- only the rendered skills: `disableBundledSkills` removes Claude Code's own skills and the `skills` option allows exactly the directories under the workdir's `.claude/skills/`, so the Skill tool rejects everything else. Claude Code still lists three skills from its built-in plugins (`design`, `doctor`, `plugin-authoring`) in the session's `init`; they cannot be removed by a setting, but the allowlist rejects them.
 
 ## Tools
 
@@ -93,3 +94,15 @@ Any other tool, including tools of other MCP servers, is denied. Runs are unatte
 ```sh
 OUTSTAFF_TEST_LIVE_SDK=1 pnpm vitest run --project runtime-agent-sdk
 ```
+
+### Runtime upgrade test
+
+`src/upgrade.test.ts` guards against SDK or Claude Code upgrades that change what loads in an unattended run. It renders the workdir of one person of the acme example (stock catalog, the adapter's layout mapping) and runs short sessions with `haiku`, checking that:
+
+- the person's skill is available and other roles' skills are not; any skill in `init` outside the rendered ones and a documented list of built-ins fails the test, and built-in skills are rejected by the Skill tool;
+- a deny rule from the workdir's `.claude/settings.json` applies;
+- the `PreToolUse` hook sees tool calls and a policy deny blocks one;
+- an in-process `ost` tool is callable;
+- no account connectors, other MCP servers or non-built-in plugins load.
+
+Run it locally with `OUTSTAFF_TEST_LIVE_SDK=1 pnpm vitest run --project runtime-agent-sdk upgrade`; without the variable it is skipped with a warning. The `Runtime upgrade` workflow (`.github/workflows/runtime-upgrade.yml`, job `runtime-upgrade`) runs it when `packages/runtime-agent-sdk/package.json` or `pnpm-lock.yaml` changes, on manual dispatch, and when a release workflow calls it (`workflow_call`). It needs the repository secret `OUTSTAFF_TEST_ANTHROPIC_API_KEY`, an Anthropic API key with a small budget; without it (forks, pull requests without secrets) the job is skipped with a notice. When Claude Code adds a built-in skill the test fails by name: decide whether it can be disabled, and if not add it to `UNAVOIDABLE_BUILTIN_SKILLS` with a comment.
