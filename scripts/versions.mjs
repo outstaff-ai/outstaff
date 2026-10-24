@@ -2,11 +2,13 @@
 // Dependencies are pinned to exact versions. `check` fails on any range in dependencies or
 // devDependencies; `pin` rewrites ranges to the version pnpm resolved. peerDependencies keep
 // ranges on purpose: they describe what a consumer may bring, not what we install.
+// `check` also fails when a package.json does not declare the project licence.
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const FIELDS = ["dependencies", "devDependencies", "optionalDependencies"];
+export const LICENSE_ID = "Apache-2.0";
 const EXACT = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/;
 
 export function isPinned(spec) {
@@ -26,6 +28,10 @@ export function findRanges(manifest) {
   return out;
 }
 
+export function licenseIssue(manifest) {
+  return manifest.license === LICENSE_ID ? null : `"license" must be "${LICENSE_ID}"`;
+}
+
 function projects() {
   return JSON.parse(
     execFileSync("pnpm", ["list", "-r", "--depth", "0", "--json"], { encoding: "utf8" }),
@@ -39,6 +45,12 @@ function main(mode) {
     const manifest = JSON.parse(readFileSync(file, "utf8"));
     const ranges = findRanges(manifest);
     if (mode === "check") {
+      const issue = licenseIssue(manifest);
+      if (issue) {
+        console.error(`${path.relative(process.cwd(), file)}: ${issue}`);
+        failed += 1;
+      }
+
       for (const r of ranges) {
         console.error(
           `${path.relative(process.cwd(), file)}: ${r.field}.${r.name} is "${r.spec}"; pin an exact version`,
@@ -65,7 +77,7 @@ function main(mode) {
 
   if (failed) {
     console.error(
-      `${failed} unpinned dependenc${failed === 1 ? "y" : "ies"}. Run: node scripts/versions.mjs pin && pnpm install`,
+      `${failed} problem${failed === 1 ? "" : "s"} found. Pin dependencies with: node scripts/versions.mjs pin && pnpm install`,
     );
 
     process.exit(1);

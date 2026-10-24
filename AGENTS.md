@@ -48,6 +48,6 @@ Run lint, typecheck, test and build before opening a PR.
 ## Where to find the design
 
 - Architecture overview: `docs/src/content/docs/architecture/overview.md`
-- Decision records: `docs/src/content/docs/decisions/` (0001 to 0011, indexed in `index.md`). They are the source of truth. If you need to change a decision, add a new record that replaces the old one.
+- Decision records: `docs/src/content/docs/decisions/` (0001 to 0012, indexed in `index.md`). They are the source of truth. If you need to change a decision, add a new record that replaces the old one.
 - Vocabulary: `docs/src/content/docs/concepts/index.md`
 - Planned work is tracked in GitHub milestones M0 to M7 and "Later".

@@ -38,4 +38,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commit and PR rules.
 
 ## License
 
-[MIT](LICENSE)
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE).

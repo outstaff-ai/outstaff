@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "packageManager": "pnpm@12.9.1",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "scripts": {
     "lint": "oxlint",
     "typecheck": "pnpm -r --workspace-concurrency=1 run build && pnpm -r --workspace-concurrency=1 run typecheck",

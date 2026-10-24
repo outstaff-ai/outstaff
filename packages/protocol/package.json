@@ -2,7 +2,7 @@
   "name": "@outstaff/protocol",
   "version": "0.0.0",
   "description": "The wire protocol between Outstaff agents and the office.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -19,12 +19,14 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "docs:protocol": "tsx scripts/gen-docs.ts"
+    "docs:protocol": "tsx scripts/gen-docs.ts",
+    "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "dependencies": {
     "zod": "4.6.7"

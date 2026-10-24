@@ -20,3 +20,4 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0009](/decisions/0009-agent-sdk-runtime/)                | The Claude Agent SDK is the primary runtime; the CLI is a fallback            |
 | [0010](/decisions/0010-context-per-work-item/)            | Each work item has its own context                                            |
 | [0011](/decisions/0011-configurable-workflow/)            | Workflows are configured, not hard-coded                                      |
+| [0012](/decisions/0012-apache-license/)                   | The project is licensed under the Apache License 2.0                          |

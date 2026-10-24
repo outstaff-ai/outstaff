@@ -43,6 +43,8 @@ RUN set -eu; \
 # ---------------------------------------------------------------- base
 FROM ${NODE_IMAGE} AS base
 ARG UID=10001
+LABEL org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="https://github.com/outstaff-ai/outstaff"
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates git tini \
  && rm -rf /var/lib/apt/lists/* \
@@ -53,6 +55,7 @@ RUN apt-get update \
 ENV NODE_ENV=production \
     HOME=/home/outstaff
 WORKDIR /home/outstaff
+COPY LICENSE NOTICE /usr/share/doc/outstaff/
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # ---------------------------------------------------------------- agent

@@ -2,7 +2,7 @@
   "name": "outstaff",
   "version": "0.0.0",
   "description": "Command line interface for Outstaff.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -11,12 +11,14 @@
     "directory": "packages/cli"
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "docs:cli": "tsx scripts/gen-cli-docs.ts"
+    "docs:cli": "tsx scripts/gen-cli-docs.ts",
+    "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "bin": {
     "outstaff": "./dist/cli.js",

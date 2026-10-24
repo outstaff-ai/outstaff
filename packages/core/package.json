@@ -2,7 +2,7 @@
   "name": "@outstaff/core",
   "version": "0.0.0",
   "description": "Schema, config, renderer, policies and ports for Outstaff.",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "private": false,
   "type": "module",
   "repository": {
@@ -27,13 +27,15 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "NOTICE"
   ],
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
     "schema": "tsx scripts/gen-schema.ts",
-    "docs:schema": "tsx scripts/gen-docs.ts"
+    "docs:schema": "tsx scripts/gen-docs.ts",
+    "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "dependencies": {
     "semver": "7.8.5",

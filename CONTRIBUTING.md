@@ -52,4 +52,6 @@ Fill in the pull request template. It asks for a summary, the linked issue, how 
 - Security issues: do not open a public issue. Follow [SECURITY.md](SECURITY.md).
 - Conduct concerns: follow [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
+## License
+
+Outstaff is licensed under the [Apache License 2.0](LICENSE). Unless you state otherwise, any contribution you submit is licensed under the same terms, as set out in section 5 of the licence.
