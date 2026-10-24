@@ -374,11 +374,15 @@ async function main() {
   // ---- 1. a human assigns a ticket; the office schedules it; the agent clones, commits, pushes, opens a pull request
   const { key: first } = await stub("POST", "/_test/tickets", { title: "Add a greeting" });
   await stub("POST", `/_test/tickets/${first}/assign`, { to: "sam" });
-  const pr1 = await until("a pull request for the first ticket, ticket in review", (s) => {
-    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${first}`));
-    const t = s.tickets.find((x: Json) => x.key === first);
-    return pr && t.status === "In Review" ? { pr, t } : undefined;
-  });
+  // The hand-back moves the ticket, then reassigns it: wait for both, not just the move.
+  const pr1 = await until(
+    "a pull request for the first ticket, ticket in review and handed back",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${first}`));
+      const t = s.tickets.find((x: Json) => x.key === first);
+      return pr && t.status === "In Review" && t.assignee !== "sam" ? { pr, t } : undefined;
+    },
+  );
 
   assertEq(pr1.pr.author, "acme-sam[bot]", "the pull request is opened by the agent's own App");
   assertEq(pr1.pr.state, "open", "the pull request is open");

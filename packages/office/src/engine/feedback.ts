@@ -2,8 +2,17 @@ import type { WorkflowEvent } from "@outstaff/core";
 import type { Feedback } from "@outstaff/protocol";
 import type { Store } from "../store/types.js";
 
-/** The subject type that keeps the feedback that started a review round, keyed by work item id. */
+/**
+ * The subject type that keeps the feedback of a review round, keyed by work item id: a list, because feedback that
+ * arrives while the item is queued or running is attached to it. Only the engine writes it.
+ */
 export const FEEDBACK_SUBJECT = "work_feedback";
+
+/** How many of the item's feedback entries went out in an offer, so what came later is known. Only the work source writes it. */
+export const DELIVERED_SUBJECT = "work_feedback_delivered";
+
+/** Set once the follow-up round for an item's late feedback is queued, so a repeated hand-back adds no second one. */
+export const FOLLOW_UP_SUBJECT = "work_feedback_followup";
 
 /** The review or comment a pull request event carries; nothing for other events. */
 export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
@@ -13,8 +22,9 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
   };
 
   const url = text("url");
+  const at = text("at");
   const body = text("body") ?? "";
-  const base = { actor: event.actor.id, body, ...(url ? { url } : {}) };
+  const base = { actor: event.actor.id, body, ...(url ? { url } : {}), ...(at ? { at } : {}) };
   if (event.type === "pr.review_submitted") {
     const state = text("state");
     const comments = event.data["comments"];
@@ -47,9 +57,46 @@ export function awaitsReview(event: WorkflowEvent): boolean {
   );
 }
 
-export async function readFeedback(
-  store: Pick<Store, "getSubject">,
+type Reader = Pick<Store, "getSubject">;
+
+/** In the order it arrived; what an offer carried is a count of this list. */
+const arrived = async (store: Reader, itemId: string): Promise<Feedback[]> =>
+  ((await store.getSubject(FEEDBACK_SUBJECT, itemId))?.data as Feedback[] | undefined) ?? [];
+
+/** Oldest first by the time the host reported it; ids and arrival order only break ties. */
+const byTime = (list: Feedback[]) =>
+  list.toSorted((a, b) => (a.at ?? "").localeCompare(b.at ?? ""));
+
+export async function readFeedback(store: Reader, itemId: string): Promise<Feedback[]> {
+  return byTime(await arrived(store, itemId));
+}
+
+export async function addFeedback(
+  store: Reader & Pick<Store, "upsertSubject">,
   itemId: string,
-): Promise<Feedback | undefined> {
-  return (await store.getSubject(FEEDBACK_SUBJECT, itemId))?.data as Feedback | undefined;
+  feedback: Feedback,
+): Promise<void> {
+  await store.upsertSubject(FEEDBACK_SUBJECT, itemId, [
+    ...(await arrived(store, itemId)),
+    feedback,
+  ]);
+}
+
+/** Reads the feedback for an offer and records how much of it that was. */
+export async function deliverFeedback(
+  store: Reader & Pick<Store, "upsertSubject">,
+  itemId: string,
+): Promise<Feedback[]> {
+  const list = await arrived(store, itemId);
+  await store.upsertSubject(DELIVERED_SUBJECT, itemId, { count: list.length });
+  return byTime(list);
+}
+
+/** What was attached to the item after its last offer. */
+export async function undeliveredFeedback(store: Reader, itemId: string): Promise<Feedback[]> {
+  const count =
+    ((await store.getSubject(DELIVERED_SUBJECT, itemId))?.data as { count: number } | undefined)
+      ?.count ?? 0;
+
+  return byTime((await arrived(store, itemId)).slice(count));
 }

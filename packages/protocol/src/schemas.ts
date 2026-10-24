@@ -94,6 +94,7 @@ export const feedbackSchema = z.strictObject({
     ),
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),
+  at: z.string().optional().describe("When the host reported the feedback (ISO-8601)."),
   body: z.string().describe("What the person wrote. Data from that person."),
   comments: z
     .array(inlineCommentSchema)
@@ -105,9 +106,12 @@ export const offerContextSchema = z.strictObject({
   journal: z.array(journalEntrySchema).describe("What earlier rounds of this item recorded."),
   subjects: z.array(refSchema).describe("The tickets, pull requests and people the item concerns."),
   links: z.array(linkSchema).describe("Further links worth opening."),
-  feedback: feedbackSchema
+  feedback: z
+    .array(feedbackSchema)
     .optional()
-    .describe("For a review round: the review or comment that started it."),
+    .describe(
+      "For a review round: the reviews and comments it covers, oldest first. Feedback that arrives while the item is queued is added; what arrives while it runs starts a follow-up round.",
+    ),
 });
 
 export const workSummarySchema = z.strictObject({

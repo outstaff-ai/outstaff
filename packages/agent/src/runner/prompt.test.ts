@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
+import type { Feedback } from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
 import { buildWorkPrompt } from "./prompt.js";
 
-const offer = (feedback?: Offer["context"]["feedback"]): Offer =>
+const offer = (feedback?: Feedback | Feedback[]): Offer =>
   ({
     workItem: {
       id: "w7",
@@ -15,7 +16,7 @@ const offer = (feedback?: Offer["context"]["feedback"]): Offer =>
       subjects: [{ type: "pr", ref: "github.example/acme/app#3", url: "https://g.example/pull/3" }],
       links: [],
       journal: [],
-      ...(feedback ? { feedback } : {}),
+      ...(feedback ? { feedback: [feedback].flat() } : {}),
     },
   }) as unknown as Offer;
 
@@ -81,6 +82,24 @@ describe("buildWorkPrompt feedback", () => {
     );
 
     expect(prompt).toContain("- src/b.ts (no thread id)\n  > No thread.\n  > Two lines.");
+  });
+
+  it("lists every piece of feedback of the round, oldest first", () => {
+    const prompt = buildWorkPrompt(
+      offer([
+        { actor: "ada", kind: "inline_comment", url: "https://g.example/r1", body: "First." },
+        { actor: "ada", kind: "inline_comment", url: "https://g.example/r2", body: "Second." },
+      ]),
+      { resumed: false },
+    );
+
+    expect(prompt).toContain("This round covers 2 pieces of feedback, oldest first.");
+    const first = prompt.indexOf("Triggered by an inline comment from ada: https://g.example/r1");
+    const second = prompt.indexOf("Triggered by an inline comment from ada: https://g.example/r2");
+    expect(first).toBeGreaterThan(-1);
+    expect(second).toBeGreaterThan(first);
+    expect(prompt).toContain("> First.");
+    expect(prompt).toContain("> Second.");
   });
 
   it("says when a review has no text, and says nothing without feedback", () => {

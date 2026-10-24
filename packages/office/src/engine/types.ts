@@ -50,4 +50,10 @@ export interface Engine {
    * and as a work state `onEvent` handler. Idempotent under redelivery.
    */
   handle(event: WorkflowEvent, meta: EngineMeta): Promise<EffectOutcome[]>;
+
+  /**
+   * After an item was handed back: queues one more round for the feedback that was attached to it after its last
+   * offer, so the agent never saw it. Idempotent.
+   */
+  followUp(itemId: string): Promise<void>;
 }

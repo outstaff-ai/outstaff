@@ -39,45 +39,54 @@ describe("parsePrompt", () => {
       branch: "review_feedback/w7-add-a-greeting",
       scratch: "/home/outstaff/scratch/w7",
       journal: expect.stringContaining("An earlier note."),
+      feedback: [],
     });
   });
 
   it("reads the feedback that started a review round", () => {
     const o = offer("review_feedback");
-    o.context.feedback = {
-      actor: "grace",
-      kind: "review",
-      state: "commented",
-      url: "https://g.example/pull/3#pullrequestreview-1",
-      body: "Keep it short.\nOne line.",
-    };
+    o.context.feedback = [
+      {
+        actor: "grace",
+        kind: "review",
+        state: "commented",
+        url: "https://g.example/pull/3#pullrequestreview-1",
+        body: "Keep it short.\nOne line.",
+      },
+      { actor: "grace", kind: "comment", url: "https://g.example/pull/3#c2", body: "Also this." },
+    ];
 
-    expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback).toEqual({
-      kind: "review",
-      url: "https://g.example/pull/3#pullrequestreview-1",
-      body: "Keep it short.\nOne line.",
-      threads: [],
-    });
+    expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback).toEqual([
+      {
+        kind: "review",
+        url: "https://g.example/pull/3#pullrequestreview-1",
+        body: "Keep it short.\nOne line.",
+        threads: [],
+      },
+      { kind: "comment", url: "https://g.example/pull/3#c2", body: "Also this.", threads: [] },
+    ]);
   });
 
   it("reads the threads of a review's inline comments", () => {
     const o = offer("review_feedback");
-    o.context.feedback = {
-      actor: "grace",
-      kind: "review",
-      state: "changes_requested",
-      body: "",
-      comments: [
-        { path: "a.txt", line: 1, body: "One.", url: "https://g.example/r1", threadId: "PRRT_1" },
-        { path: "b.txt", body: "Two.", threadId: "PRRT_2" },
-        { path: "c.txt", body: "No thread." },
-      ],
-    };
+    o.context.feedback = [
+      {
+        actor: "grace",
+        kind: "review",
+        state: "changes_requested",
+        body: "",
+        comments: [
+          { path: "a.txt", line: 1, body: "One.", url: "https://g.example/r1", threadId: "PRRT_1" },
+          { path: "b.txt", body: "Two.", threadId: "PRRT_2" },
+          { path: "c.txt", body: "No thread." },
+        ],
+      },
+    ];
 
-    expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback?.threads).toEqual([
-      "PRRT_1",
-      "PRRT_2",
-    ]);
+    expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback[0]).toMatchObject({
+      body: "",
+      threads: ["PRRT_1", "PRRT_2"],
+    });
   });
 
   it("says nothing about a prompt that is not a work prompt", () => {

@@ -208,12 +208,15 @@ describe("kanban parity", () => {
       await h.vcs.seed.review(REPO, pr.number, "dana", "changes_requested", "Rename the flag.");
       await h.poll();
       const [item] = await h.items("sam");
-      expect(await readFeedback(h.store, item!.id)).toEqual({
-        actor: "dana",
-        kind: "review",
-        state: "changes_requested",
-        body: "Rename the flag.",
-      });
+      expect(await readFeedback(h.store, item!.id)).toEqual([
+        {
+          actor: "dana",
+          kind: "review",
+          state: "changes_requested",
+          body: "Rename the flag.",
+          at: expect.any(String),
+        },
+      ]);
     });
 
     it("schedules one round for a submitted review, carrying all of its inline comments", async () => {
@@ -229,7 +232,8 @@ describe("kanban parity", () => {
       const items = await h.items("sam");
       expect(items.map((i) => i.kind)).toEqual(["review_feedback"]);
       const [t1, t2] = (await h.vcs.reviewThreads(REPO, pr.number)).map((t) => t.id);
-      const feedback = await readFeedback(h.store, items[0]!.id);
+      const [feedback, ...rest] = await readFeedback(h.store, items[0]!.id);
+      expect(rest).toEqual([]);
       expect(feedback).toMatchObject({ actor: "dana", kind: "review", state: "changes_requested" });
       expect(feedback?.comments).toEqual([
         {
@@ -260,7 +264,7 @@ describe("kanban parity", () => {
       await h.poll();
       const items = await h.items("sam");
       expect(items.map((i) => i.kind)).toEqual(["review_feedback"]);
-      expect((await readFeedback(h.store, items[0]!.id))?.comments).toMatchObject([
+      expect((await readFeedback(h.store, items[0]!.id))[0]?.comments).toMatchObject([
         { path: "src/a.ts", body: "Nit: rename this." },
       ]);
     });
@@ -288,10 +292,9 @@ describe("kanban parity", () => {
       await h.vcs.seed.comment(REPO, pr.number, "dana", "Why this way?");
       await h.poll();
       const [item] = await h.items("sam");
-      expect(await readFeedback(h.store, item!.id)).toMatchObject({
-        kind: "comment",
-        body: "Why this way?",
-      });
+      expect(await readFeedback(h.store, item!.id)).toMatchObject([
+        { kind: "comment", body: "Why this way?" },
+      ]);
     });
 
     it("ignores an approval with nothing written in it", async () => {
@@ -515,11 +518,9 @@ describe("merged feedback", () => {
       subject: { type: "pr", ref: h.ws.prSubject(ref(pr.number)) },
     });
 
-    expect(await readFeedback(h.store, item!.id)).toMatchObject({
-      actor: "dana",
-      kind: "comment",
-      body: "The flag name is wrong.",
-    });
+    expect(await readFeedback(h.store, item!.id)).toMatchObject([
+      { actor: "dana", kind: "comment", body: "The flag name is wrong." },
+    ]);
   });
 
   it("ignores a bare approval and an untrusted comment", async () => {

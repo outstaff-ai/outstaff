@@ -17,6 +17,7 @@ const ctx = {
   repo: "shop",
   branch: "assigned/w1-add-a-greeting",
   journal: "",
+  feedback: [],
 };
 
 /** Plays a script, answering each action with `answer`, and returns the actions and the final message. */
@@ -137,12 +138,14 @@ describe("mergedFeedback", () => {
     kind: "merged_feedback",
     pr: 1,
     branch: "merged_feedback/w5-follow-up",
-    feedback: {
-      kind: "comment" as const,
-      url: "https://git.example/acme/shop/pull/1#c1",
-      body: "Add a goodbye.",
-      threads: [],
-    },
+    feedback: [
+      {
+        kind: "comment" as const,
+        url: "https://git.example/acme/shop/pull/1#c1",
+        body: "Add a goodbye.",
+        threads: [],
+      },
+    ],
   };
 
   it("answers on the merged pull request, opens a follow-up from the default branch and links it", async () => {
