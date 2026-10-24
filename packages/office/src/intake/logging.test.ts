@@ -75,7 +75,7 @@ describe("intake logging", () => {
     ).toBe(true);
   });
 
-  it("logs events the office does not map, and duplicates, with the reason", async () => {
+  it("logs events the office does not map at info once per event id, and duplicates at debug", async () => {
     const { logger, lines } = recorder();
     const { vcs, intake, store } = await setup({ logger });
     const pr = await vcs.seed.pullRequest(REPO, {
@@ -97,9 +97,18 @@ describe("intake logging", () => {
     // The same event arriving again, as a webhook retry would.
     await store.setCursor("vcs", "events", "0");
     await intake.pollOnce();
-    expect(lines.map((l) => l.message)).toContain(
-      "intake: dropped vcs pr.opened on acme/app#1: duplicate of an event already recorded",
+    expect(lines).toContainEqual(
+      expect.objectContaining({
+        level: "debug",
+        message:
+          "intake: dropped vcs pr.opened on acme/app#1: duplicate of an event already recorded",
+      }),
     );
+
+    // The unmapped event came back too: now at debug, not info again.
+    const unmapped = lines.filter((l) => l.message.includes("pr.synchronize"));
+    expect(unmapped.map((l) => l.level)).toEqual(["info", "debug"]);
+    expect(lines.filter((l) => l.level === "info" && l.message.includes("duplicate"))).toEqual([]);
   });
 
   it("logs events the adapter read but could not map", async () => {
@@ -119,6 +128,27 @@ describe("intake logging", () => {
     expect(messages("info")).toContain(
       "intake: dropped vcs PushEvent on acme/app: the adapter does not map this event type",
     );
+  });
+
+  it("logs an adapter-unmapped event at info the first time, then at debug", async () => {
+    const { logger, lines } = recorder();
+    const base = await setup({ logger });
+    const vcs: Vcs = {
+      ...base.vcs,
+      events: async () => ({
+        events: [],
+        cursor: "9",
+        unmapped: [{ externalId: "77", type: "PushEvent", repo: REPO }],
+      }),
+    };
+
+    const { intake } = await setup({ logger, store: base.store, ports: { vcs } });
+    await intake.pollOnce();
+    await intake.pollOnce();
+    expect(lines.filter((l) => l.message.includes("PushEvent")).map((l) => l.level)).toEqual([
+      "info",
+      "debug",
+    ]);
   });
 
   const failingVcs = (base: Awaited<ReturnType<typeof setup>>): Vcs => ({

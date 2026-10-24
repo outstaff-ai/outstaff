@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { envSecretSource, parseTeamConfig, parseYaml, silentLogger } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { afterEach, describe, expect, it } from "vitest";
-import { officeRegistry, startOffice, type RunningOffice } from "./main.js";
+import { jsonLogger, logLevel, officeRegistry, startOffice, type RunningOffice } from "./main.js";
 
 const TEAM = `
 version: 1
@@ -99,5 +99,27 @@ describe("the acme example", () => {
     }
 
     expect(checked).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("jsonLogger", () => {
+  it("hides debug by default and writes it at the debug level", () => {
+    const lines: string[] = [];
+    const quiet = jsonLogger((l) => void lines.push(l));
+    quiet.debug("hidden");
+    quiet.info("shown");
+    expect(lines.map((l) => JSON.parse(l).message)).toEqual(["shown"]);
+
+    const loud = jsonLogger((l) => void lines.push(l), logLevel({ OUTSTAFF_LOG_LEVEL: "debug" }));
+    loud.debug("now shown");
+    expect(JSON.parse(lines.at(-1) ?? "{}")).toMatchObject({
+      level: "debug",
+      message: "now shown",
+    });
+  });
+
+  it("rejects an unknown level", () => {
+    expect(() => logLevel({ OUTSTAFF_LOG_LEVEL: "loud" })).toThrow(/OUTSTAFF_LOG_LEVEL/);
+    expect(logLevel({})).toBe("info");
   });
 });
