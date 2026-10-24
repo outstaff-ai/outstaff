@@ -1,4 +1,4 @@
-import type { PrRef, WorkflowEvent } from "@outstaff/core";
+import type { Logger, PrRef, WorkflowEvent } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { REPO } from "../intake/test-support.js";
 import { harness, SAM, type Harness } from "./test-support.js";
@@ -382,5 +382,40 @@ describe("kanban parity", () => {
     expect(await status(key)).toBe(before);
     expect(await h.items()).toEqual([]);
     expect(await h.tracker.listComments(key)).toEqual([]);
+  });
+});
+
+describe("engine logging", () => {
+  it("logs the rules that matched with what they did, and when none matched", async () => {
+    const info: string[] = [];
+    const logger: Logger = {
+      debug() {},
+      info: (m) => void info.push(m),
+      warn() {},
+      error() {},
+    };
+
+    const h = await harness({ logger });
+    await h.human("Dana");
+    const pr = await h.vcs.seed.pullRequest(REPO, {
+      title: "Tidy up",
+      head: { ref: "sam/tidy" },
+      author: { login: SAM, kind: "agent" },
+    });
+
+    await h.poll();
+    expect(info).toContain("engine: no rule matched pr.opened on acme/app#1");
+
+    await h.vcs.seed.comment(REPO, pr.number, "dana", "one question");
+    await h.poll();
+    expect(info).toEqual(
+      expect.arrayContaining([
+        "intake: recorded vcs pr.comment on acme/app#1 by dana (trusted)",
+        "engine: rule human-feedback-back-to-author matched pr.comment on acme/app#1: schedule review_feedback for sam (high)",
+        "engine: scheduled review_feedback for sam on acme/app#1",
+      ]),
+    );
+
+    await h.close();
   });
 });

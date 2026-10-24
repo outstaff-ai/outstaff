@@ -1,5 +1,6 @@
 import {
-  evaluateWorkflow,
+  describeEffect,
+  explainWorkflow,
   PortError,
   resolveWorkflow,
   type Chat,
@@ -8,6 +9,7 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
+import { clip, prLabel, subjectLabel } from "../log.js";
 import { PRIORITY, priorityFor } from "../scheduler/index.js";
 import type { WorkItem, WorkItemTrigger } from "../store/index.js";
 import type { EffectOutcome, Engine, EngineMeta, EngineOptions } from "./types.js";
@@ -20,6 +22,22 @@ const TRANSIENT = new Set(["rate_limited", "unavailable"]);
 interface Plan {
   effects: Effect[];
   outcomes: (EffectOutcome | null)[];
+}
+
+/** What an applied effect did, in the past tense, for the log. */
+function past(e: Effect): string {
+  switch (e.type) {
+    case "schedule":
+      return `scheduled ${e.kind} for ${e.person}${e.pr ? ` on ${prLabel(e.pr)}` : e.ticket ? ` on ${e.ticket}` : ""}`;
+    case "move":
+      return `moved ${e.ticket} to ${e.to}`;
+    case "assign":
+      return e.to ? `assigned ${e.ticket} to ${e.to.id}` : `unassigned ${e.ticket}`;
+    case "comment":
+      return `commented on ${"ticket" in e.on ? e.on.ticket : prLabel(e.on.pr)}`;
+    case "notify":
+      return `notified ${e.to.kind}${e.to.id ? ` ${e.to.id}` : ""}`;
+  }
 }
 
 /** Thrown inside an effect to record it as skipped instead of applied. */
@@ -262,10 +280,40 @@ export function createEngine(opts: EngineOptions): Engine {
     const ref = `${meta.source}:${meta.externalId}`;
     const saved = (await store.getSubject(PLAN, ref))?.data as Plan | undefined;
     // On redelivery the stored plan wins: the state has moved on, and re-evaluating could shift the indexes.
-    const plan: Plan = saved ?? {
-      effects: evaluateWorkflow(event, workState, workflow.rules, workflow.options),
-      outcomes: [],
-    };
+    const explanation = saved
+      ? undefined
+      : explainWorkflow(event, workState, workflow.rules, workflow.options);
+
+    const plan: Plan = saved ?? { effects: explanation!.effects, outcomes: [] };
+    const subject = subjectLabel(event.subject);
+    const ruleOf = new Map<string, string[]>();
+    if (explanation) {
+      const matched = explanation.rules.filter((r) => r.matched);
+      for (const r of matched) {
+        for (const effect of r.effects) {
+          const key = JSON.stringify(effect);
+          ruleOf.set(key, [...(ruleOf.get(key) ?? []), r.id]);
+        }
+
+        logger.info(
+          `engine: rule ${r.id} matched ${event.type} on ${subject}: ${r.effects.map(describeEffect).join("; ") || "no effects"}`,
+          {
+            rule: r.id,
+            type: event.type,
+            subject,
+            effects: r.effects.map(describeEffect),
+            ...(r.skipped.length > 0 ? { skipped: r.skipped } : {}),
+          },
+        );
+      }
+
+      if (matched.length === 0) {
+        logger.info(`engine: no rule matched ${event.type} on ${subject}`, {
+          type: event.type,
+          subject,
+        });
+      }
+    }
 
     if (!saved) {
       plan.outcomes = plan.effects.map(() => null);
@@ -299,8 +347,20 @@ export function createEngine(opts: EngineOptions): Engine {
         }
       }
 
-      if (outcome.status !== "applied") {
-        logger.warn("effect not applied", { type: effect.type, note: outcome.note, id: ref });
+      if (outcome.status === "applied") {
+        const rules = ruleOf.get(JSON.stringify(effect));
+        logger.info(`engine: ${past(effect)}`, {
+          effect: effect.type,
+          subject,
+          ...(rules ? { rules } : {}),
+          id: ref,
+        });
+      } else {
+        logger.warn("effect not applied", {
+          type: effect.type,
+          note: clip(outcome.note, 200),
+          id: ref,
+        });
       }
 
       plan.outcomes[i] = outcome;

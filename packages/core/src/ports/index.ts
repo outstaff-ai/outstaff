@@ -14,7 +14,7 @@ export type {
   SetupStep,
 } from "./adapter.js";
 
-export type { EventPage } from "./events.js";
+export type { EventPage, UnmappedEvent } from "./events.js";
 
 export { AdapterRegistry, defineAdapter, type PortImpls } from "./define.js";
 export { parseRepoUrl, repoKey, type RepoRef } from "./repo.js";

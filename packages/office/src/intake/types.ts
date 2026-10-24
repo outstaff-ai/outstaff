@@ -34,6 +34,9 @@ export interface IntakeOptions {
   /** Webhook mode only. Port 0 picks a free one. */
   webhook?: { port: number; host?: string };
 
+  /** Warn when a polled source has had no successful poll for this long. Default 10 minutes; `office.poll_warn_after_minutes`. */
+  stalePollMinutes?: number;
+
   /** Delivery attempts before an event is given up on and marked processed with an error. Default 5. */
   maxAttempts?: number;
 

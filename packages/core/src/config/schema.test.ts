@@ -318,6 +318,13 @@ describe("parseTeamConfig", () => {
     ]);
   });
 
+  it("bounds the stale-poll warning", () => {
+    expect(bad((c) => (c.office.poll_warn_after_minutes = 0))[0]).toMatchObject({
+      path: ["office", "poll_warn_after_minutes"],
+      code: "schema.too_small",
+    });
+  });
+
   it("bounds the poll interval", () => {
     expect(bad((c) => (c.office.poll_interval_seconds = 5))[0]).toMatchObject({
       path: ["office", "poll_interval_seconds"],

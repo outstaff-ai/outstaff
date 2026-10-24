@@ -9,6 +9,7 @@ import {
   type PullRequest,
   type RepoRef,
   type ReviewThread,
+  type UnmappedEvent,
   type Vcs,
   type VcsEvent,
 } from "@outstaff/core";
@@ -651,6 +652,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       const state = parseCursor(cursor);
       const next: Cursor = { ...state };
       const found: { event: VcsEvent; id: bigint }[] = [];
+      const unmapped: UnmappedEvent[] = [];
       for (const repo of repos) {
         const key = `${repo.owner}/${repo.name}`;
         const prev = state[key];
@@ -696,6 +698,13 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
           const event = toVcsEvent(repo, e);
           if (event) {
             found.push({ event, id });
+          } else {
+            const action = e.payload["action"];
+            unmapped.push({
+              externalId: e.id,
+              type: typeof action === "string" ? `${e.type} (${action})` : e.type,
+              repo,
+            });
           }
         }
 
@@ -703,7 +712,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       }
 
       found.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-      return { events: found.map((f) => f.event), cursor: JSON.stringify(next) };
+      return { events: found.map((f) => f.event), cursor: JSON.stringify(next), unmapped };
     },
   };
 }

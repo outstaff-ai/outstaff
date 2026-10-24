@@ -844,6 +844,13 @@ describe("events", () => {
     expect(page.events[5]!.data).toMatchObject({ state: "approved" });
     expect(page.events[0]!.data).toMatchObject({ title: "T", headSha: "s1" });
     expect(JSON.parse(page.cursor)).toEqual({ "acme/app": { etag: 'W/"v1"', lastEventId: "110" } });
+
+    // What it read but has no mapping for is reported by id and type only, so the office can say so.
+    expect(page.unmapped).toEqual([
+      { externalId: "109", type: "IssueCommentEvent (created)", repo: REPO },
+      { externalId: "102", type: "PullRequestEvent (labeled)", repo: REPO },
+      { externalId: "100", type: "PushEvent", repo: REPO },
+    ]);
   });
 
   it("sends If-None-Match and treats 304 as no news", async () => {
