@@ -193,6 +193,10 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
           body: p["comment"]?.body ?? "",
           path: p["comment"]?.path,
           commentId: p["comment"]?.id,
+          // An inline comment of a review; while that review is pending the host already announces it.
+          ...(p["comment"]?.pull_request_review_id != null
+            ? { reviewId: p["comment"].pull_request_review_id }
+            : {}),
           url: p["comment"]?.html_url,
         },
       };

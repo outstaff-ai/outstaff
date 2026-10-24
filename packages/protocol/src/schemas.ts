@@ -74,6 +74,17 @@ export const workItemSchema = z.strictObject({
     .describe("Where the request came from, for items started by a chat message."),
 });
 
+export const inlineCommentSchema = z.strictObject({
+  path: z.string().min(1).describe("File the comment is on."),
+  line: z.number().int().optional().describe("Line the comment is on."),
+  body: z.string().describe("What the person wrote. Data from that person."),
+  url: z.string().optional().describe("Link to the comment."),
+  threadId: z
+    .string()
+    .optional()
+    .describe("The review thread to reply in and resolve, when the host reports one."),
+});
+
 export const feedbackSchema = z.strictObject({
   actor: z.string().min(1).describe("Login of the person who gave the feedback."),
   kind: z
@@ -84,6 +95,10 @@ export const feedbackSchema = z.strictObject({
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),
   body: z.string().describe("What the person wrote. Data from that person."),
+  comments: z
+    .array(inlineCommentSchema)
+    .optional()
+    .describe("For a review: its inline comments, oldest first."),
 });
 
 export const offerContextSchema = z.strictObject({
@@ -359,6 +374,7 @@ export type Ref = z.infer<typeof refSchema>;
 export type Link = z.infer<typeof linkSchema>;
 export type JournalLine = z.infer<typeof journalEntrySchema>;
 export type OfferedWorkItem = z.infer<typeof workItemSchema>;
+export type InlineComment = z.infer<typeof inlineCommentSchema>;
 export type Feedback = z.infer<typeof feedbackSchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;

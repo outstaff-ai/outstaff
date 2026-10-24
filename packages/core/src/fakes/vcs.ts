@@ -4,6 +4,7 @@ import type {
   Check,
   PullRequest,
   RepoRef,
+  ReviewInlineComment,
   ReviewThread,
   Vcs,
   VcsEvent,
@@ -31,6 +32,7 @@ interface StoredPr {
   pr: PullRequest;
   mergeable: PullRequest["mergeable"][];
   threads: ReviewThread[];
+  reviews: Map<string, ReviewInlineComment[]>;
 }
 
 export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
@@ -46,6 +48,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
   let shaCounter = 0;
   let threadCounter = 0;
   let commentCounter = 0;
+  let reviewCounter = 0;
 
   const key = (r: RepoRef) => repoKey(r, host);
   const withHost = (r: RepoRef): RepoRef => ({ host: host, ...r });
@@ -133,7 +136,13 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
           updatedAt: now().toISOString(),
         };
 
-        map.set(number, { pr, mergeable: [...(p.mergeable ?? ["clean"])], threads: [] });
+        map.set(number, {
+          pr,
+          mergeable: [...(p.mergeable ?? ["clean"])],
+          threads: [],
+          reviews: new Map(),
+        });
+
         emit("pr.opened", repo, number, pr.author.login);
         return structuredClone(pr);
       },
@@ -158,9 +167,42 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         emit("pr.closed", repo, number, actor);
         return structuredClone(s.pr);
       },
-      async review(repo, number, actor, state, body = "") {
-        need(repo, number);
-        emit("pr.review_submitted", repo, number, actor, { state, body });
+      async review(repo, number, actor, state, body = "", comments = []) {
+        const s = need(repo, number);
+        const reviewId = `rv${++reviewCounter}`;
+        const inline: ReviewInlineComment[] = [];
+        for (const c of comments) {
+          const thread: ReviewThread = {
+            id: `t${++threadCounter}`,
+            resolved: false,
+            path: c.path,
+            line: c.line,
+            comments: [{ id: `rc${++commentCounter}`, author: actor, body: c.body }],
+          };
+
+          s.threads.push(thread);
+          const commentId = thread.comments[0]!.id;
+          inline.push({
+            id: commentId,
+            path: c.path,
+            line: c.line,
+            body: c.body,
+            url: `${links.thread(repo, number, thread.id)}`,
+            threadId: thread.id,
+          });
+
+          emit("pr.comment", repo, number, actor, {
+            kind: "review_comment",
+            body: c.body,
+            path: c.path,
+            commentId,
+            reviewId,
+          });
+        }
+
+        s.reviews.set(reviewId, inline);
+        emit("pr.review_submitted", repo, number, actor, { state, body, reviewId });
+        return reviewId;
       },
       async comment(repo, number, actor, body) {
         need(repo, number);
@@ -239,6 +281,14 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     async reviewThreads(repo, number) {
       return structuredClone(need(repo, number).threads);
     },
+    async reviewComments(repo, number, reviewId) {
+      const comments = need(repo, number).reviews.get(reviewId);
+      if (!comments) {
+        throw new PortError("not_found", `Review ${reviewId} is not on ${key(repo)}#${number}.`);
+      }
+
+      return structuredClone(comments);
+    },
     async resolveThread(repo, threadId, login) {
       const asLogin = login ?? self;
       for (const s of prs.get(key(repo))?.values() ?? []) {
@@ -288,7 +338,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         updatedAt: now().toISOString(),
       };
 
-      map.set(number, { pr, mergeable: ["clean"], threads: [] });
+      map.set(number, { pr, mergeable: ["clean"], threads: [], reviews: new Map() });
       emit("pr.opened", repo, number, self, { title: pr.title });
       return structuredClone(pr);
     },

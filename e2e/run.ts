@@ -1,8 +1,9 @@
 // The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
-// request, a human asks for changes, the agent fixes and resolves the thread, a review with only a summary gets a pull request comment, the human merges, a second pull
-// request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull request
-// gets a reply and a follow-up pull request. The office, Postgres and the agent are the
-// real images; GitHub, the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
+// request, a human asks for changes, the agent fixes and resolves the thread, a review with only a summary gets a
+// pull request comment, a batch review with two inline comments gets a reply in each thread, the human merges, a
+// second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
+// request gets a reply and a follow-up pull request. The office, Postgres and the agent are the real images; GitHub,
+// the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
 //
@@ -455,13 +456,48 @@ async function main() {
       const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
       const t = s.tickets.find((x: Json) => x.key === first);
       const reply = pr.conversation.find((c: Json) => c.body.includes(summary));
-      return reply && pr.head.sha !== sha2 && t.status === "In Review" ? { reply } : undefined;
+      return reply && pr.head.sha !== sha2 && t.status === "In Review" ? { reply, pr } : undefined;
     },
   );
 
   assertEq(answered.reply.author, "acme-sam[bot]", "the agent replied on the pull request");
   step(
     `summary: a review with only a body on #${pr1.pr.number} -> answered with a pull request comment, back in review`,
+  );
+
+  // ---- 3c. a batch review with two inline comments: each thread gets a reply and is resolved, nothing on top level
+  const sha3 = answered.pr.head.sha;
+  const talked = answered.pr.conversation.length;
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, {
+    state: "changes_requested",
+    comments: [
+      { path: "greeting.txt", line: 1, body: "Use a comma after the greeting." },
+      { path: "greeting.txt", line: 2, body: "End with an exclamation mark." },
+    ],
+  });
+
+  const batch = await until(
+    "both inline comments of the batch review answered and resolved, the ticket back in review",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === first);
+      const mine = pr.threads.filter((th: Json) => /comma|exclamation/.test(th.comments[0].body));
+      return pr.head.sha !== sha3 &&
+        mine.length === 2 &&
+        mine.every((th: Json) => th.resolved && th.comments.length > 1) &&
+        t.status === "In Review"
+        ? { pr, mine }
+        : undefined;
+    },
+  );
+
+  for (const th of batch.mine) {
+    assertEq(th.comments.at(-1).author, "acme-sam[bot]", "the agent replied in the thread");
+  }
+
+  assertEq(batch.pr.conversation.length, talked, "nothing was posted at the top level");
+  step(
+    `batch: two inline comments on #${pr1.pr.number} -> one round, both threads replied and resolved, no top-level comment`,
   );
 
   // ---- 4. the human merges; the ticket is done; the other pull request now conflicts and the agent rebases it

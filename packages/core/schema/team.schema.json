@@ -1772,7 +1772,7 @@
             "has_body"
           ],
           "additionalProperties": false,
-          "description": "The review or comment in the event has (or lacks) a non-blank body."
+          "description": "The review or comment in the event has (or lacks) text: a non-blank body, or for a review, inline comments."
         },
         {
           "type": "object",

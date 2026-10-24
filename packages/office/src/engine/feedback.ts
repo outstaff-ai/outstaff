@@ -17,7 +17,15 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
   const base = { actor: event.actor.id, body, ...(url ? { url } : {}) };
   if (event.type === "pr.review_submitted") {
     const state = text("state");
-    return { ...base, kind: "review", ...(state ? { state } : {}) };
+    const comments = event.data["comments"];
+    return {
+      ...base,
+      kind: "review",
+      ...(state ? { state } : {}),
+      ...(Array.isArray(comments) && comments.length > 0
+        ? { comments: comments as NonNullable<Feedback["comments"]> }
+        : {}),
+    };
   }
 
   if (event.type === "pr.comment") {
@@ -25,6 +33,18 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
   }
 
   return undefined;
+}
+
+/**
+ * An inline comment of a review, announced by the host while the review is still pending. Nobody else can see it
+ * yet; the submitted review brings it along, so it neither schedules work nor changes the work state.
+ */
+export function awaitsReview(event: WorkflowEvent): boolean {
+  return (
+    event.type === "pr.comment" &&
+    event.data["kind"] === "review_comment" &&
+    event.data["reviewId"] !== undefined
+  );
 }
 
 export async function readFeedback(

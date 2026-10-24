@@ -64,6 +64,16 @@ describe("events feed payloads", () => {
     });
   });
 
+  it("carries the review an inline comment belongs to, so the office can wait for its submission", () => {
+    const e = fixture("pull-request-review-comment");
+    expect(toVcsEvent(REPO, e)).toMatchObject({
+      data: { kind: "review_comment", reviewId: 5600000010 },
+    });
+
+    delete e.payload["comment"]["pull_request_review_id"];
+    expect(toVcsEvent(REPO, e)?.data).not.toHaveProperty("reviewId");
+  });
+
   it("maps IssueCommentEvent on a pull request", () => {
     expect(map("issue-comment-on-pull-request")).toMatchObject({
       type: "pr.comment",

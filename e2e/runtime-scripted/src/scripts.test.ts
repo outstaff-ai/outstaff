@@ -141,6 +141,7 @@ describe("mergedFeedback", () => {
       kind: "comment" as const,
       url: "https://git.example/acme/shop/pull/1#c1",
       body: "Add a goodbye.",
+      threads: [],
     },
   };
 

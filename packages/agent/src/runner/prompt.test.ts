@@ -54,6 +54,35 @@ describe("buildWorkPrompt feedback", () => {
     expect(inline).toContain("Triggered by an inline comment from ada.");
   });
 
+  it("lists the inline comments of a review with their threads and links", () => {
+    const prompt = buildWorkPrompt(
+      offer({
+        actor: "grace",
+        kind: "review",
+        state: "changes_requested",
+        body: "",
+        comments: [
+          {
+            path: "src/a.ts",
+            line: 3,
+            body: "Rename this.",
+            url: "https://g.example/pull/3#r1",
+            threadId: "PRRT_1",
+          },
+          { path: "src/b.ts", body: "No thread.\nTwo lines." },
+        ],
+      }),
+      { resumed: false },
+    );
+
+    expect(prompt).toContain("Reply in each thread and resolve the ones you fixed");
+    expect(prompt).toContain(
+      "- src/a.ts:3 (thread PRRT_1, https://g.example/pull/3#r1)\n  > Rename this.",
+    );
+
+    expect(prompt).toContain("- src/b.ts (no thread id)\n  > No thread.\n  > Two lines.");
+  });
+
   it("says when a review has no text, and says nothing without feedback", () => {
     const empty = buildWorkPrompt(
       offer({ actor: "grace", kind: "review", state: "approved", body: "" }),

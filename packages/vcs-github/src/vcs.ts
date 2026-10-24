@@ -8,6 +8,7 @@ import {
   type Check,
   type PullRequest,
   type RepoRef,
+  type ReviewInlineComment,
   type ReviewThread,
   type UnmappedEvent,
   type Vcs,
@@ -49,7 +50,7 @@ const PERMISSIONS = {
 const REPLY_MUTATION = `mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}`;
 const READY_MUTATION = `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
 const DRAFT_MUTATION = `mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
-const THREADS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{id isResolved path line originalLine comments(first:100){nodes{id body author{login}}}}}}}}`;
+const THREADS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{id isResolved path line originalLine comments(first:100){nodes{id databaseId body author{login}}}}}}}}`;
 const LAST_COMMENT_QUERY = `query($id:ID!){node(id:$id){... on PullRequestReviewThread{id isResolved comments(last:1){nodes{author{login}}}}}}`;
 const RESOLVE_MUTATION = `mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}`;
 
@@ -80,7 +81,14 @@ type ThreadNode = {
   path: string | null;
   line: number | null;
   originalLine: number | null;
-  comments: { nodes: { id: string; body: string; author: { login: string } | null }[] };
+  comments: {
+    nodes: {
+      id: string;
+      databaseId: number | null;
+      body: string;
+      author: { login: string } | null;
+    }[];
+  };
 };
 type ThreadsData = {
   repository: {
@@ -92,6 +100,15 @@ type ThreadsData = {
     } | null;
   } | null;
 };
+
+interface RestReviewComment {
+  id: number;
+  path: string;
+  line?: number | null;
+  original_line?: number | null;
+  body: string;
+  html_url?: string;
+}
 
 /** Reviews need only pull request access, so a read-granted person can review. */
 const REVIEW_PERMISSIONS = { pull_requests: "write" } as const;
@@ -439,6 +456,41 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
             author: c.author?.login ?? "ghost",
             body: c.body,
           })),
+        };
+      });
+    },
+
+    async reviewComments(repo, number, reviewId) {
+      const token = await apiToken(repo);
+      const found = await http.paginate<RestReviewComment[], RestReviewComment>(
+        `${repoPath(repo)}/pulls/${number}/reviews/${encodeURIComponent(reviewId)}/comments`,
+        { token, query: { per_page: 100 } },
+        (d) => d,
+      );
+
+      if (found.length === 0) {
+        return [];
+      }
+
+      const threadOf = new Map<number, string>();
+      for (const node of await threadNodes(repo, number, token)) {
+        for (const c of node.comments.nodes) {
+          if (c.databaseId !== null) {
+            threadOf.set(c.databaseId, node.id);
+          }
+        }
+      }
+
+      return found.map((c): ReviewInlineComment => {
+        const line = c.line ?? c.original_line;
+        const threadId = threadOf.get(c.id);
+        return {
+          id: String(c.id),
+          path: c.path,
+          ...(typeof line === "number" ? { line } : {}),
+          body: c.body,
+          ...(c.html_url ? { url: c.html_url } : {}),
+          ...(threadId ? { threadId } : {}),
         };
       });
     },

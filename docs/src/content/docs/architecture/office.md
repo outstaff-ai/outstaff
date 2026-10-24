@@ -62,8 +62,10 @@ A failed poll never stops the loop.
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | pull request opened, merged, closed        | `pr.opened`, `pr.merged`, `pr.closed`                                                            |
 | review submitted                           | `pr.review_submitted` (`data.state`)                                                             |
-| pull request comment                       | `pr.comment`                                                                                     |
+| pull request comment                       | `pr.comment` (`data.kind`: `comment` or `review_comment`)                                        |
 | ticket created, assigned, moved, commented | `ticket.created`, `ticket.assigned`, `ticket.moved` (`data.from`, `data.to`), `ticket.commented` |
+
+An inline comment that belongs to a review (`data.reviewId`) is recorded but neither starts work nor changes the work state: GitHub announces each comment of a batch review as it is written, while the review is still pending and invisible to everyone but its author. The review starts the round when it is submitted, and intake reads its inline comments with their review thread ids (the port's `reviewComments`) into `data.comments`, so the `review_feedback` item carries all of them and a review with inline comments is never taken for a bare sign-off. GitHub also creates a submitted review for a single comment or a thread reply, so the review event covers every inline case. Comments on the conversation (`kind: comment`) start work as before.
 
 Pushes to a pull request are not forwarded; `pr.conflicted` and `pr.ci_failed` come from the work state, not from intake. Every event carries `data.at`, the time the source reported.
 

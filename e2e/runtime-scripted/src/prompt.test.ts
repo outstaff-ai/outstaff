@@ -56,7 +56,28 @@ describe("parsePrompt", () => {
       kind: "review",
       url: "https://g.example/pull/3#pullrequestreview-1",
       body: "Keep it short.\nOne line.",
+      threads: [],
     });
+  });
+
+  it("reads the threads of a review's inline comments", () => {
+    const o = offer("review_feedback");
+    o.context.feedback = {
+      actor: "grace",
+      kind: "review",
+      state: "changes_requested",
+      body: "",
+      comments: [
+        { path: "a.txt", line: 1, body: "One.", url: "https://g.example/r1", threadId: "PRRT_1" },
+        { path: "b.txt", body: "Two.", threadId: "PRRT_2" },
+        { path: "c.txt", body: "No thread." },
+      ],
+    };
+
+    expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback?.threads).toEqual([
+      "PRRT_1",
+      "PRRT_2",
+    ]);
   });
 
   it("says nothing about a prompt that is not a work prompt", () => {

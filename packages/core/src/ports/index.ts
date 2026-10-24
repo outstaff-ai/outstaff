@@ -27,6 +27,7 @@ export type {
   PullRequestUpdate,
   Review,
   ReviewComment,
+  ReviewInlineComment,
   ReviewThread,
   ReviewVerdict,
   Vcs,

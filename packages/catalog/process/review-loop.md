@@ -2,7 +2,7 @@
 
 Use this each time a pull request you own gets review feedback. It comes in three kinds: inline threads, review summaries (the text of a review) and comments on the pull request conversation. The work prompt names the one that started the round.
 
-1. Read every open thread, every review summary and every conversation comment before changing anything.
+1. Read every open thread, every review summary and every conversation comment before changing anything. A review round starts when the review is submitted, and the work prompt lists the inline comments of that review with their thread ids.
 2. For each one, decide: fix, answer, or disagree. Answer an inline thread in that thread with `ost pr reply <n> <thread-id> --body "..."`, never in a new top-level comment. Answer a review summary or a conversation comment with `ost pr comment <n> --body "..."`, quoting or linking what it answers.
 3. Make the fixes in one commit amended onto your branch (see `references/git.md`) and push.
 4. After the push, reply to each one you fixed, in the same place: say what changed.
