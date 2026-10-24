@@ -1,0 +1,101 @@
+# Deny everything, then allow what the containers need. Needs a CNI that enforces NetworkPolicy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+# DNS for everyone.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# HTTPS out to the internet (code host, tracker, chat, LLM provider, tool sources), not to the cluster,
+# the node network or the cloud metadata address. Narrow this to the hosts you use if your CNI supports
+# FQDN rules (Cilium, Calico), see the Kubernetes guide.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-https-egress
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except: [10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, 169.254.0.0/16]
+      ports:
+        - { protocol: TCP, port: 443 }
+---
+# Agents connect out to the office, and nothing else may.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: office-accepts-agents
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: outstaff-office
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: outstaff-agent
+      ports:
+        - { protocol: TCP, port: 8080 }
+    # Probes come from the kubelet on the node; most CNIs let them through. If yours does not, allow
+    # your node CIDR to 8081 here.
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: agents-reach-office
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: outstaff-agent
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: outstaff-office
+      ports:
+        - { protocol: TCP, port: 8080 }
+---
+# The office reaches your Postgres. Replace the CIDR with the address range of your database; delete
+# this policy when the office uses SQLite on its volume.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: office-reaches-postgres
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: outstaff-office
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8
+      ports:
+        - { protocol: TCP, port: 5432 }

@@ -1,0 +1,11 @@
+# Holds the SQLite store. With Postgres (OUTSTAFF_STORE_URL) the office writes nothing here, but the
+# image declares the volume, so it stays mounted.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: outstaff-office
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi

@@ -1,0 +1,577 @@
+# The acme team on one Docker host: an office, its Postgres, and one agent per person.
+# Secret names below are for the acme example's adapters; generate yours with `ost setup`.
+#
+#   cp .env.example .env            # set POSTGRES_PASSWORD
+#   mkdir -p secrets/office secrets/priya ...   # see secrets/README.md: one file per secret
+#   docker compose up -d --build
+#
+# Secrets are Compose `secrets:` with file sources, mounted at /run/secrets/outstaff/<KEY> in the
+# container that needs them. Nothing secret is in `environment:`, except the Postgres URL of the office
+# (the office reads the store URL from the environment only).
+#
+# Images. This file builds them from the repository's images/Dockerfile so CI tests what it ships.
+# For real use, delete the `build:` blocks and pin the released images instead:
+#   office: ghcr.io/outstaff-ai/office:<version>
+#   agent:  ghcr.io/outstaff-ai/agent:<version>
+name: outstaff-acme
+
+x-hardening: &hardening
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  tmpfs: ["/tmp"]
+  restart: unless-stopped
+
+x-team:
+  &team # The directory that holds team.yaml. A team repository works too: set OUTSTAFF_TEAM_REPO instead.
+  type: bind
+  source: ${OUTSTAFF_TEAM_DIR:-../acme/.outstaff}
+  target: /team
+  read_only: true
+
+x-agent: &agent
+  <<: *hardening
+  image: ${OUTSTAFF_AGENT_IMAGE:-outstaff/agent:local}
+  build:
+    context: ../..
+    dockerfile: images/Dockerfile
+    target: agent
+  depends_on:
+    office: { condition: service_healthy }
+  # The agent has no port and no health endpoint. It exits when it cannot start or the office rejects
+  # its token, and the restart policy brings it back. Starting points, see the container contract.
+  deploy:
+    resources:
+      limits: { cpus: "1", memory: 2g }
+  environment: &agent-env
+    OUTSTAFF_OFFICE_URL: ws://office:8080/agent
+    OUTSTAFF_TEAM_FILE: /team/team.yaml
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: outstaff
+      POSTGRES_DB: outstaff
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U outstaff -d outstaff"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [backend]
+
+  office:
+    <<: *hardening
+    image: ${OUTSTAFF_OFFICE_IMAGE:-outstaff/office:local}
+    build:
+      context: ../..
+      dockerfile: images/Dockerfile
+      target: office
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      OUTSTAFF_TEAM_FILE: /team/team.yaml
+      OUTSTAFF_STORE_URL: postgres://outstaff:${POSTGRES_PASSWORD}@postgres:5432/outstaff
+    volumes:
+      - { <<: *team }
+      # Unused with Postgres; keeps the image's volume named instead of anonymous.
+      - office-data:/var/lib/outstaff
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8081/healthz').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 512m }
+    # Publish nothing: agents reach 8080 on the Compose network. Add "8082:8082" only when the
+    # team receives webhooks, behind a TLS proxy.
+    networks: [backend, default]
+    secrets:
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+      - { source: office_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - {
+          source: office_SLACK_OFFICE_BOT_TOKEN,
+          target: /run/secrets/outstaff/SLACK_OFFICE_BOT_TOKEN,
+        }
+      - {
+          source: priya_OUTSTAFF_AGENT_TOKEN,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_PRIYA,
+        }
+      - {
+          source: tomas_OUTSTAFF_AGENT_TOKEN,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_TOMAS,
+        }
+      - {
+          source: mira_OUTSTAFF_AGENT_TOKEN,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_MIRA,
+        }
+      - { source: leo_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_LEO }
+      - { source: sam_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_SAM }
+      - {
+          source: noor_OUTSTAFF_AGENT_TOKEN,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_NOOR,
+        }
+      - {
+          source: ines_OUTSTAFF_AGENT_TOKEN,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_INES,
+        }
+      - {
+          source: kofi_OUTSTAFF_AGENT_TOKEN,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_KOFI,
+        }
+
+  priya:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: priya
+    volumes:
+      - { <<: *team }
+      - priya-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: priya_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: priya_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: priya_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - {
+          source: priya_GH_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID,
+        }
+      - { source: priya_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: priya_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: priya_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: priya_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: priya_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  tomas:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: tomas
+    volumes:
+      - { <<: *team }
+      - tomas-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: tomas_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: tomas_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: tomas_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - {
+          source: tomas_GH_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID,
+        }
+      - { source: tomas_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: tomas_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: tomas_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: tomas_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: tomas_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  mira:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: mira
+    volumes:
+      - { <<: *team }
+      - mira-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: mira_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: mira_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: mira_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - {
+          source: mira_GH_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID,
+        }
+      - { source: mira_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: mira_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: mira_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: mira_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: mira_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  leo:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: leo
+    volumes:
+      - { <<: *team }
+      - leo-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: leo_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: leo_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: leo_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - { source: leo_GH_APP_INSTALLATION_ID, target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID }
+      - { source: leo_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: leo_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: leo_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: leo_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: leo_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  sam:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: sam
+    volumes:
+      - { <<: *team }
+      - sam-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: sam_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: sam_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: sam_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - { source: sam_GH_APP_INSTALLATION_ID, target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID }
+      - { source: sam_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: sam_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: sam_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: sam_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: sam_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  noor:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: noor
+    volumes:
+      - { <<: *team }
+      - noor-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: noor_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: noor_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: noor_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - {
+          source: noor_GH_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID,
+        }
+      - { source: noor_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: noor_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: noor_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: noor_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: noor_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  ines:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: ines
+    volumes:
+      - { <<: *team }
+      - ines-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: ines_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: ines_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: ines_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - {
+          source: ines_GH_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID,
+        }
+      - { source: ines_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: ines_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: ines_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: ines_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: ines_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+  kofi:
+    <<: *agent
+    environment:
+      <<: *agent-env
+      OUTSTAFF_PERSON: kofi
+    volumes:
+      - { <<: *team }
+      - kofi-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - { source: kofi_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN }
+      - { source: kofi_ANTHROPIC_API_KEY, target: /run/secrets/outstaff/ANTHROPIC_API_KEY }
+      - { source: kofi_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
+      - {
+          source: kofi_GH_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_APP_INSTALLATION_ID,
+        }
+      - { source: kofi_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
+      - { source: kofi_GH_APP_SLUG, target: /run/secrets/outstaff/GH_APP_SLUG }
+      - { source: kofi_SLACK_APP_TOKEN, target: /run/secrets/outstaff/SLACK_APP_TOKEN }
+      - { source: kofi_SLACK_BOT_TOKEN, target: /run/secrets/outstaff/SLACK_BOT_TOKEN }
+      - { source: kofi_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
+      - {
+          source: office_GH_OFFICE_APP_INSTALLATION_ID,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_INSTALLATION_ID,
+        }
+      - {
+          source: office_GH_OFFICE_APP_PRIVATE_KEY,
+          target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
+        }
+      - { source: office_GH_OFFICE_APP_SLUG, target: /run/secrets/outstaff/GH_OFFICE_APP_SLUG }
+
+networks:
+  # Postgres is only reachable from the office and has no route out.
+  backend:
+    internal: true
+  default: {}
+
+volumes:
+  postgres-data:
+  office-data:
+  priya-home:
+  tomas-home:
+  mira-home:
+  leo-home:
+  sam-home:
+  noor-home:
+  ines-home:
+  kofi-home:
+
+# Files live under ${SECRETS_DIR:-./secrets}/<handle>/<KEY> (and office/ for the team-wide ones).
+secrets:
+  office_GH_OFFICE_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/office/GH_OFFICE_APP_ID
+  office_GH_OFFICE_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/office/GH_OFFICE_APP_INSTALLATION_ID
+  office_GH_OFFICE_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/office/GH_OFFICE_APP_PRIVATE_KEY
+  office_GH_OFFICE_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/office/GH_OFFICE_APP_SLUG
+  office_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/office/ITSAPLAN_API_KEY
+  office_SLACK_OFFICE_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/office/SLACK_OFFICE_BOT_TOKEN
+  priya_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/priya/OUTSTAFF_AGENT_TOKEN
+  priya_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/priya/ANTHROPIC_API_KEY
+  priya_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/priya/GH_APP_ID
+  priya_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/priya/GH_APP_INSTALLATION_ID
+  priya_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/priya/GH_APP_PRIVATE_KEY
+  priya_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/priya/GH_APP_SLUG
+  priya_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/priya/SLACK_APP_TOKEN
+  priya_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/priya/SLACK_BOT_TOKEN
+  priya_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/priya/ITSAPLAN_API_KEY
+  tomas_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/tomas/OUTSTAFF_AGENT_TOKEN
+  tomas_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/tomas/ANTHROPIC_API_KEY
+  tomas_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/tomas/GH_APP_ID
+  tomas_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/tomas/GH_APP_INSTALLATION_ID
+  tomas_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/tomas/GH_APP_PRIVATE_KEY
+  tomas_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/tomas/GH_APP_SLUG
+  tomas_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/tomas/SLACK_APP_TOKEN
+  tomas_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/tomas/SLACK_BOT_TOKEN
+  tomas_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/tomas/ITSAPLAN_API_KEY
+  mira_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/mira/OUTSTAFF_AGENT_TOKEN
+  mira_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/mira/ANTHROPIC_API_KEY
+  mira_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/mira/GH_APP_ID
+  mira_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/mira/GH_APP_INSTALLATION_ID
+  mira_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/mira/GH_APP_PRIVATE_KEY
+  mira_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/mira/GH_APP_SLUG
+  mira_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/mira/SLACK_APP_TOKEN
+  mira_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/mira/SLACK_BOT_TOKEN
+  mira_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/mira/ITSAPLAN_API_KEY
+  leo_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/leo/OUTSTAFF_AGENT_TOKEN
+  leo_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/leo/ANTHROPIC_API_KEY
+  leo_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/leo/GH_APP_ID
+  leo_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/leo/GH_APP_INSTALLATION_ID
+  leo_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/leo/GH_APP_PRIVATE_KEY
+  leo_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/leo/GH_APP_SLUG
+  leo_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/leo/SLACK_APP_TOKEN
+  leo_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/leo/SLACK_BOT_TOKEN
+  leo_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/leo/ITSAPLAN_API_KEY
+  sam_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/sam/OUTSTAFF_AGENT_TOKEN
+  sam_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/sam/ANTHROPIC_API_KEY
+  sam_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/sam/GH_APP_ID
+  sam_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/sam/GH_APP_INSTALLATION_ID
+  sam_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/sam/GH_APP_PRIVATE_KEY
+  sam_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/sam/GH_APP_SLUG
+  sam_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/sam/SLACK_APP_TOKEN
+  sam_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/sam/SLACK_BOT_TOKEN
+  sam_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/sam/ITSAPLAN_API_KEY
+  noor_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/noor/OUTSTAFF_AGENT_TOKEN
+  noor_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/noor/ANTHROPIC_API_KEY
+  noor_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/noor/GH_APP_ID
+  noor_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/noor/GH_APP_INSTALLATION_ID
+  noor_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/noor/GH_APP_PRIVATE_KEY
+  noor_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/noor/GH_APP_SLUG
+  noor_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/noor/SLACK_APP_TOKEN
+  noor_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/noor/SLACK_BOT_TOKEN
+  noor_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/noor/ITSAPLAN_API_KEY
+  ines_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/ines/OUTSTAFF_AGENT_TOKEN
+  ines_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/ines/ANTHROPIC_API_KEY
+  ines_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/ines/GH_APP_ID
+  ines_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/ines/GH_APP_INSTALLATION_ID
+  ines_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/ines/GH_APP_PRIVATE_KEY
+  ines_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/ines/GH_APP_SLUG
+  ines_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/ines/SLACK_APP_TOKEN
+  ines_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/ines/SLACK_BOT_TOKEN
+  ines_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/ines/ITSAPLAN_API_KEY
+  kofi_OUTSTAFF_AGENT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/kofi/OUTSTAFF_AGENT_TOKEN
+  kofi_ANTHROPIC_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/kofi/ANTHROPIC_API_KEY
+  kofi_GH_APP_ID:
+    file: ${SECRETS_DIR:-./secrets}/kofi/GH_APP_ID
+  kofi_GH_APP_INSTALLATION_ID:
+    file: ${SECRETS_DIR:-./secrets}/kofi/GH_APP_INSTALLATION_ID
+  kofi_GH_APP_PRIVATE_KEY:
+    file: ${SECRETS_DIR:-./secrets}/kofi/GH_APP_PRIVATE_KEY
+  kofi_GH_APP_SLUG:
+    file: ${SECRETS_DIR:-./secrets}/kofi/GH_APP_SLUG
+  kofi_SLACK_APP_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/kofi/SLACK_APP_TOKEN
+  kofi_SLACK_BOT_TOKEN:
+    file: ${SECRETS_DIR:-./secrets}/kofi/SLACK_BOT_TOKEN
+  kofi_ITSAPLAN_API_KEY:
+    file: ${SECRETS_DIR:-./secrets}/kofi/ITSAPLAN_API_KEY

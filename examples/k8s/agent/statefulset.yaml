@@ -1,0 +1,84 @@
+# Secret names below are for the acme example's adapters; generate yours with `ost setup`.
+# The template of one agent. people/<handle> sets the person and the Secret and gives it its name.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: outstaff-agent
+  labels:
+    app.kubernetes.io/name: outstaff-agent
+spec:
+  replicas: 1
+  serviceName: outstaff-agent
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: outstaff-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: outstaff-agent
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      # The agent hands its work item back on SIGTERM; give it time.
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: ghcr.io/outstaff-ai/agent
+          env:
+            # The patches in people/<handle> replace the person; keep it the first entry.
+            - { name: OUTSTAFF_PERSON, value: PERSON }
+            - { name: OUTSTAFF_OFFICE_URL, value: "ws://outstaff-office:8080/agent" }
+            - { name: OUTSTAFF_TEAM_FILE, value: /team/team.yaml }
+          # No port and no probes: the agent listens on nothing and exits when it cannot run, and the
+          # StatefulSet restarts it.
+          # Starting points from the container contract. An agent that builds and tests needs more.
+          resources:
+            requests: { cpu: "1", memory: 2Gi }
+            limits: { memory: 4Gi, ephemeral-storage: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/outstaff, readOnly: true }
+            - { name: team, mountPath: /team, readOnly: true }
+            - { name: home, mountPath: /home/outstaff }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        # The person's own Secret plus the team-wide GitHub office app keys from the office Secret, in one
+        # directory. The first source is replaced per person; keep it first.
+        - name: secrets
+          projected:
+            defaultMode: 0440
+            sources:
+              - secret:
+                  name: outstaff-agent-PERSON
+              - secret:
+                  name: outstaff-office
+                  items:
+                    - { key: GH_OFFICE_APP_ID, path: GH_OFFICE_APP_ID }
+                    - { key: GH_OFFICE_APP_INSTALLATION_ID, path: GH_OFFICE_APP_INSTALLATION_ID }
+                    - { key: GH_OFFICE_APP_PRIVATE_KEY, path: GH_OFFICE_APP_PRIVATE_KEY }
+                    - { key: GH_OFFICE_APP_SLUG, path: GH_OFFICE_APP_SLUG }
+        - name: team
+          configMap:
+            name: outstaff-team
+        - name: tmp
+          emptyDir: { sizeLimit: 512Mi }
+  # HOME of the agent: worktrees, memory and the tools mise installed. Size it for your repositories.
+  volumeClaimTemplates:
+    - metadata:
+        name: home
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 20Gi

@@ -3,4 +3,11 @@ title: Guides
 description: Task-oriented how-to guides.
 ---
 
-Coming soon. Guides will cover hosting the containers and storing secrets, which are the client's choice. Every deployment guide builds on the [container contract](/reference/container-contract/): the environment variables, secret files, volumes, ports, health checks and egress each container needs.
+Outstaff does not host itself and does not store your secrets ([0008](/decisions/0008-hosting-and-secrets-out-of-scope/)). These guides show how to run the containers well, on a platform of your choice. Each one is written so you, or an assistant working for you, can follow it step by step, and the examples they use are tested in CI.
+
+Every deployment guide builds on the [container contract](/reference/container-contract/): the environment variables, secret files, volumes, ports, health checks and egress each container needs.
+
+- [Container images](/guides/images/): what is in the `agent` and `office` images, how tools get into an agent, how to extend an image.
+- [Docker Compose](/guides/compose/): the acme team on one Docker host, with Postgres.
+- [Kubernetes](/guides/kubernetes/): the same team as plain manifests, with secrets, a network policy and resource sizing.
+- [Secrets](/guides/secrets/): keep the secret files in 1Password, SOPS, Kubernetes Secrets or Compose secrets.

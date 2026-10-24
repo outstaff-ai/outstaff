@@ -1,0 +1,85 @@
+# Secret names below are for the acme example's adapters; generate yours with `ost setup`.
+# One office per team: exactly one replica, and Recreate so two never run against the same store.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: outstaff-office
+  labels:
+    app.kubernetes.io/name: outstaff-office
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: outstaff-office
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: outstaff-office
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: office
+          image: ghcr.io/outstaff-ai/office
+          env:
+            - { name: OUTSTAFF_TEAM_FILE, value: /team/team.yaml }
+            # Bring your own Postgres: create the Secret (key "url", postgres://user:pass@host/db). Without
+            # it the office uses SQLite on the volume.
+            - name: OUTSTAFF_STORE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: outstaff-office-store
+                  key: url
+                  optional: true
+          ports:
+            - { name: agent, containerPort: 8080 }
+            - { name: health, containerPort: 8081 }
+          startupProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            periodSeconds: 15
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet: { path: /readyz, port: health }
+            periodSeconds: 10
+            timeoutSeconds: 3
+          # Starting points from the container contract; adjust after a week of real use.
+          resources:
+            requests: { cpu: 500m, memory: 512Mi }
+            limits: { memory: 1Gi, ephemeral-storage: 1Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - { name: secrets, mountPath: /run/secrets/outstaff, readOnly: true }
+            - { name: team, mountPath: /team, readOnly: true }
+            - { name: data, mountPath: /var/lib/outstaff }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: secrets
+          secret:
+            secretName: outstaff-office
+            defaultMode: 0440
+        - name: team
+          configMap:
+            name: outstaff-team
+        - name: data
+          persistentVolumeClaim:
+            claimName: outstaff-office
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }

@@ -1,0 +1,13 @@
+# Cluster-internal only: agents use outstaff-office:8080. Webhooks (port 8082) are not exposed here;
+# add a Service and an Ingress for them only if the team receives webhooks.
+apiVersion: v1
+kind: Service
+metadata:
+  name: outstaff-office
+  labels:
+    app.kubernetes.io/name: outstaff-office
+spec:
+  selector:
+    app.kubernetes.io/name: outstaff-office
+  ports:
+    - { name: agent, port: 8080, targetPort: agent }
