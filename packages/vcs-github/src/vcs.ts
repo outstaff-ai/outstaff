@@ -45,6 +45,9 @@ const PERMISSIONS = {
   write: { contents: "write", pull_requests: "write", issues: "write" },
 } as const;
 
+const REPLY_MUTATION = `mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}`;
+const READY_MUTATION = `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
+const DRAFT_MUTATION = `mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
 const THREADS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{id isResolved path line originalLine comments(first:100){nodes{id body author{login}}}}}}}}`;
 const LAST_COMMENT_QUERY = `query($id:ID!){node(id:$id){... on PullRequestReviewThread{id isResolved comments(last:1){nodes{author{login}}}}}}`;
 const RESOLVE_MUTATION = `mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}`;
@@ -88,6 +91,14 @@ type ThreadsData = {
     } | null;
   } | null;
 };
+
+/** Reviews need only pull request access, so a read-granted person can review. */
+const REVIEW_PERMISSIONS = { pull_requests: "write" } as const;
+const REVIEW_EVENTS = {
+  approve: "APPROVE",
+  request_changes: "REQUEST_CHANGES",
+  comment: "COMMENT",
+} as const;
 
 const repoPath = (r: RepoRef) => `/repos/${r.owner}/${r.name}`;
 
@@ -213,6 +224,47 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
   async function fetchPull(repo: RepoRef, number: number, token: string): Promise<PullRequest> {
     const res = await http.request<RestPull>("GET", `${repoPath(repo)}/pulls/${number}`, { token });
     return toPullRequest(repo, res.data, links.pr(repo, number), isAgentSlug);
+  }
+
+  /**
+   * A token for the person this container runs as, for a write. Refuses without a grant on the repo (a write
+   * grant unless `level` is "read"), and for a person other than this container's own.
+   */
+  async function actingToken(
+    repo: RepoRef,
+    level: "read" | "write",
+    permissions: Record<string, "read" | "write">,
+  ): Promise<{ token: string; app: AppAuth }> {
+    const where = `${repo.owner}/${repo.name}`;
+    const grant = self ? grantOf(self, repo) : undefined;
+    if (!self || !grant || (level === "write" && grant !== "write")) {
+      throw new PortError(
+        "forbidden",
+        `"${self ?? "this container"}" has no ${level} grant on ${where}.`,
+      );
+    }
+
+    const app = own();
+    if (!app) {
+      throw new PortError("forbidden", "Writing to GitHub needs this container's own GitHub App.");
+    }
+
+    try {
+      const issued = await app.token(repo, { repositories: [repo.name], permissions });
+      return { token: issued.token, app };
+    } catch (e) {
+      if (e instanceof PortError && (e.code === "invalid" || e.code === "not_found")) {
+        throw new PortError(
+          "forbidden",
+          `${self} has no ${level} access to ${where}: ${e.message}`,
+          {
+            cause: e,
+          },
+        );
+      }
+
+      throw e;
+    }
   }
 
   async function threadNodes(repo: RepoRef, number: number, token: string): Promise<ThreadNode[]> {
@@ -451,6 +503,134 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       );
 
       return { resolved: true };
+    },
+
+    async openPullRequest(repo, input) {
+      const { token } = await actingToken(repo, "write", PERMISSIONS.write);
+      const defaultBranch = (
+        await http.request<{ default_branch: string }>("GET", repoPath(repo), { token })
+      ).data.default_branch;
+
+      if (input.head.replace(/^[^:]+:/, "") === defaultBranch) {
+        throw new PortError(
+          "invalid",
+          `Refusing to open a pull request from the default branch ${defaultBranch}; use a feature branch.`,
+        );
+      }
+
+      const res = await http.request<RestPull>("POST", `${repoPath(repo)}/pulls`, {
+        token,
+        body: {
+          head: input.head,
+          base: input.base ?? defaultBranch,
+          title: input.title,
+          body: input.body,
+          draft: input.draft ?? false,
+        },
+      });
+
+      return toPullRequest(repo, res.data, links.pr(repo, res.data.number), isAgentSlug);
+    },
+
+    async updatePullRequest(repo, number, patch) {
+      const { token } = await actingToken(repo, "write", PERMISSIONS.write);
+      const current = (
+        await http.request<RestPull>("GET", `${repoPath(repo)}/pulls/${number}`, { token })
+      ).data;
+
+      const fields: Record<string, unknown> = {};
+      for (const k of ["title", "body", "base"] as const) {
+        if (patch[k] !== undefined) {
+          fields[k] = patch[k];
+        }
+      }
+
+      let latest = current;
+      if (Object.keys(fields).length) {
+        latest = (
+          await http.request<RestPull>("PATCH", `${repoPath(repo)}/pulls/${number}`, {
+            token,
+            body: fields,
+          })
+        ).data;
+      }
+
+      // The REST API cannot change draft state; only GraphQL can.
+      if (patch.draft !== undefined && patch.draft !== (current.draft === true)) {
+        if (!current.node_id) {
+          throw new PortError("unavailable", "GitHub returned no node id for the pull request.");
+        }
+
+        await http.graphql(token, patch.draft ? DRAFT_MUTATION : READY_MUTATION, {
+          id: current.node_id,
+        });
+
+        latest = { ...latest, draft: patch.draft };
+      }
+
+      return toPullRequest(repo, latest, links.pr(repo, number), isAgentSlug);
+    },
+
+    async submitReview(repo, number, review) {
+      const { token, app } = await actingToken(repo, "read", REVIEW_PERMISSIONS);
+      const pull = (
+        await http.request<RestPull>("GET", `${repoPath(repo)}/pulls/${number}`, { token })
+      ).data;
+
+      const me = (await app.slug()).toLowerCase();
+      if (stripBot(pull.user?.login ?? "").toLowerCase() === me) {
+        throw new PortError(
+          "forbidden",
+          `${self} cannot review their own pull request ${repo.owner}/${repo.name}#${number}.`,
+        );
+      }
+
+      await http.request("POST", `${repoPath(repo)}/pulls/${number}/reviews`, {
+        token,
+        body: {
+          event: REVIEW_EVENTS[review.verdict],
+          body: review.body,
+          ...(review.comments?.length
+            ? {
+                comments: review.comments.map((c) => ({
+                  path: c.path,
+                  line: c.line,
+                  side: "RIGHT",
+                  body: c.body,
+                })),
+              }
+            : {}),
+        },
+      });
+    },
+
+    async replyToThread(repo, number, threadId, body) {
+      const { token } = await actingToken(repo, "write", PERMISSIONS.write);
+      const nodes = await threadNodes(repo, number, token);
+      if (!nodes.some((n) => n.id === threadId)) {
+        throw new PortError(
+          "not_found",
+          `Review thread ${threadId} is not on ${repo.owner}/${repo.name}#${number}.`,
+        );
+      }
+
+      await http.graphql(token, REPLY_MUTATION, { id: threadId, body });
+    },
+
+    async diff(repo, number) {
+      if (!(self && grantOf(self, repo))) {
+        throw new PortError(
+          "forbidden",
+          `"${self ?? "this container"}" has no grant on ${repo.owner}/${repo.name}.`,
+        );
+      }
+
+      const res = await http.request<unknown>("GET", `${repoPath(repo)}/pulls/${number}`, {
+        token: await apiToken(repo),
+        headers: { accept: "application/vnd.github.diff" },
+      });
+
+      return res.text;
     },
 
     async permission(repo, login) {

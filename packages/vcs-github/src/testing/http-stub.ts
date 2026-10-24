@@ -13,6 +13,9 @@ export interface StubReply {
   status?: number;
   headers?: Record<string, string>;
   body?: unknown;
+
+  /** A non-JSON body, served as plain text. */
+  text?: string;
 }
 
 export type Handler = (req: StubRequest) => StubReply | unknown;
@@ -56,7 +59,7 @@ const isReply = (v: unknown): v is StubReply =>
   typeof v === "object" &&
   v !== null &&
   !Array.isArray(v) &&
-  Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body");
+  Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body" || k === "text");
 
 /** A fetch that serves JSON by method and path and records every call. Unmatched requests fail the test. */
 export function createStubFetch(routes: Route[], origin = "https://api.github.test") {
@@ -75,7 +78,10 @@ export function createStubFetch(routes: Route[], origin = "https://api.github.te
       `${init?.method} ${url.pathname} is unauthenticated`,
     ).toMatch(/^Bearer \S+/);
 
-    expect(headers.get("accept")).toBe("application/vnd.github+json");
+    expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
+      headers.get("accept"),
+    );
+
     expect(headers.get("x-github-api-version")).toBe("2022-11-28");
     expect(headers.get("user-agent")).toBeTruthy();
     const method = (init?.method ?? "GET").toUpperCase();
@@ -103,10 +109,15 @@ export function createStubFetch(routes: Route[], origin = "https://api.github.te
       const out = await r.handler(req);
       const reply: StubReply = isReply(out) ? out : { body: out };
       const status = reply.status ?? 200;
-      const body = status === 304 || status === 204 ? null : JSON.stringify(reply.body ?? {});
+      const body =
+        status === 304 || status === 204 ? null : (reply.text ?? JSON.stringify(reply.body ?? {}));
+
       return new Response(body, {
         status,
-        headers: { "content-type": "application/json", ...reply.headers },
+        headers: {
+          "content-type": reply.text === undefined ? "application/json" : "text/plain",
+          ...reply.headers,
+        },
       });
     }
 

@@ -1,4 +1,14 @@
-import type { Chat, Knowledge, Logger, PortName, TeamConfig, Tracker, Vcs } from "@outstaff/core";
+import type {
+  Chat,
+  Knowledge,
+  Layout,
+  Logger,
+  Policy,
+  PortName,
+  TeamConfig,
+  Tracker,
+  Vcs,
+} from "@outstaff/core";
 import type { z } from "zod";
 import type { ToolStatus } from "../tools/types.js";
 import type { OfficeClient } from "./office.js";
@@ -22,6 +32,13 @@ export interface AgentEnv {
   chat?: Chat;
   office?: OfficeClient;
 
+  /**
+   * The person's Policy and directory layout. Verbs that read a file the caller names (`--body-file`) refuse
+   * without them, and read only what the Policy lets the Read tool read.
+   */
+  policy?: Policy;
+  layout?: Layout;
+
   /** Why a configured port is missing (adapter not installed, creation failed), by port. */
   unavailable?: Partial<Record<PortName, string>>;
   log?: Logger;
@@ -33,6 +50,9 @@ export interface AgentEnv {
 export interface VerbContext {
   /** The work item the caller is running for, when there is one. */
   workItemId?: string;
+
+  /** The directory the caller works in (its worktree); relative paths and a default repo and branch come from it. */
+  cwd?: string;
 }
 
 export interface Verb {

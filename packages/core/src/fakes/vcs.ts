@@ -97,6 +97,16 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     thread: (r: RepoRef, n: number, id: string) => `${url(r)}/pull/${n}#discussion_${id}`,
   };
 
+  const defaultBranch = "main";
+
+  const grant = (repo: RepoRef, level: "write" | "read") => {
+    const have = perms.get(`${key(repo)}:${self}`) ?? "none";
+    const ok = level === "read" ? have !== "none" : have === "write" || have === "admin";
+    if (!ok) {
+      throw new PortError("forbidden", `${self} has no ${level} grant on ${key(repo)}.`);
+    }
+  };
+
   const defaultRepo: RepoRef = { host, owner: "acme", name: "app" };
 
   return {
@@ -250,6 +260,99 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
       }
 
       throw new PortError("not_found", `Thread ${threadId} not found.`);
+    },
+    async openPullRequest(repo, input) {
+      grant(repo, "write");
+      if (input.head === defaultBranch) {
+        throw new PortError(
+          "invalid",
+          `Refusing to open a pull request from the default branch ${defaultBranch}.`,
+        );
+      }
+
+      const map = prs.get(key(repo)) ?? new Map<number, StoredPr>();
+      prs.set(key(repo), map);
+      const number = map.size + 1;
+      const pr: PullRequest = {
+        repo: withHost(repo),
+        number,
+        title: input.title,
+        body: input.body,
+        url: links.pr(repo, number),
+        author: { login: self, kind: "agent" },
+        head: { ref: input.head, sha: newSha() },
+        base: { ref: input.base ?? defaultBranch },
+        state: "open",
+        draft: input.draft ?? false,
+        mergeable: "unknown",
+        updatedAt: now().toISOString(),
+      };
+
+      map.set(number, { pr, mergeable: ["clean"], threads: [] });
+      emit("pr.opened", repo, number, self, { title: pr.title });
+      return structuredClone(pr);
+    },
+    async updatePullRequest(repo, number, patch) {
+      grant(repo, "write");
+      const s = need(repo, number);
+      if (patch.title !== undefined) {
+        s.pr.title = patch.title;
+      }
+
+      if (patch.body !== undefined) {
+        s.pr.body = patch.body;
+      }
+
+      if (patch.base !== undefined) {
+        s.pr.base = { ref: patch.base };
+      }
+
+      if (patch.draft !== undefined) {
+        s.pr.draft = patch.draft;
+      }
+
+      touch(s);
+      return structuredClone(s.pr);
+    },
+    async submitReview(repo, number, review) {
+      grant(repo, "read");
+      const s = need(repo, number);
+      if (s.pr.author.login === self) {
+        throw new PortError("forbidden", `${self} cannot review their own pull request.`);
+      }
+
+      const state = {
+        approve: "approved",
+        request_changes: "changes_requested",
+        comment: "commented",
+      }[review.verdict];
+
+      for (const c of review.comments ?? []) {
+        s.threads.push({
+          id: `t${++threadCounter}`,
+          resolved: false,
+          path: c.path,
+          line: c.line,
+          comments: [{ id: `rc${++commentCounter}`, author: self, body: c.body }],
+        });
+      }
+
+      emit("pr.review_submitted", repo, number, self, { state, body: review.body });
+    },
+    async replyToThread(repo, number, threadId, body) {
+      grant(repo, "write");
+      const thread = need(repo, number).threads.find((t) => t.id === threadId);
+      if (!thread) {
+        throw new PortError("not_found", `Thread ${threadId} is not on ${key(repo)}#${number}.`);
+      }
+
+      thread.comments.push({ id: `rc${++commentCounter}`, author: self, body });
+      emit("pr.comment", repo, number, self, { kind: "review_comment", body });
+    },
+    async diff(repo, number) {
+      grant(repo, "read");
+      const s = need(repo, number);
+      return `diff --git a/${s.pr.head.ref}.txt b/${s.pr.head.ref}.txt\n--- a/${s.pr.head.ref}.txt\n+++ b/${s.pr.head.ref}.txt\n@@ -1 +1 @@\n-old\n+new\n`;
     },
     async permission(repo, login) {
       return perms.get(`${key(repo)}:${login}`) ?? "none";

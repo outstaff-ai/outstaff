@@ -34,7 +34,7 @@ export function renderVerbsReference(verbs: readonly Verb[]): string {
     "",
     "- Every result carries the URLs of the things it touches, built from the adapters' link templates.",
     "- Inputs are validated; there are no destructive verbs (nothing deletes, force-merges or edits other people's text).",
-    "- `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.",
+    "- `pr open`, `pr update`, `pr review` and `pr reply` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.",
     '- A verb that needs a port the team has not configured fails with `unsupported` ("no tracker configured for this team"); the office verbs (`ask`, `work`, `roster`) fail with `unavailable` when the agent is not connected to an office.',
     "- Commands take `--json` to print `{ text, data, links }`; errors print `{ error: { code, message } }`. The identity comes from `OUTSTAFF_PERSON` and the team from `--team` or the usual team lookup.",
   ];

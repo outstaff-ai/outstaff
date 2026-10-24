@@ -3,7 +3,7 @@
 Use this each time a pull request you own gets review feedback.
 
 1. Read every open thread before changing anything.
-2. For each thread, decide: fix, answer, or disagree. Reply in that thread, never in a new top-level comment.
+2. For each thread, decide: fix, answer, or disagree. Reply in that thread with `ost pr reply <n> <thread-id> --body "..."`, never in a new top-level comment.
 3. Make the fixes in one commit amended onto your branch (see `references/git.md`) and push.
 4. After the push, reply in each thread you fixed: say what changed.
 5. Resolve a thread only when both are true: you fixed it, and the last word in it is yours. If the reviewer replied last, or you did not change anything, leave it open for them.

@@ -6,13 +6,28 @@
 | ------------ | -------------------------------------------------------------------------------------------------------------------- |
 | `ost ticket` | Read, create, comment on, assign and move tickets. Statuses are the canonical ones in `process/ticket-lifecycle.md`. |
 | `ost doc`    | Read and write documents in the team's knowledge store.                                                              |
-| `ost pr`     | Open and update pull requests; read review threads, reply to them and resolve them.                                  |
+| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                    |
 | `ost ask`    | Ask another person, by handle or role. See `references/team.md`.                                                     |
 | `ost work`   | `list` your current work item and queue; `move` a queued item next, last, before or after another.                   |
 | `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                 |
 | `ost me`     | Show who you are: your handle, role and team.                                                                        |
 
 Run any verb with `--help` for its options.
+
+## Pull requests
+
+Every `ost pr` write acts as you, with your own identity, and only in repositories you have a write grant on (a review and a diff need only read access). Long text goes in a file in your scratch directory (or worktree): `--body-file <path>`. Only files your read policy allows are accepted, never secrets.
+
+| Command                                                                                               | What it does                                                                                                       |
+| ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `ost pr open --title <t> --body-file <f> [--draft] [--head <b>] [--base <b>] [--repo <r>]`            | Opens a pull request. The head is your current branch, the base the default branch. Never from the default branch. |
+| `ost pr update <n> [--title <t>] [--body-file <f>] [--base <b>] [--draft\|--ready]`                   | Changes a pull request you own.                                                                                    |
+| `ost pr review <n> --approve\|--request-changes\|--comment [--body-file <f>] [--comment-file <json>]` | Submits a review. `--comment-file` is a JSON array of `{ "path", "line", "body" }`. Not on your own pull request.  |
+| `ost pr reply <n> <thread-id> --body <text>`                                                          | Replies in a review thread of that pull request.                                                                   |
+| `ost pr diff <n>`                                                                                     | Prints the unified diff. Use it instead of `gh pr diff`.                                                           |
+| `ost pr status <repo> <n>`, `ost pr threads <repo> <n>`, `ost pr resolve <repo> <n> <thread-id>`      | Read state, checks and threads; resolve a thread you fixed and spoke last in.                                      |
+
+`--repo` defaults to the repository your worktree's origin points at.
 
 ## Habits
 

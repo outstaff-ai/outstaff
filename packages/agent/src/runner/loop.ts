@@ -9,7 +9,7 @@ import {
 import type { Link } from "@outstaff/protocol";
 import type { Offer, OfficeConnection } from "../office-client/index.js";
 import type { Workspaces } from "../repos/index.js";
-import { createRuntimeTools } from "../verbs/index.js";
+import { VERBS, createRuntimeTools } from "../verbs/index.js";
 import type { ChatReportKind } from "../verbs/office.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
@@ -180,7 +180,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       workdir: opts.workdir,
       addDirs: workspace ? [...opts.addDirs, workspace.worktree, workspace.scratch] : opts.addDirs,
       policy: opts.policy,
-      tools: createRuntimeTools(env),
+      tools: createRuntimeTools(env, VERBS, workspace ? { cwd: workspace.worktree } : {}),
       builtinTools: opts.builtinTools,
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.maxTurns ? { maxTurns: opts.maxTurns } : {}),
