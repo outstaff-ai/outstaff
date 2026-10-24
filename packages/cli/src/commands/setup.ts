@@ -21,9 +21,8 @@ import {
 } from "@outstaff/core";
 import { defineCommand, type Context } from "../define.js";
 import { loadTeam } from "../load.js";
+import { projectRoot, secretsLocation, shown, type SecretsLocation } from "../project.js";
 import { renderEnvExample, sections, type AnyDef, type Scope } from "./setup-template.js";
-
-export const DEFAULT_SECRETS_DIR = "secrets";
 
 /** Every adapter this build ships, for guides and derived values; loaded on demand to keep other commands fast. */
 export async function shippedRegistry(): Promise<AdapterRegistry> {
@@ -93,25 +92,27 @@ function inRepo(dir: string): boolean {
 }
 
 /** The ignore rules that are missing, as lines for `.gitignore`. */
-export function missingIgnores(out: string, envFile: string, secretsDir: string): string[] {
+export function missingIgnores(out: string, envFile: string, secrets: SecretsLocation): string[] {
   if (!inRepo(out)) {
     return [];
   }
 
   const missing: string[] = [];
-  const envRule = envFile.startsWith(join(".outstaff", "office"))
-    ? ".outstaff/office/.env"
-    : ".outstaff/people/*/.env";
-
   if (!isIgnored(out, envFile.replaceAll("\\", "/"))) {
-    missing.push(envRule);
+    missing.push(".outstaff/**/.env");
   }
 
-  const rel = relative(out, resolve(out, secretsDir));
-  if (!rel.startsWith("..") && !isAbsolute(rel) && rel !== "") {
-    if (!isIgnored(out, `${rel.replaceAll("\\", "/")}/KEY`)) {
-      missing.push(`${rel.replaceAll("\\", "/")}/`);
-    }
+  const inside = (dir: string): string | undefined => {
+    const rel = relative(out, dir);
+    return rel.startsWith("..") || isAbsolute(rel) || rel === ""
+      ? undefined
+      : rel.replaceAll("\\", "/");
+  };
+
+  const file = inside(secrets.dir);
+  const rule = inside(secrets.ignoreDir);
+  if (file && rule && !isIgnored(out, `${file}/KEY`)) {
+    missing.push(`${rule}/`);
   }
 
   return missing;
@@ -271,7 +272,7 @@ export const setup = defineCommand<{
     {
       flags: "--out <dir>",
       description:
-        "Project directory to write `.outstaff/...` into. Defaults to the current directory.",
+        "Project directory to write `.outstaff/...` into. Defaults to the project root of the team file.",
     },
     {
       flags: "--derive",
@@ -281,7 +282,7 @@ export const setup = defineCommand<{
     {
       flags: "--secrets-dir <dir>",
       description:
-        "Directory of secret files, for the layout hint and for --derive. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets.",
+        "Directory of this scope's secret files, for the layout hint and for --derive. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle|office> next to the team file.",
     },
     {
       flags: "--yes",
@@ -291,7 +292,7 @@ export const setup = defineCommand<{
   examples: [
     "ost setup sam",
     "ost setup office --out .",
-    "ost setup sam --derive --secrets-dir ./secrets",
+    "ost setup sam --derive --secrets-dir ./secrets-sam",
     "ost setup sam --derive --yes --json",
   ],
   exitCodes: [
@@ -320,14 +321,14 @@ export const setup = defineCommand<{
       return 1;
     }
 
-    const out = resolve(ctx.cwd, options.out ?? ".");
-    const secretsDir = options.secretsDir ?? ctx.env["OUTSTAFF_SECRETS_DIR"] ?? DEFAULT_SECRETS_DIR;
+    const out = resolve(ctx.cwd, options.out ?? projectRoot(ctx, loaded.source));
+    const secrets = secretsLocation(ctx, options, out, target);
     const envFile =
       scope === "office"
         ? join(".outstaff", "office", ".env")
         : join(".outstaff", "people", target, ".env");
 
-    const missing = missingIgnores(out, envFile, resolve(ctx.cwd, secretsDir));
+    const missing = missingIgnores(out, envFile, secrets);
     if (missing.length > 0) {
       ctx.err(
         `Refusing to run: these would not be ignored by git, so real secrets could be committed.\nAdd to .gitignore and run again:\n${missing.map((m) => `  ${m}`).join("\n")}\n`,
@@ -342,7 +343,7 @@ export const setup = defineCommand<{
     const { found, unknown } = configuredAdapters(config, registry, scope);
 
     if (options.derive) {
-      const dir = resolve(ctx.cwd, secretsDir);
+      const dir = secrets.dir;
       const report = await runDerive(ctx, config, found, scope, person, dir, options.yes === true);
       if (options.json) {
         ctx.out(
@@ -365,7 +366,7 @@ export const setup = defineCommand<{
 
     const defs = found.map((f) => f.def);
     const list = sections(config, defs, scope, person);
-    const text = renderEnvExample(config, scope, target, list, secretsDir);
+    const text = renderEnvExample(config, scope, target, list, shown(ctx, secrets.dir));
     const file = join(out, `${envFile}.example`);
     mkdirSync(join(file, ".."), { recursive: true });
     writeFileSync(file, text);
@@ -389,7 +390,7 @@ export const setup = defineCommand<{
         `${JSON.stringify(
           {
             file,
-            secretsDir,
+            secretsDir: secrets.dir,
             keys: list.flatMap((s) => s.specs.map((k) => k.key)),
             guides,
             unsupported: unknown,
@@ -403,7 +404,7 @@ export const setup = defineCommand<{
     }
 
     ctx.out(`Wrote ${relative(ctx.cwd, file) || file}\n`);
-    ctx.out(`Secret files go in ${secretsDir}/, one file per key.\n\n`);
+    ctx.out(`Secret files go in ${shown(ctx, secrets.dir)}/, one file per key.\n\n`);
     for (const g of guides) {
       ctx.out(`${renderGuide(g.adapter, g.steps)}\n`);
     }

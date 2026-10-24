@@ -15,7 +15,7 @@ ost [global options] <command> [options]
 
 | Option | Description |
 | --- | --- |
-| `--team <path|git-url>` | Team config to use: a file, a directory, or a git URL with an optional #ref. Defaults to OUTSTAFF_TEAM_FILE, OUTSTAFF_TEAM_REPO, then ./.outstaff/team.yaml or ./team.yaml. |
+| `--team <path|git-url>` | Team config to use: a file, a directory, or a git URL with an optional #ref. Defaults to OUTSTAFF_TEAM_FILE, OUTSTAFF_TEAM_REPO, then .outstaff/team.yaml or team.yaml in the current directory or the nearest parent up to the git root. |
 | `--json` | Print machine-readable JSON instead of text. |
 | `-v, --version` | Print the version. |
 | `-h, --help` | Show help. |
@@ -266,9 +266,9 @@ ost setup <handle|office> [options]
 
 | Option | Description |
 | --- | --- |
-| `--out <dir>` | Project directory to write `.outstaff/...` into. Defaults to the current directory. |
+| `--out <dir>` | Project directory to write `.outstaff/...` into. Defaults to the project root of the team file. |
 | `--derive` | Fill derivable secrets from the ones already provided instead of writing the template. |
-| `--secrets-dir <dir>` | Directory of secret files, for the layout hint and for --derive. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+| `--secrets-dir <dir>` | Directory of this scope's secret files, for the layout hint and for --derive. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle|office> next to the team file. |
 | `--yes` | Do not ask before moving a downloaded private key. |
 
 Exit codes:
@@ -281,7 +281,7 @@ Examples:
 ```sh
 ost setup sam
 ost setup office --out .
-ost setup sam --derive --secrets-dir ./secrets
+ost setup sam --derive --secrets-dir ./secrets-sam
 ost setup sam --derive --yes --json
 ```
 
@@ -304,8 +304,8 @@ ost hire <role> [options]
 | `--avatar <seed|url>` | Avatar seed, or an https image URL. Defaults to the handle as the seed. |
 | `--repos <grants>` | Repo grants as "repo=read|write" separated by commas, for example "shop=write,*=read". Defaults by role. |
 | `--yes` | Do not ask to confirm; write what was given or generated. |
-| `--out <dir>` | Project directory to write `.outstaff/people/<handle>/...` into. Defaults to the current directory. |
-| `--secrets-dir <dir>` | Directory of secret files, for the layout hint. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+| `--out <dir>` | Project directory to write `.outstaff/people/<handle>/...` into. Defaults to the project root of the team file. |
+| `--secrets-dir <dir>` | Directory of the new person's secret files, for the layout hint. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle> next to the team file. |
 
 Exit codes:
 
@@ -333,7 +333,7 @@ ost fire <handle> [options]
 | Option | Description |
 | --- | --- |
 | `--yes` | Do not ask to confirm. |
-| `--secrets-dir <dir>` | Directory of secret files, named in the checklist. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+| `--secrets-dir <dir>` | Directory of secret files, named in the checklist. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle> next to the team file. |
 
 Exit codes:
 
@@ -359,7 +359,7 @@ ost doctor [handle|office] [options]
 
 | Option | Description |
 | --- | --- |
-| `--secrets-dir <dir>` | Directory of secret files. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets. |
+| `--secrets-dir <dir>` | Directory of secret files, used for every scope checked. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle|office> next to the team file. |
 
 Exit codes:
 
@@ -370,7 +370,7 @@ Examples:
 
 ```sh
 ost doctor
-ost doctor sam --secrets-dir ./secrets
+ost doctor sam --secrets-dir ./secrets-sam
 ost doctor office --json
 ```
 

@@ -44,7 +44,7 @@ integrations:
 
 exports[`ost init > scaffolds a valid team in an empty directory > init --separate-repo output 1`] = `
 "Wrote .outstaff/team.yaml
-Added to .gitignore: .outstaff/people/*/.env, .env, *.pem
+Added to .gitignore: .outstaff/secrets/, .outstaff/**/.env, .env, *.pem
 Next: edit .outstaff/team.yaml, then run \`ost validate\`.
 "
 `;
