@@ -27,6 +27,7 @@ export default defineConfig({
         { label: "Reference", items: [{ autogenerate: { directory: "reference" } }] },
         { label: "Adapters", items: [{ autogenerate: { directory: "adapters" } }] },
         { label: "Decisions", items: [{ autogenerate: { directory: "decisions" } }] },
+        { label: "Sponsors", slug: "sponsors" },
       ],
     }),
   ],

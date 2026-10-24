@@ -8,6 +8,9 @@ on:
       - "pnpm-lock.yaml"
   push:
     branches: [main]
+  schedule:
+    # Mondays 06:00 UTC: refresh the generated sponsor logos without a commit.
+    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
@@ -30,6 +33,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # The build runs starlight-links-validator, so broken internal links fail here.
       - run: pnpm docs:build
+        env:
+          # Only this step sees the token. Without it (forks, pull requests from forks) the build
+          # publishes the placeholder sponsors image.
+          SPONSORKIT_GITHUB_TOKEN: ${{ secrets.SPONSORKIT_GITHUB_TOKEN }}
       - uses: actions/configure-pages@v6.0.0
         if: github.event_name != 'pull_request'
       - uses: actions/upload-pages-artifact@v5.0.0

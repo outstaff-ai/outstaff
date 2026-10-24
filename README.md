@@ -36,6 +36,14 @@ Packages live in `packages/*`: `core`, `catalog`, `cli` (published as `outstaff`
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commit and PR rules.
 
+## Sponsors
+
+Outstaff is open source under the Apache License 2.0 and built in the open. Sponsorship pays for maintenance, releases and the container images.
+
+[Sponsor Outstaff](https://github.com/sponsors/outstaff-ai) on GitHub, one time or monthly. Thank you to everyone who does:
+
+<a href="https://github.com/sponsors/outstaff-ai"><img src="https://docs.outstaff.work/sponsors.svg" alt="Sponsors of Outstaff"></a>
+
 ## License
 
 [Apache License 2.0](LICENSE). See [NOTICE](NOTICE).
