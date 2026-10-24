@@ -1,4 +1,4 @@
-import type { Rule } from "./rules.js";
+import type { Condition, Rule } from "./rules.js";
 
 const OPEN: Rule["if"] = { ticket_status: ["backlog", "ready", "active", "blocked"] };
 
@@ -6,13 +6,26 @@ const OPEN: Rule["if"] = { ticket_status: ["backlog", "ready", "active", "blocke
  * A trusted human's review or comment on an open pull request an agent wrote. An approval with
  * nothing written in it is a sign-off, not feedback.
  */
-const humanFeedback: Rule["if"] = {
+const feedbackOn = (state: { pr_open: true } | { pr_merged: true }): Condition => ({
   all: [
     { actor_kind: "human" },
     { pr_author_kind: "agent" },
-    { pr_open: true },
+    state,
     { not: { all: [{ review_state: ["approved"] }, { has_body: false }] } },
   ],
+});
+
+const humanFeedback = feedbackOn({ pr_open: true });
+
+/**
+ * The same on a merged pull request. The author answers on it and, if a change is asked for, opens a follow-up
+ * pull request; the ticket is not reopened, so there is no assign or move.
+ */
+const mergedFeedbackRule: Rule = {
+  id: "merged-feedback-follow-up",
+  on: ["pr.review_submitted", "pr.comment"],
+  if: feedbackOn({ pr_merged: true }),
+  do: [{ schedule: { person: "author", kind: "merged_feedback", priority: "high" } }],
 };
 
 const kanbanRules: Rule[] = [
@@ -40,6 +53,7 @@ const kanbanRules: Rule[] = [
     if: humanFeedback,
     do: [{ schedule: { person: "author", kind: "review_feedback", priority: "high" } }],
   },
+  mergedFeedbackRule,
   {
     id: "human-feedback-reactivates-ticket",
     on: ["pr.review_submitted", "pr.comment"],
@@ -75,6 +89,8 @@ const kanbanRules: Rule[] = [
   {
     id: "hand-back-to-requester",
     on: "agent.handed_back",
+    // A finished ticket stays finished: the answer to feedback on a merged pull request reopens nothing.
+    if: { not: { ticket_status: ["done", "canceled"] } },
     do: [{ move: "review" }, { assign: "requester" }],
   },
   {
@@ -118,6 +134,7 @@ const minimalRules: Rule[] = [
       { schedule: { person: "author", kind: "review_feedback", priority: "high" } },
     ],
   },
+  mergedFeedbackRule,
   {
     id: "assigned-agent-scheduled",
     on: "ticket.assigned",

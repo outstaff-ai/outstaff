@@ -122,11 +122,9 @@ describe("kanban preset", () => {
     ).toEqual(expect.arrayContaining([feedbackSchedule("ACME-1")]));
   });
 
-  it("ignores agent feedback, closed or merged pull requests and human-authored ones", () => {
+  it("ignores agent feedback, closed pull requests and human-authored ones", () => {
     expect(run(ev("pr.comment", { actor: agent }), world())).toEqual([]);
-    for (const state of ["closed", "merged"] as const) {
-      expect(run(ev("pr.comment"), world({ prs: [pr(10, { state })] }))).toEqual([]);
-    }
+    expect(run(ev("pr.comment"), world({ prs: [pr(10, { state: "closed" })] }))).toEqual([]);
 
     expect(
       run(
@@ -141,6 +139,75 @@ describe("kanban preset", () => {
         world({ prs: [pr(10, { author: { login: "dependabot[bot]", kind: "bot" } })] }),
       ),
     ).toEqual([]);
+  });
+
+  describe("merged-feedback-follow-up", () => {
+    const merged = (status: "done" | "review" = "done") =>
+      world({ status, prs: [pr(10, { state: "merged" })] });
+
+    const followUp = (ticket?: string) => ({
+      type: "schedule",
+      person: "ada",
+      kind: "merged_feedback",
+      priority: "high",
+      ...(ticket ? { ticket } : {}),
+      pr: ref(10),
+    });
+
+    it.each(["kanban", "scrum", "minimal"] as const)(
+      "%s: feedback on a merged agent pull request schedules merged_feedback and touches nothing else",
+      (preset) => {
+        const rules = presetRules(preset);
+        for (const type of ["pr.review_submitted", "pr.comment"] as const) {
+          expect(
+            run(ev(type, { data: { state: "commented", body: "hm" } }), merged(), rules),
+          ).toEqual([followUp("ACME-1")]);
+        }
+
+        // The ticket is not reopened, whatever its status.
+        expect(run(ev("pr.comment"), merged("review"), rules)).toEqual([followUp("ACME-1")]);
+      },
+    );
+
+    it("a review that asks for changes counts; a bare approval does not", () => {
+      expect(
+        run(ev("pr.review_submitted", { data: { state: "changes_requested" } }), merged()),
+      ).toEqual([followUp("ACME-1")]);
+
+      const approved = (body?: string) =>
+        ev("pr.review_submitted", {
+          data: { state: "approved", ...(body === undefined ? {} : { body }) },
+        });
+
+      expect(run(approved("Thanks, but the flag name is wrong."), merged())).toEqual([
+        followUp("ACME-1"),
+      ]);
+
+      expect(run(approved(""), merged())).toEqual([]);
+      expect(run(approved("  \n"), merged())).toEqual([]);
+      expect(run(approved(), merged())).toEqual([]);
+    });
+
+    it("an agent or automation commenter, a human-authored pull request or a closed one does nothing", () => {
+      expect(run(ev("pr.comment", { actor: agent }), merged())).toEqual([]);
+      expect(run(ev("pr.comment", { actor: automation }), merged())).toEqual([]);
+      expect(
+        run(
+          ev("pr.comment"),
+          world({
+            prs: [pr(10, { state: "merged", author: { login: "grace", kind: "human" } })],
+          }),
+        ),
+      ).toEqual([]);
+
+      expect(run(ev("pr.comment"), world({ prs: [pr(10, { state: "closed" })] }))).toEqual([]);
+    });
+
+    it("works without a linked ticket", () => {
+      expect(
+        run(ev("pr.comment"), createStaticWorkflowState({ prs: [pr(10, { state: "merged" })] })),
+      ).toEqual([followUp()]);
+    });
   });
 
   it("the scrum preset behaves the same", () => {
@@ -279,6 +346,10 @@ describe("kanban preset", () => {
       { type: "move", ticket: "ACME-1", to: "review" },
       { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
     ]);
+  });
+
+  it("hand-back leaves a done ticket alone", () => {
+    expect(run(ev("agent.handed_back", { actor: agent }), world({ status: "done" }))).toEqual([]);
   });
 
   it("hand-back falls back to the first listed human when the ticket has no requester", () => {
@@ -435,6 +506,7 @@ describe("overrides", () => {
     const w = resolveWorkflow(r.config.workflow);
     expect(w.rules.map((x) => x.id)).toEqual([
       "human-feedback-back-to-author",
+      "merged-feedback-follow-up",
       "assigned-agent-scheduled",
       "ping-requester",
     ]);

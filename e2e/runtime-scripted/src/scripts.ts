@@ -149,6 +149,62 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   return `Addressed ${ids.length} thread${ids.length === 1 ? "" : "s"} on pull request ${number} (${sha}).`;
 }
 
+/**
+ * A human commented on a merged pull request: answer on it, then open a follow-up pull request from the default
+ * branch that links the original and the feedback, and link the follow-up from a second reply.
+ */
+export async function* mergedFeedback(ctx: ItemContext): Script {
+  const number = need(ctx.pr, "the pull request");
+  const cwd = need(ctx.worktree, "the worktree");
+  const repo = need(ctx.repo, "the repository");
+  const branch = need(ctx.branch, "the branch");
+  const feedback = need(ctx.feedback, "the feedback");
+  const quote = feedback.body
+    .split("\n")
+    .map((l) => `> ${l}`)
+    .join("\n");
+
+  const where = feedback.url ? `${feedback.url}\n\n` : "";
+  yield {
+    type: "tool",
+    tool: "pr_comment",
+    input: { repo, number, body: `${quote}\n\n${where}Thanks, I am opening a follow-up for this.` },
+  };
+
+  // The item's worktree may predate the merge: start from the default branch as it is now.
+  yield { type: "shell", command: "git fetch --prune origin", cwd };
+  yield { type: "shell", command: `git checkout -B ${q(branch)} origin/main`, cwd };
+  const current = yield { type: "read", path: `${cwd}/${FILE}` };
+  yield {
+    type: "write",
+    path: `${cwd}/${FILE}`,
+    text: `${current.replace(/\n$/, "")}\nfollow-up\n`,
+  };
+
+  yield { type: "shell", command: "git add -A", cwd };
+  yield { type: "shell", command: `git commit -m ${q(`chore: follow up on #${number}`)}`, cwd };
+  yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
+  const title = `${ctx.ticket ? `${ctx.ticket}: ` : ""}follow up on #${number}`;
+  const opened = yield {
+    type: "tool",
+    tool: "pr_open",
+    input: {
+      repo,
+      title,
+      body: `Follows up on #${number}, which is merged.\n\nFeedback${feedback.url ? `: ${feedback.url}` : ""}\n\n${quote}\n`,
+    },
+  };
+
+  const url = /https?:\/\/\S+/.exec(opened)?.[0] ?? "";
+  yield {
+    type: "tool",
+    tool: "pr_comment",
+    input: { repo, number, body: `Follow-up: ${url}` },
+  };
+
+  return `Answered on pull request ${number} and opened ${url}`;
+}
+
 /** The pull request no longer merges: rebase it on the default branch, resolve the conflict, push with a lease. */
 export async function* conflict(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
@@ -196,5 +252,6 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   assigned,
   ticket: assigned,
   review_feedback: reviewFeedback,
+  merged_feedback: mergedFeedback,
   conflict,
 };

@@ -20,6 +20,7 @@ export type Condition =
   | { pr_author_kind: "human" | "agent" | "bot" }
   | { pr_draft: boolean }
   | { pr_open: boolean }
+  | { pr_merged: boolean }
   | { has_body: boolean }
   | { review_state: string[] };
 
@@ -50,6 +51,7 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .meta(d("Who authored the pull request.")),
     z.strictObject({ pr_draft: z.boolean() }).meta(d("The pull request is (or is not) a draft.")),
     z.strictObject({ pr_open: z.boolean() }).meta(d("The pull request is (or is not) open.")),
+    z.strictObject({ pr_merged: z.boolean() }).meta(d("The pull request is (or is not) merged.")),
     z
       .strictObject({ has_body: z.boolean() })
       .meta(d("The review or comment in the event has (or lacks) a non-blank body.")),

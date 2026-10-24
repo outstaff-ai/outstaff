@@ -539,6 +539,26 @@ export function createGithub(opts: GithubOptions) {
       await submitReview(pr, actor, event, body, comments);
     },
 
+    /** A human comments on the pull request conversation. */
+    async comment(n: number, actor: string, body: string) {
+      const pr = need(n);
+      if (!pr) {
+        throw new Error(`No pull request ${n}.`);
+      }
+
+      pr.conversation.push({ author: actor, body });
+      pr.updatedAt = now();
+      emit("IssueCommentEvent", actor, {
+        action: "created",
+        issue: { number: pr.number, pull_request: {} },
+        comment: {
+          id: eventId + 1,
+          body,
+          html_url: `https://github.example/${full}/pull/${pr.number}#issuecomment-${eventId + 1}`,
+        },
+      });
+    },
+
     async merge(n: number, actor: string) {
       const pr = need(n);
       if (!pr || pr.state !== "open") {

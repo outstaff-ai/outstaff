@@ -1,6 +1,7 @@
 // The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
 // request, a human asks for changes, the agent fixes and resolves the thread, a review with only a summary gets a pull request comment, the human merges, a second pull
-// request now conflicts and the agent rebases it and pushes with a lease. The office, Postgres and the agent are the
+// request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull request
+// gets a reply and a follow-up pull request. The office, Postgres and the agent are the
 // real images; GitHub, the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -480,6 +481,50 @@ async function main() {
   assertEq(rebased.state, "open", "the rebased pull request is still open");
   step(
     `conflict: #${pr2.pr.number} conflicted with main -> follow-up item, rebased, force-pushed with a lease, merges cleanly`,
+  );
+
+  // ---- 5. a comment on the merged pull request: the agent replies and opens a follow-up from the default branch
+  const note = "The greeting should also say goodbye.";
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/comment`, { body: note });
+  const followed = await until(
+    `#${pr1.pr.number} answered and a follow-up pull request opened`,
+    (s) => {
+      const merged = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const follow = s.github.pulls.find((p: Json) =>
+        p.body.includes(`Follows up on #${pr1.pr.number},`),
+      );
+
+      const answer = merged.conversation.find(
+        (c: Json) => c.author === "acme-sam[bot]" && c.body.includes(note),
+      );
+
+      const link = merged.conversation.find((c: Json) => c.body.includes("Follow-up:"));
+      return answer && follow && link ? { answer, follow, link } : undefined;
+    },
+  );
+
+  assertEq(
+    followed.answer.author,
+    "acme-sam[bot]",
+    "the agent answered on the merged pull request",
+  );
+
+  assertEq(followed.follow.state, "open", "the follow-up pull request is open");
+  assertEq(
+    followed.link.body.endsWith(`/pull/${followed.follow.number}`),
+    true,
+    "the reply links the follow-up",
+  );
+
+  const afterFollowUp = await state();
+  assertEq(
+    afterFollowUp.tickets.find((x: Json) => x.key === first).status,
+    "Done",
+    "the merged pull request's ticket stays done",
+  );
+
+  step(
+    `merged feedback: a comment on merged #${pr1.pr.number} -> answered, follow-up #${followed.follow.number} opened, ${first} still done`,
   );
 
   const final = await state();

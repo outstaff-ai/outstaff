@@ -414,6 +414,67 @@ describe("kanban parity", () => {
   });
 });
 
+describe("merged feedback", () => {
+  let h: Harness;
+
+  beforeEach(async () => {
+    h = await harness();
+    await h.human("Dana");
+  });
+
+  afterEach(() => h.close());
+
+  /** A pull request sam wrote that Dana has merged, with no ticket. */
+  const merged = async () => {
+    const pr = await h.vcs.seed.pullRequest(REPO, {
+      title: "Add search",
+      head: { ref: "sam/search" },
+      base: { ref: "main" },
+      author: { login: SAM, kind: "agent" },
+    });
+
+    await h.poll();
+    await h.vcs.seed.merge(REPO, pr.number, "dana");
+    await h.poll();
+    return pr;
+  };
+
+  it("schedules merged_feedback for the author and keeps the comment with the item", async () => {
+    const pr = await merged();
+    await h.vcs.seed.comment(REPO, pr.number, "dana", "The flag name is wrong.");
+    await h.poll();
+    const [item] = await h.items("sam");
+    expect(item).toMatchObject({
+      kind: "merged_feedback",
+      trigger: "human",
+      subject: { type: "pr", ref: h.ws.prSubject(ref(pr.number)) },
+    });
+
+    expect(await readFeedback(h.store, item!.id)).toMatchObject({
+      actor: "dana",
+      kind: "comment",
+      body: "The flag name is wrong.",
+    });
+  });
+
+  it("ignores a bare approval and an untrusted comment", async () => {
+    const pr = await merged();
+    await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "");
+    await h.poll();
+    await h.deliver(
+      {
+        type: "pr.comment",
+        subject: { pr: ref(pr.number) },
+        actor: { kind: "human", id: "mallory" },
+        data: { untrusted: true },
+      },
+      false,
+    );
+
+    expect(await h.items()).toEqual([]);
+  });
+});
+
 describe("engine logging", () => {
   it("logs the rules that matched with what they did, and when none matched", async () => {
     const info: string[] = [];

@@ -1751,6 +1751,19 @@
         {
           "type": "object",
           "properties": {
+            "pr_merged": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pr_merged"
+          ],
+          "additionalProperties": false,
+          "description": "The pull request is (or is not) merged."
+        },
+        {
+          "type": "object",
+          "properties": {
             "has_body": {
               "type": "boolean"
             }
