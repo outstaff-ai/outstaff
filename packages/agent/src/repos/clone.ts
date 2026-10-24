@@ -125,7 +125,7 @@ export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<C
       }
 
       // Per clone: helper list reset first, so no global helper (a keychain, say) is ever offered the token.
-      await git(["config", "--local", "credential.helper", ""], { cwd: dir });
+      await git(["config", "--local", "--replace-all", "credential.helper", ""], { cwd: dir });
       await git(["config", "--local", "--add", "credential.helper", helper], { cwd: dir });
       await git(["config", "--local", "credential.useHttpPath", "true"], { cwd: dir });
       if (issued.author) {
