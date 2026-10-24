@@ -1,4 +1,5 @@
 import {
+  PortError,
   defineAdapter,
   type DeriveContext,
   type DoctorCheck,
@@ -9,6 +10,7 @@ import {
 import { workdirFiles } from "./layout.js";
 import { agentSdkOptions } from "./options.js";
 import { createAgentSdkRuntime } from "./runtime.js";
+import { bubblewrapMissing } from "./sandbox.js";
 
 // The operator supplies credentials to the container; outstaff never reads or stores them (decision 0009).
 // None is required by outstaff itself, and exactly one way of signing in has to be present.
@@ -42,7 +44,7 @@ const setupGuide = (ctx: { scope: "person" | "office" }): SetupStep[] =>
             "- **Cloud provider**: Amazon Bedrock, Google Vertex AI or Microsoft Foundry. Set the provider's switch and region as plain environment variables (for example `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_REGION`) and give its credentials as secret files.",
             "- **Your own subscription token**: run `claude setup-token` on a machine signed in to your subscription and keep the result as `CLAUDE_CODE_OAUTH_TOKEN`. Use it only within the provider's terms (https://www.anthropic.com/legal/consumer-terms and https://www.anthropic.com/legal/commercial-terms); a subscription is meant for its owner, not for a fleet of agents.",
             "",
-            "The Claude Code binary may leave the subscription token visible to the agent's shell, so narrow its reach and the container's egress.",
+            "Commands the agent runs can read this credential unless the runtime's `sandbox` option is `bubblewrap`, so use a dedicated key with a spend limit and rotate it if it leaks.",
           ].join("\n"),
         },
       ];
@@ -91,11 +93,17 @@ export const claudeAgentSdk = defineAdapter({
   setupGuide,
   doctor,
   workdirLayout: workdirFiles,
-  create: (ctx) =>
-    createAgentSdkRuntime({
+  create: (ctx) => {
+    const missing = ctx.options.sandbox === "bubblewrap" ? bubblewrapMissing() : undefined;
+    if (missing) {
+      throw new PortError("unavailable", missing);
+    }
+
+    return createAgentSdkRuntime({
       options: ctx.options,
       log: ctx.log,
       secrets: ctx.secrets,
       scrubKeys: ctx.secretKeys ?? secrets.map((s) => s.key),
-    }),
+    });
+  },
 });

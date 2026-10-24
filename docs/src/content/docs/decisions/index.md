@@ -21,3 +21,4 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0010](/decisions/0010-context-per-work-item/)            | Each work item has its own context                                            |
 | [0011](/decisions/0011-configurable-workflow/)            | Workflows are configured, not hard-coded                                      |
 | [0012](/decisions/0012-apache-license/)                   | The project is licensed under the Apache License 2.0                          |
+| [0013](/decisions/0013-subprocess-sandbox-opt-in/)        | The subprocess sandbox is opt-in                                              |

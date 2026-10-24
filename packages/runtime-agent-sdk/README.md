@@ -13,11 +13,12 @@ adapters:
 
 ## Options
 
-| Option           | Default                         | Meaning                                                                                          |
-| ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `model`          | `sonnet`                        | Model alias or id, used when a run request names none.                                           |
-| `claudeCodePath` | the binary bundled with the SDK | Path to a pinned Claude Code binary (`pathToClaudeCodeExecutable`). Authentication is unchanged. |
-| `maxTurns`       | none                            | Upper bound on turns per run. A run request's `maxTurns` takes precedence.                       |
+| Option           | Default                         | Meaning                                                                                                      |
+| ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `model`          | `sonnet`                        | Model alias or id, used when a run request names none.                                                       |
+| `claudeCodePath` | the binary bundled with the SDK | Path to a pinned Claude Code binary (`pathToClaudeCodeExecutable`). Authentication is unchanged.             |
+| `maxTurns`       | none                            | Upper bound on turns per run. A run request's `maxTurns` takes precedence.                                   |
+| `sandbox`        | `off`                           | `off` or `bubblewrap`: whether the agent's commands can read the Claude credential. See [Sandbox](#sandbox). |
 
 The SDK version is pinned exactly in `package.json`. Pin the binary as well when you need a fixed Claude Code version, and re-check that skills, settings, agents and hooks load after every upgrade (the runtime upgrade test below does).
 
@@ -38,11 +39,29 @@ The agent's shell must not see secrets with `printenv`, so the child environment
 1. start from the process environment;
 2. remove every secret key declared by any registered adapter (the host passes them as `ctx.secretKeys`; `scrubEnv` from `@outstaff/core`), and always `GH_TOKEN` and `GITHUB_TOKEN`: git gets credentials from the `ost git-credential` helper, never the environment;
 3. add back only the runtime credential the operator supplied, read through the secret source, so it can come from `/run/secrets/outstaff/<KEY>` or `OUTSTAFF_SECRETS_DIR`: `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_OAUTH_REFRESH_TOKEN`, `AWS_BEARER_TOKEN_BEDROCK`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`, `ANTHROPIC_FOUNDRY_API_KEY`, `ANTHROPIC_FOUNDRY_AUTH_TOKEN`;
-4. set `ENABLE_CLAUDEAI_MCP_SERVERS=false` and `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`. The latter makes Claude Code strip credentials from the environment of the Bash tool, hooks and stdio MCP servers. Checked with a live run: a fake `AWS_SECRET_ACCESS_KEY` and `ANTHROPIC_FOUNDRY_API_KEY` given to the process were absent from `printenv` in the Bash tool, while a plain variable was present.
+4. set `ENABLE_CLAUDEAI_MCP_SERVERS=false`, and `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1` only with `sandbox: bubblewrap` (an inherited value is dropped, so the option decides). See [Sandbox](#sandbox).
 
 Non-secret provider configuration passes through: `CLAUDE_CODE_USE_BEDROCK`, `CLAUDE_CODE_USE_VERTEX`, `CLAUDE_CODE_USE_FOUNDRY`, `AWS_REGION`, `AWS_PROFILE`, `ANTHROPIC_BEDROCK_BASE_URL`, `CLOUD_ML_REGION`, `ANTHROPIC_VERTEX_PROJECT_ID`, `ANTHROPIC_VERTEX_BASE_URL`, `ANTHROPIC_FOUNDRY_RESOURCE` and `ANTHROPIC_FOUNDRY_BASE_URL`. Google Vertex AI has no Claude-specific secret: `GOOGLE_APPLICATION_CREDENTIALS` is a path, passed through, and the credential file it names should live in the secrets directory.
 
-Known limit: the documentation of the scrub flag does not name `CLAUDE_CODE_OAUTH_TOKEN`, so with a subscription token the agent's shell may still see it. Mitigate with the token's scope and egress rules. Sources: [environment variables](https://code.claude.com/docs/en/env-vars.md), [Amazon Bedrock](https://code.claude.com/docs/en/amazon-bedrock.md), [Google Vertex AI](https://code.claude.com/docs/en/google-vertex-ai.md), [Microsoft Foundry](https://code.claude.com/docs/en/microsoft-foundry.md).
+Sources: [environment variables](https://code.claude.com/docs/en/env-vars.md), [Amazon Bedrock](https://code.claude.com/docs/en/amazon-bedrock.md), [Google Vertex AI](https://code.claude.com/docs/en/google-vertex-ai.md), [Microsoft Foundry](https://code.claude.com/docs/en/microsoft-foundry.md).
+
+## Sandbox
+
+Steps 1 to 3 keep every other adapter's secrets away from the agent's commands. The Claude credential itself is different: Claude Code needs it in its own environment, and the commands it runs for the agent are its children.
+
+- **`sandbox: off` (default).** Commands the agent runs can read the Claude credential, from their environment or from `/proc/<pid>/environ` of Claude Code, the same as Claude Code on a developer's machine. A prompt injection that gets the agent to run a command can print it. Mitigations:
+  - only trusted humans direct work (decision 0004), so instructions come from people you trust;
+  - deny network tools (`curl`, `wget`, ...) in the team's command policies if you want to make sending it out harder;
+  - use a dedicated API key with a spend limit for each team, never a personal one;
+  - rotate the key if you think it leaked.
+- **`sandbox: bubblewrap`.** The runtime sets `CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1`: Claude Code removes the credential from the environment of commands, hooks and stdio MCP servers and, on Linux, runs each command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces, so it cannot read the credential from another process either. The container needs the `bubblewrap` and `socat` packages and has to allow user namespaces, which a hardened pod does not by default. When `bwrap` is missing, the agent stops at start with `sandbox: bubblewrap needs the bubblewrap and socat packages and a pod that allows user namespaces`.
+
+```yaml
+integrations:
+  runtime: { adapter: claude-agent-sdk, sandbox: bubblewrap }
+```
+
+See [decision 0013](https://docs.outstaff.work/decisions/0013-subprocess-sandbox-opt-in/).
 
 ## Isolation
 

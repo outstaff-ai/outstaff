@@ -38,7 +38,12 @@ describe("adapter definition", () => {
   });
 
   it("validates options and defaults the model", () => {
-    expect(claudeAgentSdk.options.parse({})).toEqual({ model: "sonnet" });
+    expect(claudeAgentSdk.options.parse({})).toEqual({ model: "sonnet", sandbox: "off" });
+    expect(claudeAgentSdk.options.parse({ sandbox: "bubblewrap" })).toMatchObject({
+      sandbox: "bubblewrap",
+    });
+
+    expect(() => claudeAgentSdk.options.parse({ sandbox: "on" })).toThrow(/sandbox/);
     expect(() => claudeAgentSdk.options.parse({ maxTurns: 0 })).toThrow(/maxTurns/);
   });
 });
