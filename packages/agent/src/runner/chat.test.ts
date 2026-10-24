@@ -146,6 +146,7 @@ describe("chat relay", () => {
             id: "w2",
             title: "Search page",
             status: "queued",
+            pr: "app#4",
             prUrl: "https://git.acme.example/acme/app/pull/4",
           },
         ],
@@ -155,7 +156,7 @@ describe("chat relay", () => {
     await dana("fix the footer");
     const text = chat.posts[0]!.text;
     expect(text).toContain("busy");
-    expect(text).toContain(`1. [Checkout bug](${tracker.links.issue("ACME-1")}) (running)`);
+    expect(text).toContain(`1. [ACME-1 Checkout bug](${tracker.links.issue("ACME-1")}) (running)`);
     expect(text).toContain("2. [Search page](https://git.acme.example/acme/app/pull/4)");
     expect(text).toMatch(/next, after one of these \(say its number\), last, or ask the PM/);
     expect(text).toContain("waits at the end");
@@ -284,7 +285,11 @@ describe("chat relay", () => {
 
   describe("context", () => {
     it("gives the thread so far and the person's current work", async () => {
-      await setup({ currentWork: "Ticket ACME-9 (active): Old work" });
+      await setup({
+        currentWork: "Ticket ACME-9 (active): Old work",
+        items: [{ id: "w9", title: "Old work", status: "active", ticketKey: "ACME-9" }],
+      });
+
       const root = await dana("add a search page");
       await chat.post("D-U0DANA0001", "On it.", { thread: root.id });
       await dana("with filters", root.id);
@@ -301,7 +306,11 @@ describe("chat relay", () => {
       expect(text).toContain("with filters");
       expect(text).toContain("On it.");
       expect(text).toContain("(agent)");
-      expect(text).toContain("Your current work:\nTicket ACME-9 (active): Old work");
+      expect(text).toContain(
+        `Your current work, one line per ticket or pull request:\n1. [ACME-9 Old work](${tracker.links.issue("ACME-9")}) (running)`,
+      );
+
+      expect(text).toContain("Their state:\nTicket ACME-9 (active): Old work");
     });
 
     it("falls back to the recent messages of the conversation for a new top-level request", async () => {

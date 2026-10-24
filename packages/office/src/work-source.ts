@@ -82,21 +82,28 @@ export async function summarizeItem(
   current?: string,
 ): Promise<WorkSummary> {
   let ticketKey: string | undefined;
-  let prUrl: string | undefined;
+  let pr: PrRecord | undefined;
   if (item.subject?.type === "ticket") {
     ticketKey = item.subject.ref;
   } else if (item.subject?.type === "pr") {
-    const rec = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
-    ticketKey = rec?.ticket;
-    prUrl = rec?.url;
+    pr = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
+    ticketKey = pr?.ticket;
   }
+
+  const ticketTitle = ticketKey
+    ? ((await store.getSubject("ticket", ticketKey))?.data as TicketRecord | undefined)?.title
+    : undefined;
 
   return {
     id: item.id,
     title: item.title,
     status: item.status,
+    kind: item.kind,
     ...(ticketKey ? { ticketKey } : {}),
-    ...(prUrl ? { prUrl } : {}),
+    ...(ticketTitle ? { ticketTitle } : {}),
+    ...(item.subject?.type === "pr" ? { pr: item.subject.ref } : {}),
+    ...(pr ? { prNumber: pr.ref.number, prTitle: pr.title } : {}),
+    ...(pr?.url ? { prUrl: pr.url } : {}),
     ...(current === item.id ? { current: true } : {}),
   };
 }

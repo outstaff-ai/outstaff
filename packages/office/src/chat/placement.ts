@@ -6,10 +6,11 @@ export type ParsedPlacement =
   | { type: "next" }
   | { type: "last" }
   | { type: "pm" }
-  | { type: "after"; itemId: string };
+  | { type: "after"; itemIds: string[] };
 
+/** One line of the list the requester saw: a piece of work and the ids of all its items. */
 export interface Candidate {
-  id: string;
+  ids: string[];
   title: string;
   ticketKey?: string | undefined;
 }
@@ -17,8 +18,8 @@ export interface Candidate {
 const words = (s: string) => s.toLowerCase().replaceAll(/[^a-z0-9#._ -]+/g, " ");
 
 /**
- * Reads the requester's answer to "where does this go?". `candidates` are the person's other open items in the
- * order they were listed (the active one first), so "after 2" means the second line of that list. Returns nothing
+ * Reads the requester's answer to "where does this go?". `candidates` are the person's other pieces of work in
+ * the order they were listed (the active one first), so "after 2" means the second line of that list, with all its items. Returns nothing
  * when the answer is not one of: next, last, after an item, ask the PM.
  */
 export function parsePlacement(text: string, candidates: Candidate[]): ParsedPlacement | undefined {
@@ -38,11 +39,11 @@ export function parsePlacement(text: string, candidates: Candidate[]): ParsedPla
     const byIndex = ordinal ? candidates[Number(ordinal[1]) - 1] : undefined;
     const hit =
       byIndex ??
-      candidates.find((c) => target.includes(c.id.toLowerCase())) ??
+      candidates.find((c) => c.ids.some((id) => target.includes(id.toLowerCase()))) ??
       candidates.find((c) => c.ticketKey && target.includes(c.ticketKey.toLowerCase())) ??
       candidates.find((c) => c.title.length > 3 && target.includes(c.title.toLowerCase()));
 
-    return hit ? { type: "after", itemId: hit.id } : undefined;
+    return hit ? { type: "after", itemIds: hit.ids } : undefined;
   }
 
   if (/\b(next|first|right away|asap|now|urgent)\b/.test(t)) {

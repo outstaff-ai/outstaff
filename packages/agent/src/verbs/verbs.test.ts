@@ -702,6 +702,10 @@ describe("office verbs", () => {
     const f = fakeEnv();
     const r = await run("work", f.env, {}, { workItemId: "w1" });
     expect(r.text).toContain("* w1 [active] Fix checkout");
+    expect(r.text).toContain(
+      `1. [SHOP-1 Fix checkout](${f.tracker.links.issue("SHOP-1")}) (running)`,
+    );
+
     expect(r.links).toEqual([f.tracker.links.issue("SHOP-1")]);
     expectLinks(r);
   });

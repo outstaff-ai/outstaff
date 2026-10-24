@@ -11,7 +11,7 @@ let h: Harness;
 afterEach(() => h.close());
 
 /** An active ticket sam works on, with a pull request whose mergeability can be scripted. */
-async function conflictSetup() {
+async function conflictSetup(prTitle: (key: string) => string = () => "Search") {
   await h.human("Dana");
   const issue = await h.tracker.createIssue({
     title: "Search",
@@ -26,7 +26,7 @@ async function conflictSetup() {
   );
 
   const pr = await h.vcs.seed.pullRequest(REPO, {
-    title: "Search",
+    title: prTitle(issue.key),
     head: { ref: `sam/${issue.key.toLowerCase()}` },
     author: { login: SAM, kind: "agent" },
   });
@@ -236,6 +236,14 @@ describe("engine", () => {
     const [item] = await h.items("sam");
     expect(item).toMatchObject({ trigger: "automation", priority: 55 });
     expect(item!.title).toBe("conflict: PR #1 Search (ACME-1)");
+  });
+
+  it("adds the ticket key to an item title only when the pull request title lacks it", async () => {
+    h = await harness();
+    const { conflicted } = await conflictSetup((key) => `feat(search): add search (${key})`);
+    await h.engine.handle(conflicted("1"), { source: "workstate", externalId: "p", trusted: true });
+    const [item] = await h.items("sam");
+    expect(item!.title).toMatch(/^conflict: PR #1 feat\(search\): add search \(ACME-1\)$/);
   });
 
   describe("notify", () => {

@@ -1,4 +1,5 @@
 import { PortError } from "@outstaff/core";
+import { formatWorkGroups, groupWork } from "@outstaff/protocol";
 import { z } from "zod";
 import { requireOffice } from "./support.js";
 import { defineVerb, result } from "./types.js";
@@ -69,7 +70,7 @@ export const work = defineVerb({
   cli: ["work", "list"],
   summary: "List your work items.",
   description:
-    "Lists the work items the office has scheduled for you, with their tickets and pull requests.",
+    "Lists the work the office has scheduled for you, one numbered line per ticket (or pull request without one) with the follow-ups on it, and under each line its work items with their ids.",
   input: z.strictObject({}),
   args: [],
   examples: ["ost work list"],
@@ -78,14 +79,16 @@ export const work = defineVerb({
       ctx.workItemId ? { workItemId: ctx.workItemId } : {},
     );
 
-    const link = (key?: string) => (key && env.tracker ? env.tracker.links.issue(key) : undefined);
-    const rows = items.map((i) => ({ ...i, ticketUrl: link(i.ticketKey) }));
-    const lines = rows.flatMap((i) => [
-      `${i.current ? "* " : "- "}${i.id} [${i.status}] ${i.title}`,
-      ...(i.ticketUrl ? [`  ${i.ticketUrl}`] : []),
-      ...(i.prUrl ? [`  ${i.prUrl}`] : []),
+    const ticketUrl = (key: string) => (env.tracker ? env.tracker.links.issue(key) : undefined);
+    const groups = groupWork(items);
+    const lines = formatWorkGroups(groups, ticketUrl).flatMap((line, n) => [
+      line,
+      ...groups[n]!.items.map(
+        (i) => `   ${i.current ? "*" : "-"} ${i.id} [${i.status}] ${i.title}`,
+      ),
     ]);
 
+    const rows = items.map((i) => ({ ...i, ticketUrl: i.ticketKey && ticketUrl(i.ticketKey) }));
     return result(
       lines.length ? lines : ["No work items."],
       { items: rows },

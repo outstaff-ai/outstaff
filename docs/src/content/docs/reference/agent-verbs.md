@@ -551,7 +551,7 @@ ost answer 01J9X "Use the fast queue; orders must not wait on mail."
 
 List your work items.
 
-Lists the work items the office has scheduled for you, with their tickets and pull requests.
+Lists the work the office has scheduled for you, one numbered line per ticket (or pull request without one) with the follow-ups on it, and under each line its work items with their ids.
 
 ```
 ost work list

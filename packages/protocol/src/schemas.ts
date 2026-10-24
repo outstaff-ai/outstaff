@@ -125,7 +125,15 @@ export const workSummarySchema = z.strictObject({
   id: z.string(),
   title: z.string(),
   status: z.string(),
+  kind: z
+    .string()
+    .optional()
+    .describe("What the item is, for example assigned or review_feedback."),
   ticketKey: z.string().optional(),
+  ticketTitle: z.string().optional(),
+  pr: z.string().optional().describe("The office's key of the pull request the item is about."),
+  prNumber: z.number().int().optional(),
+  prTitle: z.string().optional(),
   prUrl: z.string().optional(),
   current: z.boolean().optional().describe("True for the item the caller asked about."),
 });
