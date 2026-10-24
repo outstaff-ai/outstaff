@@ -1,7 +1,7 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../clock.js";
+import { manualClock, type ManualClock } from "../clock.js";
 import { createScheduler } from "../scheduler/scheduler.js";
 import { openStore } from "../store/index.js";
 import type { Store, WorkItem } from "../store/types.js";
@@ -35,6 +35,16 @@ function teamConfig(withPm = true): TeamConfig {
   return result.config;
 }
 
+const until = async (cond: () => boolean) => {
+  for (let i = 0; i < 400 && !cond(); i++) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+
+  if (!cond()) {
+    throw new Error("condition not reached");
+  }
+};
+
 const DANA = { id: "U0DANA0001", name: "Dana" };
 
 describe("chat requests", () => {
@@ -46,6 +56,8 @@ describe("chat requests", () => {
   let notified: string[];
   let asked: { to: string; question: string; workItemId?: string | undefined }[];
   let n: number;
+  let clock: ManualClock;
+  let makeDesk: (withChat?: boolean) => ChatRequests;
 
   const say = (text: string, thread?: string, messageId = `m${++n}`) =>
     desk.message("sam", {
@@ -81,37 +93,111 @@ describe("chat requests", () => {
     n = 0;
     notified = [];
     asked = [];
-    const clock = manualClock();
+    clock = manualClock();
     const team = teamConfig();
     store = await openStore("sqlite::memory:", { now: () => clock.now() });
     scheduler = createScheduler({ store, team, clock });
     tracker = createFakeTracker({ now: clock.now });
     await tracker.seed.member({ name: "Sam", kind: "agent" });
     chat = createFakeChat({ now: clock.now });
-    desk = createChatDesk({
-      store,
-      scheduler,
-      team,
-      workState: {
-        currentWork: (person) => ({
-          person,
-          tickets: [{ key: "ACME-9", title: "Old work", status: "active", prs: [] }],
-          prs: [],
-        }),
-      },
-      tracker,
-      chat,
-      messaging: {
-        async ask(_from, q) {
-          asked.push(q);
-          return { id: "q1", to: "pat", status: "pending" };
+    makeDesk = (withChat = true) =>
+      createChatDesk({
+        clock,
+        store,
+        scheduler,
+        team,
+        workState: {
+          currentWork: (person) => ({
+            person,
+            tickets: [{ key: "ACME-9", title: "Old work", status: "active", prs: [] }],
+            prs: [],
+          }),
         },
-      },
-      linksOf: async (item) =>
-        item.subject?.type === "ticket"
-          ? [{ url: tracker.links.issue(item.subject.ref), title: item.subject.ref }]
-          : [],
-      notify: (p) => notified.push(p),
+        tracker,
+        ...(withChat ? { chat } : {}),
+        messaging: {
+          async ask(_from, q) {
+            asked.push(q);
+            return { id: "q1", to: "pat", status: "pending" };
+          },
+        },
+        linksOf: async (item) =>
+          item.subject?.type === "ticket"
+            ? [{ url: tracker.links.issue(item.subject.ref), title: item.subject.ref }]
+            : [],
+        notify: (p) => notified.push(p),
+      });
+
+    desk = makeDesk();
+  });
+
+  describe("a result the agent did not post", () => {
+    const finished = async (summary = "The search page is up.\nSecond line.\nThird line.") => {
+      const r = await say("please add a search page");
+      await scheduler.markActive(r.item.id);
+      const item = await scheduler.finish(r.item.id, { outcome: summary, status: "done" });
+      const link = { url: "https://git.acme.example/acme/app/pull/4", title: "PR 4" };
+      await desk.handedBack(item, { summary, links: [link] });
+      return item;
+    };
+
+    it("posts it once, mentioning the requester, after the grace period", async () => {
+      await finished();
+      clock.advance(59_000);
+      expect(chat.posts).toEqual([]);
+
+      clock.advance(1_000);
+      await until(() => chat.posts.length === 1);
+      const [post] = chat.posts;
+      expect(post).toMatchObject({ channel: "D1", thread: "m1" });
+      expect(post!.text).toContain("<@U0DANA0001> The search page is up.");
+      expect(post!.text).toContain("offline");
+      expect(post!.text).toContain("https://git.acme.example/acme/app/pull/4");
+      expect(post!.text).not.toContain("Third line");
+
+      clock.advance(600_000);
+      expect(chat.posts).toHaveLength(1);
+    });
+
+    it("stays quiet when the agent claimed the report in time, and refuses a late claim after the office posted", async () => {
+      const item = await finished();
+      expect(await desk.report("sam", item.id, "result")).toMatchObject({ post: true });
+      clock.advance(60_000);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(chat.posts).toEqual([]);
+
+      const second = await say("another one");
+      await scheduler.markActive(second.item.id);
+      const done = await scheduler.finish(second.item.id, { outcome: "Done.", status: "done" });
+      await desk.handedBack(done, { summary: "Done.", links: [] });
+      clock.advance(60_000);
+      await until(() => chat.posts.length === 1);
+      expect(await desk.report("sam", done.id, "result")).toEqual({ post: false, links: [] });
+      expect(chat.posts).toHaveLength(1);
+    });
+
+    it("resumes after a restart from the hand-back time and still posts once", async () => {
+      await finished();
+      clock.advance(40_000);
+      desk.stop();
+
+      const restarted = makeDesk();
+      await restarted.resume();
+      clock.advance(19_000);
+      expect(chat.posts).toEqual([]);
+
+      clock.advance(1_000);
+      await until(() => chat.posts.length === 1);
+      await restarted.resume();
+      clock.advance(120_000);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(chat.posts).toHaveLength(1);
+    });
+
+    it("leaves the result alone without a chat port", async () => {
+      desk = makeDesk(false);
+      await finished();
+      expect(clock.pending()).toBe(0);
     });
   });
 

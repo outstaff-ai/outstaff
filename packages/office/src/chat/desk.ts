@@ -6,6 +6,7 @@ import {
   type Tracker,
 } from "@outstaff/core";
 import type { Link, PayloadOf, WorkSummary } from "@outstaff/protocol";
+import type { Cancel, Clock } from "../clock.js";
 import { ProtocolError, type ChatDesk, type Messaging } from "../protocol/source.js";
 import { CHAT_KIND, orderQueue } from "../scheduler/policy.js";
 import type { Scheduler } from "../scheduler/scheduler.js";
@@ -32,7 +33,7 @@ export interface ChatDeskOptions {
 
   /** The scheduler without the notifying wrapper: the desk stores the origin first and then calls `notify`. */
   scheduler: Pick<Scheduler, "enqueue" | "move">;
-  team: Pick<TeamConfig, "people">;
+  team: Pick<TeamConfig, "people" | "policies">;
   workState: Pick<WorkState, "currentWork">;
   tracker?: Pick<Tracker, "links">;
   messaging?: Pick<Messaging, "ask">;
@@ -44,7 +45,15 @@ export interface ChatDeskOptions {
   linksOf: (item: WorkItem) => Promise<Link[]>;
   notify: (person: string) => void;
   logger?: Logger;
+
+  /** Times the grace period before the office posts a result the agent did not. */
+  clock?: Clock;
+
+  /** How long the agent has to claim the report after its hand-back. Default 60. */
+  graceSeconds?: number;
 }
+
+export const DEFAULT_CHAT_REPORT_GRACE_SECONDS = 60;
 
 const firstLine = (text: string, max = 80) => {
   const line = text.split("\n", 1)[0]!.trim();
@@ -56,11 +65,28 @@ const mention = (origin: ChatOriginRecord) => `<@${origin.requester.id}>`;
 export interface ChatRequests extends ChatDesk {
   /** Tells the requester of a chat item that the scheduler blocked it. Needs the office's chat port. */
   notifyBlocked(item: WorkItem, reason: string): Promise<void>;
+
+  /**
+   * Records the hand-back of a chat item and, if the agent has not claimed the report when the grace period
+   * ends, posts the result through the office's chat port.
+   */
+  handedBack(item: WorkItem, result: { summary: string; links: Link[] }): Promise<void>;
+
+  /** Resumes the grace periods of hand-backs that no report claimed, after a restart. */
+  resume(): Promise<void>;
+
+  /** Cancels the pending timers. */
+  stop(): void;
 }
 
 export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const { store, scheduler } = opts;
   const log = opts.logger ?? silentLogger;
+
+  const clock = opts.clock;
+  const graceMs = (opts.graceSeconds ?? DEFAULT_CHAT_REPORT_GRACE_SECONDS) * 1000;
+  const timers = new Map<string, Cancel>();
+  const maxLines = opts.team.policies?.messages.max_lines ?? 3;
 
   const open = async (person: string, except: string) => {
     const active = await store.listItems({ person, status: "active" });
@@ -266,8 +292,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   }
 
   const claim = async (item: WorkItem, origin: ChatOriginRecord, kind: string) => {
-    const run = (await store.listRuns(item.id)).at(-1);
-    const key = kind === "failed" || kind === "ack" ? kind : `${kind}:${run?.id ?? "0"}`;
+    const key = kind === "failed" || kind === "ack" ? kind : await claimKey(item, kind);
     if (origin.claimed.includes(key)) {
       return false;
     }
@@ -280,7 +305,127 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     return true;
   };
 
+  const claimKey = async (item: WorkItem, kind: string) =>
+    `${kind}:${(await store.listRuns(item.id)).at(-1)?.id ?? "0"}`;
+
+  /** Posts the result the agent did not, unless a report claimed it in the meantime. */
+  async function recover(itemId: string) {
+    timers.delete(itemId);
+    const item = await store.getItem(itemId);
+    const origin = item && (await readOrigin(store, itemId));
+    const hb = origin && origin.handBack;
+    if (
+      !item ||
+      !origin ||
+      !hb ||
+      origin.claimed.includes(hb.key) ||
+      item.status !== (hb.kind === "result" ? "done" : "blocked")
+    ) {
+      return;
+    }
+
+    if (!opts.chat) {
+      return;
+    }
+
+    const got = await claim(item, origin, hb.kind);
+    if (!got) {
+      return;
+    }
+
+    const lines = hb.summary.trim().split("\n");
+    const body = lines.slice(0, Math.max(1, maxLines - 1)).join("\n");
+    const links = [...hb.links, ...(await opts.linksOf(item))].filter(
+      (l, i, all) => all.findIndex((x) => x.url === l.url) === i && !body.includes(l.url),
+    );
+
+    const text = [
+      `${mention(origin)} ${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
+      "(My agent went offline before it could post this, so the office is posting it.)",
+      ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
+    ].join("\n");
+
+    try {
+      await opts.chat.post(origin.channel, text, { thread: origin.thread });
+    } catch (error) {
+      log.warn("could not post the result of a chat item for its agent", {
+        item: item.id,
+        error: String(error),
+      });
+    }
+  }
+
+  const arm = (itemId: string, at: string) => {
+    if (!opts.chat || !clock) {
+      log.warn("no chat port: a chat result the agent does not post will not be posted", {
+        item: itemId,
+      });
+
+      return;
+    }
+
+    timers.get(itemId)?.();
+    const wait = Math.max(0, Date.parse(at) + graceMs - clock.now().getTime());
+    timers.set(
+      itemId,
+      clock.setTimeout(() => {
+        void recover(itemId).catch((error: unknown) => {
+          log.warn("chat result recovery failed", { item: itemId, error: String(error) });
+        });
+      }, wait),
+    );
+  };
+
   return {
+    async handedBack(item, result) {
+      const origin = await readOrigin(store, item.id);
+      const kind =
+        item.status === "done" ? "result" : item.status === "blocked" ? "blocked" : undefined;
+
+      if (!origin || !kind || !clock) {
+        return;
+      }
+
+      const key = await claimKey(item, kind);
+      // A retried hand-back finds it recorded, or the agent already reported it.
+      if (origin.claimed.includes(key) || origin.handBack?.key === key) {
+        return;
+      }
+
+      const at = clock.now().toISOString();
+      await store.upsertSubject(CHAT_ORIGIN_SUBJECT, item.id, {
+        ...origin,
+        handBack: { key, kind, summary: result.summary, links: result.links, at },
+      });
+
+      arm(item.id, at);
+    },
+
+    async resume() {
+      for (const status of ["done", "blocked"] as const) {
+        for (const item of await store.listItems({ status })) {
+          const hb =
+            item.kind === CHAT_KIND ? (await readOrigin(store, item.id))?.handBack : undefined;
+
+          if (
+            hb &&
+            hb.key === (await claimKey(item, hb.kind)) &&
+            !(await readOrigin(store, item.id))?.claimed.includes(hb.key)
+          ) {
+            arm(item.id, hb.at);
+          }
+        }
+      }
+    },
+
+    stop() {
+      for (const cancel of timers.values()) {
+        cancel();
+      }
+
+      timers.clear();
+    },
+
     async message(person, m) {
       const key = `${person}:${m.channel}:${m.messageId}`;
       const seen = (await store.getSubject(CHAT_MESSAGE_SUBJECT, key))?.data as

@@ -8,6 +8,7 @@ import {
   type ChatRelay,
   type OfficeConnection,
   type WorkLoop,
+  type WorkLoopOptions,
 } from "@outstaff/agent";
 import {
   AdapterRegistry,
@@ -28,6 +29,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "../clock.js";
 import { createOffice, type Office } from "../office.js";
+import { readOrigin } from "./origin.js";
 import { openStore, type Store } from "../store/index.js";
 
 const DANA = "U0DANA0001";
@@ -96,9 +98,9 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       ...(thread ? { thread } : {}),
     });
 
-  const startLoop = (rt: Runtime = runtime) => {
+  const loopOptions = (rt: Runtime = runtime): WorkLoopOptions => {
     const t = team();
-    loop = createWorkLoop({
+    return {
       office: conn,
       runtime: rt,
       env,
@@ -121,8 +123,11 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       workdir: "/h/work",
       addDirs: [],
       chat: relay,
-    });
+    };
+  };
 
+  const startLoop = (rt: Runtime = runtime) => {
+    loop = createWorkLoop(loopOptions(rt));
     running = loop.run();
   };
 
@@ -379,5 +384,62 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     expect(agentChat.posts[0]!.text).toContain("model overloaded");
     expect(agentChat.posts.filter((p) => p.text.includes("could not finish"))).toHaveLength(1);
     expect(agentChat.posts[1]!.text).toContain("pull/9");
+  });
+
+  describe("an agent that dies after the hand-back", () => {
+    const quiet = (): Runtime => ({
+      async *run() {
+        yield {
+          type: "finished",
+          ok: true,
+          text: "Done: https://git.acme.example/acme/app/pull/7",
+        };
+      },
+    });
+
+    // No relay on the loop stands for an agent that dies between the hand-back and the post.
+    const handBackOnly = async () => {
+      await dana("please add a search page");
+      const { chat: _relay, ...options } = loopOptions(quiet());
+      loop = createWorkLoop(options);
+      running = loop.run();
+      // The status turns to done a moment before the office records the hand-back and starts its timer.
+      await until(async () => {
+        const [item] = await store.listItems({ person: "sam" });
+        return item ? Boolean((await readOrigin(store, item.id))?.handBack) : false;
+      });
+    };
+
+    it("gets one post from the office, and refuses the agent's late report", async () => {
+      await handBackOnly();
+      clock.advance(60_000);
+      await until(() => officeChat.posts.length === 1);
+      expect(officeChat.posts[0]!.text).toContain(`<@${DANA}>`);
+      expect(officeChat.posts[0]!.text).toContain("pull/7");
+
+      const [item] = await store.listItems({ person: "sam" });
+      // The jump may have cost the agent its connection (its heartbeat runs on the same clock), so let it retry.
+      let late: unknown;
+      void conn.chatReport(item!.id, "result").then((r) => (late = r));
+      await until(() => {
+        clock.advance(1_000);
+        return late !== undefined;
+      });
+
+      expect(late).toMatchObject({ post: false });
+      clock.advance(120_000);
+      expect(officeChat.posts).toHaveLength(1);
+      expect(agentChat.posts).toEqual([]);
+    });
+
+    it("leaves the office silent when the agent reports within the window", async () => {
+      await dana("please add a search page");
+      startLoop(quiet());
+      await until(() => agentChat.posts.length === 1);
+      clock.advance(120_000);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(officeChat.posts).toEqual([]);
+      expect(agentChat.posts).toHaveLength(1);
+    });
   });
 });
