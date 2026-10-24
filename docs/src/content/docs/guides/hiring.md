@@ -27,7 +27,7 @@ In a terminal it asks about the name, handle, pronouns and repo grants (press En
 
 ## What it does
 
-1. Checks that git would ignore the secrets, as [`ost setup`](/guides/setup/) does, before writing anything.
+1. Checks that git would ignore the secrets (`.outstaff/secrets/` and the `.env` file), as [`ost setup`](/guides/setup/) does, before writing anything. Like every `ost` command it finds the team file from anywhere inside the repository.
 2. Adds the person to `people` in `team.yaml`. Comments, quoting and the other sections stay as they were.
 3. Renders the avatar to `.outstaff/people/<handle>/avatar.svg` (or `.png`) when `integrations.avatars` is configured.
 4. Does what `ost setup <handle>` does: writes `.outstaff/people/<handle>/.env.example` and prints the guide per adapter.

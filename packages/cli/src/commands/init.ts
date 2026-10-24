@@ -12,7 +12,7 @@ export const catalogVersion = (): string => {
   return version;
 };
 
-export const GITIGNORE_RULES = [".outstaff/people/*/.env", ".env", "*.pem"];
+export const GITIGNORE_RULES = [".outstaff/secrets/", ".outstaff/**/.env", ".env", "*.pem"];
 
 export function slugify(input: string, fallback: string): string {
   const s = input

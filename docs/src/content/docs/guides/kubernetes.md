@@ -60,7 +60,7 @@ The manifests expect these Secrets in the namespace. The keys listed are the acm
 
 The agent pods mount their own Secret plus only the four `GH_OFFICE_APP_*` keys of the office Secret, in one directory. An agent never sees another person's secrets or the office's other keys.
 
-With the files laid out as in `examples/compose/secrets/` (one folder per person and one for the office), plain `kubectl` creates all of it:
+With the files laid out as in `examples/compose/secrets/` or your own `.outstaff/secrets/` (one folder per person and one for the office; run this from `.outstaff/`), plain `kubectl` creates all of it:
 
 ```sh
 ns=outstaff-acme

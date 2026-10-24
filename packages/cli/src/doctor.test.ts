@@ -33,8 +33,8 @@ function project() {
   return dir;
 }
 
-function secretFiles(dir: string, files: Record<string, string>, mode = 0o600) {
-  const secrets = join(dir, "secrets");
+function secretFiles(dir: string, files: Record<string, string>, mode = 0o600, scope = "mira") {
+  const secrets = join(dir, ".outstaff", "secrets", scope);
   mkdirSync(secrets, { recursive: true });
   for (const [k, v] of Object.entries(files)) {
     writeFileSync(join(secrets, k), `${v}\n`);
@@ -343,16 +343,21 @@ describe("ost doctor with the shipped adapters", () => {
       ...office
     } = allSecrets;
 
-    secretFiles(dir, {
-      ...office,
-      SLACK_OFFICE_BOT_TOKEN: "xoxb-fake-office",
-      ...Object.fromEntries(
-        ["PRIYA", "TOMAS", "MIRA", "LEO", "SAM", "NOOR", "INES", "KOFI"].map((h) => [
-          `OUTSTAFF_AGENT_TOKEN_${h}`,
-          `${h}-token`,
-        ]),
-      ),
-    });
+    secretFiles(
+      dir,
+      {
+        ...office,
+        SLACK_OFFICE_BOT_TOKEN: "xoxb-fake-office",
+        ...Object.fromEntries(
+          ["PRIYA", "TOMAS", "MIRA", "LEO", "SAM", "NOOR", "INES", "KOFI"].map((h) => [
+            `OUTSTAFF_AGENT_TOKEN_${h}`,
+            `${h}-token`,
+          ]),
+        ),
+      },
+      0o600,
+      "office",
+    );
 
     const r = await ost(dir, ["doctor", "office"], { fetch: router(), now: () => new Date() });
     expect(r.out).not.toMatch(/^ {2}fail/m);
@@ -445,5 +450,35 @@ describe("ost doctor office reachability", () => {
     expect(r.out).toContain("warn  Office reachable: OUTSTAFF_OFFICE_URL is not set");
     const o = await ost(dir, ["doctor", "office"], { registry: fakeRegistry(() => []) });
     expect(o.out).toContain("warn  Office checks itself");
+  });
+});
+
+describe("ost doctor secrets directory", () => {
+  it("defaults to .outstaff/secrets/<handle> and works from a subdirectory of the repository", async () => {
+    const dir = project();
+    secretFiles(dir, { FAKE_TOKEN: VALUE });
+    const sub = join(dir, "packages", "app");
+    mkdirSync(sub, { recursive: true });
+    const r = await ost(sub, ["doctor", "mira"], { registry: fakeRegistry(() => []) });
+    expect(r.out).toContain(join(dir, ".outstaff", "secrets", "mira"));
+    expect(r.out).not.toMatch(/FAKE_TOKEN is missing|Missing secret FAKE_TOKEN/);
+  });
+
+  it("lets --secrets-dir and OUTSTAFF_SECRETS_DIR override the default", async () => {
+    const dir = project();
+    const other = join(dir, "other");
+    mkdirSync(other);
+    writeFileSync(join(other, "FAKE_TOKEN"), `${VALUE}\n`, { mode: 0o600 });
+    const registry = fakeRegistry(() => []);
+    const flag = await ost(dir, ["doctor", "mira", "--secrets-dir", "other"], { registry });
+    const env = await ost(dir, ["doctor", "mira"], {
+      registry,
+      env: { OUTSTAFF_SECRETS_DIR: other },
+    });
+
+    const none = await ost(dir, ["doctor", "mira"], { registry });
+    expect(flag.out).toContain(other);
+    expect(env.out).toContain(other);
+    expect(none.out).not.toContain(other);
   });
 });
