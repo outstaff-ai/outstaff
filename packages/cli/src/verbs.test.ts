@@ -208,7 +208,21 @@ integrations:
         ...fake,
         create: async ({ secrets }) => {
           secrets.require("FAKE_APP_KEY");
-          return vcs;
+          // Like the GitHub adapter: write credentials go only to the person this container acts as, which it
+          // learns from the OUTSTAFF_PERSON the process was given.
+          return {
+            ...vcs,
+            async credentials(person, repo, access) {
+              if (access === "write" && secrets.get("OUTSTAFF_PERSON") !== person) {
+                throw new PortError(
+                  "forbidden",
+                  "Write credentials are only issued to an agent from its own container.",
+                );
+              }
+
+              return vcs.credentials(person, repo, access);
+            },
+          };
         },
       });
 
@@ -236,6 +250,40 @@ integrations:
       const r = await helper("get", request("acme-example/shop.git"));
       expect(r.code).toBe(0);
       expect(r.out).toContain("username=x-access-token\npassword=fake-token-sam-write\n");
+    });
+
+    // The token is never printed: a failing assertion shows true or false, not the output.
+    const isPair = (out: string, access: "read" | "write") =>
+      /^username=x-access-token\npassword=\S+\n/.test(out) && out.includes(`-${access}\n`);
+
+    it("issues a write credential when OUTSTAFF_PERSON is only in the environment", async () => {
+      const r = await helper("get", request("acme-example/shop.git"));
+      expect(r.code).toBe(0);
+      expect(isPair(r.out, "write")).toBe(true);
+      expect(r.err).toBe("");
+    });
+
+    it("issues no write credential for a repo the person can only read, or where the role is readonly", async () => {
+      const readGrant = await helper("get", request("acme-example/design-system.git"));
+      expect(isPair(readGrant.out, "read")).toBe(true);
+      expect(readGrant.out.includes("-write")).toBe(false);
+
+      const readonlyRole = await helper("get", request("acme-example/shop.git"), {
+        role: "reviewer",
+      });
+
+      expect(isPair(readonlyRole.out, "read")).toBe(true);
+      expect(readonlyRole.out.includes("-write")).toBe(false);
+    });
+
+    it("refuses when OUTSTAFF_PERSON is not set", async () => {
+      const r = await helper("get", request("acme-example/shop.git"), {
+        env: { OUTSTAFF_PERSON: "" },
+      });
+
+      expect(r.code).toBe(1);
+      expect(r.out).toBe("");
+      expect(r.err).toContain("OUTSTAFF_PERSON");
     });
 
     it("works with none of the secret keys in the environment, only the files", async () => {
