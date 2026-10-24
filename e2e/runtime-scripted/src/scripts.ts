@@ -100,12 +100,10 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const threads = yield { type: "tool", tool: "pr_threads", input: { repo, number } };
   const feedback = ctx.feedback;
   // A review's prompt lists its inline comments with their threads; otherwise every open thread is meant.
-  const ids = feedback?.threads.length
-    ? feedback.threads
-    : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
-
-  const conversational = feedback !== undefined && feedback.kind !== "inline_comment";
-  if (ids.length === 0 && !conversational) {
+  const listed = feedback.flatMap((f) => f.threads);
+  const ids = listed.length > 0 ? listed : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
+  const conversational = feedback.filter((f) => f.kind !== "inline_comment");
+  if (ids.length === 0 && conversational.length === 0) {
     throw new Error("The feedback left no open thread and no summary or comment to answer.");
   }
 
@@ -133,8 +131,8 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   }
 
   // A summary or a conversation comment has no thread: answer it on the pull request, quoting what it says.
-  if (conversational && feedback.body) {
-    const quote = feedback.body
+  for (const f of conversational.filter((c) => c.body)) {
+    const quote = f.body
       .split("\n")
       .map((l) => `> ${l}`)
       .join("\n");
@@ -145,7 +143,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
       input: {
         repo,
         number,
-        body: `${quote}\n\n${feedback.url ? `${feedback.url}\n\n` : ""}Fixed in ${sha}.`,
+        body: `${quote}\n\n${f.url ? `${f.url}\n\n` : ""}Fixed in ${sha}.`,
       },
     };
   }
@@ -162,7 +160,8 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const branch = need(ctx.branch, "the branch");
-  const feedback = need(ctx.feedback, "the feedback");
+  // A merged pull request gets one comment per round; the first piece of feedback is the one to answer.
+  const feedback = need(ctx.feedback?.[0], "the feedback");
   const quote = feedback.body
     .split("\n")
     .map((l) => `> ${l}`)

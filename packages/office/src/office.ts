@@ -292,6 +292,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     onHandedBack: async (item, result) => {
       await chatDesk.handedBack(item, result);
       await handedBack(item);
+      await track(engine.followUp(item.id));
     },
   });
 

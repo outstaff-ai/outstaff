@@ -37,8 +37,12 @@ export function buildWorkPrompt(
     }
   }
 
-  const fb = context.feedback;
-  if (fb) {
+  const feedback = context.feedback ?? [];
+  if (feedback.length > 1) {
+    lines.push("", `This round covers ${feedback.length} pieces of feedback, oldest first.`);
+  }
+
+  for (const fb of feedback) {
     const what = {
       review: `a review${fb.state ? ` (${fb.state.replaceAll("_", " ")})` : ""}`,
       comment: "a comment on the pull request conversation",

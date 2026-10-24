@@ -9,7 +9,13 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
-import { awaitsReview, feedbackOf, FEEDBACK_SUBJECT } from "./feedback.js";
+import {
+  addFeedback,
+  awaitsReview,
+  feedbackOf,
+  FOLLOW_UP_SUBJECT,
+  undeliveredFeedback,
+} from "./feedback.js";
 import { clip, prLabel, subjectLabel } from "../log.js";
 import { PRIORITY, priorityFor } from "../scheduler/index.js";
 import type { WorkItem, WorkItemTrigger } from "../store/index.js";
@@ -66,6 +72,9 @@ function past(e: Effect): string {
 
 /** Thrown inside an effect to record it as skipped instead of applied. */
 class Skip extends Error {}
+
+/** Thrown inside a schedule effect that joined an item already queued or running: applied, but nothing new queued. */
+class Attached extends Error {}
 
 const sameSubject = (a: WorkItem["subject"], b: { type: string; ref: string } | undefined) =>
   !!a && !!b && a.type === b.type && a.ref === b.ref;
@@ -268,15 +277,22 @@ export function createEngine(opts: EngineOptions): Engine {
 
     const mine = await store.listItems({ person: e.person });
     if (subject) {
-      const dup = mine.find(
-        (i) =>
-          LIVE.has(i.status) &&
-          // A chat request is already working on the ticket it filed.
-          (i.kind === e.kind || i.kind === "chat") &&
-          sameSubject(i.subject, subject),
-      );
-
+      const live = mine.filter((i) => LIVE.has(i.status) && sameSubject(i.subject, subject));
+      // A chat request is already working on the ticket it filed.
+      const dup = live.find((i) => i.kind === e.kind) ?? live.find((i) => i.kind === "chat");
       if (dup) {
+        // Feedback for a round that is queued or running is attached to it instead of being lost: a queued item
+        // offers it with the rest, and for a running one the follow-up round after the hand-back picks it up.
+        const feedback = dup.kind === e.kind ? feedbackOf(event) : undefined;
+        if (feedback) {
+          await addFeedback(store, dup.id, feedback);
+          throw new Attached(
+            dup.status === "queued"
+              ? `attached to work item ${dup.id} (${dup.kind}, queued)`
+              : `attached to work item ${dup.id} (${dup.kind}, running; a follow-up round starts after its hand-back)`,
+          );
+        }
+
         throw new Skip(`work item ${dup.id} (${dup.kind}) is already ${dup.status}`);
       }
     }
@@ -328,7 +344,7 @@ export function createEngine(opts: EngineOptions): Engine {
     });
 
     if (feedback) {
-      await store.upsertSubject(FEEDBACK_SUBJECT, item.id, feedback);
+      await addFeedback(store, item.id, feedback);
     }
 
     return `queued work item ${item.id} for ${e.person}`;
@@ -469,10 +485,14 @@ export function createEngine(opts: EngineOptions): Engine {
       }
 
       let outcome: EffectOutcome;
+      let attached = false;
       try {
         outcome = { effect, status: "applied", note: await apply(effect, event, plan), at: now() };
       } catch (error) {
-        if (error instanceof Skip) {
+        if (error instanceof Attached) {
+          outcome = { effect, status: "applied", note: error.message, at: now() };
+          attached = true;
+        } else if (error instanceof Skip) {
           outcome = { effect, status: "skipped", note: error.message, at: now() };
         } else if (error instanceof PortError && !TRANSIENT.has(error.code)) {
           outcome = {
@@ -489,7 +509,7 @@ export function createEngine(opts: EngineOptions): Engine {
 
       if (outcome.status === "applied") {
         const rules = ruleOf.get(JSON.stringify(effect));
-        logger.info(`engine: ${past(effect)}`, {
+        logger.info(`engine: ${attached ? outcome.note : past(effect)}`, {
           effect: effect.type,
           subject,
           ...(rules ? { rules } : {}),
@@ -511,5 +531,41 @@ export function createEngine(opts: EngineOptions): Engine {
     return results;
   };
 
-  return { handle: (event, meta) => locked(() => run(event, meta)) };
+  const followUp = async (itemId: string): Promise<void> => {
+    if ((await store.getSubject(FOLLOW_UP_SUBJECT, itemId)) !== undefined) {
+      return;
+    }
+
+    const late = await undeliveredFeedback(store, itemId);
+    const item = await store.getItem(itemId);
+    if (!item || late.length === 0) {
+      return;
+    }
+
+    // Anything the hand-back could not have covered, because it arrived after the offer, gets a round of its own.
+    const next = await scheduler.enqueue({
+      person: item.person,
+      kind: item.kind,
+      title: item.title,
+      trigger: item.trigger,
+      priority: item.priority,
+      parentId: item.id,
+      ...(item.subject ? { subject: item.subject } : {}),
+    });
+
+    for (const feedback of late) {
+      await addFeedback(store, next.id, feedback);
+    }
+
+    await store.upsertSubject(FOLLOW_UP_SUBJECT, itemId, { itemId: next.id });
+    logger.info(
+      `engine: queued follow-up work item ${next.id} for ${item.person}: ${late.length} new feedback after ${item.id} was offered`,
+      { person: item.person, item: next.id, after: item.id },
+    );
+  };
+
+  return {
+    handle: (event, meta) => locked(() => run(event, meta)),
+    followUp: (itemId) => locked(() => followUp(itemId)),
+  };
 }

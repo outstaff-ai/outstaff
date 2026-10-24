@@ -3,7 +3,7 @@ import type { Link, Member, Ref, WorkSummary } from "@outstaff/protocol";
 import { ProtocolError, type Offer, type WorkSource } from "./protocol/source.js";
 import { readRoster, type RosterOptions } from "./messaging/roster.js";
 import { publicOrigin, readOrigin } from "./chat/origin.js";
-import { readFeedback } from "./engine/feedback.js";
+import { deliverFeedback, readFeedback } from "./engine/feedback.js";
 import { placeQueued } from "./chat/placement.js";
 import type { BlockNotice, Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
@@ -153,10 +153,14 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
   const { subjectsOf } = itemRefs(store, opts.ports);
 
-  const offerOf = async (item: WorkItem): Promise<Offer> => {
+  // A new offer counts as delivering the feedback it carries; a resumed one the agent already has.
+  const offerOf = async (item: WorkItem, fresh = true): Promise<Offer> => {
     const subjects = await subjectsOf(item);
     const origin = await readOrigin(store, item.id);
-    const feedback = await readFeedback(store, item.id);
+    const feedback = fresh
+      ? await deliverFeedback(store, item.id)
+      : await readFeedback(store, item.id);
+
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       workItem: {
@@ -177,7 +181,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         })),
         subjects,
         links: subjects.flatMap((s) => (s.url ? [{ url: s.url, title: s.title ?? s.ref }] : [])),
-        ...(feedback ? { feedback } : {}),
+        ...(feedback.length > 0 ? { feedback } : {}),
       },
     };
   };
@@ -188,10 +192,10 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
     async outstanding(person) {
       const active = await store.listItems({ person, status: "active" });
       return Promise.all(
-        active.map(async (item) => ({
-          offer: await offerOf(item),
-          accepted: (await stateOf(item.id)).accepted,
-        })),
+        active.map(async (item) => {
+          const accepted = (await stateOf(item.id)).accepted;
+          return { offer: await offerOf(item, !accepted), accepted };
+        }),
       );
     },
 
