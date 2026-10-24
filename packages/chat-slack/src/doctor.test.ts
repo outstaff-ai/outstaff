@@ -64,7 +64,10 @@ describe("doctorSlack", () => {
     const { c } = ctx({ ok: true, user_id: "U0BOT" }, person());
     expect(
       (await doctorSlack(secrets(), c)).find((x) => x.name === "Slack identity"),
-    ).toMatchObject({ status: "warn" });
+    ).toMatchObject({
+      status: "warn",
+      fix: "Set identities.chat to U0BOT for sam in team.yaml.",
+    });
   });
 
   it("fails on an app token that is not an app-level token", async () => {

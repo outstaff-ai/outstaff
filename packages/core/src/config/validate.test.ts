@@ -49,10 +49,16 @@ const config = (mutate: (c: any) => void = () => {}) => {
         handle: "ada",
         name: "Ada",
         role: "developer",
-        identities: { vcs: "acme-ada[bot]" },
+        identities: { vcs: "acme-ada[bot]", chat: "U0ADA", tracker: "ada" },
         repos: { app: "write" },
       },
-      { handle: "marcus", name: "Marcus", role: "architect", repos: { app: "read" } },
+      {
+        handle: "marcus",
+        name: "Marcus",
+        role: "architect",
+        identities: { vcs: "acme-marcus[bot]", chat: "U0MARCUS", tracker: "marcus" },
+        repos: { app: "read" },
+      },
     ],
     integrations: {
       chat: { adapter: "slack" },
@@ -209,16 +215,70 @@ describe("validateTeam", () => {
   });
 
   it("warns about writers without a vcs identity", () => {
-    const c = config((x) => delete x.people[0].identities);
+    const c = config((x) => delete x.people[0].identities.vcs);
     expect(validateTeam(c, ctx()).warnings).toEqual([
       {
         path: ["people", 0, "identities", "vcs"],
         code: "people.missing_vcs_identity",
         message: "ada has a write grant but no identities.vcs.",
         consequence:
-          "ada's pull requests and comments are treated as an unknown human's, not as the agent's own.",
+          "the office won't recognise ada's pull requests and comments as the agent's own; run `ost setup ada --derive` and copy the value into team.yaml.",
       },
     ]);
+  });
+
+  it("does not warn a reader without a vcs identity, but warns a reviewer", () => {
+    const c = config((x) => delete x.people[1].identities.vcs);
+    expect(validateTeam(c, ctx()).warnings).toEqual([]);
+
+    c.people[1]!.role = "reviewer";
+    expect(validateTeam(c, ctx()).warnings.map((w) => w.code)).toEqual([
+      "people.reviewer_without_github",
+    ]);
+  });
+
+  it("does not warn about vcs for a person without GitHub access", () => {
+    const c = config((x) => {
+      x.people[1].repos = {};
+      delete x.people[1].identities.vcs;
+    });
+
+    expect(validateTeam(c, ctx()).warnings).toEqual([]);
+  });
+
+  it("warns per person and port about a missing chat or tracker identity", () => {
+    const c = config((x) => {
+      delete x.people[0].identities.chat;
+      delete x.people[1].identities.tracker;
+    });
+
+    expect(validateTeam(c, ctx()).warnings).toEqual([
+      {
+        path: ["people", 0, "identities", "chat"],
+        code: "people.missing_chat_identity",
+        message: "ada has no identities.chat.",
+        consequence:
+          "the office won't recognise ada's chat messages; run `ost setup ada --derive` and copy the value into team.yaml.",
+      },
+      {
+        path: ["people", 1, "identities", "tracker"],
+        code: "people.missing_tracker_identity",
+        message: "marcus has no identities.tracker.",
+        consequence:
+          "the office won't recognise marcus's tracker activity; run `ost setup marcus --derive` and copy the value into team.yaml.",
+      },
+    ]);
+  });
+
+  it("does not ask for a tracker identity when no tracker is configured", () => {
+    const c = config((x) => {
+      delete x.integrations.tracker;
+      x.people.forEach((p: any) => delete p.identities.tracker);
+    });
+
+    expect(
+      validateTeam(c, ctx()).warnings.filter((w) => w.code.startsWith("people.missing")),
+    ).toEqual([]);
   });
 
   it("accepts a person without grants whose role does not review", () => {
@@ -244,7 +304,11 @@ describe("validateTeam", () => {
   });
 
   it("warns about a reviewer without an own App", () => {
-    const c = config((x) => (x.people[1].role = "reviewer"));
+    const c = config((x) => {
+      x.people[1].role = "reviewer";
+      delete x.people[1].identities.vcs;
+    });
+
     expect(validateTeam(c, ctx()).warnings).toEqual([
       {
         path: ["people", 1, "identities", "vcs"],
@@ -259,7 +323,7 @@ describe("validateTeam", () => {
   it("does not warn about a reviewer with a grant and an own App", () => {
     const c = config((x) => {
       x.people[1].role = "reviewer";
-      x.people[1].identities = { vcs: "acme-marcus[bot]" };
+      x.people[1].identities.vcs = "acme-marcus[bot]";
     });
 
     expect(validateTeam(c, ctx()).warnings).toEqual([]);

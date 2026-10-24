@@ -67,7 +67,7 @@ export async function doctorItsaplan(
         name: "Its a Plan identity",
         status: "warn",
         detail: `identities.tracker is not set for ${ctx.person.handle}, so the office cannot recognise its activity.`,
-        fix: `Set identities.tracker to ${id ?? "the member id"} in the team file.`,
+        fix: `Set identities.tracker to ${id ?? "the member id"} for ${ctx.person.handle} in team.yaml.`,
       });
     } else if (id === undefined) {
       out.push({
@@ -81,7 +81,7 @@ export async function doctorItsaplan(
         name: "Its a Plan identity",
         status: "fail",
         detail: `identities.tracker is "${wanted}" but the API key belongs to member ${id}${username ? ` (${username})` : ""}.`,
-        fix: `Set identities.tracker to ${id} in the team file, or use the key of the right member.`,
+        fix: `Set identities.tracker to ${id} for ${ctx.person.handle} in team.yaml, or use the key of the right member.`,
       });
     } else {
       out.push({
