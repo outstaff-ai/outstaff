@@ -10,8 +10,13 @@ export {
 } from "./build.js";
 
 export { loadToolset, parseToolset, teamCommandsToPack, toolsetToPack } from "./packs.js";
+export { effectiveTools, toolsToPacks, type EffectiveTool, type ToolOrigin } from "./tools.js";
 export {
   teamCommandsSchema,
+  toolsSchema,
+  type ToolDeclaration,
+  type ToolRuleInput,
+  type Tools,
   toolsetSchema,
   type CommandRuleInput,
   type TeamCommands,

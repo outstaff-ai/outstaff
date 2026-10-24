@@ -24,12 +24,19 @@ export const me = defineVerb({
       office: env.office !== undefined,
     };
 
+    const tools = env.tools ?? [];
+    const toolLine = (t: (typeof tools)[number]) =>
+      t.state === "unavailable"
+        ? `${t.name} ${t.version} UNAVAILABLE (${t.error})`
+        : `${t.name} ${t.version}`;
+
     const email = env.team.email?.pattern.replace("{handle}", person.handle);
     return result(
       [
         `${person.name} (${person.handle}), ${person.role} on ${env.team.team.name}`,
         ...(email ? [`Email: ${email}`] : []),
         `Repositories: ${grants.length ? grants.join(", ") : "none"}`,
+        `Tools: ${tools.length ? tools.map(toolLine).join("; ") : "none"}`,
         `Connected: ${Object.entries(connected)
           .map(([k, v]) => `${k} ${v ? "yes" : "no"}`)
           .join(", ")}`,
@@ -41,6 +48,7 @@ export const me = defineVerb({
         team: env.team.team.name,
         email: email ?? null,
         repos: person.repos,
+        tools,
         connected,
       },
       [],

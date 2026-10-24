@@ -1,13 +1,13 @@
 name: infra
-description: Read-only infrastructure CLIs. Applying changes goes through a pull request. Matches the infra image variant.
+description: Read-only infrastructure CLIs, installed at agent start. Applying changes goes through a pull request.
 profiles: [infra]
-rules:
-  - program: terraform
-    verbs: [init, validate, fmt, plan, show]
-    reason: Does not change infrastructure.
-  - program: kubectl
-    verbs: [get, describe, logs, diff]
-    reason: Read-only.
-  - program: helm
-    verbs: [template, lint]
-    reason: Local rendering only.
+tools:
+  terraform:
+    version: 1.9.8
+    allow: [init, validate, fmt, plan, show]
+  kubectl:
+    version: 1.31.3
+    allow: [get, describe, logs, diff]
+  helm:
+    version: 3.16.3
+    allow: [template, lint]

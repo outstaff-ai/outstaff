@@ -35,4 +35,9 @@ Rendering is strict: an unknown path (also in `#if`), a bad tag or an unbalanced
 
 ## Toolsets
 
-`toolsets/<name>.yaml` holds command permission rules for a family of tools, matching the image variants: `code` (language toolchains) and `infra` (read-only terraform, kubectl and helm verbs). Core loads them with `loadToolset()` and `toolsetToPack()` and merges the result into `buildPolicy({ packs })`. Teams add their own tools under `policies.commands` in `team.yaml`.
+`toolsets/<name>.yaml` declares a family of tools and what the agent may run of them. A role names its toolset in `role.yaml` (`base`, `code` or `infra`). A toolset has two optional parts, and needs at least one:
+
+- `tools:` installs tools at agent start with mise and allows their declared commands. Each entry is `name: { version, source?, allow }`: an exact `version`, an optional mise `source` such as `ubi:vendor/their-cli`, and `allow` as `all`, a list of first subcommands, or structured command rules. Installing a tool allows nothing by itself. The stock `infra` toolset (terraform, kubectl, helm) and the `code` toolset (pnpm, yarn, python, go) are written this way.
+- `rules:` holds plain command permission rules for programs that come with the image (node, npm) or that Outstaff does not install (make). The stock `code` toolset has both parts.
+
+Teams add their own tools under `tools:` in `team.yaml` (for everyone) or `people[].tools` (for one agent); a person's declaration beats the team's, which beats a toolset's. Core loads toolsets with `loadToolset()`, turns `rules:` into a pack with `toolsetToPack()`, resolves the tools with `effectiveTools()` and turns them into packs with `toolsToPacks()`, then merges everything into `buildPolicy({ packs })`. Teams add rules for other commands under `policies.commands`. See the [tools guide](https://github.com/outstaff-ai/outstaff/blob/main/docs/src/content/docs/guides/tools.md).

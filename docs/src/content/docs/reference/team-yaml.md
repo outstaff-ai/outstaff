@@ -452,6 +452,48 @@ Repository access by repo name, "kind:<primary|baseline|infra|other>" or "*"; va
 - Optional
 - Default: `{}`
 
+### people[].tools
+
+Tools for this agent only; they replace team-level tools of the same name.
+
+- Type: `map`
+- Optional
+
+#### people[].tools.<key>
+
+A tool installed at agent start, with the commands it may run.
+
+- Type: `object`
+- Optional
+
+#### people[].tools.<key>.version
+
+Exact version to install, for example "1.23.4".
+
+- Type: `string`
+- Required
+
+#### people[].tools.<key>.source
+
+Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cli or npm:their-cli. Defaults to the tool name, which mise looks up in its registry.
+
+- Type: `string`
+- Optional
+- Must match `^[a-z0-9_-]+:\S+$`
+
+#### people[].tools.<key>.allow
+
+What the agent may run: "all" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win.
+
+- Type: `string or list of string or list of object`
+- Required
+
+#### people[].tools.<key>.allow[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 ### people[].avatar
 
 Avatar settings.
@@ -613,6 +655,48 @@ Seconds between polls when events is "poll".
 ### office.channel
 
 Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+## tools
+
+Tools every agent of the team installs at start, with the commands they may run.
+
+- Type: `map`
+- Optional
+
+### tools.<key>
+
+A tool installed at agent start, with the commands it may run.
+
+- Type: `object`
+- Optional
+
+#### tools.<key>.version
+
+Exact version to install, for example "1.23.4".
+
+- Type: `string`
+- Required
+
+#### tools.<key>.source
+
+Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cli or npm:their-cli. Defaults to the tool name, which mise looks up in its registry.
+
+- Type: `string`
+- Optional
+- Must match `^[a-z0-9_-]+:\S+$`
+
+#### tools.<key>.allow
+
+What the agent may run: "all" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win.
+
+- Type: `string or list of string or list of object`
+- Required
+
+#### tools.<key>.allow[]
 
 - Type: `string`
 - Optional

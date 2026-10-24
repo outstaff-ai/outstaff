@@ -16,7 +16,7 @@ A team runs one **office** container and one **agent** container per person.
 
 These are the planned names; the images are tracked in [#45](https://github.com/outstaff-ai/outstaff/issues/45) and are not published yet. The catalog is baked into them. A client image extends one with `FROM` and `ost build`.
 
-There is one agent image for every role. The tools a person needs are not in the image: at start the agent installs the toolsets of its role and the tools declared in `team.yaml` into `$HOME` with mise (the format is planned, see [#156](https://github.com/outstaff-ai/outstaff/issues/156)). A team that wants no install at start, or no egress for it, can prebuild its own image with the tools instead.
+There is one agent image for every role. The tools a person needs are not in the image: at start the agent installs the toolsets of its role and the tools declared in `team.yaml` into `$HOME` with mise (see [Tools](/guides/tools/)). A team that wants no install at start, or no egress for it, can prebuild its own image with the tools instead.
 
 Images never contain secrets. A client image that needs one at build time takes it with BuildKit `--secret`, never `ARG` or `ENV`, because both end up in the image history.
 
@@ -99,16 +99,16 @@ The office URL is the only address an agent needs. Use `wss://` when the connect
 
 ## Volumes
 
-| Container | Path                                           | What it holds                                                                                | Keep it?                                                     |
-| --------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| office    | `/var/lib/outstaff`                            | The SQLite store, when `OUTSTAFF_STORE_URL` is not set. The folder is created when missing.  | Yes, unless you use Postgres, which needs no volume.         |
-| agent     | `$HOME/repos`                                  | Clones of the repositories the person may read or write.                                     | Optional; a cache that is cloned again when missing.         |
-| agent     | `$HOME/worktrees`                              | One git worktree per work item.                                                              | Yes, if unpushed work should survive a restart.              |
-| agent     | `$HOME/memory`                                 | The person's notes between work items.                                                       | Yes.                                                         |
-| agent     | `$HOME/scratch`                                | Throwaway files.                                                                             | No.                                                          |
-| agent     | `$HOME/work`                                   | The person's rendered working files (skills, references, templates), written on every start. | No.                                                          |
-| agent     | `$HOME/.local/share/mise`, `$HOME/.cache/mise` | The tools installed from the declared toolsets (mise data and cache directories).            | Yes. The first start installs them, later starts reuse them. |
-| both      | `$HOME/.cache/outstaff/teams`                  | Clone of the team repository when `OUTSTAFF_TEAM_REPO` is used (`XDG_CACHE_HOME` moves it).  | No.                                                          |
+| Container | Path                                           | What it holds                                                                                  | Keep it?                                                     |
+| --------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| office    | `/var/lib/outstaff`                            | The SQLite store, when `OUTSTAFF_STORE_URL` is not set. The folder is created when missing.    | Yes, unless you use Postgres, which needs no volume.         |
+| agent     | `$HOME/repos`                                  | Clones of the repositories the person may read or write.                                       | Optional; a cache that is cloned again when missing.         |
+| agent     | `$HOME/worktrees`                              | One git worktree per work item.                                                                | Yes, if unpushed work should survive a restart.              |
+| agent     | `$HOME/memory`                                 | The person's notes between work items.                                                         | Yes.                                                         |
+| agent     | `$HOME/scratch`                                | Throwaway files.                                                                               | No.                                                          |
+| agent     | `$HOME/work`                                   | The person's rendered working files (skills, references, templates), written on every start.   | No.                                                          |
+| agent     | `$HOME/.local/share/mise`, `$HOME/.cache/mise` | The tools installed from the declared toolsets and `tools:` (mise data and cache directories). | Yes. The first start installs them, later starts reuse them. |
+| both      | `$HOME/.cache/outstaff/teams`                  | Clone of the team repository when `OUTSTAFF_TEAM_REPO` is used (`XDG_CACHE_HOME` moves it).    | No.                                                          |
 
 The agent's own directories are all below `$HOME`, so mount that writable if you run with a read-only root filesystem. The agent keeps no session or journal on its own disk: the office stores both, and a replaced container resumes from them. What a lost volume costs is work that was never pushed, which is why `worktrees` is worth keeping.
 
