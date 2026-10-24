@@ -38,6 +38,8 @@ export interface GithubDeps {
 
 const MERGEABLE_BACKOFF_MS = [500, 1_000, 2_000, 3_000, 5_000];
 const EVENT_PAGES = 3;
+// Re-read this much before the newest time seen; intake de-duplicates by external id.
+const OVERLAP_MS = 5 * 60_000;
 
 const PERMISSIONS = {
   read: { contents: "read" },
@@ -52,7 +54,7 @@ const LAST_COMMENT_QUERY = `query($id:ID!){node(id:$id){... on PullRequestReview
 const RESOLVE_MUTATION = `mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}`;
 
 interface Cursor {
-  [repo: string]: { etag?: string; lastEventId?: string };
+  [repo: string]: { etag?: string; since?: string; seen?: string[] };
 }
 
 function parseCursor(cursor: string | undefined): Cursor {
@@ -651,32 +653,41 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     async events(repos, cursor) {
       const state = parseCursor(cursor);
       const next: Cursor = { ...state };
-      const found: { event: VcsEvent; id: bigint }[] = [];
+      const found: { event: VcsEvent; at: number; id: bigint }[] = [];
       const unmapped: UnmappedEvent[] = [];
       for (const repo of repos) {
         const key = `${repo.owner}/${repo.name}`;
         const prev = state[key];
-        const last = prev?.lastEventId ? BigInt(prev.lastEventId) : undefined;
+        // An entry without a valid `since` (new repo, or a cursor from before times were tracked) is no entry.
+        const since = prev && typeof prev.since === "string" ? Date.parse(prev.since) : Number.NaN;
+        const unknown = Number.isNaN(since);
+        // No cursor at all is the first poll: intake decides whether that history is a baseline.
+        // A cursor that lacks this repository only baselines this repository (#229).
+        const baseline = unknown && cursor !== undefined;
         const token = await apiToken(repo);
         // A 304 answers without touching the rate limit.
         let res = await http.request<RestEvent[]>("GET", `${repoPath(repo)}/events`, {
           token,
           query: { per_page: 100 },
-          ...(prev?.etag ? { headers: { "if-none-match": prev.etag } } : {}),
+          ...(!unknown && prev?.etag ? { headers: { "if-none-match": prev.etag } } : {}),
         });
 
         if (res.status === 304) {
           continue;
         }
 
-        const etag = res.headers.get("etag") ?? prev?.etag;
+        const etag = res.headers.get("etag") ?? (unknown ? undefined : prev?.etag);
         const raw: RestEvent[] = [...res.data];
-        // Events come newest first; keep paging while the whole page is newer than what we have seen.
-        const pageLimit = last === undefined ? 1 : EVENT_PAGES;
-        for (let page = 1; page < pageLimit; page++) {
+        // GitHub event ids are not one sequence and the feed is only roughly time-ordered, so page by time.
+        let floor = since - OVERLAP_MS;
+        if (unknown) {
+          floor = Math.max(...res.data.map((e) => Date.parse(e.created_at))) - OVERLAP_MS;
+        }
+
+        for (let page = 1; page < EVENT_PAGES; page++) {
           const link = nextLink(res.headers.get("link"), apiUrl);
           const oldest = res.data.at(-1);
-          if (!link || !oldest || last === undefined || BigInt(oldest.id) <= last) {
+          if (!link || !oldest || Date.parse(oldest.created_at) < floor) {
             break;
           }
 
@@ -684,20 +695,22 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
           raw.push(...res.data);
         }
 
-        let max = last ?? 0n;
+        // Ids already read at baseline time: the overlap would otherwise hand that history back as news.
+        const skip = new Set(unknown ? [] : prev?.seen);
+        let newest = unknown ? Number.NEGATIVE_INFINITY : since;
         for (const e of raw) {
-          const id = BigInt(e.id);
-          if (id > max) {
-            max = id;
+          const at = Date.parse(e.created_at);
+          if (!Number.isNaN(at) && at > newest) {
+            newest = at;
           }
 
-          if (last !== undefined && id <= last) {
+          if (baseline || Number.isNaN(at) || at < floor || skip.has(e.id)) {
             continue;
           }
 
           const event = toVcsEvent(repo, e);
           if (event) {
-            found.push({ event, id });
+            found.push({ event, at, id: BigInt(e.id) });
           } else {
             const action = e.payload["action"];
             unmapped.push({
@@ -708,10 +721,23 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
           }
         }
 
-        next[key] = { ...(etag ? { etag } : {}), lastEventId: max.toString() };
+        // An empty feed baselines at the current time so the first event after it is not lost.
+        const stamp = Number.isFinite(newest) ? newest : Date.now();
+        const keep = unknown ? undefined : skip;
+        const seen = raw
+          .filter(
+            (e) => (keep ? keep.has(e.id) : true) && Date.parse(e.created_at) >= stamp - OVERLAP_MS,
+          )
+          .map((e) => e.id);
+
+        next[key] = {
+          ...(etag ? { etag } : {}),
+          since: new Date(stamp).toISOString(),
+          ...(seen.length > 0 ? { seen } : {}),
+        };
       }
 
-      found.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      found.sort((a, b) => a.at - b.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       return { events: found.map((f) => f.event), cursor: JSON.stringify(next), unmapped };
     },
   };

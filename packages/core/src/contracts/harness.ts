@@ -83,7 +83,10 @@ export function expectAbsoluteUrl(url: string): void {
   expect(["http:", "https:"]).toContain(new URL(url).protocol);
 }
 
-/** Event cursor rules shared by every port: new cursor is opaque, replays nothing, ids are unique. */
+/**
+ * Event cursor rules shared by every port: the cursor is opaque, a replay may only repeat events
+ * already returned (adapters re-read an overlap and intake de-duplicates), ids are unique per page.
+ */
 export async function expectEventCursorBehaviour<E extends { externalId: string; at?: string }>(
   fetch: (cursor?: string) => Promise<{ events: E[]; cursor: string }>,
   produceMore: () => Promise<void>,
@@ -92,13 +95,23 @@ export async function expectEventCursorBehaviour<E extends { externalId: string;
   expect(typeof first.cursor).toBe("string");
   expect(first.events.length).toBeGreaterThan(0);
   const again = await fetch(first.cursor);
-  expect(again.events).toEqual([]);
+  const seen = new Set(first.events.map((e) => e.externalId));
+  expect(
+    again.events.filter((e) => !seen.has(e.externalId)),
+    "a replay must not return events never returned before",
+  ).toEqual([]);
+
   await produceMore();
   const next = await fetch(first.cursor);
-  expect(next.events.length).toBeGreaterThan(0);
-  const ids = [...first.events, ...next.events].map((e) => e.externalId);
-  expect(new Set(ids).size, "externalId must be unique across pages").toBe(ids.length);
-  const times = [...first.events, ...next.events]
+  const fresh = next.events.filter((e) => !seen.has(e.externalId));
+  expect(fresh.length).toBeGreaterThan(0);
+  for (const page of [first, again, next]) {
+    const pageIds = page.events.map((e) => e.externalId);
+    expect(new Set(pageIds).size, "externalId must be unique within a page").toBe(pageIds.length);
+  }
+
+  const ids = [...first.events, ...fresh].map((e) => e.externalId);
+  const times = [...first.events, ...fresh]
     .map((e) => e.at)
     .filter((a): a is string => a !== undefined);
 

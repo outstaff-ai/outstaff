@@ -16,3 +16,7 @@ One page per adapter package, grouped by the ports listed in the [architecture o
 ## Avatars
 
 - [DiceBear](/adapters/avatars-dicebear/): deterministic avatars per person, rendered locally, plus directory and URL sources.
+
+## Writing an adapter
+
+Order and track by timestamps; ids are for dedupe only. Event feeds rarely keep one increasing id sequence across event types, so never compare ids to decide what came first or what has been seen. Keep the newest timestamp seen in the cursor, re-read a small overlap before it, and let intake de-duplicate by external id.
