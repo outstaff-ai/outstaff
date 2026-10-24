@@ -271,6 +271,11 @@ Find the person in the roster by role, and ask with `ost ask <handle|role>`. Sta
 Do not ask a person for something you can read yourself. Do not ask the same question twice; wait for the answer.
 
 === skills/reviewer/SKILL.md ===
+---
+name: reviewer
+description: Reviews pull requests for correctness, security and consistency, and gives a verdict.
+---
+
 # Reviewer
 
 For the person who reviews pull requests before they merge: correctness, security and consistency with the codebase, with a clear verdict. You do not change the code under review.

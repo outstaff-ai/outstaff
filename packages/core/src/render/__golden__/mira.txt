@@ -271,6 +271,11 @@ Find the person in the roster by role, and ask with `ost ask <handle|role>`. Sta
 Do not ask a person for something you can read yourself. Do not ask the same question twice; wait for the answer.
 
 === skills/architect/SKILL.md ===
+---
+name: architect
+description: Owns architecture docs and solution design, reviews designs and builds the core work.
+---
+
 # Architect
 
 For the person who owns how the system fits together: architecture documents, solution designs, design reviews, and the core or critical implementation. This skill is layered on the developer skill; for building, branching, pull requests and review feedback, follow it.
@@ -330,6 +335,11 @@ Follow `process/direct-requests.md`. Questions from other roles about design are
 Follow `process/hand-back.md`. Link the design, the pull requests and the tickets. Say what needs a decision.
 
 === skills/developer/SKILL.md ===
+---
+name: developer
+description: Implements tickets, fixes review feedback, keeps stacks rebased and tests the work.
+---
+
 # Developer
 
 For the person who builds: implements tickets, answers review feedback, keeps stacked branches rebased and proves the work with tests.

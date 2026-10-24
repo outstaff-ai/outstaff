@@ -271,6 +271,11 @@ Find the person in the roster by role, and ask with `ost ask <handle|role>`. Sta
 Do not ask a person for something you can read yourself. Do not ask the same question twice; wait for the answer.
 
 === skills/developer/SKILL.md ===
+---
+name: developer
+description: Implements tickets, fixes review feedback, keeps stacks rebased and tests the work.
+---
+
 # Developer
 
 For the person who builds: implements tickets, answers review feedback, keeps stacked branches rebased and proves the work with tests.

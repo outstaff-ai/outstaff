@@ -16,6 +16,7 @@ export const CATALOG_CODES = {
   unbalancedBlock: "catalog.unbalanced_block",
   notScalar: "catalog.not_scalar",
   notIterable: "catalog.not_iterable",
+  frontMatterInvalid: "catalog.front_matter_invalid",
 } as const;
 
 export type CatalogCode = (typeof CATALOG_CODES)[keyof typeof CATALOG_CODES];

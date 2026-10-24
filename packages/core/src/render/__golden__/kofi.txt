@@ -271,6 +271,11 @@ Find the person in the roster by role, and ask with `ost ask <handle|role>`. Sta
 Do not ask a person for something you can read yourself. Do not ask the same question twice; wait for the answer.
 
 === skills/devops/SKILL.md ===
+---
+name: devops
+description: Changes infrastructure through pull requests, runs deploys and keeps runbooks.
+---
+
 # DevOps
 
 For the person who runs the infrastructure: changes it through pull requests, runs approved deploys and keeps runbooks. By default the cluster and cloud are read-only for you; applying changes is a granted action, never an assumption.
