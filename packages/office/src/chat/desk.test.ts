@@ -11,7 +11,7 @@ import type { PrRecord, TicketRecord } from "../workstate/index.js";
 import { addFeedback, readFeedback } from "../engine/feedback.js";
 import { parsePlacement } from "./placement.js";
 
-function teamConfig(withPm = true): TeamConfig {
+function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({
     version: 1,
     team: { name: "acme" },
@@ -28,6 +28,7 @@ function teamConfig(withPm = true): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
+    ...(policies ? { policies } : {}),
   });
 
   if (!result.ok) {
@@ -59,7 +60,7 @@ describe("chat requests", () => {
   let asked: { to: string; question: string; workItemId?: string | undefined }[];
   let n: number;
   let clock: ManualClock;
-  let makeDesk: (withChat?: boolean) => ChatRequests;
+  let makeDesk: (withChat?: boolean, over?: TeamConfig) => ChatRequests;
   let tickets: TicketRecord[];
   let pulls: PrRecord[];
 
@@ -141,12 +142,12 @@ describe("chat requests", () => {
     tracker = createFakeTracker({ now: clock.now });
     await tracker.seed.member({ name: "Sam", kind: "agent" });
     chat = createFakeChat({ now: clock.now });
-    makeDesk = (withChat = true) =>
+    makeDesk = (withChat = true, over = team) =>
       createChatDesk({
         clock,
         store,
         scheduler,
-        team,
+        team: over,
         workState: knownWork(),
         tracker,
         ...(withChat ? { chat } : {}),
@@ -928,6 +929,18 @@ describe("chat requests", () => {
       });
 
       expect(notified).toEqual(["sam"]);
+    });
+
+    it("leaves it blocked when policies.retry.on_signal is off, and still keeps the reply", async () => {
+      const id = await blocked();
+      desk = makeDesk(true, teamConfig(true, { retry: { on_signal: false } }));
+      await say("try again please", "m1");
+      expect(await store.getItem(id)).toMatchObject({ status: "blocked" });
+      expect((await store.readJournal(id)).map((j) => j.text)).toContain(
+        "In the chat thread: try again please",
+      );
+
+      expect(notified).toEqual([]);
     });
 
     it("works for an item of any kind the thread is linked to", async () => {

@@ -392,6 +392,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     }),
     addDirs: [layout.reposDir, layout.worktreesDir, layout.scratchDir, layout.memoryDir],
     ...(model ? { model } : {}),
+    ...(team.policies ? { policies: team.policies } : {}),
     log,
   });
 

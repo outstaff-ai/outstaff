@@ -13,6 +13,16 @@ import type { Rule } from "./rules.js";
 
 const kanban = presetRules("kanban");
 
+const baseConfig = () => ({
+  version: 1,
+  team: { name: "acme" },
+  humans: [{ name: "Ada", identities: { tracker: "Ada" } }],
+  catalog: { version: "1.0.0" },
+  repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
+  people: [{ handle: "ada", name: "Ada", role: "r" }],
+  integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
+});
+
 const feedbackSchedule = (ticket?: string) => ({
   type: "schedule",
   person: "ada",
@@ -373,7 +383,7 @@ describe("kanban preset", () => {
     const x = explainWorkflow(ev("agent.handed_back", { ...tk, actor: agent }), state, kanban);
     expect(x.effects).toEqual([{ type: "move", ticket: "ACME-1", to: "review" }]);
     expect(x.rules.find((r) => r.id === "hand-back-to-requester")?.skipped).toEqual([
-      "assign: ticket ACME-1 has no known requester and the team lists no humans",
+      "assign: ticket ACME-1 has no known requester and there is no first-human fallback (the team lists no humans, or policies.hand_back.fallback is none)",
     ]);
   });
 
@@ -386,6 +396,66 @@ describe("kanban preset", () => {
     expect(resolveWorkflow(undefined, humans).options.fallbackRequester).toBe("ada.admin");
     expect(resolveWorkflow(undefined, [humans[1]!]).options.fallbackRequester).toBe("Grace");
     expect(resolveWorkflow(undefined).options.fallbackRequester).toBeUndefined();
+  });
+
+  describe("policy switches", () => {
+    const ids = (policies?: Record<string, unknown>, rules?: unknown[]) => {
+      const parsed = parseTeamConfig({
+        ...baseConfig(),
+        ...(rules ? { workflow: { rules } } : {}),
+        ...(policies ? { policies } : {}),
+      });
+
+      if (!parsed.ok) {
+        throw new Error(JSON.stringify(parsed.issues));
+      }
+
+      return resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+    };
+
+    const has = (w: { rules: Rule[] }, id: string) => w.rules.some((r) => r.id === id);
+
+    it("keeps every preset rule by default", () => {
+      expect(ids().rules.map((r) => r.id)).toEqual(kanban.map((r) => r.id));
+      expect(ids().switched).toEqual([]);
+    });
+
+    it("feedback.merged_prs and conflicts.follow_up remove their rule", () => {
+      const w = ids({ feedback: { merged_prs: false }, conflicts: { follow_up: false } });
+      expect(has(w, "merged-feedback-follow-up")).toBe(false);
+      expect(has(w, "conflict-back-to-author")).toBe(false);
+      expect(w.switched.map((s) => [s.rule, s.switch, s.effect])).toEqual([
+        ["merged-feedback-follow-up", "feedback.merged_prs", "removed"],
+        ["conflict-back-to-author", "conflicts.follow_up", "removed"],
+      ]);
+    });
+
+    it("hand_back.reassign: none keeps the move to review and drops the assignment", () => {
+      const rule = ids({ hand_back: { reassign: "none" } }).rules.find(
+        (r) => r.id === "hand-back-to-requester",
+      );
+
+      expect(rule?.do).toEqual([{ move: "review" }]);
+    });
+
+    it("hand_back.fallback: none leaves out the first-human fallback", () => {
+      expect(ids().options.fallbackRequester).toBe("Ada");
+      expect(ids({ hand_back: { fallback: "none" } }).options.fallbackRequester).toBeUndefined();
+    });
+
+    it("an explicit workflow rule wins over a switch", () => {
+      const own = {
+        id: "conflict-back-to-author",
+        on: "pr.conflicted",
+        do: [{ notify: { to: "channel", template: "rebase_conflict" } }],
+      };
+
+      const w = ids({ conflicts: { follow_up: false } }, [own]);
+      expect(w.rules.find((r) => r.id === "conflict-back-to-author")?.do).toEqual(own.do);
+
+      const disabled = ids({}, [{ id: "conflict-back-to-author", disabled: true }]);
+      expect(has(disabled, "conflict-back-to-author")).toBe(false);
+    });
   });
 
   it("assignment to an agent schedules that agent, but not for our own assignments or finished tickets", () => {

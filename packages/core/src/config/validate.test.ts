@@ -28,7 +28,7 @@ const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
     ["reviewer", { needs: [] }],
   ]),
   adapters: new Map([
-    adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads"]),
+    adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
     adapter("chat", "slack", ["chat.messages"]),
     adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
     adapter("knowledge", "notion", ["knowledge.docs"]),
@@ -165,6 +165,33 @@ describe("validateTeam", () => {
           "architect marcus cannot write design docs: no knowledge integration provides knowledge.docs.",
       },
     ]);
+  });
+
+  it("warns when a policies switch needs a capability the vcs adapter lacks, unless it is off", () => {
+    const noReactions = ctx({
+      adapters: new Map([
+        adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads"]),
+        adapter("chat", "slack", ["chat.messages"]),
+        adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+        adapter("knowledge", "notion", ["knowledge.docs"]),
+        adapter("tracker", "linear", ["tracker.issues"]),
+      ]),
+    });
+
+    expect(validateTeam(config(), noReactions).warnings).toEqual([
+      {
+        path: ["policies", "acknowledge", "vcs"],
+        code: "policies.capability_missing",
+        message:
+          'policies.acknowledge.vcs is true, but the vcs adapter "github" does not provide vcs.reactions.',
+        consequence:
+          "policies.acknowledge.vcs does nothing: the vcs adapter cannot react to pull request comments; set it to false to silence this.",
+      },
+    ]);
+
+    const off = config((x) => (x.policies = { acknowledge: { vcs: false } }));
+    expect(validateTeam(off, noReactions).warnings).toEqual([]);
+    expect(validateTeam(config(), ctx()).warnings).toEqual([]);
   });
 
   it("warns about missing optional capabilities", () => {

@@ -3,6 +3,7 @@ import { ADAPTER_PORTS, type AdapterPort } from "./adapters.js";
 import { CONFIG_CODES, type ConfigCode } from "./codes.js";
 import type { ConfigIssue } from "./issues.js";
 import { repoAccess } from "../permissions/build.js";
+import { POLICY_SWITCHES, policyOn, policyValue } from "../policies/switches.js";
 import type { TeamConfig } from "./schema.js";
 
 export type RoleNeeds = { needs: Capability[]; optionalNeeds?: Capability[] };
@@ -20,6 +21,9 @@ export type ValidationContext = {
 
   /** Identity checks of installed adapters keyed `<port>/<adapter>`; only those of configured integrations run. Independent of `adapters`, so a host can check identities without checking adapter names. */
   identityValidators?: Map<string, IdentityValidator>;
+
+  /** Capabilities of installed adapters keyed `<port>/<adapter>`, for the `policies` switch checks. Defaults to `adapters`; independent of it, so a host can check switches without checking adapter names. */
+  adapterCapabilities?: Map<string, AdapterInfo>;
 };
 
 export type ConfigWarning = ConfigIssue & {
@@ -41,6 +45,7 @@ export const WARNING_CODES = {
   identityVcsNotLogin: "identities.vcs_not_login",
   identityVcsNotBotLogin: "identities.vcs_not_bot_login",
   identityTrackerEmpty: "identities.tracker_empty",
+  policyCapabilityMissing: "policies.capability_missing",
 } as const;
 
 export type WarningCode = (typeof WARNING_CODES)[keyof typeof WARNING_CODES];
@@ -54,6 +59,7 @@ const LACKING: Record<Capability, string> = {
   "vcs.pullRequests": "open or update pull requests",
   "vcs.reviewThreads": "reply to review threads",
   "vcs.webhooks": "react to repository changes instantly",
+  "vcs.reactions": "react to pull request comments",
   "chat.messages": "send chat messages",
   "chat.history": "read earlier chat messages",
   "chat.agentProfile": "show the agent's profile and status in chat",
@@ -125,6 +131,8 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "identities.vcs_not_bot_login":
     "A person's vcs identity is not a GitHub App bot login (<slug>[bot]), so the agent's own activity is not recognized.",
   "identities.tracker_empty": "A tracker identity is blank.",
+  "policies.capability_missing":
+    "A policies switch is on, but the configured adapter lacks the capability it needs.",
 };
 
 const adapterKey = (port: string, adapter: string) => `${port}/${adapter}`;
@@ -268,6 +276,30 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       }
     }
   });
+
+  // A switch that is on but cannot do anything with the configured adapter. Without that port there is nothing to act on.
+  const known = ctx.adapterCapabilities ?? ctx.adapters;
+  for (const sw of POLICY_SWITCHES) {
+    const cap = sw.needs;
+    const ref = cap && config.integrations[CAPABILITY_PORT[cap]];
+    const info = ref && known.get(adapterKey(CAPABILITY_PORT[cap], ref.adapter));
+    if (
+      !cap ||
+      !ref ||
+      !info ||
+      info.capabilities.includes(cap) ||
+      !policyOn(config.policies, sw.path)
+    ) {
+      continue;
+    }
+
+    warnings.push({
+      path: ["policies", ...sw.path.split(".")],
+      code: WARNING_CODES.policyCapabilityMissing,
+      message: `policies.${sw.path} is ${String(policyValue(config.policies, sw.path))}, but the ${CAPABILITY_PORT[cap]} adapter "${ref.adapter}" does not provide ${cap}.`,
+      consequence: `policies.${sw.path} does nothing: the ${CAPABILITY_PORT[cap]} adapter cannot ${LACKING[cap]}; set it to ${String(sw.off)} to silence this.`,
+    });
+  }
 
   if (config.humans === undefined) {
     warnings.push({

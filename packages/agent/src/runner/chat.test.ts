@@ -5,7 +5,7 @@ import { createFakeOffice, type ChatMessageResult, type FakeOffice } from "../ve
 import type { Offer } from "../office-client/index.js";
 import { createChatRelay, type ChatRelay } from "./chat.js";
 
-function team(withPm = true): TeamConfig {
+function team(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({
     version: 1,
     team: { name: "acme" },
@@ -21,6 +21,7 @@ function team(withPm = true): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
+    ...(policies ? { policies } : {}),
   });
 
   if (!result.ok) {
@@ -57,7 +58,11 @@ describe("chat relay", () => {
   let relay: ChatRelay;
   let handler: (m: ChatMessage) => Promise<void>;
 
-  const setup = async (opts: Parameters<typeof createFakeOffice>[0] = {}, withPm = true) => {
+  const setup = async (
+    opts: Parameters<typeof createFakeOffice>[0] = {},
+    withPm = true,
+    policies?: Record<string, unknown>,
+  ) => {
     office = createFakeOffice(opts);
     relay = createChatRelay({
       chat: {
@@ -71,7 +76,7 @@ describe("chat relay", () => {
         react: chat.react,
       } as typeof chat,
       office,
-      team: team(withPm),
+      team: team(withPm, policies),
       person: "sam",
       tracker,
     });
@@ -116,6 +121,13 @@ describe("chat relay", () => {
     expect(chat.posts[0]).toMatchObject({ channel: "D-U0DANA0001", thread: "m1" });
     expect(chat.posts[0]!.text).toContain("On it. Tracked in");
     expect(chat.posts[0]!.text).toContain("ACME-1");
+  });
+
+  it("does not react, but still passes the message on, when policies.acknowledge.chat is off", async () => {
+    await setup({}, true, { acknowledge: { chat: false } });
+    const sent = await dana("add a search page");
+    expect(chat.reactions).toEqual([]);
+    expect(office.chatMessages.map((m) => m.messageId)).toEqual([sent.id]);
   });
 
   it("posts the acknowledgement once", async () => {

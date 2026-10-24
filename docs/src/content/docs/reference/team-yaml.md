@@ -178,8 +178,22 @@ workflow:
     done: Done
     canceled: Canceled
 
-# Team-wide guardrails and message style.
+# Team-wide guardrails, message style and switches for what outstaff does on its own.
 policies:
+  # What outstaff does on its own. Everything below is on by default; set a switch to false (or none) to turn it off.
+  acknowledge:
+    chat: true
+    vcs: true
+  feedback:
+    follow_up_round: true
+    merged_prs: true
+  hand_back:
+    reassign: requester
+    fallback: first_human
+  conflicts:
+    follow_up: true
+  retry:
+    on_signal: true
   messages:
     max_lines: 3
 ```
@@ -1024,7 +1038,7 @@ Ticket label that keeps work with a human. Default "needs-human".
 
 ## policies
 
-Team-wide guardrails and message style.
+Team-wide guardrails, message style and switches for what outstaff does on its own.
 
 - Type: `object`
 - Optional
@@ -1093,13 +1107,111 @@ Groups of people who use one LLM subscription, as lists of handles. A usage repo
 - Optional
 - Minimum length 1
 
-### policies.retry
+### policies.acknowledge
 
-How a failing work item is retried: exponential backoff, then blocked.
+The reactions that show people their message or comment was picked up.
 
 - Type: `object`
 - Optional
-- Default: `{"base_minutes":1,"cap_minutes":30,"max_failures":3}`
+- Default: `{"chat":true,"vcs":true}`
+
+#### policies.acknowledge.chat
+
+React with eyes to a chat message from a trusted person when the agent has seen it. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+#### policies.acknowledge.vcs
+
+React with eyes to each pull request comment the agent is about to answer, when its round starts. Needs a vcs adapter with vcs.reactions. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+### policies.feedback
+
+How agents act on feedback from trusted people beyond the first round.
+
+- Type: `object`
+- Optional
+- Default: `{"follow_up_round":true,"merged_prs":true}`
+
+#### policies.feedback.follow_up_round
+
+Start another round when feedback arrived after the agent was offered its work. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+#### policies.feedback.merged_prs
+
+Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+### policies.hand_back
+
+What happens to a ticket when an agent hands its work back.
+
+- Type: `object`
+- Optional
+- Default: `{"reassign":"requester","fallback":"first_human"}`
+
+#### policies.hand_back.reassign
+
+Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves to review). Edits the preset rule hand-back-to-requester. Default requester.
+
+- Type: `string`
+- Optional
+- Default: `requester`
+- Allowed values: `requester`, `none`
+
+#### policies.hand_back.fallback
+
+Who stands in when a ticket has no known requester: the first human in humans, or none to skip. Default first_human.
+
+- Type: `string`
+- Optional
+- Default: `first_human`
+- Allowed values: `first_human`, `none`
+
+### policies.conflicts
+
+Merge conflicts between pull requests.
+
+- Type: `object`
+- Optional
+- Default: `{"follow_up":true}`
+
+#### policies.conflicts.follow_up
+
+Send a pull request that starts to conflict with its base, for example after another one merged, back to its agent author to rebase. Switches the preset rule conflict-back-to-author. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+### policies.retry
+
+How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.
+
+- Type: `object`
+- Optional
+- Default: `{"on_signal":true,"base_minutes":1,"cap_minutes":30,"max_failures":3}`
+
+#### policies.retry.on_signal
+
+Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
 
 #### policies.retry.base_minutes
 

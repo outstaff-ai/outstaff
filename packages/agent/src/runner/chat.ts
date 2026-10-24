@@ -1,4 +1,5 @@
 import {
+  policyOn,
   silentLogger,
   type Chat,
   type ChatMessage,
@@ -79,6 +80,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   const log = opts.log ?? silentLogger;
   const historyLimit = opts.historyLimit ?? 10;
   const maxLines = team.policies?.messages.max_lines ?? 3;
+  const acknowledge = policyOn(team.policies, "acknowledge.chat");
   const hasPm = team.people.some((p) => p.role === "pm");
 
   const post = async (channel: string, thread: string, text: string) => {
@@ -136,7 +138,10 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
 
     const thread = m.thread ?? m.id;
-    chat.react(m.channel, m.id, "eyes").catch(() => {});
+    if (acknowledge) {
+      chat.react(m.channel, m.id, "eyes").catch(() => {});
+    }
+
     let result: ChatMessageResult;
     try {
       result = await office.chatMessage({

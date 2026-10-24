@@ -66,4 +66,5 @@ A warning describes something that will not work as written or a default that ap
 | `people.missing_tracker_identity` | A person has no identities.tracker while a tracker integration is configured. |
 | `people.missing_vcs_identity` | A person has a write grant but no identities.vcs, while a vcs integration is configured. |
 | `people.reviewer_without_github` | A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves. |
+| `policies.capability_missing` | A policies switch is on, but the configured adapter lacks the capability it needs. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

@@ -242,8 +242,92 @@ const policiesSchema = z
       })
       .default({ defer_scheduled_at: 0.85, pause_automatic_at: 0.95 })
       .meta(d("Thresholds that slow down work as the LLM usage limit approaches.")),
+    acknowledge: z
+      .strictObject({
+        chat: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "React with eyes to a chat message from a trusted person when the agent has seen it. Default on.",
+            ),
+          ),
+        vcs: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "React with eyes to each pull request comment the agent is about to answer, when its round starts. Needs a vcs adapter with vcs.reactions. Default on.",
+            ),
+          ),
+      })
+      .default({ chat: true, vcs: true })
+      .meta(d("The reactions that show people their message or comment was picked up.")),
+    feedback: z
+      .strictObject({
+        follow_up_round: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Start another round when feedback arrived after the agent was offered its work. Default on.",
+            ),
+          ),
+        merged_prs: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.",
+            ),
+          ),
+      })
+      .default({ follow_up_round: true, merged_prs: true })
+      .meta(d("How agents act on feedback from trusted people beyond the first round.")),
+    hand_back: z
+      .strictObject({
+        reassign: z
+          .enum(["requester", "none"])
+          .default("requester")
+          .meta(
+            d(
+              "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves to review). Edits the preset rule hand-back-to-requester. Default requester.",
+            ),
+          ),
+        fallback: z
+          .enum(["first_human", "none"])
+          .default("first_human")
+          .meta(
+            d(
+              "Who stands in when a ticket has no known requester: the first human in humans, or none to skip. Default first_human.",
+            ),
+          ),
+      })
+      .default({ reassign: "requester", fallback: "first_human" })
+      .meta(d("What happens to a ticket when an agent hands its work back.")),
+    conflicts: z
+      .strictObject({
+        follow_up: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Send a pull request that starts to conflict with its base, for example after another one merged, back to its agent author to rebase. Switches the preset rule conflict-back-to-author. Default on.",
+            ),
+          ),
+      })
+      .default({ follow_up: true })
+      .meta(d("Merge conflicts between pull requests.")),
     retry: z
       .strictObject({
+        on_signal: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread. Default on.",
+            ),
+          ),
         base_minutes: z
           .int()
           .min(1)
@@ -275,8 +359,12 @@ const policiesSchema = z
           );
         }
       })
-      .default({ base_minutes: 1, cap_minutes: 30, max_failures: 3 })
-      .meta(d("How a failing work item is retried: exponential backoff, then blocked.")),
+      .default({ on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 })
+      .meta(
+        d(
+          "How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.",
+        ),
+      ),
     messages: z
       .strictObject({
         max_lines: z
@@ -313,7 +401,7 @@ const policiesSchema = z
       .meta(d("How agents take chat messages.")),
     commands: teamCommandsSchema.optional(),
   })
-  .meta(d("Team-wide guardrails and message style."));
+  .meta(d("Team-wide guardrails, message style and switches for what outstaff does on its own."));
 
 export const teamConfigSchema = z
   .strictObject({

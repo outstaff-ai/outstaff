@@ -409,6 +409,7 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
 
       it("reacts to a conversation comment and to an inline comment, once per reaction", async (t) => {
         const { s, repo, self } = await setupSelf(t, "write");
+        requireCapability(t, s, "vcs.reactions");
         const reactions = requireSeed(t, s.seed, "reactions");
         const pr = await otherPr(t, s, repo, "Reacted to");
         const commentId = await requireSeed(t, s.seed, "comment")(repo, pr.number, "dana", "Hm?");

@@ -27,7 +27,11 @@ knowledgeContract("fake", async () => {
 
 vcsContract("fake", async () => {
   const subject = createFakeVcs();
-  return { subject, seed: subject.seed, capabilities: ["vcs.pullRequests", "vcs.reviewThreads"] };
+  return {
+    subject,
+    seed: subject.seed,
+    capabilities: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"],
+  };
 });
 
 chatContract("fake", async () => {

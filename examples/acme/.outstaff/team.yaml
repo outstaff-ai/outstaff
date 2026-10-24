@@ -154,5 +154,19 @@ workflow:
     canceled: Canceled
 
 policies:
+  # What outstaff does on its own. Everything below is on by default; set a switch to false (or none) to turn it off.
+  acknowledge:
+    chat: true
+    vcs: true
+  feedback:
+    follow_up_round: true
+    merged_prs: true
+  hand_back:
+    reassign: requester
+    fallback: first_human
+  conflicts:
+    follow_up: true
+  retry:
+    on_signal: true
   messages:
     max_lines: 3

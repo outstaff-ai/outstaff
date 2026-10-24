@@ -1,9 +1,11 @@
 import {
+  policyOn,
   silentLogger,
   type Logger,
   type Policy,
   type RunRequest,
   type Runtime,
+  type TeamConfig,
   type ToolKind,
 } from "@outstaff/core";
 import type { Filed, Link } from "@outstaff/protocol";
@@ -64,6 +66,9 @@ export interface WorkLoopOptions {
   /** Chat requests: the context a new chat session starts with, and the report to the requester. */
   chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
   log?: Logger;
+
+  /** The team's `policies`; `acknowledge.vcs` decides whether feedback gets a reaction. */
+  policies?: TeamConfig["policies"];
 
   /** Least time between two progress messages for an item. Default 30000. */
   progressEveryMs?: number;
@@ -381,7 +386,10 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     opts.usage?.setBusy(true);
     try {
       // Before the run starts, so the people who wrote the feedback see at once that it was taken.
-      await acknowledgeFeedback(offer, opts.env.vcs, log);
+      if (policyOn(opts.policies, "acknowledge.vcs")) {
+        await acknowledgeFeedback(offer, opts.env.vcs, log);
+      }
+
       await work(offer, abort);
     } catch (e) {
       log.error("work item failed", { workItemId: id, error: reason(e) });

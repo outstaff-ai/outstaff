@@ -1,4 +1,5 @@
 import {
+  policyOn,
   silentLogger,
   type Chat,
   type Logger,
@@ -589,7 +590,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     );
 
     let current = item;
-    if (item.status === "blocked") {
+    if (item.status === "blocked" && policyOn(opts.team.policies, "retry.on_signal")) {
       // Whatever kind of work the thread is linked to; the human's reply is the request to try again.
       const by = m.author.name ?? m.author.id;
       current = (await scheduler.retry(item.id, { by, signal: "chat reply" })) ?? item;
