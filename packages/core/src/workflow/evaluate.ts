@@ -127,6 +127,23 @@ function check(c: Condition, ctx: Ctx): Check {
     };
   }
 
+  if ("pr_open" in c) {
+    const state = ctx.pr?.state;
+    return {
+      ok: state !== undefined && (state === "open") === c.pr_open,
+      detail: `pull request is ${state ?? "unknown"}, wanted ${c.pr_open ? "open" : "not open"}`,
+    };
+  }
+
+  if ("has_body" in c) {
+    const body = ctx.event.data["body"];
+    const has = typeof body === "string" && body.trim() !== "";
+    return {
+      ok: has === c.has_body,
+      detail: `event ${has ? "has" : "has no"} body, wanted ${c.has_body ? "one" : "none"}`,
+    };
+  }
+
   const st = ctx.event.data["state"];
   return {
     ok: typeof st === "string" && c.review_state.includes(st),

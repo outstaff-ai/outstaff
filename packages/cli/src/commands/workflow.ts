@@ -72,16 +72,17 @@ export const explain = defineCommand<{ state?: string }>({
   group: "workflow",
   summary: "Show which workflow rules an event triggers, and why.",
   description:
-    "Runs the team's workflow (its preset and rule overrides) against one event and a static snapshot of the world, and prints for every rule whether it matched, why, and what it would do. Nothing is applied. The event is JSON with a type, an optional subject, actor and data; the snapshot (--state) is JSON with tickets, prs, links and roles, and defaults to an empty world, in which most rules report that no ticket is linked.",
+    "Runs the team's workflow (its preset and rule overrides) against one event and a static snapshot of the world, and prints for every rule whether it matched, why, and what it would do. Nothing is applied. The event is JSON with a type, an optional subject, actor and data; the snapshot (--state) is JSON with tickets, prs, links and roles, and defaults to an empty world, in which most rules report that no ticket is linked. A pull request entry needs its state (open, closed or merged) and author kind; feedback on an open agent pull request is scheduled for the author whatever the ticket status, and the ticket is only moved when it is in review or blocked.",
   args: "<event-json>",
   options: [
     {
       flags: "--state <json>",
       description:
-        'World snapshot as JSON: {"tickets": {"ACME-1": {"status": "review"}}, "prs": [], "links": {"10": "ACME-1"}, "roles": {}}.',
+        'World snapshot as JSON: {"tickets": {"ACME-1": {"status": "review"}}, "prs": [{"ref": {"repo": {"owner": "acme", "name": "app"}, "number": 10}, "title": "Add search", "headRef": "sam/acme-1", "baseRef": "main", "draft": false, "state": "open", "author": {"login": "acme-sam[bot]", "kind": "agent", "person": "sam"}}], "links": {"10": "ACME-1"}, "roles": {}}.',
     },
   ],
   examples: [
+    `ost workflow explain '{"type":"pr.comment","subject":{"pr":{"repo":{"owner":"acme","name":"app"},"number":10}},"actor":{"kind":"human","id":"dana"},"data":{"body":"please add a test"}}' --state '{"prs":[{"ref":{"repo":{"owner":"acme","name":"app"},"number":10},"title":"Add search","headRef":"sam/acme-1","baseRef":"main","draft":false,"state":"open","author":{"login":"acme-sam[bot]","kind":"agent","person":"sam"}}]}'`,
     `ost workflow explain '{"type":"ticket.assigned","subject":{"ticket":"ACME-1"},"actor":{"kind":"human","id":"dana"}}' --state '{"tickets":{"ACME-1":{"status":"ready","assignee":{"id":"sam","kind":"agent"}}}}'`,
   ],
   exitCodes: [

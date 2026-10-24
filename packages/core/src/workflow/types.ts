@@ -47,6 +47,7 @@ export interface WorkflowPr {
   headRef: string;
   baseRef: string;
   draft: boolean;
+  state: "open" | "closed" | "merged";
 
   /** `person` is the agent's handle when the author is one of our agents. */
   author: { login: string; kind: "human" | "agent" | "bot"; person?: string };

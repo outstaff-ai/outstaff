@@ -227,6 +227,38 @@ describe("ost workflow explain", () => {
     ]);
   });
 
+  it("schedules PR feedback for the author when there is no linked ticket", async () => {
+    const pr = { repo: { owner: "acme", name: "app" }, number: 10 };
+    const r = await ost(acme(), [
+      "workflow",
+      "explain",
+      JSON.stringify({
+        type: "pr.comment",
+        subject: { pr },
+        actor: { kind: "human", id: "dana" },
+        data: { body: "please add a test" },
+      }),
+      "--state",
+      JSON.stringify({
+        prs: [
+          {
+            ref: pr,
+            title: "Add search",
+            headRef: "sam/search",
+            baseRef: "main",
+            draft: false,
+            state: "open",
+            author: { login: "acme-sam[bot]", kind: "agent", person: "sam" },
+          },
+        ],
+      }),
+    ]);
+
+    expect(r.out).toContain("match    human-feedback-back-to-author");
+    expect(r.out).toContain("schedule review_feedback for sam (high)");
+    expect(r.out).toContain("no match  human-feedback-reactivates-ticket");
+  });
+
   it("works against an empty world", async () => {
     const r = await ost(acme(), ["workflow", "explain", '{"type":"pr.opened"}']);
     expect(r.code).toBe(0);

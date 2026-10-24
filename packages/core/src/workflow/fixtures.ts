@@ -13,6 +13,7 @@ export function pr(number: number, over: Partial<WorkflowPr> = {}): WorkflowPr {
     headRef: `feat-${number}`,
     baseRef: "main",
     draft: false,
+    state: "open",
     author: { login: "ada-bot", kind: "agent", person: "ada" },
     ...over,
   };

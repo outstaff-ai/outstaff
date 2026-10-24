@@ -158,9 +158,9 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         emit("pr.closed", repo, number, actor);
         return structuredClone(s.pr);
       },
-      async review(repo, number, actor, state) {
+      async review(repo, number, actor, state, body = "") {
         need(repo, number);
-        emit("pr.review_submitted", repo, number, actor, { state });
+        emit("pr.review_submitted", repo, number, actor, { state, body });
       },
       async comment(repo, number, actor, body) {
         need(repo, number);

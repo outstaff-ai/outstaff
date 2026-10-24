@@ -51,6 +51,7 @@ export interface VcsSeed {
     number: number,
     actor: string,
     state: "approved" | "changes_requested" | "commented",
+    body?: string,
   ): Promise<void>;
   comment(repo: RepoRef, number: number, actor: string, body: string): Promise<void>;
   thread(

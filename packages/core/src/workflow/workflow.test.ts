@@ -3,6 +3,7 @@ import { parseTeamConfig } from "../config/parse.js";
 import { buildTeamJsonSchema } from "../config/json-schema.js";
 import { agent, automation, ev, pr, ref, world } from "./fixtures.js";
 import { presetRules } from "./presets.js";
+import { createStaticWorkflowState } from "./state.js";
 import { mergeRules, resolveWorkflow } from "./resolve.js";
 import { evaluateWorkflow, explainWorkflow } from "./evaluate.js";
 import { ruleInputSchema } from "./rules.js";
@@ -11,6 +12,16 @@ import { renderTemplate, TemplateError } from "./template.js";
 import type { Rule } from "./rules.js";
 
 const kanban = presetRules("kanban");
+
+const feedbackSchedule = (ticket?: string) => ({
+  type: "schedule",
+  person: "ada",
+  kind: "review_feedback",
+  priority: "high",
+  ...(ticket ? { ticket } : {}),
+  pr: ref(10),
+});
+
 const run = (
   event: ReturnType<typeof ev>,
   state: ReturnType<typeof world>,
@@ -53,39 +64,95 @@ describe("kanban preset", () => {
   });
 
   it.each(["pr.review_submitted", "pr.comment"] as const)(
-    "human %s sends review work back to the author",
+    "human %s on a ticket in review sends the work back to the author",
     (type) => {
       expect(
         run(ev(type, { data: { state: "changes_requested" } }), world({ status: "review" })),
       ).toEqual([
+        feedbackSchedule("ACME-1"),
         { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
         { type: "move", ticket: "ACME-1", to: "active" },
-        {
-          type: "schedule",
-          person: "ada",
-          kind: "review_feedback",
-          priority: "high",
-          ticket: "ACME-1",
-          pr: ref(10),
-        },
       ]);
     },
   );
 
-  it("feedback also applies to blocked tickets", () => {
+  it("feedback also reactivates blocked tickets", () => {
     expect(run(ev("pr.comment"), world({ status: "blocked" }))).toHaveLength(3);
   });
 
-  it("ignores approvals, agent feedback, human authors and tickets not in review", () => {
-    expect(run(ev("pr.review_submitted", { data: { state: "approved" } }), world())).toEqual([]);
+  it.each(["backlog", "ready", "active", "done", "canceled"] as const)(
+    "feedback reaches the author but leaves a %s ticket alone",
+    (status) => {
+      expect(run(ev("pr.comment"), world({ status }))).toEqual([feedbackSchedule("ACME-1")]);
+      expect(
+        run(
+          ev("pr.review_submitted", { data: { state: "commented", body: "hm" } }),
+          world({ status }),
+        ),
+      ).toEqual([feedbackSchedule("ACME-1")]);
+    },
+  );
+
+  it("feedback reaches the author when the pull request has no ticket", () => {
+    const noTicket = createStaticWorkflowState({ prs: [pr(10)] });
+    expect(run(ev("pr.comment"), noTicket)).toEqual([feedbackSchedule()]);
+    expect(
+      run(ev("pr.review_submitted", { data: { state: "changes_requested" } }), noTicket),
+    ).toEqual([feedbackSchedule()]);
+  });
+
+  it("an approval with a body is feedback, one without is not", () => {
+    const approved = (body?: string) =>
+      ev("pr.review_submitted", {
+        data: { state: "approved", ...(body === undefined ? {} : { body }) },
+      });
+
+    expect(run(approved("Ship it, but rename the flag."), world({ status: "ready" }))).toEqual([
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    expect(run(approved(""), world())).toEqual([]);
+    expect(run(approved("  \n"), world())).toEqual([]);
+    expect(run(approved(), world())).toEqual([]);
+  });
+
+  it("an inline comment left with an approval still reaches the author", () => {
+    expect(
+      run(ev("pr.comment", { data: { kind: "review_comment", body: "nit" } }), world()),
+    ).toEqual(expect.arrayContaining([feedbackSchedule("ACME-1")]));
+  });
+
+  it("ignores agent feedback, closed or merged pull requests and human-authored ones", () => {
     expect(run(ev("pr.comment", { actor: agent }), world())).toEqual([]);
-    expect(run(ev("pr.comment"), world({ status: "active" }))).toEqual([]);
+    for (const state of ["closed", "merged"] as const) {
+      expect(run(ev("pr.comment"), world({ prs: [pr(10, { state })] }))).toEqual([]);
+    }
+
     expect(
       run(
         ev("pr.comment"),
         world({ prs: [pr(10, { author: { login: "grace", kind: "human" } })] }),
       ),
     ).toEqual([]);
+
+    expect(
+      run(
+        ev("pr.comment"),
+        world({ prs: [pr(10, { author: { login: "dependabot[bot]", kind: "bot" } })] }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("the scrum preset behaves the same", () => {
+    const scrum = presetRules("scrum");
+    expect(run(ev("pr.comment"), world({ status: "review" }), scrum)).toHaveLength(3);
+    expect(run(ev("pr.comment"), world({ status: "backlog" }), scrum)).toEqual([
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    expect(run(ev("pr.comment"), createStaticWorkflowState({ prs: [pr(10)] }), scrum)).toEqual([
+      feedbackSchedule(),
+    ]);
   });
 
   it("conflict goes back to the author with recipe and schedule", () => {
@@ -260,14 +327,7 @@ describe("scrum and minimal presets", () => {
 
     expect(run(ev("pr.comment"), world(), minimal)).toEqual([
       { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
-      {
-        type: "schedule",
-        person: "ada",
-        kind: "review_feedback",
-        priority: "high",
-        ticket: "ACME-1",
-        pr: ref(10),
-      },
+      feedbackSchedule("ACME-1"),
     ]);
 
     expect(run(e, world({ ticket: { assignee: a } }), minimal)).toHaveLength(1);
@@ -443,12 +503,15 @@ describe("explain", () => {
       reason: "listens to pr.merged, not pr.comment",
     });
 
-    expect(by["human-feedback-back-to-author"]).toMatchObject({ matched: false });
-    expect(by["human-feedback-back-to-author"]?.reason).toBe(
+    expect(by["human-feedback-back-to-author"]).toMatchObject({ matched: true });
+    expect(by["human-feedback-reactivates-ticket"]).toMatchObject({ matched: false });
+    expect(by["human-feedback-reactivates-ticket"]?.reason).toBe(
       "ticket status active in [review, blocked]",
     );
 
-    expect(x.effects).toEqual([]);
+    expect(x.effects).toEqual([
+      expect.objectContaining({ type: "schedule", kind: "review_feedback" }),
+    ]);
   });
 
   it("lists effects and skipped actions of matching rules", () => {

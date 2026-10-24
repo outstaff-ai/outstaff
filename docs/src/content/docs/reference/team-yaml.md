@@ -879,6 +879,16 @@ Condition that must hold.
 - Type: `boolean`
 - Required
 
+#### workflow.rules[].if.pr_open
+
+- Type: `boolean`
+- Required
+
+#### workflow.rules[].if.has_body
+
+- Type: `boolean`
+- Required
+
 #### workflow.rules[].if.review_state
 
 - Type: `list of string`

@@ -2,6 +2,19 @@ import type { Rule } from "./rules.js";
 
 const OPEN: Rule["if"] = { ticket_status: ["backlog", "ready", "active", "blocked"] };
 
+/**
+ * A trusted human's review or comment on an open pull request an agent wrote. An approval with
+ * nothing written in it is a sign-off, not feedback.
+ */
+const humanFeedback: Rule["if"] = {
+  all: [
+    { actor_kind: "human" },
+    { pr_author_kind: "agent" },
+    { pr_open: true },
+    { not: { all: [{ review_state: ["approved"] }, { has_body: false }] } },
+  ],
+};
+
 const kanbanRules: Rule[] = [
   {
     id: "pr-opened-review",
@@ -24,19 +37,14 @@ const kanbanRules: Rule[] = [
   {
     id: "human-feedback-back-to-author",
     on: ["pr.review_submitted", "pr.comment"],
-    if: {
-      all: [
-        { actor_kind: "human" },
-        { pr_author_kind: "agent" },
-        { ticket_status: ["review", "blocked"] },
-        { not: { review_state: ["approved"] } },
-      ],
-    },
-    do: [
-      { assign: "author" },
-      { move: "active" },
-      { schedule: { person: "author", kind: "review_feedback", priority: "high" } },
-    ],
+    if: humanFeedback,
+    do: [{ schedule: { person: "author", kind: "review_feedback", priority: "high" } }],
+  },
+  {
+    id: "human-feedback-reactivates-ticket",
+    on: ["pr.review_submitted", "pr.comment"],
+    if: { all: [humanFeedback, { ticket_status: ["review", "blocked"] }] },
+    do: [{ assign: "author" }, { move: "active" }],
   },
   {
     id: "conflict-back-to-author",
@@ -104,13 +112,7 @@ const minimalRules: Rule[] = [
   {
     id: "human-feedback-back-to-author",
     on: ["pr.review_submitted", "pr.comment"],
-    if: {
-      all: [
-        { actor_kind: "human" },
-        { pr_author_kind: "agent" },
-        { not: { review_state: ["approved"] } },
-      ],
-    },
+    if: humanFeedback,
     do: [
       { assign: "author" },
       { schedule: { person: "author", kind: "review_feedback", priority: "high" } },
