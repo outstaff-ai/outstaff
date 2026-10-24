@@ -1,0 +1,27 @@
+{
+  "id": "25000000010",
+  "type": "PushEvent",
+  "actor": {
+    "id": 1010,
+    "login": "marcus",
+    "display_login": "marcus"
+  },
+  "repo": {
+    "id": 1,
+    "name": "acme/app",
+    "url": "https://api.github.com/repos/acme/app"
+  },
+  "payload": {
+    "repository_id": 1,
+    "push_id": 47000000001,
+    "ref": "refs/heads/feat/login",
+    "head": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "before": "cccccccccccccccccccccccccccccccccccccccc"
+  },
+  "public": true,
+  "created_at": "2026-01-05T10:00:00Z",
+  "org": {
+    "id": 2,
+    "login": "acme"
+  }
+}
