@@ -17,7 +17,9 @@ export function cappedAccess(grant: GitMode, profile: Profile): GitMode {
 
 /**
  * Secrets for the git credential helper. git starts it from inside the agent's shell, where credential-looking
- * variables have been scrubbed, so it reads files only and never the environment.
+ * variables have been scrubbed, so it reads files only and never the environment. The one exception is
+ * `OUTSTAFF_PERSON`, who the container acts as: it is not a secret, and the vcs adapter refuses to issue write
+ * credentials without it.
  */
 export function fileOnlySecrets(env: NodeJS.ProcessEnv): SecretSource {
   const dir = env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff";
@@ -28,10 +30,11 @@ export function fileOnlySecrets(env: NodeJS.ProcessEnv): SecretSource {
       `Missing secret ${key}: secrets must be provided as files under ${dir}; env-only secrets are not visible to git's credential helper.`,
     );
 
+  const get = (key: string) => (key === "OUTSTAFF_PERSON" ? env[key] || undefined : files.get(key));
   return {
-    get: files.get,
+    get,
     require(key) {
-      const value = files.get(key);
+      const value = get(key);
       if (value === undefined) {
         throw missing(key);
       }

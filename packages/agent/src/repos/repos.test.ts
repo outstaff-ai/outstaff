@@ -148,6 +148,18 @@ describe("credential helper", () => {
     );
   });
 
+  it("still tells the credential helper who the container acts as", () => {
+    const secrets = fileOnlySecrets({
+      OUTSTAFF_SECRETS_DIR: "/nonexistent",
+      OUTSTAFF_PERSON: "sam",
+    });
+
+    expect(secrets.require("OUTSTAFF_PERSON")).toBe("sam");
+    expect(
+      fileOnlySecrets({ OUTSTAFF_SECRETS_DIR: "/nonexistent" }).get("OUTSTAFF_PERSON"),
+    ).toBeUndefined();
+  });
+
   it("lets a refusal from the VCS through", async () => {
     const vcs: Vcs = createFakeVcs({ host });
     const helper = createCredentialHelper({
