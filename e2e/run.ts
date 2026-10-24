@@ -434,12 +434,28 @@ async function main() {
         thread?.resolved &&
         thread.comments.length > 1 &&
         t.status === "In Review"
-        ? { pr, t, thread }
+        ? { pr, t, thread, github: s.github }
         : undefined;
     },
   );
 
   assertEq(fixed.thread.comments.at(-1).author, "acme-sam[bot]", "the agent replied in the thread");
+  const eyes = fixed.github.reactions.filter(
+    (x: Json) => x.kind === "inline_comment" && x.commentId === fixed.thread.comments[0].databaseId,
+  );
+
+  assertEq(
+    JSON.stringify(eyes.map((x: Json) => [x.user, x.content])),
+    JSON.stringify([["acme-sam[bot]", "eyes"]]),
+    "the agent reacted with eyes to the inline comment once",
+  );
+
+  assertEq(
+    eyes[0].seq < fixed.thread.comments[1].seq,
+    true,
+    "the eyes reaction came before the agent's reply",
+  );
+
   const rounds = fixed.t.moves.map((m: Json) => `${m.from}>${m.to}`);
   assertIncludes(rounds, "In Review>In Progress", "the review sent the ticket back to active");
   step(

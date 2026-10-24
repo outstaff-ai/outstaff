@@ -675,6 +675,16 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       });
     },
 
+    async react(repo, target, reaction) {
+      const { token } = await actingToken(repo, "write", PERMISSIONS.write);
+      const path = target.kind === "conversation_comment" ? "issues" : "pulls";
+      await http.request(
+        "POST",
+        `${repoPath(repo)}/${path}/comments/${encodeURIComponent(target.id)}/reactions`,
+        { token, body: { content: reaction } },
+      );
+    },
+
     async diff(repo, number) {
       if (!(self && grantOf(self, repo))) {
         throw new PortError(

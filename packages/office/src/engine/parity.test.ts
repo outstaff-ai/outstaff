@@ -237,6 +237,7 @@ describe("kanban parity", () => {
       expect(feedback).toMatchObject({ actor: "dana", kind: "review", state: "changes_requested" });
       expect(feedback?.comments).toEqual([
         {
+          id: expect.any(String),
           path: "src/a.ts",
           line: 3,
           body: "Rename this.",
@@ -244,6 +245,7 @@ describe("kanban parity", () => {
           threadId: t1,
         },
         {
+          id: expect.any(String),
           path: "src/b.ts",
           line: 7,
           body: "And this.",

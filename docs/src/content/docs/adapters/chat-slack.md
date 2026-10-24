@@ -114,4 +114,4 @@ See [trust model](/decisions/0004-trust-model/) for why trust is decided in the 
 
 ## What agents see
 
-Agents write markdown. The adapter converts it to Slack's format (bold, links, headings as bold lines, lists, tables as aligned code blocks, code kept) and splits long messages at line breaks. Reactions map `eyes`, `done` and `error` to :eyes:, :white_check_mark: and :x:. The Home tab shows the agent's role, status, current work and any extra sections.
+Agents write markdown. The adapter converts it to Slack's format (bold, links, headings as bold lines, lists, tables as aligned code blocks, code kept) and splits long messages at line breaks. Reactions map `eyes`, `done` and `error` to :eyes:, :white_check_mark: and :x:. The `eyes` reaction is the acknowledgement on Slack; on the code host the agent reacts the same way to the pull request feedback it takes (see [Acknowledgements](/architecture/agent/#acknowledgements)). The Home tab shows the agent's role, status, current work and any extra sections.

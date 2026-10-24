@@ -64,13 +64,14 @@ describe("buildWorkPrompt feedback", () => {
         body: "",
         comments: [
           {
+            id: "101",
             path: "src/a.ts",
             line: 3,
             body: "Rename this.",
             url: "https://g.example/pull/3#r1",
             threadId: "PRRT_1",
           },
-          { path: "src/b.ts", body: "No thread.\nTwo lines." },
+          { id: "102", path: "src/b.ts", body: "No thread.\nTwo lines." },
         ],
       }),
       { resumed: false },

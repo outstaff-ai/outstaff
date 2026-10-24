@@ -15,6 +15,7 @@ import type { AgentEnv } from "../verbs/types.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { ChatRelay } from "./chat.js";
 import { buildWorkPrompt } from "./prompt.js";
+import { acknowledgeFeedback } from "./reactions.js";
 import type { UsageReporter } from "./usage.js";
 import { createSessionManager, type SessionManager } from "./sessions.js";
 
@@ -344,6 +345,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
     opts.usage?.setBusy(true);
     try {
+      // Before the run starts, so the people who wrote the feedback see at once that it was taken.
+      await acknowledgeFeedback(offer, opts.env.vcs, log);
       await work(offer, abort);
     } catch (e) {
       log.error("work item failed", { workItemId: id, error: reason(e) });

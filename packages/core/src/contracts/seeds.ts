@@ -3,6 +3,7 @@ import type {
   Doc,
   Member,
   PullRequest,
+  ReactionTarget,
   RepoRef,
   Check,
   VcsPermission,
@@ -60,7 +61,12 @@ export interface VcsSeed {
     body?: string,
     comments?: { path: string; line: number; body: string }[],
   ): Promise<string>;
-  comment(repo: RepoRef, number: number, actor: string, body: string): Promise<void>;
+
+  /** A comment on the pull request conversation. Resolves to the comment id. */
+  comment(repo: RepoRef, number: number, actor: string, body: string): Promise<string>;
+
+  /** Who reacted to a comment with what, for the kit to see the effect of `react`. */
+  reactions?(repo: RepoRef, target: ReactionTarget): Promise<{ user: string; reaction: string }[]>;
   thread(
     repo: RepoRef,
     number: number,

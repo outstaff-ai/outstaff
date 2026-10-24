@@ -76,9 +76,16 @@ describe("parsePrompt", () => {
         state: "changes_requested",
         body: "",
         comments: [
-          { path: "a.txt", line: 1, body: "One.", url: "https://g.example/r1", threadId: "PRRT_1" },
-          { path: "b.txt", body: "Two.", threadId: "PRRT_2" },
-          { path: "c.txt", body: "No thread." },
+          {
+            id: "1",
+            path: "a.txt",
+            line: 1,
+            body: "One.",
+            url: "https://g.example/r1",
+            threadId: "PRRT_1",
+          },
+          { id: "2", path: "b.txt", body: "Two.", threadId: "PRRT_2" },
+          { id: "3", path: "c.txt", body: "No thread." },
         ],
       },
     ];

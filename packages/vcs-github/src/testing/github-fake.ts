@@ -77,6 +77,16 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
   const threads = new Map<string, Thread>();
   const reviews = new Map<number, StoredReview>();
   const perms = new Map<string, VcsPermission>();
+
+  // Conversation comment ids, and the reactions on a comment (`<endpoint>:<id>` -> `<login>:<content>`).
+  const issueComments = new Set<number>();
+  const reactions = new Map<string, Set<string>>();
+  const inlineIds = () =>
+    new Set([
+      ...[...threads.values()].flatMap((t) => t.comments.map((c) => c.databaseId)),
+      ...[...reviews.values()].flatMap((r) => r.comments.map((c) => c.databaseId)),
+    ]);
+
   const events: Record<string, unknown>[] = [];
   const clockIso = () => new Date(Date.parse("2026-01-01T00:00:00Z") + ++tick * 1000).toISOString();
 
@@ -365,15 +375,36 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
           return { status: 404, body: { message: "Not Found" } };
         }
 
+        const id = ++commentCounter;
+        issueComments.add(id);
         emit("IssueCommentEvent", `${actorOf(r)}[bot]`, {
           action: "created",
           issue: { number: pr.number, pull_request: {} },
-          comment: { id: eventId, body: r.json.body },
+          comment: { id, body: r.json.body },
         });
 
-        return { status: 201, body: { id: eventId } };
+        return { status: 201, body: { id } };
       },
     },
+    ...(["issues", "pulls"] as const).map((kind): Route => ({
+      method: "POST",
+      path: `/repos/${repo.owner}/${repo.name}/${kind}/comments/:id/reactions`,
+      handler: (r) => {
+        const id = Number(r.params["id"]);
+        const known = kind === "issues" ? issueComments.has(id) : inlineIds().has(id);
+        if (!known) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        const key = `${kind}:${id}`;
+        const set = reactions.get(key) ?? new Set<string>();
+        const entry = `${actorOf(r)}[bot]:${r.json.content}`;
+        const created = !set.has(entry);
+        set.add(entry);
+        reactions.set(key, set);
+        return { status: created ? 201 : 200, body: { id, content: r.json.content } };
+      },
+    })),
     {
       method: "GET",
       path: `/repos/${repo.owner}/${repo.name}/pulls/:n`,
@@ -552,10 +583,21 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
       return String(submitReview(number, actor, state.toUpperCase(), body, comments));
     },
     async comment(_repo, number, actor, body) {
+      const id = ++commentCounter;
+      issueComments.add(id);
       emit("IssueCommentEvent", actor, {
         action: "created",
         issue: { number, pull_request: {} },
-        comment: { id: eventId, body },
+        comment: { id, body },
+      });
+
+      return String(id);
+    },
+    async reactions(_repo, target) {
+      const kind = target.kind === "conversation_comment" ? "issues" : "pulls";
+      return [...(reactions.get(`${kind}:${target.id}`) ?? [])].map((r) => {
+        const [user, reaction] = r.split(":") as [string, string];
+        return { user, reaction };
       });
     },
     async thread(_repo, number, t) {

@@ -75,6 +75,7 @@ export const workItemSchema = z.strictObject({
 });
 
 export const inlineCommentSchema = z.strictObject({
+  id: z.string().min(1).describe("The comment's id on the host."),
   path: z.string().min(1).describe("File the comment is on."),
   line: z.number().int().optional().describe("Line the comment is on."),
   body: z.string().describe("What the person wrote. Data from that person."),
@@ -94,6 +95,12 @@ export const feedbackSchema = z.strictObject({
     ),
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),
+  commentId: z
+    .string()
+    .optional()
+    .describe(
+      "For a comment or inline comment: its id on the host. The kind tells which kind of comment it is.",
+    ),
   at: z.string().optional().describe("When the host reported the feedback (ISO-8601)."),
   body: z.string().describe("What the person wrote. Data from that person."),
   comments: z

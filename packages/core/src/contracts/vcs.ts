@@ -407,6 +407,48 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
         await expectPortError(s.subject.commentOnPullRequest(repo, 99999, "x"), "not_found");
       });
 
+      it("reacts to a conversation comment and to an inline comment, once per reaction", async (t) => {
+        const { s, repo, self } = await setupSelf(t, "write");
+        const reactions = requireSeed(t, s.seed, "reactions");
+        const pr = await otherPr(t, s, repo, "Reacted to");
+        const commentId = await requireSeed(t, s.seed, "comment")(repo, pr.number, "dana", "Hm?");
+        const reviewId = await requireSeed(t, s.seed, "review")(
+          repo,
+          pr.number,
+          "dana",
+          "commented",
+          "",
+          [{ path: "src/a.ts", line: 2, body: "rename" }],
+        );
+
+        const [inline] = await s.subject.reviewComments(repo, pr.number, reviewId);
+        const targets = [
+          { kind: "conversation_comment", id: commentId },
+          { kind: "inline_comment", id: inline!.id },
+        ] as const;
+
+        for (const target of targets) {
+          await s.subject.react(repo, target, "eyes");
+          await s.subject.react(repo, target, "eyes");
+          const found = (await reactions(repo, target)).map((r) => [
+            r.user.replace(/\[bot\]$/, ""),
+            r.reaction,
+          ]);
+
+          expect(found).toEqual([[self, "eyes"]]);
+        }
+
+        await expectPortError(
+          s.subject.react(repo, { kind: "conversation_comment", id: "99999999" }, "eyes"),
+          "not_found",
+        );
+
+        await expectPortError(
+          s.subject.react(repo, { kind: "inline_comment", id: "99999999" }, "eyes"),
+          "not_found",
+        );
+      });
+
       it("returns the unified diff with a read grant", async (t) => {
         const { s, repo } = await setupSelf(t, "read");
         const pr = await otherPr(t, s, repo, "Diffed");

@@ -3,6 +3,7 @@ import { PortError, repoKey } from "../ports/index.js";
 import type {
   Check,
   PullRequest,
+  ReactionTarget,
   RepoRef,
   ReviewInlineComment,
   ReviewThread,
@@ -49,6 +50,17 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
   let threadCounter = 0;
   let commentCounter = 0;
   let reviewCounter = 0;
+
+  // Conversation comments by id, and who reacted with what to a comment (`kind:id` -> `login:reaction`).
+  const conversation = new Map<string, string>();
+  const reactions = new Map<string, Set<string>>();
+  const reactionKey = (repo: RepoRef, t: ReactionTarget) => `${key(repo)}:${t.kind}:${t.id}`;
+  const knows = (repo: RepoRef, t: ReactionTarget) =>
+    t.kind === "conversation_comment"
+      ? conversation.get(t.id) === key(repo)
+      : [...(prs.get(key(repo))?.values() ?? [])].some((s) =>
+          s.threads.some((th) => th.comments.some((c) => c.id === t.id)),
+        );
 
   const key = (r: RepoRef) => repoKey(r, host);
   const withHost = (r: RepoRef): RepoRef => ({ host: host, ...r });
@@ -206,7 +218,16 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
       },
       async comment(repo, number, actor, body) {
         need(repo, number);
-        emit("pr.comment", repo, number, actor, { kind: "comment", body });
+        const commentId = `ic${++commentCounter}`;
+        conversation.set(commentId, key(repo));
+        emit("pr.comment", repo, number, actor, { kind: "comment", body, commentId });
+        return commentId;
+      },
+      async reactions(repo, target) {
+        return [...(reactions.get(reactionKey(repo, target)) ?? [])].map((r) => {
+          const [user, reaction] = r.split(":") as [string, string];
+          return { user, reaction };
+        });
       },
       async thread(repo, number, t) {
         const s = need(repo, number);
@@ -402,7 +423,19 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     async commentOnPullRequest(repo, number, body) {
       grant(repo, "write");
       need(repo, number);
-      emit("pr.comment", repo, number, self, { kind: "comment", body });
+      const commentId = `ic${++commentCounter}`;
+      conversation.set(commentId, key(repo));
+      emit("pr.comment", repo, number, self, { kind: "comment", body, commentId });
+    },
+    async react(repo, target, reaction) {
+      grant(repo, "write");
+      if (!knows(repo, target)) {
+        throw new PortError("not_found", `${target.kind} ${target.id} is not on ${key(repo)}.`);
+      }
+
+      const set = reactions.get(reactionKey(repo, target)) ?? new Set<string>();
+      set.add(`${self}:${reaction}`);
+      reactions.set(reactionKey(repo, target), set);
     },
     async diff(repo, number) {
       grant(repo, "read");

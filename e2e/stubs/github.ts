@@ -20,7 +20,7 @@ interface Pr {
   forcePushes: number;
 
   /** Top-level comments on the conversation. */
-  conversation: { author: string; body: string }[];
+  conversation: { id: number; seq: number; author: string; body: string }[];
   state: "open" | "closed";
   merged: boolean;
   draft: boolean;
@@ -33,7 +33,7 @@ interface Thread {
   resolved: boolean;
   path: string | undefined;
   line: number | undefined;
-  comments: { id: string; databaseId: number; author: string; body: string }[];
+  comments: { id: string; databaseId: number; seq: number; author: string; body: string }[];
 }
 
 interface Review {
@@ -74,6 +74,16 @@ export function createGithub(opts: GithubOptions) {
   let threadId = 0;
   let reviewId = 0;
   let commentId = 0;
+  // Orders what the agent does on GitHub, so a test can tell a reaction from the reply that follows it.
+  let seq = 0;
+  const reactions: {
+    kind: "conversation_comment" | "inline_comment";
+    commentId: number;
+    user: string;
+    content: string;
+    seq: number;
+  }[] = [];
+
   let tokenId = 0;
   const etag = () => `W/"${eventId}"`;
 
@@ -197,7 +207,7 @@ export function createGithub(opts: GithubOptions) {
         resolved: false,
         path: c.path,
         line: c.line,
-        comments: [{ id: `${thread}_c0`, databaseId, author: actor, body: c.body }],
+        comments: [{ id: `${thread}_c0`, databaseId, seq: ++seq, author: actor, body: c.body }],
       });
 
       review.comments.push({ databaseId, path: c.path, line: c.line, body: c.body });
@@ -280,6 +290,7 @@ export function createGithub(opts: GithubOptions) {
       t.comments.push({
         id: `${t.id}_c${t.comments.length}`,
         databaseId: ++commentId,
+        seq: ++seq,
         author: actor,
         body: variables["body"],
       });
@@ -498,17 +509,54 @@ export function createGithub(opts: GithubOptions) {
           return pr ? unauthorized : notFound;
         }
 
-        pr.conversation.push({ author: actor, body: r.json.body });
+        const id = ++commentId;
+        pr.conversation.push({ id, seq: ++seq, author: actor, body: r.json.body });
         pr.updatedAt = now();
         emit("IssueCommentEvent", actor, {
           action: "created",
           issue: { number: pr.number, pull_request: {} },
-          comment: { id: eventId + 1, body: r.json.body },
+          comment: { id, body: r.json.body },
         });
 
-        return { id: eventId };
+        return { id };
       },
     },
+    ...(["issues", "pulls"] as const).map((segment): Route => ({
+      method: "POST",
+      path: `${API}/repos/${full}/${segment}/comments/:id/reactions`,
+      handler: (r) => {
+        const actor = botOf(r);
+        if (!actor) {
+          return unauthorized;
+        }
+
+        const id = Number(r.params["id"]);
+        const kind = segment === "issues" ? "conversation_comment" : "inline_comment";
+        const known =
+          kind === "conversation_comment"
+            ? [...prs.values()].some((p) => p.conversation.some((c) => c.id === id))
+            : [...threads.values()].some((t) => t.comments.some((c) => c.databaseId === id));
+
+        if (!known) {
+          return notFound;
+        }
+
+        const found = reactions.find(
+          (x) =>
+            x.kind === kind &&
+            x.commentId === id &&
+            x.user === actor &&
+            x.content === r.json.content,
+        );
+
+        if (found) {
+          return { status: 200, body: { id, content: found.content } };
+        }
+
+        reactions.push({ kind, commentId: id, user: actor, content: r.json.content, seq: ++seq });
+        return { status: 201, body: { id, content: r.json.content } };
+      },
+    })),
     {
       method: "GET",
       path: `${API}/repos/${full}/commits/:sha/check-runs`,
@@ -595,15 +643,16 @@ export function createGithub(opts: GithubOptions) {
         throw new Error(`No pull request ${n}.`);
       }
 
-      pr.conversation.push({ author: actor, body });
+      const id = ++commentId;
+      pr.conversation.push({ id, seq: ++seq, author: actor, body });
       pr.updatedAt = now();
       emit("IssueCommentEvent", actor, {
         action: "created",
         issue: { number: pr.number, pull_request: {} },
         comment: {
-          id: eventId + 1,
+          id,
           body,
-          html_url: `https://github.example/${full}/pull/${pr.number}#issuecomment-${eventId + 1}`,
+          html_url: `https://github.example/${full}/pull/${pr.number}#issuecomment-${id}`,
         },
       });
     },
@@ -623,6 +672,7 @@ export function createGithub(opts: GithubOptions) {
       return {
         main: await repo.sha("main"),
         branches: await repo.branches(),
+        reactions,
         pulls: await Promise.all(
           [...prs.values()].map(async (p) => {
             const r = await rest(p);
