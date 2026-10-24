@@ -387,6 +387,7 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       });
 
       intake.onEvent((e, m) => ws.apply(e, m));
+      await intake.pollOnce();
       await vcs.seed.permission(REPO, "dana", "write");
       const merged = await pr({ title: "m" });
       const hit = await pr({ title: "hit", mergeable: ["clean", "conflicting"] });

@@ -20,6 +20,8 @@ Intake turns activity in your repositories and tracker into deduplicated, normal
 
 Each source keeps an opaque cursor in the store and sends it with the next poll, so a restart resumes where it stopped. The cursor only moves after the whole page was recorded. Every event is also recorded by `(source, externalId)`; a repeat is dropped. So a crash mid-page, a replayed page or a webhook redelivery never produces a second event.
 
+**First poll.** A source with no stored cursor returns its recent history, which is not news. Intake therefore sets a baseline: it stores the cursor of that first page, records and delivers none of its events, and logs `intake: baseline set for <source>`. Later polls process only what happened after it, and a restart with a stored cursor does not baseline again. Existing tickets and pull requests are not picked up on first start; the work begins when one is assigned or moved. Webhook mode has no baseline, because deliveries are live events and poll mode never runs beside it.
+
 ### Delivery is at-least-once
 
 An event is recorded first, then handed to the handlers registered with `onEvent`, then marked processed. If a handler throws, the event stays unprocessed and is retried with the same backoff as polling, up to 5 attempts (`maxAttempts`); after that the error is logged and the event is marked processed with the error, so one poisoned event cannot block the rest. Events are always delivered in order: later events wait behind a failing one. On start, intake first redelivers everything still unprocessed. Handlers therefore **must be idempotent**: the same event can reach them more than once, and when several handlers are registered a retry reruns all of them.

@@ -49,6 +49,8 @@ kubectl -n outstaff-acme logs deploy/outstaff-office | grep "agent connected"
 kubectl -n outstaff-acme logs sts/outstaff-agent-sam   # why an agent does not start
 ```
 
+On first start the office doesn't pick up existing tickets or pull requests; assign or move a ticket to start work.
+
 ## Secrets
 
 kustomize generates the Secrets from files. Put one file per key in a gitignored tree, `examples/k8s/secrets/office/<KEY>` for the team and `examples/k8s/secrets/<handle>/<KEY>` for each person, and `kubectl apply -k` creates them. A file holds the bare value, so multi-line values such as PEM private keys survive intact. [`secrets/README.md`](https://github.com/outstaff-ai/outstaff/tree/main/examples/k8s/secrets) lists every file per person.

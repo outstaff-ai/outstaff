@@ -165,7 +165,7 @@ describe("tracker", () => {
     await expect(tracker.events("not json")).rejects.toMatchObject({ code: "invalid" });
   });
 
-  it("pages back through a long feed when no cursor is given", async () => {
+  it("reads only the newest page when no cursor is given, with a cursor that represents now", async () => {
     const fake = createItsaplanFake();
     const tracker = await createItsaplanTracker(trackerCtx(fake));
     const issue = await tracker.createIssue({ title: "Busy", body: "" });
@@ -173,9 +173,14 @@ describe("tracker", () => {
       await tracker.comment(issue.key, `c${i}`);
     }
 
-    const all = await tracker.events();
-    expect(all.events).toHaveLength(121);
-    expect(all.events[0]?.type).toBe("created");
+    const first = await tracker.events();
+    expect(first.events).toHaveLength(100);
+    expect(first.events.at(-1)?.data["body"]).toBe("c119");
+    expect((await tracker.events(first.cursor)).events).toEqual([]);
+    await tracker.comment(issue.key, "after");
+    expect((await tracker.events(first.cursor)).events.map((e) => e.data["body"])).toEqual([
+      "after",
+    ]);
   });
 
   it("classifies activity actions", () => {

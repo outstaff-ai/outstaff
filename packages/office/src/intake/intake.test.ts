@@ -240,13 +240,75 @@ describe("dedupe and cursors", () => {
 
     // The agent's pr.opened is delivered first; classifying the human comment aborts the page.
     await expect(intake.pollOnce()).rejects.toThrow(/slow down/);
-    expect(await store.getCursor("vcs", "events")).toBeUndefined();
+    expect(await store.getCursor("vcs", "events")).toBe("0");
     expect(events.map((e) => e.event.type)).toEqual(["pr.opened"]);
 
     fail = false;
     await intake.pollOnce();
     expect(events.map((e) => e.event.type)).toEqual(["pr.opened", "pr.comment"]);
     expect(await store.getCursor("vcs", "events")).toBe("2");
+  });
+});
+
+describe("first poll baseline", () => {
+  const quiet = () => {
+    const info = vi.fn<(message: string) => void>();
+    return { info, logger: { debug() {}, info, warn() {}, error() {} } };
+  };
+
+  it("records where now is for each source and replays no history", async () => {
+    const { info, logger } = quiet();
+    const { vcs, tracker, intake, events, store } = await setup({
+      noBaseline: true,
+      logger,
+      trackerActor: human("u1", "dana"),
+    });
+
+    await vcs.seed.permission(REPO, "dana", "write");
+    await vcs.seed.pullRequest(REPO, { ...pr, author: { login: "dana", kind: "human" } });
+    const issue = await tracker.createIssue({ title: "Old", body: "", assignee: "u1" });
+    await intake.pollOnce();
+    expect(events).toEqual([]);
+    expect(await store.listUnprocessed()).toEqual([]);
+    expect(await store.getCursor("vcs", "events")).toBe("1");
+    expect(await store.getCursor("tracker", "events")).toBe("2");
+    expect(info).toHaveBeenCalledWith("intake: baseline set for vcs");
+    expect(info).toHaveBeenCalledWith("intake: baseline set for tracker");
+
+    await tracker.transition(issue.key, "active");
+    await vcs.seed.comment(REPO, 1, "dana", "new");
+    await intake.pollOnce();
+    expect(events.map((e) => e.event.type).toSorted()).toEqual(["pr.comment", "ticket.moved"]);
+    expect(info).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not re-baseline after a restart with a stored cursor", async () => {
+    const first = await setup({ noBaseline: true });
+    await first.vcs.seed.pullRequest(REPO, { ...pr });
+    await first.intake.pollOnce();
+    expect(first.events).toEqual([]);
+
+    const { info, logger } = quiet();
+    const second = await setup({
+      store: first.store,
+      ports: { vcs: first.vcs, tracker: first.tracker },
+      logger,
+    });
+
+    await first.vcs.seed.pullRequest(REPO, { ...pr });
+    await second.intake.pollOnce();
+    expect(second.events.map((e) => e.event.type)).toEqual(["pr.opened"]);
+    expect(info).not.toHaveBeenCalled();
+  });
+
+  it("baselines on start in poll mode and does not enqueue history", async () => {
+    const { vcs, intake, clock, events, store } = await setup({ noBaseline: true });
+    await vcs.seed.pullRequest(REPO, { ...pr });
+    await intake.start();
+    clock.advance(0);
+    await vi.waitFor(async () => expect(await store.getCursor("vcs", "events")).toBe("1"));
+    expect(events).toEqual([]);
+    await intake.stop();
   });
 });
 
