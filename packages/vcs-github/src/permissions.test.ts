@@ -41,54 +41,31 @@ describe("GitHub adapter rule pack", () => {
   });
 
   it.each([
-    ["gh pr view 3", APP],
-    ["gh pr checks 3", APP],
-    ["gh pr diff 3", SITE],
-    ["gh api repos/acme/app/pulls", APP],
-    ["gh api -X GET repos/acme/app/pulls", APP],
-    ["gh api --method=get repos/acme/app/pulls", SITE],
-  ])("allows %s", (command, cwd) => {
-    expect(run(command, cwd).effect).toBe("allow");
+    "gh pr view 3",
+    "gh pr checks 3",
+    "gh pr diff 3",
+    "gh pr create --title t",
+    "gh pr merge 3",
+    "gh api repos/acme/app/pulls",
+    "gh api -X POST repos/acme/app/issues",
+    "gh api graphql",
+    "gh pr view 3 -R acme/other",
+    "gh release create v1",
+    "gh --version",
+  ])("denies %s", (command) => {
+    expect(run(command)).toMatchObject({ effect: "deny", rule: "gh.denied" });
   });
 
-  it("allows reads for the readonly profile too", () => {
-    expect(run("gh pr view 3", SITE, "readonly").effect).toBe("allow");
+  it("denies gh in every profile and in repositories without a write grant", () => {
+    expect(run("gh pr view 3", SITE, "readonly")).toMatchObject({
+      effect: "deny",
+      rule: "gh.denied",
+    });
+
+    expect(run("gh pr view 3", SITE)).toMatchObject({ effect: "deny", rule: "gh.denied" });
   });
 
-  it.each([
-    ["gh api -X POST repos/acme/app/issues", "gh.api.method"],
-    ["gh api --method=DELETE repos/acme/app/git/refs/heads/x", "gh.api.method"],
-    ["gh api -XPATCH repos/acme/app/pulls/1", "gh.api.method"],
-    ["gh api repos/acme/app/issues -f title=x", "gh.api.body"],
-    ["gh api repos/acme/app/issues --input body.json", "gh.api.body"],
-    ["gh api graphql -f query=@q", "gh.api.body"],
-    ["gh api /graphql", "gh.api.graphql"],
-    ["gh api graphql", "gh.api.graphql"],
-    ["gh pr create --title t", "gh.pr.create"],
-    ["gh pr edit 3 --title x", "gh.pr.edit"],
-    ["gh pr merge 3", "gh.pr.merge"],
-    ["gh pr comment 3 --body hi", "gh.pr.comment"],
-  ])("denies %s", (command, rule) => {
-    expect(run(command)).toMatchObject({ effect: "deny", rule });
-  });
-
-  it("points PR changes at ost pr", () => {
+  it("points at ost pr", () => {
     expect(run("gh pr create").reason).toContain("ost pr");
-  });
-
-  it("asks outside granted repositories and for -R targets", () => {
-    expect(run("gh pr view 3", "/work/scratch")).toMatchObject({
-      effect: "ask",
-      rule: "git.no-repo",
-    });
-
-    expect(run("gh pr view 3 -R acme/other")).toMatchObject({
-      effect: "ask",
-      rule: "commands.repo-flag",
-    });
-  });
-
-  it("does not cover other gh commands", () => {
-    expect(run("gh release create v1").effect).toBe("ask");
   });
 });

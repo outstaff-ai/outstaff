@@ -58,17 +58,11 @@ Installation tokens are cached and reused until five minutes before they expire.
 
 The adapter contributes a rule pack for the `gh` CLI (`githubVcs.permissions()`, collected by `AdapterRegistry.rulePacks()` and merged by core's `buildPolicy({ packs })`). Core itself knows nothing about `gh`.
 
-| Command                                                       | Decision                                             |
-| ------------------------------------------------------------- | ---------------------------------------------------- |
-| `gh pr view`, `gh pr checks`, `gh pr diff`                    | allowed in granted repositories                      |
-| `gh api` (GET)                                                | allowed in granted repositories                      |
-| `gh api` with `-X`/`--method` other than GET                  | denied                                               |
-| `gh api` with `-f`, `-F`, `--field`, `--raw-field`, `--input` | denied                                               |
-| `gh api graphql`                                              | denied                                               |
-| `gh pr create`, `edit`, `merge`, `comment`                    | denied; pull requests go through `ost pr`            |
-| anything else                                                 | not covered (asks; unattended runs treat it as deny) |
+| Command          | Decision                                               |
+| ---------------- | ------------------------------------------------------ |
+| any `gh` command | denied (rule `gh.denied`); agents use `ost pr` instead |
 
-A `-R`/`--repo` target cannot be mapped to a granted repository, so it is not covered either. Deny wins over every allow, whichever source it comes from.
+Agents hold no GitHub token: git gets short-lived tokens from the `ost git-credential` helper, and `GH_TOKEN` and `GITHUB_TOKEN` are scrubbed. The `gh` CLI does not use git credential helpers for API calls, so it could not authenticate anyway; the rule keeps agents from reaching for it.
 
 ## What it implements
 
