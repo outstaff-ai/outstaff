@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import {
   parseRepoUrl,
+  profileAllowsWrite,
   type DeriveContext,
+  type Profile,
   type SecretSource,
   type SetupContext,
   type SetupStep,
@@ -29,6 +31,20 @@ export function grantedRepos(team: Team, person: NonNullable<SetupContext["perso
     const level = grants[repo.name] ?? grants[`kind:${repo.kind}`] ?? grants["*"];
     return level ? [{ repo, level }] : [];
   });
+}
+
+/**
+ * Repositories the person's own App must be installed on: the ones they can write. The role profile caps the grant
+ * the way the credential helper does; reads go through the office App.
+ */
+export function writableRepos(
+  team: Team,
+  person: NonNullable<SetupContext["person"]>,
+  profile?: Profile,
+) {
+  return profile && !profileAllowsWrite(profile)
+    ? []
+    : grantedRepos(team, person).filter((g) => g.level === "write");
 }
 
 const slugOf = (team: Team, who: string) => `${team.team.name}-${who}`.slice(0, 34);
@@ -94,8 +110,9 @@ export function githubSetupGuide(ctx: SetupContext): SetupStep[] {
     ];
   }
 
-  const writes = granted.some((g) => g.level === "write");
-  const list = granted.map((g) => `\`${g.repo.url}\` (${g.level})`).join(", ");
+  const writable = writableRepos(team, person, ctx.profile);
+  const writes = writable.length > 0;
+  const list = writable.map((g) => `\`${g.repo.url}\``).join(", ");
 
   return [
     createStep(
@@ -107,8 +124,12 @@ export function githubSetupGuide(ctx: SetupContext): SetupStep[] {
         : "metadata, contents, pull requests, issues, checks and commit statuses, all read-only. This person has only read grants, so their own App is optional: it lets them comment on or review pull requests as themselves.",
     ),
     {
-      title: "Install it on exactly the repositories this person is granted",
-      body: `Install App, pick the owning account, "Only select repositories": ${list}. A GitHub App's permissions are per installation, not per repository; Outstaff narrows every token to the grant (write only where \`write\` is granted), so the repository list is the real boundary.`,
+      title: writes
+        ? "Install it on exactly the repositories this person can write"
+        : "Install it on no repository, or skip it",
+      body: writes
+        ? `Install App, pick the owning account, "Only select repositories": ${list}. Nothing else: the App carries write permissions, and a GitHub App's permissions are per installation, not per repository, so the repository list is the real boundary. Read access comes from the office App, so read-only repositories do not belong on this installation.`
+        : "This person has no write access, so their own App needs no repository. Read access comes from the office App.",
     },
     {
       title: "Generate a private key and copy the keys",

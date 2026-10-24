@@ -112,7 +112,7 @@ const good: Record<string, Fake> = {
   "11": {
     app: { slug: "acme-sam" },
     installation: { permissions: WRITE },
-    repos: ["Acme-Example/shop", "acme-example/infra"],
+    repos: ["Acme-Example/shop"],
   },
   "22": {
     app: { slug: "acme-office" },
@@ -182,19 +182,54 @@ describe("doctorGithub", () => {
     expect(by(r, "GitHub App: installation")[0]!.detail).toContain('belongs to "someone-else"');
   });
 
-  it("fails on a missing repository and warns on an extra one", async () => {
+  it("fails when the own App misses the repository the person writes", async () => {
+    const { impl } = fake({ ...good, "11": { ...good["11"]!, repos: ["acme-example/docs"] } });
+    const missing = by(await doctorGithub(secrets(), ctx(impl)), "GitHub App: repositories")[0]!;
+    expect(missing).toMatchObject({ status: "fail" });
+    expect(missing.detail).toContain("acme-example/shop");
+  });
+
+  it("warns when the own App also covers a repository the person only reads or lacks a grant on", async () => {
     const { impl } = fake({
       ...good,
-      "11": { ...good["11"]!, repos: ["acme-example/shop", "acme-example/docs"] },
+      "11": {
+        ...good["11"]!,
+        repos: ["acme-example/shop", "acme-example/infra", "acme-example/docs"],
+      },
     });
 
     const checks = await doctorGithub(secrets(), ctx(impl));
-    const missing = checks.find((c) => c.name === "GitHub App: repositories")!;
-    expect(missing).toMatchObject({ status: "fail" });
-    expect(missing.detail).toContain("acme-example/infra");
     const extra = checks.find((c) => c.name === "GitHub App: extra repositories")!;
     expect(extra).toMatchObject({ status: "warn" });
-    expect(extra.detail).toContain("acme-example/docs");
+    expect(extra.detail).toBe(
+      "The App can write to acme-example/infra, acme-example/docs, which this person may only read (or has no grant on).",
+    );
+
+    expect(checks.filter((c) => c.status === "fail")).toEqual([]);
+  });
+
+  it("does not require read-granted repositories on the own App, only on the office App", async () => {
+    const { impl } = fake(good);
+    const checks = await doctorGithub(secrets(), ctx(impl));
+    expect(by(checks, "GitHub App: repositories")[0]!.detail).toBe(
+      "The installation covers acme-example/shop.",
+    );
+
+    const office = fake({ ...good, "22": { ...good["22"]!, repos: ["acme-example/shop"] } });
+    const r = await doctorGithub(secrets(), ctx(office.impl));
+    expect(by(r, "Office GitHub App: repositories")[0]).toMatchObject({ status: "fail" });
+    expect(by(r, "Office GitHub App: repositories")[0]!.detail).toContain("acme-example/infra");
+  });
+
+  it("does not count a write grant a readonly role profile ignores", async () => {
+    const c = ctx(
+      fake({ ...good, "11": { ...good["11"]!, installation: { permissions: READ } } }).impl,
+    );
+
+    c.profile = "readonly";
+    const checks = await doctorGithub(secrets(), c);
+    expect(checks.filter((x) => x.status === "fail")).toEqual([]);
+    expect(by(checks, "GitHub App: extra repositories")).toEqual([]);
   });
 
   it("warns when the App is installed on all repositories", async () => {

@@ -6,7 +6,7 @@ import {
 } from "@outstaff/core";
 import { githubOptions } from "./options.js";
 import { signAppJwt } from "./jwt.js";
-import { grantedRepos, privateKey } from "./setup.js";
+import { grantedRepos, privateKey, writableRepos } from "./setup.js";
 
 const READ_PERMISSIONS = [
   "metadata",
@@ -121,6 +121,9 @@ interface AppExpectation {
 
   /** Repositories beyond `repos` are a finding only when the App is meant to be narrow. */
   exact: boolean;
+
+  /** Names the risk of extra repositories: the person's own App can write there. */
+  extraCanWrite?: boolean;
   readOnly: boolean;
   wantWrite: boolean;
 
@@ -311,7 +314,9 @@ async function checkApp(
         "warn",
         `${label}: repositories`,
         "The App is installed on all repositories of the account.",
-        'Change the installation to "Only select repositories" and pick exactly the granted ones.',
+        want.extraCanWrite
+          ? 'Change the installation to "Only select repositories" and pick exactly the ones this person can write.'
+          : 'Change the installation to "Only select repositories" and pick exactly the granted ones.',
       ),
     );
 
@@ -345,22 +350,28 @@ async function checkApp(
     );
   }
 
-  if (want.exact && extra.length > 0) {
+  // An own App without write permissions cannot write to extra repositories, so they are no finding.
+  const warnExtra = want.exact && extra.length > 0 && (!want.extraCanWrite || writes.length > 0);
+  if (warnExtra) {
     out.push(
       bad(
         "warn",
         `${label}: extra repositories`,
-        `The installation also covers ${extra.join(", ")}, which are not granted.`,
+        want.extraCanWrite
+          ? `The App can write to ${extra.join(", ")}, which this person may only read (or has no grant on).`
+          : `The installation also covers ${extra.join(", ")}, which are not granted.`,
         "Remove those repositories from the installation.",
       ),
     );
   }
 
-  if (missing.length === 0 && !(want.exact && extra.length > 0)) {
+  if (missing.length === 0 && !warnExtra) {
     out.push(
       ok(
         `${label}: repositories`,
-        `The installation covers ${want.repos.length === 0 ? "no repositories" : want.repos.join(", ")}.`,
+        want.repos.length === 0
+          ? "The person needs no repositories on this App."
+          : `The installation covers ${want.repos.join(", ")}.`,
       ),
     );
   }
@@ -385,14 +396,16 @@ export async function doctorGithub(
       ];
     }
 
-    const repos = granted.map((g) => repoName(g.repo.url));
+    // Reads and clones go through the office App; the own App only needs the repositories the person can write.
+    const writable = writableRepos(ctx.team, person, ctx.profile);
     apps.push({
       prefix: "GH_APP_",
       label: "GitHub App",
-      repos,
+      repos: writable.map((g) => repoName(g.repo.url)),
       exact: true,
+      extraCanWrite: true,
       readOnly: false,
-      wantWrite: granted.some((g) => g.level === "write"),
+      wantWrite: writable.length > 0,
       ...(person.identities?.vcs ? { login: person.identities.vcs } : {}),
     });
 
@@ -400,7 +413,7 @@ export async function doctorGithub(
     apps.push({
       prefix: "GH_OFFICE_APP_",
       label: "Office GitHub App",
-      repos,
+      repos: granted.map((g) => repoName(g.repo.url)),
       exact: false,
       readOnly: true,
       wantWrite: false,

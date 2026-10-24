@@ -2,7 +2,7 @@ import type { Capability } from "../capabilities.js";
 import type { AdapterPort } from "../config/adapters.js";
 import type { ConfigWarning } from "../config/validate.js";
 import type { TeamConfig } from "../config/schema.js";
-import type { CommandRule } from "../permissions/types.js";
+import type { CommandRule, Profile } from "../permissions/types.js";
 import type { ZodType } from "zod";
 import type { Logger } from "./logger.js";
 import type { SecretSource, SecretSpec } from "./secrets.js";
@@ -46,6 +46,9 @@ export interface SetupContext {
 
   /** The person being set up; absent for the office. */
   person?: TeamConfig["people"][number];
+
+  /** The permission profile of the person's role, when the host resolved it. Only a profile that honours write grants lets a write grant count. */
+  profile?: Profile;
   scope: "person" | "office";
 
   /** The options of this adapter's integration in the team file. */

@@ -240,7 +240,7 @@ describe("ost doctor with the shipped adapters", () => {
 
   function router(opts: { officeWrites?: boolean; slackOk?: boolean } = {}) {
     const apps: Record<string, ReturnType<typeof github>> = {
-      "11": github("11", "acme-mira", ["acme-example/shop", "acme-example/design-system"], true),
+      "11": github("11", "acme-mira", ["acme-example/shop"], true),
       "22": github(
         "22",
         "acme-office",
