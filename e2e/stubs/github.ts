@@ -33,7 +33,12 @@ interface Thread {
   resolved: boolean;
   path: string | undefined;
   line: number | undefined;
-  comments: { id: string; author: string; body: string }[];
+  comments: { id: string; databaseId: number; author: string; body: string }[];
+}
+
+interface Review {
+  prNumber: number;
+  comments: { databaseId: number; path: string; line: number; body: string }[];
 }
 
 type Json = Record<string, any>; // oxlint-disable-line no-explicit-any
@@ -62,10 +67,13 @@ export function createGithub(opts: GithubOptions) {
   const key = createPublicKey(opts.publicKey);
   const prs = new Map<number, Pr>();
   const threads = new Map<string, Thread>();
+  const reviews = new Map<number, Review>();
   const events: Json[] = [];
   const tokens = new Map<string, { slug: string; write: boolean }>();
   let eventId = 1000;
   let threadId = 0;
+  let reviewId = 0;
+  let commentId = 0;
   let tokenId = 0;
   const etag = () => `W/"${eventId}"`;
 
@@ -153,25 +161,12 @@ export function createGithub(opts: GithubOptions) {
     comments: {
       nodes: t.comments.map((c) => ({
         id: c.id,
+        databaseId: c.databaseId,
         body: c.body,
         author: { login: c.author.replace(/\[bot\]$/, "") },
       })),
     },
   });
-
-  const addThreads = (pr: Pr, actor: string, comments: Json[] | undefined) => {
-    for (const c of comments ?? []) {
-      const id = `PRRT_${++threadId}`;
-      threads.set(id, {
-        id,
-        prNumber: pr.number,
-        resolved: false,
-        path: c.path,
-        line: c.line,
-        comments: [{ id: `${id}_c0`, author: actor, body: c.body }],
-      });
-    }
-  };
 
   const REVIEW_STATE: Record<string, string> = {
     APPROVE: "APPROVED",
@@ -179,25 +174,60 @@ export function createGithub(opts: GithubOptions) {
     COMMENT: "COMMENTED",
   };
 
+  /**
+   * A review the way GitHub reports it: each inline comment is announced when it is written, while the review is
+   * still pending, and the review itself only when it is submitted.
+   */
   async function submitReview(
     pr: Pr,
     actor: string,
     event: string,
     body: string,
     comments?: Json[],
-  ) {
-    addThreads(pr, actor, comments);
+  ): Promise<number> {
+    const id = ++reviewId;
+    const review: Review = { prNumber: pr.number, comments: [] };
+    reviews.set(id, review);
+    for (const c of comments ?? []) {
+      const thread = `PRRT_${++threadId}`;
+      const databaseId = ++commentId;
+      threads.set(thread, {
+        id: thread,
+        prNumber: pr.number,
+        resolved: false,
+        path: c.path,
+        line: c.line,
+        comments: [{ id: `${thread}_c0`, databaseId, author: actor, body: c.body }],
+      });
+
+      review.comments.push({ databaseId, path: c.path, line: c.line, body: c.body });
+      pr.updatedAt = now();
+      emit("PullRequestReviewCommentEvent", actor, {
+        action: "created",
+        pull_request: { number: pr.number },
+        comment: {
+          id: databaseId,
+          body: c.body,
+          path: c.path,
+          pull_request_review_id: id,
+          html_url: `https://github.example/${full}/pull/${pr.number}#discussion_r${databaseId}`,
+        },
+      });
+    }
+
     pr.updatedAt = now();
     emit("PullRequestReviewEvent", actor, {
       action: "submitted",
       pull_request: { number: pr.number },
       review: {
-        id: eventId + 1,
+        id,
         state: REVIEW_STATE[event],
         body,
-        html_url: `https://github.example/${full}/pull/${pr.number}#pullrequestreview-${eventId + 1}`,
+        html_url: `https://github.example/${full}/pull/${pr.number}#pullrequestreview-${id}`,
       },
     });
+
+    return id;
   }
 
   /** After a push: a pull request whose branch moved gets a `synchronize` event, as on GitHub. */
@@ -249,6 +279,7 @@ export function createGithub(opts: GithubOptions) {
 
       t.comments.push({
         id: `${t.id}_c${t.comments.length}`,
+        databaseId: ++commentId,
         author: actor,
         body: variables["body"],
       });
@@ -435,8 +466,26 @@ export function createGithub(opts: GithubOptions) {
           return { status: 422, body: { message: "Unprocessable: bad event" } };
         }
 
-        await submitReview(pr, actor, r.json.event, r.json.body ?? "", r.json.comments);
-        return { id: eventId, state: REVIEW_STATE[r.json.event] };
+        const id = await submitReview(pr, actor, r.json.event, r.json.body ?? "", r.json.comments);
+        return { id, state: REVIEW_STATE[r.json.event] };
+      },
+    },
+    {
+      method: "GET",
+      path: `${pulls}/:n/reviews/:id/comments`,
+      handler: (r) => {
+        const review = reviews.get(Number(r.params["id"]));
+        if (!review || review.prNumber !== Number(r.params["n"])) {
+          return notFound;
+        }
+
+        return review.comments.map((c) => ({
+          id: c.databaseId,
+          path: c.path,
+          line: c.line,
+          body: c.body,
+          html_url: `https://github.example/${full}/pull/${review.prNumber}#discussion_r${c.databaseId}`,
+        }));
       },
     },
     {

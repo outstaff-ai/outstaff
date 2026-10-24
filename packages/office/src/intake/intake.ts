@@ -10,6 +10,7 @@ import { createWebhookServer, type WebhookParser, type WebhookServer } from "./w
 
 const CURSOR_KEY = "events";
 const DEFAULT_MAX_ATTEMPTS = 5;
+const TRANSIENT = new Set(["rate_limited", "unavailable"]);
 const DEFAULT_STALE_POLL_MINUTES = 10;
 
 /** The adapters re-read the last 5 minutes of each feed, so an id older than that no longer comes back. */
@@ -227,8 +228,43 @@ export function createIntake(opts: IntakeOptions): Intake {
     ingest("vcs", event, prLabel(event), async () => {
       const actor = await trust.vcsActor(event.repo, event.actor);
       const mapped = normalizeVcsEvent(event, actor);
+      if (mapped && actor.kind === "human") {
+        await withInlineComments(event, mapped);
+      }
+
       return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
     });
+
+  // A submitted review brings the inline comments it was written with; they are stored with the event.
+  const withInlineComments = async (event: VcsEvent, mapped: WorkflowEvent) => {
+    const id = event.type === "pr.review_submitted" ? event.data["reviewId"] : undefined;
+    if (id === undefined || id === null) {
+      return;
+    }
+
+    try {
+      const found = await ports.vcs.reviewComments(event.repo, event.number, String(id));
+      if (found.length > 0) {
+        mapped.data["comments"] = found.map((c) => ({
+          path: c.path,
+          ...(c.line === undefined ? {} : { line: c.line }),
+          body: c.body,
+          ...(c.url ? { url: c.url } : {}),
+          ...(c.threadId ? { threadId: c.threadId } : {}),
+        }));
+      }
+    } catch (error) {
+      // Transient failures abort the page so it is retried; the cursor does not move.
+      if (!(error instanceof PortError) || TRANSIENT.has(error.code)) {
+        throw error;
+      }
+
+      logger.warn(`intake: inline comments of review ${String(id)} not read: ${error.message}`, {
+        review: String(id),
+        code: error.code,
+      });
+    }
+  };
 
   const ingestTracker = (event: TrackerEvent) =>
     ingest("tracker", event, event.key, async () => {

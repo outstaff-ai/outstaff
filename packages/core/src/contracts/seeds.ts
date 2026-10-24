@@ -46,13 +46,20 @@ export interface VcsSeed {
   push(repo: RepoRef, number: number, actor: string): Promise<PullRequest>;
   merge(repo: RepoRef, number: number, actor: string): Promise<PullRequest>;
   close(repo: RepoRef, number: number, actor: string): Promise<PullRequest>;
+
+  /**
+   * Submit a review, optionally with inline comments; each one opens a review thread. Resolves to the review id.
+   * The inline comments of a batch review are announced as `pr.comment` events (with the `reviewId`) before the
+   * `pr.review_submitted` event, the way a host reports a pending review.
+   */
   review(
     repo: RepoRef,
     number: number,
     actor: string,
     state: "approved" | "changes_requested" | "commented",
     body?: string,
-  ): Promise<void>;
+    comments?: { path: string; line: number; body: string }[],
+  ): Promise<string>;
   comment(repo: RepoRef, number: number, actor: string, body: string): Promise<void>;
   thread(
     repo: RepoRef,

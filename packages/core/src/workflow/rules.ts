@@ -54,7 +54,11 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z.strictObject({ pr_merged: z.boolean() }).meta(d("The pull request is (or is not) merged.")),
     z
       .strictObject({ has_body: z.boolean() })
-      .meta(d("The review or comment in the event has (or lacks) a non-blank body.")),
+      .meta(
+        d(
+          "The review or comment in the event has (or lacks) text: a non-blank body, or for a review, inline comments.",
+        ),
+      ),
     z
       .strictObject({ review_state: z.array(z.string().min(1)).min(1) })
       .meta(d('The review state in the event, for example "approved".')),

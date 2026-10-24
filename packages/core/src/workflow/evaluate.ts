@@ -145,7 +145,11 @@ function check(c: Condition, ctx: Ctx): Check {
 
   if ("has_body" in c) {
     const body = ctx.event.data["body"];
-    const has = typeof body === "string" && body.trim() !== "";
+    const comments = ctx.event.data["comments"];
+    const has =
+      (typeof body === "string" && body.trim() !== "") ||
+      (Array.isArray(comments) && comments.length > 0);
+
     return {
       ok: has === c.has_body,
       detail: `event ${has ? "has" : "has no"} body, wanted ${c.has_body ? "one" : "none"}`,

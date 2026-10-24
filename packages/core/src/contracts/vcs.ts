@@ -416,6 +416,38 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
       });
     });
 
+    it("lists the inline comments of a submitted review, each with its thread", async (t) => {
+      const s = get();
+      requireCapability(t, s, "vcs.pullRequests", "vcs.reviewThreads");
+      const repo = repoOf(t, s);
+      const pr = await requireSeed(t, s.seed, "pullRequest")(repo, { title: "Batch reviewed" });
+      const reviewId = await requireSeed(t, s.seed, "review")(
+        repo,
+        pr.number,
+        "noor",
+        "changes_requested",
+        "Two things",
+        [
+          { path: "src/a.ts", line: 3, body: "rename this" },
+          { path: "src/b.ts", line: 7, body: "and this" },
+        ],
+      );
+
+      const threads = await s.subject.reviewThreads(repo, pr.number);
+      const comments = await s.subject.reviewComments(repo, pr.number, reviewId);
+      expect(comments.map((c) => [c.path, c.line, c.body])).toEqual([
+        ["src/a.ts", 3, "rename this"],
+        ["src/b.ts", 7, "and this"],
+      ]);
+
+      expect(comments.map((c) => c.threadId)).toEqual(threads.map((th) => th.id));
+      for (const c of comments) {
+        expectAbsoluteUrl(c.url!);
+      }
+
+      await expectPortError(s.subject.reviewComments(repo, pr.number, "nope"), "not_found");
+    });
+
     it("pages events with an opaque cursor and no duplicates", async (t) => {
       const s = get();
       requireCapability(t, s, "vcs.pullRequests");

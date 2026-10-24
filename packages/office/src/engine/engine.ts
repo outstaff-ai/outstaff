@@ -9,7 +9,7 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
-import { feedbackOf, FEEDBACK_SUBJECT } from "./feedback.js";
+import { awaitsReview, feedbackOf, FEEDBACK_SUBJECT } from "./feedback.js";
 import { clip, prLabel, subjectLabel } from "../log.js";
 import { PRIORITY, priorityFor } from "../scheduler/index.js";
 import type { WorkItem, WorkItemTrigger } from "../store/index.js";
@@ -315,6 +315,7 @@ export function createEngine(opts: EngineOptions): Engine {
       .filter((i) => i !== undefined)
       .toSorted((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))[0];
 
+    const feedback = feedbackOf(event);
     const trigger = triggerOf(event);
     const item = await scheduler.enqueue({
       person: e.person,
@@ -326,7 +327,6 @@ export function createEngine(opts: EngineOptions): Engine {
       ...(subject ? { subject } : {}),
     });
 
-    const feedback = feedbackOf(event);
     if (feedback) {
       await store.upsertSubject(FEEDBACK_SUBJECT, item.id, feedback);
     }
@@ -391,6 +391,15 @@ export function createEngine(opts: EngineOptions): Engine {
   };
 
   const run = async (event: WorkflowEvent, meta: EngineMeta): Promise<EffectOutcome[]> => {
+    if (awaitsReview(event)) {
+      logger.info(
+        `engine: ${event.type} on ${subjectLabel(event.subject)} waits for its review to be submitted`,
+        { type: event.type, id: `${meta.source}:${meta.externalId}` },
+      );
+
+      return [];
+    }
+
     if (meta.trusted === false || event.data["untrusted"] === true) {
       logger.info("engine ignored an untrusted event", { type: event.type, id: meta.externalId });
       return [];

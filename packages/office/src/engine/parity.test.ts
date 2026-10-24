@@ -216,6 +216,71 @@ describe("kanban parity", () => {
       });
     });
 
+    it("schedules one round for a submitted review, carrying all of its inline comments", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      await h.vcs.seed.review(REPO, pr.number, "dana", "changes_requested", "", [
+        { path: "src/a.ts", line: 3, body: "Rename this." },
+        { path: "src/b.ts", line: 7, body: "And this." },
+      ]);
+
+      await h.poll();
+      const items = await h.items("sam");
+      expect(items.map((i) => i.kind)).toEqual(["review_feedback"]);
+      const [t1, t2] = (await h.vcs.reviewThreads(REPO, pr.number)).map((t) => t.id);
+      const feedback = await readFeedback(h.store, items[0]!.id);
+      expect(feedback).toMatchObject({ actor: "dana", kind: "review", state: "changes_requested" });
+      expect(feedback?.comments).toEqual([
+        {
+          path: "src/a.ts",
+          line: 3,
+          body: "Rename this.",
+          url: expect.stringContaining("http"),
+          threadId: t1,
+        },
+        {
+          path: "src/b.ts",
+          line: 7,
+          body: "And this.",
+          url: expect.stringContaining("http"),
+          threadId: t2,
+        },
+      ]);
+    });
+
+    it("treats an approval with inline comments but no summary as feedback", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "", [
+        { path: "src/a.ts", line: 3, body: "Nit: rename this." },
+      ]);
+
+      await h.poll();
+      const items = await h.items("sam");
+      expect(items.map((i) => i.kind)).toEqual(["review_feedback"]);
+      expect((await readFeedback(h.store, items[0]!.id))?.comments).toMatchObject([
+        { path: "src/a.ts", body: "Nit: rename this." },
+      ]);
+    });
+
+    it("does not schedule anything for an inline comment of a review still pending", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      const out = await h.deliver({
+        type: "pr.comment",
+        subject: { pr: { repo: REPO, number: pr.number } },
+        actor: { kind: "human", id: "dana" },
+        data: { kind: "review_comment", body: "Rename this.", reviewId: "rv1" },
+      });
+
+      expect(out).toEqual([]);
+      expect(await h.items()).toEqual([]);
+      expect(await status(key)).toBe("review");
+    });
+
     it("tells a conversation comment from an inline one", async () => {
       const key = await ticket();
       const pr = await openPr(key);

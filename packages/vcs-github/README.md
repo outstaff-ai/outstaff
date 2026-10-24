@@ -56,7 +56,7 @@ A person with no grants has no GitHub identity: their agent starts without the `
 
 - `credentials(person, repo, "read")`: a token from the office App, narrowed to that one repository with `contents: read`. Issued only to a person with a read or write grant on that repo in `team.yaml` (by repo name, `kind:<kind>` or `*`, resolved with core's `repoGrant`); anyone else is `forbidden`.
 - `credentials(person, repo, "write")`: a token from the container's own App, narrowed to the repository with `contents`, `pull_requests` and `issues` write, plus the git author `<slug>[bot]` / `<id>+<slug>[bot]@users.noreply.<host>` (the id comes from `GET /users/<slug>[bot]`). Only when `person` has a write grant on the repo and is the person this container runs as (`OUTSTAFF_PERSON`); for anyone else, and always in the office container (which has no own App), it is `forbidden`. A permission GitHub will not grant (App not installed on the repo, permission missing) is also `forbidden`.
-- `listPullRequests`, `getPullRequest`, `checks`, `reviewThreads`, `events`, `permission`: office App.
+- `listPullRequests`, `getPullRequest`, `checks`, `reviewThreads`, `reviewComments`, `events`, `permission`: office App.
 - `resolveThread(repo, id, asLogin?)`: `asLogin` defaults to this container's own bot login (`<slug>[bot]`); refuses unless the last comment is `asLogin`'s, then requires `asLogin` to be this container's own bot login (`forbidden` otherwise, and in a container without an own App), and resolves with the own App's token.
 
 Installation tokens are cached and reused until five minutes before they expire. Tokens are never broader than the request. The JWT (RS256) is signed with `node:crypto`; there is no `jsonwebtoken` or `openssl` dependency.
@@ -100,7 +100,7 @@ Agents hold no GitHub token: git gets short-lived tokens from the `ost git-crede
 - Checks: check runs plus legacy commit statuses.
 - Review threads: exactly three fixed GraphQL documents (list threads with comments, read the last comment of a thread, resolve). Logins are compared without the `[bot]` suffix, since GraphQL leaves it off.
 - Permissions: collaborator permission mapped to `admin | write | read | none` (`maintain` is `write`, `triage` is `read`).
-- Events: `pr.opened` (also reopened, with `data.reopened`), `pr.closed`, `pr.merged`, `pr.synchronize`, `pr.review_submitted`, `pr.comment` (review comments and comments on pull requests). `externalId` is the GitHub event id.
+- Events: `pr.opened` (also reopened, with `data.reopened`), `pr.closed`, `pr.merged`, `pr.synchronize`, `pr.review_submitted`, `pr.comment` (review comments, which carry `data.reviewId` when they belong to a review, and comments on pull requests). `externalId` is the GitHub event id.
 - Links: pull request, commit and thread URLs from `webUrl`.
 - Errors: 404 `not_found`; 401/403 `forbidden`; 429, or 403 with `retry-after`, `x-ratelimit-remaining: 0` or a "rate limit" message, `rate_limited` with `retryAfterMs`; 409 `conflict`; 400/422 `invalid`; 5xx and network failures `unavailable`.
 

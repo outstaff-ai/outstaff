@@ -24,7 +24,12 @@ interface Thread {
   resolved: boolean;
   path: string | undefined;
   line: number | undefined;
-  comments: { id: string; author: string; body: string }[];
+  comments: { id: string; databaseId: number; author: string; body: string }[];
+}
+
+interface StoredReview {
+  prNumber: number;
+  comments: { databaseId: number; path: string; line: number; body: string }[];
 }
 
 export const OWN_APP = 201;
@@ -51,7 +56,12 @@ const toNode = (t: Thread) => ({
   line: t.line ?? null,
   originalLine: null,
   comments: {
-    nodes: t.comments.map((c) => ({ id: c.id, body: c.body, author: { login: c.author } })),
+    nodes: t.comments.map((c) => ({
+      id: c.id,
+      databaseId: c.databaseId,
+      body: c.body,
+      author: { login: c.author },
+    })),
   },
 });
 
@@ -60,9 +70,12 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
   let eventId = 1000;
   let sha = 0;
   let thread = 0;
+  let reviewCounter = 0;
+  let commentCounter = 0;
   const prs = new Map<number, Pr>();
   const checks = new Map<string, { name: string; status: string; conclusion: string | null }[]>();
   const threads = new Map<string, Thread>();
+  const reviews = new Map<number, StoredReview>();
   const perms = new Map<string, VcsPermission>();
   const events: Record<string, unknown>[] = [];
   const clockIso = () => new Date(Date.parse("2026-01-01T00:00:00Z") + ++tick * 1000).toISOString();
@@ -147,6 +160,52 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
       base: pr.base,
     },
   });
+
+  /** A batch review the way the host reports it: each inline comment is announced while it is pending, then the review. */
+  const submitReview = (
+    prNumber: number,
+    actor: string,
+    state: string,
+    body: string,
+    inline: { path: string; line: number; body: string }[],
+  ): number => {
+    const id = ++reviewCounter;
+    const stored: StoredReview = { prNumber, comments: [] };
+    reviews.set(id, stored);
+    for (const c of inline) {
+      const threadId = `PRRT_${++thread}`;
+      const databaseId = ++commentCounter;
+      threads.set(threadId, {
+        id: threadId,
+        prNumber,
+        resolved: false,
+        path: c.path,
+        line: c.line,
+        comments: [{ id: `${threadId}_c0`, databaseId, author: actor, body: c.body }],
+      });
+
+      stored.comments.push({ databaseId, ...c });
+      emit("PullRequestReviewCommentEvent", actor, {
+        action: "created",
+        pull_request: { number: prNumber },
+        comment: {
+          id: databaseId,
+          body: c.body,
+          path: c.path,
+          pull_request_review_id: id,
+          html_url: `https://github.example/${repo.owner}/${repo.name}/pull/${prNumber}#discussion_r${databaseId}`,
+        },
+      });
+    }
+
+    emit("PullRequestReviewEvent", actor, {
+      action: "submitted",
+      pull_request: { number: prNumber },
+      review: { id, state, body },
+    });
+
+    return id;
+  };
 
   const etag = () => `W/"${eventId}"`;
 
@@ -274,25 +333,27 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
           return { status: 422, body: { message: "Unprocessable: bad event" } };
         }
 
-        for (const c of r.json.comments ?? []) {
-          const id = `PRRT_${++thread}`;
-          threads.set(id, {
-            id,
-            prNumber: pr.number,
-            resolved: false,
-            path: c.path,
-            line: c.line,
-            comments: [{ id: `${id}_c0`, author: actor, body: c.body }],
-          });
+        const id = submitReview(pr.number, actor, state, r.json.body, r.json.comments ?? []);
+
+        return { status: 200, body: { id, state } };
+      },
+    },
+    {
+      method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}/pulls/:n/reviews/:id/comments`,
+      handler: (r) => {
+        const review = reviews.get(Number(r.params["id"]));
+        if (!review || review.prNumber !== Number(r.params["n"])) {
+          return { status: 404, body: { message: "Not Found" } };
         }
 
-        emit("PullRequestReviewEvent", actor, {
-          action: "submitted",
-          pull_request: { number: pr.number },
-          review: { id: eventId, state, body: r.json.body },
-        });
-
-        return { status: 200, body: { id: eventId, state } };
+        return review.comments.map((c) => ({
+          id: c.databaseId,
+          path: c.path,
+          line: c.line,
+          body: c.body,
+          html_url: `https://github.example/${repo.owner}/${repo.name}/pull/${review.prNumber}#discussion_r${c.databaseId}`,
+        }));
       },
     },
     {
@@ -389,6 +450,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
 
           t.comments.push({
             id: `${t.id}_c${t.comments.length}`,
+            databaseId: ++commentCounter,
             author: `${actorOf(r)}[bot]`,
             body: variables["body"],
           });
@@ -486,12 +548,8 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
       emit("PullRequestEvent", actor, prPayload(pr, "closed"));
       return domain(pr);
     },
-    async review(_repo, number, actor, state) {
-      emit("PullRequestReviewEvent", actor, {
-        action: "submitted",
-        pull_request: { number },
-        review: { id: eventId, state: state.toUpperCase(), body: "" },
-      });
+    async review(_repo, number, actor, state, body = "", comments = []) {
+      return String(submitReview(number, actor, state.toUpperCase(), body, comments));
     },
     async comment(_repo, number, actor, body) {
       emit("IssueCommentEvent", actor, {
@@ -508,7 +566,11 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
         resolved: false,
         path: t.path,
         line: t.line,
-        comments: t.comments.map((c, i) => ({ id: `${id}_c${i}`, ...c })),
+        comments: t.comments.map((c, i) => ({
+          id: `${id}_c${i}`,
+          databaseId: ++commentCounter,
+          ...c,
+        })),
       });
 
       return id;

@@ -18,7 +18,14 @@ export interface ItemContext {
   journal: string;
 
   /** The review or comment that started a review round. */
-  feedback?: { kind: "review" | "comment" | "inline_comment"; url?: string; body: string };
+  feedback?: {
+    kind: "review" | "comment" | "inline_comment";
+    url?: string;
+    body: string;
+
+    /** The review threads the prompt lists for a review's inline comments. */
+    threads: string[];
+  };
 }
 
 export function parsePrompt(prompt: string): ItemContext | undefined {
@@ -47,7 +54,11 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
         start[1] as "a review" | "an inline comment"
       ] ?? "comment",
     ...(start[2] ? { url: start[2] } : {}),
-    body: (quoted ?? "").replace(/^> /gm, "").trim(),
+    body: (quoted ?? "")
+      .replace(/^> /gm, "")
+      .trim()
+      .replace(/^\(no text\)$/, ""),
+    threads: [...prompt.matchAll(/^- \S+ \(thread (\S+?)[,)]/gm)].map((m) => m[1]!),
   };
 
   return {

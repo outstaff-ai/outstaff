@@ -98,8 +98,12 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const repo = need(ctx.repo, "the repository");
   const branch = yield* branchOf(ctx, key);
   const threads = yield { type: "tool", tool: "pr_threads", input: { repo, number } };
-  const ids = [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
   const feedback = ctx.feedback;
+  // A review's prompt lists its inline comments with their threads; otherwise every open thread is meant.
+  const ids = feedback?.threads.length
+    ? feedback.threads
+    : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
+
   const conversational = feedback !== undefined && feedback.kind !== "inline_comment";
   if (ids.length === 0 && !conversational) {
     throw new Error("The feedback left no open thread and no summary or comment to answer.");

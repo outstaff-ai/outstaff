@@ -31,6 +31,18 @@ export interface ReviewThread {
   comments: { id: string; author: string; body: string }[];
 }
 
+/** One inline comment of a submitted review. */
+export interface ReviewInlineComment {
+  id: string;
+  path: string;
+  line?: number;
+  body: string;
+  url?: string;
+
+  /** The review thread the comment opened or belongs to, when the host reports one. */
+  threadId?: string;
+}
+
 export interface NewPullRequest {
   /** Branch with the changes; it must already be pushed. */
   head: string;
@@ -103,6 +115,12 @@ export interface Vcs {
   ): Promise<PullRequest>;
   checks(repo: RepoRef, sha: string): Promise<Check[]>;
   reviewThreads(repo: RepoRef, number: number): Promise<ReviewThread[]>;
+
+  /**
+   * The inline comments of one submitted review, oldest first, each with its thread when there is one.
+   * `not_found` unless the review belongs to that pull request.
+   */
+  reviewComments(repo: RepoRef, number: number, reviewId: string): Promise<ReviewInlineComment[]>;
 
   /**
    * Resolves only when the last comment in the thread is `asLogin`'s. Without `asLogin` the adapter uses its own

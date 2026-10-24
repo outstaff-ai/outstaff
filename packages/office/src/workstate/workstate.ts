@@ -10,6 +10,7 @@ import type {
   WorkflowPr,
 } from "@outstaff/core";
 import type { Cancel } from "../clock.js";
+import { awaitsReview } from "../engine/feedback.js";
 import type { Ref } from "../store/index.js";
 import { ticketCandidates } from "./infer.js";
 import type {
@@ -253,8 +254,11 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     const login = trustedHuman(event);
     const rec = prs.get(prSubject(ref));
     const body = event.data["body"];
+    const comments = event.data["comments"];
     const signOff =
-      event.data["state"] === "approved" && !(typeof body === "string" && body.trim() !== "");
+      event.data["state"] === "approved" &&
+      !(typeof body === "string" && body.trim() !== "") &&
+      !(Array.isArray(comments) && comments.length > 0);
 
     if (!login || !rec?.ticket || rec.state !== "open" || rec.author.kind !== "agent" || signOff) {
       return;
@@ -456,6 +460,10 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   // Events
 
   const handle = async (ctx: Ctx, event: WorkflowEvent) => {
+    if (awaitsReview(event)) {
+      return;
+    }
+
     const pr = event.subject.pr;
     switch (event.type) {
       case "pr.opened":
