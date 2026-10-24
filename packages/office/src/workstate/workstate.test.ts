@@ -83,11 +83,11 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
     });
   };
 
-  const build = async () => {
+  const build = async (team = teamConfig()) => {
     ws = await createWorkState({
       store,
       ports: { vcs, tracker },
-      team: teamConfig(),
+      team,
       clock,
       logger: silent,
     });
@@ -420,6 +420,91 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       await tracker.transition(issue.key, "review");
       await ws.apply(ticketEvent("ticket.moved", issue.key, { kind: "agent", id: "sam" }), meta());
       expect(ws.ticketStatus(issue.key)).toBe("review");
+      expect(ws.requester(issue.key)).toBe("dana");
+    });
+
+    it("takes the trusted human whose review sends a ticket back for the requester, mapped to their tracker identity", async () => {
+      await ws.stop();
+      await build(
+        teamConfig({
+          humans: [{ name: "Grace", identities: { vcs: "Grace-Hopper", tracker: "grace.h" } }],
+        }),
+      );
+
+      // A ticket from before the office's store: nobody ever recorded a requester.
+      const issue = await tracker.createIssue({ title: "A", body: "", status: "review" });
+      const p = await pr({ title: "a", head: { ref: `sam/${issue.key}` } });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      expect(ws.ticketStatus(issue.key)).toBe("review");
+      expect(ws.requester(issue.key)).toBeUndefined();
+
+      // Not from an untrusted human, and a bare approval is a sign-off, not feedback.
+      await ws.apply(
+        prEvent("pr.comment", p.number, { untrusted: true }, { kind: "human", id: "eve" }),
+        meta("c1"),
+      );
+
+      await ws.apply(
+        prEvent(
+          "pr.review_submitted",
+          p.number,
+          { state: "approved" },
+          { kind: "human", id: "bob" },
+        ),
+        meta("c2"),
+      );
+
+      expect(ws.requester(issue.key)).toBeUndefined();
+
+      await ws.apply(
+        prEvent(
+          "pr.review_submitted",
+          p.number,
+          { state: "changes_requested", body: "Fix it" },
+          { kind: "human", id: "grace-hopper" },
+        ),
+        meta("c3"),
+      );
+
+      expect(ws.requester(issue.key)).toBe("grace.h");
+    });
+
+    it("ignores feedback on a ticket that is not waiting for review", async () => {
+      const issue = await tracker.createIssue({ title: "A", body: "", status: "active" });
+      const p = await pr({ title: "a", head: { ref: `sam/${issue.key}` } });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      await ws.apply(prEvent("pr.comment", p.number, { body: "hm" }), meta("c1"));
+      expect(ws.requester(issue.key)).toBeUndefined();
+    });
+
+    it("replaces the requester with the latest trusted human to assign or send back, by time", async () => {
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      const at = (s: number) => ({ at: new Date(Date.UTC(2026, 0, 1, 0, 0, s)).toISOString() });
+      const by = (id: string): WorkflowEvent["actor"] => ({ kind: "human", id });
+      await ws.apply(ticketEvent("ticket.created", issue.key, by("dana"), at(10)), meta());
+      expect(ws.requester(issue.key)).toBe("dana");
+
+      await ws.apply(ticketEvent("ticket.assigned", issue.key, by("grace"), at(20)), meta("e2"));
+      expect(ws.requester(issue.key)).toBe("grace");
+
+      // Delivered late: it happened before, so it does not take over.
+      await ws.apply(ticketEvent("ticket.assigned", issue.key, by("ada"), at(15)), meta("e3"));
+      expect(ws.requester(issue.key)).toBe("grace");
+
+      // A later send-back through the pull request replaces the assigner.
+      await tracker.transition(issue.key, "review");
+      await ws.apply(
+        ticketEvent("ticket.moved", issue.key, { kind: "agent", id: "sam" }),
+        meta("e6"),
+      );
+
+      const p = await pr({ title: "a", head: { ref: `sam/${issue.key}` } });
+      await ws.apply(prEvent("pr.opened", p.number), meta("e4"));
+      await ws.apply(
+        prEvent("pr.comment", p.number, { body: "again", ...at(30) }, by("dana")),
+        meta("e5"),
+      );
+
       expect(ws.requester(issue.key)).toBe("dana");
     });
 

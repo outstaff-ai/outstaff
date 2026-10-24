@@ -281,6 +281,42 @@ describe("kanban preset", () => {
     ]);
   });
 
+  it("hand-back falls back to the first listed human when the ticket has no requester", () => {
+    const state = world({ status: "active", ticket: { requester: undefined as never } });
+    const handBack = ev("agent.handed_back", { ...tk, actor: agent });
+    expect(evaluateWorkflow(handBack, state, kanban, { fallbackRequester: "ada.admin" })).toEqual([
+      { type: "move", ticket: "ACME-1", to: "review" },
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "ada.admin" } },
+    ]);
+
+    // A known requester beats the fallback.
+    expect(
+      evaluateWorkflow(handBack, world({ status: "active" }), kanban, {
+        fallbackRequester: "ada.admin",
+      }),
+    ).toContainEqual({ type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } });
+  });
+
+  it("hand-back without a requester or a humans list skips the assignment and names the ticket", () => {
+    const state = world({ status: "active", ticket: { requester: undefined as never } });
+    const x = explainWorkflow(ev("agent.handed_back", { ...tk, actor: agent }), state, kanban);
+    expect(x.effects).toEqual([{ type: "move", ticket: "ACME-1", to: "review" }]);
+    expect(x.rules.find((r) => r.id === "hand-back-to-requester")?.skipped).toEqual([
+      "assign: ticket ACME-1 has no known requester and the team lists no humans",
+    ]);
+  });
+
+  it("resolves the fallback requester from the first listed human", () => {
+    const humans = [
+      { name: "Ada", identities: { tracker: "ada.admin" } },
+      { name: "Grace", identities: { vcs: "grace" } },
+    ];
+
+    expect(resolveWorkflow(undefined, humans).options.fallbackRequester).toBe("ada.admin");
+    expect(resolveWorkflow(undefined, [humans[1]!]).options.fallbackRequester).toBe("Grace");
+    expect(resolveWorkflow(undefined).options.fallbackRequester).toBeUndefined();
+  });
+
   it("assignment to an agent schedules that agent, but not for our own assignments or finished tickets", () => {
     const a = { id: "ada", kind: "agent" as const };
     const e = ev("ticket.assigned", { ...tk });

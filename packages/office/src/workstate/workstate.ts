@@ -194,6 +194,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       ...(assignee ? { assignee } : {}),
       labels: [...issue.labels],
       ...(prev?.requester ? { requester: prev.requester } : {}),
+      ...(prev?.requesterAt ? { requesterAt: prev.requesterAt } : {}),
       updatedAt: clock.now().toISOString(),
     };
   };
@@ -221,13 +222,52 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       }
     }
 
-    const human = event?.actor.kind === "human" && event.data["untrusted"] !== true;
     const requestedBy =
-      event && human && !rec.requester && ["ticket.created", "ticket.assigned"].includes(event.type)
-        ? event.actor.id
+      event && ["ticket.created", "ticket.assigned"].includes(event.type)
+        ? trustedHuman(event)
         : undefined;
 
-    await saveTicket(requestedBy ? { ...rec, requester: requestedBy } : rec);
+    await saveTicket(requestedBy && event ? withRequester(rec, requestedBy, event) : rec);
+  };
+
+  const trustedHuman = (event: WorkflowEvent): string | undefined =>
+    event.actor.kind === "human" && event.data["untrusted"] !== true ? event.actor.id : undefined;
+
+  /** The latest trusted human wins; events are ordered by when they happened, never by id. */
+  const withRequester = (rec: TicketRecord, requester: string, event: WorkflowEvent) => {
+    const at = typeof event.data["at"] === "string" ? event.data["at"] : clock.now().toISOString();
+    return rec.requesterAt && Date.parse(at) < Date.parse(rec.requesterAt)
+      ? rec
+      : { ...rec, requester, requesterAt: at };
+  };
+
+  /** What the tracker knows the human as: pull request actors are code host logins, so map them through `humans:`. */
+  const trackerIdentity = (login: string): string => {
+    const lower = login.toLowerCase();
+    const human = team.humans?.find((h) => h.identities.vcs?.toLowerCase() === lower);
+    return human?.identities.tracker ?? login;
+  };
+
+  /** A trusted human's feedback that sends a ticket back to its agent (as `human-feedback-reactivates-ticket` does). */
+  const recordFeedbackRequester = async (event: WorkflowEvent, ref: PrRef) => {
+    const login = trustedHuman(event);
+    const rec = prs.get(prSubject(ref));
+    const body = event.data["body"];
+    const signOff =
+      event.data["state"] === "approved" && !(typeof body === "string" && body.trim() !== "");
+
+    if (!login || !rec?.ticket || rec.state !== "open" || rec.author.kind !== "agent" || signOff) {
+      return;
+    }
+
+    if (!(await ensureTicket(rec.ticket))) {
+      return;
+    }
+
+    const ticket = tickets.get(rec.ticket)!;
+    if (ticket.status === "review" || ticket.status === "blocked") {
+      await saveTicket(withRequester(ticket, trackerIdentity(login), event));
+    }
   };
 
   const ensureTicket = async (key: string): Promise<boolean> => {
@@ -434,6 +474,10 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
             : undefined;
 
         await refreshPr(ctx, pr, review ? { review } : {});
+        if (event.type === "pr.review_submitted" || event.type === "pr.comment") {
+          await recordFeedbackRequester(event, pr);
+        }
+
         if (event.type === "pr.merged") {
           for (const other of openPrs(pr.repo)) {
             if (prSubject(other.ref) !== prSubject(pr)) {

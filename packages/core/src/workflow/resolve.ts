@@ -33,17 +33,23 @@ export function mergeRules(preset: readonly Rule[], overrides: readonly RuleInpu
 
 export interface ResolvedWorkflow {
   rules: Rule[];
-  options: Required<WorkflowOptions>;
+  options: WorkflowOptions & Required<Pick<WorkflowOptions, "templates" | "needsHumanLabel">>;
   statuses: WorkflowStatusMap;
 }
 
-export function resolveWorkflow(config?: TeamConfig["workflow"]): ResolvedWorkflow {
+export function resolveWorkflow(
+  config?: TeamConfig["workflow"],
+  humans?: TeamConfig["humans"],
+): ResolvedWorkflow {
+  const first = humans?.[0];
+  const fallbackRequester = first && (first.identities.tracker ?? first.name);
   const preset: WorkflowPreset = config?.preset ?? "kanban";
   return {
     rules: mergeRules(presetRules(preset), config?.rules as RuleInput[] | undefined),
     options: {
       templates: config?.templates ?? {},
       needsHumanLabel: config?.needs_human_label ?? DEFAULT_NEEDS_HUMAN_LABEL,
+      ...(fallbackRequester ? { fallbackRequester } : {}),
     },
     statuses: createStatusMap(config?.statuses),
   };

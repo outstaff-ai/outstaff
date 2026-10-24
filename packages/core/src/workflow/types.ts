@@ -108,6 +108,9 @@ export interface WorkflowOptions {
 
   /** Label meaning "leave this to a human". Default `needs-human`. */
   needsHumanLabel?: string;
+
+  /** Who a ticket goes back to when no requester is known: the tracker identity of the first listed human. */
+  fallbackRequester?: string;
 }
 
 export const DEFAULT_NEEDS_HUMAN_LABEL = "needs-human";

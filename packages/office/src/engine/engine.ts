@@ -74,7 +74,7 @@ export function createEngine(opts: EngineOptions): Engine {
   const now = () => clock.now().toISOString();
   const tracker: Tracker | undefined = opts.ports?.tracker;
   const chat: Chat | undefined = opts.ports?.chat;
-  const workflow = opts.workflow ?? resolveWorkflow(team.workflow);
+  const workflow = opts.workflow ?? resolveWorkflow(team.workflow, team.humans);
   const channel =
     opts.channel ??
     (typeof team.integrations.chat["channel"] === "string"
@@ -413,7 +413,8 @@ export function createEngine(opts: EngineOptions): Engine {
           ruleOf.set(key, [...(ruleOf.get(key) ?? []), r.id]);
         }
 
-        logger.info(
+        // A skipped action (for example a ticket with no requester) is worth a warning.
+        logger[r.skipped.length > 0 ? "warn" : "info"](
           `engine: rule ${r.id} matched ${event.type} on ${subject}: ${r.effects.map(describeEffect).join("; ") || "no effects"}`,
           {
             rule: r.id,
