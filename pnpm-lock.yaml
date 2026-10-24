@@ -289,6 +289,9 @@ importers:
       '@outstaff/agent':
         specifier: workspace:*
         version: link:../agent
+      '@outstaff/avatars-dicebear':
+        specifier: workspace:*
+        version: link:../avatars-dicebear
       '@outstaff/catalog':
         specifier: workspace:*
         version: link:../catalog

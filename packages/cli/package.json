@@ -27,6 +27,7 @@
   "dependencies": {
     "@commander-js/extra-typings": "15.0.0",
     "@outstaff/agent": "workspace:*",
+    "@outstaff/avatars-dicebear": "workspace:*",
     "@outstaff/catalog": "workspace:*",
     "@outstaff/chat-slack": "workspace:*",
     "@outstaff/core": "workspace:*",
