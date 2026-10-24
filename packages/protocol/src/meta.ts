@@ -107,6 +107,50 @@ export const MESSAGE_META = {
     replies: ["work_move_result", "error"],
   },
   work_move_result: { from: "office", summary: "The item after the move.", replies: [] },
+  work_place: {
+    from: "agent",
+    summary: "Moves one of the caller's queued items to a place in the queue.",
+    replies: ["work_move_result", "error"],
+  },
+  work_link: {
+    from: "agent",
+    summary:
+      "Makes a ticket the subject of a chat request's work item, after the agent created the ticket for it. Refused for an item that already has a ticket or pull request as its subject.",
+    replies: ["work_link_result", "error"],
+  },
+  work_link_result: { from: "office", summary: "The ticket is linked to the item.", replies: [] },
+  chat_message: {
+    from: "agent",
+    summary:
+      "A message from a trusted human in chat. The office starts an item for it, queues it when the person is busy, or adds it to the item of the thread. Delivered at least once; the office recognizes a message it handled.",
+    replies: ["chat_message_result", "error"],
+  },
+  chat_message_result: {
+    from: "office",
+    summary: "What the office did with the message, and what the agent should answer.",
+    replies: [],
+  },
+  chat_report: {
+    from: "agent",
+    summary:
+      "Asks to tell the requester of a chat item how it ended. The office grants it once per ending, so a retried hand-back does not post twice.",
+    replies: ["chat_report_result", "error"],
+  },
+  chat_report_result: {
+    from: "office",
+    summary: "Whether to post, whom to mention and which links to include.",
+    replies: [],
+  },
+  current_work: {
+    from: "agent",
+    summary: "Asks for the caller's open tickets and pull requests, as context for a chat session.",
+    replies: ["current_work_result", "error"],
+  },
+  current_work_result: {
+    from: "office",
+    summary: "The caller's current work as text.",
+    replies: [],
+  },
   ack: { from: "office", summary: "The request succeeded and has nothing to return.", replies: [] },
   error: {
     from: "both",

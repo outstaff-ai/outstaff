@@ -14,6 +14,8 @@ export interface FakeTrackerOptions {
 }
 
 export interface FakeTracker extends Tracker {
+  /** The same tracker seen by another identity: its calls are attributed to `identity`, as an adapter with its own credentials. */
+  as(identity: Member): FakeTracker;
   seed: TrackerSeed;
   relations: { key: string; otherKey: string; relation: string }[];
 }
@@ -22,9 +24,11 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const base = (opts.baseUrl ?? "https://tracker.acme.example").replace(/\/+$/, "");
   const prefix = opts.keyPrefix ?? "ACME";
   const now = opts.now ?? steppingClock();
-  const actor: Member = opts.actor ?? { id: "u-bot", name: "Fake Tracker", kind: "agent" };
+  const defaultActor: Member = opts.actor ?? { id: "u-bot", name: "Fake Tracker", kind: "agent" };
   const statusName = (s: CanonicalStatus) => opts.statusMap?.[s] ?? s;
-  const members = new Map<string, Member>([[actor.id, actor]]);
+  // Who the current call acts as; `as()` changes it for the calls of one view.
+  let actor: Member = defaultActor;
+  const members = new Map<string, Member>([[defaultActor.id, defaultActor]]);
   const issues = new Map<string, Issue>();
   const comments = new Map<string, Comment[]>();
   const log = new EventLog<TrackerEvent>();
@@ -70,6 +74,26 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const tracker: FakeTracker = {
     links,
     relations,
+    as(identity) {
+      return new Proxy(tracker, {
+        get(target, prop) {
+          const value = Reflect.get(target, prop) as unknown;
+          if (typeof value !== "function" || prop === "as") {
+            return value;
+          }
+
+          return (...args: unknown[]) => {
+            const previous = actor;
+            actor = identity;
+            try {
+              return (value as (...a: unknown[]) => unknown).apply(target, args);
+            } finally {
+              actor = previous;
+            }
+          };
+        },
+      });
+    },
     seed: {
       async member(m) {
         const created: Member = {

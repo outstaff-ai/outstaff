@@ -123,6 +123,11 @@ export function createEngine(opts: EngineOptions): Engine {
       throw new Skip(`${e.person} is not a person on the team`);
     }
 
+    // What a person did themselves never starts work for them, for example assigning a ticket to oneself.
+    if (event.actor.kind === "agent" && event.actor.id === e.person) {
+      throw new Skip(`${e.person} caused the event themselves`);
+    }
+
     const subject = e.pr
       ? { type: "pr", ref: workState.prSubject(e.pr) }
       : e.ticket
@@ -132,7 +137,11 @@ export function createEngine(opts: EngineOptions): Engine {
     const mine = await store.listItems({ person: e.person });
     if (subject) {
       const dup = mine.find(
-        (i) => LIVE.has(i.status) && i.kind === e.kind && sameSubject(i.subject, subject),
+        (i) =>
+          LIVE.has(i.status) &&
+          // A chat request is already working on the ticket it filed.
+          (i.kind === e.kind || i.kind === "chat") &&
+          sameSubject(i.subject, subject),
       );
 
       if (dup) {

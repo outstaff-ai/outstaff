@@ -8,6 +8,7 @@ export * from "./workstate/index.js";
 
 export * from "./messaging/index.js";
 export * from "./usage/index.js";
+export * from "./chat/index.js";
 
 export * from "./engine/index.js";
 

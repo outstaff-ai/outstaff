@@ -20,7 +20,10 @@ export interface Chat {
   start(onMessage: (message: ChatMessage) => Promise<void>): Promise<void>;
   stop(): Promise<void>;
 
-  /** Markdown in; the adapter converts to the platform format and splits long text at line breaks. */
+  /**
+   * Markdown in; the adapter converts to the platform format and splits long text at line breaks. `<@id>` with a
+   * member's id (`ChatMessage.author.id`) mentions that member.
+   */
   post(
     channel: string,
     markdown: string,

@@ -2,9 +2,103 @@ import type { Tracker, TeamConfig, Vcs } from "@outstaff/core";
 import type { Link, Member, Ref, WorkSummary } from "@outstaff/protocol";
 import { ProtocolError, type Offer, type WorkSource } from "./protocol/source.js";
 import { readRoster, type RosterOptions } from "./messaging/roster.js";
+import { publicOrigin, readOrigin } from "./chat/origin.js";
+import { placeQueued } from "./chat/placement.js";
 import type { Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { PrRecord, TicketRecord } from "./workstate/index.js";
+
+/** The tickets and pull requests an item concerns, as links the agent and the requester can open. */
+export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs }) {
+  const ticketRef = async (key: string): Promise<Ref> => {
+    const rec = (await store.getSubject("ticket", key))?.data as TicketRecord | undefined;
+    const url = rec?.url ?? ports?.tracker?.links.issue(key);
+    return {
+      type: "ticket",
+      ref: key,
+      ...(rec ? { title: rec.title } : {}),
+      ...(url ? { url } : {}),
+    };
+  };
+
+  const prRef = async (key: string): Promise<Ref> => {
+    const rec = (await store.getSubject("pr", key))?.data as PrRecord | undefined;
+    const url = rec?.url ?? (rec ? ports?.vcs?.links.pr(rec.ref.repo, rec.ref.number) : undefined);
+
+    return {
+      type: "pr",
+      ref: key,
+      ...(rec ? { title: rec.title } : {}),
+      ...(url ? { url } : {}),
+    };
+  };
+
+  /** The item's own subject, plus the ticket and pull requests it is connected to. */
+  const subjectsOf = async (item: WorkItem): Promise<Ref[]> => {
+    const subject = item.subject;
+    if (!subject) {
+      return [];
+    }
+
+    if (subject.type === "ticket") {
+      const prs = await store.queryLinks({
+        to: { type: "ticket", ref: subject.ref },
+        relation: "implements",
+      });
+
+      return [
+        await ticketRef(subject.ref),
+        ...(await Promise.all(
+          prs.filter((l) => l.from.type === "pr").map((l) => prRef(l.from.ref)),
+        )),
+      ];
+    }
+
+    if (subject.type === "pr") {
+      const rec = (await store.getSubject("pr", subject.ref))?.data as PrRecord | undefined;
+      const stacked = await store.queryLinks({
+        from: { type: "pr", ref: subject.ref },
+        relation: "stacked_on",
+      });
+
+      return [
+        await prRef(subject.ref),
+        ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
+        ...(await Promise.all(stacked.map((l) => prRef(l.to.ref)))),
+      ];
+    }
+
+    return [{ type: subject.type, ref: subject.ref }];
+  };
+
+  return { subjectsOf, ticketRef, prRef };
+}
+
+/** An item as the protocol lists it. */
+export async function summarizeItem(
+  store: Store,
+  item: WorkItem,
+  current?: string,
+): Promise<WorkSummary> {
+  let ticketKey: string | undefined;
+  let prUrl: string | undefined;
+  if (item.subject?.type === "ticket") {
+    ticketKey = item.subject.ref;
+  } else if (item.subject?.type === "pr") {
+    const rec = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
+    ticketKey = rec?.ticket;
+    prUrl = rec?.url;
+  }
+
+  return {
+    id: item.id,
+    title: item.title,
+    status: item.status,
+    ...(ticketKey ? { ticketKey } : {}),
+    ...(prUrl ? { prUrl } : {}),
+    ...(current === item.id ? { current: true } : {}),
+  };
+}
 
 /** Subject type that keeps whether the agent accepted an offered item; it must survive a restart. */
 export const OFFER_SUBJECT = "offer";
@@ -53,70 +147,11 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       accepted: false,
     };
 
-  const ticketRef = async (key: string): Promise<Ref> => {
-    const rec = (await store.getSubject("ticket", key))?.data as TicketRecord | undefined;
-    const url = rec?.url ?? opts.ports?.tracker?.links.issue(key);
-    return {
-      type: "ticket",
-      ref: key,
-      ...(rec ? { title: rec.title } : {}),
-      ...(url ? { url } : {}),
-    };
-  };
-
-  const prRef = async (key: string): Promise<Ref> => {
-    const rec = (await store.getSubject("pr", key))?.data as PrRecord | undefined;
-    const url =
-      rec?.url ?? (rec ? opts.ports?.vcs?.links.pr(rec.ref.repo, rec.ref.number) : undefined);
-
-    return {
-      type: "pr",
-      ref: key,
-      ...(rec ? { title: rec.title } : {}),
-      ...(url ? { url } : {}),
-    };
-  };
-
-  /** The item's own subject, plus the ticket and pull requests it is connected to. */
-  const subjectsOf = async (item: WorkItem): Promise<Ref[]> => {
-    const subject = item.subject;
-    if (!subject) {
-      return [];
-    }
-
-    if (subject.type === "ticket") {
-      const prs = await store.queryLinks({
-        to: { type: "ticket", ref: subject.ref },
-        relation: "implements",
-      });
-
-      return [
-        await ticketRef(subject.ref),
-        ...(await Promise.all(
-          prs.filter((l) => l.from.type === "pr").map((l) => prRef(l.from.ref)),
-        )),
-      ];
-    }
-
-    if (subject.type === "pr") {
-      const rec = (await store.getSubject("pr", subject.ref))?.data as PrRecord | undefined;
-      const stacked = await store.queryLinks({
-        from: { type: "pr", ref: subject.ref },
-        relation: "stacked_on",
-      });
-
-      return [
-        await prRef(subject.ref),
-        ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
-        ...(await Promise.all(stacked.map((l) => prRef(l.to.ref)))),
-      ];
-    }
-
-    return [{ type: subject.type, ref: subject.ref }];
-  };
+  const { subjectsOf } = itemRefs(store, opts.ports);
 
   const offerOf = async (item: WorkItem): Promise<Offer> => {
     const subjects = await subjectsOf(item);
+    const origin = await readOrigin(store, item.id);
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       workItem: {
@@ -127,6 +162,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         trigger: item.trigger,
         ...(item.parentId ? { parentId: item.parentId } : {}),
         ...(item.subject ? { subject: item.subject } : {}),
+        ...(origin ? { origin: publicOrigin(origin) } : {}),
       },
       context: {
         journal: (await store.readJournal(item.id)).map((j) => ({
@@ -140,26 +176,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
     };
   };
 
-  const summaryOf = async (item: WorkItem, current?: string): Promise<WorkSummary> => {
-    let ticketKey: string | undefined;
-    let prUrl: string | undefined;
-    if (item.subject?.type === "ticket") {
-      ticketKey = item.subject.ref;
-    } else if (item.subject?.type === "pr") {
-      const rec = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
-      ticketKey = rec?.ticket;
-      prUrl = rec?.url;
-    }
-
-    return {
-      id: item.id,
-      title: item.title,
-      status: item.status,
-      ...(ticketKey ? { ticketKey } : {}),
-      ...(prUrl ? { prUrl } : {}),
-      ...(current === item.id ? { current: true } : {}),
-    };
-  };
+  const summaryOf = (item: WorkItem, current?: string) => summarizeItem(store, item, current);
 
   return {
     async outstanding(person) {
@@ -282,6 +299,48 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         .toSorted((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
 
       return Promise.all(items.map((i) => summaryOf(i, q.workItemId)));
+    },
+
+    async place(person, id, position, relativeTo) {
+      const item = await own(person, id);
+      if (item.status !== "queued") {
+        throw new ProtocolError(
+          "invalid",
+          `Work item ${id} is ${item.status}; only queued items can be placed.`,
+        );
+      }
+
+      if ((position === "before" || position === "after") && !relativeTo) {
+        throw new ProtocolError("invalid", `Say which item it goes ${position}.`);
+      }
+
+      try {
+        await placeQueued(
+          { store, scheduler },
+          id,
+          position === "before" || position === "after"
+            ? position === "before"
+              ? { before: relativeTo! }
+              : { after: relativeTo! }
+            : position,
+        );
+      } catch (error) {
+        throw new ProtocolError("invalid", error instanceof Error ? error.message : String(error));
+      }
+
+      const origin = await readOrigin(store, id);
+      if (origin?.awaitingPlacement) {
+        await store.upsertSubject("chat_origin", id, { ...origin, awaitingPlacement: false });
+      }
+
+      await store.appendJournal(
+        id,
+        person,
+        `Placed ${position}${relativeTo ? ` ${relativeTo}` : ""}.`,
+      );
+
+      opts.notify?.(person);
+      return summaryOf((await store.getItem(id)) ?? item, id);
     },
 
     async move(person, id, status) {

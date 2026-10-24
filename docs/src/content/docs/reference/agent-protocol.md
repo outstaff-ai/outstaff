@@ -69,32 +69,38 @@ A work item for the agent to take, with its context. Delivered at least once: an
 
 Sent by: office.
 
-| Field                      | Type                                             | Required | Description                                                                 |
-| -------------------------- | ------------------------------------------------ | -------- | --------------------------------------------------------------------------- |
-| `workItem`                 | object                                           | yes      | The item to work on.                                                        |
-| `workItem.id`              | string                                           | yes      |                                                                             |
-| `workItem.kind`            | string                                           | yes      | What the work is, for example a ticket, a review round or a question.       |
-| `workItem.title`           | string                                           | yes      |                                                                             |
-| `workItem.priority`        | number                                           | yes      | Lower runs first.                                                           |
-| `workItem.trigger`         | `human` or `agent` or `automation` or `schedule` | yes      |                                                                             |
-| `workItem.parentId`        | string                                           | no       | The item this one was split from, for questions.                            |
-| `workItem.subject`         | object                                           | no       |                                                                             |
-| `workItem.subject.type`    | string                                           | yes      |                                                                             |
-| `workItem.subject.ref`     | string                                           | yes      |                                                                             |
-| `context`                  | object                                           | yes      | What the agent needs to start.                                              |
-| `context.journal`          | list of objects                                  | yes      | What earlier rounds of this item recorded.                                  |
-| `context.journal[].at`     | string                                           | yes      | ISO-8601 timestamp.                                                         |
-| `context.journal[].author` | string                                           | yes      | Handle of the author.                                                       |
-| `context.journal[].text`   | string                                           | yes      |                                                                             |
-| `context.subjects`         | list of objects                                  | yes      | The tickets, pull requests and people the item concerns.                    |
-| `context.subjects[].type`  | string                                           | yes      | Kind of subject, for example a ticket or a pull request.                    |
-| `context.subjects[].ref`   | string                                           | yes      | Reference of the subject in its system.                                     |
-| `context.subjects[].title` | string                                           | no       | Human-readable title.                                                       |
-| `context.subjects[].url`   | string                                           | no       | Link to the subject.                                                        |
-| `context.links`            | list of objects                                  | yes      | Further links worth opening.                                                |
-| `context.links[].url`      | string                                           | yes      | Absolute URL.                                                               |
-| `context.links[].title`    | string                                           | no       | Label for the link.                                                         |
-| `sessionId`                | string                                           | no       | Runtime session of this item from an earlier round; resume it when present. |
+| Field                            | Type                                             | Required | Description                                                                 |
+| -------------------------------- | ------------------------------------------------ | -------- | --------------------------------------------------------------------------- |
+| `workItem`                       | object                                           | yes      | The item to work on.                                                        |
+| `workItem.id`                    | string                                           | yes      |                                                                             |
+| `workItem.kind`                  | string                                           | yes      | What the work is, for example a ticket, a review round or a question.       |
+| `workItem.title`                 | string                                           | yes      |                                                                             |
+| `workItem.priority`              | number                                           | yes      | Lower runs first.                                                           |
+| `workItem.trigger`               | `human` or `agent` or `automation` or `schedule` | yes      |                                                                             |
+| `workItem.parentId`              | string                                           | no       | The item this one was split from, for questions.                            |
+| `workItem.subject`               | object                                           | no       |                                                                             |
+| `workItem.subject.type`          | string                                           | yes      |                                                                             |
+| `workItem.subject.ref`           | string                                           | yes      |                                                                             |
+| `workItem.origin`                | object                                           | no       | Where the request came from, for items started by a chat message.           |
+| `workItem.origin.channel`        | string                                           | yes      | Chat channel of the request.                                                |
+| `workItem.origin.thread`         | string                                           | yes      | Thread the agent answers in.                                                |
+| `workItem.origin.requester`      | object                                           | yes      |                                                                             |
+| `workItem.origin.requester.id`   | string                                           | yes      | Id of the requester in the chat workspace.                                  |
+| `workItem.origin.requester.name` | string                                           | no       |                                                                             |
+| `context`                        | object                                           | yes      | What the agent needs to start.                                              |
+| `context.journal`                | list of objects                                  | yes      | What earlier rounds of this item recorded.                                  |
+| `context.journal[].at`           | string                                           | yes      | ISO-8601 timestamp.                                                         |
+| `context.journal[].author`       | string                                           | yes      | Handle of the author.                                                       |
+| `context.journal[].text`         | string                                           | yes      |                                                                             |
+| `context.subjects`               | list of objects                                  | yes      | The tickets, pull requests and people the item concerns.                    |
+| `context.subjects[].type`        | string                                           | yes      | Kind of subject, for example a ticket or a pull request.                    |
+| `context.subjects[].ref`         | string                                           | yes      | Reference of the subject in its system.                                     |
+| `context.subjects[].title`       | string                                           | no       | Human-readable title.                                                       |
+| `context.subjects[].url`         | string                                           | no       | Link to the subject.                                                        |
+| `context.links`                  | list of objects                                  | yes      | Further links worth opening.                                                |
+| `context.links[].url`            | string                                           | yes      | Absolute URL.                                                               |
+| `context.links[].title`          | string                                           | no       | Label for the link.                                                         |
+| `sessionId`                      | string                                           | no       | Runtime session of this item from an earlier round; resume it when present. |
 
 ### `accept`
 
@@ -318,6 +324,127 @@ Sent by: office.
 | `item.ticketKey` | string  | no       |                                           |
 | `item.prUrl`     | string  | no       |                                           |
 | `item.current`   | boolean | no       | True for the item the caller asked about. |
+
+### `work_place`
+
+Moves one of the caller's queued items to a place in the queue.
+
+Sent by: agent. Answered by: `work_move_result`, `error`.
+
+| Field        | Type                                    | Required | Description                                                               |
+| ------------ | --------------------------------------- | -------- | ------------------------------------------------------------------------- |
+| `workItemId` | string                                  | yes      | Id of the work item.                                                      |
+| `position`   | `next` or `last` or `before` or `after` | yes      | Where among the queued items it goes.                                     |
+| `relativeTo` | string                                  | no       | The queued item to go before or after; required for `before` and `after`. |
+
+### `work_link`
+
+Makes a ticket the subject of a chat request's work item, after the agent created the ticket for it. Refused for an item that already has a ticket or pull request as its subject.
+
+Sent by: agent. Answered by: `work_link_result`, `error`.
+
+| Field        | Type   | Required | Description                          |
+| ------------ | ------ | -------- | ------------------------------------ |
+| `workItemId` | string | yes      | Id of the work item.                 |
+| `ticket`     | string | yes      | Key of the ticket the agent created. |
+
+### `work_link_result`
+
+The ticket is linked to the item.
+
+Sent by: office.
+
+| Field | Type   | Required | Description         |
+| ----- | ------ | -------- | ------------------- |
+| `url` | string | no       | Link to the ticket. |
+
+### `chat_message`
+
+A message from a trusted human in chat. The office starts an item for it, queues it when the person is busy, or adds it to the item of the thread. Delivered at least once; the office recognizes a message it handled.
+
+Sent by: agent. Answered by: `chat_message_result`, `error`.
+
+| Field         | Type   | Required | Description                                            |
+| ------------- | ------ | -------- | ------------------------------------------------------ |
+| `messageId`   | string | yes      | Id of the message in the chat workspace.               |
+| `channel`     | string | yes      |                                                        |
+| `thread`      | string | no       | Thread of the message; absent for a top-level message. |
+| `text`        | string | yes      |                                                        |
+| `author`      | object | yes      |                                                        |
+| `author.id`   | string | yes      |                                                        |
+| `author.name` | string | no       |                                                        |
+
+### `chat_message_result`
+
+What the office did with the message, and what the agent should answer.
+
+Sent by: office.
+
+| Field              | Type                                                                      | Required | Description                                                                                                                                                                                                                                               |
+| ------------------ | ------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `disposition`      | `started` or `waiting` or `joined` or `placed` or `asked_pm` or `unclear` | yes      | What the office did: `started` a new item for an idle person, queued it as `waiting` for an answer about where it goes, `joined` an item of the thread, `placed` the waiting item, `asked_pm` to prioritize it, or could not read the answer (`unclear`). |
+| `repeated`         | boolean                                                                   | yes      | True when the office already handled this message.                                                                                                                                                                                                        |
+| `item`             | object                                                                    | yes      | The item the message belongs to.                                                                                                                                                                                                                          |
+| `item.id`          | string                                                                    | yes      |                                                                                                                                                                                                                                                           |
+| `item.title`       | string                                                                    | yes      |                                                                                                                                                                                                                                                           |
+| `item.status`      | string                                                                    | yes      |                                                                                                                                                                                                                                                           |
+| `item.ticketKey`   | string                                                                    | no       |                                                                                                                                                                                                                                                           |
+| `item.prUrl`       | string                                                                    | no       |                                                                                                                                                                                                                                                           |
+| `item.current`     | boolean                                                                   | no       | True for the item the caller asked about.                                                                                                                                                                                                                 |
+| `links`            | list of objects                                                           | yes      | What the office created for the request, for example the ticket.                                                                                                                                                                                          |
+| `links[].url`      | string                                                                    | yes      | Absolute URL.                                                                                                                                                                                                                                             |
+| `links[].title`    | string                                                                    | no       | Label for the link.                                                                                                                                                                                                                                       |
+| `work`             | list of objects                                                           | yes      | The person's other open items in the order they run, for `waiting` and `unclear`.                                                                                                                                                                         |
+| `work[].id`        | string                                                                    | yes      |                                                                                                                                                                                                                                                           |
+| `work[].title`     | string                                                                    | yes      |                                                                                                                                                                                                                                                           |
+| `work[].status`    | string                                                                    | yes      |                                                                                                                                                                                                                                                           |
+| `work[].ticketKey` | string                                                                    | no       |                                                                                                                                                                                                                                                           |
+| `work[].prUrl`     | string                                                                    | no       |                                                                                                                                                                                                                                                           |
+| `work[].current`   | boolean                                                                   | no       | True for the item the caller asked about.                                                                                                                                                                                                                 |
+| `placement`        | string                                                                    | no       | For `placed`: where the item goes, in words.                                                                                                                                                                                                              |
+
+### `chat_report`
+
+Asks to tell the requester of a chat item how it ended. The office grants it once per ending, so a retried hand-back does not post twice.
+
+Sent by: agent. Answered by: `chat_report_result`, `error`.
+
+| Field        | Type                                       | Required | Description                                    |
+| ------------ | ------------------------------------------ | -------- | ---------------------------------------------- |
+| `workItemId` | string                                     | yes      | Id of the work item.                           |
+| `kind`       | `ack` or `result` or `blocked` or `failed` | yes      | What the agent is about to tell the requester. |
+
+### `chat_report_result`
+
+Whether to post, whom to mention and which links to include.
+
+Sent by: office.
+
+| Field           | Type            | Required | Description                                                               |
+| --------------- | --------------- | -------- | ------------------------------------------------------------------------- |
+| `post`          | boolean         | yes      | False when nothing should be posted: no chat origin, or already reported. |
+| `requester`     | string          | no       | Id of the requester to mention.                                           |
+| `links`         | list of objects | yes      | The ticket and pull requests of the item.                                 |
+| `links[].url`   | string          | yes      | Absolute URL.                                                             |
+| `links[].title` | string          | no       | Label for the link.                                                       |
+
+### `current_work`
+
+Asks for the caller's open tickets and pull requests, as context for a chat session.
+
+Sent by: agent. Answered by: `current_work_result`, `error`.
+
+No payload fields.
+
+### `current_work_result`
+
+The caller's current work as text.
+
+Sent by: office.
+
+| Field  | Type   | Required | Description |
+| ------ | ------ | -------- | ----------- |
+| `text` | string | yes      |             |
 
 ### `ack`
 

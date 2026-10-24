@@ -61,6 +61,30 @@ export interface WorkSource {
     workItemId: string,
     status: "queued" | "blocked" | "canceled",
   ): Promise<WorkSummary>;
+
+  /** Puts one of the person's queued items at a place in their queue. */
+  place(
+    person: string,
+    workItemId: string,
+    position: "next" | "last" | "before" | "after",
+    relativeTo?: string,
+  ): Promise<WorkSummary>;
+}
+
+/** Chat requests of trusted humans, and the report back to them. Optional: without it chat messages are unsupported. */
+export interface ChatDesk {
+  message(person: string, m: PayloadOf<"chat_message">): Promise<PayloadOf<"chat_message_result">>;
+  report(
+    person: string,
+    workItemId: string,
+    kind: PayloadOf<"chat_report">["kind"],
+  ): Promise<PayloadOf<"chat_report_result">>;
+
+  /** The person's open tickets and pull requests, as text. */
+  currentWork(person: string): Promise<string>;
+
+  /** Makes the ticket the agent created the subject of its chat item. */
+  linkTicket(person: string, workItemId: string, ticket: string): Promise<{ url?: string }>;
 }
 
 /** Agent-to-agent questions. Optional until the messaging component exists; without it `ask` is unsupported. */

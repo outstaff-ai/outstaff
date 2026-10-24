@@ -24,7 +24,7 @@ export interface CreateAgentEnvOptions {
   now?: () => Date;
 }
 
-const PORTS = ["tracker", "knowledge", "vcs"] as const satisfies readonly PortName[];
+const PORTS = ["tracker", "knowledge", "vcs", "chat"] as const satisfies readonly PortName[];
 
 /**
  * Builds the ports the verbs use from team.yaml. A port the team does not configure stays unset; one it

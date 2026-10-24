@@ -172,6 +172,21 @@ Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`)
 
 **Roster.** `ost team` (`ost roster`) shows the people with role title, busy or idle (or paused), what they work on, and the trusted humans. Titles and summaries come from the catalog when the office has it; otherwise the role id is shown.
 
+## Chat requests and report-back
+
+A trusted human asks an agent for something in chat; the agent's chat relay (see [The agent](/architecture/agent/)) sends the message to the office with `chat_message`, and the office decides. The state lives in the store as subjects (`chat_origin` per item, `chat_thread` per thread, `chat_message` per message), so it needs no migration and survives a restart.
+
+**A new top-level message** becomes a work item for the asked person: trigger `human`, kind `chat`, so it ranks in the human-chat class, ahead of agent-triggered and scheduled work. Its origin (channel, thread, requester) is recorded and offered with the item. The office files nothing itself, since many messages are questions. When the request is work the agent creates the ticket (`ost ticket create`) and the office links it: `work_link` sets it as the item's subject, so the workflow moves it and finds its pull requests like any ticket's, and the engine does not queue a second item for a subject a live chat item is working on. More generally, a `schedule` effect is skipped when the event's actor is the person to schedule (an agent assigning a ticket to itself, or creating it assigned to itself, starts nothing), so the tracker echoing the agent's own ticket back never produces a second item, live or not. An item that already has a ticket or pull request as its subject refuses a second ticket. Until then, and for questions, the subject is the thread.
+
+- **Idle** (no active item and an empty queue): the item goes first and is offered at once.
+- **Busy:** the item waits last, and `chat_message_result` carries the person's other open items in the order they run, so the agent can list them with links. The item is marked as awaiting a placement.
+
+**The answer** is a reply in the thread of the waiting request. The office reads it with a small set of rules, not a model: _next_ (or _first_, _now_, _urgent_), _last_ (or _later_, _no rush_), _after_ a number from the list, a ticket key, a work item id or a title (after the running item means next, since a running item is never interrupted), and _PM_ or _prioritize_. A match moves the item with the scheduler's `move`; the agent's `ost work move` (`work_place`) does the same. _PM_ asks the team's `pm` role through the question routing with the request and the queue, and the item keeps waiting: the PM's answer reaches the item's journal but does not move it, the requester's answer does. An answer that matches nothing gets the question again. The item runs when its turn comes, so nothing is dropped.
+
+**A reply in the thread of an item** attaches to it: the text goes to the item's journal and a waiting or blocked item is queued again, so the message joins the session on the next round. A reply to a finished item starts a new chat item in the same thread that takes over the finished item's session and ticket. A reply in a thread the office does not know is a new request in that thread. Messages are remembered by id, so a message the platform delivers twice is handled once.
+
+**Report back.** `chat_report` is a claim: the office answers whether the agent should post, once for each ending of an item (`result` for a finished item, `blocked`, `failed` once per item), together with the requester and the links of the item: its ticket, if the agent made one, and the pull requests that implement it. The first reply is a claim of its own (`ack`), made when the ticket is linked. A retried hand-back or a restart cannot post twice. An item the scheduler blocks on its own is announced by the office through its chat port, with the same claim, so the thread is not left in silence. Follow-ups are items of their own without a chat origin, so a review round or a question reports nothing until the requester's item finishes.
+
 ## Engine
 
 The engine (`createEngine`) is the glue between what happened and what the office does about it. It receives every event after the work state has applied it, asks the workflow what to do, and carries out the answer.

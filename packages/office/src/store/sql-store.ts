@@ -346,6 +346,11 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
         set["workspace"] = patch.workspace;
       }
 
+      if (patch.subject !== undefined) {
+        set["subject_type"] = patch.subject.type;
+        set["subject_ref"] = patch.subject.ref;
+      }
+
       const row = await db
         .updateTable("work_items")
         .set(set)

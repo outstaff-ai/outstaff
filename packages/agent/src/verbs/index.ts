@@ -9,11 +9,16 @@ import type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 export { createAgentEnv, type CreateAgentEnvOptions } from "./env.js";
 export { createFakeOffice, type FakeOffice } from "./office.js";
 export type {
+  ChatMessageRequest,
+  ChatMessageResult,
+  ChatReportKind,
+  ChatReportResult,
   OfficeAnswer,
   OfficeClient,
   OfficeTeam,
   OfficeTeamMember,
   OfficeWorkItem,
+  Placement,
 } from "./office.js";
 
 export { cliPath, describeVerb, kebab, type VerbField } from "./describe.js";

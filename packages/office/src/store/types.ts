@@ -57,6 +57,7 @@ export interface WorkItemPatch {
   position?: number;
   sessionId?: string | null;
   workspace?: string | null;
+  subject?: { type: string; ref: string };
 }
 
 export interface Run {

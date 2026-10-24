@@ -324,6 +324,44 @@ describe("office verbs", () => {
     expectLinks(r);
   });
 
+  it("moves a queued work item", async () => {
+    const f = fakeEnv();
+    const r = await run("work.move", f.env, { id: "w2", position: "after", relativeTo: "w3" });
+    expect(r.text).toContain("Work item w2");
+    expect(f.office.placed).toEqual([
+      { workItemId: "w2", placement: { position: "after", relativeTo: "w3" } },
+    ]);
+  });
+
+  it("creates a ticket for the caller and links it to the chat item", async () => {
+    const f = fakeEnv();
+    f.office.work = async () => [{ id: "c1", title: "Chat", status: "active" }];
+    const r = await run(
+      "ticket.create",
+      f.env,
+      { title: "Add search", body: "Dana asked." },
+      { workItemId: "c1" },
+    );
+
+    expect(r.text).toContain("Created SHOP-");
+    expectLinks(r);
+    expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
+    const issue = await f.tracker.getIssue("SHOP-1");
+    expect(issue).toMatchObject({ title: "Add search" });
+    expect(issue.status.canonical).toBe("active");
+  });
+
+  it("refuses a second ticket for an item that has one", async () => {
+    const f = fakeEnv();
+    await rejects(
+      run("ticket.create", f.env, { title: "Again" }, { workItemId: "w1" }),
+      "invalid",
+      /already has ticket SHOP-1/,
+    );
+
+    expect(await f.tracker.listIssues({})).toHaveLength(0);
+  });
+
   it("lists the team", async () => {
     expect((await run("team", fakeEnv().env)).text).toContain(
       "mira (Mira Okafor), architect: idle",
@@ -446,6 +484,7 @@ describe("verb catalogue", () => {
       "ticket.comment",
       "ticket.move",
       "ticket.assign",
+      "ticket.create",
       "doc.search",
       "doc.show",
       "doc.create",
@@ -458,6 +497,7 @@ describe("verb catalogue", () => {
       "ask",
       "question.answer",
       "work",
+      "work.move",
       "team",
     ]);
 
@@ -486,7 +526,7 @@ describe("verb catalogue", () => {
 describe("createAgentEnv", () => {
   const fakeTeam = () => {
     const team = acmeTeam();
-    for (const port of ["vcs", "tracker", "knowledge"] as const) {
+    for (const port of ["vcs", "tracker", "knowledge", "chat"] as const) {
       team.integrations[port] = { adapter: "fake" };
     }
 
@@ -502,7 +542,7 @@ describe("createAgentEnv", () => {
     });
 
     expect(env).toMatchObject({ person: "sam" });
-    expect(env.tracker && env.knowledge && env.vcs).toBeTruthy();
+    expect(env.tracker && env.knowledge && env.vcs && env.chat).toBeTruthy();
     expect(env.unavailable).toBeUndefined();
     await run("me", env);
   });

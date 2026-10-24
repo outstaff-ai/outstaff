@@ -448,6 +448,34 @@ ost ticket assign ACME-12 none
 ost ticket assign ACME-12 me --json
 ```
 
+## ost ticket create
+
+Create a ticket assigned to you.
+
+Creates a ticket assigned to you. Inside a chat request, the ticket becomes the request's ticket: the requester is told about it and the work item is tracked by it. A chat request that already has a ticket refuses a second one. Create one only for a request that is work; answer a question directly.
+
+```
+ost ticket create [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--title <title>` | Short title. |
+| `--body <body>` | What is asked and why, Markdown. |
+| `--status <status>` | Where it starts; active when you start now (the default inside a work item). |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket create --title "Add a search page" --body "Asked by Dana in chat."
+ost ticket create --title "Add a search page" --body "Asked by Dana in chat." --json
+```
+
 ## ost doc search
 
 Search the knowledge base.
@@ -705,14 +733,14 @@ ost answer 01J9X "Use the fast queue; orders must not wait on mail."
 ost answer 01J9X "Use the fast queue; orders must not wait on mail." --json
 ```
 
-## ost work
+## ost work list
 
 List your work items.
 
 Lists the work items the office has scheduled for you, with their tickets and pull requests.
 
 ```
-ost work
+ost work list
 ```
 
 Exit codes:
@@ -723,8 +751,31 @@ Exit codes:
 Examples:
 
 ```sh
-ost work
-ost work --json
+ost work list
+ost work list --json
+```
+
+## ost work move
+
+Put one of your queued work items at a place in your queue.
+
+Moves a queued work item of yours: next (ahead of the other queued items), last, or before or after another queued item. A running item is never interrupted. Use it when a human tells you where a chat request goes.
+
+```
+ost work move <id> <position> [relativeTo]
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost work move 01J9X next
+ost work move 01J9X after 01J9Y
+ost work move 01J9X next --json
 ```
 
 ## ost roster

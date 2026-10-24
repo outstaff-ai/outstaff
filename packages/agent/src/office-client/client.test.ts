@@ -169,6 +169,57 @@ describe("office connection", () => {
   });
 
   describe("requests", () => {
+    it("maps chat messages, reports, placement and current work onto the protocol", async () => {
+      await connectUp();
+      const message = conn.chatMessage({
+        messageId: "m1",
+        channel: "D1",
+        text: "hi",
+        author: { id: "U1" },
+      });
+
+      expect(current().last()).toMatchObject({
+        type: "chat_message",
+        payload: { messageId: "m1" },
+      });
+
+      const result = {
+        disposition: "started",
+        repeated: false,
+        item: { id: "c1", title: "hi", status: "queued" },
+        links: [],
+        work: [],
+      };
+
+      current().reply(current().last(), "chat_message_result", result);
+      expect(await message).toEqual(result);
+
+      const report = conn.chatReport("c1", "result");
+      expect(current().last()).toMatchObject({
+        type: "chat_report",
+        payload: { workItemId: "c1", kind: "result" },
+      });
+
+      current().reply(current().last(), "chat_report_result", { post: true, links: [] });
+      expect(await report).toEqual({ post: true, links: [] });
+
+      const place = conn.place("c1", { position: "after", relativeTo: "w2" });
+      expect(current().last()).toMatchObject({
+        type: "work_place",
+        payload: { workItemId: "c1", position: "after", relativeTo: "w2" },
+      });
+
+      current().reply(current().last(), "work_move_result", {
+        item: { id: "c1", title: "hi", status: "queued" },
+      });
+
+      expect(await place).toEqual({ id: "c1", title: "hi", status: "queued" });
+
+      const work = conn.currentWork();
+      current().reply(current().last(), "current_work_result", { text: "Ticket ACME-1" });
+      expect(await work).toBe("Ticket ACME-1");
+    });
+
     it("maps ask, work and team onto the protocol", async () => {
       await connectUp();
       const ask = conn.ask({ to: "noor", question: "Ok?", workItemId: "w1" });

@@ -50,6 +50,15 @@ export const journalEntrySchema = z.strictObject({
   text: z.string(),
 });
 
+export const chatOriginSchema = z.strictObject({
+  channel: z.string().min(1).describe("Chat channel of the request."),
+  thread: z.string().min(1).describe("Thread the agent answers in."),
+  requester: z.strictObject({
+    id: z.string().min(1).describe("Id of the requester in the chat workspace."),
+    name: z.string().optional(),
+  }),
+});
+
 export const workItemSchema = z.strictObject({
   id: z.string().min(1),
   kind: z
@@ -60,6 +69,9 @@ export const workItemSchema = z.strictObject({
   trigger: z.enum(["human", "agent", "automation", "schedule"]),
   parentId: z.string().optional().describe("The item this one was split from, for questions."),
   subject: z.strictObject({ type: z.string(), ref: z.string() }).optional(),
+  origin: chatOriginSchema
+    .optional()
+    .describe("Where the request came from, for items started by a chat message."),
 });
 
 export const offerContextSchema = z.strictObject({
@@ -227,6 +239,89 @@ export const messageSchema = z.discriminatedUnion("type", [
     }),
   ),
   message("work_move_result", z.strictObject({ item: workSummarySchema })),
+  message(
+    "work_place",
+    z.strictObject({
+      workItemId: itemId,
+      position: z
+        .enum(["next", "last", "before", "after"])
+        .describe("Where among the queued items it goes."),
+      relativeTo: itemId
+        .optional()
+        .describe("The queued item to go before or after; required for `before` and `after`."),
+    }),
+  ),
+  message(
+    "work_link",
+    z.strictObject({
+      workItemId: itemId,
+      ticket: z.string().min(1).max(200).describe("Key of the ticket the agent created."),
+    }),
+  ),
+  message(
+    "work_link_result",
+    z.strictObject({ url: z.string().optional().describe("Link to the ticket.") }),
+  ),
+  message(
+    "chat_message",
+    z.strictObject({
+      messageId: z.string().min(1).max(200).describe("Id of the message in the chat workspace."),
+      channel: z.string().min(1).max(200),
+      thread: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("Thread of the message; absent for a top-level message."),
+      text,
+      author: z.strictObject({
+        id: z.string().min(1).max(200),
+        name: z.string().max(200).optional(),
+      }),
+    }),
+  ),
+  message(
+    "chat_message_result",
+    z.strictObject({
+      disposition: z
+        .enum(["started", "waiting", "joined", "placed", "asked_pm", "unclear"])
+        .describe(
+          "What the office did: `started` a new item for an idle person, queued it as `waiting` for an answer about where it goes, `joined` an item of the thread, `placed` the waiting item, `asked_pm` to prioritize it, or could not read the answer (`unclear`).",
+        ),
+      repeated: z.boolean().describe("True when the office already handled this message."),
+      item: workSummarySchema.describe("The item the message belongs to."),
+      links: z
+        .array(linkSchema)
+        .describe("What the office created for the request, for example the ticket."),
+      work: z
+        .array(workSummarySchema)
+        .describe(
+          "The person's other open items in the order they run, for `waiting` and `unclear`.",
+        ),
+      placement: z.string().optional().describe("For `placed`: where the item goes, in words."),
+    }),
+  ),
+  message(
+    "chat_report",
+    z.strictObject({
+      workItemId: itemId,
+      kind: z
+        .enum(["ack", "result", "blocked", "failed"])
+        .describe("What the agent is about to tell the requester."),
+    }),
+  ),
+  message(
+    "chat_report_result",
+    z.strictObject({
+      post: z
+        .boolean()
+        .describe("False when nothing should be posted: no chat origin, or already reported."),
+      requester: z.string().optional().describe("Id of the requester to mention."),
+      links: z.array(linkSchema).describe("The ticket and pull requests of the item."),
+    }),
+  ),
+  message("current_work", empty),
+  message("current_work_result", z.strictObject({ text: z.string() })),
   message("ack", empty),
   message(
     "error",
@@ -253,6 +348,7 @@ export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
 export type MemberUsage = z.infer<typeof memberUsageSchema>;
+export type ChatOrigin = z.infer<typeof chatOriginSchema>;
 export type Human = z.infer<typeof humanSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type AnswerState = z.infer<typeof answerStateSchema>;

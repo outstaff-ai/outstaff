@@ -8,4 +8,10 @@ export {
   type ProtocolServerOptions,
 } from "./server.js";
 
-export { ProtocolError, type Messaging, type Offer, type WorkSource } from "./source.js";
+export {
+  ProtocolError,
+  type ChatDesk,
+  type Messaging,
+  type Offer,
+  type WorkSource,
+} from "./source.js";

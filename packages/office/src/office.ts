@@ -8,6 +8,7 @@ import {
 } from "@outstaff/core";
 import type { Human } from "@outstaff/protocol";
 import type { Clock } from "./clock.js";
+import { createChatDesk } from "./chat/index.js";
 import { createEngine, type Engine } from "./engine/index.js";
 import { createIntake, type Intake } from "./intake/index.js";
 import { createMessaging } from "./messaging/index.js";
@@ -22,7 +23,7 @@ import { recipeFor } from "./recipes.js";
 import { createUsageTracker, type UsageTracker } from "./usage/index.js";
 import { createScheduler, type Scheduler } from "./scheduler/index.js";
 import type { Store, WorkItem } from "./store/types.js";
-import { schedulerWorkSource } from "./work-source.js";
+import { itemRefs, schedulerWorkSource } from "./work-source.js";
 import { createWorkState, type PrRecord, type WorkState } from "./workstate/index.js";
 
 export interface OfficeOptions {
@@ -292,10 +293,34 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ...(ports.tracker ? { tracker: ports.tracker } : {}),
   });
 
+  const refs = itemRefs(store, {
+    vcs: ports.vcs,
+    ...(ports.tracker ? { tracker: ports.tracker } : {}),
+  });
+
+  const chatDesk = createChatDesk({
+    store,
+    scheduler: baseScheduler,
+    team,
+    workState,
+    messaging,
+    notify,
+    logger: log,
+    ...(ports.tracker ? { tracker: ports.tracker } : {}),
+    ...(ports.chat ? { chat: ports.chat } : {}),
+    linksOf: async (item) =>
+      (await refs.subjectsOf(item)).flatMap((r) =>
+        r.url && (r.type === "ticket" || r.type === "pr")
+          ? [{ url: r.url, title: r.title ? `${r.ref}: ${r.title}` : r.ref }]
+          : [],
+      ),
+  });
+
   server = createProtocolServer({
     source,
     messaging,
     usage,
+    chat: chatDesk,
     auth: agentAuthFromSecrets(
       input.secrets,
       team.people.map((p) => p.handle),
@@ -367,6 +392,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
           for (const b of result.blocked) {
             log.warn("work item blocked", { item: b.item.id, code: b.code, reason: b.reason });
+            void chatDesk.notifyBlocked(b.item, b.reason);
           }
         });
 
