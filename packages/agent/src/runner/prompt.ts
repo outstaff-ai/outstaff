@@ -4,7 +4,7 @@ import type { Workspace } from "../repos/index.js";
 /** The user prompt of a run, from what the office sent with the offer. */
 export function buildWorkPrompt(
   offer: Offer,
-  opts: { resumed: boolean; workspace?: Workspace },
+  opts: { resumed: boolean; restarted?: boolean; workspace?: Workspace },
 ): string {
   const { workItem: item, context } = offer;
   const lines = [
@@ -49,9 +49,11 @@ export function buildWorkPrompt(
 
   lines.push(
     "",
-    opts.resumed
-      ? "This continues your earlier session on this item. Check the current state before you carry on, since things may have changed since you stopped."
-      : "Start from the state above and what you can read with your tools.",
+    opts.restarted
+      ? "Your earlier session on this item could not be resumed, so this is a new one. The journal above is what you recorded before; nothing else carried over. Check the worktree, the pull request and the other state above before you carry on."
+      : opts.resumed
+        ? "This continues your earlier session on this item. Check the current state before you carry on, since things may have changed since you stopped."
+        : "Start from the state above and what you can read with your tools.",
     `Work only on this item. Pass work item ${item.id} where a tool asks for it. When you stop, your last message is the hand-back summary.`,
   );
 

@@ -6,10 +6,13 @@ import { createOfficeConnection, type OfficeConnection } from "../office-client/
 import { FakeSocket, createManualClock, type ManualClientClock } from "../office-client/testing.js";
 import { fakeEnv } from "../verbs/testing.js";
 import type { Workspaces } from "../repos/index.js";
+import { JOURNAL_PROMPT } from "./journal.js";
 import { createWorkLoop, linksIn, type WorkLoop } from "./loop.js";
 
 /** An office that acknowledges everything and says a question is still open. */
 class OfficeSocket extends FakeSocket {
+  failJournal = false;
+
   override send(data: string) {
     super.send(data);
     const m = this.last();
@@ -17,11 +20,15 @@ class OfficeSocket extends FakeSocket {
       return;
     }
 
-    queueMicrotask(() =>
-      m.type === "ask"
-        ? this.reply(m, "ask_result", { id: "q1", to: m.payload.to, status: "pending" })
-        : this.reply(m, "ack"),
-    );
+    queueMicrotask(() => {
+      if (m.type === "ask") {
+        this.reply(m, "ask_result", { id: "q1", to: m.payload.to, status: "pending" });
+      } else if (m.type === "journal" && this.failJournal) {
+        this.reply(m, "error", { code: "invalid", message: "No journal today." });
+      } else {
+        this.reply(m, "ack");
+      }
+    });
   }
 
   offerWith(id: string, extra: { sessionId?: string; journal?: boolean } = {}) {
@@ -69,6 +76,11 @@ function blockingRuntime() {
     async *run(req) {
       requests.push(req);
       yield { type: "started", sessionId: "sess-1" } satisfies RuntimeEvent;
+      if (req.prompt === JOURNAL_PROMPT) {
+        yield { type: "finished", ok: true, text: "" } satisfies RuntimeEvent;
+        return;
+      }
+
       yield { type: "text", text: "Working on it" } satisfies RuntimeEvent;
       await new Promise<void>((resolve) => {
         release = resolve;
@@ -165,7 +177,7 @@ describe("work loop", () => {
     socket.offerWith("w1", { journal: true });
     await until(() => sentOf("handback").length === 1);
 
-    expect(types()).toEqual(["accept", "session", "progress", "handback"]);
+    expect(types()).toEqual(["accept", "session", "progress", "journal", "handback"]);
     expect(sentOf("session")[0]?.payload).toEqual({
       workItemId: "w1",
       sessionId: "fake-session-1",
@@ -256,6 +268,114 @@ describe("work loop", () => {
 
     // w2 is waiting for an answer, so its worktree stays for the next round.
     expect(released).toEqual(["w1"]);
+    await loop.stop();
+    await conn.stop();
+  });
+
+  it("appends a journal entry from the same session before every hand-back", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    runtime.enqueue([{ type: "finish", text: "Fixed. https://git.acme.example/shop/pull/7" }]);
+    runtime.enqueue([
+      {
+        type: "finish",
+        text: "Done: fixed it\nDecisions: kept the old API\nOpen: none\nLinks: https://git.acme.example/shop/pull/7",
+      },
+    ]);
+
+    start(runtime);
+    socket.offerWith("w1", { sessionId: "stored-1" });
+    await until(() => sentOf("handback").length === 1);
+
+    const order = types();
+    expect(order.indexOf("journal")).toBeLessThan(order.indexOf("handback"));
+    expect(sentOf("journal")[0]?.payload).toEqual({
+      workItemId: "w1",
+      text: "Done: fixed it\nDecisions: kept the old API\nOpen: none\nLinks: https://git.acme.example/shop/pull/7",
+    });
+
+    const [, ask] = runtime.requests;
+    expect(ask?.prompt).toBe(JOURNAL_PROMPT);
+    expect(ask?.sessionId).toBe("stored-1");
+    expect(ask?.tools).toEqual([]);
+    expect(ask?.builtinTools).toEqual([]);
+    await loop.stop();
+    await conn.stop();
+  });
+
+  it("falls back to the final message when the journal answer is not in the format", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    runtime.enqueue([{ type: "finish", text: "Fixed. https://git.acme.example/shop/pull/7" }]);
+    runtime.enqueue([{ type: "finish", text: "Sure, I did a lot." }]);
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+
+    const text = (sentOf("journal")[0]!.payload as { text: string }).text;
+    expect(text).toContain("Done: Fixed. https://git.acme.example/shop/pull/7");
+    expect(text).toContain("Links: https://git.acme.example/shop/pull/7");
+    await loop.stop();
+    await conn.stop();
+  });
+
+  it("still hands back when the journal cannot be stored", async () => {
+    await connect();
+    socket.failJournal = true;
+    start(createFakeRuntime());
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+    expect(sentOf("journal")).toHaveLength(1);
+    expect(sentOf("fail")).toHaveLength(0);
+    await loop.stop();
+    await conn.stop();
+  });
+
+  it("starts a new session from the journal when the stored one is lost, and says so", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    runtime.enqueue([
+      { type: "finish", ok: false, error: "No conversation found", sessionLost: true },
+    ]);
+
+    runtime.enqueue([{ type: "finish", text: "Carried on from the journal." }]);
+    start(runtime);
+    socket.offerWith("w1", { sessionId: "gone-1", journal: true });
+    await until(() => sentOf("handback").length === 1);
+
+    const [lost, fresh] = runtime.requests;
+    expect(lost?.sessionId).toBe("gone-1");
+    expect(fresh?.sessionId).toBeUndefined();
+    expect(fresh?.prompt).toContain("could not be resumed");
+    expect(fresh?.prompt).toContain("sam: Plan: a");
+    expect(fresh?.prompt).toContain("ticket SHOP-1 Checkout");
+
+    const journals = sentOf("journal").map((m) => (m.payload as { text: string }).text);
+    expect(journals[0]).toContain("Session restarted from journal");
+    expect(sentOf("fail")).toHaveLength(0);
+    expect(sentOf("handback")[0]?.payload).toMatchObject({
+      summary: "Carried on from the journal.",
+      status: "done",
+    });
+
+    // The new session replaces the lost one in the office.
+    expect(sentOf("session")[0]?.payload).toEqual({
+      workItemId: "w1",
+      sessionId: "fake-session-1",
+    });
+
+    await loop.stop();
+    await conn.stop();
+  });
+
+  it("fails the item, not restarts, when a fresh run reports a lost session", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    runtime.enqueue([{ type: "finish", ok: false, error: "boom", sessionLost: true }]);
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("fail").length === 1);
+    expect(runtime.requests).toHaveLength(1);
     await loop.stop();
     await conn.stop();
   });

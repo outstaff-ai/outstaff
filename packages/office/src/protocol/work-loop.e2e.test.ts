@@ -94,8 +94,10 @@ describe("the agent work loop against the real protocol server", () => {
     await source.setSession("sam", "w2", "stored-2");
     server.notify("sam");
     await until(() => source.stateOf("w2") === "done");
-    expect(runtime.requests[0]?.sessionId).toBeUndefined();
-    expect(runtime.requests[1]?.sessionId).toBe("stored-2");
+    // Each hand-back also asks for a journal entry (one turn, no tools) in the same session.
+    const rounds = runtime.requests.filter((r) => r.maxTurns !== 1);
+    expect(rounds[0]?.sessionId).toBeUndefined();
+    expect(rounds[1]?.sessionId).toBe("stored-2");
     await loop.stop();
     await conn.stop();
     await running;

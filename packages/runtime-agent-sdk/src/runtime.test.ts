@@ -133,6 +133,34 @@ describe("message mapping", () => {
     expect(calls).toHaveLength(1);
   });
 
+  it("flags a lost session when resuming fails, and only then", async () => {
+    const lost = fakeQuery(async function* () {
+      yield* [];
+      throw new Error("No conversation found with session ID: gone-1");
+    });
+
+    const resumed = await collect(
+      createAgentSdkRuntime({ options, query: lost.query }).run(req({ sessionId: "gone-1" })),
+    );
+
+    expect(resumed.at(-1)).toMatchObject({ type: "finished", ok: false, sessionLost: true });
+
+    const fresh = await collect(createAgentSdkRuntime({ options, query: lost.query }).run(req()));
+
+    expect(fresh.at(-1)).not.toHaveProperty("sessionLost");
+
+    const other = fakeQuery(async function* () {
+      yield* [];
+      throw new Error("rate limited");
+    });
+
+    const failed = await collect(
+      createAgentSdkRuntime({ options, query: other.query }).run(req({ sessionId: "s1" })),
+    );
+
+    expect(failed.at(-1)).not.toHaveProperty("sessionLost");
+  });
+
   it("does not start a query when the signal is already aborted", async () => {
     const controller = new AbortController();
     controller.abort();

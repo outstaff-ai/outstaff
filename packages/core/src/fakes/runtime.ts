@@ -8,7 +8,14 @@ export type FakeRunStep =
   /** The call is judged against the request's policy with `evaluate()`; the decision lands in the emitted event. */
   | { type: "tool_call"; tool: string; call: ToolCall }
   | UsageEvent
-  | { type: "finish"; ok?: boolean; text?: string; error?: string; costUsd?: number };
+  | {
+      type: "finish";
+      ok?: boolean;
+      text?: string;
+      error?: string;
+      costUsd?: number;
+      sessionLost?: boolean;
+    };
 
 export interface FakeRuntime extends Runtime {
   seed: RuntimeSeed;
@@ -75,6 +82,7 @@ export function createFakeRuntime(): FakeRuntime {
             text,
             ...(step.error !== undefined ? { error: step.error } : {}),
             ...(step.costUsd !== undefined ? { costUsd: step.costUsd } : {}),
+            ...(step.sessionLost ? { sessionLost: true } : {}),
           };
 
           return;
