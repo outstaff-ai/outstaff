@@ -818,6 +818,8 @@ describe("events", () => {
     ev(100, "PushEvent", {}),
   ];
 
+  const SINCE_START = JSON.stringify({ "acme/app": { since: "2026-01-01T00:00:00Z" } });
+
   it("normalises events oldest first with actor and a stable external id", async () => {
     const { vcs } = build([
       ...appRoutes(),
@@ -828,7 +830,7 @@ describe("events", () => {
       },
     ]);
 
-    const page = await vcs.events([REPO]);
+    const page = await vcs.events([REPO], SINCE_START);
     expect(page.events.map((e) => [e.externalId, e.type, e.number, e.actor])).toEqual([
       ["101", "pr.opened", 2, "sam[bot]"],
       ["103", "pr.opened", 2, "noor"],
@@ -843,7 +845,9 @@ describe("events", () => {
     expect(page.events[1]!.data).toMatchObject({ reopened: true });
     expect(page.events[5]!.data).toMatchObject({ state: "approved" });
     expect(page.events[0]!.data).toMatchObject({ title: "T", headSha: "s1" });
-    expect(JSON.parse(page.cursor)).toEqual({ "acme/app": { etag: 'W/"v1"', lastEventId: "110" } });
+    expect(JSON.parse(page.cursor)).toEqual({
+      "acme/app": { etag: 'W/"v1"', since: "2026-01-01T00:00:50.000Z" },
+    });
 
     // What it read but has no mapping for is reported by id and type only, so the office can say so.
     expect(page.unmapped).toEqual([
@@ -871,17 +875,17 @@ describe("events", () => {
       },
     ]);
 
-    const first = await vcs.events([REPO]);
+    const first = await vcs.events([REPO], SINCE_START);
     const again = await vcs.events([REPO], first.cursor);
     expect(again.events).toEqual([]);
     expect(again.cursor).toBe(first.cursor);
     expect(served).toBe(2);
-    expect(
-      stub.called("GET", "/repos/acme/app/events")[0]!.headers.get("if-none-match"),
-    ).toBeNull();
+    expect(stub.called("GET", "/repos/acme/app/events")[1]!.headers.get("if-none-match")).toBe(
+      'W/"v1"',
+    );
   });
 
-  it("returns only events newer than the cursor and follows pages while they are all new", async () => {
+  it("returns events from the overlap window onward and follows pages while the page is not older than it", async () => {
     const newer = [
       ev(113, "IssueCommentEvent", {
         action: "created",
@@ -922,13 +926,131 @@ describe("events", () => {
       },
     ]);
 
-    const cursor = JSON.stringify({ "acme/app": { etag: 'W/"v1"', lastEventId: "110" } });
+    // since is 00:00:50 (event 110); the overlap reaches back 5 minutes, so 100..110 come back too.
+    const cursor = JSON.stringify({
+      "acme/app": { etag: 'W/"v1"', since: "2026-01-01T00:00:50Z" },
+    });
+
     const page = await vcs.events([REPO], cursor);
-    expect(page.events.map((e) => e.externalId)).toEqual(["111", "112", "113"]);
-    expect(JSON.parse(page.cursor)["acme/app"]).toEqual({ etag: 'W/"v2"', lastEventId: "113" });
+    expect(page.events.map((e) => e.externalId)).toEqual(
+      ["100", "101", "103", "104", "105", "106", "107", "108", "110", "111", "112", "113"].filter(
+        (id) => id !== "100",
+      ),
+    );
+
+    expect(JSON.parse(page.cursor)["acme/app"]).toEqual({
+      etag: 'W/"v2"',
+      since: "2026-01-01T00:00:53.000Z",
+    });
+
     expect(stub.called("GET", "/repos/acme/app/events")[0]!.headers.get("if-none-match")).toBe(
       'W/"v1"',
     );
+  });
+
+  it("does not drop later events whose ids are lower than an earlier push", async () => {
+    const feed = [
+      {
+        id: "18120005357",
+        type: "PullRequestReviewEvent",
+        actor: { login: "noor" },
+        created_at: "2026-01-01T19:17:30Z",
+        payload: {
+          action: "created",
+          pull_request: { number: 8 },
+          review: { id: 1, state: "commented", body: "hm" },
+        },
+      },
+      {
+        id: "18120004139",
+        type: "PullRequestReviewCommentEvent",
+        actor: { login: "noor" },
+        created_at: "2026-01-01T19:17:10Z",
+        payload: {
+          action: "created",
+          pull_request: { number: 8 },
+          comment: { id: 2, body: "nit", path: "a.ts" },
+        },
+      },
+      {
+        id: "25040006193",
+        type: "PushEvent",
+        actor: { login: "marcus" },
+        created_at: "2026-01-01T15:31:00Z",
+        payload: {},
+      },
+    ];
+
+    const { vcs } = build([
+      ...appRoutes(),
+      { method: "GET", path: "/repos/acme/app/events", handler: () => ({ body: feed }) },
+    ]);
+
+    const cursor = JSON.stringify({ "acme/app": { since: "2026-01-01T15:31:00Z" } });
+    const page = await vcs.events([REPO], cursor);
+    expect(page.events.map((e) => e.externalId)).toEqual(["18120004139", "18120005357"]);
+    expect(JSON.parse(page.cursor)["acme/app"].since).toBe("2026-01-01T19:17:30.000Z");
+  });
+
+  it("re-returns recent events inside the overlap and never moves the time backwards", async () => {
+    const { vcs } = build([
+      ...appRoutes(),
+      {
+        method: "GET",
+        path: "/repos/acme/app/events",
+        handler: () => ({
+          body: [
+            ev(110, "IssueCommentEvent", {
+              action: "created",
+              issue: { number: 4, pull_request: {} },
+              comment: { id: 9, body: "ping" },
+            }),
+          ],
+        }),
+      },
+    ]);
+
+    // The cursor is ahead of everything in the feed: 110 (00:00:50) is within 5 minutes of it.
+    const ahead = JSON.stringify({ "acme/app": { since: "2026-01-01T00:04:00Z" } });
+    const page = await vcs.events([REPO], ahead);
+    expect(page.events.map((e) => e.externalId)).toEqual(["110"]);
+    expect(JSON.parse(page.cursor)["acme/app"].since).toBe("2026-01-01T00:04:00.000Z");
+
+    const stale = JSON.stringify({ "acme/app": { since: "2026-01-01T00:06:00Z" } });
+    expect((await vcs.events([REPO], stale)).events).toEqual([]);
+  });
+
+  it("baselines a repository with no entry (new repo or an old cursor shape) and emits nothing", async () => {
+    const { vcs, stub } = build([
+      ...appRoutes(),
+      {
+        method: "GET",
+        path: "/repos/acme/app/events",
+        handler: () => ({ headers: { etag: 'W/"v1"' }, body: history }),
+      },
+    ]);
+
+    const old = JSON.stringify({ "acme/app": { etag: 'W/"old"', lastEventId: "110" } });
+    for (const cursor of ["{}", old]) {
+      const page = await vcs.events([REPO], cursor);
+      expect(page.events).toEqual([]);
+      expect(page.unmapped).toEqual([]);
+      const entry = JSON.parse(page.cursor)["acme/app"];
+      expect(entry).toMatchObject({ etag: 'W/"v1"', since: "2026-01-01T00:00:50.000Z" });
+      // What the baseline read must not come back as news through the overlap.
+      expect(entry.seen).toContain("110");
+      expect((await vcs.events([REPO], page.cursor)).events).toEqual([]);
+    }
+
+    // With no cursor at all it is the first poll: the history is returned and intake baselines it.
+    const firstPoll = await vcs.events([REPO]);
+    expect(firstPoll.events.length).toBeGreaterThan(0);
+    expect(JSON.parse(firstPoll.cursor)["acme/app"].since).toBe("2026-01-01T00:00:50.000Z");
+
+    // An old entry's etag is not sent: it must not turn the baseline read into a 304.
+    expect(
+      stub.called("GET", "/repos/acme/app/events")[2]!.headers.get("if-none-match"),
+    ).toBeNull();
   });
 
   it("rejects a cursor it did not produce", async () => {

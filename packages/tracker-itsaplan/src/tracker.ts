@@ -53,19 +53,26 @@ const HYDRATE_CONCURRENCY = 5;
 const FEED_PAGE = 100;
 const EVENT_PAGES = 20;
 
+// Re-read this much before the newest time seen; intake de-duplicates by external id.
+const OVERLAP_MS = 5 * 60_000;
+
 interface EventCursor {
-  id: number;
+  since: number;
+  seen: Set<string>;
 }
 
-function parseCursor(cursor: string | undefined): EventCursor {
+/** Undefined means "no usable position": an old cursor shape counts as no entry and is baselined. */
+function parseCursor(cursor: string | undefined): EventCursor | undefined {
   if (!cursor) {
-    return { id: 0 };
+    return undefined;
   }
 
   try {
-    const parsed = JSON.parse(cursor) as Partial<EventCursor>;
-    if (typeof parsed.id === "number") {
-      return { id: parsed.id };
+    const parsed = JSON.parse(cursor) as { since?: unknown; seen?: unknown };
+    if (parsed && typeof parsed === "object") {
+      const since = typeof parsed.since === "string" ? Date.parse(parsed.since) : Number.NaN;
+      const seen = Array.isArray(parsed.seen) ? parsed.seen.map(String) : [];
+      return Number.isNaN(since) ? undefined : { since, seen: new Set(seen) };
     }
   } catch {
     // fall through
@@ -261,7 +268,7 @@ function buildTracker(api: Itsaplan): Tracker {
       const items = await feed(issue.id, "comments");
       return items
         .filter((i) => i.kind === "comment")
-        .toSorted((a, b) => a.id - b.id)
+        .toSorted((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id)
         .map((i) => ({
           id: String(i.id),
           author: actor(setup, i),
@@ -300,29 +307,43 @@ function buildTracker(api: Itsaplan): Tracker {
     async events(cursor): Promise<EventPage<TrackerEvent>> {
       const after = parseCursor(cursor);
       const setup = await api.project();
-      const fresh: ApiActivityItem[] = [];
+      const read: ApiActivityItem[] = [];
       let next: string | undefined;
-      // The feed is newest first: page back until what we have already seen (or the page budget) is reached.
-      // Without a cursor only the newest page is needed: the caller just wants to know where "now" is.
-      const pageLimit = cursor === undefined ? 1 : EVENT_PAGES;
-      for (let page = 0; page < pageLimit; page++) {
+      // Activity ids are identifiers only; progress is tracked by createdAt.
+      // The feed is newest first: page back until a page reaches older than the overlap window.
+      // Without a usable position the caller just wants to know where "now" is, plus the ids inside the overlap so they are not handed back later.
+      let floor = (after?.since ?? Number.NaN) - OVERLAP_MS;
+      for (let page = 0; page < EVENT_PAGES; page++) {
         const res = await api.http.request<Page<ApiActivityItem>>(
           "GET",
           `${api.projectPath}/analytics/activity`,
           { query: { limit: FEED_PAGE, cursor: next } },
         );
 
-        fresh.push(...res.items.filter((i) => i.id > after.id));
-        const reachedSeen = res.items.some((i) => i.id <= after.id);
-        if (reachedSeen || !res.nextCursor || res.items.length === 0) {
+        read.push(...res.items);
+        if (!after && page === 0) {
+          // Without a position, the window is what lies within the overlap of the newest item.
+          floor = Math.max(...res.items.map((i) => Date.parse(i.createdAt))) - OVERLAP_MS;
+        }
+
+        const oldest = res.items.at(-1);
+        if (!res.nextCursor || !oldest || Date.parse(oldest.createdAt) < floor) {
           break;
         }
 
         next = JSON.stringify(res.nextCursor);
       }
 
+      // No cursor at all is the first poll (intake decides if it is a baseline); a cursor we cannot use baselines here.
+      const baseline = cursor !== undefined && !after;
+      const fresh = baseline
+        ? []
+        : read.filter(
+            (i) => !after || (Date.parse(i.createdAt) >= floor && !after.seen.has(String(i.id))),
+          );
+
       const ordered = fresh.toSorted(
-        (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id - b.id,
+        (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id,
       );
 
       const events: TrackerEvent[] = [];
@@ -347,8 +368,23 @@ function buildTracker(api: Itsaplan): Tracker {
         });
       }
 
-      const top = Math.max(after.id, ...fresh.map((i) => i.id));
-      return { events, cursor: JSON.stringify({ id: top } satisfies EventCursor) };
+      const times = read.map((i) => Date.parse(i.createdAt)).filter((t) => !Number.isNaN(t));
+      const newest = Math.max(after?.since ?? Number.NEGATIVE_INFINITY, ...times);
+      const since = new Date(Number.isFinite(newest) ? newest : Date.now()).toISOString();
+      // Ids read at baseline time, kept while they are inside the overlap so that history is not handed back as news.
+      const keep = after?.seen;
+      const seenIds = read
+        .filter(
+          (i) =>
+            (keep ? keep.has(String(i.id)) : true) &&
+            Date.parse(i.createdAt) >= Date.parse(since) - OVERLAP_MS,
+        )
+        .map((i) => String(i.id));
+
+      return {
+        events,
+        cursor: JSON.stringify({ since, ...(seenIds.length > 0 ? { seen: seenIds } : {}) }),
+      };
     },
   };
 }

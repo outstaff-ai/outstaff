@@ -158,14 +158,20 @@ describe("tracker", () => {
 
     expect(first.events[3]?.data["body"]).toBe("hello");
     expect(new Set(first.events.map((e) => e.externalId)).size).toBe(4);
-    expect((await tracker.events(first.cursor)).events).toEqual([]);
+    // The overlap re-reads recent activity; intake de-duplicates by external id.
+    const seen = new Set(first.events.map((e) => e.externalId));
+    const replay = await tracker.events(first.cursor);
+    expect(replay.events.filter((e) => !seen.has(e.externalId))).toEqual([]);
     await tracker.comment(issue.key, "more");
     const next = await tracker.events(first.cursor);
-    expect(next.events.map((e) => e.data["body"])).toEqual(["more"]);
+    expect(next.events.filter((e) => !seen.has(e.externalId)).map((e) => e.data["body"])).toEqual([
+      "more",
+    ]);
+
     await expect(tracker.events("not json")).rejects.toMatchObject({ code: "invalid" });
   });
 
-  it("reads only the newest page when no cursor is given, with a cursor that represents now", async () => {
+  it("with no cursor reads what is within the overlap of now, and hands none of it back as news later", async () => {
     const fake = createItsaplanFake();
     const tracker = await createItsaplanTracker(trackerCtx(fake));
     const issue = await tracker.createIssue({ title: "Busy", body: "" });
@@ -174,13 +180,58 @@ describe("tracker", () => {
     }
 
     const first = await tracker.events();
-    expect(first.events).toHaveLength(100);
+    expect(first.events).toHaveLength(121);
     expect(first.events.at(-1)?.data["body"]).toBe("c119");
-    expect((await tracker.events(first.cursor)).events).toEqual([]);
+    const seen = new Set(first.events.map((e) => e.externalId));
+    const unseen = async () =>
+      (await tracker.events(first.cursor)).events.filter((e) => !seen.has(e.externalId));
+
+    expect(await unseen()).toEqual([]);
     await tracker.comment(issue.key, "after");
-    expect((await tracker.events(first.cursor)).events.map((e) => e.data["body"])).toEqual([
-      "after",
-    ]);
+    expect((await unseen()).map((e) => e.data["body"])).toEqual(["after"]);
+  });
+
+  it("tracks activity by time: a later item with a lower id is not skipped, an old cursor shape baselines", async () => {
+    const fake = createItsaplanFake();
+    const item = (id: number, body: string, createdAt: string) => ({
+      id,
+      issueId: 1,
+      issueSequence: 1,
+      kind: "comment",
+      body,
+      createdAt,
+    });
+
+    // Newest first by time, but ids are not in time order.
+    const feed = [
+      item(100, "late", "2026-01-01T11:00:00Z"),
+      item(900, "early", "2026-01-01T10:00:00Z"),
+    ];
+
+    const fetch: typeof fake.fetch = async (url, init) =>
+      String(url).includes("/analytics/activity")
+        ? new Response(JSON.stringify({ items: feed }), {
+            headers: { "content-type": "application/json" },
+          })
+        : fake.fetch(url, init);
+
+    const tracker = await createItsaplanTracker({ ...trackerCtx(fake), fetch });
+    const cursor = JSON.stringify({ since: "2026-01-01T10:30:00Z" });
+    const page = await tracker.events(cursor);
+    expect(page.events.map((e) => e.data["body"])).toEqual(["late"]);
+    expect(JSON.parse(page.cursor)).toEqual({ since: "2026-01-01T11:00:00.000Z" });
+
+    // Never backwards, and the overlap window re-returns what is close to it.
+    const ahead = await tracker.events(JSON.stringify({ since: "2026-01-01T11:03:00Z" }));
+    expect(ahead.events.map((e) => e.data["body"])).toEqual(["late"]);
+    expect(JSON.parse(ahead.cursor)).toEqual({ since: "2026-01-01T11:03:00.000Z" });
+
+    // An id-based cursor from before is no position: baseline, emit nothing.
+    const old = await tracker.events(JSON.stringify({ id: 5 }));
+    expect(old.events).toEqual([]);
+    expect(JSON.parse(old.cursor)).toMatchObject({ since: "2026-01-01T11:00:00.000Z" });
+    // ...and what the baseline read is not returned again.
+    expect((await tracker.events(old.cursor)).events).toEqual([]);
   });
 
   it("classifies activity actions", () => {
