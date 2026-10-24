@@ -1,0 +1,52 @@
+name: CLA
+
+# Never check out or run pull request code here: pull_request_target runs with
+# a write-capable token and secrets. The action only reads PR metadata and comments.
+on:
+  pull_request_target:
+    types: [opened, synchronize, closed]
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  cla:
+    # On issue_comment, only act on pull request comments that sign or ask for a recheck.
+    if: >-
+      github.event_name == 'pull_request_target' ||
+      (github.event.issue.pull_request &&
+      (github.event.comment.body == 'recheck' ||
+      github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # Signatures live in a separate repository because main is protected by a
+      # ruleset and a merge queue, so the action must not write to this repository.
+      - name: CLA signatures storage not configured (maintainers, see CONTRIBUTING.md)
+        if: github.event_name == 'pull_request_target'
+        env:
+          CLA_SIGNATURES_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN }}
+        run: |
+          if [ -z "$CLA_SIGNATURES_TOKEN" ]; then
+            echo "::error title=CLA signatures storage not configured::The CLA_SIGNATURES_TOKEN secret is not set, so signatures cannot be recorded. Maintainers: see CONTRIBUTING.md. Add a fine-grained token with contents read/write on outstaff-ai/cla-signatures; see CONTRIBUTING.md."
+            exit 1
+          fi
+      - name: CLA assistant
+        uses: contributor-assistant/github-action@v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.CLA_SIGNATURES_TOKEN }}
+        with:
+          path-to-document: https://github.com/outstaff-ai/outstaff/blob/main/CLA.md
+          path-to-signatures: signatures/v1/cla.json
+          branch: main
+          remote-organization-name: outstaff-ai
+          remote-repository-name: cla-signatures
+          allowlist: "*[bot]"
+          custom-pr-sign-comment: I have read the CLA Document and I hereby sign the CLA
+          lock-pullrequest-aftermerge: false

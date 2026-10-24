@@ -40,6 +40,18 @@ Before you open a pull request, run `pnpm format && pnpm lint && pnpm typecheck 
 
 Fill in the pull request template. It asks for a summary, the linked issue, how you verified the change, and whether docs are included.
 
+## Contributor License Agreement
+
+Outside contributors sign a Contributor License Agreement ([CLA.md](CLA.md)) before their first pull request is merged. You keep the copyright in your work. The agreement gives the maintainers a broad licence to it, so the project can keep its licensing options open, and it gives users a patent licence for what you contribute.
+
+To sign, post this comment on your pull request, exactly once:
+
+> I have read the CLA Document and I hereby sign the CLA
+
+The CLA check on the pull request then passes. Your signature is recorded and covers your future pull requests, so you will not be asked again. If you contribute as part of your job, read the section on employers in the CLA first. Comment `recheck` to run the check again. Bots such as Dependabot are exempt.
+
+Maintainers: signatures are stored in the separate `outstaff-ai/cla-signatures` repository, written with the `CLA_SIGNATURES_TOKEN` secret (a fine-grained token with contents read/write on that repository only). The check fails on pull requests while the secret is missing.
+
 ## Code style
 
 - TypeScript in strict mode, ESM only, and no default exports.
@@ -54,4 +66,4 @@ Fill in the pull request template. It asks for a summary, the linked issue, how 
 
 ## License
 
-Outstaff is licensed under the [Apache License 2.0](LICENSE). Unless you state otherwise, any contribution you submit is licensed under the same terms, as set out in section 5 of the licence.
+Outstaff is licensed under the [Apache License 2.0](LICENSE). Unless you state otherwise, any contribution you submit is licensed under the same terms, as set out in section 5 of the licence. Outside contributions are also covered by the [Contributor License Agreement](CLA.md), described above.
