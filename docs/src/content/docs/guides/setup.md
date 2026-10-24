@@ -8,15 +8,16 @@ Every agent signs in to your tools with credentials of its own, and the office n
 ## Before you start
 
 - A [team file](/concepts/team-config/) with the integrations you use. `ost setup` reads the adapters from `integrations` and the repositories and grants from `repos` and `people`.
-- A directory for secret files that git ignores, one file per key, named after the key. Containers read the same layout from `/run/secrets/outstaff` or `OUTSTAFF_SECRETS_DIR` ([secrets are files first](/reference/container-contract/#secrets)). Add this to `.gitignore`:
+- A secrets directory that git ignores. By default it is `.outstaff/secrets/` next to the team file: one folder per scope, `.outstaff/secrets/<handle>/` for each person and `.outstaff/secrets/office/` for the office, with one file per key, named after the key. A container reads one such folder from `/run/secrets/outstaff` or `OUTSTAFF_SECRETS_DIR` ([secrets are files first](/reference/container-contract/#secrets)). Add this to `.gitignore`:
 
   ```text
-  .outstaff/people/*/.env
-  .outstaff/office/.env
-  secrets/
+  .outstaff/secrets/
+  .outstaff/**/.env
   ```
 
-`ost setup` refuses to run until git ignores the `.env` file it names and the secrets directory (if that is inside the repository), and prints the lines to add. `ost init` already adds the `.env` rules.
+Run `ost` commands from anywhere inside the repository: without `--team`, the team file is the first `.outstaff/team.yaml` or `team.yaml` found in the current directory or a parent, up to the git root. `ost setup` writes below the project root (the folder that holds `.outstaff/`); `--out` picks another one.
+
+`ost setup` refuses to run until git ignores the `.env` file it names and the secrets directory it will use (if that is inside the repository), and prints the lines to add. `ost init` already adds both rules.
 
 ## A new person
 
@@ -26,7 +27,7 @@ Add the person to `people` in `team.yaml` with their repo grants (`ost hire` doe
 ost setup sam
 ```
 
-This writes `.outstaff/people/sam/.env.example` and prints a guide per adapter. The template lists every key the configured adapters need for that person, each with what it is, where to get it, whether it is optional and whether it is derivable. It also shows the `secrets/` layout. It never contains a real value.
+This writes `.outstaff/people/sam/.env.example` and prints a guide per adapter. The template lists every key the configured adapters need for that person, each with what it is, where to get it, whether it is optional and whether it is derivable. It also shows where the secret files go. It never contains a real value.
 
 Follow the guides in order:
 
@@ -38,12 +39,12 @@ Follow the guides in order:
    - A human accepts it, signs in as the member and creates the API key. Keep it as `ITSAPLAN_API_KEY`.
 4. **Claude.** Choose how the agent signs in: an API key, a cloud provider, or your own subscription token (within the provider's terms).
 
-Put each value in a file named after its key in the secrets directory, for example `secrets/SLACK_BOT_TOKEN`. Keep the environment-variable route (`.env`) for platforms that can only inject variables; anything in the environment is visible to the agent's shell.
+Put each value in a file named after its key in the secrets directory, for example `.outstaff/secrets/sam/SLACK_BOT_TOKEN`. Keep the environment-variable route (`.env`) for platforms that can only inject variables; anything in the environment is visible to the agent's shell.
 
 ### Let it fill in the rest
 
 ```sh
-ost setup sam --derive --secrets-dir ./secrets
+ost setup sam --derive
 ```
 
 `--derive` reads what you provided (files in the secrets directory first, then the environment) and looks up the values that can be computed:
@@ -54,7 +55,7 @@ ost setup sam --derive --secrets-dir ./secrets
 | Slack      | `SLACK_BOT_TOKEN`               | `SLACK_BOT_USER_ID` (from `auth.test`)                                                                                                     |
 | Its a Plan | `ITSAPLAN_API_KEY`              | `ITSAPLAN_MEMBER_ID` (from `/me`)                                                                                                          |
 
-Derived values are written only as files into the secrets directory (`--secrets-dir`, default `OUTSTAFF_SECRETS_DIR`, then `./secrets`) with mode 0600, and only when the key is not there yet. The command prints key names and warnings, never a value, so its output is safe to paste into a support thread. A warning such as "not installed yet" tells you what to fix before running it again.
+Derived values are written only as files into the secrets directory (`.outstaff/secrets/sam/`; `--secrets-dir` and then `OUTSTAFF_SECRETS_DIR` override it with one folder holding that scope's files) with mode 0600, and only when the key is not there yet. The command prints key names and warnings, never a value, so its output is safe to paste into a support thread. A warning such as "not installed yet" tells you what to fix before running it again.
 
 GitHub offers the private key as a download. If you set `GH_APP_SLUG` (the name in the App's URL) first, `--derive` finds the newest `<slug>.*.pem` in `~/Downloads`, asks before moving it into the secrets directory as `GH_APP_PRIVATE_KEY`, and deletes the download. Pass `--yes` to skip the question in scripts.
 
@@ -62,7 +63,7 @@ GitHub offers the private key as a download. If you set `GH_APP_SLUG` (the name 
 
 ```sh
 ost setup office
-ost setup office --derive --secrets-dir ./secrets-office
+ost setup office --derive
 ```
 
 The office has its own template at `.outstaff/office/.env.example`: the read-only GitHub App that covers every team repository, the tracker member the office acts as, and one `OUTSTAFF_AGENT_TOKEN_<HANDLE>` per person. Generate each token yourself (`openssl rand -hex 32`) and give the same value to that agent as `OUTSTAFF_AGENT_TOKEN`. Slack and the model credentials belong to agents and are not listed.

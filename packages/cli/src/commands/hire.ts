@@ -12,9 +12,10 @@ import { catalogIssue, loadCatalogs } from "../catalogs.js";
 import { defineCommand, type Context } from "../define.js";
 import { openTeam } from "../ejected.js";
 import { generateName, HANDLE, baseHandle, uniqueHandle, RESERVED_HANDLES } from "../hire-names.js";
+import { projectRoot, secretsLocation } from "../project.js";
 import { composeSnippet, k8sKustomization } from "../hire-snippets.js";
 import { addPerson, type NewPerson } from "../teamfile.js";
-import { DEFAULT_SECRETS_DIR, missingIgnores, renderGuide, setup } from "./setup.js";
+import { missingIgnores, renderGuide, setup } from "./setup.js";
 import { validate } from "./validate.js";
 
 type SetupJson = {
@@ -178,12 +179,12 @@ export const hire = defineCommand<{
     {
       flags: "--out <dir>",
       description:
-        "Project directory to write `.outstaff/people/<handle>/...` into. Defaults to the current directory.",
+        "Project directory to write `.outstaff/people/<handle>/...` into. Defaults to the project root of the team file.",
     },
     {
       flags: "--secrets-dir <dir>",
       description:
-        "Directory of secret files, for the layout hint. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets.",
+        "Directory of the new person's secret files, for the layout hint. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle> next to the team file.",
     },
   ],
   examples: [
@@ -310,8 +311,8 @@ export const hire = defineCommand<{
       `Avatar:    ${isUrl ? avatarArg : `seed ${seed}`}`,
     ];
 
-    const out = resolve(ctx.cwd, options.out ?? ".");
-    const secretsDir = options.secretsDir ?? ctx.env["OUTSTAFF_SECRETS_DIR"] ?? DEFAULT_SECRETS_DIR;
+    const out = resolve(ctx.cwd, options.out ?? projectRoot(ctx, source));
+    const secrets = secretsLocation(ctx, options, out, handle);
     const result = (extraFields: Record<string, unknown>) =>
       `${JSON.stringify({ person, ...extraFields }, null, 2)}\n`;
 
@@ -338,11 +339,7 @@ export const hire = defineCommand<{
       }
     }
 
-    const missing = missingIgnores(
-      out,
-      join(".outstaff", "people", handle, ".env"),
-      resolve(ctx.cwd, secretsDir),
-    );
+    const missing = missingIgnores(out, join(".outstaff", "people", handle, ".env"), secrets);
 
     if (missing.length > 0) {
       ctx.err(
@@ -365,7 +362,7 @@ export const hire = defineCommand<{
       notes.push("The avatar is a URL; it is stored in the team file and nothing was rendered.");
     } else {
       try {
-        const image = await renderAvatar(ctx, config, seed, resolve(ctx.cwd, secretsDir));
+        const image = await renderAvatar(ctx, config, seed, secrets.dir);
         if ("skipped" in image) {
           notes.push(image.skipped);
         } else {
@@ -394,8 +391,8 @@ export const hire = defineCommand<{
       sub.ctx,
       {
         ...(options.team !== undefined ? { team: options.team } : {}),
-        out: options.out ?? ".",
-        secretsDir,
+        out,
+        ...(options.secretsDir !== undefined ? { secretsDir: options.secretsDir } : {}),
         json: true,
       },
       [handle],
@@ -407,7 +404,7 @@ export const hire = defineCommand<{
       ctx.err(sub.text());
     } else if (!options.json) {
       ctx.out(`Wrote ${shown(setupJson.file)}\n`);
-      ctx.out(`Secret files go in ${setupJson.secretsDir}/, one file per key.\n\n`);
+      ctx.out(`Secret files go in ${shown(setupJson.secretsDir)}/, one file per key.\n\n`);
       for (const g of setupJson.guides) {
         ctx.out(`${renderGuide(g.adapter, g.steps)}\n`);
       }

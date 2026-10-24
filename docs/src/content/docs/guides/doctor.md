@@ -17,7 +17,7 @@ Run it after [`ost setup`](/guides/setup/), and again whenever you change a gran
 
 The team file is validated first, as `ost validate` does; doctor stops if it has errors. Then, for each scope:
 
-1. **Secrets present.** Every required key is a file in the secrets directory (`--secrets-dir`, then `OUTSTAFF_SECRETS_DIR`, then `./secrets`) or an environment variable, files first. A GitHub private key may be given as `..._PRIVATE_KEY` or `..._PRIVATE_KEY_FILE`.
+1. **Secrets present.** Every required key is a file in the scope's secrets folder (`--secrets-dir`, then `OUTSTAFF_SECRETS_DIR`, then `.outstaff/secrets/<handle|office>` next to the team file) or an environment variable, files first. A GitHub private key may be given as `..._PRIVATE_KEY` or `..._PRIVATE_KEY_FILE`.
 2. **File modes.** A secret file readable by group or others fails; another mode that is not `0600` (for example `0400`) warns.
 3. **Live checks per adapter**, listed below.
 
@@ -48,11 +48,10 @@ mira
 
 The exit code is 0 when nothing failed (warnings are allowed) and 1 otherwise, so doctor can gate a deploy. With `--json`, the output holds `ok`, a `summary` of counts and one entry per scope with its checks (`key`, `name`, `status`, `detail`, `fix`).
 
-Without a handle, doctor reads one secrets directory for the office and for every person. People normally have separate secrets, so check each with its own `--secrets-dir`:
+Run it from anywhere inside the repository. Without a handle, doctor reads each scope from its own folder under `.outstaff/secrets/`. `--secrets-dir` and `OUTSTAFF_SECRETS_DIR` name one folder and apply to every scope checked, so use them with a handle:
 
 ```sh
-ost doctor sam --secrets-dir ./secrets-sam
-ost doctor office --secrets-dir ./secrets-office
+ost doctor sam --secrets-dir /run/secrets/sam
 ```
 
 Every option is in the [CLI reference](/reference/cli/#ost-doctor).

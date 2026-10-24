@@ -1,6 +1,6 @@
 import { statSync } from "node:fs";
 import { createOfficeConnection } from "@outstaff/agent";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import {
   envSecretSource,
   formatIssue,
@@ -12,7 +12,8 @@ import {
 import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand, type Context } from "../define.js";
 import { loadTeam } from "../load.js";
-import { configuredAdapters, DEFAULT_SECRETS_DIR, shippedRegistry } from "./setup.js";
+import { projectRoot, secretsLocation } from "../project.js";
+import { configuredAdapters, shippedRegistry } from "./setup.js";
 import { sections, type Scope } from "./setup-template.js";
 
 type Status = DoctorCheck["status"];
@@ -373,10 +374,15 @@ export const doctor = defineCommand<{ secretsDir?: string }>({
   options: [
     {
       flags: "--secrets-dir <dir>",
-      description: "Directory of secret files. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets.",
+      description:
+        "Directory of secret files, used for every scope checked. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle|office> next to the team file.",
     },
   ],
-  examples: ["ost doctor", "ost doctor sam --secrets-dir ./secrets", "ost doctor office --json"],
+  examples: [
+    "ost doctor",
+    "ost doctor sam --secrets-dir ./secrets-sam",
+    "ost doctor office --json",
+  ],
   exitCodes: [
     "0: no check failed (warnings are allowed)",
     "1: a check failed, the team file has errors, or the person is unknown",
@@ -419,17 +425,16 @@ export const doctor = defineCommand<{ secretsDir?: string }>({
     }
 
     const handles = target ? [target] : ["office", ...config.people.map((p) => p.handle)];
-    const dir = resolve(
-      ctx.cwd,
-      options.secretsDir ?? ctx.env["OUTSTAFF_SECRETS_DIR"] ?? DEFAULT_SECRETS_DIR,
-    );
+    const root = projectRoot(ctx, loaded.source);
 
     const registry =
       ctx.registry && ctx.registry.list().length > 0 ? ctx.registry : await shippedRegistry();
 
     const reports: ScopeReport[] = [];
     for (const h of handles) {
-      reports.push(await checkScope(ctx, config, h, dir, registry));
+      reports.push(
+        await checkScope(ctx, config, h, secretsLocation(ctx, options, root, h).dir, registry),
+      );
     }
 
     const count = (s: Status) =>

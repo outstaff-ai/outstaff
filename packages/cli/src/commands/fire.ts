@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { defineCommand } from "../define.js";
 import { openTeam } from "../ejected.js";
+import { projectRoot, secretsLocation, shown } from "../project.js";
 import { removePerson } from "../teamfile.js";
-import { DEFAULT_SECRETS_DIR } from "./setup.js";
 import { validate } from "./validate.js";
 
 const describe = (u: { before: string[]; after: string[] | null }) =>
@@ -21,7 +21,7 @@ export const fire = defineCommand<{ yes?: boolean; secretsDir?: string }>({
     {
       flags: "--secrets-dir <dir>",
       description:
-        "Directory of secret files, named in the checklist. Defaults to OUTSTAFF_SECRETS_DIR, then ./secrets.",
+        "Directory of secret files, named in the checklist. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle> next to the team file.",
     },
   ],
   examples: ["ost fire sam", "ost fire sam --yes --json"],
@@ -86,13 +86,17 @@ export const fire = defineCommand<{ yes?: boolean; secretsDir?: string }>({
 
     writeFileSync(source.file, removal.yaml);
 
-    const secretsDir = options.secretsDir ?? ctx.env["OUTSTAFF_SECRETS_DIR"] ?? DEFAULT_SECRETS_DIR;
+    const secretsDir = shown(
+      ctx,
+      secretsLocation(ctx, options, projectRoot(ctx, source), handle).dir,
+    );
+
     const ids = person.identities ?? {};
     const checklist = [
       `GitHub App${ids.vcs ? ` (${ids.vcs})` : ""}: uninstall it from the repositories, then delete the App.`,
       `Chat app${ids.chat ? ` (${ids.chat})` : ""}: remove the app from the workspace.`,
       `Tracker member${ids.tracker ? ` (${ids.tracker})` : ""}: remove the member from the project, and reassign their open tickets.`,
-      `Secrets: delete ${secretsDir}/${handle}/ and .outstaff/people/${handle}/, and the person's OUTSTAFF_AGENT_TOKEN_${handle.toUpperCase().replaceAll("-", "_")} from the office's secrets.`,
+      `Secrets: delete ${secretsDir}/ and .outstaff/people/${handle}/, and the person's OUTSTAFF_AGENT_TOKEN_${handle.toUpperCase().replaceAll("-", "_")} from the office's secrets.`,
       `Compose: delete the ${handle} service, its ${handle}-home volume and its secrets, and the office's token secret for ${handle}. Kubernetes: delete people/${handle}/ and its line in the top kustomization.yaml, and the outstaff-agent-${handle} Secret.`,
       `Office: stop the agent's container first; work items still assigned to ${handle} stay in the office's queue until they are reassigned or canceled in the tracker.`,
     ];

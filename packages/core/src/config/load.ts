@@ -151,7 +151,7 @@ async function resolveSource(a: {
 }): Promise<Resolved> {
   const { target, cwd, fs } = a;
   if (target === undefined) {
-    return discover(cwd, "file", fs, cwd);
+    return discoverUp(cwd, fs);
   }
 
   const gitUrl = parseGitUrl(target);
@@ -179,6 +179,43 @@ async function resolveSource(a: {
   }
 
   return { error: fail(target, CONFIG_CODES.notFound, `No team config at ${path}.`) };
+}
+
+/** Directories to look in when nothing was named: `cwd` and its parents up to the repository root (the first with a `.git`). Outside a repository only `cwd`. */
+async function searchDirs(cwd: string, fs: ConfigFs): Promise<string[]> {
+  const dirs: string[] = [];
+  for (let dir = cwd; ; dir = dirname(dir)) {
+    dirs.push(dir);
+    if ((await fs.kind(join(dir, ".git"))) !== null) {
+      return dirs;
+    }
+
+    if (dirname(dir) === dir) {
+      return [cwd];
+    }
+  }
+}
+
+async function discoverUp(cwd: string, fs: ConfigFs): Promise<Resolved> {
+  const dirs = await searchDirs(cwd, fs);
+  for (const dir of dirs) {
+    for (const c of CANDIDATES) {
+      const file = join(dir, c);
+      if ((await fs.kind(file)) === "file") {
+        return { source: { kind: "file", file, dir: dirname(file) }, base: dir };
+      }
+    }
+  }
+
+  const shown = CANDIDATES.map((c) => relative(cwd, join(cwd, c)) || c);
+  const last = dirs.at(-1) ?? cwd;
+  return {
+    error: fail(
+      shown[0] ?? "team.yaml",
+      CONFIG_CODES.notFound,
+      `No team config found. Looked in: ${shown.join(", ")}${last === cwd ? "" : `, and in the parent directories up to ${last}`}.`,
+    ),
+  };
 }
 
 async function discover(
