@@ -53,6 +53,16 @@ const repoSchema = z
         d("Role of the repository: primary (the product, at most one), baseline, infra or other."),
       ),
     default_branch: z.string().min(1).default("main").meta(d("Branch that pull requests target.")),
+    checks: z
+      .array(z.string().trim().min(1, "A check command cannot be empty."))
+      .min(1)
+      .max(10)
+      .optional()
+      .meta(
+        d(
+          "Commands an agent runs before pushing, covering only what a change affects (for example lint and the tests related to changed files). CI runs the full suite. When omitted, agents work out the affected checks themselves.",
+        ),
+      ),
   })
   .meta(d("A repository the team works in."));
 

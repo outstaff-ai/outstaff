@@ -48,6 +48,9 @@ repos:
   - name: shop
     url: github.com/acme-example/shop
     kind: primary
+    checks:
+      - pnpm lint
+      - pnpm vitest related --run
   - name: infra
     url: github.com/acme-example/infra
     kind: infra
@@ -343,6 +346,20 @@ Branch that pull requests target.
 - Type: `string`
 - Optional
 - Default: `main`
+- Minimum length 1
+
+### repos[].checks
+
+Commands an agent runs before pushing, covering only what a change affects (for example lint and the tests related to changed files). CI runs the full suite. When omitted, agents work out the affected checks themselves.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+### repos[].checks[]
+
+- Type: `string`
+- Optional
 - Minimum length 1
 
 ## people

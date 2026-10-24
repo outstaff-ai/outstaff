@@ -29,7 +29,7 @@ A pull request is waiting for a review.
    - consistency: names, structure, patterns and error handling that match the code around it;
    - maintainability: size, clarity, dead code, missing docs for behavior that changed.
 3. Comment on the line it concerns. One issue per comment; say why it matters and, when it helps, show a fix. Collect them in a JSON file of `{ "path", "line", "body" }` items, submitted with the review.
-4. Do not repeat what linters and CI already check.
+4. Do not repeat what linters and CI already check. Rely on CI for the full suite (`ost pr status`); do not re-run it.
 5. Give a verdict with `ost pr review <n> --approve`, `--request-changes` or `--comment`, plus `--body-file <file>` and, for inline comments, `--comment-file <json>`. State the verdict in the first line of the body, with the must-fix count. You cannot review your own pull request.
 
 ### re-review

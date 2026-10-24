@@ -319,7 +319,7 @@ A ticket is assigned and ready.
 
 1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code.
 2. Fetch, branch from the up-to-date default branch and write the change in small, readable steps that match the code around it.
-3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the tests, lint and type checks the repository uses; fix what you broke.
+3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the checks for what you changed (see "Checks before you push"); fix what you broke.
 4. One commit, `type(scope): summary`. Push the branch, write the description from `templates/pull-request.md` to a file in your scratch directory and open the pull request: `ost pr open --title "type(scope): summary" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review).
 5. Hand back.
 
@@ -346,6 +346,24 @@ CI fails on a pull request you own.
 
 - Read the failing log; reproduce it locally if you can. Fix the cause, never skip, weaken or delete a check.
 - If the failure is unrelated to your change (flaky, broken base), say so in the pull request and ask the owner with `ost ask`.
+
+## Checks before you push
+
+CI runs the full suite on every pull request, so run only the checks your change affects. Your container is small.
+
+Where a repository lists checks, run exactly those:
+
+- `shop`:
+- `pnpm lint`
+- `pnpm vitest related --run`
+
+Elsewhere, pick the affected checks yourself:
+
+- Lint and type checks of the packages you touched.
+- The tests that cover the code you changed.
+- Never the whole suite, and never container image builds.
+
+Then push, watch CI with `ost pr status`, and fix what it reports. CI is the gate.
 
 ## Stacked pull requests
 

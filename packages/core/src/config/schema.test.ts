@@ -204,6 +204,26 @@ describe("parseTeamConfig", () => {
     });
   });
 
+  it("accepts repo checks and rejects empty or too many", () => {
+    const ok = parseTeamConfig(
+      (() => {
+        const c: any = valid();
+        c.repos[0].checks = ["pnpm lint"];
+        return c;
+      })(),
+    );
+
+    expect(ok.ok).toBe(true);
+    expect(bad((c) => (c.repos[0].checks = [" "]))[0]).toMatchObject({
+      path: ["repos", 0, "checks", 0],
+    });
+
+    expect(bad((c) => (c.repos[0].checks = []))[0]).toMatchObject({ path: ["repos", 0, "checks"] });
+    expect(
+      bad((c) => (c.repos[0].checks = Array.from({ length: 11 }, (_, i) => `c${i}`)))[0],
+    ).toMatchObject({ path: ["repos", 0, "checks"] });
+  });
+
   it("rejects duplicate repo names", () => {
     expect(
       bad((c) => {

@@ -26,6 +26,9 @@ repos:
   - name: shop
     url: github.com/acme-example/shop
     kind: primary
+    checks:
+      - pnpm lint
+      - pnpm vitest related --run
   - name: infra
     url: github.com/acme-example/infra
     kind: infra

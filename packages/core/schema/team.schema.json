@@ -133,6 +133,16 @@
             "description": "Branch that pull requests target.",
             "type": "string",
             "minLength": 1
+          },
+          "checks": {
+            "description": "Commands an agent runs before pushing, covering only what a change affects (for example lint and the tests related to changed files). CI runs the full suite. When omitted, agents work out the affected checks themselves.",
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [
