@@ -1,0 +1,10 @@
+# HOME of the agent. people/<handle> renames it to <handle>-home. Size it for your repositories.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: home
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 20Gi

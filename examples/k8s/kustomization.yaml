@@ -1,7 +1,7 @@
 # The acme team on Kubernetes: kubectl apply -k examples/k8s
 # Before building, put your team file next to this one:  cp <repo>/.outstaff/team.yaml examples/k8s/team.yaml
 # Secret names below are for the acme example's adapters; generate yours with `ost setup`.
-# Secrets are not in this tree. Create them as the Secrets guide says; the names are listed there.
+# Secrets are generated from files you add under secrets/ (see secrets/README.md); none are in git.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
@@ -32,3 +32,147 @@ images:
     newTag: 0.1.0
   - name: ghcr.io/outstaff-ai/agent
     newTag: 0.1.0
+
+# One Secret per scope, generated from files: one file per key under secrets/<scope>/KEY (gitignored, see
+# secrets/README.md). A file per key keeps multi-line values such as PEM keys intact. The key list of each
+# person is what `ost setup <handle>` lists for them; a person without repository grants gets no GitHub keys.
+# Kustomize only reads files inside this folder, so the generators live here and not in people/<handle>.
+secretGenerator:
+  - name: outstaff-office
+    files:
+      - secrets/office/GH_OFFICE_APP_ID
+      - secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - secrets/office/GH_OFFICE_APP_SLUG
+      - secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/office/ITSAPLAN_API_KEY
+      - secrets/office/SLACK_OFFICE_BOT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_PRIYA=secrets/priya/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_TOMAS=secrets/tomas/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_MIRA=secrets/mira/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_LEO=secrets/leo/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_SAM=secrets/sam/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_NOOR=secrets/noor/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_INES=secrets/ines/OUTSTAFF_AGENT_TOKEN
+      - OUTSTAFF_AGENT_TOKEN_KOFI=secrets/kofi/OUTSTAFF_AGENT_TOKEN
+  - name: outstaff-agent-priya
+    files:
+      - secrets/priya/OUTSTAFF_AGENT_TOKEN
+      - secrets/priya/ANTHROPIC_API_KEY
+      - secrets/priya/SLACK_APP_TOKEN
+      - secrets/priya/SLACK_BOT_TOKEN
+      - secrets/priya/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/priya/GH_APP_ID
+      - secrets/priya/GH_APP_INSTALLATION_ID
+      - secrets/priya/GH_APP_PRIVATE_KEY
+      - secrets/priya/GH_APP_SLUG
+      - secrets/priya/GH_APP_BOT_EMAIL
+  - name: outstaff-agent-tomas
+    files:
+      - secrets/tomas/OUTSTAFF_AGENT_TOKEN
+      - secrets/tomas/ANTHROPIC_API_KEY
+      - secrets/tomas/SLACK_APP_TOKEN
+      - secrets/tomas/SLACK_BOT_TOKEN
+      - secrets/tomas/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/tomas/GH_APP_ID
+      - secrets/tomas/GH_APP_INSTALLATION_ID
+      - secrets/tomas/GH_APP_PRIVATE_KEY
+      - secrets/tomas/GH_APP_SLUG
+      - secrets/tomas/GH_APP_BOT_EMAIL
+  - name: outstaff-agent-mira
+    files:
+      - secrets/mira/OUTSTAFF_AGENT_TOKEN
+      - secrets/mira/ANTHROPIC_API_KEY
+      - secrets/mira/SLACK_APP_TOKEN
+      - secrets/mira/SLACK_BOT_TOKEN
+      - secrets/mira/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/mira/GH_APP_ID
+      - secrets/mira/GH_APP_INSTALLATION_ID
+      - secrets/mira/GH_APP_PRIVATE_KEY
+      - secrets/mira/GH_APP_SLUG
+      - secrets/mira/GH_APP_BOT_EMAIL
+  - name: outstaff-agent-leo
+    files:
+      - secrets/leo/OUTSTAFF_AGENT_TOKEN
+      - secrets/leo/ANTHROPIC_API_KEY
+      - secrets/leo/SLACK_APP_TOKEN
+      - secrets/leo/SLACK_BOT_TOKEN
+      - secrets/leo/ITSAPLAN_API_KEY
+  - name: outstaff-agent-sam
+    files:
+      - secrets/sam/OUTSTAFF_AGENT_TOKEN
+      - secrets/sam/ANTHROPIC_API_KEY
+      - secrets/sam/SLACK_APP_TOKEN
+      - secrets/sam/SLACK_BOT_TOKEN
+      - secrets/sam/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/sam/GH_APP_ID
+      - secrets/sam/GH_APP_INSTALLATION_ID
+      - secrets/sam/GH_APP_PRIVATE_KEY
+      - secrets/sam/GH_APP_SLUG
+      - secrets/sam/GH_APP_BOT_EMAIL
+  - name: outstaff-agent-noor
+    files:
+      - secrets/noor/OUTSTAFF_AGENT_TOKEN
+      - secrets/noor/ANTHROPIC_API_KEY
+      - secrets/noor/SLACK_APP_TOKEN
+      - secrets/noor/SLACK_BOT_TOKEN
+      - secrets/noor/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/noor/GH_APP_ID
+      - secrets/noor/GH_APP_INSTALLATION_ID
+      - secrets/noor/GH_APP_PRIVATE_KEY
+      - secrets/noor/GH_APP_SLUG
+      - secrets/noor/GH_APP_BOT_EMAIL
+  - name: outstaff-agent-ines
+    files:
+      - secrets/ines/OUTSTAFF_AGENT_TOKEN
+      - secrets/ines/ANTHROPIC_API_KEY
+      - secrets/ines/SLACK_APP_TOKEN
+      - secrets/ines/SLACK_BOT_TOKEN
+      - secrets/ines/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+  - name: outstaff-agent-kofi
+    files:
+      - secrets/kofi/OUTSTAFF_AGENT_TOKEN
+      - secrets/kofi/ANTHROPIC_API_KEY
+      - secrets/kofi/SLACK_APP_TOKEN
+      - secrets/kofi/SLACK_BOT_TOKEN
+      - secrets/kofi/ITSAPLAN_API_KEY
+      - GH_OFFICE_APP_ID=secrets/office/GH_OFFICE_APP_ID
+      - GH_OFFICE_APP_INSTALLATION_ID=secrets/office/GH_OFFICE_APP_INSTALLATION_ID
+      - GH_OFFICE_APP_PRIVATE_KEY=secrets/office/GH_OFFICE_APP_PRIVATE_KEY
+      - GH_OFFICE_APP_SLUG=secrets/office/GH_OFFICE_APP_SLUG
+      - GH_OFFICE_APP_BOT_EMAIL=secrets/office/GH_OFFICE_APP_BOT_EMAIL
+      - secrets/kofi/GH_APP_ID
+      - secrets/kofi/GH_APP_INSTALLATION_ID
+      - secrets/kofi/GH_APP_PRIVATE_KEY
+      - secrets/kofi/GH_APP_SLUG
+      - secrets/kofi/GH_APP_BOT_EMAIL
