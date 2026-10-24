@@ -1,5 +1,6 @@
 import { defineAdapter } from "@outstaff/core";
 import { createSlackChat } from "./chat.js";
+import { doctorSlack } from "./doctor.js";
 import { validateSlackIdentities } from "./identities.js";
 import { deriveSlack, slackSetupGuide } from "./setup.js";
 import { slackOptions } from "./options.js";
@@ -50,4 +51,5 @@ export const slackChat = defineAdapter({
   create: (ctx) => createSlackChat(ctx),
   setupGuide: slackSetupGuide,
   derive: deriveSlack,
+  doctor: doctorSlack,
 });

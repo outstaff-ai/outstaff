@@ -69,4 +69,4 @@ The office has its own template at `.outstaff/office/.env.example`: the read-onl
 
 ## Then
 
-Run `ost validate`, give each container its secrets by whatever means you host with ([container contract](/reference/container-contract/)), and start them. Every option of the command is in the [CLI reference](/reference/cli/#ost-setup).
+Run `ost validate`, then [`ost doctor`](/guides/doctor/) to check the secrets against GitHub, Slack and the tracker. Give each container its secrets by whatever means you host with ([container contract](/reference/container-contract/)), and start them. Every option of the command is in the [CLI reference](/reference/cli/#ost-setup).

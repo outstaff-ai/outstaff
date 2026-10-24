@@ -1,6 +1,7 @@
 import { defineAdapter, type SecretSpec } from "@outstaff/core";
 import { validateItsaplanIdentities } from "./identities.js";
 import { createItsaplanKnowledge } from "./knowledge.js";
+import { doctorItsaplan } from "./doctor.js";
 import { deriveItsaplan, itsaplanSetupGuide } from "./setup.js";
 import { knowledgeOptions, trackerOptions } from "./options.js";
 import { createItsaplanTracker } from "./tracker.js";
@@ -46,6 +47,7 @@ export const itsaplanTracker = defineAdapter({
   validateIdentities: validateItsaplanIdentities,
   setupGuide: itsaplanSetupGuide,
   derive: deriveItsaplan,
+  doctor: doctorItsaplan,
 });
 
 export const itsaplanKnowledge = defineAdapter({
@@ -57,4 +59,5 @@ export const itsaplanKnowledge = defineAdapter({
   create: (ctx) => createItsaplanKnowledge(ctx),
   setupGuide: itsaplanSetupGuide,
   derive: deriveItsaplan,
+  doctor: doctorItsaplan,
 });
