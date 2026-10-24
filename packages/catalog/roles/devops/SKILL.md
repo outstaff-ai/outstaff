@@ -51,6 +51,24 @@ Something is broken in a running environment.
 - Gather evidence with read-only commands: what changed, when, what the logs say. Link or quote the minimum needed.
 - Report the likely cause, the evidence and options with risks. Do not fix by hand; propose the change as a pull request or ask a trusted human for a granted action.
 
+## Checks before you push
+
+Run only the checks your change affects: validate, lint and plan for the files you touched.
+{{#if repos.has_checks}}
+Where a repository lists checks, run exactly those:
+
+{{#each repos.list}}
+{{#if this.checks}}
+- `{{this.name}}`:
+{{#each this.checks}}
+- `{{this}}`
+{{/each}}
+{{/if}}
+{{/each}}
+
+{{/if}}
+Never the whole suite and never container image builds; CI runs those. Push, watch CI with `ost pr status`, and fix what it reports.
+
 ## Direct requests
 
 Follow `process/direct-requests.md`.

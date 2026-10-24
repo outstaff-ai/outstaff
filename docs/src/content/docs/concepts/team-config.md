@@ -23,6 +23,18 @@ Run `ost validate` to check the file. Problems come back with a stable code, lis
 
 [`repos`](/reference/team-yaml/#repos) lists the repositories the team works in. Each has a name, a URL and a kind (`primary`, `baseline`, `infra` or `other`). At most one repository is primary.
 
+A repository can also list `checks`: the commands an agent runs before pushing, covering only what a change affects. CI runs the full suite on every pull request, so agents never run it locally or build container images; they push, watch CI with `ost pr status` and fix what it reports. Without `checks`, agents work out the affected lint, type checks and tests themselves.
+
+```yaml
+repos:
+  - name: shop
+    url: github.com/acme-example/shop
+    kind: primary
+    checks:
+      - pnpm lint
+      - pnpm vitest related --run
+```
+
 ## People
 
 [`people`](/reference/team-yaml/#people) are the agents. Each has a handle, a display name, a role from the catalog, optional extra roles to combine with it (`extends`), and a `repos` map of grants. A grant key is a repository name, `kind:<kind>` to cover every repository of a kind, or `*` for all of them, and the value is `read` or `write`. A person with no grants can do nothing, which `ost validate` reports as `people.no_repos`.

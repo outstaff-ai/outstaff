@@ -36,6 +36,20 @@ describe("buildContext", () => {
     expect(ctx.repos.primary?.name).toBe("shop");
   });
 
+  it("exposes each repo's checks", () => {
+    expect(ctx.repos.has_checks).toBe(true);
+    expect(ctx.repos.list.find((r) => r.name === "shop")?.checks).toEqual([
+      "pnpm lint",
+      "pnpm vitest related --run",
+    ]);
+
+    expect(ctx.repos.list.find((r) => r.name === "infra")?.checks).toEqual([]);
+    const tpl =
+      "{{#each repos.list}}{{#if this.checks}}{{this.name}}:{{#each this.checks}}[{{this}}]{{/each}};{{/if}}{{/each}}";
+
+    expect(render(tpl, ctx)).toBe("shop:[pnpm lint][pnpm vitest related --run];");
+  });
+
   it("groups people by role, including known empty roles", () => {
     expect(ctx.people.byRole.developer?.map((p) => p.handle)).toEqual(["sam", "noor"]);
     expect(ctx.people.byRole.tester).toEqual([]);

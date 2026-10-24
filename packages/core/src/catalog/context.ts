@@ -9,7 +9,8 @@ import type { TeamConfig } from "../config/schema.js";
  * at runtime.
  *
  *   team.name, team.product
- *   repos.list[] {name,url,kind,default_branch}, repos.primary (null when none)
+ *   repos.list[] {name,url,kind,default_branch,checks[]}, repos.primary (null when none),
+ *                  repos.has_checks (true when any repo lists checks)
  *   people.list[] {handle,name,pronouns,role,role_title,role_summary,model},
  *   people.byRole.<role>[] (a key, possibly empty, for every catalog role)
  *   roles[] {name,title,summary,people[]} for every catalog role; people is the
@@ -21,7 +22,16 @@ import type { TeamConfig } from "../config/schema.js";
  *                  adapters fill them later. issue, pr and doc always exist.
  *   policies.messages.{max_lines,always_link,omit[]}
  */
-export type RepoContext = { name: string; url: string; kind: string; default_branch: string };
+export type RepoContext = {
+  name: string;
+  url: string;
+  kind: string;
+  default_branch: string;
+
+  /** The repo's configured affected-check commands; empty when none. */
+  checks: string[];
+};
+
 export type PersonContext = {
   handle: string;
   name: string;
@@ -42,7 +52,7 @@ type Port = (typeof PORTS)[number];
 
 export type CatalogContext = {
   team: { name: string; product: string };
-  repos: { list: RepoContext[]; primary: RepoContext | null };
+  repos: { list: RepoContext[]; primary: RepoContext | null; has_checks: boolean };
   people: { list: PersonContext[]; byRole: Record<string, PersonContext[]> };
   roles: (RoleInfo & { people: PersonContext[] })[];
   humans: { list: HumanContext[]; has: boolean; default_trust: boolean };
@@ -91,6 +101,7 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
     url: r.url,
     kind: r.kind,
     default_branch: r.default_branch,
+    checks: r.checks ?? [],
   }));
 
   const messages = team.policies?.messages;
@@ -104,7 +115,11 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
 
   return {
     team: { name: team.team.name, product: team.team.product ?? "" },
-    repos: { list: repos, primary: repos.find((r) => r.kind === "primary") ?? null },
+    repos: {
+      list: repos,
+      primary: repos.find((r) => r.kind === "primary") ?? null,
+      has_checks: repos.some((r) => r.checks.length > 0),
+    },
     people: { list, byRole },
     roles: roles.map((r) => ({
       name: r.name,
