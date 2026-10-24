@@ -204,6 +204,20 @@ After a `move` or `assign` the engine refreshes the ticket in the work state str
 
 **Explaining a rule.** `ost workflow explain '<event-json>' --state '<json>'` runs `explainWorkflow` against the team's workflow and a static snapshot and prints, for every rule, whether it matched and why. See the [CLI reference](/reference/cli/).
 
+## Office identities
+
+The office acts under its own name on every system it uses, named `<team>-outstaff-office`:
+
+- **Code host:** a read-only GitHub App (`GH_OFFICE_APP_*`). All reads go through it, and agents hold it too to clone read-granted repositories.
+- **Tracker:** its own member account (`ITSAPLAN_API_KEY` in the office scope), so its comments and assignments are visibly the office's.
+- **Chat:** its own Slack app (`SLACK_OFFICE_BOT_TOKEN`). It posts notifications and mirrors agent-to-agent questions, and reads channel history; it has no app-level token because the office never listens to chat. `createOffice` creates the chat port in office scope, and when `integrations.chat` is set without the office token it stops at startup with an error naming `SLACK_OFFICE_BOT_TOKEN`.
+
+**Why per-team apps.** Outstaff hosts no shared keys. A shared app would hold every team's installation behind one credential, and revoking or auditing one team would touch all. With one app per team, the team owns the credential, its permissions and its audit trail, and can remove it at will.
+
+**Why read-only is safe.** The office never writes code: it reads pull requests, reviews and CI to keep work state, and agents write through their own Apps. A leaked office key can read the repositories it is installed on, but cannot push, merge or comment, and the office's chat token cannot join channels it was not invited to or act as a person. Give the office App only the permissions in the setup guide, and install it on the repositories in `repos`.
+
+`ost validate` also checks the identities written in team.yaml: each adapter validates the ones it owns (a Slack member id, a GitHub login for humans and an App bot login `<slug>[bot]` for agents, a non-blank tracker identity) and reports located warnings. See the [validation codes](/reference/validation-codes/).
+
 ## Running the office
 
 `createOffice` assembles the parts above into one process, and `outstaff-office` (the `bin` of `@outstaff/office`) starts it from the environment. The office image runs that command.

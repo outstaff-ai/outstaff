@@ -54,13 +54,53 @@ settings:
   token_rotation_enabled: false
 ```
 
+## Set up the office app
+
+The office posts notifications and mirrors agent-to-agent questions, so it needs its own app, `<team>-outstaff-office`. It posts and reads history only: the manifest has no app-level token, Socket Mode or event subscriptions, because the office never listens to chat.
+
+1. Create an app from the manifest below.
+2. Install it to your workspace and keep the Bot User OAuth Token as `SLACK_OFFICE_BOT_TOKEN` in the office container.
+3. Invite the app to the channels it should post in, or send only direct messages.
+
+```yaml
+display_information:
+  name: acme-outstaff-office
+  description: Notifications from the acme team's office
+features:
+  bot_user:
+    display_name: acme-outstaff-office
+    always_online: false
+oauth_config:
+  scopes:
+    bot:
+      - chat:write
+      - im:write
+      - im:history
+      - channels:history
+      - groups:history
+      - users:read
+settings:
+  socket_mode_enabled: false
+  org_deploy_enabled: false
+  token_rotation_enabled: false
+```
+
+If `integrations.chat` is set and `SLACK_OFFICE_BOT_TOKEN` is missing, the office stops at startup with an error naming the key; it does not run without posting. An agent's `SLACK_BOT_TOKEN` is never used in its place.
+
 ## Secrets
 
-| Key                 | Meaning                                                  |
-| ------------------- | -------------------------------------------------------- |
-| `SLACK_BOT_TOKEN`   | Bot User OAuth Token (`xoxb-...`)                        |
-| `SLACK_APP_TOKEN`   | App-level token for Socket Mode (`xapp-...`)             |
-| `SLACK_BOT_USER_ID` | The bot's member id. Optional: derived with `auth.test`. |
+| Key                      | Meaning                                                          |
+| ------------------------ | ---------------------------------------------------------------- |
+| `SLACK_BOT_TOKEN`        | Bot User OAuth Token (`xoxb-...`)                                |
+| `SLACK_APP_TOKEN`        | App-level token for Socket Mode (`xapp-...`)                     |
+| `SLACK_BOT_USER_ID`      | The bot's member id. Optional: derived with `auth.test`.         |
+| `SLACK_OFFICE_BOT_TOKEN` | Office container only: bot token of the office app (`xoxb-...`). |
+
+The first three are in each agent's container; the last is only in the office's.
+
+## Checking identities
+
+`ost validate` warns (`identities.chat_not_member_id`) when a `humans[].identities.chat` or `people[].identities.chat` is not a Slack member id, with the file and line. The adapter repeats the check at startup as a backstop.
 
 ## Who the agent listens to
 

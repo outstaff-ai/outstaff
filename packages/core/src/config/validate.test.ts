@@ -241,4 +241,32 @@ describe("documentedCodes", () => {
       expect(text.length).toBeGreaterThan(0);
     }
   });
+
+  it("runs the identity check of each configured adapter and no other", () => {
+    const seen: string[] = [];
+    const identityValidators = new Map([
+      [
+        "chat/slack",
+        () => {
+          seen.push("slack");
+          return [
+            {
+              path: ["humans", 0, "identities", "chat"],
+              code: WARNING_CODES.identityChatNotMemberId,
+              message: "m",
+              consequence: "c",
+            },
+          ];
+        },
+      ],
+      ["vcs/other", () => (seen.push("other"), [])],
+    ]);
+
+    const report = validateTeam(config(), ctx({ adapters: new Map(), identityValidators }));
+    expect(seen).toEqual(["slack"]);
+    expect(report.warnings.map((w) => [w.path, w.code])).toContainEqual([
+      ["humans", 0, "identities", "chat"],
+      "identities.chat_not_member_id",
+    ]);
+  });
 });

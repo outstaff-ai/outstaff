@@ -26,10 +26,26 @@ export interface SlackDeps {
 
 const isoOf = (ts: string) => new Date(Number(ts) * 1000).toISOString();
 
+function requireToken(ctx: AdapterContext<SlackOptions>, key: string): string {
+  const token = ctx.secrets.get(key);
+  if (!token) {
+    throw new PortError(
+      "invalid",
+      ctx.scope === "office"
+        ? `integrations.chat is configured, but the office has no Slack credentials: set ${key} (the bot token of the team's office Slack app).`
+        : `Missing secret ${key}.`,
+    );
+  }
+
+  return token;
+}
+
 export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDeps = {}): Chat {
   // WebClient's response types are wider than the slice used here.
+  const office = ctx.scope === "office";
+  const tokenKey = office ? "SLACK_OFFICE_BOT_TOKEN" : "SLACK_BOT_TOKEN";
   const web: SlackWeb =
-    deps.web ?? (new WebClient(ctx.secrets.require("SLACK_BOT_TOKEN")) as unknown as SlackWeb);
+    deps.web ?? (new WebClient(requireToken(ctx, tokenKey)) as unknown as SlackWeb);
 
   let socket = deps.socket;
   let botUserId = ctx.secrets.get("SLACK_BOT_USER_ID");
@@ -171,6 +187,13 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
 
   return {
     async start(onMessage) {
+      if (office) {
+        throw new PortError(
+          "unsupported",
+          "The office never listens to chat; it only posts and reads history.",
+        );
+      }
+
       handler = onMessage;
       await ensureBotUserId();
       if (!socket) {

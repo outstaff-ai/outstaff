@@ -1,4 +1,5 @@
 import { defineAdapter, type SecretSpec } from "@outstaff/core";
+import { validateItsaplanIdentities } from "./identities.js";
 import { createItsaplanKnowledge } from "./knowledge.js";
 import { knowledgeOptions, trackerOptions } from "./options.js";
 import { createItsaplanTracker } from "./tracker.js";
@@ -34,6 +35,7 @@ export const itsaplanTracker = defineAdapter({
   options: trackerOptions,
   secrets: apiKey,
   create: (ctx) => createItsaplanTracker(ctx),
+  validateIdentities: validateItsaplanIdentities,
 });
 
 export const itsaplanKnowledge = defineAdapter({

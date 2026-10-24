@@ -59,6 +59,7 @@ async function create(port: PortName, input: Input) {
         ...d.secrets("person").map((s) => s.key),
       ]),
     team: input.team,
+    scope: "office",
     log: input.logger,
     fetch,
     now: () => input.clock.now(),

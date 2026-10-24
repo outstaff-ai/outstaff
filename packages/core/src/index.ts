@@ -37,10 +37,13 @@ export {
   type WarningCode,
   type RoleNeeds,
   type AdapterInfo,
+  type IdentityValidator,
   type ValidationContext,
   type ValidationReport,
   type ConfigWarning,
 } from "./config/validate.js";
+
+export { identitiesOf, identityWarning, type IdentityRef } from "./config/identities.js";
 
 export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";
 

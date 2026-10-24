@@ -1,8 +1,10 @@
 import { defineAdapter } from "@outstaff/core";
 import { createSlackChat } from "./chat.js";
+import { validateSlackIdentities } from "./identities.js";
 import { slackOptions } from "./options.js";
 
 export { createSlackChat, type SlackDeps } from "./chat.js";
+export { validateSlackIdentities } from "./identities.js";
 export { slackOptions, type SlackOptions } from "./options.js";
 export { toMrkdwn, splitMrkdwn, SLACK_MAX_LENGTH } from "./mrkdwn.js";
 export type { SlackWeb, SlackSocket, SlackEvent } from "./api.js";
@@ -12,10 +14,19 @@ export const slackChat = defineAdapter({
   name: "slack",
   capabilities: ["chat.messages", "chat.history", "chat.agentProfile"],
   options: slackOptions,
-  // Each agent has its own Slack app; the office does not talk to Slack.
+  // Each agent has its own Slack app, and the office has one more (`<team>-outstaff-office`) that only posts and
+  // reads history: no app token, since the office never listens.
   secrets: (scope) =>
-    scope === "person"
+    scope === "office"
       ? [
+          {
+            key: "SLACK_OFFICE_BOT_TOKEN",
+            description:
+              "Bot User OAuth Token of the team's office Slack app (xoxb-...); it posts and reads channel history only",
+            where: "api.slack.com/apps > the office app > OAuth & Permissions",
+          },
+        ]
+      : [
           {
             key: "SLACK_BOT_TOKEN",
             description: "Bot User OAuth Token of this person's Slack app (xoxb-...)",
@@ -33,7 +44,7 @@ export const slackChat = defineAdapter({
             derivable: true,
             optional: true,
           },
-        ]
-      : [],
+        ],
+  validateIdentities: validateSlackIdentities,
   create: (ctx) => createSlackChat(ctx),
 });

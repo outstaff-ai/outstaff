@@ -1,5 +1,6 @@
 import type { Capability } from "../capabilities.js";
 import type { AdapterPort } from "../config/adapters.js";
+import type { ConfigWarning } from "../config/validate.js";
 import type { TeamConfig } from "../config/schema.js";
 import type { CommandRule } from "../permissions/types.js";
 import type { ZodType } from "zod";
@@ -15,6 +16,9 @@ export interface AdapterContext<Options> {
   /** Every secret key declared by the registered adapters, both scopes. Set by the host; adapters that start child processes scrub these from the child's environment. */
   secretKeys?: readonly string[];
   team: TeamConfig;
+
+  /** Which container the port is created for. Absent means "person". */
+  scope?: "person" | "office";
   log: Logger;
   fetch: typeof fetch;
   now: () => Date;
@@ -39,6 +43,12 @@ export interface AdapterDefinition<P extends PortName, Options, Impl> {
    * process documents), as a map from rendered path to path below the working directory. Without it they stay as rendered.
    */
   workdirLayout?: (files: ReadonlyMap<string, string>) => Map<string, string>;
+
+  /**
+   * Checks the identities this adapter's platform owns (`humans[].identities.*`, `people[].identities.*`) and returns
+   * located warnings with stable codes, for example at `humans.0.identities.chat`. Called by `ost validate`.
+   */
+  validateIdentities?: (team: TeamConfig) => ConfigWarning[];
 
   permissions?: (scope: "person" | "office") => CommandRule[];
 }
