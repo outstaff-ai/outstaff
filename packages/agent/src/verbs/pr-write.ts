@@ -300,6 +300,28 @@ export const prReply = defineVerb({
   },
 });
 
+export const prComment = defineVerb({
+  name: "pr.comment",
+  summary: "Comment on the conversation of a pull request.",
+  description:
+    "Posts a top-level comment on the pull request as you. Use it to answer a review summary or a conversation comment, quoting or linking what it answers. Answer an inline thread with pr reply instead.",
+  input: z.strictObject({ repo, number, body, bodyFile }),
+  args: ["number"],
+  examples: ['ost pr comment 42 --body "> Please rename it.\n\nRenamed in the last push."'],
+  async run(env, input, ctx) {
+    const text = textOf(env, ctx, input, true)!;
+    if (!text.trim()) {
+      throw new PortError("invalid", "The comment is empty.");
+    }
+
+    const vcs = requireVcs(env);
+    const ref = await repoOrWorktree(env, ctx, input.repo);
+    await vcs.commentOnPullRequest(ref, input.number, text);
+    const url = vcs.links.pr(ref, input.number);
+    return result([`Commented on ${repoLabel(ref)}#${input.number}.`, url], {}, [url]);
+  },
+});
+
 export const prDiff = defineVerb({
   name: "pr.diff",
   summary: "Show the unified diff of a pull request.",
@@ -321,4 +343,4 @@ export const prDiff = defineVerb({
   },
 });
 
-export const prWriteVerbs = [prOpen, prUpdate, prReview, prReply, prDiff];
+export const prWriteVerbs = [prOpen, prUpdate, prReview, prReply, prComment, prDiff];

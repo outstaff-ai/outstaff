@@ -128,6 +128,9 @@ export interface Vcs {
   /** Needs a write grant. `not_found` unless the thread belongs to that pull request. */
   replyToThread(repo: RepoRef, number: number, threadId: string, body: string): Promise<void>;
 
+  /** A top-level comment on the pull request conversation. Needs a write grant. */
+  commentOnPullRequest(repo: RepoRef, number: number, body: string): Promise<void>;
+
   /** The unified diff of the pull request (read grant). */
   diff(repo: RepoRef, number: number): Promise<string>;
 

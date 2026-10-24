@@ -42,6 +42,23 @@ describe("parsePrompt", () => {
     });
   });
 
+  it("reads the feedback that started a review round", () => {
+    const o = offer("review_feedback");
+    o.context.feedback = {
+      actor: "grace",
+      kind: "review",
+      state: "commented",
+      url: "https://g.example/pull/3#pullrequestreview-1",
+      body: "Keep it short.\nOne line.",
+    };
+
+    expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback).toEqual({
+      kind: "review",
+      url: "https://g.example/pull/3#pullrequestreview-1",
+      body: "Keep it short.\nOne line.",
+    });
+  });
+
   it("says nothing about a prompt that is not a work prompt", () => {
     expect(parsePrompt("Reply with the word ok.")).toBeUndefined();
   });

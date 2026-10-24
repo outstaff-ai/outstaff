@@ -615,6 +615,14 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       await http.graphql(token, REPLY_MUTATION, { id: threadId, body });
     },
 
+    async commentOnPullRequest(repo, number, body) {
+      const { token } = await actingToken(repo, "write", PERMISSIONS.write);
+      await http.request("POST", `${repoPath(repo)}/issues/${number}/comments`, {
+        token,
+        body: { body },
+      });
+    },
+
     async diff(repo, number) {
       if (!(self && grantOf(self, repo))) {
         throw new PortError(

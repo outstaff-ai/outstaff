@@ -607,6 +607,19 @@ describe("pr write verbs", () => {
     );
   });
 
+  it("comments on the conversation of a pull request", async () => {
+    const f = await setup();
+    const pr = await f.theirs();
+    const r = await run("pr.comment", f.env, { number: pr.number, body: "Done." }, f.ctx);
+    expect(r.links).toEqual([pr.url]);
+    const sent = (await f.vcs.events([f.repo])).events.filter(
+      (e) => e.type === "pr.comment" && e.data["kind"] === "comment",
+    );
+
+    expect(sent.map((e) => [e.actor, e.data["body"]])).toEqual([["sam", "Done."]]);
+    await rejects(run("pr.comment", f.env, { number: pr.number, body: " " }, f.ctx), "invalid");
+  });
+
   it("prints the diff after the link, needing only a read grant", async () => {
     const f = await setup("read");
     const pr = await f.theirs();
@@ -626,7 +639,14 @@ describe("pr write verbs", () => {
     const f = await setup();
     const tools = createRuntimeTools(f.env, VERBS, f.ctx);
     expect(tools.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["pr_open", "pr_update", "pr_review", "pr_reply", "pr_diff"]),
+      expect.arrayContaining([
+        "pr_open",
+        "pr_update",
+        "pr_review",
+        "pr_reply",
+        "pr_comment",
+        "pr_diff",
+      ]),
     );
 
     const open = tools.find((t) => t.name === "pr_open")!;
@@ -859,6 +879,7 @@ describe("verb catalogue", () => {
       "pr.update",
       "pr.review",
       "pr.reply",
+      "pr.comment",
       "pr.diff",
       "me",
       "ask",

@@ -24,6 +24,7 @@ If you have no repository grants you have no GitHub identity and every `ost pr` 
 | `ost pr update <n> [--title <t>] [--body-file <f>] [--base <b>] [--draft\|--ready]`                   | Changes a pull request you own.                                                                                    |
 | `ost pr review <n> --approve\|--request-changes\|--comment [--body-file <f>] [--comment-file <json>]` | Submits a review. `--comment-file` is a JSON array of `{ "path", "line", "body" }`. Not on your own pull request.  |
 | `ost pr reply <n> <thread-id> --body <text>`                                                          | Replies in a review thread of that pull request.                                                                   |
+| `ost pr comment <n> --body <text>`                                                                    | Comments on the pull request conversation: answers a review summary or a comment.                                  |
 | `ost pr diff <n>`                                                                                     | Prints the unified diff. Use it instead of `gh pr diff`.                                                           |
 | `ost pr status <repo> <n>`, `ost pr threads <repo> <n>`, `ost pr resolve <repo> <n> <thread-id>`      | Read state, checks and threads; resolve a thread you fixed and spoke last in.                                      |
 

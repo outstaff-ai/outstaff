@@ -99,6 +99,15 @@ function setup(person: string, over: { pull?: Record<string, unknown>; threads?:
     },
     {
       method: "POST",
+      path: "/repos/acme/app/issues/7/comments",
+      handler: (r) => {
+        seen.bodies["comment"] = r.json;
+        seen.auth["comment"] = r.headers.get("authorization")!;
+        return {};
+      },
+    },
+    {
+      method: "POST",
       path: "/graphql",
       handler: (r) => {
         const { query, variables } = r.json;
@@ -203,6 +212,7 @@ describe("opening and updating pull requests", () => {
 
       await expectPortError(vcs.updatePullRequest(REPO, 7, { title: "t" }), "forbidden");
       await expectPortError(vcs.replyToThread(REPO, 7, "PRRT_1", "ok"), "forbidden");
+      await expectPortError(vcs.commentOnPullRequest(REPO, 7, "ok"), "forbidden");
       expect(seen.tokenRequests).toEqual([]);
       expect(seen.bodies).toEqual({});
     },
@@ -295,6 +305,13 @@ describe("reviews, replies and diffs", () => {
 
     await expectPortError(vcs.replyToThread(REPO, 7, "PRRT_elsewhere", "x"), "not_found");
     expect(seen.graphql).toHaveLength(1);
+  });
+
+  it("comments on the conversation as the own App", async () => {
+    const { vcs, seen } = setup("sam");
+    await vcs.commentOnPullRequest(REPO, 7, "Thanks, done.");
+    expect(seen.bodies["comment"]).toEqual({ body: "Thanks, done." });
+    expect(seen.auth["comment"]).toBe("Bearer ghs_own");
   });
 
   it("reads the diff with the diff media type and a read grant", async () => {

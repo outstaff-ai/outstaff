@@ -24,7 +24,7 @@ Teams name their statuses differently and want different automations. Hard-coded
 
 **The `kanban` preset includes:**
 
-- a trusted human's review or comment on an open agent-authored pull request is scheduled for the author as `review_feedback`, whatever the ticket's status and even with no linked ticket (`human-feedback-back-to-author`); an approval with an empty body is a sign-off and is not feedback;
+- a trusted human's review or comment on an open agent-authored pull request is scheduled for the author as `review_feedback`, whatever the ticket's status and even with no linked ticket (`human-feedback-back-to-author`); an approval with an empty body is a sign-off and is not feedback; the item carries the review or comment that triggered it (who, kind, link, body), and the work prompt names it;
 - the same feedback also assigns the author and moves the ticket to `active`, but only when the ticket is in `review` or `blocked` (`human-feedback-reactivates-ticket`); `scrum` does the same, and `minimal` schedules and assigns without moving anything;
 - conflicts after a merge go to the authors of the affected pull requests, with the stack listed bottom first;
 - a ticket moved to active while assigned to a human goes to the agent who last worked on it;

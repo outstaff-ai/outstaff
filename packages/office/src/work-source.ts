@@ -3,6 +3,7 @@ import type { Link, Member, Ref, WorkSummary } from "@outstaff/protocol";
 import { ProtocolError, type Offer, type WorkSource } from "./protocol/source.js";
 import { readRoster, type RosterOptions } from "./messaging/roster.js";
 import { publicOrigin, readOrigin } from "./chat/origin.js";
+import { readFeedback } from "./engine/feedback.js";
 import { placeQueued } from "./chat/placement.js";
 import type { BlockNotice, Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
@@ -155,6 +156,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
   const offerOf = async (item: WorkItem): Promise<Offer> => {
     const subjects = await subjectsOf(item);
     const origin = await readOrigin(store, item.id);
+    const feedback = await readFeedback(store, item.id);
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       workItem: {
@@ -175,6 +177,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         })),
         subjects,
         links: subjects.flatMap((s) => (s.url ? [{ url: s.url, title: s.title ?? s.ref }] : [])),
+        ...(feedback ? { feedback } : {}),
       },
     };
   };

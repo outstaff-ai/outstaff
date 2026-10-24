@@ -1,6 +1,7 @@
 import type { Logger, PrRef, WorkflowEvent } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { REPO } from "../intake/test-support.js";
+import { readFeedback } from "./feedback.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
 // The kanban preset, end to end: fakes -> intake -> work state -> engine -> fakes.
@@ -198,6 +199,34 @@ describe("kanban parity", () => {
       await h.poll();
       expect(await status(key)).toBe("active");
       expect((await h.items("sam")).map((i) => i.kind)).toEqual(["review_feedback"]);
+    });
+
+    it("carries the review or comment that started the round to the offer", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      await h.vcs.seed.review(REPO, pr.number, "dana", "changes_requested", "Rename the flag.");
+      await h.poll();
+      const [item] = await h.items("sam");
+      expect(await readFeedback(h.store, item!.id)).toEqual({
+        actor: "dana",
+        kind: "review",
+        state: "changes_requested",
+        body: "Rename the flag.",
+      });
+    });
+
+    it("tells a conversation comment from an inline one", async () => {
+      const key = await ticket();
+      const pr = await openPr(key);
+      await h.poll();
+      await h.vcs.seed.comment(REPO, pr.number, "dana", "Why this way?");
+      await h.poll();
+      const [item] = await h.items("sam");
+      expect(await readFeedback(h.store, item!.id)).toMatchObject({
+        kind: "comment",
+        body: "Why this way?",
+      });
     });
 
     it("ignores an approval with nothing written in it", async () => {

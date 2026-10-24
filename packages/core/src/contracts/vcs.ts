@@ -394,6 +394,19 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
         );
       });
 
+      it("comments on the pull request conversation with a write grant", async (t) => {
+        const { s, repo, self } = await setupSelf(t, "write");
+        const pr = await otherPr(t, s, repo, "Talked about");
+        await s.subject.commentOnPullRequest(repo, pr.number, "Thanks, done.");
+        const comments = (await s.subject.events([repo])).events.filter(
+          (e) => e.type === "pr.comment" && e.number === pr.number && e.data["kind"] === "comment",
+        );
+
+        expect(comments.map((e) => e.data["body"])).toEqual(["Thanks, done."]);
+        expect(comments[0]?.actor.replace(/\[bot\]$/, "")).toBe(self);
+        await expectPortError(s.subject.commentOnPullRequest(repo, 99999, "x"), "not_found");
+      });
+
       it("returns the unified diff with a read grant", async (t) => {
         const { s, repo } = await setupSelf(t, "read");
         const pr = await otherPr(t, s, repo, "Diffed");

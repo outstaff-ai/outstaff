@@ -9,7 +9,7 @@ Agents never talk to the tracker, the knowledge base or the code host directly. 
 
 - Every result carries the URLs of the things it touches, built from the adapters' link templates.
 - Inputs are validated; there are no destructive verbs (nothing deletes, force-merges or edits other people's text).
-- `pr open`, `pr update`, `pr review` and `pr reply` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.
+- `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.
 - A verb that needs a port the team has not configured fails with `unsupported` ("no tracker configured for this team"); the office verbs (`ask`, `work`, `roster`) fail with `unavailable` when the agent is not connected to an office.
 - Commands take `--json` to print `{ text, data, links }`; errors print `{ error: { code, message } }`. The identity comes from `OUTSTAFF_PERSON` and the team from `--team` or the usual team lookup.
 
@@ -430,6 +430,33 @@ Examples:
 
 ```sh
 ost pr reply 42 PRT_abc123 --body "Renamed, thanks."
+```
+
+## pr.comment
+
+Comment on the conversation of a pull request.
+
+Posts a top-level comment on the pull request as you. Use it to answer a review summary or a conversation comment, quoting or linking what it answers. Answer an inline thread with pr reply instead.
+
+```
+ost pr comment <number> [--repo <repo>] [--body <body>] [--body-file <bodyFile>]
+```
+
+Runtime tool: `pr_comment`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `repo` | string | no | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `number` | integer | yes | Pull request number. |
+| `body` | string | no | Text, Markdown. Or pass body-file. |
+| `bodyFile` | string | no | File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+
+Examples:
+
+```sh
+ost pr comment 42 --body "> Please rename it.
+
+Renamed in the last push."
 ```
 
 ## pr.diff
