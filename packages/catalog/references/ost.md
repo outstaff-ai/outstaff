@@ -16,7 +16,7 @@ Run any verb with `--help` for its options.
 
 ## Pull requests
 
-Every `ost pr` write acts as you, with your own identity, and only in repositories you have a write grant on (a review and a diff need only read access). Long text goes in a file in your scratch directory (or worktree): `--body-file <path>`. Only files your read policy allows are accepted, never secrets.
+If you have no repository grants you have no GitHub identity and every `ost pr` verb refuses ("<handle> has no GitHub identity; ask a human or a teammate with repository access"); do the work through tickets and documents, and ask with `ost ask`. Every `ost pr` write acts as you, with your own identity, and only in repositories you have a write grant on (a review and a diff need only read access). Long text goes in a file in your scratch directory (or worktree): `--body-file <path>`. Only files your read policy allows are accepted, never secrets.
 
 | Command                                                                                               | What it does                                                                                                       |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |

@@ -36,7 +36,7 @@ A design or solution proposal needs checking.
 
 1. Read the requirements first, then the proposal.
 2. Check each acceptance criterion: covered, partly, or missing. Check that nothing was added that nobody asked for.
-3. Comment with findings, ordered by impact. Say what must change and what is only a suggestion.
+3. Comment on the ticket or the document the proposal lives in, never in pull request threads (you may have no GitHub identity). Put findings in order of impact. Say what must change and what is only a suggestion.
 4. End with a clear verdict: matches the requirements, or what does not.
 5. A finding about feasibility or technique goes to the architect, not into the requirements.
 

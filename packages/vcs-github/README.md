@@ -23,6 +23,20 @@ Nobody holds anyone else's key. Each container holds only the Apps it needs:
 
 **Why agents also hold the read-only App.** An agent clones the repos it has read grants for, and its own App is installed only on the repos it may write to. The office App is the one identity with read access across the team's repos, and having no write permission it cannot be misused to change anything, so handing it to every container is safe. It also keeps all read traffic (polling, listing, checks) off the person Apps' rate-limit budgets.
 
+### Which people need an App
+
+Credentials follow a person's repository grants (`people[].repos`, resolved by repo name, `kind:<kind>` and `*`, to the repositories the team lists):
+
+| The person has                  | Office App (`GH_OFFICE_APP_*`) | Own App (`GH_APP_*`) |
+| ------------------------------- | ------------------------------ | -------------------- |
+| no grant on any repository      | not needed                     | not needed           |
+| read grants only                | required                       | optional             |
+| a write grant on any repository | required                       | required             |
+
+The office container always holds the office App. An optional own App is used when present, for example to comment on or review pull requests as the person.
+
+A person with no grants has no GitHub identity: their agent starts without the `vcs` port (not an error), `ost setup` lists no GitHub keys, `ost doctor` skips GitHub, and the `ost pr` verbs refuse with "<handle> has no GitHub identity; ask a human or a teammate with repository access". Their tickets are still tracked by the office. `ost validate` warns when a person in the `reviewer` role has no repo grant or no `identities.vcs`, since reviewing pull requests is that role's job. `secrets("person")` without a person (container-contract table, secret scrubbing) lists every key.
+
 ### What `Vcs` does with them
 
 - `credentials(person, repo, "read")`: a token from the office App, narrowed to that one repository with `contents: read`. Issued only to a person with a read or write grant on that repo in `team.yaml` (by repo name, `kind:<kind>` or `*`, resolved with core's `repoGrant`); anyone else is `forbidden`.
@@ -41,7 +55,7 @@ Installation tokens are cached and reused until five minutes before they expire.
 
 ### Secrets
 
-`secrets("person")` lists both sets, `secrets("office")` only the office set.
+`secrets("person", { team, person })` lists the set that person needs (see above), `secrets("person")` both sets, `secrets("office")` only the office set.
 
 | Key                                                            | Scope          | Meaning                                               | Derivable                                                    |
 | -------------------------------------------------------------- | -------------- | ----------------------------------------------------- | ------------------------------------------------------------ |

@@ -376,6 +376,15 @@ export async function doctorGithub(
   if (ctx.scope === "person" && ctx.person) {
     const person = ctx.person;
     const granted = grantedRepos(ctx.team, person);
+    if (granted.length === 0) {
+      return [
+        ok(
+          "GitHub credentials",
+          `${person.handle} has no repository grants, so no GitHub credentials are needed or checked.`,
+        ),
+      ];
+    }
+
     const repos = granted.map((g) => repoName(g.repo.url));
     apps.push({
       prefix: "GH_APP_",

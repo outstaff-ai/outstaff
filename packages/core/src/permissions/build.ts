@@ -236,6 +236,29 @@ export function repoGrant(
   return person.repos[repo.name] ?? person.repos[`kind:${repo.kind}`] ?? person.repos["*"];
 }
 
+/**
+ * The strongest grant a person has on any repository of the team: "none" when no repository resolves to a grant,
+ * "write" when any does. Decides which credentials the person needs from the code host.
+ */
+export function repoAccess(
+  team: PermissionTeam,
+  person: PermissionPerson,
+): "none" | "read" | "write" {
+  let access: "none" | "read" | "write" = "none";
+  for (const repo of team.repos) {
+    const granted = repoGrant(person, repo);
+    if (granted === "write") {
+      return "write";
+    }
+
+    if (granted) {
+      access = "read";
+    }
+  }
+
+  return access;
+}
+
 export function buildPolicy({
   profile,
   person,

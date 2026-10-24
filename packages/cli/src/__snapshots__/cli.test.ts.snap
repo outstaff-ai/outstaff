@@ -111,7 +111,7 @@ People
   priya   Priya Raman  pm                   default  *:read, docs-site:write
   tomas   Tomas Novak  product              default  *:read, docs-site:write
   mira    Mira Okafor  architect+developer  default  shop:write, kind:baseline:read
-  leo     Leo Fischer  designer             default  design-system:write, shop:read
+  leo     Leo Fischer  designer             default  none
   sam     Sam Duarte   developer            default  shop:write, kind:baseline:read
   noor    Noor Haddad  developer            default  shop:write, kind:baseline:read
   ines    Ines Varga   reviewer             default  *:read
@@ -134,7 +134,7 @@ exports[`ost validate > accepts the acme team cleanly 1`] = `
 `;
 
 exports[`ost validate > exits 1 with file:line for duplicate handle 1`] = `
-"error    .outstaff/team.yaml:89:13 people.duplicate_handle: Handle "sam" is already used by people[4].
+"error    .outstaff/team.yaml:84:13 people.duplicate_handle: Handle "sam" is already used by people[4].
 1 error, 0 warnings
 "
 `;
@@ -146,7 +146,7 @@ exports[`ost validate > exits 1 with file:line for missing repos 1`] = `
 `;
 
 exports[`ost validate > exits 1 with file:line for unknown repo grant 1`] = `
-"error    .outstaff/team.yaml:88:7 people.unknown_repo: Grant refers to unknown repo "billing".
+"error    .outstaff/team.yaml:83:7 people.unknown_repo: Grant refers to unknown repo "billing".
 1 error, 0 warnings
 "
 `;
@@ -158,8 +158,8 @@ exports[`ost validate > exits 1 with file:line for yaml syntax 1`] = `
 `;
 
 exports[`ost validate > lists warnings with their consequence and still exits 0 1`] = `
-"warning  .outstaff/team.yaml:92:5 people.no_repos: ines has no repo grants.
-         Consequence: ines cannot read or change any repository.
+"warning  .outstaff/team.yaml:87:5 people.reviewer_without_github: ines is a reviewer but has no repo grants.
+         Consequence: ines cannot review pull requests as themselves; give them a read or write grant and their own GitHub App.
 warning  .outstaff/team.yaml:3:1 trust.default: humans is not set, so trust follows the default rule.
          Consequence: trusted humans are repo writers and full chat-workspace members; set humans: for open-source repos or large workspaces
 acme: 0 errors, 2 warnings
@@ -173,11 +173,11 @@ exports[`ost validate > prints a JSON report 1`] = `
   "errors": [],
   "warnings": [
     {
-      "code": "people.no_repos",
-      "message": "ines has no repo grants.",
-      "consequence": "ines cannot read or change any repository.",
+      "code": "people.reviewer_without_github",
+      "message": "ines is a reviewer but has no repo grants.",
+      "consequence": "ines cannot review pull requests as themselves; give them a read or write grant and their own GitHub App.",
       "file": ".outstaff/team.yaml",
-      "line": 92,
+      "line": 87,
       "column": 5,
       "path": [
         "people",

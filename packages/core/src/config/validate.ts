@@ -2,6 +2,7 @@ import { CAPABILITY_PORT, type Capability } from "../capabilities.js";
 import { ADAPTER_PORTS, type AdapterPort } from "./adapters.js";
 import { CONFIG_CODES, type ConfigCode } from "./codes.js";
 import type { ConfigIssue } from "./issues.js";
+import { repoAccess } from "../permissions/build.js";
 import type { TeamConfig } from "./schema.js";
 
 export type RoleNeeds = { needs: Capability[]; optionalNeeds?: Capability[] };
@@ -32,8 +33,8 @@ export const WARNING_CODES = {
   capabilityMissing: "capability.missing",
   capabilityOptionalMissing: "capability.optional_missing",
   trustDefault: "trust.default",
-  peopleNoRepos: "people.no_repos",
   peopleMissingVcsIdentity: "people.missing_vcs_identity",
+  peopleReviewerWithoutGithub: "people.reviewer_without_github",
   identityChatNotMemberId: "identities.chat_not_member_id",
   identityVcsNotLogin: "identities.vcs_not_login",
   identityVcsNotBotLogin: "identities.vcs_not_bot_login",
@@ -106,8 +107,9 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "capability.optional_missing":
     "A role can use a capability that no configured integration provides.",
   "trust.default": "humans is omitted, so the default trust rule applies.",
-  "people.no_repos": "A person has no repo grants.",
   "people.missing_vcs_identity": "A person has a write grant but no identities.vcs.",
+  "people.reviewer_without_github":
+    "A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves.",
   "identities.chat_not_member_id":
     "A chat identity is not a Slack member id (for example U0123ABCD); names never match.",
   "identities.vcs_not_login":
@@ -187,15 +189,6 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       }
     }
 
-    if (Object.keys(person.repos).length === 0) {
-      warnings.push({
-        path: ["people", i, "repos"],
-        code: WARNING_CODES.peopleNoRepos,
-        message: `${person.handle} has no repo grants.`,
-        consequence: `${person.handle} cannot read or change any repository.`,
-      });
-    }
-
     if (!person.identities?.vcs && Object.values(person.repos).includes("write")) {
       warnings.push({
         path: ["people", i, "identities", "vcs"],
@@ -203,6 +196,20 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
         message: `${person.handle} has a write grant but no identities.vcs.`,
         consequence: `${person.handle}'s pull requests and comments are treated as an unknown human's, not as the agent's own.`,
       });
+    }
+
+    if (person.role === "reviewer") {
+      const noGrant = repoAccess(config, person) === "none";
+      if (noGrant || !person.identities?.vcs) {
+        warnings.push({
+          path: noGrant ? ["people", i, "repos"] : ["people", i, "identities", "vcs"],
+          code: WARNING_CODES.peopleReviewerWithoutGithub,
+          message: noGrant
+            ? `${person.handle} is a reviewer but has no repo grants.`
+            : `${person.handle} is a reviewer but has no identities.vcs (no GitHub App of their own).`,
+          consequence: `${person.handle} cannot review pull requests as themselves; give them a read or write grant and their own GitHub App.`,
+        });
+      }
     }
 
     const roleNames = [person.role, ...(person.extends ?? [])];

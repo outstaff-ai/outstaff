@@ -54,6 +54,19 @@ describe("githubSetupGuide", () => {
     );
   });
 
+  it("sends a person without grants to no App at all", () => {
+    const steps = githubSetupGuide({
+      team,
+      scope: "person",
+      options: {},
+      person: { ...sam, repos: {} } as never,
+    });
+
+    expect(steps).toHaveLength(1);
+    expect(steps[0]!.title).toBe("Sam needs no GitHub credentials");
+    expect(steps[0]!.manifest).toBeUndefined();
+  });
+
   it("covers every repository for the office", () => {
     const steps = githubSetupGuide({ team, scope: "office", options: {} });
     expect(steps[1]!.body).toContain("acme-example/shop");

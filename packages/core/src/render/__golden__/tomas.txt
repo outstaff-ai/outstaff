@@ -202,7 +202,7 @@ Run any verb with `--help` for its options.
 
 ## Pull requests
 
-Every `ost pr` write acts as you, with your own identity, and only in repositories you have a write grant on (a review and a diff need only read access). Long text goes in a file in your scratch directory (or worktree): `--body-file <path>`. Only files your read policy allows are accepted, never secrets.
+If you have no repository grants you have no GitHub identity and every `ost pr` verb refuses ("<handle> has no GitHub identity; ask a human or a teammate with repository access"); do the work through tickets and documents, and ask with `ost ask`. Every `ost pr` write acts as you, with your own identity, and only in repositories you have a write grant on (a review and a diff need only read access). Long text goes in a file in your scratch directory (or worktree): `--body-file <path>`. Only files your read policy allows are accepted, never secrets.
 
 | Command                                                                                               | What it does                                                                                                       |
 | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -328,7 +328,7 @@ A design or solution proposal needs checking.
 
 1. Read the requirements first, then the proposal.
 2. Check each acceptance criterion: covered, partly, or missing. Check that nothing was added that nobody asked for.
-3. Comment with findings, ordered by impact. Say what must change and what is only a suggestion.
+3. Comment on the ticket or the document the proposal lives in, never in pull request threads (you may have no GitHub identity). Put findings in order of impact. Say what must change and what is only a suggestion.
 4. End with a clear verdict: matches the requirements, or what does not.
 5. A finding about feasibility or technique goes to the architect, not into the requirements.
 

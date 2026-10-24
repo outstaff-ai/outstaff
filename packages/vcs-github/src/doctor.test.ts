@@ -264,4 +264,20 @@ describe("doctorGithub", () => {
     expect(await doctorGithub(none, ctx(impl))).toEqual([]);
     expect(calls).toEqual([]);
   });
+
+  it("skips GitHub for a person without repository grants", async () => {
+    const { impl, calls } = fake(good);
+    const checks = await doctorGithub(secrets(), {
+      ...ctx(impl),
+      person: { ...sam, repos: {}, identities: undefined } as never,
+    });
+
+    expect(checks).toHaveLength(1);
+    expect(checks[0]).toMatchObject({
+      status: "ok",
+      detail: expect.stringContaining("no GitHub credentials"),
+    });
+
+    expect(calls).toEqual([]);
+  });
 });

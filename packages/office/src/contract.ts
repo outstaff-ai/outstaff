@@ -9,6 +9,7 @@ interface Row {
   key: string;
   container: Container;
   optional: boolean;
+  conditional: boolean;
   derivable: boolean;
   visible: boolean;
   text: string;
@@ -31,6 +32,7 @@ const CORE_ROWS: Row[] = [
     key: "OUTSTAFF_AGENT_TOKEN_<HANDLE>",
     container: "office",
     optional: false,
+    conditional: false,
     derivable: false,
     visible: false,
     markdown: true,
@@ -40,6 +42,7 @@ const CORE_ROWS: Row[] = [
     key: "OUTSTAFF_AGENT_TOKEN",
     container: "agent",
     optional: false,
+    conditional: false,
     derivable: false,
     visible: false,
     markdown: true,
@@ -51,8 +54,8 @@ const cell = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", " ").repla
 
 const yes = (b: boolean) => (b ? "yes" : "no");
 
-const sentence = (description: string, where: string) =>
-  `${description.replace(/\.$/, "")}. ${where.replace(/\.$/, "")}.`;
+const sentence = (description: string, where: string, when?: string) =>
+  `${description.replace(/\.$/, "")}. ${where.replace(/\.$/, "")}.${when ? ` Needed when ${when.replace(/\.$/, "")}.` : ""}`;
 
 function table(header: string[], rows: string[][]): string[] {
   const widths = header.map((h, i) => Math.max(h.length, 3, ...rows.map((r) => r[i]!.length)));
@@ -69,12 +72,13 @@ export function renderSecretsTable(office: AdapterRegistry, agent: AdapterRegist
       for (const s of def.secrets(scope)) {
         const side = scope === "office" ? "office" : "agent";
         const prev = found.get(s.key);
-        const text = sentence(s.description, s.where);
+        const text = sentence(s.description, s.where, s.when);
         found.set(s.key, {
           ...prev,
           key: s.key,
           container: prev && prev.container !== side ? "both" : side,
           optional: (prev?.optional ?? true) && (s.optional ?? false),
+          conditional: (prev?.conditional ?? true) && s.when !== undefined,
           derivable: s.derivable ?? false,
           visible: AGENT_VISIBLE.has(s.key),
           text,
@@ -109,7 +113,7 @@ export function renderSecretsTable(office: AdapterRegistry, agent: AdapterRegist
     rows.map((r) => [
       `\`${r.key}\``,
       r.container,
-      r.optional ? "optional" : "required",
+      r.optional ? "optional" : r.conditional ? "conditional" : "required",
       yes(r.derivable),
       yes(r.visible),
       r.markdown ? r.text : cell(r.text),

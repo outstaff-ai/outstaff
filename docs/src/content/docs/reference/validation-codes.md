@@ -62,5 +62,5 @@ A warning describes something that will not work as written or a default that ap
 | `identities.vcs_not_bot_login` | A person's vcs identity is not a GitHub App bot login (<slug>[bot]), so the agent's own activity is not recognized. |
 | `identities.vcs_not_login` | A human's vcs identity is not a GitHub login (letters, digits, hyphens or underscores, up to 39 characters). |
 | `people.missing_vcs_identity` | A person has a write grant but no identities.vcs. |
-| `people.no_repos` | A person has no repo grants. |
+| `people.reviewer_without_github` | A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

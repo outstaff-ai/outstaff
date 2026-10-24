@@ -281,6 +281,7 @@ async function checkScope(
     team,
     found.map((f) => f.def),
     scope,
+    person,
   );
 
   const checks: ScopeReport["checks"] = secretChecks(list, secrets, dir, handle);

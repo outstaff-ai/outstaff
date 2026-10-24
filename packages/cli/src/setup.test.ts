@@ -69,6 +69,25 @@ describe("ost setup template", () => {
     expect(text).not.toMatch(/=\S/);
   });
 
+  it("lists no GitHub keys for a person without repository grants", async () => {
+    const dir = project();
+    expect((await ost(dir, ["setup", "leo"])).code).toBe(0);
+    const text = example(dir, ".outstaff/people/leo/.env.example");
+    expect(text).toMatchSnapshot();
+    expect(text).toContain("\nSLACK_BOT_TOKEN=\n");
+    expect(text).not.toContain("GH_");
+  });
+
+  it("lists the office App and an optional own App for a reader", async () => {
+    const dir = project();
+    expect((await ost(dir, ["setup", "ines"])).code).toBe(0);
+    const text = example(dir, ".outstaff/people/ines/.env.example");
+    expect(text).toContain("\nGH_OFFICE_APP_ID=\n");
+    const blockOf = (key: string) => text.split("\n\n").find((b) => b.endsWith(`\n${key}=`))!;
+    expect(blockOf("GH_APP_ID")).toContain("# Optional.");
+    expect(blockOf("GH_OFFICE_APP_ID")).toContain("# Required.");
+  });
+
   it("lists the office's keys, one agent token per person, the office Slack token and no runtime keys", async () => {
     const dir = project();
     expect((await ost(dir, ["setup", "office"])).code).toBe(0);

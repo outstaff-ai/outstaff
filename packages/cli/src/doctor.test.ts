@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AdapterRegistry, type DoctorCheck } from "@outstaff/core";
+import { githubVcs } from "@outstaff/vcs-github";
 import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE } from "../../core/src/testing/fixtures.js";
 import { testKey } from "../../vcs-github/src/testing/keys.js";
@@ -97,6 +98,25 @@ describe("ost doctor", () => {
     expect(r.out).toContain("fail  OUTSTAFF_AGENT_TOKEN present");
     expect(r.out).not.toContain("FAKE_OPT");
     expect(r.out).toMatch(/ok, \d+ warnings, 2 failures\n$/);
+  });
+
+  it("checks no GitHub secrets for a person without repository grants", async () => {
+    const dir = project();
+    const registry = new AdapterRegistry().register(githubVcs as unknown as AnyDef);
+    const env = { OUTSTAFF_AGENT_TOKEN: "fake-agent-token" };
+    const fetchStub = (() => {
+      throw new Error("no network expected");
+    }) as unknown as typeof fetch;
+
+    const r = await ost(dir, ["doctor", "leo", "--json"], { env, registry, fetch: fetchStub });
+    const report = JSON.parse(r.out) as {
+      scopes: { scope: string; checks: { name: string; status: string }[] }[];
+    };
+
+    const names = report.scopes.flatMap((s) => s.checks.map((c) => c.name));
+    expect(names.some((name) => name.includes("GH_"))).toBe(false);
+    expect(names).toContain("GitHub credentials");
+    expect(report.scopes.flatMap((s) => s.checks).filter((c) => c.status === "fail")).toEqual([]);
   });
 
   it("takes secrets from the environment too", async () => {
