@@ -1,4 +1,5 @@
-import { PortError, type PortErrorCode } from "@outstaff/core";
+import { PortError, type Logger, type PortErrorCode } from "@outstaff/core";
+import { RETRY_AFTER_BURST_MS, pacerFor, realClock, type Clock, type Pacer } from "./pacing.js";
 
 export interface HttpConfig {
   fetch: typeof fetch;
@@ -7,6 +8,13 @@ export interface HttpConfig {
   /** Sent as `Origin`, which the API checks on writes. */
   webUrl: string;
   apiKey: string;
+  log?: Logger;
+
+  /** Paces this key's requests; by default one shared by every client of the same key and host. */
+  pacer?: Pacer;
+
+  /** Used for the wait before a retry; tests inject their own. */
+  clock?: Clock;
 }
 
 export interface RequestOptions {
@@ -15,6 +23,9 @@ export interface RequestOptions {
 }
 
 const DEFAULT_RETRY_MS = 30_000;
+
+/** Repeating these changes nothing, so a refused one can be sent again. */
+const IDEMPOTENT = new Set(["GET", "HEAD", "PUT", "DELETE"]);
 
 export function errorCode(status: number): PortErrorCode {
   if (status === 401 || status === 403) {
@@ -42,7 +53,13 @@ export function errorCode(status: number): PortErrorCode {
 
 /** A small typed JSON client. Every failure leaves here as a PortError. */
 export class ItsaplanHttp {
-  constructor(private readonly cfg: HttpConfig) {}
+  private readonly pacer: Pacer;
+  private readonly clock: Clock;
+
+  constructor(private readonly cfg: HttpConfig) {
+    this.pacer = cfg.pacer ?? pacerFor(cfg.apiUrl, cfg.apiKey);
+    this.clock = cfg.clock ?? realClock;
+  }
 
   async request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
     const url = new URL(`${this.cfg.apiUrl}${path}`);
@@ -52,20 +69,18 @@ export class ItsaplanHttp {
       }
     }
 
-    let res: Response;
-    try {
-      res = await this.cfg.fetch(url, {
+    let { res, burst } = await this.send(method, url, opts.body);
+    // Past its burst limit the service answers 500 until the key has been idle for a second.
+    if (res.status === 500 && burst > 1 && IDEMPOTENT.has(method)) {
+      this.cfg.log?.warn("rate limited", {
         method,
-        headers: {
-          "x-api-key": this.cfg.apiKey,
-          accept: "application/json",
-          origin: this.cfg.webUrl,
-          ...(opts.body === undefined ? {} : { "content-type": "application/json" }),
-        },
-        ...(opts.body === undefined ? {} : { body: JSON.stringify(opts.body) }),
+        path,
+        status: res.status,
+        retryInMs: RETRY_AFTER_BURST_MS,
       });
-    } catch (cause) {
-      throw new PortError("unavailable", `Its a Plan is unreachable: ${String(cause)}`, { cause });
+
+      await this.clock.sleep(RETRY_AFTER_BURST_MS);
+      ({ res } = await this.send(method, url, opts.body));
     }
 
     const raw = await res.text();
@@ -92,5 +107,29 @@ export class ItsaplanHttp {
     }
 
     return data as T;
+  }
+
+  private async send(
+    method: string,
+    url: URL,
+    body: unknown,
+  ): Promise<{ res: Response; burst: number }> {
+    const burst = await this.pacer.acquire();
+    try {
+      const res = await this.cfg.fetch(url, {
+        method,
+        headers: {
+          "x-api-key": this.cfg.apiKey,
+          accept: "application/json",
+          origin: this.cfg.webUrl,
+          ...(body === undefined ? {} : { "content-type": "application/json" }),
+        },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      });
+
+      return { res, burst };
+    } catch (cause) {
+      throw new PortError("unavailable", `Its a Plan is unreachable: ${String(cause)}`, { cause });
+    }
   }
 }
