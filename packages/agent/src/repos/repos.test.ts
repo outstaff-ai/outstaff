@@ -252,6 +252,18 @@ describe("syncRepositories", () => {
     expect(readFileSync(join(shop, ".git/hooks/pre-push"), "utf8")).not.toContain("fake-token");
   });
 
+  it("prepares an existing clone again on a restart, with the helper list unchanged", async () => {
+    const s = await setup();
+    await s.run();
+    const second = await s.run();
+    const shop = join(s.reposDir, "shop");
+
+    expect(second.map((r) => r.name)).toContain("shop");
+    expect(sh(shop, "config", "--local", "--get-all", "credential.helper")).toBe(
+      "\n!ost git-credential\n",
+    );
+  });
+
   it("fetches an existing clone instead of cloning again", async () => {
     const s = await setup();
     await s.run();
