@@ -1,6 +1,8 @@
 packages:
   - "packages/*"
   - "docs"
+  - "e2e"
+  - "e2e/runtime-scripted"
 allowBuilds:
   esbuild: true
 savePrefix: ""

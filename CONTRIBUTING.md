@@ -26,6 +26,29 @@ Run these from the repository root.
 
 Before you open a pull request, run `pnpm format && pnpm lint && pnpm typecheck && pnpm test && pnpm build`. Formatting is oxfmt (`.oxfmtrc.json`: double quotes, semicolons, trailing commas, 100 columns); linting is oxlint with the stylistic rules in `.oxlintrc.json`. CI runs `pnpm format:check`. CI runs the same checks, plus secret and hygiene scans.
 
+## End-to-end test
+
+`e2e/` runs the acme loop on Docker Compose, with the real office and agent images and stand-ins for everything outside them. It takes a few minutes (about 75 seconds with the images built, under four with a cold build), needs no secrets and no network beyond pulling images and packages, and runs every night, by hand, before a release, and on pull requests that touch `packages/`, `images/` or `e2e/` (`.github/workflows/e2e.yml`); it is not a required check yet.
+
+```sh
+pnpm install && pnpm --filter outstaff... run build   # the test runs the built CLI
+node e2e/run.ts                                       # builds the images, runs the loop, tears everything down
+```
+
+Needs Docker with Compose, `openssl` and `git`. `E2E_PREBUILT=1` skips the image build, `E2E_KEEP=1` leaves the stack up for a look around, `E2E_TIMEOUT_MS` bounds the run (default ten minutes). On a failure it prints the tail of the stub, office and agent logs.
+
+What is real: the `ost hire` command, the office with Postgres, the agent image, the GitHub and Its a Plan adapters talking HTTP, the agent's `ost` verbs, git cloning, committing, pushing and force-pushing over https with the credential helper, and the App JWT and installation token flow.
+
+What is faked:
+
+- **GitHub and the tracker** (`e2e/stubs`, one Node service). It implements the endpoints the adapters call, keeps its state in memory, serves a real bare repository over git's smart HTTP protocol, and decides mergeability with `git merge-tree`. `/_test/*` is the driver's control surface: it creates and assigns tickets, submits a human review and merges a pull request, acting as the team's humans.
+- **The model** (`e2e/runtime-scripted`, a private package, never published). A runtime adapter that plays a fixed script per work item kind through the same in-process `ost` tools and the same permission policy as the real runtime. It is only in the `agent-e2e` image target.
+- **Chat.** `integrations.chat` is required by the team file, so the office and agent are configured with Slack and dummy tokens; nothing talks to it.
+
+The flow it asserts: hire, a ticket assigned to the agent, a pull request opened and the ticket moved to review, a human requesting changes (the ticket goes back to active, the agent pushes a fix, replies and resolves the thread), the human merging (the ticket is done), a second pull request that now conflicts (a follow-up item, a rebase, a force push with lease), and `ost ask` to the architect (mirrored on the ticket, since no chat channel is set). Only one agent runs, so the architect is not started and the question is asserted as routed and mirrored, not answered.
+
+Against real GitHub instead of the stub: tracked in [#195](https://github.com/outstaff-ai/outstaff/issues/195).
+
 ## Branches and pull requests
 
 - Branch from `main`, or from the branch your change depends on.

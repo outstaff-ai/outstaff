@@ -1,0 +1,32 @@
+{
+  "name": "@outstaff/runtime-scripted",
+  "version": "0.0.0",
+  "description": "Test-only runtime adapter that plays a fixed script of tool calls instead of calling a model. Never published.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "ost-agent-e2e": "./dist/bin.js"
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@outstaff/agent": "workspace:*",
+    "@outstaff/catalog": "workspace:*",
+    "@outstaff/core": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

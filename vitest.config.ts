@@ -50,6 +50,11 @@ export default defineConfig({
         resolve: { alias: coreAlias },
         test: { name: pkg, root: `packages/${pkg}`, include: ["src/**/*.test.ts"] },
       })),
+      // The scripted runtime of the end-to-end test reads the agent's prompt, so it tests against the agent's source.
+      {
+        resolve: { alias: coreAlias },
+        test: { name: "e2e", root: "e2e", include: ["**/src/**/*.test.ts"] },
+      },
       { test: { name: "scripts", root: "scripts", include: ["*.test.ts"] } },
       { test: { name: "docs", root: "docs", include: ["scripts/**/*.test.mjs"] } },
     ],
