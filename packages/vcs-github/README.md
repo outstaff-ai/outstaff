@@ -9,8 +9,23 @@ integrations:
     # apiUrl: https://ghe.acme.example/api/v3   # GitHub Enterprise Server (default https://api.github.com)
     # webUrl: https://ghe.acme.example          # used for links (default https://github.com)
     # graphqlUrl: ...                           # derived from apiUrl when omitted
-    # appSlugs: { sam: acme-sam }               # person handle -> App slug, when it differs from the handle
 ```
+
+## Identities: who opened a pull request
+
+The adapter recognizes a person's pull requests and events only by the exact login written in `team.yaml`, compared without regard to case. It never guesses from an App slug or a handle.
+
+```yaml
+humans:
+  - { name: Alex, identities: { vcs: alex } } # a GitHub login
+people:
+  - handle: sam
+    identities: { vcs: acme-sam, [bot] } # the person's App: <slug>[bot]
+```
+
+- A pull request or event by `acme-sam[bot]` belongs to `sam`, even though the handle and the slug differ. `sam[bot]` is then just another bot.
+- Any other `[bot]` login is a bot, and a login that no one declares is an unknown human. Their text is data, never instructions, and they are trusted only as a repo writer or a listed human.
+- `ost validate` warns (`people.missing_vcs_identity`) when a person has a write grant but no `identities.vcs`.
 
 ## Identity: two GitHub Apps
 
@@ -66,7 +81,7 @@ Agents hold no GitHub token: git gets short-lived tokens from the `ost git-crede
 
 ## What it implements
 
-- Pull requests: list (paginated, author filter), get, `mergeable` mapped to `clean | conflicting | unknown`, `author.kind` (`bot` for `[bot]` logins, `agent` when the slug is a team handle or in `appSlugs`; `createGithubVcs(ctx, { isAgentSlug })` takes your own resolver).
+- Pull requests: list (paginated, author filter), get, `mergeable` mapped to `clean | conflicting | unknown`, `author.kind` (`agent` when the login is a person's `identities.vcs`, `bot` for any other `[bot]` login, `human` otherwise).
 - `getPullRequest(..., { waitForMergeable: true })` re-reads a `null` mergeability up to five more times with backoff (0.5s, 1s, 2s, 3s, 5s). Closed and merged pull requests are not retried.
 - Checks: check runs plus legacy commit statuses.
 - Review threads: exactly three fixed GraphQL documents (list threads with comments, read the last comment of a thread, resolve). Logins are compared without the `[bot]` suffix, since GraphQL leaves it off.

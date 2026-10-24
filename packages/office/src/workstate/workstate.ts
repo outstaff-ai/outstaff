@@ -1,4 +1,4 @@
-import { parseRepoUrl, PortError, repoKey } from "@outstaff/core";
+import { parseRepoUrl, PortError, repoKey, vcsAgentLogins } from "@outstaff/core";
 import type {
   CanonicalStatus,
   Issue,
@@ -66,13 +66,9 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   });
 
   const defaultHost = repos[0]?.host ?? "git.acme.example";
-  const vcsPeople = new Map<string, string>();
+  const vcsPeople = vcsAgentLogins(team);
   const trackerPeople = new Map<string, string>();
   for (const p of team.people) {
-    if (p.identities?.vcs) {
-      vcsPeople.set(p.identities.vcs.toLowerCase(), p.handle);
-    }
-
     if (p.identities?.tracker) {
       trackerPeople.set(p.identities.tracker, p.handle);
     }

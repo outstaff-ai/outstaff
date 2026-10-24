@@ -22,15 +22,16 @@ const BOT_SUFFIX = "[bot]";
 export const stripBot = (login: string): string =>
   login.endsWith(BOT_SUFFIX) ? login.slice(0, -BOT_SUFFIX.length) : login;
 
+/** An agent is a login that is exactly some person's identity; any other `[bot]` login is a bot, anything else a human. */
 export function authorKind(
   login: string,
-  isAgentSlug: (slug: string) => boolean,
+  isAgentLogin: (login: string) => boolean,
 ): PullRequest["author"]["kind"] {
-  if (!login.endsWith(BOT_SUFFIX)) {
-    return "human";
+  if (isAgentLogin(login)) {
+    return "agent";
   }
 
-  return isAgentSlug(stripBot(login)) ? "agent" : "bot";
+  return login.endsWith(BOT_SUFFIX) ? "bot" : "human";
 }
 
 export function mergeability(
@@ -51,7 +52,7 @@ export function toPullRequest(
   repo: RepoRef,
   pr: RestPull,
   url: string,
-  isAgentSlug: (slug: string) => boolean,
+  isAgentLogin: (login: string) => boolean,
 ): PullRequest {
   const login = pr.user?.login ?? "ghost";
   const merged = pr.merged === true || (pr.merged_at ?? null) !== null;
@@ -61,7 +62,7 @@ export function toPullRequest(
     title: pr.title,
     body: pr.body ?? "",
     url,
-    author: { login, kind: authorKind(login, isAgentSlug) },
+    author: { login, kind: authorKind(login, isAgentLogin) },
     head: { ref: pr.head.ref, sha: pr.head.sha },
     base: { ref: pr.base.ref },
     state: merged ? "merged" : pr.state,

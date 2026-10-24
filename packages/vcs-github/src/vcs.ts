@@ -3,6 +3,7 @@ import {
   PortError,
   parseRepoUrl,
   repoGrant,
+  vcsAgentLogins,
   type AdapterContext,
   type Check,
   type PullRequest,
@@ -29,9 +30,6 @@ import type { GithubOptions } from "./options.js";
 export interface GithubDeps {
   sleep?: (ms: number) => Promise<void>;
   readFile?: (path: string) => string;
-
-  /** Decides whether a bot login's app slug belongs to a person of the team. Default: the slug is a team handle or listed in `appSlugs`. */
-  isAgentSlug?: (slug: string) => boolean;
 
   /** The person this container runs as; only they can get write credentials, from the container's own App. Default: secret `OUTSTAFF_PERSON`. */
   self?: string;
@@ -135,12 +133,9 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     return known && entry ? repoGrant(known, entry) : undefined;
   };
 
-  const agentSlugs = new Set([
-    ...ctx.team.people.map((p) => p.handle),
-    ...Object.values(options.appSlugs),
-  ]);
-
-  const isAgentSlug = deps.isAgentSlug ?? ((slug: string) => agentSlugs.has(slug));
+  // Exact match on the people's `identities.vcs`; a login is never guessed from a handle.
+  const agentLogins = vcsAgentLogins(ctx.team);
+  const isAgentLogin = (login: string) => agentLogins.has(login.toLowerCase());
 
   const links = {
     pr: (r: RepoRef, n: number) => `${web}/${r.owner}/${r.name}/pull/${n}`,
@@ -223,7 +218,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
 
   async function fetchPull(repo: RepoRef, number: number, token: string): Promise<PullRequest> {
     const res = await http.request<RestPull>("GET", `${repoPath(repo)}/pulls/${number}`, { token });
-    return toPullRequest(repo, res.data, links.pr(repo, number), isAgentSlug);
+    return toPullRequest(repo, res.data, links.pr(repo, number), isAgentLogin);
   }
 
   /**
@@ -378,7 +373,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
           (p) =>
             !author || [author, `${author}[bot]`].includes((p.user?.login ?? "").toLowerCase()),
         )
-        .map((p) => toPullRequest(repo, p, links.pr(repo, p.number), isAgentSlug));
+        .map((p) => toPullRequest(repo, p, links.pr(repo, p.number), isAgentLogin));
     },
 
     async getPullRequest(repo, number, opts) {
@@ -529,7 +524,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         },
       });
 
-      return toPullRequest(repo, res.data, links.pr(repo, res.data.number), isAgentSlug);
+      return toPullRequest(repo, res.data, links.pr(repo, res.data.number), isAgentLogin);
     },
 
     async updatePullRequest(repo, number, patch) {
@@ -568,7 +563,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         latest = { ...latest, draft: patch.draft };
       }
 
-      return toPullRequest(repo, latest, links.pr(repo, number), isAgentSlug);
+      return toPullRequest(repo, latest, links.pr(repo, number), isAgentLogin);
     },
 
     async submitReview(repo, number, review) {

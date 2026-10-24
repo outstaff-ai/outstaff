@@ -1,4 +1,4 @@
-import { PortError, repoKey } from "@outstaff/core";
+import { PortError, repoKey, vcsAgentLogins } from "@outstaff/core";
 import type { Member, RepoRef, TeamConfig, Vcs } from "@outstaff/core";
 import type { Clock } from "../clock.js";
 import type { Store } from "../store/index.js";
@@ -29,13 +29,9 @@ export interface TrustOptions {
 export function createTrust(opts: TrustOptions): Trust {
   const ttl = opts.ttlMs ?? DEFAULT_TRUST_TTL_MS;
   // Agents are recognized only by the identities declared in team.yaml, never by how a login looks.
-  const vcsAgents = new Map<string, string>();
+  const vcsAgents = vcsAgentLogins(opts.team);
   const trackerAgents = new Map<string, string>();
   for (const p of opts.team.people) {
-    if (p.identities?.vcs) {
-      vcsAgents.set(p.identities.vcs.toLowerCase(), p.handle);
-    }
-
     if (p.identities?.tracker) {
       trackerAgents.set(p.identities.tracker, p.handle);
     }
