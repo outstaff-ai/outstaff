@@ -560,6 +560,10 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
       return Number(row.n);
     },
 
+    async clearLoopGuard(workItemId) {
+      await db.deleteFrom("loop_guard").where("work_item_id", "=", workItemId).execute();
+    },
+
     async setPause(scope, reason) {
       await db
         .insertInto("pauses")

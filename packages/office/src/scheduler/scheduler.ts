@@ -96,6 +96,14 @@ export interface FailResult {
   notBefore?: string;
 }
 
+export interface RetryRequest {
+  /** The human who asked. */
+  by: string;
+
+  /** What they did, for the journal and the log: "ticket moved", "PR comment", "chat reply". */
+  signal: string;
+}
+
 export interface PauseState {
   team: { reason: string | null; since: string } | null;
   people: Record<string, { reason: string | null; since: string }>;
@@ -125,6 +133,12 @@ export interface Scheduler {
 
   /** Blocks the item and journals the reason. */
   block(itemId: string, reason: string): Promise<BlockNotice>;
+
+  /**
+   * A trusted human asked for a blocked item to run again: it is queued with no failures, no backoff and no
+   * loop-guard count; its session and journal stay. Returns null when the item is not blocked (nothing to retry).
+   */
+  retry(itemId: string, request: RetryRequest): Promise<WorkItem | null>;
 
   /** Explicit reorder of a queued item. Active items are never interrupted. */
   move(itemId: string, target: MoveTarget): Promise<void>;
@@ -460,6 +474,35 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
         }
 
         return blockItem(item, reason, "manual");
+      });
+    },
+
+    retry(itemId, request) {
+      return exclusive(async () => {
+        const item = await store.getItem(itemId);
+        if (item?.status !== "blocked") {
+          return null;
+        }
+
+        await store.clearLoopGuard(itemId);
+        const queued = await store.updateItem(itemId, {
+          status: "queued",
+          failures: 0,
+          notBefore: null,
+        });
+
+        await store.appendJournal(
+          itemId,
+          "scheduler",
+          `Retried on request by ${request.by} (${request.signal}).`,
+        );
+
+        log.info(
+          `retried ${itemId} for ${request.by} on ${item.subject?.ref ?? item.title} (signal: ${request.signal})`,
+          { item: itemId, person: item.person, by: request.by, signal: request.signal },
+        );
+
+        return queued;
       });
     },
 

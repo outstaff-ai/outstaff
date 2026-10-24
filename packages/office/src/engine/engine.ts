@@ -22,6 +22,29 @@ const TRANSIENT = new Set(["rate_limited", "unavailable"]);
 interface Plan {
   effects: Effect[];
   outcomes: (EffectOutcome | null)[];
+
+  /** Blocked items this event asks to run again; kept so a redelivery retries the same ones. */
+  retry?: { id: string; person: string }[];
+  retried?: true;
+}
+
+/** The signal a trusted human's event is, when it can bring a blocked item back. */
+function retrySignal(event: WorkflowEvent): string | undefined {
+  switch (event.type) {
+    case "ticket.moved": {
+      const to = event.data["to"];
+      return to === "ready" || to === "active" ? "ticket moved" : undefined;
+    }
+
+    case "ticket.assigned":
+      return "ticket assigned";
+    case "pr.review_submitted":
+      return "PR review";
+    case "pr.comment":
+      return "PR comment";
+    default:
+      return undefined;
+  }
 }
 
 /** What an applied effect did, in the past tense, for the log. */
@@ -133,9 +156,93 @@ export function createEngine(opts: EngineOptions): Engine {
 
   const humanize = (kind: string) => kind.replaceAll(/[_-]/g, " ");
 
+  /** The ticket an item is about, directly or through its pull request. */
+  const ticketOfItem = async (item: WorkItem): Promise<string | undefined> => {
+    if (item.subject?.type === "ticket") {
+      return item.subject.ref;
+    }
+
+    return item.subject?.type === "pr"
+      ? ((await store.getSubject("pr", item.subject.ref))?.data as { ticket?: string } | undefined)
+          ?.ticket
+      : undefined;
+  };
+
+  /** The blocked items a trusted human's event brings back: the ones on its ticket or pull request. */
+  const blockedFor = async (event: WorkflowEvent): Promise<WorkItem[]> => {
+    if (event.actor.kind !== "human" || retrySignal(event) === undefined) {
+      return [];
+    }
+
+    const pr = event.subject.pr;
+    const ticket = event.subject.ticket ?? (pr ? workState.ticketForPr(pr) : undefined);
+    const blocked = await store.listItems({ status: "blocked" });
+    const prKey = pr ? workState.prSubject(pr) : undefined;
+    const author = pr ? workState.pullRequest(pr)?.author.person : undefined;
+    const assignee =
+      event.type === "ticket.assigned" && ticket ? workState.assignee(ticket) : undefined;
+
+    const hits: WorkItem[] = [];
+    for (const item of blocked) {
+      const onPr = prKey !== undefined && item.subject?.type === "pr" && item.subject.ref === prKey;
+      const onTicket = ticket !== undefined && (await ticketOfItem(item)) === ticket;
+      if (!onPr && !onTicket) {
+        continue;
+      }
+
+      // Only the person the signal is about: the owner of the assignment, the author of the pull request.
+      if (
+        event.type === "ticket.assigned" &&
+        !(assignee?.kind === "agent" && assignee.id === item.person)
+      ) {
+        continue;
+      }
+
+      if (pr && author !== undefined && item.person !== author) {
+        continue;
+      }
+
+      hits.push(item);
+    }
+
+    return hits;
+  };
+
+  const retryNote = async (item: WorkItem, event: WorkflowEvent) => {
+    const ticket = (await ticketOfItem(item)) ?? event.subject.ticket;
+    if (!tracker || !ticket) {
+      // Pull requests have no comment port yet, so without a ticket the journal and the log are the record.
+      return;
+    }
+
+    try {
+      await tracker.comment(ticket, `Retrying ${item.subject?.ref ?? ticket} on request`);
+    } catch (error) {
+      logger.warn("could not post the retry note", { item: item.id, error: String(error) });
+    }
+  };
+
+  const retryBlocked = async (plan: Plan, event: WorkflowEvent) => {
+    const signal = retrySignal(event);
+    for (const { id } of plan.retry ?? []) {
+      const item = await scheduler.retry(id, { by: event.actor.id, signal: signal! });
+      if (!item) {
+        continue;
+      }
+
+      const feedback = event.data["body"];
+      if (typeof feedback === "string" && feedback.trim() !== "") {
+        await store.appendJournal(id, event.actor.id, `${signal}: ${feedback.trim()}`);
+      }
+
+      await retryNote(item, event);
+    }
+  };
+
   const schedule = async (
     e: Extract<Effect, { type: "schedule" }>,
     event: WorkflowEvent,
+    plan: Plan,
   ): Promise<string> => {
     if (!team.people.some((p) => p.handle === e.person)) {
       throw new Skip(`${e.person} is not a person on the team`);
@@ -144,6 +251,12 @@ export function createEngine(opts: EngineOptions): Engine {
     // What a person did themselves never starts work for them, for example assigning a ticket to oneself.
     if (event.actor.kind === "agent" && event.actor.id === e.person) {
       throw new Skip(`${e.person} caused the event themselves`);
+    }
+
+    // The blocked item that was just retried carries the new feedback; a second item would run beside it.
+    const retried = plan.retry?.find((r) => r.person === e.person);
+    if (retried) {
+      throw new Skip(`work item ${retried.id} was retried on request instead`);
     }
 
     const subject = e.pr
@@ -215,10 +328,10 @@ export function createEngine(opts: EngineOptions): Engine {
     return `queued work item ${item.id} for ${e.person}`;
   };
 
-  const apply = async (e: Effect, event: WorkflowEvent): Promise<string> => {
+  const apply = async (e: Effect, event: WorkflowEvent, plan: Plan): Promise<string> => {
     switch (e.type) {
       case "schedule":
-        return schedule(e, event);
+        return schedule(e, event, plan);
       case "move":
         if (!tracker) {
           throw new Skip("no tracker is configured");
@@ -284,7 +397,12 @@ export function createEngine(opts: EngineOptions): Engine {
       ? undefined
       : explainWorkflow(event, workState, workflow.rules, workflow.options);
 
-    const plan: Plan = saved ?? { effects: explanation!.effects, outcomes: [] };
+    const plan: Plan = saved ?? {
+      effects: explanation!.effects,
+      outcomes: [],
+      retry: (await blockedFor(event)).map((i) => ({ id: i.id, person: i.person })),
+    };
+
     const subject = subjectLabel(event.subject);
     const ruleOf = new Map<string, string[]>();
     if (explanation) {
@@ -320,6 +438,12 @@ export function createEngine(opts: EngineOptions): Engine {
       await store.upsertSubject(PLAN, ref, plan);
     }
 
+    if (!plan.retried) {
+      await retryBlocked(plan, event);
+      plan.retried = true;
+      await store.upsertSubject(PLAN, ref, plan);
+    }
+
     const results: EffectOutcome[] = [];
     for (const [i, effect] of plan.effects.entries()) {
       const done = plan.outcomes[i];
@@ -330,7 +454,7 @@ export function createEngine(opts: EngineOptions): Engine {
 
       let outcome: EffectOutcome;
       try {
-        outcome = { effect, status: "applied", note: await apply(effect, event), at: now() };
+        outcome = { effect, status: "applied", note: await apply(effect, event, plan), at: now() };
       } catch (error) {
         if (error instanceof Skip) {
           outcome = { effect, status: "skipped", note: error.message, at: now() };

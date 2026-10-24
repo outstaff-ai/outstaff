@@ -177,6 +177,14 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       notify(created.person);
       return created;
     },
+    async retry(itemId, request) {
+      const item = await baseScheduler.retry(itemId, request);
+      if (item) {
+        notify(item.person);
+      }
+
+      return item;
+    },
   };
 
   const engine = createEngine({

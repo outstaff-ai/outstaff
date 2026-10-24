@@ -255,6 +255,10 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
       expect(await store.countLoopGuard(item.id, 90_000)).toBe(1);
       expect(await store.countLoopGuard(item.id, 1_000)).toBe(0);
       expect(await store.countLoopGuard(other.id, 10 * 60_000)).toBe(1);
+
+      await store.clearLoopGuard(item.id);
+      expect(await store.countLoopGuard(item.id, 10 * 60_000)).toBe(0);
+      expect(await store.countLoopGuard(other.id, 10 * 60_000)).toBe(1);
     });
 
     it("orders the queue by priority, then position, then age", async () => {
