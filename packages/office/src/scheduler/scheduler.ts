@@ -3,7 +3,9 @@ import type { Clock } from "../clock.js";
 import type { NewWorkItem, Run, Store, WorkItem } from "../store/types.js";
 import {
   CHAT_KIND,
+  DEFAULT_RETRY,
   HOUR_MS,
+  backoffMs,
   isLoopGuarded,
   loopGuardVerdict,
   orderQueue,
@@ -51,7 +53,7 @@ export type StartResult =
   | { started: true; item: WorkItem; run: Run }
   | {
       started: false;
-      reason: "not_queued" | "busy" | RunBlock["code"] | "loop_guard";
+      reason: "not_queued" | "busy" | "backoff" | RunBlock["code"] | "loop_guard";
       detail: string;
 
       /** Set when the attempt blocked the item (loop guard). */
@@ -61,12 +63,15 @@ export type StartResult =
 export interface BlockNotice {
   item: WorkItem;
   reason: string;
-  code: "loop_guard" | "stale" | "manual";
+  code: "loop_guard" | "stale" | "failures" | "manual";
 }
 
 export interface TickResult {
   /** Stale items sent back to the queue for their one retry. */
   retried: WorkItem[];
+
+  /** Failed items whose backoff ran out; they can be offered again. */
+  released: WorkItem[];
 
   /** Items the tick blocked: stale twice, or tripped by the loop guard. */
   blocked: BlockNotice[];
@@ -81,6 +86,16 @@ export interface FinishInput {
   usage?: unknown;
 }
 
+export interface FailResult {
+  item: WorkItem;
+
+  /** Set when this failure was the last one allowed and blocked the item. */
+  blocked?: BlockNotice;
+
+  /** When a queued item may run again. */
+  notBefore?: string;
+}
+
 export interface PauseState {
   team: { reason: string | null; since: string } | null;
   people: Record<string, { reason: string | null; since: string }>;
@@ -91,7 +106,7 @@ export interface Scheduler {
 
   /**
    * The item the person should run next, or null: while one is active, while
-   * paused, and when every queued item is held back by a policy. Does not change state.
+   * paused, and when every queued item is held back by a policy or by a failure backoff. Does not change state.
    */
   next(person: string): Promise<WorkItem | null>;
 
@@ -101,6 +116,12 @@ export interface Scheduler {
   /** Records activity so the item is not considered stale. */
   heartbeat(itemId: string): Promise<void>;
   finish(itemId: string, input: FinishInput): Promise<WorkItem>;
+
+  /**
+   * Ends the run as failed. The item goes back to the queue but is held back with exponential backoff; after
+   * `policies.retry.max_failures` failures in a row it is blocked instead.
+   */
+  fail(itemId: string, error: string): Promise<FailResult>;
 
   /** Blocks the item and journals the reason. */
   block(itemId: string, reason: string): Promise<BlockNotice>;
@@ -150,6 +171,11 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     chain = run.catch(() => undefined);
     return run;
   };
+
+  const retry = { ...DEFAULT_RETRY, ...team.policies?.retry };
+
+  const backingOff = (item: Pick<WorkItem, "notBefore">) =>
+    item.notBefore !== null && Date.parse(item.notBefore) > clock.now().getTime();
 
   const getWindows = async (person: string): Promise<UsageWindow[]> => {
     if (!opts.usage) {
@@ -290,6 +316,10 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
       const windows = await getWindows(person);
       for (const item of queue) {
+        if (backingOff(item)) {
+          continue;
+        }
+
         if (await usageBlock(person, item, windows)) {
           continue;
         }
@@ -320,6 +350,14 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
             started: false,
             reason: "busy",
             detail: `${item.person} already has an active item.`,
+          };
+        }
+
+        if (backingOff(item)) {
+          return {
+            started: false,
+            reason: "backoff",
+            detail: `Held back after a failed run until ${item.notBefore}.`,
           };
         }
 
@@ -363,7 +401,54 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
           });
         }
 
-        return store.updateItem(itemId, { status: input.status ?? "done" });
+        const status = input.status ?? "done";
+        // Finishing the work is a success; a plain requeue is not.
+        return store.updateItem(itemId, {
+          status,
+          ...(status === "queued" ? {} : { failures: 0, notBefore: null }),
+        });
+      });
+    },
+
+    fail(itemId, error) {
+      return exclusive(async () => {
+        const item = await store.getItem(itemId);
+        if (!item) {
+          throw new Error(`unknown work item: ${itemId}`);
+        }
+
+        const run = await openRun(itemId);
+        if (run) {
+          await store.finishRun(run.id, { outcome: "failed", error });
+        }
+
+        const failures = item.failures + 1;
+        if (failures >= retry.max_failures) {
+          const firstLine = error.split("\n", 1)[0]?.trim() || "unknown error";
+          const blocked = await blockItem(
+            item,
+            `failed ${failures} times: ${firstLine}`,
+            "failures",
+          );
+
+          // A human who unblocks the item starts it with a clean count.
+          const reset = await store.updateItem(itemId, { failures: 0, notBefore: null });
+          return { item: reset, blocked: { ...blocked, item: reset } };
+        }
+
+        const notBefore = new Date(
+          clock.now().getTime() + backoffMs(failures, retry),
+        ).toISOString();
+
+        const updated = await store.updateItem(itemId, { status: "queued", failures, notBefore });
+        await store.appendJournal(
+          itemId,
+          "scheduler",
+          `Failed ${failures} of ${retry.max_failures} times; retrying after ${notBefore}.`,
+        );
+
+        log.warn("work item failed; backing off", { item: itemId, failures, notBefore });
+        return { item: updated, notBefore };
       });
     },
 
@@ -408,7 +493,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
     tick() {
       return exclusive(async () => {
-        const result: TickResult = { retried: [], blocked: [] };
+        const result: TickResult = { retried: [], released: [], blocked: [] };
         const now = clock.now();
 
         for (const item of await store.listItems({ status: "active" })) {
@@ -446,6 +531,13 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
                 "stale",
               ),
             );
+          }
+        }
+
+        // Backoff that ran out: clear it so the person is told there is work again.
+        for (const item of await store.listItems({ status: "queued" })) {
+          if (item.notBefore !== null && !backingOff(item)) {
+            result.released.push(await store.updateItem(item.id, { notBefore: null }));
           }
         }
 

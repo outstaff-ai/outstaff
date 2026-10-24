@@ -52,6 +52,8 @@ export interface WorkSource {
     workItemId: string,
     result: { summary: string; links: Link[]; status: "done" | "waiting" | "blocked" },
   ): Promise<void>;
+
+  /** Counts a failed run: the item is held back with backoff, and blocked after repeated failures. */
   fail(person: string, workItemId: string, reason: string): Promise<void>;
 
   roster(): Promise<Member[]>;

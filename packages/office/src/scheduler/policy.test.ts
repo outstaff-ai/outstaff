@@ -3,6 +3,7 @@ import {
   PRIORITY,
   compareQueue,
   isLoopGuarded,
+  backoffMs,
   loopGuardVerdict,
   orderQueue,
   peakWindow,
@@ -212,5 +213,14 @@ describe("stale verdict", () => {
     expect(trailingStale(["stale", "ok", null])).toBe(0);
     expect(trailingStale(["ok", "stale", "stale"])).toBe(2);
     expect(trailingStale(["stale", "ok"])).toBe(0);
+  });
+});
+
+describe("backoffMs", () => {
+  it("doubles from the base and stops at the cap", () => {
+    const retry = { base_minutes: 1, cap_minutes: 30 };
+    expect([1, 2, 3, 4, 5, 6, 7, 20].map((n) => backoffMs(n, retry) / 60_000)).toEqual([
+      1, 2, 4, 8, 16, 30, 30, 30,
+    ]);
   });
 });

@@ -4,7 +4,7 @@ import { ProtocolError, type Offer, type WorkSource } from "./protocol/source.js
 import { readRoster, type RosterOptions } from "./messaging/roster.js";
 import { publicOrigin, readOrigin } from "./chat/origin.js";
 import { placeQueued } from "./chat/placement.js";
-import type { Scheduler } from "./scheduler/scheduler.js";
+import type { BlockNotice, Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { PrRecord, TicketRecord } from "./workstate/index.js";
 
@@ -121,6 +121,9 @@ export interface WorkSourceOptions {
   /** Called after the item left `active` because of a hand-back, so the workflow can react (move the ticket, notify). */
   onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;
 
+  /** Called after the scheduler blocked an item on its own (repeated failures, loop guard), so the requester hears of it. */
+  onBlocked?: (notice: BlockNotice) => void | Promise<void>;
+
   /** Called after an item went back to the queue because the agent asked for it. */
   notify?: (person: string) => void;
 }
@@ -197,6 +200,10 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
       const started = await scheduler.markActive(item.id);
       if (!started.started) {
+        if (started.blocked) {
+          await opts.onBlocked?.(started.blocked);
+        }
+
         return undefined;
       }
 
@@ -280,7 +287,10 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       }
 
       await store.appendJournal(id, person, `The run failed: ${reason}`);
-      await scheduler.finish(id, { outcome: "failed", error: reason, status: "queued" });
+      const failed = await scheduler.fail(id, reason);
+      if (failed.blocked) {
+        await opts.onBlocked?.(failed.blocked);
+      }
     },
 
     async roster(): Promise<Member[]> {

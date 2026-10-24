@@ -280,6 +280,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ports: { ...(ports.tracker ? { tracker: ports.tracker } : {}), vcs: ports.vcs },
     roles,
     notify,
+    onBlocked: (b) => chatDesk.notifyBlocked(b.item, b.reason),
     onHandedBack: async (item, result) => {
       await chatDesk.handedBack(item, result);
       await handedBack(item);
@@ -396,6 +397,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
         up.intake = true;
         baseScheduler.start((result) => {
           for (const item of result.retried) {
+            notify(item.person);
+          }
+
+          for (const item of result.released) {
             notify(item.person);
           }
 

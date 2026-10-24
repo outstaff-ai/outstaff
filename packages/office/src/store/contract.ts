@@ -303,6 +303,34 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
       expect(got.filter((x) => x !== undefined)).toHaveLength(0);
     });
 
+    it("stores failures and not_before", async () => {
+      const a = await store.enqueue({ person: "ann", kind: "k", title: "a", trigger: "human" });
+      expect(a).toMatchObject({ failures: 0, notBefore: null });
+      await store.updateItem(a.id, { failures: 2, notBefore: "2030-01-01T00:04:00.000Z" });
+      expect(await store.getItem(a.id)).toMatchObject({
+        failures: 2,
+        notBefore: "2030-01-01T00:04:00.000Z",
+      });
+
+      await store.updateItem(a.id, { failures: 0, notBefore: null });
+      expect(await store.getItem(a.id)).toMatchObject({ failures: 0, notBefore: null });
+    });
+
+    it("keeps failures and not_before across a restart", async () => {
+      if (!h.persistent) {
+        return;
+      }
+
+      const a = await store.enqueue({ person: "ann", kind: "k", title: "a", trigger: "human" });
+      await store.updateItem(a.id, { failures: 2, notBefore: "2030-01-01T00:04:00.000Z" });
+      await store.close();
+      await open();
+      expect(await store.getItem(a.id)).toMatchObject({
+        failures: 2,
+        notBefore: "2030-01-01T00:04:00.000Z",
+      });
+    });
+
     it("persists pauses by scope", async () => {
       expect(await store.listPauses()).toEqual([]);
       await store.setPause("team", "release freeze");
