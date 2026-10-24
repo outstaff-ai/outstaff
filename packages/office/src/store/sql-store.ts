@@ -62,6 +62,8 @@ const toItem = (r: Selectable<Database["work_items"]>): WorkItem => ({
   trigger: r.trigger,
   attempts: Number(r.attempts),
   position: Number(r.position),
+  failures: Number(r.failures),
+  notBefore: r.not_before,
 });
 
 const toRun = (r: Selectable<Database["runs"]>): Run => ({
@@ -214,6 +216,7 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
           updated_at: iso(at),
           trigger: input.trigger,
           attempts: 0,
+          not_before: null,
           position,
         })
         .returningAll()
@@ -336,6 +339,14 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
 
       if (patch.position !== undefined) {
         set["position"] = patch.position;
+      }
+
+      if (patch.failures !== undefined) {
+        set["failures"] = patch.failures;
+      }
+
+      if (patch.notBefore !== undefined) {
+        set["not_before"] = patch.notBefore;
       }
 
       if (patch.sessionId !== undefined) {

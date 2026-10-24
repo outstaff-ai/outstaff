@@ -14,6 +14,7 @@ const team = {
   policies: {
     agent_loop_guard: { max_runs_per_item_per_hour: 3 },
     usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
+    retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
   },
 } as Pick<TeamConfig, "policies">;
 
@@ -512,7 +513,7 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       const a = await add("a");
       await sched.markActive(a.id);
       clock.advance(9 * 60_000);
-      expect(await sched.tick()).toEqual({ retried: [], blocked: [] });
+      expect(await sched.tick()).toEqual({ retried: [], released: [], blocked: [] });
 
       clock.advance(2 * 60_000);
       const first = await sched.tick();
@@ -591,6 +592,130 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       expect(await sched.next("ann")).toBeNull();
       await sched.finish(active.id, { outcome: "ok" });
       expect((await sched.next("ann"))?.title).toBe("later");
+    });
+  });
+
+  describe("failure backoff", () => {
+    const failRun = async (person = "ann", error = "boom") => {
+      const item = await runNext(person);
+      return { item, result: await sched.fail(item.id, error) };
+    };
+
+    it("holds a failed item back 1, 2 minutes and blocks on the third failure", async () => {
+      const a = await add("a");
+      const t0 = clock.now().getTime();
+
+      const first = await failRun();
+      expect(first.result.item).toMatchObject({ status: "queued", failures: 1 });
+      expect(first.result.notBefore).toBe(new Date(t0 + 60_000).toISOString());
+      expect(await sched.next("ann")).toBeNull();
+      expect(await sched.markActive(a.id)).toMatchObject({ started: false, reason: "backoff" });
+
+      clock.advance(59_000);
+      expect(await sched.next("ann")).toBeNull();
+      clock.advance(1_000);
+      expect((await sched.next("ann"))?.id).toBe(a.id);
+
+      const second = await failRun();
+      expect(second.result.notBefore).toBe(new Date(clock.now().getTime() + 120_000).toISOString());
+      expect(await sched.next("ann")).toBeNull();
+      clock.advance(120_000);
+
+      const third = await failRun("ann", "tool missing\nstack line");
+      expect(third.result.blocked).toMatchObject({
+        code: "failures",
+        reason: "failed 3 times: tool missing",
+      });
+
+      expect(await store.getItem(a.id)).toMatchObject({
+        status: "blocked",
+        failures: 0,
+        notBefore: null,
+      });
+
+      expect((await store.listRuns(a.id)).map((r) => r.outcome)).toEqual([
+        "failed",
+        "failed",
+        "failed",
+      ]);
+    });
+
+    it("caps the wait", async () => {
+      const capped = createScheduler({
+        store,
+        team: {
+          policies: {
+            ...team.policies!,
+            retry: { base_minutes: 4, cap_minutes: 5, max_failures: 5 },
+          },
+        },
+        clock,
+      });
+
+      const a = await capped.enqueue({ person: "ann", kind: "task", title: "a", trigger: "human" });
+      const waits: number[] = [];
+      for (let i = 0; i < 3; i++) {
+        await capped.markActive(a.id);
+        const r = await capped.fail(a.id, "x");
+        waits.push(Date.parse(r.notBefore!) - clock.now().getTime());
+        clock.advance(5 * 60_000);
+      }
+
+      expect(waits).toEqual([4 * 60_000, 5 * 60_000, 5 * 60_000]);
+    });
+
+    it("lets other queued items run while a failed one waits", async () => {
+      const a = await add("a");
+      await add("b");
+      await failRun();
+      expect((await sched.next("ann"))?.title).toBe("b");
+      const b = await runNext();
+      await sched.finish(b.id, { outcome: "ok" });
+      expect(await sched.next("ann")).toBeNull();
+      clock.advance(60_000);
+      expect((await sched.next("ann"))?.id).toBe(a.id);
+    });
+
+    it("keeps not_before across a restart", async () => {
+      const a = await add("a");
+      await failRun();
+      await store.close();
+      store = await h.open(() => clock.now());
+      sched = build();
+      expect(await sched.next("ann")).toBeNull();
+      clock.advance(60_000);
+      expect((await sched.next("ann"))?.id).toBe(a.id);
+      expect(await store.getItem(a.id)).toMatchObject({ failures: 1 });
+    });
+
+    it("resets the count on success", async () => {
+      await add("a");
+      await failRun();
+      clock.advance(60_000);
+      await failRun();
+      clock.advance(120_000);
+      const item = await runNext();
+      await sched.finish(item.id, { outcome: "ok", status: "waiting" });
+      expect(await store.getItem(item.id)).toMatchObject({ failures: 0, notBefore: null });
+    });
+
+    it("does not count a plain requeue as a success", async () => {
+      await add("a");
+      const { item } = await failRun();
+      await store.updateItem(item.id, { status: "active" });
+      await sched.finish(item.id, { outcome: "again", status: "queued" });
+      expect(await store.getItem(item.id)).toMatchObject({ failures: 1 });
+    });
+
+    it("tells the tick when a backoff ran out", async () => {
+      await add("a");
+      const { item } = await failRun();
+      expect((await sched.tick()).released).toEqual([]);
+      clock.advance(60_000);
+      const released = (await sched.tick()).released;
+      expect(released.map((i) => i.id)).toEqual([item.id]);
+      expect(await store.getItem(item.id)).toMatchObject({ notBefore: null, failures: 1 });
+      expect((await sched.tick()).released).toEqual([]);
     });
   });
 });

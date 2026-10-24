@@ -1151,6 +1151,39 @@
           },
           "additionalProperties": false
         },
+        "retry": {
+          "default": {
+            "base_minutes": 1,
+            "cap_minutes": 30,
+            "max_failures": 3
+          },
+          "description": "How a failing work item is retried: exponential backoff, then blocked.",
+          "type": "object",
+          "properties": {
+            "base_minutes": {
+              "default": 1,
+              "description": "Wait after the first failed run of a work item; doubles with each failure.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "cap_minutes": {
+              "default": 30,
+              "description": "Longest wait between two attempts at a failing work item.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "max_failures": {
+              "default": 3,
+              "description": "Consecutive failed runs after which the work item is blocked and its requester told.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
         "messages": {
           "default": {
             "max_lines": 3,

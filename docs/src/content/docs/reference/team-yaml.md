@@ -1057,6 +1057,41 @@ Groups of people who use one LLM subscription, as lists of handles. A usage repo
 - Optional
 - Minimum length 1
 
+### policies.retry
+
+How a failing work item is retried: exponential backoff, then blocked.
+
+- Type: `object`
+- Optional
+- Default: `{"base_minutes":1,"cap_minutes":30,"max_failures":3}`
+
+#### policies.retry.base_minutes
+
+Wait after the first failed run of a work item; doubles with each failure.
+
+- Type: `integer`
+- Optional
+- Default: `1`
+- Minimum 1
+
+#### policies.retry.cap_minutes
+
+Longest wait between two attempts at a failing work item.
+
+- Type: `integer`
+- Optional
+- Default: `30`
+- Minimum 1
+
+#### policies.retry.max_failures
+
+Consecutive failed runs after which the work item is blocked and its requester told.
+
+- Type: `integer`
+- Optional
+- Default: `3`
+- Minimum 1
+
 ### policies.messages
 
 How agents write chat messages.

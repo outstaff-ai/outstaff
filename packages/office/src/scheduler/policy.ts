@@ -227,3 +227,20 @@ export function trailingStale(outcomes: readonly (string | null)[]): number {
 
   return n;
 }
+
+export interface RetryPolicy {
+  base_minutes: number;
+  cap_minutes: number;
+  max_failures: number;
+}
+
+export const DEFAULT_RETRY: RetryPolicy = { base_minutes: 1, cap_minutes: 30, max_failures: 3 };
+
+/** Wait after the n-th consecutive failure (n >= 1): base * 2^(n-1), at most the cap. */
+export function backoffMs(
+  failures: number,
+  retry: Pick<RetryPolicy, "base_minutes" | "cap_minutes">,
+) {
+  const minutes = Math.min(retry.base_minutes * 2 ** Math.max(0, failures - 1), retry.cap_minutes);
+  return minutes * 60_000;
+}

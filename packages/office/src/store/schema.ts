@@ -43,6 +43,8 @@ export interface WorkItemsTable {
   trigger: WorkItemTrigger;
   attempts: number;
   position: number;
+  failures: Generated<number>;
+  not_before: string | null;
 }
 
 export interface RunsTable {

@@ -15,6 +15,7 @@ export const CONFIG_CODES = {
   peopleUnknownRepo: "people.unknown_repo",
   emailMissingPlaceholder: "email.missing_placeholder",
   usageThresholdOrder: "policies.usage_threshold_order",
+  retryBackoffOrder: "policies.retry_backoff_order",
   usageSharedUnknownPerson: "policies.usage_shared_unknown_person",
   usageSharedOverlap: "policies.usage_shared_overlap",
   toolsInvalidVersion: "tools.invalid_version",

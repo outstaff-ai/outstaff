@@ -127,6 +127,7 @@ describe("parseTeamConfig", () => {
     expect(r.config.policies).toEqual({
       agent_loop_guard: { max_runs_per_item_per_hour: 12 },
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
+      retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
     });
   });
@@ -346,6 +347,22 @@ describe("parseTeamConfig", () => {
         code: "policies.usage_threshold_order",
         message: expect.any(String),
       },
+    ]);
+  });
+
+  it("checks the retry policy", () => {
+    expect(
+      bad((c) => (c.policies.retry = { base_minutes: 40, cap_minutes: 30, max_failures: 3 })),
+    ).toEqual([
+      {
+        path: ["policies", "retry", "base_minutes"],
+        code: "policies.retry_backoff_order",
+        message: expect.any(String),
+      },
+    ]);
+
+    expect(bad((c) => (c.policies.retry = { max_failures: 0 }))).toEqual([
+      expect.objectContaining({ path: ["policies", "retry", "max_failures"] }),
     ]);
   });
 

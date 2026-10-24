@@ -242,6 +242,41 @@ const policiesSchema = z
       })
       .default({ defer_scheduled_at: 0.85, pause_automatic_at: 0.95 })
       .meta(d("Thresholds that slow down work as the LLM usage limit approaches.")),
+    retry: z
+      .strictObject({
+        base_minutes: z
+          .int()
+          .min(1)
+          .default(1)
+          .meta(d("Wait after the first failed run of a work item; doubles with each failure.")),
+        cap_minutes: z
+          .int()
+          .min(1)
+          .default(30)
+          .meta(d("Longest wait between two attempts at a failing work item.")),
+        max_failures: z
+          .int()
+          .min(1)
+          .default(3)
+          .meta(
+            d(
+              "Consecutive failed runs after which the work item is blocked and its requester told.",
+            ),
+          ),
+      })
+      .superRefine((v, ctx) => {
+        if (v.base_minutes > v.cap_minutes) {
+          ctx.addIssue(
+            customIssue(
+              CONFIG_CODES.retryBackoffOrder,
+              "base_minutes must not exceed cap_minutes.",
+              ["base_minutes"],
+            ),
+          );
+        }
+      })
+      .default({ base_minutes: 1, cap_minutes: 30, max_failures: 3 })
+      .meta(d("How a failing work item is retried: exponential backoff, then blocked.")),
     messages: z
       .strictObject({
         max_lines: z

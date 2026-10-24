@@ -376,9 +376,13 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     runtime.enqueue([{ type: "finish", text: "Done: https://git.acme.example/acme/app/pull/9" }]);
     await dana("please add a search page");
     startLoop();
-    // The scheduler offers the item again at once, so wait for the end of the story, not for a step of it:
-    // the first failure posts, the second stays quiet, and the success reports the result.
-    await until(() => agentChat.posts.some((p) => p.text.includes("pull/9")));
+    // A failed item waits out its backoff on the clock (1, then 2 minutes). Wait for the end of the story, not
+    // for a step of it: the first failure posts, the second stays quiet, and the success reports the result.
+    await until(() => {
+      clock.advance(5_000);
+      return agentChat.posts.some((p) => p.text.includes("pull/9"));
+    });
+
     expect(agentChat.posts).toHaveLength(2);
     expect(agentChat.posts[0]!.text).toContain("could not finish this");
     expect(agentChat.posts[0]!.text).toContain("model overloaded");

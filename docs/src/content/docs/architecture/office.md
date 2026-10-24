@@ -95,6 +95,12 @@ A human chat request starts at once when the person is idle. When the person is 
 
 A run of an agent- or automation-triggered item is counted when it starts. When an item already had `policies.agent_loop_guard.max_runs_per_item_per_hour` runs in the last hour, it is blocked instead of started, and the reason is returned to the caller (and written to the item's journal) so the workflow engine can comment and notify. `tick()` also blocks queued items that tripped the guard. Human-triggered and scheduled runs are never limited.
 
+### Failed runs
+
+When an agent reports that a run failed, `fail(itemId, error)` ends the run as `failed`, counts a consecutive failure on the item, and puts it back in the queue with `not_before = now + min(base * 2^(n-1), cap)`. The defaults are 1 minute and 30 minutes (so 1, 2, 4, 8, 16, 30, 30 ...) and come from `policies.retry` (`base_minutes`, `cap_minutes`, `max_failures`). `next` skips an item whose `not_before` is still in the future, so the person's other queued items run meanwhile, and `markActive` refuses it with `backoff`. The count and `not_before` are columns of the work item, so a restart keeps them; nothing is a timer in memory. Every `tick()` clears the `not_before` that ran out and the office tells the agent there is work again.
+
+After `policies.retry.max_failures` failures in a row (default 3) the item is blocked with the reason `failed N times: <first line of the last error>`. It goes through the same path as a loop-guard block: the reason is written to the journal and the office announces it to the requester and the person's chat. A successful hand-back (`done` or `waiting`) resets the count, and so does blocking, so a human who unblocks the item starts with a clean count. A stale run is not a failure; it keeps its own retry-once rule.
+
 ### Usage policy
 
 An injected `UsageSource` reports the 5-hour and 7-day utilization. The busiest window counts:

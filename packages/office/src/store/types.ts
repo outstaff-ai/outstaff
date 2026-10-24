@@ -48,6 +48,12 @@ export interface WorkItem {
   trigger: WorkItemTrigger;
   attempts: number;
   position: number;
+
+  /** Consecutive failed runs; a successful hand-back resets it. */
+  failures: number;
+
+  /** The item is not offered before this time (ISO-8601), or null. */
+  notBefore: string | null;
 }
 
 export interface WorkItemPatch {
@@ -55,6 +61,8 @@ export interface WorkItemPatch {
   title?: string;
   priority?: number;
   position?: number;
+  failures?: number;
+  notBefore?: string | null;
   sessionId?: string | null;
   workspace?: string | null;
   subject?: { type: string; ref: string };
