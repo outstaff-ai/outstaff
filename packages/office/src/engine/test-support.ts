@@ -1,4 +1,4 @@
-import type { Member, TeamConfig, WorkflowEvent } from "@outstaff/core";
+import type { Logger, Member, TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { createFakeChat, createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { manualClock } from "../clock.js";
 import { createIntake } from "../intake/index.js";
@@ -16,6 +16,7 @@ export interface HarnessOptions {
   noChat?: boolean;
   team?: TeamConfig;
   workflow?: Record<string, unknown>;
+  logger?: Logger;
 }
 
 /** Fakes -> intake -> work state -> engine -> fakes, all on an in-memory store and a manual clock. */
@@ -45,11 +46,11 @@ export async function harness(o: HarnessOptions = {}) {
     ports: { vcs, tracker },
     team,
     clock,
-    logger: silent,
+    logger: o.logger ?? silent,
   });
 
   // Intake sees only the VCS: tracker events are delivered by hand so a test controls who caused them.
-  const intake = createIntake({ store, ports: { vcs }, team, clock, logger: silent });
+  const intake = createIntake({ store, ports: { vcs }, team, clock, logger: o.logger ?? silent });
   const scheduler = createScheduler({ store, team, clock, logger: silent });
   const engine = createEngine({
     store,
@@ -57,7 +58,7 @@ export async function harness(o: HarnessOptions = {}) {
     scheduler,
     team,
     clock,
-    logger: silent,
+    logger: o.logger ?? silent,
     ports: { ...(tracked ? { tracker: tracked } : {}), ...(o.noChat ? {} : { chat }) },
   });
 

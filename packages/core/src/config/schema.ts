@@ -366,6 +366,16 @@ export const teamConfigSchema = z
           .max(3600)
           .default(60)
           .meta(d('Seconds between polls when events is "poll".')),
+        poll_warn_after_minutes: z
+          .int()
+          .min(1)
+          .max(1440)
+          .optional()
+          .meta(
+            d(
+              "Minutes without a successful poll of an event source before the office logs a warning. Default 10.",
+            ),
+          ),
         channel: z
           .string()
           .min(1)

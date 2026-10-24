@@ -681,6 +681,15 @@ Seconds between polls when events is "poll".
 - Minimum 10
 - Maximum 3600
 
+### office.poll_warn_after_minutes
+
+Minutes without a successful poll of an event source before the office logs a warning. Default 10.
+
+- Type: `integer`
+- Optional
+- Minimum 1
+- Maximum 1440
+
 ### office.channel
 
 Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.

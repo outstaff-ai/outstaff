@@ -1,10 +1,10 @@
 import {
   createStaticWorkflowState,
+  describeEffect,
   explainWorkflow,
   formatIssue,
   resolveWorkflow,
   WORKFLOW_EVENT_TYPES,
-  type Effect,
   type StaticWorkflowData,
   type WorkflowEvent,
   type WorkflowEventType,
@@ -50,21 +50,6 @@ function parseEvent(text: string): WorkflowEvent {
     actor,
     data,
   } as WorkflowEvent;
-}
-
-function describeEffect(e: Effect): string {
-  switch (e.type) {
-    case "move":
-      return `move ${e.ticket} to ${e.to}`;
-    case "assign":
-      return `assign ${e.ticket} to ${e.to ? `${e.to.kind} ${e.to.id}` : "nobody"}`;
-    case "comment":
-      return `comment "${e.template}" on ${"ticket" in e.on ? e.on.ticket : `pull request #${e.on.pr.number}`}`;
-    case "schedule":
-      return `schedule ${e.kind} for ${e.person} (${e.priority})`;
-    case "notify":
-      return `notify ${e.to.kind}${e.to.id ? ` ${e.to.id}` : ""} with "${e.template}"`;
-  }
 }
 
 export const explain = defineCommand<{ state?: string }>({

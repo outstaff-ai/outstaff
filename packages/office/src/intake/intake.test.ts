@@ -250,6 +250,9 @@ describe("dedupe and cursors", () => {
   });
 });
 
+const baselines = (info: { mock: { calls: unknown[][] } }) =>
+  info.mock.calls.filter(([m]) => String(m).startsWith("intake: baseline"));
+
 describe("first poll baseline", () => {
   const quiet = () => {
     const info = vi.fn<(message: string) => void>();
@@ -279,7 +282,7 @@ describe("first poll baseline", () => {
     await vcs.seed.comment(REPO, 1, "dana", "new");
     await intake.pollOnce();
     expect(events.map((e) => e.event.type).toSorted()).toEqual(["pr.comment", "ticket.moved"]);
-    expect(info).toHaveBeenCalledTimes(2);
+    expect(baselines(info)).toHaveLength(2);
   });
 
   it("does not re-baseline after a restart with a stored cursor", async () => {
@@ -298,7 +301,7 @@ describe("first poll baseline", () => {
     await first.vcs.seed.pullRequest(REPO, { ...pr });
     await second.intake.pollOnce();
     expect(second.events.map((e) => e.event.type)).toEqual(["pr.opened"]);
-    expect(info).not.toHaveBeenCalled();
+    expect(baselines(info)).toEqual([]);
   });
 
   it("baselines on start in poll mode and does not enqueue history", async () => {

@@ -1,6 +1,7 @@
 import { parseRepoUrl, PortError } from "@outstaff/core";
-import type { RepoRef, TrackerEvent, VcsEvent, WorkflowEvent } from "@outstaff/core";
+import type { RepoRef, TrackerEvent, UnmappedEvent, VcsEvent, WorkflowEvent } from "@outstaff/core";
 import type { Cancel } from "../clock.js";
+import { clip, prLabel, subjectLabel } from "../log.js";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffOptions } from "./backoff.js";
 import { normalizeTrackerEvent, normalizeVcsEvent } from "./normalize.js";
 import { createTrust } from "./trust.js";
@@ -9,6 +10,7 @@ import { createWebhookServer, type WebhookParser, type WebhookServer } from "./w
 
 const CURSOR_KEY = "events";
 const DEFAULT_MAX_ATTEMPTS = 5;
+const DEFAULT_STALE_POLL_MINUTES = 10;
 
 interface StoredPayload {
   raw: { externalId: string; type: string };
@@ -20,6 +22,10 @@ export function createIntake(opts: IntakeOptions): Intake {
   const { store, ports, team, clock, logger } = opts;
   const mode = team.office?.events ?? "poll";
   const intervalMs = (team.office?.poll_interval_seconds ?? 60) * 1000;
+  const stalePollMs =
+    (opts.stalePollMinutes ?? team.office?.poll_warn_after_minutes ?? DEFAULT_STALE_POLL_MINUTES) *
+    60_000;
+
   const backoff: BackoffOptions = { ...DEFAULT_BACKOFF, ...opts.backoff };
   const repos: RepoRef[] = team.repos.map((r) => {
     const { host, owner, name } = parseRepoUrl(r.url);
@@ -48,7 +54,7 @@ export function createIntake(opts: IntakeOptions): Intake {
         await handler(event, meta);
       } catch (error) {
         failure ??= error;
-        logger.warn("event handler failed", { type: event.type, error: String(error) });
+        logger.warn("event handler failed", { type: event.type, error: clip(String(error)) });
       }
     }
 
@@ -122,11 +128,21 @@ export function createIntake(opts: IntakeOptions): Intake {
   const ingest = async (
     source: IntakeMeta["source"],
     raw: { externalId: string; type: string },
+    subject: string,
     normalize: () => Promise<{ event: WorkflowEvent; trusted: boolean } | undefined>,
   ) => {
+    const dropped = (reason: string) =>
+      logger.info(`intake: dropped ${source} ${raw.type} on ${subject}: ${reason}`, {
+        source,
+        type: raw.type,
+        subject,
+        externalId: raw.externalId,
+        reason,
+      });
+
     const result = await normalize();
     if (!result) {
-      logger.debug("event not mapped", { source, type: raw.type });
+      dropped("the office does not map this event type");
       return;
     }
 
@@ -138,20 +154,53 @@ export function createIntake(opts: IntakeOptions): Intake {
       payload,
     });
 
-    if (fresh) {
-      await drain();
+    const { event } = result;
+    const where = subjectLabel(event.subject);
+    if (!fresh) {
+      dropped("duplicate of an event already recorded");
+      return;
+    }
+
+    logger.info(
+      `intake: recorded ${source} ${event.type} on ${where} by ${event.actor.id} (${result.trusted ? "trusted" : "untrusted"})`,
+      {
+        source,
+        type: event.type,
+        subject: where,
+        actor: event.actor.id,
+        actorKind: event.actor.kind,
+        trusted: result.trusted,
+      },
+    );
+
+    await drain();
+  };
+
+  const logUnmapped = (source: IntakeMeta["source"], page: { unmapped?: UnmappedEvent[] }) => {
+    for (const u of page.unmapped ?? []) {
+      const subject = u.repo ? `${u.repo.owner}/${u.repo.name}` : source;
+      logger.info(
+        `intake: dropped ${source} ${u.type} on ${subject}: the adapter does not map this event type`,
+        {
+          source,
+          type: u.type,
+          subject,
+          externalId: u.externalId,
+          reason: "the adapter does not map this event type",
+        },
+      );
     }
   };
 
   const ingestVcs = (event: VcsEvent) =>
-    ingest("vcs", event, async () => {
+    ingest("vcs", event, prLabel(event), async () => {
       const actor = await trust.vcsActor(event.repo, event.actor);
       const mapped = normalizeVcsEvent(event, actor);
       return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
     });
 
   const ingestTracker = (event: TrackerEvent) =>
-    ingest("tracker", event, async () => {
+    ingest("tracker", event, event.key, async () => {
       const actor = trust.trackerActor(event.actor);
       const mapped = normalizeTrackerEvent(event, actor);
       return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
@@ -179,6 +228,7 @@ export function createIntake(opts: IntakeOptions): Intake {
           return;
         }
 
+        logUnmapped("vcs", page);
         for (const event of page.events) {
           await ingestVcs(event);
         }
@@ -200,6 +250,7 @@ export function createIntake(opts: IntakeOptions): Intake {
           return;
         }
 
+        logUnmapped("tracker", page);
         for (const event of page.events) {
           await ingestTracker(event);
         }
@@ -209,6 +260,7 @@ export function createIntake(opts: IntakeOptions): Intake {
     });
   }
 
+  const lastOk = new Map<string, number>();
   const timers = new Map<string, Cancel>();
   const inFlight = new Set<Promise<void>>();
 
@@ -222,15 +274,31 @@ export function createIntake(opts: IntakeOptions): Intake {
           try {
             await source.poll();
             next = 0;
+            lastOk.set(source.name, clock.now().getTime());
           } catch (error) {
             next = failures + 1;
             delay = backoffDelay(error, next, backoff);
-            logger.warn("poll failed", {
-              source: source.name,
-              code: error instanceof PortError ? error.code : "error",
-              retryInMs: delay,
-              error: String(error),
-            });
+            const code = error instanceof PortError ? error.code : "error";
+            logger.error(
+              `intake: ${source.name} poll failed (${code}), retrying in ${Math.round(delay / 1000)}s`,
+              {
+                source: source.name,
+                code,
+                retryInMs: delay,
+                error: clip(String(error), 200),
+              },
+            );
+
+            const quietMs =
+              clock.now().getTime() - (lastOk.get(source.name) ?? clock.now().getTime());
+
+            if (quietMs >= stalePollMs) {
+              const minutes = Math.floor(quietMs / 60_000);
+              logger.warn(`intake: no successful ${source.name} poll for ${minutes} minutes`, {
+                source: source.name,
+                minutes,
+              });
+            }
           }
 
           if (running) {
@@ -281,6 +349,10 @@ export function createIntake(opts: IntakeOptions): Intake {
       }
 
       running = true;
+      for (const source of sources) {
+        lastOk.set(source.name, clock.now().getTime());
+      }
+
       await drain(true);
       if (mode === "webhook") {
         const parsers = webhookParsers();

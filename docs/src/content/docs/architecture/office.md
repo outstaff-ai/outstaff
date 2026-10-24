@@ -16,6 +16,17 @@ Intake turns activity in your repositories and tracker into deduplicated, normal
 - **poll** (default). Every `office.poll_interval_seconds` the office asks the VCS adapter for events across all team repos and, if a tracker is configured, the tracker adapter. Each source polls on its own timer.
 - **webhook**. The office listens for `POST /webhooks/vcs` and `POST /webhooks/tracker`. The adapter verifies the signature and parses the body; intake only does the HTTP. A bad signature gets `401`, a malformed body `400`, a source without adapter support `404`, an oversized body `413`. Adapters opt in by implementing the optional `parseWebhook(headers, body)` method of their port.
 
+### What the logs say
+
+Intake and the engine log at info level, so "the agent did not react" can be answered from the logs:
+
+- `intake: recorded <source> <type> on <repo#n or ticket> by <actor> (trusted|untrusted)` for every event kept.
+- `intake: dropped <source> <type> on <subject>: <reason>` for every event read but not kept. The reason is that the adapter does not map the event type, that the office does not map it (for example `pr.synchronize`), or that it is a duplicate.
+- `engine: rule <id> matched <type> on <subject>: <effects>` for each rule that matched, then `engine: scheduled review_feedback for sam on acme/app#8` (or moved, assigned, commented, notified) for each effect that was applied, and `engine: no rule matched <type> on <subject>` when none did. Effects that were skipped or failed are warnings.
+- A failed poll is an error. When a polled source has had no successful poll for `office.poll_warn_after_minutes` (default 10), each further failure also logs a warning with the minutes.
+
+Logs never carry message or comment bodies; error text is cut to a short length.
+
 ### Cursors, dedupe and restarts
 
 Each source keeps an opaque cursor in the store and sends it with the next poll, so a restart resumes where it stopped. The cursor only moves after the whole page was recorded. Every event is also recorded by `(source, externalId)`; a repeat is dropped. So a crash mid-page, a replayed page or a webhook redelivery never produces a second event.

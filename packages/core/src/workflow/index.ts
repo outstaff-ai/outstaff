@@ -21,6 +21,7 @@ export {
 
 export { WORKFLOW_PRESETS, presetRules, type WorkflowPreset } from "./presets.js";
 export { mergeRules, resolveWorkflow, type ResolvedWorkflow } from "./resolve.js";
+export { describeEffect } from "./describe.js";
 export {
   evaluateWorkflow,
   explainWorkflow,
