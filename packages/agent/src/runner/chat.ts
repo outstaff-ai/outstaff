@@ -1,4 +1,5 @@
 import {
+  createTicketLinker,
   policyOn,
   silentLogger,
   type Chat,
@@ -92,6 +93,10 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   const acknowledge = policyOn(team.policies, "acknowledge.chat");
   const hasPm = team.people.some((p) => p.role === "pm");
 
+  const linker = createTicketLinker(team, opts.tracker);
+
+  /** Ticket keys linked to the tracker by code, never by the model. */
+  const linked = (text: string) => linker.format(text, "chat");
   const post = async (channel: string, thread: string, text: string) => {
     try {
       await chat.post(channel, text, { thread });
@@ -195,7 +200,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
     const text = replyFor(result);
     if (text) {
-      await post(m.channel, thread, text);
+      await post(m.channel, thread, linked(text));
     }
   }
 
@@ -304,10 +309,12 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       await post(
         origin.channel,
         origin.thread,
-        [
-          `${tag(origin)}${a ? tracked : `On it. ${tracked}`}`,
-          ...(filed.waiting ? [placementQuestion(filed.work)] : []),
-        ].join("\n"),
+        linked(
+          [
+            `${tag(origin)}${a ? tracked : `On it. ${tracked}`}`,
+            ...(filed.waiting ? [placementQuestion(filed.work)] : []),
+          ].join("\n"),
+        ),
       );
     },
 
@@ -333,7 +340,11 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       );
 
       for (const t of threads) {
-        await post(t.channel, t.thread, [`${tag(t)}${body}`, ...all.map(linkLine)].join("\n"));
+        await post(
+          t.channel,
+          t.thread,
+          [linked(`${tag(t)}${body}`), ...all.map(linkLine)].join("\n"),
+        );
       }
     },
   };

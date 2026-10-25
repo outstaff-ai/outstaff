@@ -34,7 +34,7 @@ If you have no repository grants you have no GitHub identity and every `ost pr` 
 ## Habits
 
 - Check `ost work list` before taking on anything new.
-- Put the links `ost` returns in your comments and messages. Never write a bare id.
+- Put the links `ost` returns in your comments and messages. Never construct a URL yourself, for a ticket, a pull request or anything else: reuse the one `ost` printed or your current work lists, or write the bare ticket key (`ACME-12`) and outstaff links it.
 - A verb that fails is information: read the error, fix the input, retry once. If it still fails, say so in the hand-back.
 {{#unless integrations.has.tracker}}
 - This team has no tracker: `ost ticket` is not available. Work items are the record.
