@@ -1,5 +1,5 @@
 import type { Offer } from "../office-client/index.js";
-import type { Workspace } from "../repos/index.js";
+import { headBranchOf, type Workspace } from "../repos/index.js";
 
 /** The user prompt of a run, from what the office sent with the offer. */
 export function buildWorkPrompt(
@@ -97,9 +97,13 @@ export function buildWorkPrompt(
 
   if (opts.workspace) {
     const w = opts.workspace;
+    const head = headBranchOf(offer);
     lines.push(
       "",
-      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, branch ${w.branch}). Commit there and push that branch; never push to the default branch. Scratch space: ${w.scratch}.`,
+      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, branch ${w.branch}). Scratch space: ${w.scratch}.`,
+      head
+        ? `The branch to push to is ${head}, the head of your open pull request: git push origin HEAD:${head} (amend and use --force-with-lease as references/git.md says), so the pull request itself changes. Never open a new branch or pull request for this round, and never push to the default branch.`
+        : "Commit there and push that branch; never push to the default branch.",
     );
   }
 

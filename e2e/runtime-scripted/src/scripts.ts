@@ -125,8 +125,13 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
     throw new Error("The feedback left no open thread and no summary or comment to answer.");
   }
 
-  // The item's worktree starts from the default branch; the pull request lives on its own.
-  yield { type: "shell", command: `git checkout -B fix-${number} origin/${branch}`, cwd };
+  // The round's worktree is on the pull request's own branch; a branch of its own would leave the pull request behind.
+  const here = (yield { type: "shell", command: "git rev-parse --abbrev-ref HEAD", cwd }).trim();
+  // A waiting item may hold the branch itself; the round then works on a local branch of the same commit.
+  if (here !== branch && !here.startsWith(`${branch}-`)) {
+    throw new Error(`The worktree is on ${here}, not on the pull request's branch ${branch}.`);
+  }
+
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
     type: "write",
@@ -238,7 +243,12 @@ export async function* conflict(ctx: ItemContext): Script {
     cwd,
   }).trim();
 
-  yield { type: "shell", command: `git checkout -B rebase-${number} origin/${branch}`, cwd };
+  const here = (yield { type: "shell", command: "git rev-parse --abbrev-ref HEAD", cwd }).trim();
+  // A waiting item may hold the branch itself; the round then works on a local branch of the same commit.
+  if (here !== branch && !here.startsWith(`${branch}-`)) {
+    throw new Error(`The worktree is on ${here}, not on the pull request's branch ${branch}.`);
+  }
+
   let clean = true;
   try {
     yield { type: "shell", command: "git rebase origin/main", cwd };

@@ -14,7 +14,7 @@ import {
   parseCredentialRequest,
   repoForRequest,
 } from "./credential-helper.js";
-import { branchName, createWorkspaces, repoForItem } from "./workspaces.js";
+import { branchName, createWorkspaces, headBranchOf, repoForItem } from "./workspaces.js";
 
 const sh = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -458,6 +458,120 @@ describe("workspaces", () => {
 
     const back = await s.workspaces.prepare(offer("w4"));
     expect(readFileSync(join(back!.worktree, "kept.txt"), "utf8")).toBe("kept\n");
+  });
+
+  describe("on a pull request's own branch", () => {
+    const pr = (extra: Record<string, unknown> = {}) => ({
+      type: "pr",
+      ref: "acme-example/shop#3",
+      headRef: "feat/x",
+      baseRef: "main",
+      state: "open",
+      own: true,
+      ...extra,
+    });
+
+    const withBranch = async (s: Awaited<ReturnType<typeof setup>>, name: string) => {
+      const seed = join(s.dir, "seed/shop");
+      sh(seed, "checkout", "-q", "-b", name);
+      writeFileSync(join(seed, "PR.md"), "pr\n");
+      sh(seed, "add", ".");
+      sh(seed, "commit", "-q", "-m", "pr");
+      sh(seed, "push", "-q", s.bare("shop"), name);
+      sh(seed, "checkout", "-q", "main");
+    };
+
+    const roundOn = (
+      id: string,
+      kind: string,
+      subject: { type: string; ref: string },
+      subjects: unknown[],
+    ) => {
+      const o = offer(id, { subjects } as Partial<Offer["context"]>, kind);
+      o.workItem.subject = subject;
+      return o;
+    };
+
+    it("works a review round on the head of the pull request", async () => {
+      const s = await setup();
+      await withBranch(s, "feat/x");
+      const w = await s.workspaces.prepare(
+        roundOn("r1", "review_feedback", { type: "pr", ref: pr().ref }, [pr()]),
+      );
+
+      expect(w!.branch).toBe("feat/x");
+      expect(readFileSync(join(w!.worktree, "PR.md"), "utf8")).toBe("pr\n");
+      expect(sh(w!.worktree, "rev-parse", "HEAD").trim()).toBe(
+        sh(w!.worktree, "rev-parse", "origin/feat/x").trim(),
+      );
+
+      // A resumed worktree keeps its branch.
+      const again = await s.workspaces.prepare(
+        roundOn("r1", "review_feedback", { type: "pr", ref: pr().ref }, [pr()]),
+      );
+
+      expect(again!.branch).toBe("feat/x");
+    });
+
+    it("pushes by name when a waiting item still holds the head branch", async () => {
+      const s = await setup();
+      await withBranch(s, "feat/x");
+      const ticket = { type: "ticket", ref: "ACME-1" };
+      const first = await s.workspaces.prepare(roundOn("t2", "assigned", ticket, [pr()]));
+      expect(first!.branch).toBe("feat/x");
+
+      const round = await s.workspaces.prepare(
+        roundOn("r2", "conflict", { type: "pr", ref: pr().ref }, [pr()]),
+      );
+
+      expect(round!.branch).toBe("feat/x-r2");
+      expect(sh(round!.worktree, "rev-parse", "HEAD").trim()).toBe(
+        sh(round!.worktree, "rev-parse", "origin/feat/x").trim(),
+      );
+    });
+
+    it("uses the only open pull request of a ticket", async () => {
+      const s = await setup();
+      await withBranch(s, "feat/x");
+      const t = { type: "ticket", ref: "ACME-1" };
+      const w = await s.workspaces.prepare(
+        roundOn("t1", "assigned", t, [
+          { ...t },
+          pr(),
+          pr({ ref: "acme-example/shop#4", headRef: "feat/old", state: "merged" }),
+        ]),
+      );
+
+      expect(w!.branch).toBe("feat/x");
+    });
+
+    it("keeps its own branch for new work, other people's and several pull requests", () => {
+      const t = { type: "ticket", ref: "ACME-1" };
+      const prSubject = { type: "pr", ref: pr().ref };
+      const head = (o: Offer) => headBranchOf(o);
+      expect(head(roundOn("a", "assigned", t, [{ ...t }]))).toBeUndefined();
+      expect(head(roundOn("b", "assigned", t, [pr({ own: false })]))).toBeUndefined();
+      expect(
+        head(roundOn("c", "assigned", t, [pr(), pr({ ref: "acme-example/shop#5" })])),
+      ).toBeUndefined();
+
+      expect(
+        head(roundOn("d", "review_feedback", prSubject, [pr({ state: "closed" })])),
+      ).toBeUndefined();
+
+      expect(
+        head(roundOn("e", "merged_feedback", prSubject, [pr({ state: "merged" })])),
+      ).toBeUndefined();
+
+      expect(head(roundOn("f", "merged_feedback", prSubject, [pr()]))).toBeUndefined();
+    });
+
+    it("gives a new ticket its own branch from the default branch", async () => {
+      const s = await setup();
+      const t = { type: "ticket", ref: "ACME-2" };
+      const w = await s.workspaces.prepare(roundOn("assigned-7", "assigned", t, [{ ...t }]));
+      expect(w!.branch).toBe("assigned/assigned-7-fix-assigned-7-now");
+    });
   });
 
   it("has no workspace when no repo is writable and none is named", async () => {

@@ -22,7 +22,7 @@ export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs })
     };
   };
 
-  const prRef = async (key: string): Promise<Ref> => {
+  const prRef = async (key: string, person?: string): Promise<Ref> => {
     const rec = (await store.getSubject("pr", key))?.data as PrRecord | undefined;
     const url = rec?.url ?? (rec ? ports?.vcs?.links.pr(rec.ref.repo, rec.ref.number) : undefined);
 
@@ -31,6 +31,14 @@ export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs })
       ref: key,
       ...(rec ? { title: rec.title } : {}),
       ...(url ? { url } : {}),
+      ...(rec
+        ? {
+            headRef: rec.headRef,
+            baseRef: rec.baseRef,
+            state: rec.state,
+            ...(person !== undefined ? { own: rec.author.person === person } : {}),
+          }
+        : {}),
     };
   };
 
@@ -50,7 +58,7 @@ export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs })
       return [
         await ticketRef(subject.ref),
         ...(await Promise.all(
-          prs.filter((l) => l.from.type === "pr").map((l) => prRef(l.from.ref)),
+          prs.filter((l) => l.from.type === "pr").map((l) => prRef(l.from.ref, item.person)),
         )),
       ];
     }
@@ -63,9 +71,9 @@ export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs })
       });
 
       return [
-        await prRef(subject.ref),
+        await prRef(subject.ref, item.person),
         ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
-        ...(await Promise.all(stacked.map((l) => prRef(l.to.ref)))),
+        ...(await Promise.all(stacked.map((l) => prRef(l.to.ref, item.person)))),
       ];
     }
 

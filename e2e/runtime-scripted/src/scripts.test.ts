@@ -119,6 +119,10 @@ describe("conflict", () => {
           return "origin/main, origin/HEAD|Merge pull request #1\norigin/assigned/w2-second|SHOP-2: Second\n";
         }
 
+        if (a.type === "shell" && a.command === "git rev-parse --abbrev-ref HEAD") {
+          return "assigned/w2-second\n";
+        }
+
         if (a.type === "shell" && a.command === "git rev-parse origin/assigned/w2-second") {
           return "abc123\n";
         }

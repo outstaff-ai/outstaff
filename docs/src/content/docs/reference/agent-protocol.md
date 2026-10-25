@@ -97,6 +97,10 @@ Sent by: office.
 | `context.subjects[].ref`                 | string                                              | yes      | Reference of the subject in its system.                                                                                                                                             |
 | `context.subjects[].title`               | string                                              | no       | Human-readable title.                                                                                                                                                               |
 | `context.subjects[].url`                 | string                                              | no       | Link to the subject.                                                                                                                                                                |
+| `context.subjects[].headRef`             | string                                              | no       | For a pull request: the branch it is opened from.                                                                                                                                   |
+| `context.subjects[].baseRef`             | string                                              | no       | For a pull request: the branch it targets.                                                                                                                                          |
+| `context.subjects[].state`               | `open` or `closed` or `merged`                      | no       | For a pull request: whether it is open, closed or merged.                                                                                                                           |
+| `context.subjects[].own`                 | boolean                                             | no       | For a pull request: true when the person the item is offered to opened it.                                                                                                          |
 | `context.links`                          | list of objects                                     | yes      | Further links worth opening.                                                                                                                                                        |
 | `context.links[].url`                    | string                                              | yes      | Absolute URL.                                                                                                                                                                       |
 | `context.links[].title`                  | string                                              | no       | Label for the link.                                                                                                                                                                 |
@@ -474,45 +478,53 @@ The existing work the request is part of now.
 
 Sent by: office.
 
-| Field                   | Type            | Required | Description                                                                                                               |
-| ----------------------- | --------------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `url`                   | string          | no       | Link to the ticket.                                                                                                       |
-| `item`                  | object          | yes      | The work item that carries the filed work.                                                                                |
-| `item.id`               | string          | yes      |                                                                                                                           |
-| `item.title`            | string          | yes      |                                                                                                                           |
-| `item.status`           | string          | yes      |                                                                                                                           |
-| `item.kind`             | string          | no       | What the item is, for example assigned or review_feedback.                                                                |
-| `item.ticketKey`        | string          | no       |                                                                                                                           |
-| `item.ticketTitle`      | string          | no       |                                                                                                                           |
-| `item.pr`               | string          | no       | The office's key of the pull request the item is about.                                                                   |
-| `item.prNumber`         | integer         | no       |                                                                                                                           |
-| `item.prTitle`          | string          | no       |                                                                                                                           |
-| `item.prUrl`            | string          | no       |                                                                                                                           |
-| `item.current`          | boolean         | no       | True for the item the caller asked about.                                                                                 |
-| `waiting`               | boolean         | yes      | True when the person is busy: the item waits at the end until the requester says where it goes. False when it starts now. |
-| `work`                  | list of objects | yes      | The person's other open items in the order they run, for the placement question.                                          |
-| `work[].id`             | string          | yes      |                                                                                                                           |
-| `work[].title`          | string          | yes      |                                                                                                                           |
-| `work[].status`         | string          | yes      |                                                                                                                           |
-| `work[].kind`           | string          | no       | What the item is, for example assigned or review_feedback.                                                                |
-| `work[].ticketKey`      | string          | no       |                                                                                                                           |
-| `work[].ticketTitle`    | string          | no       |                                                                                                                           |
-| `work[].pr`             | string          | no       | The office's key of the pull request the item is about.                                                                   |
-| `work[].prNumber`       | integer         | no       |                                                                                                                           |
-| `work[].prTitle`        | string          | no       |                                                                                                                           |
-| `work[].prUrl`          | string          | no       |                                                                                                                           |
-| `work[].current`        | boolean         | no       | True for the item the caller asked about.                                                                                 |
-| `attached`              | object          | yes      | The existing work the request is part of now.                                                                             |
-| `attached.ticket`       | object          | no       | The ticket the request was added to.                                                                                      |
-| `attached.ticket.type`  | string          | yes      | Kind of subject, for example a ticket or a pull request.                                                                  |
-| `attached.ticket.ref`   | string          | yes      | Reference of the subject in its system.                                                                                   |
-| `attached.ticket.title` | string          | no       | Human-readable title.                                                                                                     |
-| `attached.ticket.url`   | string          | no       | Link to the subject.                                                                                                      |
-| `attached.pr`           | object          | no       | The pull request the request was added to.                                                                                |
-| `attached.pr.type`      | string          | yes      | Kind of subject, for example a ticket or a pull request.                                                                  |
-| `attached.pr.ref`       | string          | yes      | Reference of the subject in its system.                                                                                   |
-| `attached.pr.title`     | string          | no       | Human-readable title.                                                                                                     |
-| `attached.pr.url`       | string          | no       | Link to the subject.                                                                                                      |
+| Field                     | Type                           | Required | Description                                                                                                               |
+| ------------------------- | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `url`                     | string                         | no       | Link to the ticket.                                                                                                       |
+| `item`                    | object                         | yes      | The work item that carries the filed work.                                                                                |
+| `item.id`                 | string                         | yes      |                                                                                                                           |
+| `item.title`              | string                         | yes      |                                                                                                                           |
+| `item.status`             | string                         | yes      |                                                                                                                           |
+| `item.kind`               | string                         | no       | What the item is, for example assigned or review_feedback.                                                                |
+| `item.ticketKey`          | string                         | no       |                                                                                                                           |
+| `item.ticketTitle`        | string                         | no       |                                                                                                                           |
+| `item.pr`                 | string                         | no       | The office's key of the pull request the item is about.                                                                   |
+| `item.prNumber`           | integer                        | no       |                                                                                                                           |
+| `item.prTitle`            | string                         | no       |                                                                                                                           |
+| `item.prUrl`              | string                         | no       |                                                                                                                           |
+| `item.current`            | boolean                        | no       | True for the item the caller asked about.                                                                                 |
+| `waiting`                 | boolean                        | yes      | True when the person is busy: the item waits at the end until the requester says where it goes. False when it starts now. |
+| `work`                    | list of objects                | yes      | The person's other open items in the order they run, for the placement question.                                          |
+| `work[].id`               | string                         | yes      |                                                                                                                           |
+| `work[].title`            | string                         | yes      |                                                                                                                           |
+| `work[].status`           | string                         | yes      |                                                                                                                           |
+| `work[].kind`             | string                         | no       | What the item is, for example assigned or review_feedback.                                                                |
+| `work[].ticketKey`        | string                         | no       |                                                                                                                           |
+| `work[].ticketTitle`      | string                         | no       |                                                                                                                           |
+| `work[].pr`               | string                         | no       | The office's key of the pull request the item is about.                                                                   |
+| `work[].prNumber`         | integer                        | no       |                                                                                                                           |
+| `work[].prTitle`          | string                         | no       |                                                                                                                           |
+| `work[].prUrl`            | string                         | no       |                                                                                                                           |
+| `work[].current`          | boolean                        | no       | True for the item the caller asked about.                                                                                 |
+| `attached`                | object                         | yes      | The existing work the request is part of now.                                                                             |
+| `attached.ticket`         | object                         | no       | The ticket the request was added to.                                                                                      |
+| `attached.ticket.type`    | string                         | yes      | Kind of subject, for example a ticket or a pull request.                                                                  |
+| `attached.ticket.ref`     | string                         | yes      | Reference of the subject in its system.                                                                                   |
+| `attached.ticket.title`   | string                         | no       | Human-readable title.                                                                                                     |
+| `attached.ticket.url`     | string                         | no       | Link to the subject.                                                                                                      |
+| `attached.ticket.headRef` | string                         | no       | For a pull request: the branch it is opened from.                                                                         |
+| `attached.ticket.baseRef` | string                         | no       | For a pull request: the branch it targets.                                                                                |
+| `attached.ticket.state`   | `open` or `closed` or `merged` | no       | For a pull request: whether it is open, closed or merged.                                                                 |
+| `attached.ticket.own`     | boolean                        | no       | For a pull request: true when the person the item is offered to opened it.                                                |
+| `attached.pr`             | object                         | no       | The pull request the request was added to.                                                                                |
+| `attached.pr.type`        | string                         | yes      | Kind of subject, for example a ticket or a pull request.                                                                  |
+| `attached.pr.ref`         | string                         | yes      | Reference of the subject in its system.                                                                                   |
+| `attached.pr.title`       | string                         | no       | Human-readable title.                                                                                                     |
+| `attached.pr.url`         | string                         | no       | Link to the subject.                                                                                                      |
+| `attached.pr.headRef`     | string                         | no       | For a pull request: the branch it is opened from.                                                                         |
+| `attached.pr.baseRef`     | string                         | no       | For a pull request: the branch it targets.                                                                                |
+| `attached.pr.state`       | `open` or `closed` or `merged` | no       | For a pull request: whether it is open, closed or merged.                                                                 |
+| `attached.pr.own`         | boolean                        | no       | For a pull request: true when the person the item is offered to opened it.                                                |
 
 ### `chat_message`
 

@@ -504,6 +504,14 @@ async function main() {
     },
   );
 
+  const strays = Object.keys(fixed.github.branches).filter((b) => /^review[-_]feedback\//.test(b));
+
+  assertEq(
+    strays.length,
+    0,
+    "the review round pushed to the pull request's branch, no branch of its own",
+  );
+
   assertEq(fixed.thread.comments.at(-1).author, "acme-sam[bot]", "the agent replied in the thread");
   const eyes = fixed.github.reactions.filter(
     (x: Json) => x.kind === "inline_comment" && x.commentId === fixed.thread.comments[0].databaseId,
