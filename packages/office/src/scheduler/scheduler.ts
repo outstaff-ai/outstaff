@@ -43,8 +43,7 @@ export type Placement = "next" | "last" | { before: string } | { after: string }
 export interface EnqueueInput extends Omit<NewWorkItem, "position"> {
   /**
    * Where the item goes among the person's queued items. Default: the priority
-   * class decides, except that human chat waits last until the human chooses a
-   * position. An idle person starts either way.
+   * class decides.
    */
   placement?: Placement;
 }
@@ -113,8 +112,9 @@ export interface Scheduler {
   enqueue(input: EnqueueInput): Promise<WorkItem>;
 
   /**
-   * The item the person should run next, or null: while one is active, while
-   * paused, and when every queued item is held back by a policy or by a failure backoff. Does not change state.
+   * The item the person should run next, or null: while paused, and when every queued item is held back by a
+   * policy, a failure backoff, or a lane that is full (one work item at a time; chat sessions up to
+   * `policies.chat.parallel_sessions`, beside it). Does not change state.
    */
   next(person: string): Promise<WorkItem | null>;
 
@@ -159,8 +159,8 @@ export interface Scheduler {
   stop(): void;
 }
 
-const isChat = (i: Pick<NewWorkItem, "trigger" | "kind">) =>
-  i.trigger === "human" && i.kind === CHAT_KIND;
+/** Chat sessions run beside the active work item, up to `policies.chat.parallel_sessions`. */
+const DEFAULT_CHAT_SESSIONS = 2;
 
 // Mirrors the team.yaml defaults for a team that sets no `policies`.
 const DEFAULT_MAX_RUNS_PER_HOUR = 12;
@@ -187,6 +187,15 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
   };
 
   const retry = { ...DEFAULT_RETRY, ...team.policies?.retry };
+  const chatSessions = team.policies?.chat?.parallel_sessions ?? DEFAULT_CHAT_SESSIONS;
+
+  /** Whether the person has room to start the item: a chat session needs a free session, other work an idle lane. */
+  const hasRoom = async (item: Pick<WorkItem, "person" | "kind">) => {
+    const active = await store.listItems({ person: item.person, status: "active" });
+    return item.kind === CHAT_KIND
+      ? active.filter((i) => i.kind === CHAT_KIND).length < chatSessions
+      : !active.some((i) => i.kind !== CHAT_KIND);
+  };
 
   const backingOff = (item: Pick<WorkItem, "notBefore">) =>
     item.notBefore !== null && Date.parse(item.notBefore) > clock.now().getTime();
@@ -290,7 +299,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     enqueue(input) {
       return exclusive(async () => {
         const { placement: chosen, ...rest } = input;
-        const placement = chosen ?? (isChat(input) ? "last" : undefined);
+        const placement = chosen;
         const created = await store.enqueue({
           ...rest,
           priority: input.priority ?? priorityFor(input.trigger, input.kind),
@@ -319,10 +328,6 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
         return null;
       }
 
-      if ((await store.listItems({ person, status: "active" })).length > 0) {
-        return null;
-      }
-
       const queue = orderQueue(await queuedOf(person));
       if (queue.length === 0) {
         return null;
@@ -330,6 +335,10 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
       const windows = await getWindows(person);
       for (const item of queue) {
+        if (!(await hasRoom(item))) {
+          continue;
+        }
+
         if (backingOff(item)) {
           continue;
         }
@@ -359,11 +368,14 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
           return { started: false, reason: "not_queued", detail: `Item is ${item.status}.` };
         }
 
-        if ((await store.listItems({ person: item.person, status: "active" })).length > 0) {
+        if (!(await hasRoom(item))) {
           return {
             started: false,
             reason: "busy",
-            detail: `${item.person} already has an active item.`,
+            detail:
+              item.kind === CHAT_KIND
+                ? `${item.person} already runs ${chatSessions} chat sessions.`
+                : `${item.person} already has an active item.`,
           };
         }
 

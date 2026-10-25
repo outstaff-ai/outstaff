@@ -8,6 +8,7 @@ import {
 import {
   formatWorkGroups,
   groupWork,
+  type Filed,
   type Link,
   type PayloadOf,
   type WorkSummary,
@@ -97,7 +98,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const open = async (person: string, except: string) => {
     const active = await store.listItems({ person, status: "active" });
     const queued = orderQueue(await store.listItems({ person, status: "queued" }));
-    return [...active, ...queued].filter((i) => i.id !== except);
+    // Chat sessions answer beside the work; they are no place in the queue.
+    return [...active, ...queued].filter((i) => i.id !== except && i.kind !== CHAT_KIND);
   };
 
   const summaries = async (items: WorkItem[]): Promise<WorkSummary[]> =>
@@ -111,37 +113,39 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       ...(g.ticketKey ? { ticketKey: g.ticketKey } : {}),
     }));
 
+  const chatSessions = opts.team.policies?.chat?.parallel_sessions ?? 2;
+
+  /** A chat session for the message. It starts at once, beside the active item, unless all sessions are taken. */
   async function newRequest(
     person: string,
     m: Message,
     follow?: { item: WorkItem },
   ): Promise<MessageResult> {
     const thread = m.thread ?? m.messageId;
-    const busy = (await open(person, "")).length > 0;
-    const subject = follow?.item.subject ?? { type: "chat", ref: threadKey(m.channel, thread) };
+    const taken = [
+      ...(await store.listItems({ person, status: "active" })),
+      ...(await store.listItems({ person, status: "queued" })),
+    ].filter((i) => i.kind === CHAT_KIND).length;
 
     const created = await scheduler.enqueue({
       person,
       kind: CHAT_KIND,
       title: `Chat: ${firstLine(m.text)}`,
       trigger: "human",
-      subject,
-      placement: busy ? "last" : "next",
+      subject: { type: "chat", ref: threadKey(m.channel, thread) },
       ...(follow ? { parentId: follow.item.id } : {}),
     });
 
-    if (follow) {
-      await store.updateItem(created.id, {
-        sessionId: follow.item.sessionId,
-        workspace: follow.item.workspace,
-      });
+    // A session that answered in this thread before goes on with its conversation.
+    if (follow?.item.kind === CHAT_KIND && follow.item.sessionId) {
+      await store.updateItem(created.id, { sessionId: follow.item.sessionId });
     }
 
     const origin: ChatOriginRecord = {
       channel: m.channel,
       thread,
       requester: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
-      awaitingPlacement: busy,
+      awaitingPlacement: false,
       claimed: [],
     };
 
@@ -153,9 +157,78 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     await store.appendJournal(
       created.id,
       "office",
+      `${m.author.name ?? m.author.id} asked in chat (thread ${thread}):\n${m.text}`,
+    );
+
+    opts.notify(person);
+    return {
+      disposition: taken < chatSessions ? "started" : "limited",
+      repeated: false,
+      item: await summarizeItem(store, (await store.getItem(created.id)) ?? created),
+      links: [],
+      work: [],
+    };
+  }
+
+  /**
+   * Files the work a chat session decided a message is: a work item of its own, in the session's thread. The thread
+   * belongs to the new item from here on, so the requester's answer about its place and later replies reach it.
+   */
+  async function file(
+    person: string,
+    sessionId: string,
+    spec: { kind: string; title: string; subject: { type: string; ref: string }; note: string },
+  ): Promise<Filed> {
+    const session = await store.getItem(sessionId);
+    const origin =
+      session && session.person === person ? await readOrigin(store, sessionId) : undefined;
+
+    if (!session || session.person !== person) {
+      throw new ProtocolError("unknown_item", `No work item ${sessionId} for ${person}.`);
+    }
+
+    if (session.kind !== CHAT_KIND || !origin) {
+      throw new ProtocolError("invalid", "Only a chat session files work this way.");
+    }
+
+    if (origin.filed) {
+      throw new ProtocolError(
+        "invalid",
+        "This chat request already filed its work; use that instead of filing a second one.",
+      );
+    }
+
+    const others = await open(person, session.id);
+    const busy = others.some((i) => i.kind !== CHAT_KIND);
+    const created = await scheduler.enqueue({
+      person,
+      kind: spec.kind,
+      title: spec.title,
+      trigger: "human",
+      subject: spec.subject,
+      parentId: session.id,
+      placement: busy ? "last" : "next",
+    });
+
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, {
+      channel: origin.channel,
+      thread: origin.thread,
+      requester: origin.requester,
+      awaitingPlacement: busy,
+      claimed: [],
+    } satisfies ChatOriginRecord);
+
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, { ...origin, filed: created.id });
+    await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
+      itemId: created.id,
+    });
+
+    await store.appendJournal(
+      created.id,
+      "office",
       [
-        `${m.author.name ?? m.author.id} asked in chat (thread ${thread}):`,
-        m.text,
+        `${origin.requester.name ?? origin.requester.id} asked in chat (thread ${origin.thread}); the chat session filed it.`,
+        spec.note,
         ...(busy
           ? [
               "",
@@ -167,11 +240,9 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
 
     opts.notify(person);
     return {
-      disposition: busy ? "waiting" : "started",
-      repeated: false,
       item: await summarizeItem(store, (await store.getItem(created.id)) ?? created),
-      links: [],
-      work: busy ? await summaries(await open(person, created.id)) : [],
+      waiting: busy,
+      work: busy ? await summaries(others.filter((i) => i.kind !== CHAT_KIND)) : [],
     };
   }
 
@@ -424,7 +495,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       const kind =
         item.status === "done" ? "result" : item.status === "blocked" ? "blocked" : undefined;
 
-      if (!origin || !kind || !clock) {
+      // A session that filed its request as work has nothing to report; the work reports its own result.
+      if (!origin || !kind || !clock || origin.filed) {
         return;
       }
 
@@ -505,29 +577,28 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     },
 
     async linkTicket(person, workItemId, ticket) {
-      const item = await store.getItem(workItemId);
-      if (!item || item.person !== person) {
-        throw new ProtocolError("unknown_item", `No work item ${workItemId} for ${person}.`);
-      }
+      const title = (await store.getSubject("ticket", ticket))?.data as
+        | { title?: string }
+        | undefined;
 
-      if (!(await readOrigin(store, item.id))) {
-        throw new ProtocolError(
-          "invalid",
-          "Only a chat request's work item takes a ticket this way.",
-        );
-      }
+      const filed = await file(person, workItemId, {
+        kind: "assigned",
+        title: `assigned: ${ticket}${title?.title ? ` ${title.title}` : ""}`,
+        subject: { type: "ticket", ref: ticket },
+        note: `Tracked in ${ticket}.`,
+      });
 
-      if (item.subject?.type !== "chat") {
-        throw new ProtocolError(
-          "invalid",
-          `Work item ${workItemId} already has a ${item.subject?.type ?? "subject"}; create no ticket for it.`,
-        );
-      }
-
-      await store.updateItem(item.id, { subject: { type: "ticket", ref: ticket } });
-      await store.appendJournal(item.id, person, `Tracked in ${ticket}.`);
       const url = opts.tracker?.links.issue(ticket);
-      return url ? { url } : {};
+      return { ...filed, ...(url ? { url } : {}) };
+    },
+
+    queueWork(person, workItemId, request) {
+      return file(person, workItemId, {
+        kind: "request",
+        title: request.title,
+        subject: { type: "chat", ref: workItemId },
+        note: request.body,
+      });
     },
 
     async currentWork(person) {

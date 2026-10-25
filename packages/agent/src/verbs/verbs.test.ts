@@ -719,9 +719,9 @@ describe("office verbs", () => {
     ]);
   });
 
-  it("creates a ticket for the caller and links it to the chat item", async () => {
+  it("creates a ticket for a chat session and files it as work", async () => {
     const f = fakeEnv();
-    f.office.work = async () => [{ id: "c1", title: "Chat", status: "active" }];
+    f.office.work = async () => [{ id: "c1", title: "Chat", status: "active", kind: "chat" }];
     const r = await run(
       "ticket.create",
       f.env,
@@ -734,7 +734,25 @@ describe("office verbs", () => {
     expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
     const issue = await f.tracker.getIssue("SHOP-1");
     expect(issue).toMatchObject({ title: "Add search" });
-    expect(issue.status.canonical).toBe("active");
+    expect(issue.status.canonical).toBe("ready");
+    expect(r.text).toContain("Filed as work item");
+  });
+
+  it("files a request without a tracker from a chat session, and only from one", async () => {
+    const f = fakeEnv({ tracker: false });
+    const r = await run(
+      "work.queue",
+      f.env,
+      { title: "Add search", body: "Dana asked." },
+      { workItemId: "c1" },
+    );
+
+    expect(r.text).toContain('Queued "Add search".');
+    expect(f.office.queued).toEqual([
+      { workItemId: "c1", title: "Add search", body: "Dana asked." },
+    ]);
+
+    await rejects(run("work.queue", f.env, { title: "x" }), "invalid", /chat session/);
   });
 
   it("refuses a second ticket for an item that has one", async () => {
@@ -890,6 +908,7 @@ describe("verb catalogue", () => {
       "question.answer",
       "work",
       "work.move",
+      "work.queue",
       "team",
     ]);
 

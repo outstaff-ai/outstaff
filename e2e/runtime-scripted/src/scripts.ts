@@ -5,7 +5,10 @@ export type Action =
   | { type: "tool"; tool: string; input: Record<string, unknown> }
   | { type: "shell"; command: string; cwd: string }
   | { type: "write"; path: string; text: string }
-  | { type: "read"; path: string };
+  | { type: "read"; path: string }
+
+  /** Waits until the end-to-end driver opens the gate; it is open unless the driver closed it. */
+  | { type: "gate"; name: string };
 
 /** A script yields actions and receives each result as text (a failed shell command throws into it). It returns its last message. */
 export type Script = AsyncGenerator<Action, string, string>;
@@ -96,6 +99,8 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const number = need(ctx.pr, "the pull request");
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
+  // The driver can hold a review round here to talk to the agent while it is under way.
+  yield { type: "gate", name: "review" };
   const branch = yield* branchOf(ctx, key);
   const threads = yield { type: "tool", tool: "pr_threads", input: { repo, number } };
   const feedback = ctx.feedback;
@@ -251,10 +256,21 @@ export async function* conflict(ctx: ItemContext): Script {
   return `Rebased pull request ${number} on main and pushed ${branch} with a lease.`;
 }
 
+/**
+ * A chat message in a chat session, beside a running round: look at the person's work in the office and answer.
+ * Nothing is filed, so no ticket and no work item.
+ */
+export async function* chat(): Script {
+  const work = yield { type: "tool", tool: "work", input: {} };
+  const first = work.split("\n")[0] ?? "";
+  return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;
+}
+
 export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   assigned,
   ticket: assigned,
   review_feedback: reviewFeedback,
   merged_feedback: mergedFeedback,
   conflict,
+  chat,
 };

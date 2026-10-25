@@ -130,12 +130,10 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         }
       }
 
-      if (outstanding.length === 0) {
-        const offer = await source.next(person);
-        if (offer) {
-          c.offered.add(offer.workItem.id);
-          send(c, "offer", offer);
-        }
+      // The work item and the chat sessions run in lanes of their own: offer until nothing more can start.
+      for (let offer = await source.next(person); offer; offer = await source.next(person)) {
+        c.offered.add(offer.workItem.id);
+        send(c, "offer", offer);
       }
     };
 
@@ -257,6 +255,14 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         return reply(
           "work_link_result",
           await desk().linkTicket(person, m.payload.workItemId, m.payload.ticket),
+        );
+      case "work_queue":
+        return reply(
+          "work_queue_result",
+          await desk().queueWork(person, m.payload.workItemId, {
+            title: m.payload.title,
+            body: m.payload.body,
+          }),
         );
       case "current_work":
         return reply("current_work_result", { text: await desk().currentWork(person) });

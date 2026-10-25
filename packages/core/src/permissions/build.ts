@@ -23,7 +23,33 @@ interface ProfileSpec {
   /** Writable file globs relative to a worktree; "all" is every file. */
   writable: "none" | "docs" | "all";
   mutators: boolean;
+
+  /** The `ost` verbs the profile may call. Every verb when omitted. */
+  verbs?: string[];
+
+  /** Whether rule packs apply when they name no profile. Default true. */
+  anyPack?: boolean;
 }
+
+/**
+ * The verbs a chat session may call: look at the team, the work, tickets, documents and pull requests, comment, and
+ * file work. Nothing that changes a ticket, a pull request or a document.
+ */
+export const CHAT_VERBS = [
+  "me",
+  "team",
+  "work",
+  "work.queue",
+  "doc.search",
+  "doc.show",
+  "ticket.show",
+  "ticket.comment",
+  "ticket.create",
+  "pr.status",
+  "pr.threads",
+  "pr.diff",
+  "pr.comment",
+];
 
 /**
  * readonly: look but do not touch. Read and search, read-only git even where a write grant exists, no edits.
@@ -31,6 +57,8 @@ interface ProfileSpec {
  *           worktrees, scratch and memory; git write verbs and PR verbs for write repos.
  * code:     software work. Edits any file in worktrees of write repos.
  * infra:    like code, for infrastructure repos.
+ * chat:     a chat session beside a running work item. Reads the repositories and the office state; writes no file,
+ *           pushes nothing, and calls only the `ost` verbs in CHAT_VERBS. Only rule packs that name this profile apply.
  *
  * Which tools each profile may run (build tools, infra CLIs, an integration's CLI) comes from rule packs.
  */
@@ -58,6 +86,14 @@ export const PROFILE_SPECS: Record<Profile, ProfileSpec> = {
     honoursWrite: true,
     writable: "all",
     mutators: true,
+  },
+  chat: {
+    tools: ["read", "search", "shell", "ost"],
+    honoursWrite: false,
+    writable: "none",
+    mutators: false,
+    verbs: CHAT_VERBS,
+    anyPack: false,
   },
 };
 
@@ -328,9 +364,12 @@ export function buildPolicy({
     },
     commands: [
       ...commandRules(spec),
-      ...packs.filter((p) => !p.profiles || p.profiles.includes(profile)).flatMap((p) => p.rules),
+      ...packs
+        .filter((p) => (p.profiles ? p.profiles.includes(profile) : spec.anyPack !== false))
+        .flatMap((p) => p.rules),
     ],
     git: { repos, defaultBranches },
     network: { raw: "deny" },
+    ...(spec.verbs ? { ost: { allow: [...spec.verbs] } } : {}),
   };
 }

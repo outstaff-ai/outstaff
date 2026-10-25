@@ -1,6 +1,6 @@
 import { CANONICAL_STATUSES, PortError, type Issue, type Member } from "@outstaff/core";
 import { z } from "zod";
-import { requireOffice, requireTracker } from "./support.js";
+import { filedLine, requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
 const key = z
@@ -140,7 +140,7 @@ export const ticketCreate = defineVerb({
   name: "ticket.create",
   summary: "Create a ticket assigned to you.",
   description:
-    "Creates a ticket assigned to you. Inside a chat request, the ticket becomes the request's ticket: the requester is told about it and the work item is tracked by it. A chat request that already has a ticket refuses a second one. Create one only for a request that is work; answer a question directly.",
+    "Creates a ticket assigned to you. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.",
   input: z.strictObject({
     title: z.string().min(1).max(300).describe("Short title."),
     body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),
@@ -153,19 +153,21 @@ export const ticketCreate = defineVerb({
   examples: ['ost ticket create --title "Add a search page" --body "Asked by Dana in chat."'],
   async run(env, input, ctx) {
     const tracker = requireTracker(env);
-    if (ctx.workItemId) {
-      const [current] = (await requireOffice(env).work({ workItemId: ctx.workItemId })).filter(
-        (i) => i.id === ctx.workItemId,
-      );
+    const current = ctx.workItemId
+      ? (await requireOffice(env).work({ workItemId: ctx.workItemId })).find(
+          (i) => i.id === ctx.workItemId,
+        )
+      : undefined;
 
-      if (current?.ticketKey) {
-        throw new PortError(
-          "invalid",
-          `This work item already has ticket ${current.ticketKey}; use it instead of creating another.`,
-        );
-      }
+    if (current?.ticketKey) {
+      throw new PortError(
+        "invalid",
+        `This work item already has ticket ${current.ticketKey}; use it instead of creating another.`,
+      );
     }
 
+    // A chat session files the ticket as work; the work item that does it moves the ticket when it starts.
+    const chat = current?.kind === "chat";
     const handle = env.team.people.find((p) => p.handle === env.person)?.identities?.tracker;
     const member = handle
       ? (await tracker.members()).find((m) => m.id === handle || m.username === handle)
@@ -174,16 +176,17 @@ export const ticketCreate = defineVerb({
     const issue = await tracker.createIssue({
       title: input.title,
       body: input.body,
-      status: input.status ?? (ctx.workItemId ? "active" : "ready"),
+      status: input.status ?? (ctx.workItemId && !chat ? "active" : "ready"),
       ...(member ? { assignee: member.id } : {}),
     });
 
     const url = tracker.links.issue(issue.key);
-    if (ctx.workItemId) {
-      await requireOffice(env).linkTicket(ctx.workItemId, issue.key);
-    }
-
-    return result([`Created ${issue.key}.`, ...summary(issue, url)], { issue }, [url]);
+    const filed = chat ? await requireOffice(env).linkTicket(current.id, issue.key) : undefined;
+    return result(
+      [`Created ${issue.key}.`, ...summary(issue, url), ...(filed ? [filedLine(filed)] : [])],
+      { issue, ...(filed ? { filed } : {}) },
+      [url],
+    );
   },
 });
 

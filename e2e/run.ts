@@ -1,5 +1,5 @@
 // The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
-// request, a human asks for changes, the agent fixes and resolves the thread, a review with only a summary gets a
+// request, a human asks for changes while another asks a question in chat (answered by a chat session before the round ends), the agent fixes and resolves the thread, a review with only a summary gets a
 // pull request comment, a batch review with two inline comments gets a reply in each thread, the human merges, a
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request. The office, Postgres and the agent are the real images; GitHub,
@@ -416,13 +416,52 @@ async function main() {
     `ask: ${second} opened pull request #${pr2.pr.number}; the question to the architect is mirrored on the ticket`,
   );
 
-  // ---- 3. a human asks for changes; the ticket goes back to the author, who fixes, replies and resolves
+  // ---- 3. a human asks for changes; the ticket goes back to the author, who fixes, replies and resolves.
+  // The round is held at a gate, and a human asks a question in chat meanwhile: it is answered by a chat session
+  // beside the round, before the round ends.
   const before = pr1.pr.head.sha;
+  await stub("POST", "/_test/gates/review/close");
   await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, {
     state: "changes_requested",
     body: "Please greet properly.",
     comments: [{ path: "greeting.txt", line: 1, body: "Say hello to someone." }],
   });
+
+  await until("the review round running and held at the gate", (s) => s.chat.gates.review?.arrived);
+  const asked = await stub("POST", "/_test/chat/say", { text: "Where do the greetings live?" });
+  const reply = await until("an answer in chat while the review round is held", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === asked.id),
+  );
+
+  const during = await state();
+  assertIncludes([reply.text], reply.text, "the question was answered");
+  assertEq(reply.text.includes("greeting.txt"), true, "the answer is about the greetings");
+  assertEq(reply.text.includes("busy"), false, "no busy reply, no placement question");
+  assertEq(
+    during.chat.posts.filter((p: Json) => p.thread === asked.id).length,
+    1,
+    "one post in the thread, the answer",
+  );
+
+  assertEq(
+    during.github.pulls.find((p: Json) => p.number === pr1.pr.number).head.sha,
+    before,
+    "the review round has not pushed yet",
+  );
+
+  assertEq(
+    during.tickets.find((x: Json) => x.key === first).status,
+    "In Progress",
+    "the round is still running when the answer comes",
+  );
+
+  assertEq(during.tickets.length, 2, "the question filed no ticket");
+
+  step(
+    "chat: a question asked while the review round is held is answered right away, with no ticket and no queue",
+  );
+
+  await stub("POST", "/_test/gates/review/open");
 
   const fixed = await until(
     "a fix pushed, the thread answered and resolved, the ticket back in review",

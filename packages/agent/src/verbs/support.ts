@@ -7,7 +7,7 @@ import {
   type Tracker,
   type Vcs,
 } from "@outstaff/core";
-import type { OfficeClient } from "./office.js";
+import type { Filed, OfficeClient } from "./office.js";
 import type { AgentEnv } from "./types.js";
 
 function need<T>(env: AgentEnv, port: PortName, impl: T | undefined, label: string): T {
@@ -34,6 +34,12 @@ export function requireOffice(env: AgentEnv): OfficeClient {
 
   return env.office;
 }
+
+/** What a chat session is told after it filed work. The agent posts the reply and any placement question itself. */
+export const filedLine = (f: Filed) =>
+  f.waiting
+    ? `Filed as work item ${f.item.id}. You are busy, so it waits last; your agent asks the requester where it goes. Finish with a short note.`
+    : `Filed as work item ${f.item.id}. It starts now. Finish with a short note.`;
 
 const sameRepo = (a: RepoRef, b: RepoRef) =>
   a.owner.toLowerCase() === b.owner.toLowerCase() && a.name.toLowerCase() === b.name.toLowerCase();

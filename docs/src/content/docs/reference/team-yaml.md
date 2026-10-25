@@ -1169,6 +1169,24 @@ Details left out of chat messages.
 - Optional
 - Allowed values: `ci`, `mergeability`, `hashes`, `file_lists`
 
+### policies.chat
+
+How agents take chat messages.
+
+- Type: `object`
+- Optional
+- Default: `{"parallel_sessions":2}`
+
+#### policies.chat.parallel_sessions
+
+How many chat sessions an agent runs at once, beside its active work item. A message beyond that waits for a free session.
+
+- Type: `integer`
+- Optional
+- Default: `2`
+- Minimum 1
+- Maximum 10
+
 ### policies.commands
 
 Extra commands for this team's own tools, on top of the built-in and toolset rules.

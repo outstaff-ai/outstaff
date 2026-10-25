@@ -3,8 +3,8 @@ import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { StartupError, agentRegistry, prepareAgent } from "@outstaff/agent";
-import type { Logger } from "@outstaff/core";
-import { scriptedRuntime } from "./index.js";
+import { AdapterRegistry, type Logger } from "@outstaff/core";
+import { scriptedRuntime, stubChat } from "./index.js";
 
 const write = (level: string) => (message: string, data?: Record<string, unknown>) =>
   process.stderr.write(
@@ -18,12 +18,21 @@ const log: Logger = {
   error: write("error"),
 };
 
-// The agent's own bin, with one more adapter: the scripted runtime. Only the agent-e2e image has this file.
+// The agent's own bin, with two changes: the scripted runtime is one more adapter, and the stub workspace takes the
+// place of Slack. Only the agent-e2e image has this file.
+const registry = new AdapterRegistry();
+for (const def of agentRegistry().list()) {
+  if (def.port !== "chat") {
+    registry.register(def);
+  }
+}
+
+registry.register(scriptedRuntime).register(stubChat);
 try {
   const agent = await prepareAgent({
     env: process.env,
     home: process.env["HOME"] ?? homedir(),
-    registry: agentRegistry().register(scriptedRuntime),
+    registry,
     stockCatalogDir: dirname(fileURLToPath(import.meta.resolve("@outstaff/catalog/package.json"))),
     agentVersion: "e2e",
     log,
@@ -35,8 +44,8 @@ try {
   const shutdown = (signal: string) => {
     log.info("stopping", { signal });
     agent.usage.stop();
-    agent.loop
-      .stop()
+    (agent.chat?.stop() ?? Promise.resolve())
+      .then(() => agent.loop.stop())
       .then(() => agent.connection.stop())
       .catch((e) => log.error("could not stop cleanly", { error: String(e) }));
   };
@@ -48,6 +57,10 @@ try {
   await agent.connection.whenConnected();
   log.info("connected");
   agent.usage.start();
+  await agent.chat?.start().catch((e: unknown) => {
+    log.error("chat requests are off: the chat connection failed", { error: String(e) });
+  });
+
   await agent.loop.run();
   await agent.connection.stop();
   process.exitCode = agent.connection.rejection() ? 1 : 0;

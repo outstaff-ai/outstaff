@@ -10,6 +10,9 @@ export interface ChatOriginRecord extends ChatOrigin {
   /** The request waits last until the requester says where it goes. */
   awaitingPlacement: boolean;
 
+  /** For a chat session: the work item it filed for the request. The thread belongs to that item from then on. */
+  filed?: string;
+
   /** What was already reported to the requester, so a retry does not post again. */
   claimed: string[];
 

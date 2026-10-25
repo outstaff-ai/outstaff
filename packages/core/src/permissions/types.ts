@@ -11,7 +11,7 @@ export const TOOL_KINDS = [
 
 export type ToolKind = (typeof TOOL_KINDS)[number];
 
-export const PROFILES = ["readonly", "docs", "code", "infra"] as const;
+export const PROFILES = ["readonly", "docs", "code", "infra", "chat"] as const;
 export type Profile = (typeof PROFILES)[number];
 
 export type GitMode = "read" | "write";
@@ -87,6 +87,9 @@ export interface Policy {
     defaultBranches: Record<string, string>;
   };
   network: { raw: "deny" };
+
+  /** The `ost` verbs the profile may call, by verb name (`ticket.create`). Every verb when omitted. */
+  ost?: { allow: string[] };
 }
 
 export interface ToolCall {

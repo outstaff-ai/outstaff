@@ -149,7 +149,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   let counter = 0;
   let rejected: { code: ErrorCode; message: string } | undefined;
   let resumeIds: string[] = [];
-  let activeItem: string | undefined;
+  // A work item and chat sessions run at once; each is kept alive by a heartbeat of its own.
+  const activeItems = new Set<string>();
   let cancelBackoff: (() => void) | undefined;
   let cancelBeat: (() => void) | undefined;
   const pending = new Map<string, Pending>();
@@ -212,7 +213,12 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
         return;
       }
 
-      request("heartbeat", activeItem === undefined ? {} : { workItemId: activeItem }, heartbeatMs)
+      const beats =
+        activeItems.size === 0
+          ? [request("heartbeat", {}, heartbeatMs)]
+          : [...activeItems].map((workItemId) => request("heartbeat", { workItemId }, heartbeatMs));
+
+      Promise.all(beats)
         .then(() => scheduleBeat(heartbeatMs))
         .catch(() => {
           log.warn("office did not answer a heartbeat; reconnecting");
@@ -451,7 +457,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
 
     async accept(workItemId) {
       await ack("accept", { workItemId });
-      activeItem = workItemId;
+      activeItems.add(workItemId);
     },
 
     decline: (workItemId, reason) => ack("decline", { workItemId, reason }),
@@ -460,16 +466,12 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     journal: (workItemId, text) => ack("journal", { workItemId, text }),
     async handBack(workItemId, result) {
       await ack("handback", { workItemId, ...result, links: result.links ?? [] });
-      if (activeItem === workItemId) {
-        activeItem = undefined;
-      }
+      activeItems.delete(workItemId);
     },
 
     async fail(workItemId, reason) {
       await ack("fail", { workItemId, reason });
-      if (activeItem === workItemId) {
-        activeItem = undefined;
-      }
+      activeItems.delete(workItemId);
     },
 
     usage: (windows) => ack("usage", { windows }),
@@ -492,10 +494,10 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     chatMessage: (m): Promise<ChatMessageResult> => call("chat_message", m, "chat_message_result"),
     chatReport: (workItemId, kind): Promise<ChatReportResult> =>
       call("chat_report", { workItemId, kind }, "chat_report_result"),
-    async linkTicket(workItemId, ticket) {
-      const r = await call("work_link", { workItemId, ticket }, "work_link_result");
-      return r.url ? { url: r.url } : {};
-    },
+    linkTicket: (workItemId, ticket) =>
+      call("work_link", { workItemId, ticket }, "work_link_result"),
+    queueWork: (workItemId, request) =>
+      call("work_queue", { workItemId, ...request }, "work_queue_result"),
     async currentWork() {
       return (await call("current_work", {}, "current_work_result")).text;
     },

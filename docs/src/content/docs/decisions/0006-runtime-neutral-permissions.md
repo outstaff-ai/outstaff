@@ -18,7 +18,7 @@ Each LLM runtime has its own permission format. Hand-written rule files tend to 
 
 ## Decision
 
-- Each role names a **profile**: `readonly`, `docs`, `code` or `infra`.
+- Each role names a **profile**: `readonly`, `docs`, `code` or `infra`. Chat sessions have a profile of their own, `chat`, that no role names: read-only, with a short list of `ost` verbs.
 - Core builds a **neutral policy** from three inputs: the profile, the person's repository grants and the container layout. The policy covers:
   - tools;
   - commands;

@@ -277,9 +277,10 @@ export function createEngine(opts: EngineOptions): Engine {
 
     const mine = await store.listItems({ person: e.person });
     if (subject) {
-      const live = mine.filter((i) => LIVE.has(i.status) && sameSubject(i.subject, subject));
-      // A chat request is already working on the ticket it filed.
-      const dup = live.find((i) => i.kind === e.kind) ?? live.find((i) => i.kind === "chat");
+      const dup = mine.find(
+        (i) => LIVE.has(i.status) && i.kind === e.kind && sameSubject(i.subject, subject),
+      );
+
       if (dup) {
         // Feedback for a round that is queued or running is attached to it instead of being lost: a queued item
         // offers it with the rest, and for a running one the follow-up round after the hand-back picks it up.

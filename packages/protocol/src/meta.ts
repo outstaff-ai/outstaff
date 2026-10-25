@@ -115,14 +115,29 @@ export const MESSAGE_META = {
   work_link: {
     from: "agent",
     summary:
-      "Makes a ticket the subject of a chat request's work item, after the agent created the ticket for it. Refused for an item that already has a ticket or pull request as its subject.",
+      "Files the ticket a chat session created as work: the office creates a work item for it, in the thread the session answers in. Refused for an item that is not a chat session.",
     replies: ["work_link_result", "error"],
   },
-  work_link_result: { from: "office", summary: "The ticket is linked to the item.", replies: [] },
+  work_link_result: {
+    from: "office",
+    summary: "The work item created for the ticket, and whether it waits for its place.",
+    replies: [],
+  },
+  work_queue: {
+    from: "agent",
+    summary:
+      "Files work from a chat session when there is no tracker: the office creates a work item for it, in the thread the session answers in. Refused for an item that is not a chat session.",
+    replies: ["work_queue_result", "error"],
+  },
+  work_queue_result: {
+    from: "office",
+    summary: "The work item created for the request, and whether it waits for its place.",
+    replies: [],
+  },
   chat_message: {
     from: "agent",
     summary:
-      "A message from a trusted human in chat. The office starts an item for it, queues it when the person is busy, or adds it to the item of the thread. Delivered at least once; the office recognizes a message it handled.",
+      "A message from a trusted human in chat. The office starts a chat session for it at once, beside the person's active item, or adds it to the item of the thread. Delivered at least once; the office recognizes a message it handled.",
     replies: ["chat_message_result", "error"],
   },
   chat_message_result: {

@@ -6,7 +6,7 @@ import {
   type Runtime,
   type ToolKind,
 } from "@outstaff/core";
-import type { Link } from "@outstaff/protocol";
+import type { Filed, Link } from "@outstaff/protocol";
 import type { Offer, OfficeConnection } from "../office-client/index.js";
 import type { Workspaces } from "../repos/index.js";
 import { VERBS, createRuntimeTools } from "../verbs/index.js";
@@ -45,6 +45,12 @@ export interface WorkLoopOptions {
   workdir: string;
   addDirs: string[];
 
+  /**
+   * How chat sessions run: beside the active item, with their own policy (see the `chat` permission profile) and
+   * no worktree. Without it a chat item runs like any other item.
+   */
+  chatSession?: { policy: Policy; builtinTools: ToolKind[] };
+
   /** Per-item worktree and scratch directory. Without it items run in `workdir` alone. */
   workspaces?: Workspaces;
   model?: string;
@@ -64,13 +70,17 @@ export interface WorkLoopOptions {
 }
 
 export interface WorkLoop {
-  /** Takes offers one at a time until the connection ends or `stop` is called. */
+  /**
+   * Takes work items one at a time, and chat sessions beside them, until the connection ends or `stop` is called.
+   * The office decides how many chat sessions it offers.
+   */
   run(): Promise<void>;
 
   /** Interrupts the running item, hands it back as waiting, and ends `run`. */
   stop(): Promise<void>;
 }
 
+const CHAT_KIND = "chat";
 const URL_PATTERN = /https?:\/\/[^\s<>()"'`\]]+/g;
 const PROGRESS_MAX = 300;
 
@@ -93,8 +103,9 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   const progressEveryMs = opts.progressEveryMs ?? 30_000;
   const sessions = opts.sessions ?? createSessionManager(opts.office, log);
   let stopping = false;
-  let active: AbortController | undefined;
-  let inFlight: Promise<void> = Promise.resolve();
+  const running = new Map<string, AbortController>();
+  const inFlight = new Set<Promise<void>>();
+  let workLane: Promise<void> = Promise.resolve();
 
   /** Items the office still lists as ours after a restart have no offer to resume from; it queues them again. */
   async function releaseResumed() {
@@ -139,11 +150,29 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   async function work(offer: Offer, abort: AbortController) {
     const id = offer.workItem.id;
     const sessionId = sessions.resumeFor(offer);
-    const workspace = await opts.workspaces?.prepare(offer);
+
+    // A chat session reads and answers; it has no worktree and runs under the chat policy.
+    const session = offer.workItem.kind === CHAT_KIND ? opts.chatSession : undefined;
+    const policy = session?.policy ?? opts.policy;
+    const verbs = policy.ost ? VERBS.filter((v) => policy.ost!.allow.includes(v.name)) : VERBS;
+    const workspace = session ? undefined : await opts.workspaces?.prepare(offer);
 
     // A resumed session already knows the conversation; the thread's later messages are in the journal.
     const chatContext =
       offer.workItem.origin && !sessionId ? await opts.chat?.context(offer) : undefined;
+
+    // A chat session that filed its request as work tells the requester in the thread. The work reports its own result.
+    let filedWork = false;
+    const filed = async (workItemId: string, what: { key?: string; title: string }, f: Filed) => {
+      if (workItemId !== id || !offer.workItem.origin) {
+        return;
+      }
+
+      filedWork = true;
+      await opts.chat?.acknowledge(offer, what, f).catch((err) => {
+        log.warn("could not acknowledge in chat", { workItemId: id, error: reason(err) });
+      });
+    };
 
     // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
     let asked = false;
@@ -160,13 +189,12 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
             },
             async linkTicket(workItemId, ticket) {
               const r = await base.linkTicket(workItemId, ticket);
-              // The first reply in the thread tells the requester what tracks the request.
-              if (workItemId === id && offer.workItem.origin) {
-                await opts.chat?.acknowledge(offer, { key: ticket, ...r }).catch((err) => {
-                  log.warn("could not acknowledge in chat", { workItemId: id, error: reason(err) });
-                });
-              }
-
+              await filed(workItemId, { key: ticket, title: ticket }, r);
+              return r;
+            },
+            async queueWork(workItemId, request) {
+              const r = await base.queueWork(workItemId, request);
+              await filed(workItemId, { title: request.title }, r);
               return r;
             },
           },
@@ -180,9 +208,9 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       systemPrompt: opts.systemPrompt,
       workdir: opts.workdir,
       addDirs: workspace ? [...opts.addDirs, workspace.worktree, workspace.scratch] : opts.addDirs,
-      policy: opts.policy,
-      tools: createRuntimeTools(env, VERBS, workspace ? { cwd: workspace.worktree } : {}),
-      builtinTools: opts.builtinTools,
+      policy,
+      tools: createRuntimeTools(env, verbs, workspace ? { cwd: workspace.worktree } : {}),
+      builtinTools: session?.builtinTools ?? opts.builtinTools,
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.maxTurns ? { maxTurns: opts.maxTurns } : {}),
       signal: abort.signal,
@@ -316,7 +344,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     });
 
     // An item that waits (for a teammate's answer) tells the requester nothing yet; it reports when it is done.
-    if (status === "done") {
+    if (status === "done" && !filedWork) {
       await report(offer, "result", text || "Done.", linksIn(text));
     }
 
@@ -331,11 +359,12 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   async function handle(offer: Offer) {
     const id = offer.workItem.id;
     const abort = new AbortController();
-    active = abort;
+    running.set(id, abort);
     try {
       await opts.office.accept(id);
     } catch (e) {
       log.warn("could not accept an offer", { workItemId: id, error: reason(e) });
+      running.delete(id);
       return;
     }
 
@@ -352,11 +381,16 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       log.error("work item failed", { workItemId: id, error: reason(e) });
       await opts.office.fail(id, reason(e)).catch(() => {});
     } finally {
-      active = undefined;
-      opts.usage?.setBusy(false);
+      running.delete(id);
+      opts.usage?.setBusy(running.size > 0);
       opts.usage?.flush();
     }
   }
+
+  const track = (p: Promise<void>) => {
+    inFlight.add(p);
+    void p.finally(() => inFlight.delete(p));
+  };
 
   return {
     async run() {
@@ -367,18 +401,25 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
           break;
         }
 
-        inFlight = handle(offer);
-        await inFlight;
-        if (stopping) {
-          break;
+        if (offer.workItem.kind === CHAT_KIND && opts.chatSession) {
+          track(handle(offer));
+        } else {
+          // One work item at a time, in the order they came.
+          workLane = workLane.then(() => (stopping ? undefined : handle(offer)));
+          track(workLane);
         }
       }
+
+      await Promise.all(inFlight);
     },
 
     async stop() {
       stopping = true;
-      active?.abort();
-      await inFlight;
+      for (const abort of running.values()) {
+        abort.abort();
+      }
+
+      await Promise.all(inFlight);
     },
   };
 }

@@ -109,7 +109,7 @@ ost ticket assign ACME-12 none
 
 Create a ticket assigned to you.
 
-Creates a ticket assigned to you. Inside a chat request, the ticket becomes the request's ticket: the requester is told about it and the work item is tracked by it. A chat request that already has a ticket refuses a second one. Create one only for a request that is work; answer a question directly.
+Creates a ticket assigned to you. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.
 
 ```
 ost ticket create --title <title> [--body <body>] [--status <status>]
@@ -588,6 +588,29 @@ Examples:
 ```sh
 ost work move 01J9X next
 ost work move 01J9X after 01J9Y
+```
+
+## work.queue
+
+File a chat request as work when there is no tracker.
+
+Files the request of a chat session as a work item of yours. Use it for a message that is work on a team without a tracker (with a tracker, create a ticket). The requester is told, and when you are busy they are asked where it goes. A chat session files one request. A question is answered directly: file nothing.
+
+```
+ost work queue <title> [body]
+```
+
+Runtime tool: `work_queue`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `title` | string | yes | Short title of the work. |
+| `body` | string | no | What is asked and why, Markdown. Default: "". |
+
+Examples:
+
+```sh
+ost work queue "Add a search page" "Asked by Dana in chat."
 ```
 
 ## team

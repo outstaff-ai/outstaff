@@ -1,4 +1,4 @@
-import type { PayloadOf, WorkSummary } from "@outstaff/protocol";
+import type { Filed, PayloadOf, WorkSummary } from "@outstaff/protocol";
 
 /** What the office tells an agent; the wire protocol is defined separately (the verbs only need this). */
 export type OfficeWorkItem = WorkSummary;
@@ -30,6 +30,7 @@ export interface OfficeAnswer {
   answer?: string;
 }
 
+export type { Filed };
 export type ChatMessageRequest = PayloadOf<"chat_message">;
 export type ChatMessageResult = PayloadOf<"chat_message_result">;
 export type ChatReportKind = PayloadOf<"chat_report">["kind"];
@@ -59,8 +60,11 @@ export interface OfficeClient {
   /** The caller's open tickets and pull requests, as text. */
   currentWork(): Promise<string>;
 
-  /** Makes a ticket the subject of the caller's chat item. Refused when the item already has one. */
-  linkTicket(workItemId: string, ticket: string): Promise<{ url?: string }>;
+  /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for a second filing. */
+  linkTicket(workItemId: string, ticket: string): Promise<Filed>;
+
+  /** Files work from a chat session when there is no tracker. Like `linkTicket`. */
+  queueWork(workItemId: string, request: { title: string; body: string }): Promise<Filed>;
 }
 
 export interface FakeOffice extends OfficeClient {
@@ -68,6 +72,7 @@ export interface FakeOffice extends OfficeClient {
   answered: { questionId: string; answer: string }[];
   placed: { workItemId: string; placement: Placement }[];
   linked: { workItemId: string; ticket: string }[];
+  queued: { workItemId: string; title: string; body: string }[];
   chatMessages: ChatMessageRequest[];
   chatReports: { workItemId: string; kind: ChatReportKind }[];
 }
@@ -83,12 +88,16 @@ export function createFakeOffice(
     chatMessage?: (m: ChatMessageRequest) => ChatMessageResult;
     chatReport?: (workItemId: string, kind: ChatReportKind) => ChatReportResult;
     currentWork?: string;
+
+    /** What the office answers when a chat session files work; by default the person is idle. */
+    filed?: Partial<Filed>;
   } = {},
 ): FakeOffice {
   const asked: FakeOffice["asked"] = [];
   const answered: FakeOffice["answered"] = [];
   const placed: FakeOffice["placed"] = [];
   const linked: FakeOffice["linked"] = [];
+  const queued: FakeOffice["queued"] = [];
   const chatMessages: ChatMessageRequest[] = [];
   const chatReports: FakeOffice["chatReports"] = [];
   const seen = new Set<string>();
@@ -97,9 +106,25 @@ export function createFakeOffice(
     answered,
     placed,
     linked,
+    queued,
     async linkTicket(workItemId, ticket) {
       linked.push({ workItemId, ticket });
-      return { url: `https://tracker.acme.example/issue/${ticket}` };
+      return {
+        url: `https://tracker.acme.example/issue/${ticket}`,
+        item: { id: `work-${ticket}`, title: ticket, status: "queued" },
+        waiting: false,
+        work: [],
+        ...opts.filed,
+      };
+    },
+    async queueWork(workItemId, request) {
+      queued.push({ workItemId, ...request });
+      return {
+        item: { id: `work-${queued.length}`, title: request.title, status: "queued" },
+        waiting: false,
+        work: [],
+        ...opts.filed,
+      };
     },
     chatMessages,
     chatReports,

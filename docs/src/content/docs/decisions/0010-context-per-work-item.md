@@ -26,11 +26,11 @@ Each work item has its own layers:
 **Chat:**
 
 - A reply in a thread the agent opened for an item joins that item.
-- A new top-level message starts its own chat session. That session gets recent conversation history and the person's current work, and the agent can link it to an existing item.
+- A new top-level message starts its own chat session, at once and beside the active work item. That session gets recent conversation history and the person's current work. A question is answered in the thread; work is filed as a ticket (or a request) that becomes a work item in the same thread.
 
 **Agent-to-agent questions:** a question is a child item of the asker's item. The answer resumes the asker's session.
 
 ## Consequences
 
-- The scheduler runs one active item per person at a time. Running several in parallel is safe later because of this isolation.
+- The scheduler runs one active work item per person at a time, and chat sessions beside it, up to `policies.chat.parallel_sessions`. Chat sessions run under a read-only permission profile, so they cannot disturb the active item. Running several work items in parallel is safe later because of the per-item isolation.
 - The store holds journals, so backing up the store preserves context.

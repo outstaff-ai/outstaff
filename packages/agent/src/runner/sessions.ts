@@ -11,8 +11,8 @@ export interface SessionStore {
  * One runtime session per work item (decision 0010): a later round resumes the session stored with the item, and a
  * session is never used for another item. The office persists the id, so it survives restarts of the agent.
  *
- * Chat requests have a second kind of key, the thread. The items of one chat thread (the request, and a follow-up
- * after the first was done) share one session, and a thread session is never used for an item that did not come
+ * Chat sessions have a second kind of key, the thread. The chat sessions of one thread (the first, and a follow-up
+ * after it was done) share one session, and a thread session is never used for an item that did not come
  * from that thread, nor an item session for a thread. The office stores both with the item and carries the id over
  * to the next item of the thread.
  */
@@ -24,10 +24,15 @@ export interface SessionManager {
   started(workItemId: string, sessionId: string): Promise<void>;
 }
 
-/** The key a session is kept under: the chat thread of a chat request, else the work item. */
+/**
+ * The key a session is kept under: the chat thread of a chat session, else the work item. Work that a chat session
+ * filed has the thread's origin too, but it runs under other permissions at the same time, so it has its own session.
+ */
 export function sessionKey(offer: Offer): string {
   const origin = offer.workItem.origin;
-  return origin ? `thread:${origin.channel}:${origin.thread}` : `item:${offer.workItem.id}`;
+  return origin && offer.workItem.kind === "chat"
+    ? `thread:${origin.channel}:${origin.thread}`
+    : `item:${offer.workItem.id}`;
 }
 
 export function createSessionManager(
