@@ -19,7 +19,7 @@ function team(withPm = true, policies?: Record<string, unknown>): TeamConfig {
       chat: { adapter: "fake" },
       vcs: { adapter: "fake" },
       runtime: { adapter: "fake" },
-      tracker: { adapter: "fake" },
+      tracker: { adapter: "fake", project: "ACME" },
     },
     ...(policies ? { policies } : {}),
   });
@@ -129,6 +129,20 @@ describe("chat relay", () => {
     expect(chat.posts[0]).toMatchObject({ channel: "D-U0DANA0001", thread: "m1" });
     expect(chat.posts[0]!.text).toContain("On it. Tracked in");
     expect(chat.posts[0]!.text).toContain("ACME-1");
+  });
+
+  it("links ticket keys in what it posts, and fixes guessed links", async () => {
+    await setup();
+    await relay.report(
+      offerOf(),
+      "result",
+      "Done: ACME-7 and [ACME-8](https://github.com/acme/app/issues/acme-8).",
+    );
+
+    const text = chat.posts.at(-1)!.text;
+    expect(text).toContain(`[ACME-7](${tracker.links.issue("ACME-7")})`);
+    expect(text).toContain(`[ACME-8](${tracker.links.issue("ACME-8")})`);
+    expect(text).not.toContain("github.com");
   });
 
   it("does not react, but still passes the message on, when policies.acknowledge.chat is off", async () => {

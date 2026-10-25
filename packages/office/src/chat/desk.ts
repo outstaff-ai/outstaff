@@ -1,4 +1,5 @@
 import {
+  createTicketLinker,
   policyOn,
   silentLogger,
   type Chat,
@@ -52,7 +53,7 @@ export interface ChatDeskOptions {
 
   /** The scheduler without the notifying wrapper: the desk stores the origin first and then calls `notify`. */
   scheduler: Pick<Scheduler, "enqueue" | "move" | "retry">;
-  team: Pick<TeamConfig, "people" | "policies">;
+  team: Pick<TeamConfig, "people" | "policies"> & Partial<Pick<TeamConfig, "integrations">>;
   workState: Pick<WorkState, "currentWork" | "pullRequests" | "ticket" | "prSubject">;
   tracker?: Pick<Tracker, "links">;
   messaging?: Pick<Messaging, "ask">;
@@ -108,6 +109,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const graceMs = (opts.graceSeconds ?? DEFAULT_CHAT_REPORT_GRACE_SECONDS) * 1000;
   const timers = new Map<string, Cancel>();
   const maxLines = opts.team.policies?.messages.max_lines ?? 3;
+  const linker = createTicketLinker(opts.team, opts.tracker);
 
   const open = async (person: string, except: string) => {
     const active = await store.listItems({ person, status: "active" });
@@ -582,9 +584,13 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     }
 
     try {
-      await opts.chat.post(m.channel, `Retrying ${item.subject?.ref ?? item.title} on request`, {
-        thread: m.thread ?? m.messageId,
-      });
+      await opts.chat.post(
+        m.channel,
+        linker.format(`Retrying ${item.subject?.ref ?? item.title} on request`, "chat"),
+        {
+          thread: m.thread ?? m.messageId,
+        },
+      );
     } catch (error) {
       log.warn("could not post the retry note", { item: item.id, error: String(error) });
     }
@@ -715,7 +721,10 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
 
     for (const t of threadsOf(origin)) {
       const text = [
-        `${mention(t)}${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
+        linker.format(
+          `${mention(t)}${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
+          "chat",
+        ),
         "(My agent went offline before it could post this, so the office is posting it.)",
         ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
       ].join("\n");
@@ -884,7 +893,10 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       const links = await opts.linksOf(item);
       for (const t of threadsOf(origin)) {
         const text = [
-          `${mention(t)}I could not carry on with this: ${firstLine(reason, 200)}`,
+          linker.format(
+            `${mention(t)}I could not carry on with this: ${firstLine(reason, 200)}`,
+            "chat",
+          ),
           ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
         ].join("\n");
 

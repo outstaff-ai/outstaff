@@ -488,6 +488,35 @@ describe("pr write verbs", () => {
     });
   });
 
+  describe("ticket links", () => {
+    it("fixes guessed ticket links in pull request text and leaves bare keys to the host", async () => {
+      const f = await setup();
+      const pr = await f.theirs();
+      await run(
+        "pr.comment",
+        f.env,
+        {
+          number: pr.number,
+          body: "Fixes [SHOP-3](https://github.com/acme/shop/issues/shop-3), see SHOP-4.",
+        },
+        f.ctx,
+      );
+
+      expect((await f.vcs.events([f.repo])).events.at(-1)!.data["body"]).toBe(
+        `Fixes [SHOP-3](${f.tracker.links.issue("SHOP-3")}), see SHOP-4.`,
+      );
+    });
+
+    it("links bare keys in ticket comments", async () => {
+      const { env, tracker } = fakeEnv();
+      const issue = await tracker.createIssue({ title: "T", body: "b" });
+      await run("ticket.comment", env, { key: issue.key, body: "Blocked by SHOP-9" });
+      expect((await tracker.listComments(issue.key)).map((c) => c.body)).toEqual([
+        `Blocked by [SHOP-9](${tracker.links.issue("SHOP-9")})`,
+      ]);
+    });
+  });
+
   describe("files the caller names", () => {
     const body = (path: string) => ({ title: "x", bodyFile: path });
 

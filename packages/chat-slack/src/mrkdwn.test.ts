@@ -1,5 +1,21 @@
+import { createTicketLinker } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { splitMrkdwn, toMrkdwn } from "./mrkdwn.js";
+
+describe("ticket links in Slack", () => {
+  it("converts the formatter's output to Slack links", () => {
+    const tracker = { links: { issue: (key: string) => `https://tracker.acme.example/p/${key}` } };
+    const team = { integrations: { tracker: { adapter: "x", project: "ACME" } } } as never;
+    const text = createTicketLinker(team, tracker).format(
+      "Done ACME-45 and [acme-46](https://github.com/acme/app/issues/acme-46)",
+      "chat",
+    );
+
+    expect(toMrkdwn(text)).toBe(
+      "Done <https://tracker.acme.example/p/ACME-45|ACME-45> and <https://tracker.acme.example/p/ACME-46|ACME-46>",
+    );
+  });
+});
 
 describe("toMrkdwn goldens", () => {
   const cases: [string, string, string][] = [

@@ -1,4 +1,9 @@
-import { PortError, type ReviewComment, type ReviewVerdict } from "@outstaff/core";
+import {
+  createTicketLinker,
+  PortError,
+  type ReviewComment,
+  type ReviewVerdict,
+} from "@outstaff/core";
 import { z } from "zod";
 import { repoLabel, requireVcs } from "./support.js";
 import { readInputFile } from "./files.js";
@@ -28,7 +33,15 @@ const bodyFile = z
     "File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text.",
   );
 
-/** The text from `body` or `body-file`, with @-mentions guarded; `undefined` when neither is given and it is optional. */
+/** Mentions guarded, then ticket keys linked the way the code host wants (wrong links only; GitHub autolinks bare keys). */
+function guarded(env: AgentEnv, text: string): string {
+  return createTicketLinker(env.team, env.tracker).format(
+    mentionGuard(env.team).apply(text),
+    "host",
+  );
+}
+
+/** The text from `body` or `body-file`, with @-mentions guarded and ticket links fixed; `undefined` when neither is given and it is optional. */
 function textOf(
   env: AgentEnv,
   ctx: VerbContext,
@@ -39,16 +52,15 @@ function textOf(
     throw new PortError("invalid", "Pass either body or body-file, not both.");
   }
 
-  const guard = mentionGuard(env.team);
   if (input.bodyFile !== undefined) {
-    return guard.apply(readInputFile(env, ctx, input.bodyFile, "body file"));
+    return guarded(env, readInputFile(env, ctx, input.bodyFile, "body file"));
   }
 
   if (input.body === undefined && required) {
     throw new PortError("invalid", "Pass body or body-file.");
   }
 
-  return input.body === undefined ? undefined : guard.apply(input.body);
+  return input.body === undefined ? undefined : guarded(env, input.body);
 }
 
 const inlineComments = z
@@ -90,8 +102,7 @@ function commentsOf(
     );
   }
 
-  const guard = mentionGuard(env.team);
-  return parsed.data.map((c) => ({ ...c, body: guard.apply(c.body) }));
+  return parsed.data.map((c) => ({ ...c, body: guarded(env, c.body) }));
 }
 
 export const prOpen = defineVerb({
