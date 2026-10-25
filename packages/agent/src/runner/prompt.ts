@@ -125,7 +125,12 @@ export function buildWorkPrompt(
         : `This is a request from ${who}, a trusted human, in chat. Follow process/direct-requests.md. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the requester's thread as the result. Do not greet or address them by name or tag them: just give the outcome. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
     );
 
-    if (origin.about) {
+    if (origin.about?.state === "finished") {
+      lines.push(
+        "",
+        `This is a reply in the thread of your earlier work item ${origin.about.id} (${origin.about.title}), which you handed back. Its ticket, pull request and journal are listed above. Continue that ticket instead of filing a new one: for a follow-up, a correction or more of the same work, run \`ost work attach <its ticket or pull request> --confirmed\` (the human is directing that very work); it reopens or re-queues the work. File a new ticket only for clearly new work. Answer a question yourself.`,
+      );
+    } else if (origin.about) {
       lines.push(
         "",
         `This is a reply in the thread of your running work item ${origin.about.id} (${origin.about.title}). Its ticket, pull request and journal are listed above. The running work does not see the reply: answer a question yourself; for an instruction about that work, attach it with \`ost work attach <its ticket or pull request> --confirmed\` (the human is directing that very work), and your agent says it will be picked up when the current round ends.`,

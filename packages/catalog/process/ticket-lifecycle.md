@@ -2,15 +2,15 @@
 
 Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-specific names map onto these seven.
 
-| Status   | Meaning                             | What you do                                                                                         |
-| -------- | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
-| backlog  | Not yet refined or not scheduled    | Do not start it. Refine it only if it is assigned to you for refinement.                            |
-| ready    | Clear, scoped, waiting for a person | Pick it up only when it is assigned to you and you have no active item.                             |
-| active   | You are working on it               | Move it here when you start. Keep one active item.                                                  |
-| review   | Waiting for someone else            | Move it here at hand-back. Answer review feedback; do not start new work on it.                     |
-| blocked  | Cannot continue                     | Say what blocks it and who can unblock it, then ask that person with `ost ask`. Pick up other work. |
-| done     | Finished and accepted               | Nothing. Never reopen it; file a new ticket for follow-ups.                                         |
-| canceled | Will not be done                    | Nothing. Say why in a comment if you are the one canceling.                                         |
+| Status   | Meaning                             | What you do                                                                                                                                                               |
+| -------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| backlog  | Not yet refined or not scheduled    | Do not start it. Refine it only if it is assigned to you for refinement.                                                                                                  |
+| ready    | Clear, scoped, waiting for a person | Pick it up only when it is assigned to you and you have no active item.                                                                                                   |
+| active   | You are working on it               | Move it here when you start. Keep one active item.                                                                                                                        |
+| review   | Waiting for someone else            | Move it here at hand-back. Answer review feedback; do not start new work on it.                                                                                           |
+| blocked  | Cannot continue                     | Say what blocks it and who can unblock it, then ask that person with `ost ask`. Pick up other work. Hand the item back as `blocked`, not `done` (`process/hand-back.md`). |
+| done     | Finished and accepted               | Nothing. Never reopen it; file a new ticket for follow-ups.                                                                                                               |
+| canceled | Will not be done                    | Nothing. Say why in a comment if you are the one canceling.                                                                                                               |
 
 ## Rules
 

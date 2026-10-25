@@ -138,6 +138,9 @@ export interface WorkSourceOptions {
   /** Called after the item left `active` because of a hand-back, so the workflow can react (move the ticket, notify). */
   onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;
 
+  /** Called after an item started, before it is offered. */
+  onStarted?: (item: WorkItem) => Promise<void>;
+
   /** Called after the scheduler blocked an item on its own (repeated failures, loop guard), so the requester hears of it. */
   onBlocked?: (notice: BlockNotice) => void | Promise<void>;
 
@@ -248,6 +251,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         return undefined;
       }
 
+      await opts.onStarted?.(started.item);
       await store.upsertSubject(OFFER_SUBJECT, item.id, { accepted: false });
       return offerOf(started.item);
     },

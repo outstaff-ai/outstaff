@@ -376,7 +376,7 @@ describe("chat", () => {
     const { seen, text } = await play(
       chat({
         ...talk([false, "Where do the greetings live?"]),
-        about: { itemId: "w9", title: "review feedback" },
+        about: { itemId: "w9", title: "review feedback", state: "running" as const },
       }),
       () => "1. [SHOP-1 Add a greeting](x) (running)\n",
     );
@@ -389,7 +389,7 @@ describe("chat", () => {
     const { seen } = await play(
       chat({
         ...talk([false, "Also keep it on one line."]),
-        about: { itemId: "w9", title: "review feedback" },
+        about: { itemId: "w9", title: "review feedback", state: "running" as const },
       }),
       () => "",
     );
@@ -408,7 +408,7 @@ describe("chat", () => {
       chat({
         ...ctx,
         kind: "chat",
-        about: { itemId: "w9", title: "review feedback" },
+        about: { itemId: "w9", title: "review feedback", state: "running" as const },
         journal:
           "- 2026-01-01T00:00:00Z office: Ada replied in chat (thread t1):\nAlso end it with a full stop.",
       }),

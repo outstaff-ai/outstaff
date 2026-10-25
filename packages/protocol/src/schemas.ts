@@ -101,10 +101,13 @@ export const chatOriginSchema = z.strictObject({
     .strictObject({
       id: z.string().min(1),
       title: z.string(),
+      state: z
+        .enum(["running", "finished"])
+        .describe("Whether the work is still running or was handed back, done or canceled."),
     })
     .optional()
     .describe(
-      "For a chat session started by a reply in the thread of running work: that work item. Its ticket, pull request and journal are in the offer's context.",
+      "For a chat session started by a reply in the thread of earlier work: that work item. Its ticket, pull request and journal are in the offer's context.",
     ),
 });
 

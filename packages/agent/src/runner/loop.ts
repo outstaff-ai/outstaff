@@ -211,6 +211,22 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
     // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
     let asked = false;
+    // The last status the agent moved each ticket to in this run; a ticket it left blocked is handed back as blocked.
+    const moved = new Map<string, string>();
+    const baseTracker = opts.env.tracker;
+    const tracker = baseTracker
+      ? Object.create(baseTracker, {
+          transition: {
+            value: async (...args: Parameters<typeof baseTracker.transition>) => {
+              const issue = await baseTracker.transition(...args);
+              moved.delete(args[0]);
+              moved.set(args[0], args[1]);
+              return issue;
+            },
+          },
+        })
+      : undefined;
+
     const base = opts.env.office;
     const files = {
       ...(attachments.length ? { attachments } : {}),
@@ -221,6 +237,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       ? {
           ...opts.env,
           ...files,
+          ...(tracker ? { tracker } : {}),
           office: {
             ...base,
             async ask(q) {
@@ -245,7 +262,9 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
             },
           },
         }
-      : { ...opts.env, ...files };
+      : tracker
+        ? { ...opts.env, ...files, tracker }
+        : { ...opts.env, ...files };
 
     const requestFor = (prompt: string, resume: string | undefined): RunRequest => ({
       ...(resume ? { sessionId: resume } : {}),
@@ -384,7 +403,21 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     }
 
     const text = outcome.text || lastText;
-    const status = asked ? "waiting" : "done";
+    const offeredTickets = new Set(
+      offer.context.subjects.filter((x) => x.type === "ticket").map((x) => x.ref),
+    );
+
+    const last = [...moved]
+      .filter(([k]) => offeredTickets.size === 0 || offeredTickets.has(k))
+      .at(-1);
+
+    const blocked = last?.[1] === "blocked";
+
+    if (blocked && !asked) {
+      log.warn("the agent left its ticket blocked; handing back as blocked", { workItemId: id });
+    }
+
+    const status = asked ? "waiting" : blocked ? "blocked" : "done";
     await appendJournal(id, await entryFor(text, linksIn(text), true));
     await opts.office.handBack(id, {
       summary: text || "Finished without a message.",

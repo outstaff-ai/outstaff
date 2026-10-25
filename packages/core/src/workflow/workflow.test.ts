@@ -379,6 +379,19 @@ describe("kanban preset", () => {
     ]);
   });
 
+  it("a done hand-back on a blocked ticket is treated as blocked", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } }),
+        world({ status: "blocked" }),
+      ),
+    ).toEqual([
+      // Already blocked: the move is not repeated.
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+      expect.objectContaining({ type: "notify", template: "hand_back_blocked", ticket: "ACME-1" }),
+    ]);
+  });
+
   it("a waiting hand-back changes nothing", () => {
     expect(
       run(
