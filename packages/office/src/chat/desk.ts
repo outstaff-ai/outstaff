@@ -8,6 +8,8 @@ import {
 import {
   formatWorkGroups,
   groupWork,
+  type Attached,
+  type Feedback,
   type Filed,
   type Link,
   type PayloadOf,
@@ -19,7 +21,13 @@ import { CHAT_KIND, orderQueue } from "../scheduler/policy.js";
 import type { Scheduler } from "../scheduler/scheduler.js";
 import type { Store, WorkItem } from "../store/types.js";
 import { summarizeItem } from "../work-source.js";
-import { formatCurrentWork, type WorkState } from "../workstate/index.js";
+import {
+  formatCurrentWork,
+  type PrRecord,
+  type TicketRecord,
+  type WorkState,
+} from "../workstate/index.js";
+import { addFeedback } from "../engine/feedback.js";
 import {
   CHAT_MESSAGE_SUBJECT,
   CHAT_ORIGIN_SUBJECT,
@@ -41,7 +49,7 @@ export interface ChatDeskOptions {
   /** The scheduler without the notifying wrapper: the desk stores the origin first and then calls `notify`. */
   scheduler: Pick<Scheduler, "enqueue" | "move" | "retry">;
   team: Pick<TeamConfig, "people" | "policies">;
-  workState: Pick<WorkState, "currentWork">;
+  workState: Pick<WorkState, "currentWork" | "pullRequests" | "ticket" | "prSubject">;
   tracker?: Pick<Tracker, "links">;
   messaging?: Pick<Messaging, "ask">;
 
@@ -147,6 +155,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       requester: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
       awaitingPlacement: false,
       claimed: [],
+      text: m.text,
     };
 
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, origin);
@@ -170,23 +179,14 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     };
   }
 
-  /**
-   * Files the work a chat session decided a message is: a work item of its own, in the session's thread. The thread
-   * belongs to the new item from here on, so the requester's answer about its place and later replies reach it.
-   */
-  async function file(
-    person: string,
-    sessionId: string,
-    spec: { kind: string; title: string; subject: { type: string; ref: string }; note: string },
-  ): Promise<Filed> {
+  /** The chat session a filing verb was called from. */
+  async function sessionOf(person: string, sessionId: string) {
     const session = await store.getItem(sessionId);
-    const origin =
-      session && session.person === person ? await readOrigin(store, sessionId) : undefined;
-
     if (!session || session.person !== person) {
       throw new ProtocolError("unknown_item", `No work item ${sessionId} for ${person}.`);
     }
 
+    const origin = await readOrigin(store, sessionId);
     if (session.kind !== CHAT_KIND || !origin) {
       throw new ProtocolError("invalid", "Only a chat session files work this way.");
     }
@@ -198,6 +198,19 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       );
     }
 
+    return { session, origin };
+  }
+
+  /**
+   * Files the work a chat session decided a message is: a work item of its own, in the session's thread. The thread
+   * belongs to the new item from here on, so the requester's answer about its place and later replies reach it.
+   */
+  async function file(
+    person: string,
+    sessionId: string,
+    spec: { kind: string; title: string; subject: { type: string; ref: string }; note: string },
+  ): Promise<Filed> {
+    const { session, origin } = await sessionOf(person, sessionId);
     const others = await open(person, session.id);
     const busy = others.some((i) => i.kind !== CHAT_KIND);
     const created = await scheduler.enqueue({
@@ -243,6 +256,212 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       item: await summarizeItem(store, (await store.getItem(created.id)) ?? created),
       waiting: busy,
       work: busy ? await summaries(others.filter((i) => i.kind !== CHAT_KIND)) : [],
+    };
+  }
+
+  const LIVE: WorkItem["status"][] = ["active", "queued", "waiting", "blocked"];
+  const ownTicket = (person: string, t?: TicketRecord) =>
+    t?.assignee?.kind === "agent" && t.assignee.id === person;
+
+  interface Target {
+    ticket?: TicketRecord;
+    pr?: PrRecord;
+  }
+
+  /** The existing work a verb argument names, if it is the person's own. */
+  function resolve(person: string, text: string): Target {
+    const t = text.trim();
+    const refuse = (why: string): never => {
+      throw new ProtocolError("invalid", why);
+    };
+
+    const mine = (pr: PrRecord) =>
+      pr.author.person === person ||
+      ownTicket(person, pr.ticket ? opts.workState.ticket(pr.ticket) : undefined);
+
+    if (/^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(t)) {
+      const ticket = opts.workState.ticket(t) ?? opts.workState.ticket(t.toUpperCase());
+      if (!ticket || !ownTicket(person, ticket)) {
+        return refuse(`No ticket ${t} is assigned to you. Attach a request only to your own work.`);
+      }
+
+      return { ticket };
+    }
+
+    const number = /(?:^|[#/])(\d+)$/.exec(t)?.[1];
+    if (number === undefined) {
+      return refuse(
+        `Say a ticket key (ACME-11) or a pull request (11, #11, owner/repo#11 or its link), not "${t}".`,
+      );
+    }
+
+    const found = opts.workState.pullRequests(Number(number)).filter(mine);
+    const named = found.filter(
+      (p) => t.includes("/") && t.toLowerCase().includes(p.ref.repo.name.toLowerCase()),
+    );
+
+    const pool = named.length > 0 ? named : found;
+    if (pool.length === 0) {
+      return refuse(`No pull request #${number} is yours. Attach a request only to your own work.`);
+    }
+
+    if (pool.length > 1) {
+      return refuse(
+        `More than one of your repositories has a pull request #${number}; say which: ${pool.map((p) => opts.workState.prSubject(p.ref)).join(", ")}.`,
+      );
+    }
+
+    const pr = pool[0]!;
+    return {
+      pr,
+      ...(pr.ticket && opts.workState.ticket(pr.ticket)
+        ? { ticket: opts.workState.ticket(pr.ticket)! }
+        : {}),
+    };
+  }
+
+  const TERMINAL = new Set(["done", "canceled"]);
+
+  async function attachWork(
+    person: string,
+    sessionId: string,
+    request: { target: string; confirmed: boolean; request?: string },
+  ): Promise<Attached> {
+    const { session, origin } = await sessionOf(person, sessionId);
+    const target = resolve(person, request.target);
+
+    // A ticket is the work of its open pull request, when it has one.
+    let { ticket, pr } = target;
+    if (!pr && ticket) {
+      const open = opts.workState.currentWork(person).prs.find((p) => p.ticket === ticket!.key);
+      pr =
+        open &&
+        opts.workState
+          .pullRequests(open.number)
+          .find((p) => opts.workState.prSubject(p.ref) === open.ref);
+    }
+
+    const what = pr ? `PR #${pr.ref.number}` : (ticket?.key ?? request.target);
+    if (pr ? pr.state !== "open" : TERMINAL.has(ticket?.status ?? "")) {
+      throw new ProtocolError(
+        "invalid",
+        `${what} is ${pr ? pr.state : ticket?.status}, and finished work is never reopened. File a follow-up instead: ost ticket create, linking ${what} and saying it depends on it.`,
+      );
+    }
+
+    if (ticket && TERMINAL.has(ticket.status ?? "")) {
+      throw new ProtocolError(
+        "invalid",
+        `${ticket.key} is ${ticket.status}, and finished work is never reopened. File a follow-up instead: ost ticket create, linking ${ticket.key} and saying it depends on it.`,
+      );
+    }
+
+    const inReview = pr ? !pr.draft : ticket?.status === "review";
+    if (inReview && !request.confirmed) {
+      throw new ProtocolError(
+        "invalid",
+        `${what} is in review. Do not add to it on your own: ask the requester in the thread, linking both options ("Add this to ${what}, which is in review, or do it as a follow-up?"). When they say this one, run this again with --confirmed. When they say follow-up, file it with ost ticket create, linking ${what} and saying it depends on it. Nothing is queued meanwhile.`,
+      );
+    }
+
+    const subject = pr
+      ? { type: "pr", ref: opts.workState.prSubject(pr.ref) }
+      : { type: "ticket", ref: ticket!.key };
+
+    const key = ticket?.key ?? pr?.ticket;
+    const who = origin.requester.name ?? origin.requester.id;
+    // The session's message is the request, unless it is only the answer to a question about where the request goes.
+    const message = request.request?.trim() || origin.text || "";
+    const feedback: Feedback = {
+      actor: who,
+      kind: "chat",
+      body: message,
+      ...(clock ? { at: clock.now().toISOString() } : {}),
+    };
+
+    const note = `${who} asked in chat (thread ${origin.thread}); added to ${what}${key && !pr ? "" : key ? ` for ${key}` : ""}:\n${message}`;
+    const live = (await store.listItems({ person }))
+      .filter(
+        (i) =>
+          LIVE.includes(i.status) &&
+          i.kind !== CHAT_KIND &&
+          i.id !== session.id &&
+          ((i.subject?.type === "pr" && i.subject.ref === subject.ref) ||
+            (key !== undefined && i.subject?.type === "ticket" && i.subject.ref === key)),
+      )
+      .toSorted((a, b) => LIVE.indexOf(a.status) - LIVE.indexOf(b.status));
+
+    // The attached work keeps its place: nothing is asked about it, and an active round is not interrupted.
+    let item = live[0];
+    if (item) {
+      await store.appendJournal(item.id, who, `In chat: ${message}`);
+      if (item.status === "blocked") {
+        item = (await scheduler.retry(item.id, { by: who, signal: "chat reply" })) ?? item;
+      } else if (item.status === "waiting") {
+        item = await store.updateItem(item.id, { status: "queued" });
+      }
+    } else {
+      const title =
+        pr !== undefined
+          ? `review feedback: PR #${pr.ref.number}${pr.title ? ` ${pr.title}` : ""}${key && !pr.title.toLowerCase().includes(key.toLowerCase()) ? ` (${key})` : ""}`
+          : `assigned: ${ticket!.key} ${ticket!.title}`.trim();
+
+      item = await scheduler.enqueue({
+        person,
+        kind: pr ? "review_feedback" : "assigned",
+        title,
+        trigger: "human",
+        subject,
+        parentId: session.id,
+      });
+
+      await store.appendJournal(item.id, "office", note);
+    }
+
+    // Queued, the item offers the message with its other feedback; running, a follow-up round starts after its
+    // hand-back and picks it up.
+    await addFeedback(store, item.id, feedback);
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, item.id, {
+      channel: origin.channel,
+      thread: origin.thread,
+      requester: origin.requester,
+      awaitingPlacement: false,
+      claimed: [],
+    } satisfies ChatOriginRecord);
+
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, { ...origin, filed: item.id });
+    await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
+      itemId: item.id,
+    });
+
+    opts.notify(person);
+    const ticketUrl = key ? (ticket?.url ?? opts.tracker?.links.issue(key)) : undefined;
+    return {
+      item: await summarizeItem(store, (await store.getItem(item.id)) ?? item),
+      waiting: false,
+      work: [],
+      attached: {
+        ...(key
+          ? {
+              ticket: {
+                type: "ticket",
+                ref: key,
+                ...(ticket?.title ? { title: ticket.title } : {}),
+                ...(ticketUrl ? { url: ticketUrl } : {}),
+              },
+            }
+          : {}),
+        ...(pr
+          ? {
+              pr: {
+                type: "pr",
+                ref: `#${pr.ref.number}`,
+                title: pr.title,
+                ...(pr.url ? { url: pr.url } : {}),
+              },
+            }
+          : {}),
+      },
     };
   }
 
@@ -591,6 +810,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       const url = opts.tracker?.links.issue(ticket);
       return { ...filed, ...(url ? { url } : {}) };
     },
+
+    attachWork,
 
     queueWork(person, workItemId, request) {
       return file(person, workItemId, {

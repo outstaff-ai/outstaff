@@ -10,18 +10,25 @@ A chat session runs beside your work, so it cannot disturb it. You can read the 
 ## Decide what the message is
 
 1. **A question or a discussion** ("why is CI failing?", "would X be integrated in Y?", "what are you on?"): answer it in your last message. Look at the code, the tickets and your current work to be right. Nothing is filed: no ticket, no work item, no queue. You are done.
-2. **Work** (something to build, fix, write or change): file it with a ticket, `ost ticket create --title "..." --body "..."`. It is assigned to you and starts `ready`. The office makes a work item for it in the same thread, your agent replies there with the ticket link, and you end your session. The work item moves the ticket to `active` when it starts (`process/ticket-lifecycle.md`). File one ticket per message.
+2. **A change to work you already have** ("for the mediator PR, also support X"): check `ost work list` and your tickets and pull requests first. If the request belongs to an open pull request or an active or queued ticket of yours, it is part of that work. Do not create a ticket for it; attach it with `ost work attach <ticket|pr>` (a ticket key, or a pull request number, `#number` or link). It becomes a round on that work and carries the human's message as feedback; the thread follows it, and nothing is asked about its place. What to do depends on the state of the work:
+   - **Still being built** (a draft pull request, or a ticket that is active or has no pull request yet): `ost work attach`.
+   - **In review** (the pull request is open and ready for review, or approved): do not attach on your own. Ask in the thread, linking both options: "Add this to [PR #11](...), which is in review, or do it as a follow-up?" Then end your session; nothing is queued and no ticket is created until they answer. Their reply starts a new chat session in the same thread. If they say this pull request, run `ost work attach <target> --confirmed --request "<what they asked earlier>"`: their reply is only the answer, so restate the request. If they say follow-up, file it as new work (below), linking the pull request and saying it depends on it. The verb refuses a pull request in review without `--confirmed`.
+   - **Merged or done**: a follow-up, always, never a reopening: a new ticket, or the merged-feedback follow-up (`process/merged-feedback.md`). `ost work attach` refuses it.
 
-If you cannot tell, ask the human in your last message. Do not file work on a guess.
+   `ost work attach` takes only your own work (assigned to you or authored by you). If you cannot tell which work the request means, ask in the thread with the candidates linked. Do not guess.
+3. **New work** (something to build, fix, write or change that no work of yours covers): file it with a ticket, `ost ticket create --title "..." --body "..."`. It is assigned to you and starts `ready`. The office makes a work item for it in the same thread, your agent replies there with the ticket link, and you end your session. The work item moves the ticket to `active` when it starts (`process/ticket-lifecycle.md`). File one ticket per message.
 
-## After you file work
+If you cannot tell whether it is a question or work, ask the human in your last message. Do not file work on a guess.
 
-You do not post in chat yourself, and you do not wait for anything: your agent posts the reply when you file.
+## After you file or attach work
 
-- If you are idle, the work starts as soon as your session ends.
-- If you are busy, your agent also asks where the work goes. It lists your current work, one line per ticket or pull request with the follow-ups on it, and the human answers next, after one of the lines (by number), last, or the PM when the team has one. Until they answer, the work waits at the end of your queue. Nothing is dropped and your active item is not interrupted. You can move it yourself if asked: `ost work move <id> next|last|before|after [other id]`.
+You do not post in chat yourself, and you do not wait for anything: your agent posts the reply when you file, or "Adding this to [PR #11](...) for [ACME-11](...)" when you attach.
 
-A reply in the thread of filed work joins that work item. A reply in the thread of a question starts another chat session.
+- Attached work keeps its place: if that work is the active item, it picks the message up on its next round, and the human is not asked where it goes.
+- If you are idle, new work starts as soon as your session ends.
+- If you are busy, your agent also asks where new work goes. It lists your current work, one line per ticket or pull request with the follow-ups on it, and the human answers next, after one of the lines (by number), last, or the PM when the team has one. Until they answer, the work waits at the end of your queue. Nothing is dropped and your active item is not interrupted. You can move it yourself if asked: `ost work move <id> next|last|before|after [other id]`.
+
+A reply in the thread of filed or attached work joins that work item. A reply in the thread of a question starts another chat session.
 
 ## Limits
 
@@ -213,15 +220,15 @@ Memory is shared across all of your work items and survives restarts. Keep it sm
 
 `ost` is how you reach the team's systems. It is the same whatever tracker, document store or code host the team uses. Outputs include links; pass them on.
 
-| Verb         | Use it to                                                                                                                                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ost ticket` | Read, create, comment on, assign and move tickets. Statuses are the canonical ones in `process/ticket-lifecycle.md`.                                          |
-| `ost doc`    | Read and write documents in the team's knowledge store.                                                                                                       |
-| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                                                             |
-| `ost ask`    | Ask another person, by handle or role. See `references/team.md`.                                                                                              |
-| `ost work`   | `list` your work, one line per ticket or pull request; `move` a queued item next, last, before or after another; `queue` a chat request as work (no tracker). |
-| `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                                                          |
-| `ost me`     | Show who you are: your handle, role and team.                                                                                                                 |
+| Verb         | Use it to                                                                                                                                                                                                       |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ost ticket` | Read, create, comment on, assign and move tickets. Statuses are the canonical ones in `process/ticket-lifecycle.md`.                                                                                            |
+| `ost doc`    | Read and write documents in the team's knowledge store.                                                                                                                                                         |
+| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                                                                                                               |
+| `ost ask`    | Ask another person, by handle or role. See `references/team.md`.                                                                                                                                                |
+| `ost work`   | `list` your work, one line per ticket or pull request; `move` a queued item next, last, before or after another; `queue` a chat request as work (no tracker); `attach` a chat request to work you already have. |
+| `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                                                                                                            |
+| `ost me`     | Show who you are: your handle, role and team.                                                                                                                                                                   |
 
 Run any verb with `--help` for its options.
 

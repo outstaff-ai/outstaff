@@ -1048,6 +1048,34 @@ ost work queue "Add a search page" "Asked by Dana in chat."
 ost work queue "Add a search page" "Asked by Dana in chat." --json
 ```
 
+## ost work attach
+
+Add a chat request to work you already have.
+
+Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket.
+
+```
+ost work attach <target> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--confirmed` | The requester said in the thread that the request belongs to this pull request, which is in review. |
+| `--request <request>` | What to add, when the message of this session is only the human's answer (for example "this PR"): restate the request they made earlier in the thread. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost work attach ACME-11
+ost work attach 11 --confirmed
+ost work attach ACME-11 --json
+```
+
 ## ost roster
 
 List the team and what everyone is doing.

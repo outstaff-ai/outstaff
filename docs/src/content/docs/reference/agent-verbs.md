@@ -613,6 +613,31 @@ Examples:
 ost work queue "Add a search page" "Asked by Dana in chat."
 ```
 
+## work.attach
+
+Add a chat request to work you already have.
+
+Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket.
+
+```
+ost work attach <target> [--confirmed] [--request <request>]
+```
+
+Runtime tool: `work_attach`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `target` | string | yes | A ticket key (ACME-11), or a pull request: its number, #number, owner/repo#number or link. |
+| `confirmed` | boolean | no | The requester said in the thread that the request belongs to this pull request, which is in review. Default: false. |
+| `request` | string | no | What to add, when the message of this session is only the human's answer (for example "this PR"): restate the request they made earlier in the thread. |
+
+Examples:
+
+```sh
+ost work attach ACME-11
+ost work attach 11 --confirmed
+```
+
 ## team
 
 List the team and what everyone is doing.

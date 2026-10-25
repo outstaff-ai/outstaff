@@ -1,4 +1,4 @@
-import type { Filed, PayloadOf, WorkSummary } from "@outstaff/protocol";
+import type { Attached, Filed, PayloadOf, WorkSummary } from "@outstaff/protocol";
 
 /** What the office tells an agent; the wire protocol is defined separately (the verbs only need this). */
 export type OfficeWorkItem = WorkSummary;
@@ -30,7 +30,7 @@ export interface OfficeAnswer {
   answer?: string;
 }
 
-export type { Filed };
+export type { Attached, Filed };
 export type ChatMessageRequest = PayloadOf<"chat_message">;
 export type ChatMessageResult = PayloadOf<"chat_message_result">;
 export type ChatReportKind = PayloadOf<"chat_report">["kind"];
@@ -63,6 +63,12 @@ export interface OfficeClient {
   /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for a second filing. */
   linkTicket(workItemId: string, ticket: string): Promise<Filed>;
 
+  /** Makes a chat session's request part of the caller's existing ticket or pull request. */
+  attachWork(
+    workItemId: string,
+    request: { target: string; confirmed: boolean; request?: string },
+  ): Promise<Attached>;
+
   /** Files work from a chat session when there is no tracker. Like `linkTicket`. */
   queueWork(workItemId: string, request: { title: string; body: string }): Promise<Filed>;
 }
@@ -73,6 +79,7 @@ export interface FakeOffice extends OfficeClient {
   placed: { workItemId: string; placement: Placement }[];
   linked: { workItemId: string; ticket: string }[];
   queued: { workItemId: string; title: string; body: string }[];
+  attached: { workItemId: string; target: string; confirmed: boolean; request?: string }[];
   chatMessages: ChatMessageRequest[];
   chatReports: { workItemId: string; kind: ChatReportKind }[];
 }
@@ -91,6 +98,9 @@ export function createFakeOffice(
 
     /** What the office answers when a chat session files work; by default the person is idle. */
     filed?: Partial<Filed>;
+
+    /** What the office answers when a chat session attaches its request; by default it is attached. */
+    attach?: (target: string, confirmed: boolean) => Partial<Attached>;
   } = {},
 ): FakeOffice {
   const asked: FakeOffice["asked"] = [];
@@ -98,6 +108,7 @@ export function createFakeOffice(
   const placed: FakeOffice["placed"] = [];
   const linked: FakeOffice["linked"] = [];
   const queued: FakeOffice["queued"] = [];
+  const attached: FakeOffice["attached"] = [];
   const chatMessages: ChatMessageRequest[] = [];
   const chatReports: FakeOffice["chatReports"] = [];
   const seen = new Set<string>();
@@ -107,6 +118,29 @@ export function createFakeOffice(
     placed,
     linked,
     queued,
+    attached,
+    async attachWork(workItemId, request) {
+      attached.push({ workItemId, ...request });
+      return {
+        item: { id: "work-attached", title: request.target, status: "queued" },
+        waiting: false,
+        work: [],
+        attached: {
+          pr: {
+            type: "pr",
+            ref: "#11",
+            title: "Add search",
+            url: "https://git.acme.example/acme/app/pull/11",
+          },
+          ticket: {
+            type: "ticket",
+            ref: "SHOP-11",
+            url: "https://tracker.acme.example/issue/SHOP-11",
+          },
+        },
+        ...opts.attach?.(request.target, request.confirmed),
+      };
+    },
     async linkTicket(workItemId, ticket) {
       linked.push({ workItemId, ticket });
       return {

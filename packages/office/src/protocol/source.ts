@@ -1,5 +1,6 @@
 import type {
   AnswerState,
+  Attached,
   ErrorCode,
   Filed,
   Human,
@@ -91,6 +92,17 @@ export interface ChatDesk {
    * when the person is idle and otherwise waits last until the requester says where it goes.
    */
   linkTicket(person: string, workItemId: string, ticket: string): Promise<Filed>;
+
+  /**
+   * Makes a chat session's request part of existing work of the person: a round on its pull request or ticket, or the
+   * item already working on it, with the thread moved to that item. Refused for work that is not the person's, work
+   * that is merged or done, and a pull request in review unless the requester confirmed.
+   */
+  attachWork(
+    person: string,
+    workItemId: string,
+    request: { target: string; confirmed: boolean; request?: string },
+  ): Promise<Attached>;
 
   /** Files work that has no tracker: a work item for the request, in the session's thread. Like `linkTicket`. */
   queueWork(

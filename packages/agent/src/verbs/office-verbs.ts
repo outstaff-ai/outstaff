@@ -154,6 +154,62 @@ export const workQueue = defineVerb({
   },
 });
 
+export const workAttach = defineVerb({
+  name: "work.attach",
+  summary: "Add a chat request to work you already have.",
+  description:
+    "Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket.",
+  input: z.strictObject({
+    target: z
+      .string()
+      .min(1)
+      .max(500)
+      .describe(
+        "A ticket key (ACME-11), or a pull request: its number, #number, owner/repo#number or link.",
+      ),
+    confirmed: z
+      .boolean()
+      .default(false)
+      .describe(
+        "The requester said in the thread that the request belongs to this pull request, which is in review.",
+      ),
+    request: z
+      .string()
+      .max(20_000)
+      .optional()
+      .describe(
+        'What to add, when the message of this session is only the human\'s answer (for example "this PR"): restate the request they made earlier in the thread.',
+      ),
+  }),
+  args: ["target"],
+  examples: ["ost work attach ACME-11", "ost work attach 11 --confirmed"],
+  async run(env, input, ctx) {
+    if (!ctx.workItemId) {
+      throw new PortError(
+        "invalid",
+        "Only a chat session attaches a request; there is no work item here.",
+      );
+    }
+
+    const done = await requireOffice(env).attachWork(ctx.workItemId, {
+      target: input.target,
+      confirmed: input.confirmed,
+      ...(input.request ? { request: input.request } : {}),
+    });
+
+    const pr = done.attached.pr;
+    const ticket = done.attached.ticket;
+    return result(
+      [
+        `Added the request to ${[pr && `PR ${pr.ref}`, ticket?.ref].filter(Boolean).join(" for ")}.`,
+        "It is part of that work now and keeps its place. Finish with a short note.",
+      ],
+      { attached: done.attached },
+      [pr?.url, ticket?.url].filter((u): u is string => !!u),
+    );
+  },
+});
+
 export const team = defineVerb({
   name: "team",
   cli: ["roster"],
@@ -179,4 +235,4 @@ export const team = defineVerb({
   },
 });
 
-export const officeVerbs = [ask, answer, work, workMove, workQueue, team];
+export const officeVerbs = [ask, answer, work, workMove, workQueue, workAttach, team];

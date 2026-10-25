@@ -134,6 +134,17 @@ export const MESSAGE_META = {
     summary: "The work item created for the request, and whether it waits for its place.",
     replies: [],
   },
+  work_attach: {
+    from: "agent",
+    summary:
+      "Makes a chat session's request part of existing work of the caller (a ticket or a pull request) instead of new work: the request becomes a round on it, carrying the human's message as feedback, and the thread belongs to that item. Refused for work that is not the caller's, for merged or done work, and for a pull request in review unless the requester confirmed.",
+    replies: ["work_attach_result", "error"],
+  },
+  work_attach_result: {
+    from: "office",
+    summary: "The existing work the request is part of now.",
+    replies: [],
+  },
   chat_message: {
     from: "agent",
     summary:

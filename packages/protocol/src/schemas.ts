@@ -89,9 +89,9 @@ export const inlineCommentSchema = z.strictObject({
 export const feedbackSchema = z.strictObject({
   actor: z.string().min(1).describe("Login of the person who gave the feedback."),
   kind: z
-    .enum(["review", "comment", "inline_comment"])
+    .enum(["review", "comment", "inline_comment", "chat"])
     .describe(
-      "A review with its summary, a comment on the pull request conversation, or an inline comment on the diff.",
+      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, or a message from a trusted human in chat.",
     ),
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),
@@ -332,6 +332,43 @@ export const messageSchema = z.discriminatedUnion("type", [
   ),
   message("work_queue_result", filedSchema),
   message(
+    "work_attach",
+    z.strictObject({
+      workItemId: itemId,
+      target: z
+        .string()
+        .min(1)
+        .max(500)
+        .describe(
+          "A ticket key, or a pull request: its number, `#number`, `owner/repo#number` or link.",
+        ),
+      confirmed: z
+        .boolean()
+        .default(false)
+        .describe(
+          "True when the requester said in the thread that the request belongs to a pull request that is in review.",
+        ),
+      request: z
+        .string()
+        .max(20_000)
+        .optional()
+        .describe(
+          "What to add, when the session's message is only the requester's answer and the request came earlier in the thread. Default: the session's message.",
+        ),
+    }),
+  ),
+  message(
+    "work_attach_result",
+    filedSchema.extend({
+      attached: z
+        .strictObject({
+          ticket: refSchema.optional().describe("The ticket the request was added to."),
+          pr: refSchema.optional().describe("The pull request the request was added to."),
+        })
+        .describe("The existing work the request is part of now."),
+    }),
+  ),
+  message(
     "chat_message",
     z.strictObject({
       messageId: z.string().min(1).max(200).describe("Id of the message in the chat workspace."),
@@ -416,6 +453,7 @@ export type Feedback = z.infer<typeof feedbackSchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 export type Filed = z.infer<typeof filedSchema>;
+export type Attached = PayloadOf<"work_attach_result">;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
 export type MemberUsage = z.infer<typeof memberUsageSchema>;
 export type ChatOrigin = z.infer<typeof chatOriginSchema>;

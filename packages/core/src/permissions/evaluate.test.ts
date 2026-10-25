@@ -87,6 +87,7 @@ const rows: Row[] = [
   ["chat may comment on a ticket", "chat", { kind: "ost", command: "ticket.comment" }, "allow"],
   ["chat may create a ticket", "chat", { kind: "ost", command: "ticket.create" }, "allow"],
   ["chat may file a request", "chat", { kind: "ost", command: "work.queue" }, "allow"],
+  ["chat may attach a request", "chat", { kind: "ost", command: "work.attach" }, "allow"],
   ["chat may comment on a pull request", "chat", { kind: "ost", command: "pr.comment" }, "allow"],
   [
     "chat may not open a pull request",

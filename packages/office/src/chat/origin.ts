@@ -10,6 +10,9 @@ export interface ChatOriginRecord extends ChatOrigin {
   /** The request waits last until the requester says where it goes. */
   awaitingPlacement: boolean;
 
+  /** The message that started the session, for the office's own use (it is not offered to the agent). */
+  text?: string;
+
   /** For a chat session: the work item it filed for the request. The thread belongs to that item from then on. */
   filed?: string;
 

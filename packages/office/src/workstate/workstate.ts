@@ -660,6 +660,8 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       const rec = prs.get(prSubject(pr));
       return rec && toWorkflowPr(rec);
     },
+    pullRequests: (number) => [...prs.values()].filter((p) => p.ref.number === number),
+    ticket: (key) => tickets.get(key),
     lastWorker: (t) => workers.get(t),
     requester: (t) => tickets.get(t)?.requester,
     hasLabel: (t, label) => tickets.get(t)?.labels.includes(label) ?? false,

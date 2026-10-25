@@ -2,15 +2,15 @@
 
 `ost` is how you reach the team's systems. It is the same whatever tracker, document store or code host the team uses. Outputs include links; pass them on.
 
-| Verb         | Use it to                                                                                                                                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ost ticket` | Read, create, comment on, assign and move tickets. Statuses are the canonical ones in `process/ticket-lifecycle.md`.                                          |
-| `ost doc`    | Read and write documents in the team's knowledge store.                                                                                                       |
-| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                                                             |
-| `ost ask`    | Ask another person, by handle or role. See `references/team.md`.                                                                                              |
-| `ost work`   | `list` your work, one line per ticket or pull request; `move` a queued item next, last, before or after another; `queue` a chat request as work (no tracker). |
-| `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                                                          |
-| `ost me`     | Show who you are: your handle, role and team.                                                                                                                 |
+| Verb         | Use it to                                                                                                                                                                                                       |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ost ticket` | Read, create, comment on, assign and move tickets. Statuses are the canonical ones in `process/ticket-lifecycle.md`.                                                                                            |
+| `ost doc`    | Read and write documents in the team's knowledge store.                                                                                                                                                         |
+| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                                                                                                               |
+| `ost ask`    | Ask another person, by handle or role. See `references/team.md`.                                                                                                                                                |
+| `ost work`   | `list` your work, one line per ticket or pull request; `move` a queued item next, last, before or after another; `queue` a chat request as work (no tracker); `attach` a chat request to work you already have. |
+| `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                                                                                                            |
+| `ost me`     | Show who you are: your handle, role and team.                                                                                                                                                                   |
 
 Run any verb with `--help` for its options.
 

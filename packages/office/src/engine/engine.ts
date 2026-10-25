@@ -9,6 +9,7 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
+import { CHAT_ORIGIN_SUBJECT, readOrigin } from "../chat/origin.js";
 import {
   addFeedback,
   awaitsReview,
@@ -563,6 +564,18 @@ export function createEngine(opts: EngineOptions): Engine {
 
     for (const feedback of late) {
       await addFeedback(store, next.id, feedback);
+    }
+
+    // A request from chat that reached the item late is answered in the same thread.
+    const origin = await readOrigin(store, itemId);
+    if (origin) {
+      await store.upsertSubject(CHAT_ORIGIN_SUBJECT, next.id, {
+        channel: origin.channel,
+        thread: origin.thread,
+        requester: origin.requester,
+        awaitingPlacement: false,
+        claimed: [],
+      });
     }
 
     await store.upsertSubject(FOLLOW_UP_SUBJECT, itemId, { itemId: next.id });

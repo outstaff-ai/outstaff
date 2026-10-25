@@ -7,6 +7,8 @@ import { openStore } from "../store/index.js";
 import type { Store, WorkItem } from "../store/types.js";
 import { createChatDesk, type ChatRequests } from "./desk.js";
 import { readOrigin } from "./origin.js";
+import type { PrRecord, TicketRecord } from "../workstate/index.js";
+import { addFeedback, readFeedback } from "../engine/feedback.js";
 import { parsePlacement } from "./placement.js";
 
 function teamConfig(withPm = true): TeamConfig {
@@ -58,6 +60,32 @@ describe("chat requests", () => {
   let n: number;
   let clock: ManualClock;
   let makeDesk: (withChat?: boolean) => ChatRequests;
+  let tickets: TicketRecord[];
+  let pulls: PrRecord[];
+
+  // The office's picture of the work, as the work state keeps it.
+  const knownWork = () => ({
+    currentWork: (person: string) => ({
+      person,
+      tickets: [{ key: "ACME-9", title: "Old work", status: "active" as const, prs: [] }],
+      prs: pulls
+        .filter((p) => p.state === "open" && p.author.person === person)
+        .map((p) => ({
+          ref: `acme/app#${p.ref.number}`,
+          number: p.ref.number,
+          title: p.title,
+          state: p.state,
+          draft: p.draft,
+          ci: "success" as const,
+          mergeable: "clean" as const,
+          unresolvedThreads: 0,
+          ...(p.ticket ? { ticket: p.ticket } : {}),
+        })),
+    }),
+    pullRequests: (number: number) => pulls.filter((p) => p.ref.number === number),
+    ticket: (key: string) => tickets.find((t) => t.key === key),
+    prSubject: (ref: { number: number }) => `acme/app#${ref.number}`,
+  });
 
   const say = (text: string, thread?: string, messageId = `m${++n}`) =>
     desk.message("sam", {
@@ -101,6 +129,8 @@ describe("chat requests", () => {
   };
 
   beforeEach(async () => {
+    tickets = [];
+    pulls = [];
     n = 0;
     notified = [];
     asked = [];
@@ -117,13 +147,7 @@ describe("chat requests", () => {
         store,
         scheduler,
         team,
-        workState: {
-          currentWork: (person) => ({
-            person,
-            tickets: [{ key: "ACME-9", title: "Old work", status: "active", prs: [] }],
-            prs: [],
-          }),
-        },
+        workState: knownWork(),
         tracker,
         ...(withChat ? { chat } : {}),
         messaging: {
@@ -325,6 +349,293 @@ describe("chat requests", () => {
     });
   });
 
+  describe("attaching a request to existing work", () => {
+    const ticket = (key: string, extra: Partial<TicketRecord> = {}) => {
+      const rec: TicketRecord = {
+        key,
+        title: "Search page",
+        labels: [],
+        status: "active",
+        assignee: { id: "sam", kind: "agent" },
+        updatedAt: "2030-01-01T00:00:00.000Z",
+        ...extra,
+      };
+
+      tickets.push(rec);
+      return rec;
+    };
+
+    const pull = (number: number, extra: Partial<PrRecord> = {}) => {
+      const rec: PrRecord = {
+        ref: { repo: { host: "git.acme.example", owner: "acme", name: "app" }, number },
+        title: "feat: search page",
+        url: `https://git.acme.example/acme/app/pull/${number}`,
+        headRef: "search",
+        headSha: "abc",
+        baseRef: "main",
+        draft: true,
+        state: "open",
+        mergeable: "clean",
+        author: { login: "acme-sam[bot]", kind: "agent", person: "sam" },
+        checks: [],
+        ci: "success",
+        unresolvedThreads: 0,
+        ticket: "ACME-11",
+        updatedAt: "2030-01-01T00:00:00.000Z",
+        ...extra,
+      };
+
+      pulls.push(rec);
+      return rec;
+    };
+
+    const session = async (text = "for the search PR, also support filters") => {
+      const r = await say(text);
+      await scheduler.markActive(r.item.id);
+      return r.item;
+    };
+
+    const attach = async (target: string, confirmed = false, text?: string) => {
+      const s = await session(text);
+      return { s, attached: await desk.attachWork("sam", s.id, { target, confirmed }) };
+    };
+
+    it("joins the item that is working on an own ticket, carries the message, and moves the thread there", async () => {
+      ticket("ACME-11");
+      pull(11);
+      const [running] = await busyWith("assigned: ACME-11 Search page");
+      await store.updateItem(running!.id, { subject: { type: "ticket", ref: "ACME-11" } });
+
+      const { s, attached } = await attach("ACME-11");
+      expect(attached).toMatchObject({
+        item: { id: running!.id },
+        waiting: false,
+        work: [],
+        attached: { ticket: { ref: "ACME-11" }, pr: { ref: "#11" } },
+      });
+
+      // The active round is not interrupted and nothing is queued or asked.
+      expect((await store.getItem(running!.id))!.status).toBe("active");
+      expect((await store.listItems({ person: "sam", status: "queued" })).length).toBe(0);
+      // The running round gets it after its hand-back, in a follow-up round, like any late feedback.
+      expect(await readFeedback(store, running!.id)).toMatchObject([
+        { kind: "chat", actor: "Dana", body: "for the search PR, also support filters" },
+      ]);
+
+      expect(await readOrigin(store, running!.id)).toMatchObject({
+        thread: "m1",
+        requester: DANA,
+        awaitingPlacement: false,
+      });
+
+      expect(await readOrigin(store, s.id)).toMatchObject({ filed: running!.id });
+      const journal = (await store.readJournal(running!.id)).map((j) => j.text).join("\n");
+      expect(journal).toContain("In chat: for the search PR, also support filters");
+
+      // A later reply in the thread joins the attached item.
+      const reply = await say("and keep it fast", "m1");
+      expect(reply).toMatchObject({ disposition: "joined", item: { id: running!.id } });
+      expect((await store.readJournal(running!.id)).map((j) => j.text).join("\n")).toContain(
+        "and keep it fast",
+      );
+    });
+
+    it("starts a round on an own draft pull request when nothing is working on it", async () => {
+      ticket("ACME-11");
+      pull(11);
+      const { s, attached } = await attach("#11");
+      const item = (await store.getItem(attached.item.id))!;
+      expect(item).toMatchObject({
+        kind: "review_feedback",
+        status: "queued",
+        trigger: "human",
+        parentId: s.id,
+        subject: { type: "pr", ref: "acme/app#11" },
+      });
+
+      expect(item.title).toContain("PR #11");
+      expect(item.title).toContain("(ACME-11)");
+      expect(await readFeedback(store, item.id)).toMatchObject([
+        { actor: "Dana", kind: "chat", body: "for the search PR, also support filters" },
+      ]);
+
+      expect(await readOrigin(store, item.id)).toMatchObject({
+        awaitingPlacement: false,
+        thread: "m1",
+      });
+
+      expect(attached.attached.pr).toMatchObject({
+        ref: "#11",
+        url: "https://git.acme.example/acme/app/pull/11",
+      });
+
+      expect((await scheduler.next("sam"))?.id).toBe(item.id);
+    });
+
+    it("takes a pull request by number, link or ticket", async () => {
+      ticket("ACME-11");
+      pull(11);
+      for (const target of [
+        "11",
+        "#11",
+        "acme/app#11",
+        "https://git.acme.example/acme/app/pull/11",
+        "ACME-11",
+      ]) {
+        const s = await session();
+        const done = await desk.attachWork("sam", s.id, { target, confirmed: false });
+        expect(done.attached.pr?.ref).toBe("#11");
+        await store.updateItem(done.item.id, { status: "canceled" });
+      }
+    });
+
+    it("adds to an own ticket that has no pull request yet, as a round on the ticket", async () => {
+      ticket("ACME-12", { title: "Billing" });
+      const { attached } = await attach("ACME-12");
+      expect(await store.getItem(attached.item.id)).toMatchObject({
+        kind: "assigned",
+        subject: { type: "ticket", ref: "ACME-12" },
+      });
+
+      expect(attached.attached).toMatchObject({ ticket: { ref: "ACME-12" } });
+      expect(attached.attached.pr).toBeUndefined();
+    });
+
+    it("refuses a ticket or pull request that is not the person's own", async () => {
+      ticket("ACME-20", { assignee: { id: "pat", kind: "agent" } });
+      ticket("ACME-21", { assignee: { id: "dana", kind: "human" } });
+      pull(20, {
+        ticket: "ACME-20",
+        author: { login: "acme-pat[bot]", kind: "agent", person: "pat" },
+      });
+
+      for (const target of [
+        "ACME-20",
+        "ACME-21",
+        "ACME-99",
+        "20",
+        "https://git.acme.example/acme/app/pull/20",
+        "nonsense",
+      ]) {
+        const s = await session();
+        await expect(
+          desk.attachWork("sam", s.id, { target, confirmed: true }),
+        ).rejects.toMatchObject({
+          code: "invalid",
+        });
+      }
+
+      expect((await store.listItems({ person: "sam" })).filter((i) => i.kind !== "chat")).toEqual(
+        [],
+      );
+    });
+
+    it("refuses a pull request in review until the requester confirmed, and queues nothing meanwhile", async () => {
+      ticket("ACME-11", { status: "review" });
+      pull(11, { draft: false, review: "approved" });
+      const s = await session();
+      const before = (await store.listItems({ person: "sam" })).length;
+      await expect(
+        desk.attachWork("sam", s.id, { target: "11", confirmed: false }),
+      ).rejects.toMatchObject({
+        code: "invalid",
+        message: expect.stringContaining("in review") as string,
+      });
+
+      expect((await store.listItems({ person: "sam" })).length).toBe(before);
+      expect((await readOrigin(store, s.id))!.filed).toBeUndefined();
+
+      const done = await desk.attachWork("sam", s.id, { target: "11", confirmed: true });
+      expect(await store.getItem(done.item.id)).toMatchObject({
+        kind: "review_feedback",
+        subject: { type: "pr", ref: "acme/app#11" },
+      });
+    });
+
+    it("treats a ticket in review without a pull request like a pull request in review", async () => {
+      ticket("ACME-13", { status: "review" });
+      const s = await session();
+      await expect(
+        desk.attachWork("sam", s.id, { target: "ACME-13", confirmed: false }),
+      ).rejects.toMatchObject({
+        message: expect.stringContaining("in review") as string,
+      });
+
+      await expect(
+        desk.attachWork("sam", s.id, { target: "ACME-13", confirmed: true }),
+      ).resolves.toBeDefined();
+    });
+
+    it("never reopens merged or done work: it is a follow-up", async () => {
+      ticket("ACME-14", { status: "done" });
+      ticket("ACME-15");
+      pull(15, { ticket: "ACME-15", state: "merged", draft: false });
+      for (const target of ["ACME-14", "15"]) {
+        const s = await session();
+        await expect(
+          desk.attachWork("sam", s.id, { target, confirmed: true }),
+        ).rejects.toMatchObject({
+          code: "invalid",
+          message: expect.stringContaining("follow-up") as string,
+        });
+      }
+
+      expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([]);
+    });
+
+    it("attaches once per session and only from a chat session", async () => {
+      ticket("ACME-11");
+      const { s } = await attach("ACME-11");
+      await expect(
+        desk.attachWork("sam", s.id, { target: "ACME-11", confirmed: false }),
+      ).rejects.toMatchObject({
+        code: "invalid",
+      });
+
+      const plain = await scheduler.enqueue({
+        person: "sam",
+        kind: "ticket",
+        title: "x",
+        trigger: "human",
+      });
+
+      await expect(
+        desk.attachWork("sam", plain.id, { target: "ACME-11", confirmed: false }),
+      ).rejects.toMatchObject({
+        code: "invalid",
+      });
+
+      await expect(
+        desk.attachWork("pat", s.id, { target: "ACME-11", confirmed: false }),
+      ).rejects.toMatchObject({
+        code: "unknown_item",
+      });
+    });
+
+    it("adds the message to the feedback a queued round already has", async () => {
+      ticket("ACME-11");
+      pull(11);
+      const [queued] = await busyWith("review feedback: PR #11");
+      await store.updateItem(queued!.id, {
+        subject: { type: "pr", ref: "acme/app#11" },
+        status: "queued",
+      });
+
+      await addFeedback(store, queued!.id, { actor: "grace", kind: "review", body: "Please fix" });
+
+      const { attached } = await attach("11");
+      expect(attached.item.id).toBe(queued!.id);
+      expect((await readFeedback(store, queued!.id)).map((f) => [f.actor, f.kind])).toEqual([
+        ["grace", "review"],
+        ["Dana", "chat"],
+      ]);
+
+      expect((await store.readJournal(queued!.id)).map((j) => j.text).join("\n")).toContain(
+        "for the search PR",
+      );
+    });
+  });
+
   it("starts a chat session beside the active item and queues nothing behind it", async () => {
     const [running] = await busyWith("Running thing", "Queued thing");
     const r = await say("would X be integrated in Y?");
@@ -412,7 +723,7 @@ describe("chat requests", () => {
       store,
       scheduler,
       team: teamConfig(false),
-      workState: { currentWork: () => ({ person: "sam", tickets: [], prs: [] }) },
+      workState: knownWork(),
       linksOf: async () => [],
       notify: () => {},
     });

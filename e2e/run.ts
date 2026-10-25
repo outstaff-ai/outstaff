@@ -559,6 +559,69 @@ async function main() {
     `batch: two inline comments on #${pr1.pr.number} -> one round, both threads replied and resolved, no top-level comment`,
   );
 
+  // ---- 3d. a chat request about the open pull request: the agent asks first (it is in review), then adds it to that
+  // pull request instead of creating a ticket
+  const sha4 = batch.pr.head.sha;
+  const ticketsBefore = (await state()).tickets.length;
+  const pullsBefore = (await state()).github.pulls.length;
+  const wish = `For PR #${pr1.pr.number}, also say goodbye on the last line.`;
+  const wished = await stub("POST", "/_test/chat/say", { text: wish });
+  const question = await until(
+    "the agent asking whether the request belongs to the pull request in review",
+    (s) =>
+      s.chat.posts.find(
+        (p: Json) => p.thread === wished.id && /in review, or do it as a follow-up\?/.test(p.text),
+      ),
+  );
+
+  assertEq(
+    question.text.includes(`PR #${pr1.pr.number}`),
+    true,
+    "the question names the pull request",
+  );
+
+  const asleep = await state();
+  assertEq(asleep.tickets.length, ticketsBefore, "nothing is filed before the human answers");
+  assertEq(
+    asleep.github.pulls.find((p: Json) => p.number === pr1.pr.number).head.sha,
+    sha4,
+    "nothing is pushed before the human answers",
+  );
+
+  await stub("POST", "/_test/chat/say", { text: "This PR.", thread: wished.id });
+  const added = await until(
+    "the request pushed to the pull request, with the first reply and the answer in the thread",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const first = s.chat.posts.find(
+        (p: Json) => p.thread === wished.id && p.text.startsWith("Adding this to"),
+      );
+
+      const note = pr.conversation.find((c: Json) =>
+        c.body.includes("say goodbye on the last line"),
+      );
+
+      const done = s.chat.posts.find(
+        (p: Json) => p.thread === wished.id && p.text.includes("Addressed") && p !== first,
+      );
+
+      return pr.head.sha !== sha4 && first && note && done ? { pr, first, done } : undefined;
+    },
+  );
+
+  assertEq(
+    added.first.text.includes(`PR #${pr1.pr.number}`),
+    true,
+    "the first reply links the pull request",
+  );
+
+  const kept = await state();
+  assertEq(kept.tickets.length, ticketsBefore, "no new ticket was created");
+  assertEq(kept.github.pulls.length, pullsBefore, "no new pull request was opened");
+  step(
+    `attach: a chat request about #${pr1.pr.number} in review -> asked first, then pushed to that pull request, no new ticket`,
+  );
+
   // ---- 4. the human merges; the ticket is done; the other pull request now conflicts and the agent rebases it
   await stub("POST", `/_test/pulls/${pr1.pr.number}/merge`);
   await until(

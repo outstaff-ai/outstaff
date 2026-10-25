@@ -12,7 +12,7 @@ import {
   type ToolCall,
   type UsageEvent,
 } from "@outstaff/core";
-import { parsePrompt } from "./prompt.js";
+import { parsePrompt, type ItemContext } from "./prompt.js";
 import { SCRIPTS, type Action } from "./scripts.js";
 
 const sh = (command: string, cwd: string): Promise<string> =>
@@ -90,8 +90,12 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
   const log = config.log ?? silentLogger;
   let sessions = 0;
 
+  // What a model would remember: the conversation of each chat session, which a resumed prompt does not repeat.
+  const talks = new Map<string, NonNullable<ItemContext["conversation"]>>();
+
   async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
-    yield { type: "started", sessionId: req.sessionId ?? `scripted-${++sessions}-${Date.now()}` };
+    const session = req.sessionId ?? `scripted-${++sessions}-${Date.now()}`;
+    yield { type: "started", sessionId: session };
     yield USAGE;
     // The loop asks for a journal entry in the same session, with no tools and one turn.
     if (req.tools.length === 0) {
@@ -105,6 +109,20 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
     }
 
     const ctx = parsePrompt(req.prompt);
+    if (ctx?.kind === "chat") {
+      const known = talks.get(session);
+      const latest = [...req.prompt.matchAll(/asked in chat \(thread [^)]*\):\n([^\n]*)/g)].at(
+        -1,
+      )?.[1];
+
+      if (ctx.conversation) {
+        talks.set(session, [...ctx.conversation]);
+      } else if (known && latest) {
+        known.push({ from: "human", agent: false, text: latest });
+        ctx.conversation = [...known];
+      }
+    }
+
     const script = ctx ? SCRIPTS[ctx.kind] : undefined;
     if (!ctx || !script) {
       yield {
@@ -176,6 +194,10 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
       }
 
       last = step.value;
+      if (ctx?.kind === "chat") {
+        talks.get(session)?.push({ from: "agent", agent: true, text: last });
+      }
+
       yield { type: "text", text: last };
       yield { type: "finished", ok: true, text: last };
     } catch (e) {
