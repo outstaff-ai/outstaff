@@ -90,8 +90,23 @@ const kanbanRules: Rule[] = [
     id: "hand-back-to-requester",
     on: "agent.handed_back",
     // A finished ticket stays finished: the answer to feedback on a merged pull request reopens nothing.
-    if: { not: { ticket_status: ["done", "canceled"] } },
+    // Waiting (for an answer) changes nothing here; blocked has its own rule.
+    if: {
+      all: [{ hand_back_status: ["done"] }, { not: { ticket_status: ["done", "canceled"] } }],
+    },
     do: [{ move: "review" }, { assign: "requester" }],
+  },
+  {
+    id: "hand-back-blocked-to-requester",
+    on: "agent.handed_back",
+    if: {
+      all: [{ hand_back_status: ["blocked"] }, { not: { ticket_status: ["done", "canceled"] } }],
+    },
+    do: [
+      { move: "blocked" },
+      { assign: "requester" },
+      { notify: { to: "requester", template: "hand_back_blocked" } },
+    ],
   },
   {
     id: "assigned-agent-scheduled",

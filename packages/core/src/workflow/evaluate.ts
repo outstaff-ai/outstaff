@@ -156,6 +156,14 @@ function check(c: Condition, ctx: Ctx): Check {
     };
   }
 
+  if ("hand_back_status" in c) {
+    const s = ctx.event.data["status"];
+    return {
+      ok: typeof s === "string" && (c.hand_back_status as string[]).includes(s),
+      detail: `hand-back status ${String(s ?? "none")} in ${list(c.hand_back_status)}`,
+    };
+  }
+
   const st = ctx.event.data["state"];
   return {
     ok: typeof st === "string" && c.review_state.includes(st),

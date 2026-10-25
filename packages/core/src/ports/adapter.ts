@@ -49,6 +49,9 @@ export interface SetupContext {
 
   /** The permission profile of the person's role, when the host resolved it. Only a profile that honours write grants lets a write grant count. */
   profile?: Profile;
+
+  /** Capabilities the person's role needs or uses (`needs` and `optional_needs`), when the host resolved the role. */
+  roleCapabilities?: Capability[];
   scope: "person" | "office";
 
   /** The options of this adapter's integration in the team file. */

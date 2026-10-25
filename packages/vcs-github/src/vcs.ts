@@ -47,6 +47,9 @@ const PERMISSIONS = {
   write: { contents: "write", pull_requests: "write", issues: "write" },
 } as const;
 
+/** Added to a person's write token when their installation has it, so a push under `.github/workflows/` is accepted. */
+const OPTIONAL_WRITE = { workflows: "write" } as const;
+
 const REPLY_MUTATION = `mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}`;
 const READY_MUTATION = `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
 const DRAFT_MUTATION = `mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
@@ -353,6 +356,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         issued = await app.token(repo, {
           repositories: [repo.name],
           permissions: PERMISSIONS.write,
+          optionalPermissions: OPTIONAL_WRITE,
         });
       } catch (e) {
         // The App lacks the permission, is not installed on the repo, or the repo is not visible to it.

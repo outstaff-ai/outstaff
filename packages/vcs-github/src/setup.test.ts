@@ -42,6 +42,25 @@ describe("githubSetupGuide", () => {
     expect(steps[2]!.body).toContain("GH_APP_SLUG");
   });
 
+  it("asks for Workflows only when the role changes CI, and names the risk", () => {
+    const guide = (roleCapabilities: string[]) =>
+      githubSetupGuide({
+        team,
+        scope: "person",
+        options: {},
+        person: sam as never,
+        roleCapabilities: roleCapabilities as never,
+      })[0]!;
+
+    const devops = guide(["vcs.pullRequests", "vcs.workflows"]);
+    expect(JSON.parse(devops.manifest!).default_permissions).toMatchObject({ workflows: "write" });
+    expect(devops.body).toContain("Actions secrets");
+
+    const developer = guide(["vcs.pullRequests", "vcs.reviewThreads"]);
+    expect(JSON.parse(developer.manifest!).default_permissions).not.toHaveProperty("workflows");
+    expect(developer.body).not.toContain("Workflows");
+  });
+
   it("keeps a reader's App read-only", () => {
     const [create] = githubSetupGuide({
       team,

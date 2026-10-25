@@ -929,6 +929,19 @@ Condition that must hold.
 - Optional
 - Minimum length 1
 
+#### workflow.rules[].if.hand_back_status
+
+- Type: `list of string`
+- Required
+- Allowed values: `done`, `waiting`, `blocked`
+- Minimum items 1
+
+#### workflow.rules[].if.hand_back_status[]
+
+- Type: `string`
+- Optional
+- Allowed values: `done`, `waiting`, `blocked`
+
 #### workflow.rules[].do
 
 Actions, run in order.
@@ -1165,7 +1178,7 @@ What happens to a ticket when an agent hands its work back.
 
 #### policies.hand_back.reassign
 
-Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves to review). Edits the preset rule hand-back-to-requester. Default requester.
+Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.
 
 - Type: `string`
 - Optional

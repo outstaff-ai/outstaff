@@ -91,7 +91,7 @@ function githubSecrets(scope: "person" | "office", ctx?: SecretsContext): Secret
 export const githubVcs = defineAdapter({
   port: "vcs",
   name: "github",
-  capabilities: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"],
+  capabilities: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.workflows", "vcs.reactions"],
   options: githubOptions,
   // Agents hold the read-only office App too: they clone read-granted repos with it.
   secrets: githubSecrets,

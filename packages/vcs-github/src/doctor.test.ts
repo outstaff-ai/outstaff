@@ -243,6 +243,45 @@ describe("doctorGithub", () => {
     ).toMatchObject({ status: "warn" });
   });
 
+  it("fails when the role changes CI and the App lacks the Workflows permission", async () => {
+    const devopsCtx = (f: typeof fetch) => ({
+      ...ctx(f),
+      roleCapabilities: ["vcs.pullRequests", "vcs.workflows"] as never,
+    });
+
+    const without = await doctorGithub(secrets(), devopsCtx(fake(good).impl));
+    expect(by(without, "GitHub App: permissions")[0]).toMatchObject({ status: "fail" });
+    expect(by(without, "GitHub App: permissions")[0]!.detail).toContain("workflows:write");
+
+    const withIt = fake({
+      ...good,
+      "11": { ...good["11"]!, installation: { permissions: { ...WRITE, workflows: "write" } } },
+    });
+
+    const ok = await doctorGithub(secrets(), devopsCtx(withIt.impl));
+    expect(ok.filter((c) => c.status !== "ok")).toEqual([]);
+
+    // A developer is not asked for it.
+    const dev = await doctorGithub(secrets(), ctx(fake(good).impl));
+    expect(by(dev, "GitHub App: permissions")[0]!.detail).not.toContain("workflows");
+  });
+
+  it("warns about permissions the role does not need, including Workflows for a developer", async () => {
+    const extra = fake({
+      ...good,
+      "11": {
+        ...good["11"]!,
+        installation: { permissions: { ...WRITE, repository_hooks: "write", workflows: "write" } },
+      },
+    });
+
+    const r = await doctorGithub(secrets(), ctx(extra.impl));
+    const found = by(r, "surplus permissions")[0]!;
+    expect(found).toMatchObject({ status: "warn" });
+    expect(found.detail).toContain("repository_hooks:write");
+    expect(found.detail).toContain("workflows:write");
+  });
+
   it("fails when a write grant lacks write permissions, and warns on unused write access", async () => {
     const lacking = fake({
       ...good,

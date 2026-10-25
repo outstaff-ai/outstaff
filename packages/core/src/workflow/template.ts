@@ -54,6 +54,8 @@ export function renderTemplate(text: string, vars: Readonly<Record<string, strin
 }
 
 export const BUILTIN_TEMPLATES: Readonly<Record<string, string>> = {
+  hand_back_blocked:
+    "{{ticket}} is blocked: the agent could not continue. Its last comment on the ticket says what is needed; the work so far is kept on its branch.",
   rebase_conflict: [
     "Pull request #{{pr.number}} ({{pr.title}}) now conflicts with `{{pr.base}}`.",
     "",

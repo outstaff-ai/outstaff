@@ -22,6 +22,13 @@ const READ = {
 
 const WRITE = { ...READ, contents: "write", pull_requests: "write", issues: "write" } as const;
 
+/** Needed to push changes under `.github/workflows/`; GitHub rejects such a push from an App without it. */
+const WORKFLOWS = { workflows: "write" } as const;
+
+/** Whether the person's role declares it changes CI workflow files (the `vcs.workflows` capability). */
+export const needsWorkflows = (ctx: Pick<SetupContext, "roleCapabilities">): boolean =>
+  ctx.roleCapabilities?.includes("vcs.workflows") ?? false;
+
 type Team = SetupContext["team"];
 
 /** Repositories a person has any grant on, by the grant rules of `team.people[].repos`. */
@@ -63,6 +70,9 @@ function manifest(name: string, permissions: Record<string, string>): string {
     2,
   );
 }
+
+const WORKFLOWS_NOTE =
+  " Workflows read and write too: this person's role changes CI, and GitHub refuses a push that touches `.github/workflows/` from an App without it. Mind the risk: a workflow can read the repository's Actions secrets when it runs, so grant Workflows only to roles that need it and review such pull requests with care.";
 
 const keyHelp = (prefix: string) =>
   `Keep the App id as \`${prefix}ID\`. Keep the private key as \`${prefix}PRIVATE_KEY\` (a file named that in your secrets directory holding the PEM text) or point \`${prefix}PRIVATE_KEY_FILE\` at the file. \`ost setup --derive\` fills \`${prefix}SLUG\`, \`${prefix}INSTALLATION_ID\` and \`${prefix}BOT_EMAIL\` from them, and offers to move a freshly downloaded \`*.pem\` for the App from your Downloads folder.`;
@@ -112,15 +122,16 @@ export function githubSetupGuide(ctx: SetupContext): SetupStep[] {
 
   const writable = writableRepos(team, person, ctx.profile);
   const writes = writable.length > 0;
+  const workflows = writes && needsWorkflows(ctx);
   const list = writable.map((g) => `\`${g.repo.url}\``).join(", ");
 
   return [
     createStep(
       `${writes ? "Create" : "Optionally create"} ${person.name}'s GitHub App`,
       slugOf(team, person.handle),
-      writes ? WRITE : READ,
+      workflows ? { ...WRITE, ...WORKFLOWS } : writes ? WRITE : READ,
       writes
-        ? "metadata, checks and commit statuses read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API)."
+        ? `metadata, checks and commit statuses read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API).${workflows ? WORKFLOWS_NOTE : ""}`
         : "metadata, contents, pull requests, issues, checks and commit statuses, all read-only. This person has only read grants, so their own App is optional: it lets them comment on or review pull requests as themselves.",
     ),
     {
