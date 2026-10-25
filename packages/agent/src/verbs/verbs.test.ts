@@ -407,6 +407,87 @@ describe("pr write verbs", () => {
     });
   });
 
+  describe("mentions on the code host", () => {
+    const lastBody = async (f: Awaited<ReturnType<typeof setup>>) =>
+      (await f.vcs.events([f.repo])).events.at(-1)!.data["body"];
+
+    it("rewrites a teammate's handle to their name and keeps a configured human's username", async () => {
+      const f = await setup();
+      const pr = await f.theirs();
+      await run(
+        "pr.comment",
+        f.env,
+        { number: pr.number, body: "@sam can you look? cc @ada-admin" },
+        f.ctx,
+      );
+
+      expect(await lastBody(f)).toBe("Sam can you look? cc @ada-admin");
+
+      await run(
+        "pr.open",
+        f.env,
+        { title: "x", body: "Pairs with @noor's change", head: "feat/b" },
+        f.ctx,
+      );
+
+      expect((await f.vcs.getPullRequest(f.repo, 2)).body).toBe("Pairs with Noor's change");
+
+      const file = f.file(
+        "inline.json",
+        JSON.stringify([{ path: "a.ts", line: 1, body: "ask @mira" }]),
+      );
+
+      await run(
+        "pr.review",
+        f.env,
+        { number: pr.number, comment: true, body: "hi @leo", commentFile: file },
+        f.ctx,
+      );
+
+      expect(await lastBody(f)).toBe("hi Leo");
+      expect((await f.vcs.reviewThreads(f.repo, pr.number)).at(-1)!.comments[0]!.body).toBe(
+        "ask Mira",
+      );
+    });
+
+    it("refuses any other login without posting anything", async () => {
+      const f = await setup();
+      const pr = await f.theirs();
+      await rejects(
+        run("pr.comment", f.env, { number: pr.number, body: "hey @stranger" }, f.ctx),
+        "invalid",
+        /@stranger/,
+      );
+
+      await rejects(
+        run("pr.open", f.env, { title: "x", body: "by @stranger", head: "feat/b" }, f.ctx),
+        "invalid",
+        /@stranger/,
+      );
+
+      expect((await f.vcs.events([f.repo])).events.some((e) => e.type === "pr.comment")).toBe(
+        false,
+      );
+    });
+
+    it("applies to tracker comments only where the tracker resolves mentions", async () => {
+      const { env, tracker } = fakeEnv();
+      const issue = await tracker.createIssue({ title: "T", body: "b" });
+      await run("ticket.comment", env, { key: issue.key, body: "@stranger fyi" });
+      tracker.mentionsUsers = true;
+      await rejects(
+        run("ticket.comment", env, { key: issue.key, body: "@stranger fyi" }),
+        "invalid",
+      );
+
+      await run("ticket.comment", env, { key: issue.key, body: "@sam fyi" });
+      expect((await tracker.listComments(issue.key)).map((c) => c.body)).toEqual([
+        "@stranger fyi",
+        "Sam fyi",
+      ]);
+    });
+  });
+
   describe("files the caller names", () => {
     const body = (path: string) => ({ title: "x", bodyFile: path });
 

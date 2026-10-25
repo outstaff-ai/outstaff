@@ -1,5 +1,6 @@
 import { CANONICAL_STATUSES, PortError, type Issue, type Member } from "@outstaff/core";
 import { z } from "zod";
+import { mentionGuard } from "./mentions.js";
 import { filedLine, requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
@@ -63,7 +64,8 @@ export const ticketComment = defineVerb({
   examples: ['ost ticket comment ACME-12 "Pull request is up for review."'],
   async run(env, input) {
     const tracker = requireTracker(env);
-    const comment = await tracker.comment(input.key, input.body);
+    const body = tracker.mentionsUsers ? mentionGuard(env.team).apply(input.body) : input.body;
+    const comment = await tracker.comment(input.key, body);
     const url = tracker.links.issue(input.key);
     return result([`Commented on ${input.key}: ${comment.url}`, url], { key: input.key, comment }, [
       comment.url,

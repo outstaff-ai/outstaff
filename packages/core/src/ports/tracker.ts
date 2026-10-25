@@ -48,6 +48,12 @@ export interface NewIssue {
 
 export interface Tracker {
   links: Pick<Links, "issue">;
+
+  /**
+   * True when an `@name` in a comment mentions (and notifies) a user of the tracker. Agents' comments are then
+   * guarded the way pull request text is. Absent or false: `@` is plain text.
+   */
+  mentionsUsers?: boolean;
   getIssue(key: string): Promise<Issue>;
   listIssues(filter: {
     assignee?: string;
