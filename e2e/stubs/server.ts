@@ -91,7 +91,12 @@ const control: Route[] = [
     method: "POST",
     path: "/_test/tickets",
     handler: (r) => ({
-      key: tracker.createTicket(r.json.title, r.json.description ?? "", r.json.status ?? "Ready"),
+      key: tracker.createTicket(
+        r.json.title,
+        r.json.description ?? "",
+        r.json.status ?? "Ready",
+        r.json.assignee,
+      ),
     }),
   },
   {

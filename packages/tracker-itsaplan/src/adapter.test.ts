@@ -139,6 +139,24 @@ describe("tracker", () => {
     await expect(tracker.getIssue("nonsense!")).rejects.toMatchObject({ code: "invalid" });
   });
 
+  it("maps the one created item of an issue made with an assignee to ticket.created, which resolves to that assignee", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const issue = await tracker.createIssue({
+      title: "Born assigned",
+      body: "",
+      assignee: "u-sam",
+    });
+
+    const { events } = await tracker.events();
+    expect(events.map((e) => e.type)).toEqual(["created"]);
+    expect(events[0]).toMatchObject({ key: issue.key });
+    expect((await tracker.getIssue(issue.key)).assignee).toMatchObject({
+      id: "u-sam",
+      kind: "agent",
+    });
+  });
+
   it("turns activity into events, skips what the office does not act on, and never replays", async () => {
     const fake = createItsaplanFake();
     const tracker = await createItsaplanTracker(trackerCtx(fake));

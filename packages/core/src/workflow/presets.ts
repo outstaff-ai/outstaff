@@ -95,7 +95,8 @@ const kanbanRules: Rule[] = [
   },
   {
     id: "assigned-agent-scheduled",
-    on: "ticket.assigned",
+    // A ticket created already assigned has one `created` item and no assignment item to go on.
+    on: ["ticket.assigned", "ticket.created"],
     if: {
       all: [
         { assignee_kind: "agent" },
@@ -137,7 +138,8 @@ const minimalRules: Rule[] = [
   mergedFeedbackRule,
   {
     id: "assigned-agent-scheduled",
-    on: "ticket.assigned",
+    // A ticket created already assigned has one `created` item and no assignment item to go on.
+    on: ["ticket.assigned", "ticket.created"],
     if: { all: [{ assignee_kind: "agent" }, { not: { actor_kind: "automation" } }] },
     do: [{ schedule: { person: "assignee", kind: "assigned", priority: "normal" } }],
   },
