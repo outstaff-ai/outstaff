@@ -36,6 +36,80 @@ export class GithubHttp {
     return this.send<T>(method, url, opts.token, opts.body, opts.headers);
   }
 
+  /**
+   * GET a path that answers with a redirect to a short-lived, pre-authorised URL (job logs) and returns that URL's
+   * body. The redirect is followed here, without the token, so the credential never travels to the other host.
+   */
+  async getRedirected(path: string, token: string): Promise<string> {
+    const url = this.url(path);
+    let res: Response;
+    try {
+      res = await this.cfg.fetch(url, {
+        method: "GET",
+        redirect: "manual",
+        headers: {
+          accept: "application/vnd.github+json",
+          "x-github-api-version": "2022-11-28",
+          "user-agent": "outstaff-vcs-github",
+          authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (cause) {
+      throw new PortError("unavailable", `GitHub is unreachable: ${(cause as Error).message}`, {
+        cause,
+      });
+    }
+
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      let target: URL;
+      try {
+        target = new URL(location ?? "", url);
+      } catch {
+        throw new PortError("unavailable", "GitHub redirected without a usable location.");
+      }
+
+      if (target.protocol !== "https:" && target.origin !== new URL(url).origin) {
+        throw new PortError("unavailable", "GitHub redirected to a URL that is not https.");
+      }
+
+      try {
+        res = await this.cfg.fetch(target.toString(), {
+          method: "GET",
+          headers: { "user-agent": "outstaff-vcs-github" },
+        });
+      } catch (cause) {
+        throw new PortError(
+          "unavailable",
+          `The log host is unreachable: ${(cause as Error).message}`,
+          {
+            cause,
+          },
+        );
+      }
+
+      if (!res.ok) {
+        throw new PortError("unavailable", `The log host answered ${res.status}.`);
+      }
+
+      return res.text();
+    }
+
+    const text = await res.text();
+    if (res.ok) {
+      return text;
+    }
+
+    let data: unknown;
+    try {
+      data = text ? JSON.parse(text) : undefined;
+    } catch {
+      data = undefined;
+    }
+
+    throw this.toError("GET", url, res, data, text);
+  }
+
   /** Follows `Link: rel="next"` and concatenates the pages (at most `maxPages`). */
   async paginate<T, Item>(
     path: string,

@@ -72,7 +72,17 @@ export interface VcsSeed {
     number: number,
     t: { path?: string; line?: number; comments: { author: string; body: string }[] },
   ): Promise<string>;
-  check(repo: RepoRef, sha: string, c: { name: string; status: Check["status"] }): Promise<void>;
+  check(
+    repo: RepoRef,
+    sha: string,
+    c: {
+      name: string;
+      status: Check["status"];
+
+      /** Gives the check a readable log: its steps in order, `failed` ones included in `checkLog`. */
+      log?: { steps: { name: string; failed?: boolean; lines: string[] }[] };
+    },
+  ): Promise<void>;
   permission(repo: RepoRef, login: string, level: VcsPermission): Promise<void>;
   forbiddenCall?(): Promise<unknown>;
 }

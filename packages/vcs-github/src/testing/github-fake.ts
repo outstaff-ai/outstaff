@@ -65,6 +65,8 @@ const toNode = (t: Thread) => ({
   },
 });
 
+const LOG_ORIGIN = "https://logs.github.test";
+
 export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" }) {
   let tick = 0;
   let eventId = 1000;
@@ -73,7 +75,14 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
   let reviewCounter = 0;
   let commentCounter = 0;
   const prs = new Map<number, Pr>();
-  const checks = new Map<string, { name: string; status: string; conclusion: string | null }[]>();
+  const checks = new Map<
+    string,
+    { id: number; name: string; status: string; conclusion: string | null; job?: boolean }[]
+  >();
+
+  // Actions jobs by id (the id of their check run): steps with their conclusion, and the raw log text.
+  const jobs = new Map<number, { steps: { name: string; conclusion: string }[]; log: string }>();
+  let checkId = 5000;
   const threads = new Map<string, Thread>();
   const reviews = new Map<number, StoredReview>();
   const perms = new Map<string, VcsPermission>();
@@ -428,8 +437,31 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
         check_runs: (checks.get(r.params["sha"]!) ?? []).map((c) => ({
           ...c,
           html_url: `https://github.example/runs/${c.name}`,
+          details_url: c.job ? `https://github.example/acme/app/actions/runs/9/job/${c.id}` : null,
+          app: { slug: c.job ? "github-actions" : "other-ci" },
         })),
       }),
+    },
+    {
+      method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}/actions/jobs/:id`,
+      handler: (r) => {
+        const job = jobs.get(Number(r.params["id"]));
+        return job ? { steps: job.steps } : { status: 404, body: { message: "Not Found" } };
+      },
+    },
+    {
+      method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}/actions/jobs/:id/logs`,
+      handler: (r) =>
+        jobs.has(Number(r.params["id"]))
+          ? { status: 302, headers: { location: `${LOG_ORIGIN}/logs/${r.params["id"]}?sig=abc` } }
+          : { status: 404, body: { message: "Not Found" } },
+    },
+    {
+      method: "GET",
+      path: `${LOG_ORIGIN}/logs/:id`,
+      handler: (r) => ({ text: jobs.get(Number(r.params["id"]))?.log ?? "" }),
     },
     {
       method: "GET",
@@ -628,11 +660,33 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
               ? "neutral"
               : null;
 
+      const id = ++checkId;
       list.push({
+        id,
         name: c.name,
         status: c.status === "pending" ? "in_progress" : "completed",
         conclusion,
+        ...(c.log ? { job: true } : {}),
       });
+
+      if (c.log) {
+        jobs.set(id, {
+          steps: c.log.steps.map((st) => ({
+            name: st.name,
+            conclusion: st.failed ? "failure" : "success",
+          })),
+          log: c.log.steps
+            .flatMap((st, i) => [
+              `2026-01-01T00:00:0${i}.0000000Z ##[group]${st.name}`,
+              `2026-01-01T00:00:0${i}.0000000Z ##[endgroup]`,
+              ...st.lines.map((l) => `2026-01-01T00:00:0${i}.1000000Z ${l}`),
+              ...(st.failed
+                ? [`2026-01-01T00:00:0${i}.2000000Z ##[error]Process completed with exit code 1.`]
+                : []),
+            ])
+            .join("\n"),
+        });
+      }
 
       checks.set(shaValue, list);
     },

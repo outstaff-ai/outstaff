@@ -2,6 +2,7 @@ import type { VcsSeed } from "../contracts/seeds.js";
 import { PortError, repoKey } from "../ports/index.js";
 import type {
   Check,
+  CheckLog,
   PullRequest,
   ReactionTarget,
   RepoRef,
@@ -43,6 +44,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
   const retries = opts.mergeableRetries ?? 5;
   const prs = new Map<string, Map<number, StoredPr>>();
   const checks = new Map<string, Check[]>();
+  const logs = new Map<string, { name: string; failed?: boolean; lines: string[] }[]>();
   const perms = new Map<string, VcsPermission>();
   const log = new EventLog<VcsEvent>();
   let eventCounter = 0;
@@ -251,10 +253,16 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
       async check(repo, sha, c) {
         const k = `${key(repo)}@${sha}`;
         const list = (checks.get(k) ?? []).filter((x) => x.name !== c.name);
+        const logId = c.log ? `${key(repo)}@${sha}:${c.name}` : undefined;
+        if (logId && c.log) {
+          logs.set(logId, structuredClone(c.log.steps));
+        }
+
         list.push({
           name: c.name,
           status: c.status,
           url: `${links.commit(repo, sha)}/checks/${encodeURIComponent(c.name)}`,
+          ...(logId ? { logId } : {}),
         });
 
         checks.set(k, list);
@@ -298,6 +306,23 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     },
     async checks(repo, sha) {
       return structuredClone(checks.get(`${key(repo)}@${sha}`) ?? []);
+    },
+    async checkLog(repo, logId, o = {}): Promise<CheckLog> {
+      const steps = logs.get(logId);
+      if (!steps || !logId.startsWith(`${key(repo)}@`)) {
+        throw new PortError("not_found", `No log ${logId} on ${key(repo)}.`);
+      }
+
+      const tail = o.tail ?? 200;
+      return {
+        failedSteps: steps
+          .filter((s) => s.failed)
+          .map((s) => ({
+            name: s.name,
+            lines: s.lines.slice(-tail),
+            omitted: Math.max(0, s.lines.length - tail),
+          })),
+      };
     },
     async reviewThreads(repo, number) {
       return structuredClone(need(repo, number).threads);

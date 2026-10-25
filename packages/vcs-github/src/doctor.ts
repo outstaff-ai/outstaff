@@ -266,10 +266,16 @@ async function checkApp(
 
   const granted = inst.data.permissions ?? {};
   const level = (p: string) => granted[p] ?? "none";
-  const missingRead = READ_PERMISSIONS.filter((p) => level(p) === "none");
+  const missingRead: string[] = READ_PERMISSIONS.filter((p) => level(p) === "none");
   const missingWrite: string[] = want.wantWrite
     ? WRITE_PERMISSIONS.filter((p) => level(p) !== "write")
     : [];
+
+  // Writers read the logs of their failed CI jobs, which needs Actions: read (write also covers it).
+  const missingActions = want.wantWrite && level("actions") === "none";
+  if (missingActions) {
+    missingRead.push("actions");
+  }
 
   const missingWorkflows = want.wantWorkflows && level("workflows") !== "write";
   if (missingWorkflows) {
@@ -286,7 +292,7 @@ async function checkApp(
           ...missingWrite.map((p) => `${p}:write`),
         ].join(
           ", ",
-        )}${want.wantWrite ? " (this person has a write grant)" : ""}${missingWorkflows ? ". Without Workflows, GitHub refuses to push a change under .github/workflows/ (this person's role changes CI)" : ""}.`,
+        )}${want.wantWrite ? " (this person has a write grant)" : ""}${missingActions ? ". Without Actions: read, `ost pr checks` cannot show why a CI job failed" : ""}${missingWorkflows ? ". Without Workflows, GitHub refuses to push a change under .github/workflows/ (this person's role changes CI)" : ""}.`,
         "Edit the App's permissions, then accept the new permissions on the installation.",
       ),
     );
@@ -297,6 +303,7 @@ async function checkApp(
   // Least privilege: a permission outside what the grants and the role need is advice, not a failure.
   const needed = new Set<string>([
     ...READ_PERMISSIONS,
+    ...(want.wantWrite ? ["actions"] : []),
     ...(want.wantWorkflows ? ["workflows"] : []),
   ]);
 

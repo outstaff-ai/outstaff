@@ -310,6 +310,7 @@ describe("ost doctor with the shipped adapters", () => {
       repository_selection: "selected",
       permissions: {
         metadata: "read",
+        ...(write ? { actions: "read" } : {}),
         contents: write ? "write" : "read",
         pull_requests: write ? "write" : "read",
         issues: write ? "write" : "read",

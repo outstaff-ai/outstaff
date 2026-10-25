@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import {
   PortError,
+  maskSecrets,
   parseRepoUrl,
   repoGrant,
   vcsAgentLogins,
@@ -15,9 +16,12 @@ import {
   type VcsEvent,
 } from "@outstaff/core";
 import { AppAuth, type AppCredentials } from "./auth.js";
+import { failedStepNames, failedSteps } from "./check-log.js";
 import { GithubHttp, nextLink } from "./http.js";
 import {
+  actionsJobId,
   checkRunStatus,
+  checkSummary,
   commitStatusState,
   permissionLevel,
   stripBot,
@@ -49,6 +53,11 @@ const PERMISSIONS = {
 
 /** Added to a person's write token when their installation has it, so a push under `.github/workflows/` is accepted. */
 const OPTIONAL_WRITE = { workflows: "write" } as const;
+
+/** Reading job logs needs Actions: read; requested when the installation has it, like Workflows. */
+const LOG_PERMISSIONS = { contents: "read" } as const;
+const OPTIONAL_LOGS = { actions: "read" } as const;
+const DEFAULT_TAIL = 200;
 
 const REPLY_MUTATION = `mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}`;
 const READY_MUTATION = `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
@@ -252,6 +261,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     repo: RepoRef,
     level: "read" | "write",
     permissions: Record<string, "read" | "write">,
+    optionalPermissions?: Record<string, "read" | "write">,
   ): Promise<{ token: string; app: AppAuth }> {
     const where = `${repo.owner}/${repo.name}`;
     const grant = self ? grantOf(self, repo) : undefined;
@@ -268,7 +278,12 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     }
 
     try {
-      const issued = await app.token(repo, { repositories: [repo.name], permissions });
+      const issued = await app.token(repo, {
+        repositories: [repo.name],
+        permissions,
+        ...(optionalPermissions ? { optionalPermissions } : {}),
+      });
+
       return { token: issued.token, app };
     } catch (e) {
       if (e instanceof PortError && (e.code === "invalid" || e.code === "not_found")) {
@@ -433,6 +448,8 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         name: r.name,
         status: checkRunStatus(r),
         url: r.html_url ?? r.details_url ?? fallback,
+        ...(checkSummary(r) ? { summary: checkSummary(r)! } : {}),
+        ...(actionsJobId(r) ? { logId: actionsJobId(r)! } : {}),
       }));
 
       for (const s of status.data.statuses) {
@@ -444,6 +461,55 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
       }
 
       return out;
+    },
+
+    async checkLog(repo, logId, opts = {}) {
+      if (!/^\d+$/.test(logId)) {
+        throw new PortError("not_found", `"${logId}" is not a GitHub Actions job id.`);
+      }
+
+      const { token } = await actingToken(repo, "read", LOG_PERMISSIONS, OPTIONAL_LOGS);
+      const jobPath = `${repoPath(repo)}/actions/jobs/${logId}`;
+      let text: string;
+      let steps: { name: string; conclusion: string | null }[];
+      try {
+        steps =
+          (
+            await http.request<{ steps?: { name: string; conclusion: string | null }[] }>(
+              "GET",
+              jobPath,
+              { token },
+            )
+          ).data.steps ?? [];
+
+        text = await http.getRedirected(`${jobPath}/logs`, token);
+      } catch (e) {
+        if (e instanceof PortError && e.code === "forbidden") {
+          throw new PortError(
+            "forbidden",
+            `GitHub refused the logs of job ${logId}: ${self ?? "this person"}'s GitHub App needs the Actions: read permission on the installation (run \`ost doctor\`). ${e.message}`,
+            { cause: e },
+          );
+        }
+
+        throw e;
+      }
+
+      const known = [
+        token,
+        ...["GH_APP_", "GH_OFFICE_APP_"].map((p) => secrets.get(`${p}PRIVATE_KEY`) ?? ""),
+      ];
+
+      const masked = (line: string) => maskSecrets(line, known);
+
+      return {
+        failedSteps: failedSteps(text, failedStepNames(steps), opts.tail ?? DEFAULT_TAIL).map(
+          (s) => ({
+            ...s,
+            lines: s.lines.map(masked),
+          }),
+        ),
+      };
     },
 
     async reviewThreads(repo, number) {

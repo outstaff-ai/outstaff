@@ -20,7 +20,14 @@ const READ = {
   statuses: "read",
 } as const;
 
-const WRITE = { ...READ, contents: "write", pull_requests: "write", issues: "write" } as const;
+/** Actions: read lets a person who can write read the logs of a failed CI job (`ost pr checks`). */
+const WRITE = {
+  ...READ,
+  actions: "read",
+  contents: "write",
+  pull_requests: "write",
+  issues: "write",
+} as const;
 
 /** Needed to push changes under `.github/workflows/`; GitHub rejects such a push from an App without it. */
 const WORKFLOWS = { workflows: "write" } as const;
@@ -131,7 +138,7 @@ export function githubSetupGuide(ctx: SetupContext): SetupStep[] {
       slugOf(team, person.handle),
       workflows ? { ...WRITE, ...WORKFLOWS } : writes ? WRITE : READ,
       writes
-        ? `metadata, checks and commit statuses read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API).${workflows ? WORKFLOWS_NOTE : ""}`
+        ? `metadata, checks, commit statuses and Actions (to read the logs of failed CI jobs) read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API).${workflows ? WORKFLOWS_NOTE : ""}`
         : "metadata, contents, pull requests, issues, checks and commit statuses, all read-only. This person has only read grants, so their own App is optional: it lets them comment on or review pull requests as themselves.",
     ),
     {

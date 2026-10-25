@@ -111,6 +111,36 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
       expectAbsoluteUrl(checks[0]!.url);
     });
 
+    it("reads the tail of the failed steps of a check", async (t) => {
+      const s = get();
+      requireCapability(t, s, "vcs.pullRequests");
+      if (!s.subject.checkLog) {
+        t.skip("checkLog not implemented");
+      }
+
+      const repo = repoOf(t, s);
+      const pr = await requireSeed(t, s.seed, "pullRequest")(repo, { title: "Failing" });
+      await requireSeed(t, s.seed, "check")(repo, pr.head.sha, {
+        name: "ci",
+        status: "failure",
+        log: {
+          steps: [
+            { name: "Set up job", lines: ["ready"] },
+            { name: "Run tests", failed: true, lines: ["one", "two", "three", "four"] },
+          ],
+        },
+      });
+
+      const check = (await s.subject.checks(repo, pr.head.sha)).find((c) => c.name === "ci")!;
+      expect(check.logId).toBeTruthy();
+      const log = await s.subject.checkLog!(repo, check.logId!, { tail: 2 });
+      // A host may add its own marker lines, so the lines are counted, not compared.
+      expect(log.failedSteps.map((st) => st.name)).toEqual(["Run tests"]);
+      expect(log.failedSteps[0]!.lines).toHaveLength(2);
+      expect(log.failedSteps[0]!.omitted).toBeGreaterThanOrEqual(2);
+      await expectPortError(s.subject.checkLog!(repo, "no-such-log"), "not_found");
+    });
+
     it("resolves a review thread only when the last comment is the caller's", async (t) => {
       const s = get();
       requireCapability(t, s, "vcs.pullRequests", "vcs.reviewThreads");

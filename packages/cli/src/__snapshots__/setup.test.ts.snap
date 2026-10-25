@@ -392,7 +392,7 @@ Secret files go in .outstaff/secrets/mira/, one file per key.
 
 1. Create Mira Okafor's GitHub App
 
-   Open GitHub > Settings (or the organization's settings) > Developer settings > GitHub Apps > New GitHub App. Name it \`acme-mira\`, leave the webhook off, and set these repository permissions, which are the only ones the adapter uses: metadata, checks and commit statuses read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API). Set "Where can this GitHub App be installed" to "Only on this account". The manifest below lists the same settings; GitHub only takes it through the app-manifest flow, so use it as the checklist.
+   Open GitHub > Settings (or the organization's settings) > Developer settings > GitHub Apps > New GitHub App. Name it \`acme-mira\`, leave the webhook off, and set these repository permissions, which are the only ones the adapter uses: metadata, checks, commit statuses and Actions (to read the logs of failed CI jobs) read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API). Set "Where can this GitHub App be installed" to "Only on this account". The manifest below lists the same settings; GitHub only takes it through the app-manifest flow, so use it as the checklist.
 
    Paste or follow:
 
@@ -411,7 +411,8 @@ Secret files go in .outstaff/secrets/mira/, one file per key.
        "pull_requests": "write",
        "issues": "write",
        "checks": "read",
-       "statuses": "read"
+       "statuses": "read",
+       "actions": "read"
      },
      "default_events": []
    }
