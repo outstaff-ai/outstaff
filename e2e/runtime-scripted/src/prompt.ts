@@ -47,9 +47,10 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
 
   const ticket = /^- ticket (\S+)/m.exec(prompt)?.[1];
   const pr = /^- pr \S*#(\d+)/m.exec(prompt)?.[1];
-  const tree = /Your worktree for this item is (\S+) \(repository (\S+), branch (\S+)\)\./.exec(
-    prompt,
-  );
+  const tree =
+    /Your worktree for this item is (\S+) \(repository (\S+), (?:branch (\S+)|detached HEAD[^)]*)\)\./.exec(
+      prompt,
+    );
 
   const scratch = /Scratch space: (\S+?)\.$/m.exec(prompt)?.[1];
   const listed = /Read these files in the worktree before you change anything[^:]*: (.+?)\.$/m.exec(
@@ -107,7 +108,13 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     title: head[3]!,
     ...(ticket ? { ticket } : {}),
     ...(pr ? { pr: Number(pr) } : {}),
-    ...(tree ? { worktree: tree[1]!, repo: tree[2]!.replace(/,$/, ""), branch: tree[3]! } : {}),
+    ...(tree
+      ? {
+          worktree: tree[1]!,
+          repo: tree[2]!.replace(/,$/, ""),
+          ...(tree[3] ? { branch: tree[3] } : {}),
+        }
+      : {}),
     ...(scratch ? { scratch } : {}),
     conventionFiles: listed ? listed.split(", ") : [],
     journal,

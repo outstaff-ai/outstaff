@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assigned,
+  branchFor,
   chat,
   conflict,
   keepBoth,
@@ -17,7 +18,6 @@ const ctx = {
   ticket: "SHOP-1",
   worktree: "/wt",
   repo: "shop",
-  branch: "assigned/w1-add-a-greeting",
   journal: "",
   feedback: [],
   conventionFiles: ["CONTRIBUTING.md"],
@@ -76,15 +76,31 @@ describe("assigned", () => {
       "ticket_move",
       "pnpm --version",
       "read",
+      "git switch -c 'feat/SHOP-1-add-a-greeting'",
+      "read",
       "write",
       "git add -A",
       "git commit -m 'SHOP-1: Add a greeting'",
-      "git push origin 'assigned/w1-add-a-greeting'",
+      "git push origin 'feat/SHOP-1-add-a-greeting'",
       "pr_open",
     ]);
 
     expect(seen.at(-1)).toMatchObject({ input: { body: "Closes SHOP-1\n" } });
     expect(text).toContain("https://github.acme.example/acme/shop/pull/1");
+  });
+
+  it("names the branch by the repository's rule when its files give one", async () => {
+    const { seen } = await play(assigned(ctx), (a) =>
+      a.type === "read" && a.path.endsWith("CONTRIBUTING.md")
+        ? "Branches are named `feature/<key>-<slug>`.\n"
+        : answer(a),
+    );
+
+    expect(seen).toContainEqual({
+      type: "shell",
+      command: "git switch -c 'feature/SHOP-1-add-a-greeting'",
+      cwd: "/wt",
+    });
   });
 
   it("fails when pnpm does not print a version", async () => {
@@ -161,6 +177,24 @@ describe("assigned, for a ticket that needs two pull requests", () => {
 
     expect(bodies).toEqual(["Closes SHOP-1\n", "Closes SHOP-2\n", "Closes SHOP-1\n"]);
     expect(text).toContain("one per ticket");
+
+    // Each pull request gets a branch of its own, named with its own ticket key: the parent's from the detached
+    // worktree, the sub-ticket's from the default branch.
+    const switches = seen.flatMap((a) =>
+      a.type === "shell" && a.command.startsWith("git switch -c") ? [a.command] : [],
+    );
+
+    expect(switches).toEqual([
+      "git switch -c 'feat/SHOP-1-add-a-greeting'",
+      "git switch -c 'feat/SHOP-2-add-a-farewell' origin/main",
+    ]);
+  });
+});
+
+describe("branchFor", () => {
+  it("defaults to <type>/<key>-<slug>, and drops the key without a ticket", () => {
+    expect(branchFor("", "SHOP-1", "Add a greeting!")).toBe("feat/SHOP-1-add-a-greeting");
+    expect(branchFor("", undefined, "Add a greeting")).toBe("feat/add-a-greeting");
   });
 });
 
@@ -210,7 +244,6 @@ describe("mergedFeedback", () => {
     ...ctx,
     kind: "merged_feedback",
     pr: 1,
-    branch: "merged_feedback/w5-follow-up",
     feedback: [
       {
         kind: "comment" as const,
@@ -237,11 +270,12 @@ describe("mergedFeedback", () => {
     );
 
     // The merged pull request's ticket has its pull request: the follow-up is a sub-ticket with its own.
-    expect(steps.slice(0, 4)).toEqual([
+    expect(steps.slice(0, 5)).toEqual([
       "pr_comment",
       "ticket_create",
       "git fetch --prune origin",
-      "git checkout -B 'merged_feedback/w5-follow-up' origin/main",
+      "read",
+      "git switch -c 'feat/SHOP-2-follow-up-on-1' origin/main",
     ]);
 
     expect(steps.at(-2)).toBe("pr_open");

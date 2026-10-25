@@ -35,8 +35,24 @@ export async function repoOrWorktree(
   return resolveRepo(env, await git(cwd, ["remote", "get-url", "origin"], "--repo"));
 }
 
-/** The branch checked out in the worktree. */
+/** The branch checked out in the worktree. Refuses a detached HEAD, which has no branch to open a pull request from. */
 export async function currentBranch(ctx: VerbContext): Promise<string> {
+  const cwd = needCwd(ctx, "--head");
   // Fails on a detached HEAD, and unlike rev-parse also on a branch without commits.
-  return git(needCwd(ctx, "--head"), ["symbolic-ref", "--short", "HEAD"], "--head");
+  try {
+    return (await runGit(["symbolic-ref", "--short", "HEAD"], { cwd })).trim();
+  } catch (e) {
+    const head = await runGit(["rev-parse", "--abbrev-ref", "HEAD"], { cwd }).catch(() => "");
+    if (head.trim() === "HEAD") {
+      throw new PortError(
+        "invalid",
+        "HEAD is detached, so there is no branch to open a pull request from. Name the branch first with git switch -c <name> (the repository's naming, else <type>/<ticket key>-<short slug>), push it, then open the pull request.",
+        { cause: e },
+      );
+    }
+
+    throw new PortError("invalid", `Pass --head: ${cwd} is not a git worktree with it.`, {
+      cause: e,
+    });
+  }
 }

@@ -795,6 +795,28 @@ describe("pr write verbs", () => {
     );
   });
 
+  it("refuses a detached HEAD and says to name the branch first", async () => {
+    const f = await setup();
+    f.git(
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@acme.example",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "x",
+    );
+
+    f.git("checkout", "-q", "--detach");
+    await rejects(
+      run("pr.open", f.env, { title: "x", body: "y" }, f.ctx),
+      "invalid",
+      /detached.*git switch -c/,
+    );
+  });
+
   it("refuses the default branch, a missing or doubled body and a reader's write", async () => {
     const f = await setup();
     f.git("checkout", "-q", "-b", "main");

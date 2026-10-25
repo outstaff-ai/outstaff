@@ -45,6 +45,26 @@ describe("parsePrompt", () => {
     });
   });
 
+  it("reads a worktree on a detached HEAD as having no branch", () => {
+    const prompt = buildWorkPrompt(offer("assigned"), {
+      resumed: false,
+      workspace: {
+        repo: "shop",
+        worktree: "/home/outstaff/worktrees/shop/w7",
+        branch: undefined,
+        scratch: "/home/outstaff/scratch/w7",
+        conventionFiles: [],
+      },
+    });
+
+    expect(parsePrompt(prompt)).toMatchObject({
+      worktree: "/home/outstaff/worktrees/shop/w7",
+      repo: "shop",
+    });
+
+    expect(parsePrompt(prompt)).not.toHaveProperty("branch");
+  });
+
   it("reads the feedback that started a review round", () => {
     const o = offer("review_feedback");
     o.context.feedback = [

@@ -174,13 +174,26 @@ describe("buildWorkPrompt branch", () => {
     expect(prompt).toContain("git push origin HEAD:feat/x");
   });
 
-  it("leaves new work on its own branch", () => {
+  it("tells new work on a detached HEAD to create its branch before the first commit", () => {
     const prompt = buildWorkPrompt(offer(), {
       resumed: false,
-      workspace: { ...workspace, branch: "ticket/w7-x" },
+      workspace: { ...workspace, branch: undefined, conventionFiles: ["CONTRIBUTING.md"] },
     });
 
     expect(prompt).not.toContain("head of your open pull request");
+    expect(prompt).toContain("detached HEAD at the default branch");
+    expect(prompt).toContain("before your first commit, create the branch with git switch -c");
+    expect(prompt).toContain("<type>/<ticket key>-<short slug>");
+    expect(prompt).toContain("CONTRIBUTING.md");
+  });
+
+  it("leaves a worktree that already has a branch on it", () => {
+    const prompt = buildWorkPrompt(offer(), {
+      resumed: true,
+      workspace: { ...workspace, branch: "feat/ACME-7-x" },
+    });
+
+    expect(prompt).toContain("branch feat/ACME-7-x");
     expect(prompt).toContain("Commit there and push that branch");
   });
 });
