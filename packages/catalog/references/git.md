@@ -7,7 +7,7 @@
 
 ## Branches and commits
 
-- One branch per item, named for the change, for example `feat/short-name`.
+- New work gets one branch per item, named for the change, for example `feat/short-name`. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
 - One commit per pull request. To change it, amend; do not add fixup commits.
 - Commit summary: `type(scope): summary`, with `feat`, `fix`, `docs`, `refactor`, `test`, `chore`. The pull request title is the same.
 - The body says why, then links the ticket if there is one.

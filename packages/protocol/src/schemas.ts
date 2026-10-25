@@ -37,6 +37,16 @@ export const refSchema = z.strictObject({
   ref: z.string().min(1).describe("Reference of the subject in its system."),
   title: z.string().optional().describe("Human-readable title."),
   url: z.string().optional().describe("Link to the subject."),
+  headRef: z.string().optional().describe("For a pull request: the branch it is opened from."),
+  baseRef: z.string().optional().describe("For a pull request: the branch it targets."),
+  state: z
+    .enum(["open", "closed", "merged"])
+    .optional()
+    .describe("For a pull request: whether it is open, closed or merged."),
+  own: z
+    .boolean()
+    .optional()
+    .describe("For a pull request: true when the person the item is offered to opened it."),
 });
 
 export const linkSchema = z.strictObject({

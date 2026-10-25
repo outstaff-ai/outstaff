@@ -41,6 +41,32 @@ export function branchName(item: Pick<OfferedWorkItem, "id" | "kind" | "title">)
   return `${kind}/${id}${slug ? `-${slug}` : ""}`;
 }
 
+/**
+ * The branch an item continues on instead of a new one: the head of the open pull request the person opened that the
+ * item is about, either as its subject or as the only such pull request of its ticket. Undefined means new work, which
+ * gets its own branch. A follow-up after a merge always starts afresh from the default branch.
+ */
+export function headBranchOf(offer: Offer): string | undefined {
+  const { workItem: item, context } = offer;
+  if (item.kind === "merged_feedback") {
+    return undefined;
+  }
+
+  const open = context.subjects.filter(
+    (s) => s.type === "pr" && s.own === true && s.state === "open" && s.headRef,
+  );
+
+  if (item.subject?.type === "pr") {
+    return open.find((s) => s.ref === item.subject!.ref)?.headRef;
+  }
+
+  if (item.subject?.type === "ticket" && open.length === 1) {
+    return open[0]!.headRef;
+  }
+
+  return undefined;
+}
+
 /** The repo an item is about: one named by a subject or link, else the primary repo or the first one that can be written. */
 export function repoForItem(offer: Offer, repos: ClonedRepo[]): ClonedRepo | undefined {
   const urls = [
@@ -92,6 +118,11 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       () => false,
     );
 
+  const checkedOut = async (cwd: string, branch: string) =>
+    (await git(["worktree", "list", "--porcelain"], { cwd }))
+      .split("\n")
+      .includes(`branch refs/heads/${branch}`);
+
   return {
     async prepare(offer) {
       const item = offer.workItem;
@@ -112,9 +143,22 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
         return { repo: repo.name, worktree, branch, scratch };
       }
 
-      const branch = branchName(item);
+      const head = headBranchOf(offer);
       mkdirSync(join(opts.layout.worktreesDir, repo.name), { recursive: true });
       await git(["worktree", "prune"], { cwd: repo.dir });
+
+      // A branch can be checked out in one worktree only. When an earlier item that is still waiting holds the pull
+      // request's head, this round gets a local branch of its own on the same commit and pushes to the head by name.
+      let branch = head ?? branchName(item);
+      if (head && (await checkedOut(repo.dir, head))) {
+        branch = `${head}-${safeId(item.id)}`;
+        await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${head}`], {
+          cwd: repo.dir,
+        });
+
+        return { repo: repo.name, worktree, branch, scratch };
+      }
+
       if (await has(repo.dir, `refs/remotes/origin/${branch}`)) {
         await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${branch}`], {
           cwd: repo.dir,

@@ -115,3 +115,30 @@ describe("buildWorkPrompt feedback", () => {
     expect(buildWorkPrompt(offer(), { resumed: false })).not.toContain("Triggered by");
   });
 });
+
+describe("buildWorkPrompt branch", () => {
+  const workspace = { repo: "app", worktree: "/w/app/w7", branch: "feat/x", scratch: "/s/w7" };
+
+  it("tells a round on a pull request to push to its head branch", () => {
+    const o = offer();
+    o.workItem.subject = { type: "pr", ref: "github.example/acme/app#3" };
+    o.context.subjects = [
+      { type: "pr", ref: "github.example/acme/app#3", headRef: "feat/x", state: "open", own: true },
+    ];
+
+    const prompt = buildWorkPrompt(o, { resumed: false, workspace });
+    expect(prompt).toContain("branch feat/x");
+    expect(prompt).toContain("head of your open pull request");
+    expect(prompt).toContain("git push origin HEAD:feat/x");
+  });
+
+  it("leaves new work on its own branch", () => {
+    const prompt = buildWorkPrompt(offer(), {
+      resumed: false,
+      workspace: { ...workspace, branch: "ticket/w7-x" },
+    });
+
+    expect(prompt).not.toContain("head of your open pull request");
+    expect(prompt).toContain("Commit there and push that branch");
+  });
+});

@@ -227,6 +227,14 @@ describe("createOffice", () => {
     expect(journal).toContain("git rebase origin/feat/a");
     expect(journal).toContain("--onto");
     expect(offer.context.subjects.map((s) => s.title)).toContain("Cart on top");
+    expect(offer.context.subjects[0]).toMatchObject({
+      type: "pr",
+      headRef: "feat/b",
+      baseRef: "feat/a",
+      state: "open",
+      own: true,
+    });
+
     expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-2");
   });
 
