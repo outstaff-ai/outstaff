@@ -102,7 +102,14 @@ describe("parsePrompt", () => {
 
   it("reads the conversation of a chat session and a chat message that started a round", () => {
     const asked = offer("chat");
-    asked.workItem.origin = { channel: "D1", thread: "t1", requester: { id: "U1", name: "Ada" } };
+    asked.workItem.origin = {
+      channel: "D1",
+      thread: "t1",
+      requester: { id: "U1", name: "Ada" },
+      direct: true,
+      participant: true,
+    };
+
     const chat = buildWorkPrompt(asked, {
       resumed: false,
       chatContext: [

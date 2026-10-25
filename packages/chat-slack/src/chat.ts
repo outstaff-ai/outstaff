@@ -102,6 +102,8 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
           : await trust.resolve(userId);
 
     const thread = m.thread_ts;
+    // A direct message channel has an id that starts with D.
+    const direct = channel.startsWith("D");
     return {
       id: m.ts!,
       channel,
@@ -114,6 +116,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
       },
       text: clean(m.text),
       at: isoOf(m.ts!),
+      ...(direct ? { direct } : {}),
     };
   };
 

@@ -90,6 +90,8 @@ class OfficeSocket extends FakeSocket {
                   channel: "D1",
                   thread: "t1",
                   requester: { id: "U0REQ0001", name: "Dana" },
+                  direct: true,
+                  participant: true,
                 },
               }
             : {}),

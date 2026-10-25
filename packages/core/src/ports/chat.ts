@@ -5,6 +5,9 @@ export interface ChatMessage {
   author: { id: string; name?: string; trusted: boolean; bot: boolean };
   text: string;
   at: string;
+
+  /** The conversation is a direct message (a private chat). Adapters set it; absent means a channel. */
+  direct?: boolean;
 }
 
 export interface AgentProfile {

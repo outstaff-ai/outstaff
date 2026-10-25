@@ -44,8 +44,20 @@ export async function readOrigin(
 }
 
 /** The part of the record the agent sees with an offer. */
-export const publicOrigin = ({ channel, thread, requester }: ChatOriginRecord): ChatOrigin => ({
+export const publicOrigin = ({
   channel,
   thread,
   requester,
+  direct,
+  participant,
+}: ChatOriginRecord): ChatOrigin => ({
+  channel,
+  thread,
+  requester,
+  direct,
+  participant,
 });
+
+/** A mention adds a notification only outside a direct message and for someone not yet in the thread. */
+export const needsMention = (origin: Pick<ChatOrigin, "direct" | "participant">) =>
+  !origin.direct && !origin.participant;

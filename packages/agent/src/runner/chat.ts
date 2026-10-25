@@ -14,6 +14,7 @@ import {
   type Filed,
   type Link,
   type WorkSummary,
+  type ChatOrigin,
 } from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
 import type { ProfilePublisher } from "./profile.js";
@@ -77,6 +78,10 @@ const clip = (text: string, maxLines: number) => {
   return lines.length > maxLines ? lines.slice(0, maxLines).join("\n") : lines.join("\n");
 };
 
+/** Tags the requester only where it adds a notification: not in a direct message, not in a thread they are in. */
+const tag = (origin: ChatOrigin, id = origin.requester.id) =>
+  origin.direct || origin.participant ? "" : `<@${id}> `;
+
 const linkLine = (l: Link) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`;
 
 export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
@@ -135,6 +140,21 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
   }
 
+  /** Whether the author started the thread or replied in it: the chat then notifies them without a mention. */
+  async function takesPart(m: ChatMessage) {
+    if (!m.thread) {
+      return true;
+    }
+
+    try {
+      const inThread = await chat.history(m.channel, { thread: m.thread, limit: historyLimit });
+      return inThread.some((x) => x.author.id === m.author.id);
+    } catch (e) {
+      log.warn("could not read the thread to see who is in it", { error: reason(e) });
+      return false;
+    }
+  }
+
   async function onMessage(m: ChatMessage) {
     // The adapter filters already; the relay never relies on that alone.
     if (!m.author.trusted || m.author.bot) {
@@ -142,6 +162,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
 
     const thread = m.thread ?? m.id;
+    const participant = await takesPart(m);
     if (acknowledge) {
       chat.react(m.channel, m.id, "eyes").catch(() => {});
     }
@@ -154,6 +175,8 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         ...(m.thread ? { thread: m.thread } : {}),
         text: m.text,
         author: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
+        direct: m.direct ?? false,
+        participant,
       });
     } catch (e) {
       log.warn("the office did not take a chat message", { error: reason(e) });
@@ -282,7 +305,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         origin.channel,
         origin.thread,
         [
-          a ? tracked : `On it. ${tracked}`,
+          `${tag(origin)}${a ? tracked : `On it. ${tracked}`}`,
           ...(filed.waiting ? [placementQuestion(filed.work)] : []),
         ].join("\n"),
       );
@@ -299,7 +322,6 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         return;
       }
 
-      const who = `<@${granted.requester ?? origin.requester.id}>`;
       const body =
         kind === "result"
           ? clip(text, maxLines)
@@ -314,7 +336,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       await post(
         origin.channel,
         origin.thread,
-        [`${who} ${body}`, ...all.map(linkLine)].join("\n"),
+        [`${tag(origin, granted.requester)}${body}`, ...all.map(linkLine)].join("\n"),
       );
     },
   };

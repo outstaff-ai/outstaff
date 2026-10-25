@@ -54,6 +54,11 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
       message.thread = m.thread;
     }
 
+    // Like a real adapter, mark messages in a direct message conversation (the fake's ids start with D).
+    if (m.channel.startsWith("D")) {
+      message.direct = true;
+    }
+
     messages.push(message);
     return message;
   };

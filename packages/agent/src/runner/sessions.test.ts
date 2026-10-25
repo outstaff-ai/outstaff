@@ -10,7 +10,15 @@ const offer = (id: string, extra: { sessionId?: string; thread?: string } = {}):
     priority: 1,
     trigger: "human",
     ...(extra.thread
-      ? { origin: { channel: "D1", thread: extra.thread, requester: { id: "U0REQ0001" } } }
+      ? {
+          origin: {
+            channel: "D1",
+            thread: extra.thread,
+            requester: { id: "U0REQ0001" },
+            direct: true,
+            participant: true,
+          },
+        }
       : {}),
   },
   context: { journal: [], subjects: [], links: [] },

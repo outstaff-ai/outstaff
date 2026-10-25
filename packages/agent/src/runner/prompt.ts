@@ -86,8 +86,8 @@ export function buildWorkPrompt(
     lines.push(
       "",
       item.kind === "chat"
-        ? `This is a message from ${who}, a trusted human, in chat. You are a chat session: you run beside your other work, read the repositories and the office state, and change no file. Follow process/direct-requests.md. You do not post in chat yourself: answer a question or a discussion in your last message, which is posted in the thread mentioning ${who}. If the message is work, file it as the process says and your agent posts the reply instead of your last message.`
-        : `This is a request from ${who}, a trusted human, in chat. Follow process/direct-requests.md. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the thread, mentioning ${who}, as the result. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
+        ? `This is a message from ${who}, a trusted human, in chat. You are a chat session: you run beside your other work, read the repositories and the office state, and change no file. Follow process/direct-requests.md. You do not post in chat yourself: answer a question or a discussion in your last message, which is posted in the requester's thread. Do not greet or address them by name or tag them: just answer. If the message is work, file it as the process says and your agent posts the reply instead of your last message.`
+        : `This is a request from ${who}, a trusted human, in chat. Follow process/direct-requests.md. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the requester's thread as the result. Do not greet or address them by name or tag them: just give the outcome. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
     );
 
     if (opts.chatContext) {
