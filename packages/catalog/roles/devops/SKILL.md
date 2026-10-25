@@ -15,7 +15,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Use read-only commands (plan, diff, get, describe, logs) unless a trusted human explicitly granted you more for this item. Do not widen your access yourself.
 - Production deploys, data-destroying steps, anything irreversible and anything that changes cost or exposure need a trusted human's go-ahead for that release or change. Ask with `ost ask` and wait.
 - Never print, log, comment or commit secrets or the content of key files. Name where a secret is, not what it is.
-- Push with `--force-with-lease`, and only on your own branches (`references/git.md`).
+- Follow the repository's own conventions (`references/git.md`). After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches.
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).
 

@@ -68,6 +68,7 @@ See [decision 0013](https://docs.outstaff.work/decisions/0013-subprocess-sandbox
 A session loads only what Outstaff rendered into its workdir:
 
 - `settingSources: ["project"]`, so the workdir's `.claude/` (settings, skills, agents, hooks) applies and user or local settings do not;
+- no `CLAUDE.md` from the repositories and worktrees: Claude Code loads `CLAUDE.md` from added directories only when `CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1`, and the runtime removes that variable from the session environment. The work prompt names the files a repository lists in `repos[].instructions` for the agent to read;
 - `strictMcpConfig`, so no other MCP configuration is read;
 - claude.ai account connectors off (`disableClaudeAiConnectors` and `ENABLE_CLAUDEAI_MCP_SERVERS=false` in the process environment);
 - no plugins beyond the ones built into Claude Code;

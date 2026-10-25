@@ -262,6 +262,34 @@ describe("parseTeamConfig", () => {
     ).toMatchObject({ path: ["repos", 0, "checks"] });
   });
 
+  it("accepts repo conventions and instructions, and rejects paths outside the repository", () => {
+    const ok = parseTeamConfig(
+      (() => {
+        const c: any = valid();
+        c.repos[0].conventions = "Squash merge. Titles start with the ticket key.";
+        c.repos[0].instructions = ["CLAUDE.md", "docs/agents.md"];
+        return c;
+      })(),
+    );
+
+    expect(ok.ok).toBe(true);
+    expect(bad((c) => (c.repos[0].conventions = "  "))[0]).toMatchObject({
+      path: ["repos", 0, "conventions"],
+    });
+
+    expect(bad((c) => (c.repos[0].instructions = ["../secrets.md"]))[0]).toMatchObject({
+      path: ["repos", 0, "instructions", 0],
+    });
+
+    expect(bad((c) => (c.repos[0].instructions = ["/etc/passwd"]))[0]).toMatchObject({
+      path: ["repos", 0, "instructions", 0],
+    });
+
+    expect(bad((c) => (c.repos[0].instructions = []))[0]).toMatchObject({
+      path: ["repos", 0, "instructions"],
+    });
+  });
+
   it("rejects duplicate repo names", () => {
     expect(
       bad((c) => {

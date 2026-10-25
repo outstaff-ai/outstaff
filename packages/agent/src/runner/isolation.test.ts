@@ -134,7 +134,7 @@ describe("isolation between work items", () => {
         const scratch = join(layout.scratchDir, id);
         mkdirSync(worktree, { recursive: true });
         mkdirSync(scratch, { recursive: true });
-        return { repo: "shop", worktree, branch: `ticket/${id}`, scratch };
+        return { repo: "shop", worktree, branch: `ticket/${id}`, scratch, conventionFiles: [] };
       },
       async release(id) {
         rmSync(join(layout.worktreesDir, "shop", id), { recursive: true, force: true });

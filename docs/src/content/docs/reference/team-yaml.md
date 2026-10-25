@@ -390,6 +390,28 @@ Commands an agent runs before pushing, covering only what a change affects (for 
 - Optional
 - Minimum length 1
 
+### repos[].conventions
+
+How work is done in this repository, as free text: commits, branches, pull request title and body, tests. For repositories whose own files (CONTRIBUTING.md, AGENTS.md, the pull request template) cannot say it. Agents read it in addition to those files.
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+### repos[].instructions
+
+Extra files in this repository that agents read before they work, relative to its root, for example ["CLAUDE.md"]. A project CLAUDE.md is not loaded into agent sessions unless it is listed here.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+### repos[].instructions[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 ## people
 
 The agents on the team; may be empty.

@@ -64,6 +64,43 @@ async function* branchOf(ctx: ItemContext, ticket: string): AsyncGenerator<Actio
   throw new Error(`No branch of ${ticket} on the remote.`);
 }
 
+/** The text of the convention files the prompt lists, read from the worktree as they are on its current checkout. */
+async function* conventions(ctx: ItemContext, cwd: string): AsyncGenerator<Action, string, string> {
+  const texts: string[] = [];
+  for (const file of ctx.conventionFiles) {
+    try {
+      texts.push(yield { type: "read", path: `${cwd}/${file}` });
+    } catch {
+      // Listed but gone on this checkout: it states nothing.
+    }
+  }
+
+  return texts.join("\n");
+}
+
+/** What the repository's rules say about a change to a pull request that is already pushed. */
+const asksForOneCommit = (rules: string) => /\bone commit\b|\bsingle commit\b/i.test(rules);
+
+/**
+ * Commits the staged change to the pull request's branch the way the repository's own rules say: amended into its
+ * one commit and pushed with a lease when they ask for one commit, else as a new commit.
+ */
+async function* commitToPush(
+  ctx: ItemContext,
+  cwd: string,
+  branch: string,
+  message: string,
+): AsyncGenerator<Action, void, string> {
+  const rules = yield* conventions(ctx, cwd);
+  if (asksForOneCommit(rules)) {
+    yield { type: "shell", command: "git commit --amend --no-edit", cwd };
+    yield { type: "shell", command: `git push --force-with-lease origin HEAD:${q(branch)}`, cwd };
+  } else {
+    yield { type: "shell", command: `git commit -m ${q(message)}`, cwd };
+    yield { type: "shell", command: `git push origin HEAD:${q(branch)}`, cwd };
+  }
+}
+
 /** A ticket is assigned: take it, change the file, push, open the pull request, and ask when the ticket says so. */
 export async function* assigned(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
@@ -140,8 +177,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   };
 
   yield { type: "shell", command: "git add -A", cwd };
-  yield { type: "shell", command: `git commit -m ${q(`${key}: address review`)}`, cwd };
-  yield { type: "shell", command: `git push origin HEAD:${q(branch)}`, cwd };
+  yield* commitToPush(ctx, cwd, branch, `${key}: address review`);
   const sha = (yield { type: "shell", command: "git rev-parse --short HEAD", cwd }).trim();
   for (const thread of ids) {
     yield {

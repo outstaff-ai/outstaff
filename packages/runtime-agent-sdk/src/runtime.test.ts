@@ -257,6 +257,22 @@ describe("options passed to the SDK", () => {
     expect(o.allowedTools).toBeUndefined();
   });
 
+  it("never passes the switch that loads CLAUDE.md from added directories", async () => {
+    const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+    await collect(
+      createAgentSdkRuntime({
+        options,
+        query,
+        env: { PATH: "/bin", CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD: "1" },
+      }).run(req({ addDirs: ["/work/repos", "/work/worktrees"] })),
+    );
+
+    const o = calls[0]!.options;
+    expect(o.env).not.toHaveProperty("CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD");
+    expect(o.settingSources).toEqual(["project"]);
+    expect(o.additionalDirectories).toEqual(["/work/repos", "/work/worktrees"]);
+  });
+
   it("falls back to the configured model and turns, and omits resume for a new session", async () => {
     const { query, calls } = fakeQuery(() => [init("s1"), result()]);
     await collect(

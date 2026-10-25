@@ -80,6 +80,31 @@ describe("golden output per acme person", () => {
     });
   }
 
+  it("hard-codes no commit count or message format; the defaults are worded as defaults", () => {
+    for (const person of acme.people) {
+      const text = dump(renderPerson({ team: acme, handle: person.handle, catalog: real }).files);
+      expect(text).not.toMatch(/one commit|type\(scope\)|fixup|amended onto|squash/i);
+    }
+
+    const git = renderPerson({ team: acme, handle: "sam", catalog: real }).files.get(
+      "references/git.md",
+    );
+
+    expect(git).toContain("If the repository says nothing on a point, use these defaults");
+  });
+
+  it("renders the conventions a team states for a repo into the git reference", () => {
+    const team = {
+      ...acme,
+      repos: acme.repos.map((r, i) =>
+        i === 0 ? { ...r, conventions: "Squash merge. Titles start with the ticket key." } : r,
+      ),
+    };
+
+    const git = renderPerson({ team, handle: "sam", catalog: real }).files.get("references/git.md");
+    expect(git).toContain("Squash merge. Titles start with the ticket key.");
+  });
+
   it("has no stale golden files", () => {
     expect(readdirSync(GOLDEN).toSorted()).toEqual(
       acme.people.map((p) => `${p.handle}.txt`).toSorted(),

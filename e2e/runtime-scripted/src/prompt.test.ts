@@ -25,6 +25,7 @@ describe("parsePrompt", () => {
         worktree: "/home/outstaff/worktrees/shop/w7",
         branch: "review_feedback/w7-add-a-greeting",
         scratch: "/home/outstaff/scratch/w7",
+        conventionFiles: ["CONTRIBUTING.md"],
       },
     });
 
@@ -40,6 +41,7 @@ describe("parsePrompt", () => {
       scratch: "/home/outstaff/scratch/w7",
       journal: expect.stringContaining("An earlier note."),
       feedback: [],
+      conventionFiles: ["CONTRIBUTING.md"],
     });
   });
 

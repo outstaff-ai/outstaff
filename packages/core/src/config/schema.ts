@@ -63,6 +63,34 @@ const repoSchema = z
           "Commands an agent runs before pushing, covering only what a change affects (for example lint and the tests related to changed files). CI runs the full suite. When omitted, agents work out the affected checks themselves.",
         ),
       ),
+    conventions: z
+      .string()
+      .trim()
+      .min(1)
+      .optional()
+      .meta(
+        d(
+          "How work is done in this repository, as free text: commits, branches, pull request title and body, tests. For repositories whose own files (CONTRIBUTING.md, AGENTS.md, the pull request template) cannot say it. Agents read it in addition to those files.",
+        ),
+      ),
+    instructions: z
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1, "A path cannot be empty.")
+          .refine((v) => !v.startsWith("/") && !v.split(/[\\/]/).includes(".."), {
+            message: "Use a path inside the repository, relative to its root.",
+          }),
+      )
+      .min(1)
+      .max(10)
+      .optional()
+      .meta(
+        d(
+          'Extra files in this repository that agents read before they work, relative to its root, for example ["CLAUDE.md"]. A project CLAUDE.md is not loaded into agent sessions unless it is listed here.',
+        ),
+      ),
   })
   .meta(d("A repository the team works in."));
 

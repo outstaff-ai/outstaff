@@ -25,6 +25,9 @@ export interface ClonedRepo {
   defaultBranch: string;
   access: GitMode;
   kind: string;
+
+  /** Extra files from team.yaml `repos[].instructions` that the agent reads first. */
+  instructions: string[];
 }
 
 export interface SyncRepositoriesOptions {
@@ -146,6 +149,7 @@ export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<C
         defaultBranch: repo.default_branch,
         access,
         kind: repo.kind,
+        instructions: repo.instructions ?? [],
       });
     } catch (e) {
       log.warn("could not prepare a repository", { repo: repo.name, error: reason(e) });

@@ -4,7 +4,7 @@ Use this each time a pull request you own gets review feedback. It comes in thre
 
 1. Read every open thread, every review summary and every conversation comment before changing anything. A review round starts when the review is submitted, and the work prompt lists the inline comments of that review with their thread ids.
 2. For each one, decide: fix, answer, or disagree. Answer an inline thread in that thread with `ost pr reply <n> <thread-id> --body "..."`, never in a new top-level comment. Answer a review summary or a conversation comment with `ost pr comment <n> --body "..."`, quoting or linking what it answers.
-3. Make the fixes in one commit amended onto the pull request's own branch, the one your worktree is on (see `references/git.md`), and push to that branch. Never push to a new branch for a review round; the pull request itself has to change.
+3. Make the fixes as the repository's conventions say for follow-up changes to a pull request (see `references/git.md`); if they say nothing, add focused commits. Push to the pull request's own branch, the one your worktree is on. Never push to a new branch for a review round; the pull request itself has to change.
 4. After the push, reply to each one you fixed, in the same place: say what changed.
 5. Resolve a thread only when both are true: you fixed it, and the last word in it is yours. If the reviewer replied last, or you did not change anything, leave it open for them. Summaries and conversation comments have nothing to resolve.
 6. Never resolve a thread that someone else has to judge, including a thread you disagree with. State your reasoning once, politely, and let the reviewer decide.

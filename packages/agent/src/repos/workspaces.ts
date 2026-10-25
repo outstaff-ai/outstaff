@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseRepoUrl, silentLogger, type Layout, type Logger } from "@outstaff/core";
 import type { OfferedWorkItem } from "@outstaff/protocol";
@@ -12,6 +12,31 @@ export interface Workspace {
   worktree: string;
   branch: string;
   scratch: string;
+
+  /** Convention files found in the worktree, relative to it, plus the `instructions` files team.yaml lists that exist. */
+  conventionFiles: string[];
+}
+
+/** Where a repository states how work is done in it. */
+export const CONVENTION_FILES = [
+  "CONTRIBUTING.md",
+  "AGENTS.md",
+  ".github/CONTRIBUTING.md",
+  "docs/CONTRIBUTING.md",
+  ".github/pull_request_template.md",
+] as const;
+
+/** The convention files that exist in a worktree, then the configured extra files that exist. */
+export function findConventionFiles(worktree: string, instructions: readonly string[] = []) {
+  const isFile = (rel: string) => {
+    try {
+      return statSync(join(worktree, rel)).isFile();
+    } catch {
+      return false;
+    }
+  };
+
+  return [...new Set([...CONVENTION_FILES, ...instructions])].filter(isFile);
 }
 
 export interface Workspaces {
@@ -123,6 +148,14 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       .split("\n")
       .includes(`branch refs/heads/${branch}`);
 
+  const space = (repo: ClonedRepo, worktree: string, branch: string, scratch: string) => ({
+    repo: repo.name,
+    worktree,
+    branch,
+    scratch,
+    conventionFiles: findConventionFiles(worktree, repo.instructions),
+  });
+
   return {
     async prepare(offer) {
       const item = offer.workItem;
@@ -140,7 +173,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
       if (existsSync(worktree)) {
         const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })).trim();
-        return { repo: repo.name, worktree, branch, scratch };
+        return space(repo, worktree, branch, scratch);
       }
 
       const head = headBranchOf(offer);
@@ -156,7 +189,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
           cwd: repo.dir,
         });
 
-        return { repo: repo.name, worktree, branch, scratch };
+        return space(repo, worktree, branch, scratch);
       }
 
       if (await has(repo.dir, `refs/remotes/origin/${branch}`)) {
@@ -172,7 +205,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
         );
       }
 
-      return { repo: repo.name, worktree, branch, scratch };
+      return space(repo, worktree, branch, scratch);
     },
 
     async release(workItemId) {

@@ -78,6 +78,9 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     }
 
     env["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false";
+    // CLAUDE.md files in added directories (the repositories and worktrees) are not loaded unless this is set. A client
+    // repo's CLAUDE.md is not a convention file, so an inherited value never reaches the session.
+    delete env["CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD"];
     // The `sandbox` option decides, not an inherited value. With bubblewrap, Claude Code strips its own credentials
     // from the environment of the Bash tool, hooks and stdio MCP servers, and on Linux runs each command in bubblewrap
     // so it cannot read them from another process either.

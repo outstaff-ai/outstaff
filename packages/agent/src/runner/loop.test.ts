@@ -350,6 +350,7 @@ describe("work loop", () => {
           worktree: `/home/sam/worktrees/shop/${o.workItem.id}`,
           branch: `ticket/${o.workItem.id}`,
           scratch: `/home/sam/scratch/${o.workItem.id}`,
+          conventionFiles: [],
         };
       },
       async release(id) {

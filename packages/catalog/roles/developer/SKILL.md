@@ -12,7 +12,8 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Keep the ticket in sync: assign it to yourself, move it when its real state changes, comment on anything non-obvious (`process/ticket-lifecycle.md`).
 {{/if}}
 - Work only in your item's worktree, only in repositories you can write to. Never push to the default branch.
-- Push with `--force-with-lease`, and only on your own branches (`references/git.md`).
+- Follow the repository's own conventions for commits, branches, pull requests and checks; `references/git.md` says where to find them and what to do when they say nothing.
+- After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches (`references/git.md`).
 - Do not widen the scope. Anything extra goes in a separate ticket or a mention, not in this pull request.
 - Unclear requirement or design question: ask product or the architect with `ost ask` (`references/team.md`) and say what you do meanwhile.
 - Do not resolve a review thread someone else must judge (`process/review-loop.md`).
@@ -28,7 +29,7 @@ A ticket is assigned and ready.
 1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code.
 2. Fetch, branch from the up-to-date default branch and write the change in small, readable steps that match the code around it.
 3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the checks for what you changed (see "Checks before you push"); fix what you broke.
-4. One commit, `type(scope): summary`. Push the branch, write the description from `templates/pull-request.md` to a file in your scratch directory and open the pull request: `ost pr open --title "type(scope): summary" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review).
+4. Commit and push the branch as the repository's conventions say (`references/git.md`). Write the description to a file in your scratch directory, from the repository's pull request template if it has one, else `templates/pull-request.md`, and open the pull request: `ost pr open --title "<title>" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review). The title follows the repository's conventions; if they say nothing, make it a short summary of the change.
 5. Hand back.
 
 If the change depends on an unmerged one, stack it (below).
@@ -37,7 +38,7 @@ If the change depends on an unmerged one, stack it (below).
 
 A pull request you own has new review threads.
 
-Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or disagree, amend one commit, push, reply in each thread, resolve only what you fixed and last spoke in.
+Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or disagree, commit the fixes as the repository's conventions say, push, reply in each thread, resolve only what you fixed and last spoke in.
 
 ### merged-feedback
 

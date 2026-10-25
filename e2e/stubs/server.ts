@@ -41,7 +41,12 @@ const pairs = (text: string) =>
 const log = (line: string) => process.stdout.write(`${new Date().toISOString()} ${line}\n`);
 
 const repo = new BareRepo(env("STUB_DATA_DIR"), "acme", "shop");
-await repo.init({ "greeting.txt": "hello\nworld\n!\n", "README.md": "# Acme Shop\n" });
+await repo.init({
+  "greeting.txt": "hello\nworld\n!\n",
+  "README.md": "# Acme Shop\n",
+  "CONTRIBUTING.md":
+    "# Contributing to Acme Shop\n\n## Commits\n\nOne commit per pull request. To change it, amend it and push with `git push --force-with-lease`.\n",
+});
 
 const github = createGithub({
   repo,
@@ -86,6 +91,15 @@ const control: Route[] = [
       tickets: tracker.state(),
       chat: chat.state(),
     }),
+  },
+  {
+    // A person edits a file on main, for example the contribution rules.
+    method: "POST",
+    path: "/_test/repo/file",
+    handler: async (r) => {
+      await repo.commitFile("main", r.json.path, r.json.text, r.json.message ?? "Update");
+      return ok();
+    },
   },
   {
     method: "POST",

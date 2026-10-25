@@ -50,6 +50,14 @@ describe("buildContext", () => {
     expect(render(tpl, ctx)).toBe("shop:[pnpm lint][pnpm vitest related --run];");
   });
 
+  it("exposes each repo's conventions and instructions, empty when absent", () => {
+    expect(ctx.repos.list.every((r) => r.conventions === "" && r.instructions.length === 0)).toBe(
+      true,
+    );
+
+    expect(ctx.repos.has_conventions).toBe(false);
+  });
+
   it("groups people by role, including known empty roles", () => {
     expect(ctx.people.byRole.developer?.map((p) => p.handle)).toEqual(["sam", "noor"]);
     expect(ctx.people.byRole.tester).toEqual([]);

@@ -143,6 +143,21 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "conventions": {
+            "description": "How work is done in this repository, as free text: commits, branches, pull request title and body, tests. For repositories whose own files (CONTRIBUTING.md, AGENTS.md, the pull request template) cannot say it. Agents read it in addition to those files.",
+            "type": "string",
+            "minLength": 1
+          },
+          "instructions": {
+            "description": "Extra files in this repository that agents read before they work, relative to its root, for example [\"CLAUDE.md\"]. A project CLAUDE.md is not loaded into agent sessions unless it is listed here.",
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
           }
         },
         "required": [
