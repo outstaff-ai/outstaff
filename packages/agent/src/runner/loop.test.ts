@@ -6,6 +6,7 @@ import {
   type Runtime,
   type RuntimeEvent,
   type ToolKind,
+  type TeamConfig,
   type Vcs,
 } from "@outstaff/core";
 import { createFakeRuntime, type FakeVcs } from "@outstaff/core/fakes";
@@ -189,6 +190,7 @@ describe("work loop", () => {
       vcs?: Vcs;
       log?: Logger;
       chatSession?: { policy: Policy; builtinTools: ToolKind[] };
+      policies?: TeamConfig["policies"];
     } = {},
   ) {
     const { env, vcs } = fakeEnv();
@@ -1033,6 +1035,31 @@ describe("work loop", () => {
       socket.offerWith("w2", { kind: "ticket", feedback });
       await until(() => sentOf("handback").length === 2);
       expect(calls).toEqual([`conversation_comment:${conversation}`]);
+    });
+
+    it("does not react when policies.acknowledge.vcs is off, and still runs the round", async () => {
+      await connect();
+      const { vcs, conversation } = await prWithComments();
+      const calls: string[] = [];
+      vcs.react = async (_repo, target) => {
+        calls.push(target.id);
+      };
+
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Answered." }]);
+      start(runtime, {
+        vcs,
+        policies: { acknowledge: { chat: true, vcs: false } } as TeamConfig["policies"],
+      });
+
+      socket.offerWith("w1", {
+        kind: "review_feedback",
+        feedback: [{ actor: "dana", kind: "comment", body: "Hm", commentId: conversation }],
+      });
+
+      await until(() => types().includes("handback"));
+      expect(calls).toEqual([]);
+      expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "done" });
     });
 
     it("logs a warning when a reaction fails and still runs the round", async () => {

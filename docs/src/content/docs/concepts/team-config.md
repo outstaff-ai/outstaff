@@ -53,7 +53,7 @@ repos:
 
 ## Workflow
 
-[`workflow`](/reference/team-yaml/#workflow) picks a preset, maps the canonical statuses (`backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`) to the names in your tracker, and adds or overrides rules. A rule reacts to an event, checks a condition and performs actions such as moving a ticket, assigning it or commenting. A rule with the same id as a preset rule replaces it, and `{ id, disabled: true }` removes it.
+[`workflow`](/reference/team-yaml/#workflow) picks a preset, maps the canonical statuses (`backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`) to the names in your tracker, and adds or overrides rules. A rule reacts to an event, checks a condition and performs actions such as moving a ticket, assigning it or commenting. A rule with the same id as a preset rule replaces it, and `{ id, disabled: true }` removes it. Several preset behaviours also have a switch under `policies`; see [What outstaff does on its own](/concepts/automation/).
 
 ## Policies
 

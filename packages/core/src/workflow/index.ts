@@ -20,7 +20,14 @@ export {
 } from "./rules.js";
 
 export { WORKFLOW_PRESETS, presetRules, type WorkflowPreset } from "./presets.js";
-export { mergeRules, resolveWorkflow, type ResolvedWorkflow } from "./resolve.js";
+export {
+  applySwitches,
+  mergeRules,
+  resolveWorkflow,
+  type ResolvedWorkflow,
+  type SwitchedRule,
+} from "./resolve.js";
+
 export { describeEffect } from "./describe.js";
 export {
   evaluateWorkflow,

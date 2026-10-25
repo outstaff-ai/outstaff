@@ -220,6 +220,29 @@ describe("ost workflow explain", () => {
     expect(r.out).toContain("no match  pr-opened-review");
   });
 
+  it("names the switch behind a rule and lists a rule a switch removed", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
+      "  conflicts:\n    follow_up: true\n",
+      "  conflicts:\n    follow_up: false\n",
+    );
+
+    const conflicted = JSON.stringify({
+      type: "pr.conflicted",
+      subject: { pr: { repo: { owner: "acme", name: "app" }, number: 10 } },
+      actor: { kind: "automation", id: "engine" },
+    });
+
+    const off = await ost(project(undefined, team), ["workflow", "explain", conflicted]);
+    expect(off.out).toContain(
+      "off       conflict-back-to-author: removed by policies.conflicts.follow_up",
+    );
+
+    const handed = JSON.stringify({ type: "agent.handed_back", subject: { ticket: "ACME-1" } });
+    const on = await ost(acme(), ["workflow", "explain", handed]);
+    expect(on.out).toContain("switch policies.hand_back.reassign");
+    expect(on.out).not.toContain("removed by");
+  });
+
   it("prints JSON", async () => {
     const r = await ost(acme(), ["workflow", "explain", event, "--state", state, "--json"]);
     expect(JSON.parse(r.out).effects).toEqual([
@@ -271,6 +294,34 @@ describe("ost workflow explain", () => {
 
     const bad = await ost(acme(), ["workflow", "explain", event, "--state", "[]"]);
     expect(bad.code).toBe(1);
+  });
+});
+
+describe("ost policies", () => {
+  it("lists every switch of the acme team with its value and source", async () => {
+    const r = await ost(acme(), ["policies"]);
+    expect(r.code).toBe(0);
+    expect(r.out).toBe(`SWITCH                             VALUE        SOURCE
+policies.acknowledge.chat          true         team.yaml
+policies.acknowledge.vcs           true         team.yaml
+policies.feedback.follow_up_round  true         team.yaml
+policies.feedback.merged_prs       true         team.yaml
+policies.hand_back.reassign        requester    team.yaml
+policies.hand_back.fallback        first_human  team.yaml
+policies.conflicts.follow_up       true         team.yaml
+policies.retry.on_signal           true         team.yaml
+`);
+  });
+
+  it("reports a switch the team set and one left at its default", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8")
+      .replace("    vcs: true\n", "    vcs: false\n")
+      .replace("  conflicts:\n    follow_up: true\n", "");
+
+    const r = await ost(project(undefined, team), ["policies", "--json"]);
+    const by = Object.fromEntries(JSON.parse(r.out).map((e: any) => [e.switch, e]));
+    expect(by["policies.acknowledge.vcs"]).toMatchObject({ value: false, source: "team.yaml" });
+    expect(by["policies.conflicts.follow_up"]).toMatchObject({ value: true, source: "default" });
   });
 });
 

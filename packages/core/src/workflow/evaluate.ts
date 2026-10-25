@@ -224,7 +224,7 @@ const requesterOf = (ctx: Ctx): string | undefined =>
 
 const noRequester = (ctx: Ctx) =>
   ctx.ticket
-    ? `ticket ${ctx.ticket} has no known requester and the team lists no humans`
+    ? `ticket ${ctx.ticket} has no known requester and there is no first-human fallback (the team lists no humans, or policies.hand_back.fallback is none)`
     : "event has no linked ticket";
 
 function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {

@@ -24,7 +24,7 @@ export interface EngineOptions {
   /** Without a tracker, move, assign and comment effects are skipped (and noted); scheduling still works. */
   ports?: { tracker?: Tracker; chat?: Chat };
 
-  /** Defaults to `resolveWorkflow(team.workflow, team.humans)`. */
+  /** Defaults to `resolveWorkflow(team.workflow, team.humans, team.policies)`. */
   workflow?: ResolvedWorkflow;
 
   /** Where `notify` effects aimed at "the channel" go. Defaults to `integrations.chat.channel` when set. */

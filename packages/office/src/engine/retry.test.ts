@@ -1,7 +1,7 @@
 import type { PrRef, WorkflowEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { REPO } from "../intake/test-support.js";
-import { harness, SAM, type Harness } from "./test-support.js";
+import { REPO, teamConfig } from "../intake/test-support.js";
+import { harness, SAM, type Harness, type HarnessOptions } from "./test-support.js";
 
 const dana = { kind: "human", id: "dana" } as const;
 const ref = (number: number): PrRef => ({ repo: REPO, number });
@@ -10,8 +10,8 @@ let h: Harness;
 afterEach(() => h.close());
 
 /** A ticket sam works on, its pull request, and sam's item for the ticket blocked by repeated failures. */
-async function blockedSetup(subject: "ticket" | "pr" = "ticket") {
-  h = await harness();
+async function blockedSetup(subject: "ticket" | "pr" = "ticket", over: HarnessOptions = {}) {
+  h = await harness(over);
   await h.human("Dana");
   const issue = await h.tracker.createIssue({
     title: "Search",
@@ -87,6 +87,27 @@ const state = async (id: string) => {
 };
 
 const BLOCKED = { status: "blocked", failures: 3, guard: 3 };
+
+describe("policies.retry.on_signal", () => {
+  it("off: a human's signal leaves the blocked item blocked and a PR comment schedules a new round", async () => {
+    const team = teamConfig({
+      humans: [{ name: "Dana", identities: { vcs: "dana", tracker: "dana" } }],
+      policies: { retry: { on_signal: false } },
+    });
+
+    const { itemId, event } = await blockedSetup("pr", { team });
+    await h.deliver(event("ticket.moved", dana, { to: "active" }));
+    await h.deliver(event("pr.comment", dana, { body: "Please cover the empty query." }));
+    expect(await state(itemId)).toMatchObject(BLOCKED);
+    expect((await h.store.readJournal(itemId)).map((j) => j.text)).toEqual([
+      "Tried the migration.",
+    ]);
+
+    expect((await h.items("sam")).filter((i) => i.id !== itemId).map((i) => i.kind)).toEqual([
+      "review_feedback",
+    ]);
+  });
+});
 
 describe("a trusted human retries a blocked item", () => {
   it("moves the ticket out of blocked", async () => {

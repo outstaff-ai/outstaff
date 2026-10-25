@@ -57,6 +57,7 @@ export const validate = defineCommand({
           roles: roleRegistry(found.catalogs),
           adapters: new Map(),
           identityValidators: agentRegistry().toIdentityValidators(),
+          adapterCapabilities: agentRegistry().toValidationAdapters(),
         });
 
         errors = [...report.errors, ...validateAdapterOptions(loaded.config)].map(loaded.locate);

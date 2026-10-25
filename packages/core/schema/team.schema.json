@@ -1157,15 +1157,107 @@
           },
           "additionalProperties": false
         },
+        "acknowledge": {
+          "default": {
+            "chat": true,
+            "vcs": true
+          },
+          "description": "The reactions that show people their message or comment was picked up.",
+          "type": "object",
+          "properties": {
+            "chat": {
+              "default": true,
+              "description": "React with eyes to a chat message from a trusted person when the agent has seen it. Default on.",
+              "type": "boolean"
+            },
+            "vcs": {
+              "default": true,
+              "description": "React with eyes to each pull request comment the agent is about to answer, when its round starts. Needs a vcs adapter with vcs.reactions. Default on.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "feedback": {
+          "default": {
+            "follow_up_round": true,
+            "merged_prs": true
+          },
+          "description": "How agents act on feedback from trusted people beyond the first round.",
+          "type": "object",
+          "properties": {
+            "follow_up_round": {
+              "default": true,
+              "description": "Start another round when feedback arrived after the agent was offered its work. Default on.",
+              "type": "boolean"
+            },
+            "merged_prs": {
+              "default": true,
+              "description": "Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "hand_back": {
+          "default": {
+            "reassign": "requester",
+            "fallback": "first_human"
+          },
+          "description": "What happens to a ticket when an agent hands its work back.",
+          "type": "object",
+          "properties": {
+            "reassign": {
+              "default": "requester",
+              "description": "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves to review). Edits the preset rule hand-back-to-requester. Default requester.",
+              "type": "string",
+              "enum": [
+                "requester",
+                "none"
+              ]
+            },
+            "fallback": {
+              "default": "first_human",
+              "description": "Who stands in when a ticket has no known requester: the first human in humans, or none to skip. Default first_human.",
+              "type": "string",
+              "enum": [
+                "first_human",
+                "none"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "conflicts": {
+          "default": {
+            "follow_up": true
+          },
+          "description": "Merge conflicts between pull requests.",
+          "type": "object",
+          "properties": {
+            "follow_up": {
+              "default": true,
+              "description": "Send a pull request that starts to conflict with its base, for example after another one merged, back to its agent author to rebase. Switches the preset rule conflict-back-to-author. Default on.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "retry": {
           "default": {
+            "on_signal": true,
             "base_minutes": 1,
             "cap_minutes": 30,
             "max_failures": 3
           },
-          "description": "How a failing work item is retried: exponential backoff, then blocked.",
+          "description": "How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.",
           "type": "object",
           "properties": {
+            "on_signal": {
+              "default": true,
+              "description": "Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread. Default on.",
+              "type": "boolean"
+            },
             "base_minutes": {
               "default": 1,
               "description": "Wait after the first failed run of a work item; doubles with each failure.",
@@ -1556,7 +1648,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "Team-wide guardrails and message style."
+      "description": "Team-wide guardrails, message style and switches for what outstaff does on its own."
     }
   },
   "required": [

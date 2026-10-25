@@ -1,6 +1,6 @@
 import type { Logger } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { REPO } from "../intake/test-support.js";
+import { REPO, teamConfig } from "../intake/test-support.js";
 import { schedulerWorkSource } from "../work-source.js";
 import { readFeedback } from "./feedback.js";
 import { harness, SAM, type Harness } from "./test-support.js";
@@ -122,6 +122,26 @@ describe("feedback during a review round", () => {
     expect(next.workItem.id).toBe(followUps[0]!.id);
     expect(bodies(next.context.feedback)).toEqual(["And add a test."]);
     await work.handBack("sam", next.workItem.id, result);
+    expect((await h.items("sam")).filter((i) => i.status === "queued")).toEqual([]);
+  });
+
+  it("starts no follow-up round when policies.feedback.follow_up_round is off", async () => {
+    await h.close();
+    h = await harness({
+      team: teamConfig({
+        humans: [{ name: "Dana", identities: { vcs: "dana", tracker: "dana", chat: "U-dana" } }],
+        policies: { feedback: { follow_up_round: false } },
+      }),
+    });
+
+    await h.human("Dana");
+    const pr = await pullRequest();
+    const work = source();
+    await comment(pr.number, "Rename the flag.");
+    const offer = (await work.next("sam"))!;
+    await work.accept("sam", offer.workItem.id);
+    await comment(pr.number, "And add a test.");
+    await work.handBack("sam", offer.workItem.id, { summary: "Done.", links: [], status: "done" });
     expect((await h.items("sam")).filter((i) => i.status === "queued")).toEqual([]);
   });
 

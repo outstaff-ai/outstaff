@@ -15,6 +15,9 @@ export type Loaded =
       ok: true;
       config: TeamConfig;
       source: ConfigSource;
+
+      /** The team file as written, parsed; tells a value the team set from a default. */
+      raw: unknown;
       locate: (issue: ConfigIssue) => LocatedIssue;
     }
   | { ok: false; issues: LocatedIssue[] };
@@ -48,7 +51,7 @@ export async function loadTeam(ctx: Context, options: GlobalOptions): Promise<Lo
     ...(parsed?.locate(issue) ?? { line: 1, column: 1 }),
   });
 
-  return { ok: true, config: result.config, source: result.source, locate };
+  return { ok: true, config: result.config, source: result.source, raw: parsed?.value, locate };
 }
 
 export const issueJson = (i: LocatedIssue & { consequence?: string }) => ({

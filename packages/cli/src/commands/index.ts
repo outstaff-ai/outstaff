@@ -7,6 +7,7 @@ import { gitCredential } from "./git-credential.js";
 import { fire } from "./fire.js";
 import { hire } from "./hire.js";
 import { init } from "./init.js";
+import { policies } from "./policies.js";
 import { render } from "./render.js";
 import { roleNew } from "./role.js";
 import { setup } from "./setup.js";
@@ -32,6 +33,7 @@ export const commands: CommandDef[] = [
   hire,
   fire,
   doctor,
+  policies,
   explain,
   gitCredential,
   ...verbCommands,

@@ -4,6 +4,7 @@ import {
   explainWorkflow,
   formatIssue,
   resolveWorkflow,
+  switchOfRule,
   WORKFLOW_EVENT_TYPES,
   type StaticWorkflowData,
   type WorkflowEvent,
@@ -52,6 +53,11 @@ function parseEvent(text: string): WorkflowEvent {
   } as WorkflowEvent;
 }
 
+const switchOf = (id: string) => {
+  const sw = switchOfRule(id);
+  return sw ? `policies.${sw.path}` : undefined;
+};
+
 export const explain = defineCommand<{ state?: string }>({
   name: "explain",
   group: "workflow",
@@ -99,7 +105,12 @@ export const explain = defineCommand<{ state?: string }>({
       return 1;
     }
 
-    const workflow = resolveWorkflow(loaded.config.workflow, loaded.config.humans);
+    const workflow = resolveWorkflow(
+      loaded.config.workflow,
+      loaded.config.humans,
+      loaded.config.policies,
+    );
+
     const explanation = explainWorkflow(
       event,
       createStaticWorkflowState(data),
@@ -107,14 +118,41 @@ export const explain = defineCommand<{ state?: string }>({
       workflow.options,
     );
 
+    const switchedOff = workflow.switched
+      .filter((s) => [s.on].flat().includes(event.type))
+      .map((s) => ({
+        rule: s.rule,
+        switch: `policies.${s.switch}`,
+        effect: s.effect,
+      }));
+
     if (options.json) {
-      ctx.out(`${JSON.stringify(explanation, null, 2)}\n`);
+      ctx.out(
+        `${JSON.stringify(
+          {
+            ...explanation,
+            rules: explanation.rules.map((r) => {
+              const sw = switchOf(r.id);
+              return sw ? { ...r, switch: sw } : r;
+            }),
+            switchedOff,
+          },
+          null,
+          2,
+        )}\n`,
+      );
+
       return 0;
     }
 
     const out: string[] = [`Event ${explanation.event.type}`, ""];
     for (const r of explanation.rules) {
+      const sw = switchOf(r.id);
       out.push(`${r.matched ? "match  " : "no match"}  ${r.id}: ${r.reason}`);
+      if (sw) {
+        out.push(`           switch ${sw}`);
+      }
+
       for (const e of r.effects) {
         out.push(`           ${describeEffect(e)}`);
       }
@@ -122,6 +160,12 @@ export const explain = defineCommand<{ state?: string }>({
       for (const s of r.skipped) {
         out.push(`           skipped ${s}`);
       }
+    }
+
+    for (const s of switchedOff) {
+      out.push(
+        `${s.effect === "removed" ? "off     " : "edited  "}  ${s.rule}: ${s.effect} by ${s.switch}`,
+      );
     }
 
     out.push("", "Effects");

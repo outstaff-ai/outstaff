@@ -127,9 +127,45 @@ describe("parseTeamConfig", () => {
     expect(r.config.policies).toEqual({
       agent_loop_guard: { max_runs_per_item_per_hour: 12 },
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
-      retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
+      acknowledge: { chat: true, vcs: true },
+      feedback: { follow_up_round: true, merged_prs: true },
+      hand_back: { reassign: "requester", fallback: "first_human" },
+      conflicts: { follow_up: true },
+      retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
       chat: { parallel_sessions: 2 },
+    });
+  });
+
+  it("keeps what the team sets in policies and fills the rest with defaults", () => {
+    const r = parseTeamConfig({
+      ...valid(),
+      policies: { acknowledge: { vcs: false }, hand_back: { reassign: "none" } },
+    });
+
+    if (!r.ok) {
+      throw new Error(JSON.stringify(r.issues));
+    }
+
+    expect(r.config.policies?.acknowledge).toEqual({ chat: true, vcs: false });
+    expect(r.config.policies?.hand_back).toEqual({ reassign: "none", fallback: "first_human" });
+    expect(r.config.policies?.conflicts).toEqual({ follow_up: true });
+  });
+
+  it("rejects an unknown switch and a value outside a switch's choices", () => {
+    expect(bad((c) => (c.policies = { acknowledge: { slack: true } }))).toEqual([
+      expect.objectContaining({
+        path: ["policies", "acknowledge", "slack"],
+        code: "schema.unknown_key",
+      }),
+    ]);
+
+    expect(bad((c) => (c.policies = { merge: { on_approval: true } }))).toEqual([
+      expect.objectContaining({ path: ["policies", "merge"], code: "schema.unknown_key" }),
+    ]);
+
+    expect(bad((c) => (c.policies = { hand_back: { reassign: "everyone" } }))[0]).toMatchObject({
+      path: ["policies", "hand_back", "reassign"],
     });
   });
 

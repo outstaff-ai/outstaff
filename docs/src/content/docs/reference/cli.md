@@ -374,6 +374,28 @@ ost doctor sam --secrets-dir ./secrets-sam
 ost doctor office --json
 ```
 
+## ost policies
+
+List what outstaff does on its own, with each switch's value and where it comes from.
+
+Prints every switch under `policies` in team.yaml with its effective value and its source: `default` (team.yaml says nothing), `team.yaml`, `preset` (the workflow preset has no rule for it, so the switch cannot do anything) or `workflow.rules` (an explicit rule with the same id wins over the switch). Nothing is applied. See `ost workflow explain` for what the rules do with an event.
+
+```
+ost policies
+```
+
+Exit codes:
+
+- 0: the switches were listed
+- 1: the team config could not be loaded
+
+Examples:
+
+```sh
+ost policies
+ost policies --json
+```
+
 ## ost workflow explain
 
 Show which workflow rules an event triggers, and why.

@@ -2,6 +2,7 @@ import {
   describeEffect,
   explainWorkflow,
   PortError,
+  policyOn,
   resolveWorkflow,
   type Chat,
   type Effect,
@@ -85,7 +86,7 @@ export function createEngine(opts: EngineOptions): Engine {
   const now = () => clock.now().toISOString();
   const tracker: Tracker | undefined = opts.ports?.tracker;
   const chat: Chat | undefined = opts.ports?.chat;
-  const workflow = opts.workflow ?? resolveWorkflow(team.workflow, team.humans);
+  const workflow = opts.workflow ?? resolveWorkflow(team.workflow, team.humans, team.policies);
   const channel =
     opts.channel ??
     (typeof team.integrations.chat["channel"] === "string"
@@ -181,7 +182,11 @@ export function createEngine(opts: EngineOptions): Engine {
 
   /** The blocked items a trusted human's event brings back: the ones on its ticket or pull request. */
   const blockedFor = async (event: WorkflowEvent): Promise<WorkItem[]> => {
-    if (event.actor.kind !== "human" || retrySignal(event) === undefined) {
+    if (
+      !policyOn(team.policies, "retry.on_signal") ||
+      event.actor.kind !== "human" ||
+      retrySignal(event) === undefined
+    ) {
       return [];
     }
 
@@ -541,6 +546,10 @@ export function createEngine(opts: EngineOptions): Engine {
   };
 
   const followUp = async (itemId: string): Promise<void> => {
+    if (!policyOn(team.policies, "feedback.follow_up_round")) {
+      return;
+    }
+
     if ((await store.getSubject(FOLLOW_UP_SUBJECT, itemId)) !== undefined) {
       return;
     }
