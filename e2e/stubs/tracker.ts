@@ -345,13 +345,26 @@ export function createTracker(opts: TrackerOptions) {
     routes,
 
     /** A person creates a ticket in a column (by status name). */
-    createTicket(title: string, description: string, status: string) {
+    /** With `assignee`, the ticket is created already assigned: one `created` item, no `assignee` item. */
+    createTicket(title: string, description: string, status: string, assignee?: string) {
       const col = columnNamed(status);
       if (!col) {
         throw new Error(`No column ${status}.`);
       }
 
-      return create(human, { title, description, columnId: col.id }).identifier;
+      const who =
+        assignee === undefined ? undefined : opts.members.find((m) => m.username === assignee);
+
+      if (assignee !== undefined && !who) {
+        throw new Error(`No member ${assignee}.`);
+      }
+
+      return create(human, {
+        title,
+        description,
+        columnId: col.id,
+        ...(who ? { assigneeUserId: who.userId } : {}),
+      }).identifier;
     },
 
     assignTicket(keyName: string, username: string) {

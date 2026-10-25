@@ -117,6 +117,23 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       expect((await s.subject.assign(issue.key, null)).assignee).toBeUndefined();
     });
 
+    it("creates an issue already assigned to a member", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues", "tracker.assign");
+      const member = await requireSeed(t, s.seed, "member")({ name: "Noor" });
+      const created = await s.subject.createIssue({
+        title: "Born assigned",
+        body: "",
+        assignee: member.id,
+      });
+
+      expect(created.assignee?.id).toBe(member.id);
+      expect((await s.subject.getIssue(created.key)).assignee?.id).toBe(member.id);
+      expect((await s.subject.listIssues({ assignee: member.id })).map((i) => i.key)).toContain(
+        created.key,
+      );
+    });
+
     it("pages events with an opaque cursor and no duplicates", async (t) => {
       expect.hasAssertions();
       const s = get();

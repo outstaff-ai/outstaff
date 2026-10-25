@@ -471,6 +471,29 @@ describe("kanban preset", () => {
   });
 });
 
+describe("a ticket created already assigned", () => {
+  const a = { id: "ada", kind: "agent" as const };
+  const created = ev("ticket.created", { ...tk });
+
+  it("schedules the agent assignee, as a later assignment would", () => {
+    for (const rules of [kanban, presetRules("minimal")]) {
+      expect(run(created, world({ status: "ready", ticket: { assignee: a } }), rules)).toEqual([
+        { type: "schedule", person: "ada", kind: "assigned", priority: "normal", ticket: "ACME-1" },
+      ]);
+    }
+  });
+
+  it("schedules nothing when unassigned, assigned to a human, created by automation or finished", () => {
+    expect(run(created, world({ status: "ready" }))).toEqual([]);
+    expect(run(created, world({ ticket: { assignee: { id: "grace", kind: "human" } } }))).toEqual(
+      [],
+    );
+
+    expect(run({ ...created, actor: automation }, world({ ticket: { assignee: a } }))).toEqual([]);
+    expect(run(created, world({ status: "done", ticket: { assignee: a } }))).toEqual([]);
+  });
+});
+
 describe("scrum and minimal presets", () => {
   const a = { id: "ada", kind: "agent" as const };
   const e = ev("ticket.assigned", { ...tk });

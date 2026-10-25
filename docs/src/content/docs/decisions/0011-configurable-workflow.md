@@ -29,6 +29,7 @@ Teams name their statuses differently and want different automations. Hard-coded
 - the same feedback on a merged agent-authored pull request is scheduled for the author as `merged_feedback` (`merged-feedback-follow-up`, in all three presets, with the `pr_merged` condition); a bare approval is not feedback, and the item carries the feedback in the same way. Nothing is assigned or moved: the ticket is not reopened. The catalog process (`process/merged-feedback.md`) has the agent answer on the merged pull request and, if a change is asked for, open a follow-up pull request from the default branch that links the original and the feedback (with a tracker it is linked to the original ticket; whether a new ticket is made is left to the role);
 - conflicts after a merge go to the authors of the affected pull requests, with the stack listed bottom first;
 - a ticket moved to active while assigned to a human goes to the agent who last worked on it;
+- an agent assignee is scheduled as `assigned`, whether the ticket was assigned later or created already assigned (`assigned-agent-scheduled`, on `ticket.assigned` and `ticket.created`; the assignee is read from the ticket); work the office's own account or a sync bot creates or assigns is not scheduled;
 - a hand-back moves the ticket to `review` and assigns the human who asked for the work, unless the ticket is already `done` or `canceled`.
 
 **Inspection:** `ost workflow explain <event>` shows which rules fire.

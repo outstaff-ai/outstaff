@@ -685,6 +685,21 @@ async function main() {
     `merged feedback: a comment on merged #${pr1.pr.number} -> answered, follow-up #${followed.follow.number} opened, ${first} still done`,
   );
 
+  // ---- 6. a ticket created already assigned to the agent: one `created` item, no assignment item, and it still starts
+  const { key: third } = await stub("POST", "/_test/tickets", {
+    title: "Add a farewell",
+    assignee: "sam",
+  });
+
+  const pr3 = await until(`a pull request for ${third}, created already assigned`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${third}`));
+    return pr ? { pr } : undefined;
+  });
+
+  step(
+    `created assigned: ${third} created already assigned to sam -> pull request #${pr3.pr.number} follows`,
+  );
+
   const final = await state();
   const t2 = final.tickets.find((x: Json) => x.key === second);
   assertEq(t2.status, "In Review", "the second ticket waits in review");
