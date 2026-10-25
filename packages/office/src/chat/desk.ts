@@ -36,6 +36,8 @@ import {
   needsMention,
   readOrigin,
   threadKey,
+  threadsOf,
+  withThread,
   type ChatOriginRecord,
 } from "./origin.js";
 import { parsePlacement, placeQueued, type ParsedPlacement } from "./placement.js";
@@ -78,7 +80,7 @@ const firstLine = (text: string, max = 80) => {
 };
 
 /** The mention with its trailing space, or nothing when the requester is notified anyway. */
-const mention = (origin: ChatOriginRecord) =>
+const mention = (origin: Pick<ChatOriginRecord, "requester" | "direct" | "participant">) =>
   needsMention(origin) ? `<@${origin.requester.id}> ` : "";
 
 export interface ChatRequests extends ChatDesk {
@@ -127,12 +129,19 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
 
   const chatSessions = opts.team.policies?.chat?.parallel_sessions ?? 2;
 
-  /** A chat session for the message. It starts at once, beside the active item, unless all sessions are taken. */
+  /**
+   * A chat session for the message. It starts at once, beside the active item, unless all sessions are taken.
+   * `follow` is a finished item of the thread, whose conversation the session goes on with and which the thread
+   * moves on from. `beside` is the running item the thread is linked to: the session gets its context and the
+   * thread stays linked to it, so its result is still posted there.
+   */
   async function newRequest(
     person: string,
     m: Message,
-    follow?: { item: WorkItem },
+    link?: { follow: WorkItem } | { beside: WorkItem },
   ): Promise<MessageResult> {
+    const follow = link && "follow" in link ? { item: link.follow } : undefined;
+    const beside = link && "beside" in link ? link.beside : undefined;
     const thread = m.thread ?? m.messageId;
     const taken = [
       ...(await store.listItems({ person, status: "active" })),
@@ -162,17 +171,20 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       awaitingPlacement: false,
       claimed: [],
       text: m.text,
+      ...(beside ? { about: { id: beside.id, title: beside.title } } : {}),
     };
 
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, origin);
-    await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(m.channel, thread), {
-      itemId: created.id,
-    });
+    if (!beside) {
+      await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(m.channel, thread), {
+        itemId: created.id,
+      });
+    }
 
     await store.appendJournal(
       created.id,
       "office",
-      `${m.author.name ?? m.author.id} asked in chat (thread ${thread}):\n${m.text}`,
+      `${m.author.name ?? m.author.id} ${beside ? "replied" : "asked"} in chat (thread ${thread}):\n${m.text}`,
     );
 
     opts.notify(person);
@@ -399,6 +411,16 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       )
       .toSorted((a, b) => LIVE.indexOf(a.status) - LIVE.indexOf(b.status));
 
+    const attachedOrigin: ChatOriginRecord = {
+      channel: origin.channel,
+      thread: origin.thread,
+      requester: origin.requester,
+      direct: origin.direct,
+      participant: origin.participant,
+      awaitingPlacement: false,
+      claimed: [],
+    };
+
     // The attached work keeps its place: nothing is asked about it, and an active round is not interrupted.
     let item = live[0];
     if (item) {
@@ -421,23 +443,28 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         trigger: "human",
         subject,
         parentId: session.id,
+        // Before the item can be offered, so the offer carries its feedback and origin.
+        init: async (created) => {
+          await addFeedback(store, created.id, feedback);
+          await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, attachedOrigin);
+        },
       });
 
       await store.appendJournal(item.id, "office", note);
     }
 
-    // Queued, the item offers the message with its other feedback; running, a follow-up round starts after its
-    // hand-back and picks it up.
-    await addFeedback(store, item.id, feedback);
-    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, item.id, {
-      channel: origin.channel,
-      thread: origin.thread,
-      requester: origin.requester,
-      direct: origin.direct,
-      participant: origin.participant,
-      awaitingPlacement: false,
-      claimed: [],
-    } satisfies ChatOriginRecord);
+    if (live[0]) {
+      // Queued, the item offers the message with its other feedback; running, a follow-up round starts after its
+      // hand-back and picks it up. The item keeps the origin it has and gains this thread, so every linked thread
+      // gets its result.
+      await addFeedback(store, item.id, feedback);
+      const existing = await readOrigin(store, item.id);
+      await store.upsertSubject(
+        CHAT_ORIGIN_SUBJECT,
+        item.id,
+        existing ? withThread(existing, attachedOrigin) : attachedOrigin,
+      );
+    }
 
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, { ...origin, filed: item.id });
     await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
@@ -589,7 +616,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     }
 
     if (item.status === "done" || item.status === "canceled") {
-      return newRequest(person, m, { item });
+      return newRequest(person, m, { follow: item });
     }
 
     await store.appendJournal(
@@ -597,6 +624,11 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       m.author.name ?? m.author.id,
       `In the chat thread: ${m.text}`,
     );
+
+    // The running work does not see the reply, so a chat session beside it answers at once.
+    if (item.status === "active") {
+      return newRequest(person, m, { beside: item });
+    }
 
     let current = item;
     if (item.status === "blocked" && policyOn(opts.team.policies, "retry.on_signal")) {
@@ -681,19 +713,21 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       (l, i, all) => all.findIndex((x) => x.url === l.url) === i && !body.includes(l.url),
     );
 
-    const text = [
-      `${mention(origin)}${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
-      "(My agent went offline before it could post this, so the office is posting it.)",
-      ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
-    ].join("\n");
+    for (const t of threadsOf(origin)) {
+      const text = [
+        `${mention(t)}${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
+        "(My agent went offline before it could post this, so the office is posting it.)",
+        ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
+      ].join("\n");
 
-    try {
-      await opts.chat.post(origin.channel, text, { thread: origin.thread });
-    } catch (error) {
-      log.warn("could not post the result of a chat item for its agent", {
-        item: item.id,
-        error: String(error),
-      });
+      try {
+        await opts.chat.post(t.channel, text, { thread: t.thread });
+      } catch (error) {
+        log.warn("could not post the result of a chat item for its agent", {
+          item: item.id,
+          error: String(error),
+        });
+      }
     }
   }
 
@@ -802,7 +836,12 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         return { post: false, links: [] };
       }
 
-      return { post: true, requester: origin.requester.id, links: await opts.linksOf(item) };
+      return {
+        post: true,
+        requester: origin.requester.id,
+        links: await opts.linksOf(item),
+        threads: threadsOf(origin),
+      };
     },
 
     async linkTicket(person, workItemId, ticket) {
@@ -843,18 +882,20 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       }
 
       const links = await opts.linksOf(item);
-      const text = [
-        `${mention(origin)}I could not carry on with this: ${firstLine(reason, 200)}`,
-        ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
-      ].join("\n");
+      for (const t of threadsOf(origin)) {
+        const text = [
+          `${mention(t)}I could not carry on with this: ${firstLine(reason, 200)}`,
+          ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
+        ].join("\n");
 
-      try {
-        await opts.chat.post(origin.channel, text, { thread: origin.thread });
-      } catch (error) {
-        log.warn("could not tell the requester about a blocked item", {
-          item: item.id,
-          error: String(error),
-        });
+        try {
+          await opts.chat.post(t.channel, text, { thread: t.thread });
+        } catch (error) {
+          log.warn("could not tell the requester about a blocked item", {
+            item: item.id,
+            error: String(error),
+          });
+        }
       }
     },
   };

@@ -461,7 +461,8 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     const journal = async () => (await store.readJournal(item!.id)).map((j) => j.text).join("\n");
     // The fake chat resolves once the agent handled the message, including the office's answer.
     expect(await journal()).toContain("make it dark");
-    expect(await store.listItems({ person: "sam" })).toHaveLength(1);
+    // The item is running, so the reply gets a chat session beside it.
+    expect(await store.listItems({ person: "sam" })).toHaveLength(2);
     expect(agentChat.posts).toHaveLength(0);
 
     await agentChat.seed.inbound({
@@ -473,7 +474,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     });
 
     expect(await journal()).not.toContain("delete production");
-    expect(await store.listItems({ person: "sam" })).toHaveLength(1);
+    expect(await store.listItems({ person: "sam" })).toHaveLength(2);
   });
 
   it("tells the thread when the agent's run fails, once", async () => {

@@ -46,6 +46,12 @@ export interface EnqueueInput extends Omit<NewWorkItem, "position"> {
    * class decides.
    */
   placement?: Placement;
+
+  /**
+   * Runs once the item exists and before anything can start it, so an offer never goes out without what this
+   * stores for the item (its chat origin, its feedback).
+   */
+  init?: (item: WorkItem) => Promise<void>;
 }
 
 export type StartResult =
@@ -298,12 +304,14 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
   const scheduler: Scheduler = {
     enqueue(input) {
       return exclusive(async () => {
-        const { placement: chosen, ...rest } = input;
+        const { placement: chosen, init, ...rest } = input;
         const placement = chosen;
         const created = await store.enqueue({
           ...rest,
           priority: input.priority ?? priorityFor(input.trigger, input.kind),
         });
+
+        await init?.(created);
 
         if (placement !== undefined) {
           const queue = await queuedOf(created.person);

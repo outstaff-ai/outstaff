@@ -249,6 +249,58 @@ describe("chat", () => {
     ]);
   });
 
+  it("answers a question in the thread of running work without attaching", async () => {
+    const { seen, text } = await play(
+      chat({
+        ...talk([false, "Where do the greetings live?"]),
+        about: { itemId: "w9", title: "review feedback" },
+      }),
+      () => "1. [SHOP-1 Add a greeting](x) (running)\n",
+    );
+
+    expect(seen).toEqual([{ type: "tool", tool: "work", input: {} }]);
+    expect(text).toContain("greeting.txt");
+  });
+
+  it("attaches an instruction in the thread of running work to that work, confirmed", async () => {
+    const { seen } = await play(
+      chat({
+        ...talk([false, "Also keep it on one line."]),
+        about: { itemId: "w9", title: "review feedback" },
+      }),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: { target: "SHOP-1", confirmed: true, request: "Also keep it on one line." },
+      },
+    ]);
+  });
+
+  it("reads the reply from the journal when the session goes on with the thread's conversation", async () => {
+    const { seen } = await play(
+      chat({
+        ...ctx,
+        kind: "chat",
+        about: { itemId: "w9", title: "review feedback" },
+        journal:
+          "- 2026-01-01T00:00:00Z office: Ada replied in chat (thread t1):\nAlso end it with a full stop.",
+      }),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: { target: "SHOP-1", confirmed: true, request: "Also end it with a full stop." },
+      },
+    ]);
+  });
+
   it("files a ticket for a follow-up, and never attaches", async () => {
     const { seen } = await play(
       chat(

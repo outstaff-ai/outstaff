@@ -296,7 +296,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         : [];
 
       const tracked = a
-        ? `Adding this to ${joined.join(" for ")}.`
+        ? `Adding this to ${joined.join(" for ")}.${filed.item.status === "active" ? " I'll pick it up when the current round ends." : ""}`
         : what.key
           ? `Tracked in ${url ? `[${what.key}](${url})` : what.key}.`
           : `Queued: ${what.title}.`;
@@ -312,15 +312,14 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     },
 
     async report(offer, kind, text, links = []) {
-      const origin = offer.workItem.origin;
-      if (!origin) {
-        return;
-      }
-
+      // The offer's origin is from when the item was offered; threads attached since are only known to the office.
       const granted = await office.chatReport(offer.workItem.id, kind);
       if (!granted.post) {
         return;
       }
+
+      const origin = offer.workItem.origin;
+      const threads = granted.threads?.length ? granted.threads : origin ? [origin] : [];
 
       const body =
         kind === "result"
@@ -333,11 +332,9 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         (l, i, a) => a.findIndex((x) => x.url === l.url) === i && !body.includes(l.url),
       );
 
-      await post(
-        origin.channel,
-        origin.thread,
-        [`${tag(origin, granted.requester)}${body}`, ...all.map(linkLine)].join("\n"),
-      );
+      for (const t of threads) {
+        await post(t.channel, t.thread, [`${tag(t)}${body}`, ...all.map(linkLine)].join("\n"));
+      }
     },
   };
 }

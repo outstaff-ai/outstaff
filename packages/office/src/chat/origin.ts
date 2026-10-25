@@ -7,6 +7,12 @@ export const CHAT_THREAD_SUBJECT = "chat_thread";
 export const CHAT_MESSAGE_SUBJECT = "chat_message";
 
 export interface ChatOriginRecord extends ChatOrigin {
+  /**
+   * Other threads linked to the item, because a request from them was attached to it. Each gets the item's result,
+   * besides the thread in `channel` and `thread`.
+   */
+  also?: ChatOrigin[];
+
   /** The request waits last until the requester says where it goes. */
   awaitingPlacement: boolean;
 
@@ -50,7 +56,22 @@ export const publicOrigin = ({
   requester,
   direct,
   participant,
+  about,
 }: ChatOriginRecord): ChatOrigin => ({
+  channel,
+  thread,
+  requester,
+  direct,
+  participant,
+  ...(about ? { about } : {}),
+});
+
+/** A mention adds a notification only outside a direct message and for someone not yet in the thread. */
+export const needsMention = (origin: Pick<ChatOrigin, "direct" | "participant">) =>
+  !origin.direct && !origin.participant;
+
+/** A linked thread without the work it is about. */
+const plain = ({ channel, thread, requester, direct, participant }: ChatOrigin): ChatOrigin => ({
   channel,
   thread,
   requester,
@@ -58,6 +79,21 @@ export const publicOrigin = ({
   participant,
 });
 
-/** A mention adds a notification only outside a direct message and for someone not yet in the thread. */
-export const needsMention = (origin: Pick<ChatOrigin, "direct" | "participant">) =>
-  !origin.direct && !origin.participant;
+const sameThread = (a: ChatOrigin, b: ChatOrigin) =>
+  a.channel === b.channel && a.thread === b.thread;
+
+/** Every thread the item's result goes to: the one it came from, then the ones attached later. No thread twice. */
+export function threadsOf(origin: ChatOriginRecord): ChatOrigin[] {
+  const all = [publicOrigin(origin), ...(origin.also ?? [])].map(plain);
+
+  return all.filter((t, i) => all.findIndex((x) => sameThread(x, t)) === i);
+}
+
+/** The origin with one more linked thread; unchanged when the thread is already one of its threads. */
+export function withThread(origin: ChatOriginRecord, thread: ChatOrigin): ChatOriginRecord {
+  if (threadsOf(origin).some((t) => sameThread(t, thread))) {
+    return origin;
+  }
+
+  return { ...origin, also: [...(origin.also ?? []), plain(thread)] };
+}

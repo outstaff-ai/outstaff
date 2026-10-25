@@ -89,6 +89,9 @@ Sent by: office.
 | `workItem.origin.requester.name`         | string                                              | no       |                                                                                                                                                                                     |
 | `workItem.origin.direct`                 | boolean                                             | yes      | The conversation is a direct message with the requester.                                                                                                                            |
 | `workItem.origin.participant`            | boolean                                             | yes      | The requester started the thread or replied in it, so the chat already notifies them.                                                                                               |
+| `workItem.origin.about`                  | object                                              | no       | For a chat session started by a reply in the thread of running work: that work item. Its ticket, pull request and journal are in the offer's context.                               |
+| `workItem.origin.about.id`               | string                                              | yes      |                                                                                                                                                                                     |
+| `workItem.origin.about.title`            | string                                              | yes      |                                                                                                                                                                                     |
 | `context`                                | object                                              | yes      | What the agent needs to start.                                                                                                                                                      |
 | `context.journal`                        | list of objects                                     | yes      | What earlier rounds of this item recorded.                                                                                                                                          |
 | `context.journal[].at`                   | string                                              | yes      | ISO-8601 timestamp.                                                                                                                                                                 |
@@ -602,13 +605,21 @@ Whether to post, whom to mention and which links to include.
 
 Sent by: office.
 
-| Field           | Type            | Required | Description                                                               |
-| --------------- | --------------- | -------- | ------------------------------------------------------------------------- |
-| `post`          | boolean         | yes      | False when nothing should be posted: no chat origin, or already reported. |
-| `requester`     | string          | no       | Id of the requester to mention.                                           |
-| `links`         | list of objects | yes      | The ticket and pull requests of the item.                                 |
-| `links[].url`   | string          | yes      | Absolute URL.                                                             |
-| `links[].title` | string          | no       | Label for the link.                                                       |
+| Field                      | Type            | Required | Description                                                                                                                                         |
+| -------------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `post`                     | boolean         | yes      | False when nothing should be posted: no chat origin, or already reported.                                                                           |
+| `requester`                | string          | no       | Id of the requester to mention.                                                                                                                     |
+| `links`                    | list of objects | yes      | The ticket and pull requests of the item.                                                                                                           |
+| `links[].url`              | string          | yes      | Absolute URL.                                                                                                                                       |
+| `links[].title`            | string          | no       | Label for the link.                                                                                                                                 |
+| `threads`                  | list of objects | no       | Every thread linked to the item now, to post the result in: the one it came from and the ones attached later. Absent when nothing should be posted. |
+| `threads[].channel`        | string          | yes      | Chat channel of the request.                                                                                                                        |
+| `threads[].thread`         | string          | yes      | Thread the agent answers in.                                                                                                                        |
+| `threads[].requester`      | object          | yes      |                                                                                                                                                     |
+| `threads[].requester.id`   | string          | yes      | Id of the requester in the chat workspace.                                                                                                          |
+| `threads[].requester.name` | string          | no       |                                                                                                                                                     |
+| `threads[].direct`         | boolean         | yes      | The conversation is a direct message with the requester.                                                                                            |
+| `threads[].participant`    | boolean         | yes      | The requester started the thread or replied in it, so the chat already notifies them.                                                               |
 
 ### `current_work`
 

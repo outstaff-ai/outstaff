@@ -146,7 +146,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     text: string,
     links: Link[] = [],
   ) {
-    if (!offer.workItem.origin || !opts.chat) {
+    // Without an origin in the offer the office still knows of threads attached to the item since.
+    if (!opts.chat) {
       return;
     }
 

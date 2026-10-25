@@ -104,6 +104,22 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       trigger,
     });
 
+  it("runs init on the created item before enqueue returns, while it is still queued", async () => {
+    const seen: string[] = [];
+    const item = await sched.enqueue({
+      person: "ann",
+      kind: "task",
+      title: "with init",
+      trigger: "human",
+      init: async (created) => {
+        seen.push(`${created.title}:${(await store.getItem(created.id))?.status}`);
+      },
+    });
+
+    expect(seen).toEqual(["with init:queued"]);
+    expect(item.status).toBe("queued");
+  });
+
   const titles = async (person = "ann") =>
     (await store.listItems({ person, status: "queued" }))
       .toSorted((a, b) => a.priority - b.priority || a.position - b.position)

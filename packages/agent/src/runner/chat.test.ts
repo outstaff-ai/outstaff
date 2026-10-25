@@ -281,6 +281,19 @@ describe("chat relay", () => {
     );
   });
 
+  it("says the request is picked up when the round ends when the work it joined is running", async () => {
+    await setup();
+    await relay.acknowledge(
+      offerOf(),
+      { title: "Adding", attached: { ticket: { type: "ticket", ref: "ACME-11" } } },
+      { item: { id: "w1", title: "x", status: "active" }, waiting: false, work: [] },
+    );
+
+    expect(chat.posts[0]!.text).toBe(
+      `<@U0DANA0001> Adding this to [ACME-11](${tracker.links.issue("ACME-11")}). I'll pick it up when the current round ends.`,
+    );
+  });
+
   it("says so briefly when all chat sessions are taken, and posts no busy reply otherwise", async () => {
     await setup({
       chatMessage: () => ({
@@ -578,11 +591,42 @@ describe("chat relay", () => {
       expect(chat.posts).toEqual([]);
     });
 
-    it("does not even ask for an item without a chat origin", async () => {
-      await setup();
+    it("asks the office even for an item offered without a chat origin, and posts nothing when it has none", async () => {
+      await setup({ chatReport: () => ({ post: false, links: [] }) });
       await relay.report(offerOf("w1", false), "result", "Done.");
-      expect(office.chatReports).toEqual([]);
+      expect(office.chatReports).toEqual([{ workItemId: "w1", kind: "result" }]);
       expect(chat.posts).toEqual([]);
+    });
+
+    it("posts in every thread the office says is linked to the item now, also when the offer had no origin", async () => {
+      await setup({
+        chatReport: () => ({
+          post: true,
+          links: [],
+          threads: [
+            {
+              channel: "D1",
+              thread: "t1",
+              requester: { id: "U-a" },
+              direct: false,
+              participant: false,
+            },
+            {
+              channel: "D1",
+              thread: "t2",
+              requester: { id: "U-b" },
+              direct: false,
+              participant: false,
+            },
+          ],
+        }),
+      });
+
+      await relay.report(offerOf("w1", false), "result", "Done.");
+      expect(chat.posts.map((p) => [p.thread, p.text])).toEqual([
+        ["t1", "<@U-a> Done."],
+        ["t2", "<@U-b> Done."],
+      ]);
     });
 
     it("tells the thread what is needed when blocked, and that it failed with a retry", async () => {

@@ -6,7 +6,7 @@ import { createScheduler } from "../scheduler/scheduler.js";
 import { openStore } from "../store/index.js";
 import type { Store, WorkItem } from "../store/types.js";
 import { createChatDesk, type ChatRequests } from "./desk.js";
-import { readOrigin } from "./origin.js";
+import { readOrigin, threadsOf, withThread } from "./origin.js";
 import type { PrRecord, TicketRecord } from "../workstate/index.js";
 import { addFeedback, readFeedback } from "../engine/feedback.js";
 import { parsePlacement } from "./placement.js";
@@ -472,12 +472,51 @@ describe("chat requests", () => {
       const journal = (await store.readJournal(running!.id)).map((j) => j.text).join("\n");
       expect(journal).toContain("In chat: for the search PR, also support filters");
 
-      // A later reply in the thread joins the attached item.
+      // A later reply in the thread gets a chat session beside the running item, which keeps the thread.
       const reply = await say("and keep it fast", "m1");
-      expect(reply).toMatchObject({ disposition: "joined", item: { id: running!.id } });
+      expect(reply).toMatchObject({ disposition: "started" });
+      expect(reply.item.id).not.toBe(running!.id);
       expect((await store.readJournal(running!.id)).map((j) => j.text).join("\n")).toContain(
         "and keep it fast",
       );
+    });
+
+    it("keeps the item's own thread, adds the attached thread once, and has the result go to each", async () => {
+      ticket("ACME-11");
+      pull(11);
+      const [running] = await busyWith("assigned: ACME-11 Search page");
+      await store.updateItem(running!.id, { subject: { type: "ticket", ref: "ACME-11" } });
+      // The item came from a thread of its own.
+      await store.upsertSubject("chat_origin", running!.id, {
+        channel: "D0",
+        thread: "t0",
+        requester: { id: "U0OTHER001" },
+        awaitingPlacement: false,
+        claimed: [],
+      });
+
+      await attach("ACME-11");
+      await attach("ACME-11", false, "again, also support sorting");
+      const origin = await readOrigin(store, running!.id);
+      expect(origin).toMatchObject({
+        channel: "D0",
+        thread: "t0",
+        requester: { id: "U0OTHER001" },
+      });
+
+      expect(origin?.also?.map((t) => t.thread)).toEqual(["m1", "m2"]);
+      // The same thread attached again is not linked twice.
+      expect(threadsOf(withThread(origin!, origin!.also![0]!))).toHaveLength(3);
+
+      await scheduler.finish(running!.id, { outcome: "done", status: "done" });
+      expect(await desk.report("sam", running!.id, "result")).toMatchObject({
+        post: true,
+        threads: [
+          { channel: "D0", thread: "t0" },
+          { channel: "D1", thread: "m1" },
+          { channel: "D1", thread: "m2" },
+        ],
+      });
     });
 
     it("starts a round on an own draft pull request when nothing is working on it", async () => {
@@ -805,14 +844,50 @@ describe("chat requests", () => {
     expect(vague.work).toHaveLength(1);
   });
 
-  it("adds a reply in an item's thread to that item", async () => {
+  describe("a reply in the thread of running work", () => {
+    const running = async () => {
+      const { item } = await fileWork("Add a search page", "ACME-1");
+      await scheduler.markActive(item.id);
+      return item;
+    };
+
+    it("starts a chat session beside the work and journals the text", async () => {
+      const item = await running();
+      notified.length = 0;
+      const r = await say("anything else on the design side?", "m1");
+      expect(r.disposition).toBe("started");
+      expect(r.item.id).not.toBe(item.id);
+      expect(await store.getItem(r.item.id)).toMatchObject({ kind: "chat", status: "queued" });
+      expect(notified).toEqual(["sam"]);
+
+      const journal = (await store.readJournal(item.id)).map((j) => j.text).join("\n");
+      expect(journal).toContain("In the chat thread: anything else on the design side?");
+      expect(await readOrigin(store, r.item.id)).toMatchObject({
+        thread: "m1",
+        about: { id: item.id, title: item.title },
+      });
+
+      // The thread stays linked to the running item, so its result is posted there.
+      expect((await store.getItem(item.id))!.status).toBe("active");
+      const next = await say("and the cost?", "m1");
+      expect((await readOrigin(store, next.item.id))?.about?.id).toBe(item.id);
+    });
+
+    it("says so when all chat sessions are taken", async () => {
+      await running();
+      expect((await say("one", "m1")).disposition).toBe("started");
+      expect((await say("two", "m1")).disposition).toBe("limited");
+    });
+  });
+
+  it("starts a chat session for a reply in a chat session's thread while it runs", async () => {
     const started = await say("Add a search page");
     await scheduler.markActive(started.item.id);
     const r = await say("also add a clear button", "m1");
-    expect(r).toMatchObject({ disposition: "joined", item: { id: started.item.id } });
+    expect(r.disposition).toBe("started");
     const journal = (await store.readJournal(started.item.id)).map((j) => j.text).join("\n");
     expect(journal).toContain("also add a clear button");
-    expect(await store.listItems({ person: "sam" })).toHaveLength(1);
+    expect(await store.listItems({ person: "sam" })).toHaveLength(2);
   });
 
   it("queues a waiting item again when its thread gets a reply", async () => {
@@ -891,6 +966,9 @@ describe("chat requests", () => {
         post: true,
         requester: DANA.id,
         links: [{ url: tracker.links.issue("ACME-1"), title: "ACME-1" }],
+        threads: [
+          { channel: "D1", thread: "m1", requester: DANA, direct: true, participant: true },
+        ],
       });
 
       expect((await desk.report("sam", id, "result")).post).toBe(false);

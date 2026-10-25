@@ -90,6 +90,13 @@ export function buildWorkPrompt(
         : `This is a request from ${who}, a trusted human, in chat. Follow process/direct-requests.md. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the requester's thread as the result. Do not greet or address them by name or tag them: just give the outcome. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
     );
 
+    if (origin.about) {
+      lines.push(
+        "",
+        `This is a reply in the thread of your running work item ${origin.about.id} (${origin.about.title}). Its ticket, pull request and journal are listed above. The running work does not see the reply: answer a question yourself; for an instruction about that work, attach it with \`ost work attach <its ticket or pull request> --confirmed\` (the human is directing that very work), and your agent says it will be picked up when the current round ends.`,
+      );
+    }
+
     if (opts.chatContext) {
       lines.push("", opts.chatContext);
     }

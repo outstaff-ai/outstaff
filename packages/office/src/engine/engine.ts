@@ -561,6 +561,8 @@ export function createEngine(opts: EngineOptions): Engine {
     }
 
     // Anything the hand-back could not have covered, because it arrived after the offer, gets a round of its own.
+    // A request from chat that reached the item late is answered in the same threads.
+    const origin = await readOrigin(store, itemId);
     const next = await scheduler.enqueue({
       person: item.person,
       kind: item.kind,
@@ -569,23 +571,26 @@ export function createEngine(opts: EngineOptions): Engine {
       priority: item.priority,
       parentId: item.id,
       ...(item.subject ? { subject: item.subject } : {}),
+      // Stored before the item can be offered: an offer without its feedback or origin would never be repeated.
+      init: async (created) => {
+        for (const feedback of late) {
+          await addFeedback(store, created.id, feedback);
+        }
+
+        if (origin) {
+          await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, {
+            channel: origin.channel,
+            thread: origin.thread,
+            requester: origin.requester,
+            direct: origin.direct,
+            participant: origin.participant,
+            awaitingPlacement: false,
+            claimed: [],
+            ...(origin.also ? { also: origin.also } : {}),
+          });
+        }
+      },
     });
-
-    for (const feedback of late) {
-      await addFeedback(store, next.id, feedback);
-    }
-
-    // A request from chat that reached the item late is answered in the same thread.
-    const origin = await readOrigin(store, itemId);
-    if (origin) {
-      await store.upsertSubject(CHAT_ORIGIN_SUBJECT, next.id, {
-        channel: origin.channel,
-        thread: origin.thread,
-        requester: origin.requester,
-        awaitingPlacement: false,
-        claimed: [],
-      });
-    }
 
     await store.upsertSubject(FOLLOW_UP_SUBJECT, itemId, { itemId: next.id });
     logger.info(

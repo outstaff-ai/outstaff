@@ -170,8 +170,16 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
   // A new offer counts as delivering the feedback it carries; a resumed one the agent already has.
   const offerOf = async (item: WorkItem, fresh = true): Promise<Offer> => {
-    const subjects = await subjectsOf(item);
     const origin = await readOrigin(store, item.id);
+    // A chat session answering in the thread of running work sees that work: its ticket, pull request and journal.
+    const about = origin?.about ? await store.getItem(origin.about.id) : undefined;
+    const mine = await subjectsOf(item);
+    const subjects = about
+      ? [...(await subjectsOf(about)), ...mine].filter(
+          (s, i, all) => all.findIndex((x) => x.type === s.type && x.ref === s.ref) === i,
+        )
+      : mine;
+
     const feedback = fresh
       ? await deliverFeedback(store, item.id)
       : await readFeedback(store, item.id);
@@ -189,7 +197,10 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         ...(origin ? { origin: publicOrigin(origin) } : {}),
       },
       context: {
-        journal: (await store.readJournal(item.id)).map((j) => ({
+        journal: [
+          ...(about ? await store.readJournal(about.id) : []),
+          ...(await store.readJournal(item.id)),
+        ].map((j) => ({
           at: j.at,
           author: j.author,
           text: j.text,

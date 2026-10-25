@@ -75,3 +75,53 @@ describe("work source: failed runs", () => {
     });
   });
 });
+
+describe("work source: a chat session beside running work", () => {
+  it("offers the running work's subjects and journal with the session", async () => {
+    const clock = manualClock();
+    const store = await openStore("sqlite://:memory:", { now: () => clock.now() });
+    const scheduler = createScheduler({ store, team, clock });
+    const source = schedulerWorkSource({ scheduler, store, team });
+
+    const work = await scheduler.enqueue({
+      person: "ann",
+      kind: "assigned",
+      title: "assigned: ACME-1",
+      trigger: "human",
+      subject: { type: "ticket", ref: "ACME-1" },
+    });
+
+    await source.next("ann");
+    await store.appendJournal(work.id, "ann", "Tried the index.");
+
+    const chat = await scheduler.enqueue({
+      person: "ann",
+      kind: "chat",
+      title: "Chat: how is it going?",
+      trigger: "human",
+      subject: { type: "chat", ref: "D1:t1" },
+    });
+
+    await store.upsertSubject("chat_origin", chat.id, {
+      channel: "D1",
+      thread: "t1",
+      requester: { id: "U1" },
+      awaitingPlacement: false,
+      claimed: [],
+      about: { id: work.id, title: work.title },
+    });
+
+    await store.appendJournal(chat.id, "office", "Dana replied in chat.");
+
+    const offer = await source.next("ann");
+    expect(offer?.workItem.id).toBe(chat.id);
+    expect(offer?.workItem.origin?.about).toEqual({ id: work.id, title: work.title });
+    expect(offer?.context.subjects.map((s) => `${s.type} ${s.ref}`)).toContain("ticket ACME-1");
+    expect(offer?.context.journal.map((j) => j.text)).toEqual([
+      "Tried the index.",
+      "Dana replied in chat.",
+    ]);
+
+    await store.close();
+  });
+});
