@@ -631,6 +631,129 @@ describe("review threads", () => {
     await expectPortError(vcs.reviewThreads(REPO, 99), "not_found");
   });
 
+  describe("conversation", () => {
+    const comment = (id: number, login: string, at: string, body = "text") => ({
+      id,
+      user: { login },
+      body,
+      created_at: at,
+      updated_at: "2026-02-01T00:00:00Z",
+      html_url: `https://github.example/acme/app/pull/5#issuecomment-${id}`,
+    });
+
+    const review = (id: number, login: string, state: string, at: string | null, body = "") => ({
+      id,
+      user: { login },
+      body,
+      state,
+      submitted_at: at,
+      html_url: `https://github.example/acme/app/pull/5#pullrequestreview-${id}`,
+    });
+
+    const routes = (seen: URLSearchParams[] = []): Route[] => [
+      ...appRoutes(),
+      {
+        method: "GET",
+        path: "/repos/acme/app/issues/5/comments",
+        handler: (r) => {
+          seen.push(r.query);
+          return [
+            comment(11, "dana", "2026-01-01T10:00:00Z", "Should we cache this?"),
+            comment(12, "sam[bot]", "2026-01-01T12:00:00Z", "Proposal"),
+          ];
+        },
+      },
+      {
+        method: "GET",
+        path: "/repos/acme/app/pulls/5/reviews",
+        handler: () => [
+          review(21, "noor", "CHANGES_REQUESTED", "2026-01-01T11:00:00Z", "Needs a test"),
+          review(22, "noor", "COMMENTED", "2026-01-01T11:30:00Z"),
+          review(23, "noor", "PENDING", null, "draft"),
+          review(24, "lee", "APPROVED", "2026-01-01T13:00:00Z"),
+          review(25, "ghosty", "COMMENTED", "2026-01-01T14:00:00Z", "A note"),
+        ],
+      },
+    ];
+
+    it("merges comments and review summaries by time and leaves out empty or pending reviews", async () => {
+      const { vcs } = build(routes());
+      const all = await vcs.conversation(REPO, 5);
+      expect(all.map((e) => [e.id, e.kind, e.author, e.at, e.state])).toEqual([
+        ["comment-11", "comment", "dana", "2026-01-01T10:00:00Z", undefined],
+        ["review-21", "review", "noor", "2026-01-01T11:00:00Z", "changes_requested"],
+        ["comment-12", "comment", "sam[bot]", "2026-01-01T12:00:00Z", undefined],
+        ["review-24", "review", "lee", "2026-01-01T13:00:00Z", "approved"],
+        ["review-25", "review", "ghosty", "2026-01-01T14:00:00Z", "commented"],
+      ]);
+
+      expect(all[1]).toMatchObject({
+        body: "Needs a test",
+        url: "https://github.example/acme/app/pull/5#pullrequestreview-21",
+      });
+    });
+
+    it("keeps the newest entries for limit and the entries at or after since", async () => {
+      const seen: URLSearchParams[] = [];
+      const { vcs } = build(routes(seen));
+      expect((await vcs.conversation(REPO, 5, { limit: 2 })).map((e) => e.id)).toEqual([
+        "review-24",
+        "review-25",
+      ]);
+
+      expect(
+        (await vcs.conversation(REPO, 5, { since: "2026-01-01T11:00:00Z" })).map((e) => e.id),
+      ).toEqual(["review-21", "comment-12", "review-24", "review-25"]);
+
+      expect(
+        (await vcs.conversation(REPO, 5, { since: "2026-01-01T11:00:00Z", limit: 1 })).map(
+          (e) => e.id,
+        ),
+      ).toEqual(["review-25"]);
+
+      expect(seen.at(-1)!.get("since")).toBe("2026-01-01T11:00:00Z");
+    });
+
+    it("orders by time, not by id", async () => {
+      const { vcs } = build([
+        ...appRoutes(),
+        {
+          method: "GET",
+          path: "/repos/acme/app/issues/5/comments",
+          handler: () => [
+            comment(99, "dana", "2026-01-01T09:00:00Z"),
+            comment(3, "dana", "2026-01-01T10:00:00Z"),
+          ],
+        },
+        { method: "GET", path: "/repos/acme/app/pulls/5/reviews", handler: () => [] },
+      ]);
+
+      expect((await vcs.conversation(REPO, 5)).map((e) => e.id)).toEqual([
+        "comment-99",
+        "comment-3",
+      ]);
+    });
+
+    it("maps a missing pull request to not_found", async () => {
+      expect.hasAssertions();
+      const { vcs } = build([
+        ...appRoutes(),
+        {
+          method: "GET",
+          path: "/repos/acme/app/issues/99/comments",
+          handler: () => ({ status: 404, body: { message: "Not Found" } }),
+        },
+        {
+          method: "GET",
+          path: "/repos/acme/app/pulls/99/reviews",
+          handler: () => ({ status: 404, body: { message: "Not Found" } }),
+        },
+      ]);
+
+      await expectPortError(vcs.conversation(REPO, 99), "not_found");
+    });
+  });
+
   describe("resolveThread", () => {
     const agent = {
       ...officeSecrets,

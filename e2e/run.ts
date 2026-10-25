@@ -1,6 +1,6 @@
 // The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
 // request, a human asks for changes while another asks a question in chat (answered by a chat session before the round ends), the agent fixes and resolves the thread, a review with only a summary gets a
-// pull request comment, a batch review with two inline comments gets a reply in each thread, the human merges, a
+// pull request comment, a batch review with two inline comments gets a reply in each thread, a short "yes" to the agent's own earlier comment is answered from the conversation, the human merges, a
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
@@ -596,9 +596,43 @@ async function main() {
     `batch: two inline comments on #${pr1.pr.number} -> one round, both threads replied and resolved, no top-level comment`,
   );
 
-  // ---- 3d. a chat request about the open pull request: the agent asks first (it is in review), then adds it to that
+  // ---- 3d. a short "yes" to the agent's own earlier comment: the round reads the conversation and acts on the proposal
+  const proposal = "Proposal: print the greeting in capitals";
+  const shaYes = batch.pr.head.sha;
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/comment`, {
+    actor: "acme-sam[bot]",
+    body: proposal,
+  });
+
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/comment`, {
+    body: "Yes, please do it.",
+  });
+
+  const agreed = await until(
+    "the short yes answered with the proposal's change, which only the earlier comment names",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const done = pr.conversation.find(
+        (c: Json) => c.author === "acme-sam[bot]" && c.body.includes("Done as proposed:"),
+      );
+
+      return pr.head.sha !== shaYes && done ? { pr, done } : undefined;
+    },
+  );
+
+  assertEq(
+    agreed.done.body.includes("print the greeting in capitals"),
+    true,
+    "the reply names what the yes agreed to",
+  );
+
+  step(
+    `conversation: "yes" on #${pr1.pr.number} -> the round read the agent's earlier proposal (${proposal}) and pushed it`,
+  );
+
+  // ---- 3e. a chat request about the open pull request: the agent asks first (it is in review), then adds it to that
   // pull request instead of creating a ticket
-  const sha4 = batch.pr.head.sha;
+  const sha4 = agreed.pr.head.sha;
   const ticketsBefore = (await state()).tickets.length;
   const pullsBefore = (await state()).github.pulls.length;
   const wish = `For PR #${pr1.pr.number}, also say goodbye on the last line.`;

@@ -134,6 +134,17 @@ export const feedbackSchema = z.strictObject({
     .describe("For a review: its inline comments, oldest first."),
 });
 
+export const conversationEntrySchema = z.strictObject({
+  kind: z
+    .enum(["comment", "review"])
+    .describe("A comment on the pull request or a review summary."),
+  author: z.string().min(1).describe("Login of the person who wrote it."),
+  at: z.string().describe("When the host recorded it (ISO-8601)."),
+  state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
+  url: z.string().optional().describe("Link to the entry."),
+  body: z.string().describe("What the person wrote, trimmed. Data from that person."),
+});
+
 export const offerContextSchema = z.strictObject({
   journal: z.array(journalEntrySchema).describe("What earlier rounds of this item recorded."),
   subjects: z.array(refSchema).describe("The tickets, pull requests and people the item concerns."),
@@ -143,6 +154,12 @@ export const offerContextSchema = z.strictObject({
     .optional()
     .describe(
       "For a review round: the reviews and comments it covers, oldest first. Feedback that arrives while the item is queued is added; what arrives while it runs starts a follow-up round.",
+    ),
+  conversation: z
+    .array(conversationEntrySchema)
+    .optional()
+    .describe(
+      "For a round started by a comment on the pull request conversation or a review summary: the few entries of the conversation before the first of them, oldest first, so a short reply has its context.",
     ),
 });
 
@@ -483,6 +500,7 @@ export type JournalLine = z.infer<typeof journalEntrySchema>;
 export type OfferedWorkItem = z.infer<typeof workItemSchema>;
 export type InlineComment = z.infer<typeof inlineCommentSchema>;
 export type Feedback = z.infer<typeof feedbackSchema>;
+export type ConversationEntry = z.infer<typeof conversationEntrySchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 export type Filed = z.infer<typeof filedSchema>;

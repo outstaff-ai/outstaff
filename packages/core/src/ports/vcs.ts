@@ -65,6 +65,24 @@ export interface ReviewInlineComment {
   threadId?: string;
 }
 
+/** One entry of a pull request's conversation: a comment on it, or the summary of a submitted review. */
+export interface ConversationEntry {
+  /** Unique within the pull request. Only for telling entries apart; the order is by `at`. */
+  id: string;
+  kind: "comment" | "review";
+
+  /** Login as the host reports it (an App is `name[bot]`). */
+  author: string;
+
+  /** When the host recorded it: the comment's creation or the review's submission (ISO-8601). */
+  at: string;
+  url: string;
+  body: string;
+
+  /** For a review: approved, changes_requested, commented or dismissed. */
+  state?: string;
+}
+
 export interface NewPullRequest {
   /** Branch with the changes; it must already be pushed. */
   head: string;
@@ -154,6 +172,18 @@ export interface Vcs {
    */
   checkLog?(repo: RepoRef, logId: string, opts?: { tail?: number }): Promise<CheckLog>;
   reviewThreads(repo: RepoRef, number: number): Promise<ReviewThread[]>;
+
+  /**
+   * The conversation of a pull request, oldest first by time: comments on it and the summaries of submitted
+   * reviews (their inline comments are in `reviewThreads`). Reviews that only carry inline comments (no summary and
+   * no verdict) and reviews not yet submitted are left out. `since` keeps entries at or after that time; `limit`
+   * keeps the newest `limit` of those, still oldest first.
+   */
+  conversation(
+    repo: RepoRef,
+    number: number,
+    opts?: { since?: string; limit?: number },
+  ): Promise<ConversationEntry[]>;
 
   /**
    * The inline comments of one submitted review, oldest first, each with its thread when there is one.

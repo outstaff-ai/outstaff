@@ -3,6 +3,7 @@ import { PortError, repoKey } from "../ports/index.js";
 import type {
   Check,
   CheckLog,
+  ConversationEntry,
   PullRequest,
   ReactionTarget,
   RepoRef,
@@ -35,6 +36,7 @@ interface StoredPr {
   mergeable: PullRequest["mergeable"][];
   threads: ReviewThread[];
   reviews: Map<string, ReviewInlineComment[]>;
+  conversation: ConversationEntry[];
 }
 
 export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
@@ -104,6 +106,16 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     return structuredClone(s.pr);
   };
 
+  const noteComment = (repo: RepoRef, number: number, id: string, author: string, body: string) =>
+    need(repo, number).conversation.push({
+      id: `comment-${id}`,
+      kind: "comment",
+      author,
+      at: now().toISOString(),
+      url: `${links.pr(repo, number)}#issuecomment-${id}`,
+      body,
+    });
+
   const touch = (s: StoredPr) => {
     s.pr.updatedAt = now().toISOString();
   };
@@ -155,6 +167,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
           mergeable: [...(p.mergeable ?? ["clean"])],
           threads: [],
           reviews: new Map(),
+          conversation: [],
         });
 
         emit("pr.opened", repo, number, pr.author.login);
@@ -215,6 +228,18 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         }
 
         s.reviews.set(reviewId, inline);
+        if (state !== "commented" || body.trim()) {
+          s.conversation.push({
+            id: `review-${reviewId}`,
+            kind: "review",
+            author: actor,
+            at: now().toISOString(),
+            url: `${links.pr(repo, number)}#pullrequestreview-${reviewId}`,
+            body,
+            state,
+          });
+        }
+
         emit("pr.review_submitted", repo, number, actor, { state, body, reviewId });
         return reviewId;
       },
@@ -222,6 +247,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         need(repo, number);
         const commentId = `ic${++commentCounter}`;
         conversation.set(commentId, key(repo));
+        noteComment(repo, number, commentId, actor, body);
         emit("pr.comment", repo, number, actor, { kind: "comment", body, commentId });
         return commentId;
       },
@@ -327,6 +353,16 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
     async reviewThreads(repo, number) {
       return structuredClone(need(repo, number).threads);
     },
+    async conversation(repo, number, o = {}) {
+      const since = o.since === undefined ? undefined : Date.parse(o.since);
+      const entries = need(repo, number)
+        .conversation.filter((e) => since === undefined || Date.parse(e.at) >= since)
+        .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
+      return structuredClone(
+        o.limit === undefined ? entries : entries.slice(Math.max(0, entries.length - o.limit)),
+      );
+    },
     async reviewComments(repo, number, reviewId) {
       const comments = need(repo, number).reviews.get(reviewId);
       if (!comments) {
@@ -384,7 +420,14 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         updatedAt: now().toISOString(),
       };
 
-      map.set(number, { pr, mergeable: ["clean"], threads: [], reviews: new Map() });
+      map.set(number, {
+        pr,
+        mergeable: ["clean"],
+        threads: [],
+        reviews: new Map(),
+        conversation: [],
+      });
+
       emit("pr.opened", repo, number, self, { title: pr.title });
       return structuredClone(pr);
     },
@@ -433,6 +476,18 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         });
       }
 
+      if (state !== "commented" || review.body.trim()) {
+        s.conversation.push({
+          id: `review-${++reviewCounter}`,
+          kind: "review",
+          author: self,
+          at: now().toISOString(),
+          url: `${links.pr(repo, number)}#pullrequestreview-${reviewCounter}`,
+          body: review.body,
+          state,
+        });
+      }
+
       emit("pr.review_submitted", repo, number, self, { state, body: review.body });
     },
     async replyToThread(repo, number, threadId, body) {
@@ -450,6 +505,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
       need(repo, number);
       const commentId = `ic${++commentCounter}`;
       conversation.set(commentId, key(repo));
+      noteComment(repo, number, commentId, self, body);
       emit("pr.comment", repo, number, self, { kind: "comment", body, commentId });
     },
     async react(repo, target, reaction) {

@@ -4,6 +4,7 @@ import { ProtocolError, type Offer, type WorkSource } from "./protocol/source.js
 import { readRoster, type RosterOptions } from "./messaging/roster.js";
 import { publicOrigin, readOrigin } from "./chat/origin.js";
 import { deliverFeedback, readFeedback } from "./engine/feedback.js";
+import { previousConversation } from "./conversation-context.js";
 import { placeQueued } from "./chat/placement.js";
 import type { BlockNotice, Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
@@ -184,6 +185,8 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       ? await deliverFeedback(store, item.id)
       : await readFeedback(store, item.id);
 
+    const conversation = await previousConversation(store, opts.ports?.vcs, item, feedback);
+
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       workItem: {
@@ -208,6 +211,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         subjects,
         links: subjects.flatMap((s) => (s.url ? [{ url: s.url, title: s.title ?? s.ref }] : [])),
         ...(feedback.length > 0 ? { feedback } : {}),
+        ...(conversation.length > 0 ? { conversation } : {}),
       },
     };
   };

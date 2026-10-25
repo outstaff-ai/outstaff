@@ -153,7 +153,7 @@ const control: Route[] = [
     method: "POST",
     path: "/_test/pulls/:n/comment",
     handler: async (r) => {
-      await github.comment(Number(r.params["n"]), "grace-lead", r.json.body ?? "");
+      await github.comment(Number(r.params["n"]), r.json.actor ?? "grace-lead", r.json.body ?? "");
       return ok();
     },
   },

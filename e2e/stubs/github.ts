@@ -20,7 +20,7 @@ interface Pr {
   forcePushes: number;
 
   /** Top-level comments on the conversation. */
-  conversation: { id: number; seq: number; author: string; body: string }[];
+  conversation: { id: number; seq: number; author: string; body: string; at: string }[];
   state: "open" | "closed";
   merged: boolean;
   draft: boolean;
@@ -38,6 +38,10 @@ interface Thread {
 
 interface Review {
   prNumber: number;
+  author: string;
+  state: string;
+  body: string;
+  at: string;
   comments: { databaseId: number; path: string; line: number; body: string }[];
 }
 
@@ -57,7 +61,9 @@ export interface GithubOptions {
 }
 
 const API = "/api/v3";
-const now = () => new Date().toISOString();
+// Strictly increasing, so that two things written one after the other are told apart by time alone.
+let lastMs = 0;
+const now = () => new Date((lastMs = Math.max(Date.now(), lastMs + 1))).toISOString();
 const bearer = (req: Req): string =>
   String(req.headers["authorization"] ?? "").replace(/^[Bb]earer /, "");
 
@@ -196,8 +202,17 @@ export function createGithub(opts: GithubOptions) {
     comments?: Json[],
   ): Promise<number> {
     const id = ++reviewId;
-    const review: Review = { prNumber: pr.number, comments: [] };
+    const review: Review = {
+      prNumber: pr.number,
+      author: actor,
+      state: REVIEW_STATE[event] ?? event,
+      body,
+      at: now(),
+      comments: [],
+    };
+
     reviews.set(id, review);
+
     for (const c of comments ?? []) {
       const thread = `PRRT_${++threadId}`;
       const databaseId = ++commentId;
@@ -510,7 +525,7 @@ export function createGithub(opts: GithubOptions) {
         }
 
         const id = ++commentId;
-        pr.conversation.push({ id, seq: ++seq, author: actor, body: r.json.body });
+        pr.conversation.push({ id, seq: ++seq, author: actor, body: r.json.body, at: now() });
         pr.updatedAt = now();
         emit("IssueCommentEvent", actor, {
           action: "created",
@@ -519,6 +534,42 @@ export function createGithub(opts: GithubOptions) {
         });
 
         return { id };
+      },
+    },
+    {
+      method: "GET",
+      path: `${API}/repos/${full}/issues/:n/comments`,
+      handler: (r) => {
+        const pr = need(r.params["n"]!);
+        return pr
+          ? pr.conversation.map((c) => ({
+              id: c.id,
+              user: { login: c.author },
+              body: c.body,
+              created_at: c.at,
+              updated_at: c.at,
+              html_url: `https://github.example/${full}/pull/${pr.number}#issuecomment-${c.id}`,
+            }))
+          : notFound;
+      },
+    },
+    {
+      method: "GET",
+      path: `${pulls}/:n/reviews`,
+      handler: (r) => {
+        const pr = need(r.params["n"]!);
+        return pr
+          ? [...reviews]
+              .filter(([, v]) => v.prNumber === pr.number)
+              .map(([id, v]) => ({
+                id,
+                user: { login: v.author },
+                body: v.body,
+                state: v.state,
+                submitted_at: v.at,
+                html_url: `https://github.example/${full}/pull/${pr.number}#pullrequestreview-${id}`,
+              }))
+          : notFound;
       },
     },
     ...(["issues", "pulls"] as const).map((segment): Route => ({
@@ -644,7 +695,7 @@ export function createGithub(opts: GithubOptions) {
       }
 
       const id = ++commentId;
-      pr.conversation.push({ id, seq: ++seq, author: actor, body });
+      pr.conversation.push({ id, seq: ++seq, author: actor, body, at: now() });
       pr.updatedAt = now();
       emit("IssueCommentEvent", actor, {
         action: "created",

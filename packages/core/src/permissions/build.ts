@@ -49,6 +49,7 @@ export const CHAT_VERBS = [
   "pr.status",
   "pr.checks",
   "pr.threads",
+  "pr.conversation",
   "pr.diff",
   "pr.comment",
 ];

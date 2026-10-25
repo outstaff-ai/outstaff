@@ -7,6 +7,7 @@ import {
   vcsAgentLogins,
   type AdapterContext,
   type Check,
+  type ConversationEntry,
   type PullRequest,
   type RepoRef,
   type ReviewInlineComment,
@@ -121,6 +122,26 @@ interface RestReviewComment {
   body: string;
   html_url?: string;
 }
+
+interface RestIssueComment {
+  id: number;
+  user: { login: string } | null;
+  body?: string | null;
+  created_at: string;
+  html_url: string;
+}
+
+interface RestReview {
+  id: number;
+  user: { login: string } | null;
+  body?: string | null;
+  state: string;
+  submitted_at?: string | null;
+  html_url: string;
+}
+
+// A long conversation has more than the default ten pages; the newest entries are on the last ones.
+const CONVERSATION_PAGES = 50;
 
 /** Reviews need only pull request access, so a read-granted person can review. */
 const REVIEW_PERMISSIONS = { pull_requests: "write" } as const;
@@ -528,6 +549,69 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
           })),
         };
       });
+    },
+
+    async conversation(repo, number, opts = {}) {
+      const token = await apiToken(repo);
+      const [comments, reviews] = await Promise.all([
+        http.paginate<RestIssueComment[], RestIssueComment>(
+          `${repoPath(repo)}/issues/${number}/comments`,
+          {
+            token,
+            // The host filters by last update, which is never before creation; the exact cut by creation time is below.
+            query: { per_page: 100, ...(opts.since ? { since: opts.since } : {}) },
+          },
+          (d) => d,
+          CONVERSATION_PAGES,
+        ),
+        http.paginate<RestReview[], RestReview>(
+          `${repoPath(repo)}/pulls/${number}/reviews`,
+          { token, query: { per_page: 100 } },
+          (d) => d,
+          CONVERSATION_PAGES,
+        ),
+      ]);
+
+      const since = opts.since === undefined ? undefined : Date.parse(opts.since);
+      const entries: ConversationEntry[] = [
+        ...comments.map((c): ConversationEntry => ({
+          id: `comment-${c.id}`,
+          kind: "comment",
+          author: c.user?.login ?? "ghost",
+          at: c.created_at,
+          url: c.html_url,
+          body: c.body ?? "",
+        })),
+        ...reviews.flatMap((r): ConversationEntry[] => {
+          const state = r.state.toLowerCase();
+          // Pending reviews are invisible to others; one with neither text nor verdict only wraps inline comments.
+          if (
+            !r.submitted_at ||
+            state === "pending" ||
+            (state === "commented" && !r.body?.trim())
+          ) {
+            return [];
+          }
+
+          return [
+            {
+              id: `review-${r.id}`,
+              kind: "review",
+              author: r.user?.login ?? "ghost",
+              at: r.submitted_at,
+              url: r.html_url,
+              body: r.body ?? "",
+              state,
+            },
+          ];
+        }),
+      ]
+        .filter((e) => since === undefined || Date.parse(e.at) >= since)
+        .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
+      return opts.limit === undefined
+        ? entries
+        : entries.slice(Math.max(0, entries.length - opts.limit));
     },
 
     async reviewComments(repo, number, reviewId) {
