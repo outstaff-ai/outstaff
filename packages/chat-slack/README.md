@@ -107,7 +107,7 @@ Lookups use `users.info` and are cached for ten minutes. Dropped messages are lo
 - **Reactions.** `eyes` is `:eyes:`, `done` is `:white_check_mark:`, `error` is `:x:`. Reacting twice is not an error.
 - **History.** `history` reads `conversations.history`, or `conversations.replies` for a thread, oldest first.
 - **Direct messages.** `openDirect(userId)` calls `conversations.open`.
-- **Agent profile.** `setAgentProfile` publishes the profile (name, role, status, current work, sections) to the user's Home tab with `views.publish`, and republishes it when that user opens the tab again.
+- **Agent profile.** `setAgentProfile` publishes the profile (name, role, model, status with the active item linked, last active in the viewer's timezone from `users.info` (UTC when unknown), the chat hint, and sections such as the current work) to the user's Home tab with `views.publish`. When the user opens the tab, it republishes the held profile, first asking the agent for a fresh one (`onProfileRequest`) if the held one is older than a minute and the user is trusted.
 
 Errors map to port errors: `message_not_found`, `channel_not_found`, `user_not_found` become `not_found`; missing scope, not in channel and auth failures become `forbidden`; rate limits become `rate_limited` with `retryAfterMs`; everything else is `unavailable`.
 

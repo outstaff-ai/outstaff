@@ -29,7 +29,7 @@ const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
   ]),
   adapters: new Map([
     adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
-    adapter("chat", "slack", ["chat.messages"]),
+    adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
     adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
     adapter("knowledge", "notion", ["knowledge.docs"]),
     adapter("tracker", "linear", ["tracker.issues"]),
@@ -171,7 +171,7 @@ describe("validateTeam", () => {
     const noReactions = ctx({
       adapters: new Map([
         adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads"]),
-        adapter("chat", "slack", ["chat.messages"]),
+        adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
         adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
         adapter("knowledge", "notion", ["knowledge.docs"]),
         adapter("tracker", "linear", ["tracker.issues"]),
@@ -192,6 +192,28 @@ describe("validateTeam", () => {
     const off = config((x) => (x.policies = { acknowledge: { vcs: false } }));
     expect(validateTeam(off, noReactions).warnings).toEqual([]);
     expect(validateTeam(config(), ctx()).warnings).toEqual([]);
+  });
+
+  it("warns when the chat profile is on and the chat adapter cannot show it, unless it is off", () => {
+    const plain = ctx({
+      adapters: new Map([
+        adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
+        adapter("chat", "slack", ["chat.messages"]),
+        adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+        adapter("knowledge", "notion", ["knowledge.docs"]),
+        adapter("tracker", "linear", ["tracker.issues"]),
+      ]),
+    });
+
+    expect(validateTeam(config(), plain).warnings).toEqual([
+      expect.objectContaining({
+        path: ["policies", "chat", "profile"],
+        code: "policies.capability_missing",
+      }),
+    ]);
+
+    const off = config((x) => (x.policies = { chat: { profile: false } }));
+    expect(validateTeam(off, plain).warnings).toEqual([]);
   });
 
   it("warns about missing optional capabilities", () => {

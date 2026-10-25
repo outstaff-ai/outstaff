@@ -18,6 +18,9 @@ export interface SlackUser {
   is_bot?: boolean;
   is_restricted?: boolean;
   is_ultra_restricted?: boolean;
+
+  /** IANA timezone name of the user, for example Europe/Berlin. */
+  tz?: string;
   profile?: { display_name?: string };
 }
 

@@ -45,6 +45,7 @@ describe("policy switches", () => {
     expect(report({ policies: { acknowledge: { vcs: false } } })).toMatchObject({
       "acknowledge.chat": [true, "default"],
       "acknowledge.vcs": [false, "team.yaml"],
+      "chat.profile": [true, "default"],
       "hand_back.reassign": ["requester", "default"],
       "conflicts.follow_up": [true, "default"],
     });

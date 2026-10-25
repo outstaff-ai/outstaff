@@ -57,6 +57,15 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     needs: "vcs.reactions",
   },
   {
+    path: "chat.profile",
+    default: true,
+    off: false,
+    kind: "agent",
+    behaviour:
+      "Publish the agent's profile in chat (for Slack, the Home tab): its role, whether it is working or idle, and its current work grouped by ticket or pull request. It updates when the work changes and at least every 5 minutes while working.",
+    needs: "chat.agentProfile",
+  },
+  {
     path: "feedback.follow_up_round",
     default: true,
     off: false,

@@ -16,6 +16,7 @@ import {
   type WorkSummary,
 } from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
+import type { ProfilePublisher } from "./profile.js";
 import type { ChatMessageResult, ChatReportKind, OfficeClient } from "../verbs/office.js";
 
 /** What the relay uses of the office connection. */
@@ -35,6 +36,9 @@ export interface ChatRelayOptions {
   person: string;
   tracker?: Pick<Tracker, "links">;
   log?: Logger;
+
+  /** Publishes the agent's chat profile while the relay listens. */
+  profile?: Pick<ProfilePublisher, "start" | "stop">;
 
   /** Messages of the conversation a new chat session starts with. Default 10. */
   historyLimit?: number;
@@ -175,9 +179,13 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   return {
     async start() {
       await chat.start(onMessage);
+      await opts.profile?.start();
     },
 
-    stop: () => chat.stop(),
+    async stop() {
+      opts.profile?.stop();
+      await chat.stop();
+    },
 
     async context(offer) {
       const origin = offer.workItem.origin;

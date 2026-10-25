@@ -309,6 +309,7 @@ describe("ost policies", () => {
     expect(r.out).toBe(`SWITCH                             VALUE        SOURCE
 policies.acknowledge.chat          true         team.yaml
 policies.acknowledge.vcs           true         team.yaml
+policies.chat.profile              true         team.yaml
 policies.feedback.follow_up_round  true         team.yaml
 policies.feedback.merged_prs       true         team.yaml
 policies.hand_back.reassign        requester    team.yaml

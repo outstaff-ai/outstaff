@@ -272,7 +272,10 @@ describe("direct channels and profile", () => {
     expect(await chat.openDirect("U-noor")).toBe("D-U-noor");
   });
 
-  it("publishes the profile as a Home tab and refreshes it when the tab opens", async () => {
+  const texts = (view: { blocks: Record<string, any>[] }) =>
+    view.blocks.map((b) => b["text"]?.text ?? b["type"]);
+
+  it("publishes the profile as a Home tab and republishes it when the tab opens", async () => {
     const { fake, chat } = await started();
     await chat.setAgentProfile!("U-noor", {
       name: "Sam",
@@ -284,52 +287,102 @@ describe("direct channels and profile", () => {
 
     expect(fake.views).toHaveLength(1);
     expect(fake.views[0]?.user_id).toBe("U-noor");
-    expect(fake.views[0]?.view).toMatchInlineSnapshot(`
-      {
-        "blocks": [
-          {
-            "text": {
-              "text": "Sam",
-              "type": "plain_text",
-            },
-            "type": "header",
-          },
-          {
-            "text": {
-              "text": "*developer*
-      :large_green_circle: Working",
-              "type": "mrkdwn",
-            },
-            "type": "section",
-          },
-          {
-            "text": {
-              "text": "*Current work*
-      <https://acme.example/1|ACME-1 Fix &lt;checkout&gt;>",
-              "type": "mrkdwn",
-            },
-            "type": "section",
-          },
-          {
-            "type": "divider",
-          },
-          {
-            "text": {
-              "text": "*Waiting on*
-      *noor*: review",
-              "type": "mrkdwn",
-            },
-            "type": "section",
-          },
-        ],
-        "type": "home",
-      }
-    `);
+    expect(texts(fake.views[0]!.view)).toEqual([
+      "Sam",
+      "*developer*",
+      ":large_green_circle: *Working on* <https://acme.example/1|ACME-1 Fix &lt;checkout&gt;>",
+      "divider",
+      "*Waiting on*\n*noor*: review",
+    ]);
 
     await fake.emit({ type: "app_home_opened", tab: "home", user: "U-noor" });
     await fake.emit({ type: "app_home_opened", tab: "messages", user: "U-noor" });
     await fake.emit({ type: "app_home_opened", tab: "home", user: "U-other" });
     expect(fake.views).toHaveLength(2);
+  });
+
+  it("renders a working status, the grouped work, the hint and the time in the viewer's timezone", async () => {
+    const { fake, chat } = await started();
+    fake.users.set("U-noor", { id: "U-noor", name: "noor", tz: "Europe/Berlin" });
+    await chat.setAgentProfile!("U-noor", {
+      name: "Sam",
+      role: "Developer",
+      description: "Builds features.",
+      model: "sonnet",
+      status: "working",
+      current: { title: "ACME-1 Checkout", url: "https://t.acme.example/ACME-1" },
+      lastActiveAt: "2026-01-01T10:05:00Z",
+      hint: "**Talk to me here.** Ask a question and I answer right away.",
+      sections: [
+        {
+          heading: "Current work",
+          lines: [
+            "1. [ACME-1 Checkout](https://t.acme.example/ACME-1) (running: addressing review on [PR #4](https://git.acme.example/acme/shop/pull/4))",
+            "2. [ACME-2 Cart](https://t.acme.example/ACME-2)",
+          ],
+        },
+      ],
+    });
+
+    expect(texts(fake.views[0]!.view)).toEqual([
+      "Sam",
+      "*Developer*\nBuilds features.\n_Model: sonnet_",
+      ":large_green_circle: *Working on* <https://t.acme.example/ACME-1|ACME-1 Checkout>\n_Last active 1 Jan 2026, 11:05 CET_",
+      "*Talk to me here.* Ask a question and I answer right away.",
+      "divider",
+      "*Current work*\n1. <https://t.acme.example/ACME-1|ACME-1 Checkout> (running: addressing review on <https://git.acme.example/acme/shop/pull/4|PR #4>)\n2. <https://t.acme.example/ACME-2|ACME-2 Cart>",
+    ]);
+  });
+
+  it("renders idle with the last active time in UTC when the timezone is unknown", async () => {
+    const { fake, chat } = await started();
+    await chat.setAgentProfile!("U-noor", {
+      name: "Sam",
+      role: "Developer",
+      status: "idle",
+      lastActiveAt: "2026-01-01T10:05:00Z",
+      sections: [{ heading: "Current work", lines: [] }],
+    });
+
+    expect(texts(fake.views[0]!.view)).toEqual([
+      "Sam",
+      "*Developer*",
+      ":white_circle: *Idle*\n_Last active 1 Jan 2026, 10:05 UTC_",
+      "divider",
+      "*Current work*\n_Nothing._",
+    ]);
+  });
+
+  it("asks for a fresh profile when the tab opens and the held one is over a minute old", async () => {
+    let at = new Date("2026-01-01T00:00:00Z");
+    const s = slackWith(teamWith(), undefined, () => at);
+    await s.chat.start(async () => {});
+    s.fake.users.set("U-noor", { id: "U-noor", name: "noor" });
+    const asked: string[] = [];
+    s.chat.onProfileRequest!(async (user) => {
+      asked.push(user);
+      return { name: "Sam", role: "Developer", status: "idle" };
+    });
+
+    await s.chat.setAgentProfile!("U-noor", { name: "Sam", role: "Developer", status: "working" });
+    at = new Date("2026-01-01T00:00:30Z");
+    await s.fake.emit({ type: "app_home_opened", tab: "home", user: "U-noor" });
+    expect(asked).toEqual([]);
+    expect(s.fake.views).toHaveLength(2);
+
+    at = new Date("2026-01-01T00:02:00Z");
+    await s.fake.emit({ type: "app_home_opened", tab: "home", user: "U-noor" });
+    expect(asked).toEqual(["U-noor"]);
+    expect(texts(s.fake.views[2]!.view)[2]).toBe(":white_circle: *Idle*");
+  });
+
+  it("does not publish to an untrusted person who opens the tab", async () => {
+    const s = slackWith(teamWith(["U-noor"]));
+    await s.chat.start(async () => {});
+    s.fake.users.set("U-guest", { id: "U-guest", name: "guest" });
+    s.chat.onProfileRequest!(async () => ({ name: "Sam", role: "Developer", status: "idle" }));
+    await s.fake.emit({ type: "app_home_opened", tab: "home", user: "U-guest" });
+    expect(s.fake.views).toHaveLength(0);
   });
 });
 

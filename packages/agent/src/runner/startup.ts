@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, resolve } from "node:path";
 import {
   PROFILE_SPECS,
+  policyOn,
   buildPolicy,
   effectiveTools,
   envSecretSource,
@@ -40,6 +41,7 @@ import { createAgentEnv } from "../verbs/env.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { buildIdentityPrompt } from "./identity.js";
 import { createChatRelay, type ChatRelay } from "./chat.js";
+import { createProfilePublisher, type ProfilePublisher } from "./profile.js";
 import { agentLayout } from "./layout.js";
 import { createWorkLoop, type WorkLoop } from "./loop.js";
 import { createUsageReporter, type UsageReporter } from "./usage.js";
@@ -371,8 +373,27 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   });
 
   let chat: ChatRelay | undefined;
+  let profile: ProfilePublisher | undefined;
+  const chatPort = env.chat;
+  if (chatPort?.setAgentProfile && policyOn(team.policies, "chat.profile")) {
+    profile = createProfilePublisher({
+      chat: { ...chatPort, setAgentProfile: chatPort.setAgentProfile.bind(chatPort) },
+      office: connection,
+      team,
+      who: {
+        name: me.name,
+        role: role?.title ?? me.role,
+        ...(role?.summary ? { description: role.summary } : {}),
+        ...(model ? { model } : {}),
+      },
+      log,
+      ...(env.tracker ? { tracker: env.tracker } : {}),
+    });
+  }
+
   if (env.chat) {
     chat = createChatRelay({
+      ...(profile ? { profile } : {}),
       chat: env.chat,
       office: connection,
       team,
@@ -385,6 +406,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   }
 
   const loop = createWorkLoop({
+    ...(profile ? { profile } : {}),
     ...(chat
       ? { chat, chatSession: { policy: chatPolicy, builtinTools: [...PROFILE_SPECS.chat.tools] } }
       : {}),
