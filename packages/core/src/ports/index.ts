@@ -31,6 +31,7 @@ export type {
   Check,
   CheckLog,
   CheckLogStep,
+  ConversationEntry,
   NewPullRequest,
   PullRequest,
   PullRequestUpdate,

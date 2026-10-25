@@ -169,11 +169,22 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
     throw new Error(`The worktree is on ${here}, not on the pull request's branch ${branch}.`);
   }
 
+  // A short "yes" answers an earlier comment (the agent's own proposal): read the conversation to know what it says.
+  const approval = conversational.find((f) => f.kind === "comment" && /^yes\b/i.test(f.body));
+  let proposal: string | undefined;
+  if (approval) {
+    const talk = yield { type: "tool", tool: "pr_conversation", input: { repo, number } };
+    proposal = /^\s*> Proposal: (.+)$/m.exec(talk)?.[1]?.trim();
+    if (!proposal) {
+      throw new Error("The conversation holds no proposal for the reply to answer.");
+    }
+  }
+
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
     type: "write",
     path: `${cwd}/${FILE}`,
-    text: `${current.replace(/\n$/, "")}\nreviewed\n`,
+    text: `${current.replace(/\n$/, "")}\n${proposal ?? "reviewed"}\n`,
   };
 
   yield { type: "shell", command: "git add -A", cwd };
@@ -202,7 +213,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
       input: {
         repo,
         number,
-        body: `${quote}\n\n${f.url ? `${f.url}\n\n` : ""}Fixed in ${sha}.`,
+        body: `${quote}\n\n${f.url ? `${f.url}\n\n` : ""}${f === approval ? `Done as proposed: ${proposal}. ` : ""}Fixed in ${sha}.`,
       },
     };
   }

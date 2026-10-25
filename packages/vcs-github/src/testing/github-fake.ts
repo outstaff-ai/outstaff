@@ -29,6 +29,10 @@ interface Thread {
 
 interface StoredReview {
   prNumber: number;
+  author: string;
+  state: string;
+  body: string;
+  at: string;
   comments: { databaseId: number; path: string; line: number; body: string }[];
 }
 
@@ -88,7 +92,11 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
   const perms = new Map<string, VcsPermission>();
 
   // Conversation comment ids, and the reactions on a comment (`<endpoint>:<id>` -> `<login>:<content>`).
-  const issueComments = new Set<number>();
+  const issueComments = new Map<
+    number,
+    { prNumber: number; author: string; body: string; at: string }
+  >();
+
   const reactions = new Map<string, Set<string>>();
   const inlineIds = () =>
     new Set([
@@ -189,7 +197,15 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     inline: { path: string; line: number; body: string }[],
   ): number => {
     const id = ++reviewCounter;
-    const stored: StoredReview = { prNumber, comments: [] };
+    const stored: StoredReview = {
+      prNumber,
+      author: actor,
+      state,
+      body,
+      at: clockIso(),
+      comments: [],
+    };
+
     reviews.set(id, stored);
     for (const c of inline) {
       const threadId = `PRRT_${++thread}`;
@@ -385,7 +401,13 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
         }
 
         const id = ++commentCounter;
-        issueComments.add(id);
+        issueComments.set(id, {
+          prNumber: pr.number,
+          author: `${actorOf(r)}[bot]`,
+          body: r.json.body,
+          at: clockIso(),
+        });
+
         emit("IssueCommentEvent", `${actorOf(r)}[bot]`, {
           action: "created",
           issue: { number: pr.number, pull_request: {} },
@@ -393,6 +415,48 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
         });
 
         return { status: 201, body: { id } };
+      },
+    },
+    {
+      method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}/issues/:n/comments`,
+      handler: (r) => {
+        const n = Number(r.params["n"]);
+        if (!prs.has(n)) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        return [...issueComments]
+          .filter(([, c]) => c.prNumber === n)
+          .map(([id, c]) => ({
+            id,
+            user: { login: c.author },
+            body: c.body,
+            created_at: c.at,
+            updated_at: c.at,
+            html_url: `https://github.example/${repo.owner}/${repo.name}/pull/${n}#issuecomment-${id}`,
+          }));
+      },
+    },
+    {
+      method: "GET",
+      path: `/repos/${repo.owner}/${repo.name}/pulls/:n/reviews`,
+      handler: (r) => {
+        const n = Number(r.params["n"]);
+        if (!prs.has(n)) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        return [...reviews]
+          .filter(([, v]) => v.prNumber === n)
+          .map(([id, v]) => ({
+            id,
+            user: { login: v.author },
+            body: v.body,
+            state: v.state,
+            submitted_at: v.at,
+            html_url: `https://github.example/${repo.owner}/${repo.name}/pull/${n}#pullrequestreview-${id}`,
+          }));
       },
     },
     ...(["issues", "pulls"] as const).map((kind): Route => ({
@@ -616,7 +680,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     },
     async comment(_repo, number, actor, body) {
       const id = ++commentCounter;
-      issueComments.add(id);
+      issueComments.set(id, { prNumber: number, author: actor, body, at: clockIso() });
       emit("IssueCommentEvent", actor, {
         action: "created",
         issue: { number, pull_request: {} },
