@@ -413,7 +413,11 @@ const policiesSchema = z
           .min(1)
           .max(20)
           .default(3)
-          .meta(d("Maximum lines in a chat message from an agent.")),
+          .meta(
+            d(
+              "Guidance for agents: keep chat replies to about this many lines. It is a hard limit only for the office's own automatic notices (status lines, run notifications). An agent's reply is never cut; one over a high safety cap is split into several messages.",
+            ),
+          ),
         always_link: z
           .boolean()
           .default(true)

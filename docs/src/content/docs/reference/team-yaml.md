@@ -1326,7 +1326,7 @@ How agents write chat messages.
 
 #### policies.messages.max_lines
 
-Maximum lines in a chat message from an agent.
+Guidance for agents: keep chat replies to about this many lines. It is a hard limit only for the office's own automatic notices (status lines, run notifications). An agent's reply is never cut; one over a high safety cap is split into several messages.
 
 - Type: `integer`
 - Optional

@@ -3,7 +3,7 @@ import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createFakeOffice, type ChatMessageResult, type FakeOffice } from "../verbs/office.js";
 import type { Offer } from "../office-client/index.js";
-import { createChatRelay, type ChatRelay } from "./chat.js";
+import { createChatRelay, REPLY_SAFETY_LINES, type ChatRelay } from "./chat.js";
 
 function team(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({
@@ -588,14 +588,38 @@ describe("chat relay", () => {
       expect(chat.posts[0]!.text).toBe("<@U0DANA0001> Search page is up.");
     });
 
-    it("keeps to the line limit of the message style and does not repeat links the text has", async () => {
+    it("posts a reply longer than max_lines in full, with the links after it", async () => {
       await setup({ chatReport: () => ({ post: true, links: [ticket()] }) });
       const url = tracker.links.issue("ACME-1");
-      await relay.report(offerOf(), "result", `Done, see ${url}\nline 2\nline 3\nline 4\nline 5`);
+      await relay.report(
+        offerOf(),
+        "result",
+        `Done, see ${url}\nline 2\nline 3\nline 4\nline 5\nline 6`,
+      );
+
+      expect(chat.posts).toHaveLength(1);
       const lines = chat.posts[0]!.text.split("\n");
-      expect(lines).toHaveLength(3);
-      expect(chat.posts[0]!.text).toContain(url);
+      expect(lines.slice(0, 6).join("\n")).toContain("line 6");
       expect(lines[0]).toContain("<@U0DANA0001>");
+      expect(chat.posts[0]!.text).toContain(url);
+    });
+
+    it("splits a reply over the safety cap into several messages and drops nothing", async () => {
+      await setup({ chatReport: () => ({ post: true, links: [ticket()] }) });
+      const options = Array.from({ length: 100 }, (_, i) => `- option ${i + 1}`);
+      await relay.report(offerOf(), "result", `To go ahead, pick one:\n${options.join("\n")}`);
+      expect(chat.posts.length).toBeGreaterThan(1);
+      const all = chat.posts.map((p) => p.text).join("\n");
+      for (const o of options) {
+        expect(all).toContain(o);
+      }
+
+      expect(all).toContain("option 100");
+      expect(chat.posts[0]!.text).toContain("<@U0DANA0001>");
+      expect(chat.posts[1]!.text).not.toContain("<@U0DANA0001>");
+      for (const p of chat.posts) {
+        expect(p.text.split("\n").length).toBeLessThanOrEqual(REPLY_SAFETY_LINES + 1);
+      }
     });
 
     it("posts nothing when the office says it was reported already", async () => {

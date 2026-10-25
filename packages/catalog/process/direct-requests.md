@@ -21,6 +21,8 @@ A chat session runs beside your work, so it cannot disturb it. You can read the 
 3. **New work** (something to build, fix, write or change that no work of yours covers): this team has no tracker, so file it as a work item, `ost work queue "<title>" "<what is asked and why>"`. The office makes the work item in the same thread, your agent replies there, and you end your session. File one request per message.
 {{/if}}
 
+Keep a reply short (about {{ policies.messages.max_lines }} lines), and when it lists options keep the list complete with short items rather than cutting it. Nothing you write is cut off.
+
 If you cannot tell whether it is a question or work, ask the human in your last message. Do not file work on a guess.
 
 ## After you file or attach work

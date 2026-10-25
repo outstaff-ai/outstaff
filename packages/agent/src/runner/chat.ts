@@ -79,6 +79,51 @@ const clip = (text: string, maxLines: number) => {
   return lines.length > maxLines ? lines.slice(0, maxLines).join("\n") : lines.join("\n");
 };
 
+/**
+ * Lines of one chat message from an agent before it is split into several. An agent's answer is never cut:
+ * `messages.max_lines` is guidance in its prompt, and this is the safety cap far above it.
+ */
+export const REPLY_SAFETY_LINES = 40;
+
+/** Splits a long reply into messages of at most `cap` lines, at paragraph boundaries where it can. Nothing is dropped. */
+export function splitReply(text: string, cap = REPLY_SAFETY_LINES): string[] {
+  const paragraphs = text.trim().split(/\n{2,}/);
+  const parts: string[] = [];
+  let current: string[] = [];
+  let count = 0;
+  const flush = () => {
+    if (current.length) {
+      parts.push(current.join("\n\n"));
+    }
+
+    current = [];
+    count = 0;
+  };
+
+  for (const paragraph of paragraphs) {
+    const lines = paragraph.split("\n");
+    if (lines.length > cap) {
+      flush();
+      for (let i = 0; i < lines.length; i += cap) {
+        parts.push(lines.slice(i, i + cap).join("\n"));
+      }
+
+      continue;
+    }
+
+    // A blank line separates paragraphs inside a message.
+    if (count + lines.length + (current.length ? 1 : 0) > cap) {
+      flush();
+    }
+
+    count += lines.length + (current.length ? 1 : 0);
+    current.push(paragraph);
+  }
+
+  flush();
+  return parts;
+}
+
 /** Tags the requester only where it adds a notification: not in a direct message, not in a thread they are in. */
 const tag = (origin: ChatOrigin, id = origin.requester.id) =>
   origin.direct || origin.participant ? "" : `<@${id}> `;
@@ -89,7 +134,6 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   const { chat, office, team } = opts;
   const log = opts.log ?? silentLogger;
   const historyLimit = opts.historyLimit ?? 10;
-  const maxLines = team.policies?.messages.max_lines ?? 3;
   const acknowledge = policyOn(team.policies, "acknowledge.chat");
   const hasPm = team.people.some((p) => p.role === "pm");
 
@@ -330,21 +374,27 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
       const body =
         kind === "result"
-          ? clip(text, maxLines)
+          ? text.trim()
           : kind === "blocked"
-            ? `I am blocked. ${clip(text, maxLines)}`
+            ? `I am blocked. ${text.trim()}`
             : `I hit an error and could not finish this. I will try again. ${clip(text, 1).slice(0, 300)}`;
 
       const all = [...links, ...granted.links].filter(
         (l, i, a) => a.findIndex((x) => x.url === l.url) === i && !body.includes(l.url),
       );
 
+      const parts = splitReply(body);
       for (const t of threads) {
-        await post(
-          t.channel,
-          t.thread,
-          [linked(`${tag(t)}${body}`), ...all.map(linkLine)].join("\n"),
-        );
+        for (const [i, part] of parts.entries()) {
+          const last = i === parts.length - 1;
+          await post(
+            t.channel,
+            t.thread,
+            [linked(`${i === 0 ? tag(t) : ""}${part}`), ...(last ? all.map(linkLine) : [])].join(
+              "\n",
+            ),
+          );
+        }
       }
     },
   };

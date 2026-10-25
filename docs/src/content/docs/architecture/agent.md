@@ -109,7 +109,7 @@ A message the office already handled (`repeated`) gets no second answer, so a re
 
 **Report back.** When an item with a chat origin ends, the agent asks the office with `chat_report` whether to post, and the office grants each ending once. The post goes to the thread the request came from and mentions the requester (`<@id>`, which the adapter turns into a mention):
 
-- **Done.** The final message of the item, cut to the `policies.messages.max_lines` of the team, followed by links the message does not contain: the pull request, the ticket, documents. The links come from the hand-back and from the office, which knows the item's ticket (if there is one) and the pull requests that implement it.
+- **Done.** The final message of the item, in full (the agent is asked to keep it to about `policies.messages.max_lines` lines, and a reply over a safety cap of 40 lines is split into several messages in the thread, never cut), followed by links the message does not contain: the pull request, the ticket, documents. The links come from the hand-back and from the office, which knows the item's ticket (if there is one) and the pull requests that implement it.
 - **Failed.** One short note that it could not finish and will be tried again. The next failure of the same item stays quiet.
 - **Blocked.** What is needed, with the links. An item the scheduler blocks (stale twice, loop guard) is reported by the office itself.
 - **Waiting.** Nothing. An item that waits for a teammate's answer, a shutdown hand-back, and the review rounds and questions that grow out of the request report nothing; the requester hears when the requester's own item finishes.
