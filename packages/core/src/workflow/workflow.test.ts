@@ -867,3 +867,164 @@ describe("status map and templates", () => {
     expect(x.rules[0]?.skipped[0]).toContain("Unknown template variable");
   });
 });
+
+describe("one pull request per ticket", () => {
+  const rulesFor = (prsPerTicket: "one" | "many"): Rule[] => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      policies: { tickets: { prs_per_ticket: prsPerTicket } },
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    return resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies)
+      .rules;
+  };
+
+  const many = rulesFor("many");
+  const merged = (n: number) => pr(n, { state: "merged" });
+  const closed = (n: number) => pr(n, { state: "closed" });
+  const handBack = (status: string) =>
+    ev("agent.handed_back", { ...tk, actor: agent, data: { status } });
+
+  const done = { type: "move", ticket: "ACME-1", to: "done" };
+  const toReview = { type: "move", ticket: "ACME-1", to: "review" };
+
+  it("with one, a merge moves the ticket to done even when another pull request is open", () => {
+    expect(run(ev("pr.merged"), world({ status: "review", prs: [merged(10), pr(11)] }))).toEqual([
+      done,
+    ]);
+  });
+
+  it("with many, a merge alone does not move the ticket", () => {
+    const state = world({ status: "review", prs: [merged(10)] });
+    expect(run(ev("pr.merged"), state, many)).toEqual([]);
+    expect(
+      run(ev("pr.merged"), world({ status: "review", prs: [merged(10), pr(11)] }), many),
+    ).toEqual([]);
+  });
+
+  it("with many, the last merge closes the ticket once the agent handed it back as done", () => {
+    const state = world({
+      status: "review",
+      ticket: { handedBack: true },
+      prs: [merged(10), merged(11)],
+    });
+
+    expect(run(ev("pr.merged", { subject: { pr: ref(11) } }), state, many)).toEqual([done]);
+
+    // Another pull request is still open: not yet.
+    const open = world({
+      status: "review",
+      ticket: { handedBack: true },
+      prs: [merged(10), pr(11)],
+    });
+
+    expect(run(ev("pr.merged"), open, many)).toEqual([]);
+  });
+
+  it("with many, the hand-back as done closes a ticket whose pull requests are all closed", () => {
+    const settled = world({ status: "active", prs: [merged(10), merged(11)] });
+    expect(run(handBack("done"), settled, many)).toEqual([done]);
+
+    // Not settled: it goes to review for the requester, as before.
+    const open = world({ status: "active", prs: [merged(10), pr(11)] });
+    expect(run(handBack("done"), open, many)).toEqual([
+      toReview,
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+    ]);
+
+    // Waiting or blocked never closes it.
+    expect(run(handBack("waiting"), settled, many)).toEqual([]);
+    expect(run(handBack("blocked"), settled, many)).toContainEqual({
+      type: "move",
+      ticket: "ACME-1",
+      to: "blocked",
+    });
+  });
+
+  it("with many, a pull request closed without merging closes the ticket after the others merged", () => {
+    const state = world({
+      status: "review",
+      ticket: { handedBack: true },
+      prs: [merged(10), closed(11)],
+    });
+
+    expect(run(ev("pr.closed", { subject: { pr: ref(11) } }), state, many)).toEqual([done]);
+  });
+
+  it("with many, a closed pull request does not send the ticket back while others are open or merged", () => {
+    expect(
+      run(ev("pr.closed"), world({ status: "review", prs: [closed(10), merged(11)] }), many),
+    ).toEqual([]);
+
+    // Closing one of two open pull requests leaves the ticket where it is.
+    expect(
+      run(ev("pr.closed"), world({ status: "review", prs: [closed(10), pr(11)] }), many),
+    ).toEqual([]);
+
+    // Nothing merged and none left open: back to ready, as with one.
+    expect(run(ev("pr.closed"), world({ status: "review", prs: [closed(10)] }), many)).toEqual([
+      { type: "move", ticket: "ACME-1", to: "ready" },
+    ]);
+  });
+
+  it("with many, a ticket whose only pull request closed unmerged is not settled", () => {
+    const state = world({ status: "active", prs: [closed(10)] });
+    expect(run(handBack("done"), state, many)).toEqual([
+      toReview,
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+    ]);
+  });
+
+  describe("a person opens a second pull request", () => {
+    const opened = (n: number) => ev("pr.opened", { subject: { pr: ref(n) } });
+    const human = { login: "grace-lead", kind: "human" as const };
+    const second = world({
+      status: "review",
+      prs: [pr(10), pr(11, { author: human })],
+    });
+
+    it("comments on the ticket, saying which merge closes it", () => {
+      const comment = run(opened(11), second).find((e) => e.type === "comment");
+      expect(comment).toMatchObject({ type: "comment", on: { ticket: "ACME-1" } });
+      expect(comment && "body" in comment && comment.body).toContain("2 pull requests");
+      expect(comment && "body" in comment && comment.body).toContain("#10 Change 10");
+      expect(comment && "body" in comment && comment.body).toContain("#11 Change 11");
+      expect(comment && "body" in comment && comment.body).toContain("merges first closes");
+    });
+
+    it("says what closes the ticket with many", () => {
+      const comment = run(opened(11), second, many).find((e) => e.type === "comment");
+      expect(comment && "body" in comment && comment.body).toContain(
+        "handed its work back as done",
+      );
+    });
+
+    it("does not comment on a first pull request, an agent's or a closed one", () => {
+      const comments = (state: ReturnType<typeof world>, n: number) =>
+        run(opened(n), state).filter((e) => e.type === "comment");
+
+      expect(comments(world({ prs: [pr(10, { author: human })] }), 10)).toEqual([]);
+      expect(comments(world({ prs: [pr(10), pr(11)] }), 11)).toEqual([]);
+      expect(comments(world({ prs: [closed(10), pr(11, { author: human })] }), 11)).toEqual([]);
+
+      expect(
+        comments(world({ status: "done", prs: [merged(10), pr(11, { author: human })] }), 11),
+      ).toEqual([]);
+    });
+  });
+
+  it("every rewritten preset rule is valid and the default switch changes nothing", () => {
+    for (const rule of many) {
+      expect({ id: rule.id, valid: ruleInputSchema.safeParse(rule).success }).toEqual({
+        id: rule.id,
+        valid: true,
+      });
+    }
+
+    expect(rulesFor("one")).toEqual(kanban);
+  });
+});

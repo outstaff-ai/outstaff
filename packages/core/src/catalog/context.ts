@@ -1,4 +1,5 @@
 import type { TeamConfig } from "../config/schema.js";
+import { policyValue } from "../policies/switches.js";
 
 /**
  * The values a template can use. Every key below always exists, so a template
@@ -22,6 +23,7 @@ import type { TeamConfig } from "../config/schema.js";
  *   links.<name>   url templates with {key} slots, for example "{base}/{key}";
  *                  adapters fill them later. issue, pr and doc always exist.
  *   policies.messages.{max_lines,always_link,omit[]}
+ *   policies.tickets.many_prs (true when policies.tickets.prs_per_ticket is many)
  */
 export type RepoContext = {
   name: string;
@@ -68,7 +70,10 @@ export type CatalogContext = {
   humans: { list: HumanContext[]; has: boolean; default_trust: boolean };
   integrations: { has: Record<Port, boolean>; adapter: Record<Port, string> };
   links: Record<string, string>;
-  policies: { messages: { max_lines: number; always_link: boolean; omit: string[] } };
+  policies: {
+    messages: { max_lines: number; always_link: boolean; omit: string[] };
+    tickets: { many_prs: boolean };
+  };
 };
 
 export type ContextExtras = {
@@ -153,6 +158,7 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
         always_link: messages?.always_link ?? true,
         omit: messages?.omit ?? DEFAULT_OMIT,
       },
+      tickets: { many_prs: policyValue(team.policies, "tickets.prs_per_ticket") === "many" },
     },
   };
 }

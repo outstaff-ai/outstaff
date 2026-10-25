@@ -27,15 +27,16 @@ const ctx = {
 async function play(
   script: AsyncGenerator<Action, string, string>,
   answer: (a: Action) => string,
-  fails: (a: Action) => boolean = () => false,
+  fails: (a: Action) => boolean | string = () => false,
 ) {
   const seen: Action[] = [];
   let step = await script.next();
   while (!step.done) {
     const action = step.value;
     seen.push(action);
-    step = fails(action)
-      ? await script.throw(new Error("failed"))
+    const failure = fails(action);
+    step = failure
+      ? await script.throw(new Error(typeof failure === "string" ? failure : "failed"))
       : await script.next(answer(action));
   }
 
@@ -111,6 +112,58 @@ describe("assigned", () => {
   });
 });
 
+describe("assigned, for a ticket that needs two pull requests", () => {
+  const answer = (a: Action) =>
+    a.type === "read"
+      ? "hello\nworld\n"
+      : a.type === "tool" && a.tool === "pr_open"
+        ? "Opened https://git.example/acme/shop/pull/1"
+        : a.type === "tool" && a.tool === "ticket_create"
+          ? "Created SHOP-2.\nSHOP-2: Add a farewell\nhttps://tracker.example/issue/SHOP-2\nPart of SHOP-1: https://tracker.example/issue/SHOP-1"
+          : a.type === "tool" && a.tool === "ticket_show"
+            ? "SHOP-1 Add a greeting\n\nsplit: Add a farewell"
+            : a.type === "shell" && a.command === "pnpm --version"
+              ? "12.9.1\n"
+              : "";
+
+  it("splits first, then opens one pull request per ticket, and a second for the parent is refused", async () => {
+    // The third pull request is the parent's second one; the verb refuses it and names the first.
+    let opens = 0;
+    const { seen, text } = await play(assigned(ctx), answer, (a) => {
+      if (a.type === "tool" && a.tool === "pr_open") {
+        opens += 1;
+        return (
+          opens === 3 && "SHOP-1 already has a pull request: https://git.example/acme/shop/pull/1"
+        );
+      }
+
+      return false;
+    });
+
+    const tools = seen
+      .filter((a) => a.type === "tool")
+      .map((a) => (a.type === "tool" ? a.tool : ""));
+
+    expect(tools.slice(0, 4)).toEqual([
+      "ticket_show",
+      "ticket_move",
+      "ticket_create",
+      "ticket_comment",
+    ]);
+
+    expect(seen.find((a) => a.type === "tool" && a.tool === "ticket_create")).toMatchObject({
+      input: { title: "Add a farewell", parent: "SHOP-1" },
+    });
+
+    const bodies = seen
+      .filter((a) => a.type === "tool" && a.tool === "pr_open")
+      .map((a) => (a.type === "tool" ? a.input["body"] : ""));
+
+    expect(bodies).toEqual(["Closes SHOP-1\n", "Closes SHOP-2\n", "Closes SHOP-1\n"]);
+    expect(text).toContain("one per ticket");
+  });
+});
+
 describe("conflict", () => {
   it("pushes with a lease on the sha it started from, and only after resolving the rebase", async () => {
     const { seen } = await play(
@@ -172,24 +225,35 @@ describe("mergedFeedback", () => {
     const { seen } = await play(mergedFeedback(merged), (a) =>
       a.type === "read"
         ? "hello\nworld\n"
-        : a.type === "tool" && a.tool === "pr_open"
-          ? "Opened acme/shop#3\nhttps://git.example/acme/shop/pull/3"
-          : "",
+        : a.type === "tool" && a.tool === "ticket_create"
+          ? "Created SHOP-2.\nhttps://tracker.example/issue/SHOP-2"
+          : a.type === "tool" && a.tool === "pr_open"
+            ? "Opened acme/shop#3\nhttps://git.example/acme/shop/pull/3"
+            : "",
     );
 
     const steps = seen.map((a) =>
       a.type === "tool" ? a.tool : a.type === "shell" ? a.command : a.type,
     );
 
-    expect(steps.slice(0, 3)).toEqual([
+    // The merged pull request's ticket has its pull request: the follow-up is a sub-ticket with its own.
+    expect(steps.slice(0, 4)).toEqual([
       "pr_comment",
+      "ticket_create",
       "git fetch --prune origin",
       "git checkout -B 'merged_feedback/w5-follow-up' origin/main",
     ]);
 
     expect(steps.at(-2)).toBe("pr_open");
+    expect(seen.find((a) => a.type === "tool" && a.tool === "ticket_create")).toMatchObject({
+      input: { parent: "SHOP-1" },
+    });
+
     expect(seen.find((a) => a.type === "tool" && a.tool === "pr_open")).toMatchObject({
-      input: { body: expect.stringContaining("Follows up on #1, which is merged.") },
+      input: {
+        title: "SHOP-2: follow up on #1",
+        body: expect.stringContaining("Closes SHOP-2\n\nFollows up on #1, which is merged."),
+      },
     });
 
     expect(seen.at(-1)).toMatchObject({

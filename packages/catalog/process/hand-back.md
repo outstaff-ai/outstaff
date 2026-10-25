@@ -2,7 +2,7 @@
 
 Hand back each time you stop, whether the work is finished or not.
 
-1. Comment on the ticket or pull request with what you did. Link every pull request, ticket and document you mention. Report the pull request, not a branch name.
+1. Comment on the ticket or pull request with what you did. Link every pull request, ticket and document you mention. Report the pull request, not a branch name. If you split the ticket, link the sub-tickets and their pull requests too.
 2. Move the item to `review`, or to `blocked` if you cannot continue (see `process/ticket-lifecycle.md`). Hand back with the matching status: `done` when the work is ready for review, `waiting` when you need an answer, `blocked` when you cannot continue. Only `done` sends the ticket to review.
    - A push rejected for a missing permission (for example "refusing to allow a GitHub App to create or update workflow ... without `workflows` permission") is `blocked`, never `done`. Name the missing permission, and keep the commit on its branch so nothing is lost.
 3. Append the journal entry (see `process/work-items.md`).

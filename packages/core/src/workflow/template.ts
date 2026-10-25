@@ -21,6 +21,8 @@ export const TEMPLATE_VARIABLES = [
   "pr.author",
   "stack",
   "stack.count",
+  "ticket.prs",
+  "ticket.prs.count",
 ] as const;
 
 const PLACEHOLDER = /\{\{\s*([a-z][a-z0-9_.]*)\s*\}\}/g;
@@ -54,6 +56,20 @@ export function renderTemplate(text: string, vars: Readonly<Record<string, strin
 }
 
 export const BUILTIN_TEMPLATES: Readonly<Record<string, string>> = {
+  second_pr: [
+    "{{ticket}} now has {{ticket.prs.count}} pull requests:",
+    "",
+    "{{ticket.prs}}",
+    "",
+    "outstaff moves a ticket to done when its pull request merges, so whichever of these merges first closes {{ticket}}. If the work needs several pull requests, split it into sub-tickets, one pull request each.",
+  ].join("\n"),
+  second_pr_many: [
+    "{{ticket}} now has {{ticket.prs.count}} pull requests:",
+    "",
+    "{{ticket.prs}}",
+    "",
+    "This team allows several pull requests per ticket. outstaff moves {{ticket}} to done only when the agent has handed its work back as done and every one of them is closed with at least one merged; a merge alone does not close it.",
+  ].join("\n"),
   hand_back_blocked:
     "{{ticket}} is blocked: the agent could not continue. Its last comment on the ticket says what is needed; the work so far is kept on its branch.",
   rebase_conflict: [

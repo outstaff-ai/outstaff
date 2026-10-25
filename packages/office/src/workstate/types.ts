@@ -108,6 +108,12 @@ export interface WorkState extends WorkflowState {
   /** Re-reads every open pull request and live ticket through the ports; losing the store only costs this. */
   rescan(): Promise<void>;
 
+  /**
+   * Takes in the open pull requests the state has not heard of yet, for example one opened a moment ago whose event
+   * has not arrived. Raises no events: the ones that do arrive still do their work.
+   */
+  catchUp(): Promise<void>;
+
   /** Re-reads who last worked on each ticket from the work item history. */
   refreshWorkers(): Promise<void>;
   currentWork(person: string): CurrentWork;
@@ -121,5 +127,15 @@ export interface WorkState extends WorkflowState {
 
   /** The pull requests with this number, in any state, from every repository. */
   pullRequests(number: number): PrRecord[];
+
+  /** The pull requests linked to the ticket, in any state. */
+  prsOfTicket(ticket: string): PrRecord[];
+
+  /** The ticket a pull request about to be opened would link to, by the rule that links the ones that exist. */
+  ticketForDraft(draft: {
+    headRef: string;
+    title: string;
+    body?: string;
+  }): Promise<string | undefined>;
   ticket(key: string): TicketRecord | undefined;
 }

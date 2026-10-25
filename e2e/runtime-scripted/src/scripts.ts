@@ -15,6 +15,10 @@ export type Script = AsyncGenerator<Action, string, string>;
 
 export const FILE = "greeting.txt";
 
+/** The files the two pull requests of a split ticket add, so that neither conflicts with the greetings. */
+export const PART_ONE = "farewell.txt";
+export const PART_TWO = "footer.txt";
+
 const lines = (text: string) => text.replace(/\n$/, "").split("\n");
 
 /** Line one of the file becomes `hello from <key>`; the rest stays. Two tickets that do this to one file conflict. */
@@ -101,7 +105,14 @@ async function* commitToPush(
   }
 }
 
-/** A ticket is assigned: take it, change the file, push, open the pull request, and ask when the ticket says so. */
+/** The first link in a tool's answer: the ticket or pull request it is about. */
+const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
+
+/**
+ * A ticket is assigned: take it, change the file, push, open the pull request, and ask when the ticket says so. A
+ * ticket that says `split: <title>` needs two pull requests, so it is split first: a sub-ticket with that title, the
+ * parent told about it, then one pull request each (and a second one for the parent, which is refused).
+ */
 export async function* assigned(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const cwd = need(ctx.worktree, "the worktree");
@@ -115,8 +126,35 @@ export async function* assigned(ctx: ItemContext): Script {
     throw new Error(`pnpm --version printed "${pnpm}", not a version.`);
   }
 
-  const current = yield { type: "read", path: `${cwd}/${FILE}` };
-  yield { type: "write", path: `${cwd}/${FILE}`, text: withGreeting(current, key) };
+  const part = /^split: (.+)$/m.exec(shown)?.[1];
+  let sub: { key: string; url: string } | undefined;
+  if (part) {
+    const created = yield {
+      type: "tool",
+      tool: "ticket_create",
+      input: { title: part, body: `The second pull request of ${key}.`, parent: key },
+    };
+
+    const subKey = /^Created (\S+?)\./m.exec(created)?.[1];
+    if (!subKey) {
+      throw new Error(`ticket_create did not say which ticket it created: ${created}`);
+    }
+
+    sub = { key: subKey, url: firstUrl(created) };
+    yield {
+      type: "tool",
+      tool: "ticket_comment",
+      input: { key, body: `Split: ${part} is ${sub.key}, ${sub.url}. One pull request each.` },
+    };
+  }
+
+  if (sub) {
+    yield { type: "write", path: `${cwd}/${PART_ONE}`, text: `goodbye from ${key}\n` };
+  } else {
+    const current = yield { type: "read", path: `${cwd}/${FILE}` };
+    yield { type: "write", path: `${cwd}/${FILE}`, text: withGreeting(current, key) };
+  }
+
   yield { type: "shell", command: "git add -A", cwd };
   yield { type: "shell", command: `git commit -m ${q(`${key}: ${subject(ctx.title)}`)}`, cwd };
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
@@ -126,7 +164,40 @@ export async function* assigned(ctx: ItemContext): Script {
     input: { repo, title: `${key}: ${subject(ctx.title)}`, body: `Closes ${key}\n` },
   };
 
-  const url = /https?:\/\/\S+/.exec(opened)?.[0] ?? "";
+  const url = firstUrl(opened);
+  if (sub) {
+    // The sub-ticket's change is on a branch of its own, from the default branch, in a file of its own.
+    const second = `${branch}-part-two`;
+    yield { type: "shell", command: "git fetch --prune origin", cwd };
+    yield { type: "shell", command: `git checkout -B ${q(second)} origin/main`, cwd };
+    yield { type: "write", path: `${cwd}/${PART_TWO}`, text: `goodbye from ${sub.key}\n` };
+    yield { type: "shell", command: "git add -A", cwd };
+    yield { type: "shell", command: `git commit -m ${q(`${sub.key}: ${part}`)}`, cwd };
+    yield { type: "shell", command: `git push origin ${q(second)}`, cwd };
+    const opened2 = yield {
+      type: "tool",
+      tool: "pr_open",
+      input: { repo, title: `${sub.key}: ${part}`, body: `Closes ${sub.key}\n` },
+    };
+
+    // A second pull request for the parent is refused; the answer names the pull request it has.
+    try {
+      yield {
+        type: "tool",
+        tool: "pr_open",
+        input: { repo, title: `${key}: more of the same`, body: `Closes ${key}\n` },
+      };
+    } catch (e) {
+      if (!String(e).includes(url)) {
+        throw new Error(`The refusal does not name ${url}.`, { cause: e });
+      }
+
+      return `Opened ${url} and ${firstUrl(opened2)}, one per ticket (${key}, ${sub.key}).`;
+    }
+
+    throw new Error(`A second pull request for ${key} was not refused.`);
+  }
+
   const question = /^ask architect: (.+)$/m.exec(shown)?.[1];
   if (question) {
     yield { type: "tool", tool: "ask", input: { to: "architect", question } };
@@ -244,6 +315,22 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
     input: { repo, number, body: `${quote}\n\n${where}Thanks, I am opening a follow-up for this.` },
   };
 
+  // The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own.
+  let own: string | undefined;
+  if (ctx.ticket) {
+    const created = yield {
+      type: "tool",
+      tool: "ticket_create",
+      input: {
+        title: `Follow up on #${number}`,
+        body: `Feedback on the merged #${number}.`,
+        parent: ctx.ticket,
+      },
+    };
+
+    own = /^Created (\S+?)\./m.exec(created)?.[1];
+  }
+
   // The item's worktree may predate the merge: start from the default branch as it is now.
   yield { type: "shell", command: "git fetch --prune origin", cwd };
   yield { type: "shell", command: `git checkout -B ${q(branch)} origin/main`, cwd };
@@ -257,14 +344,14 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   yield { type: "shell", command: "git add -A", cwd };
   yield { type: "shell", command: `git commit -m ${q(`chore: follow up on #${number}`)}`, cwd };
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
-  const title = `${ctx.ticket ? `${ctx.ticket}: ` : ""}follow up on #${number}`;
+  const title = `${own ? `${own}: ` : ""}follow up on #${number}`;
   const opened = yield {
     type: "tool",
     tool: "pr_open",
     input: {
       repo,
       title,
-      body: `Follows up on #${number}, which is merged.\n\nFeedback${feedback.url ? `: ${feedback.url}` : ""}\n\n${quote}\n`,
+      body: `${own ? `Closes ${own}\n\n` : ""}Follows up on #${number}, which is merged.\n\nFeedback${feedback.url ? `: ${feedback.url}` : ""}\n\n${quote}\n`,
     },
   };
 

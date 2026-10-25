@@ -35,6 +35,8 @@ export type ChatMessageRequest = PayloadOf<"chat_message">;
 export type ChatMessageResult = PayloadOf<"chat_message_result">;
 export type ChatReportKind = PayloadOf<"chat_report">["kind"];
 export type ChatReportResult = PayloadOf<"chat_report_result">;
+export type TicketPrsRequest = PayloadOf<"ticket_prs">;
+export type TicketPrsResult = PayloadOf<"ticket_prs_result">;
 export type Placement = Pick<PayloadOf<"work_place">, "position" | "relativeTo">;
 
 export interface OfficeClient {
@@ -60,6 +62,9 @@ export interface OfficeClient {
   /** The caller's open tickets and pull requests, as text. */
   currentWork(): Promise<string>;
 
+  /** The ticket a pull request about to be opened would link to, and the pull requests that ticket already has. */
+  ticketPrs(draft: TicketPrsRequest): Promise<TicketPrsResult>;
+
   /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for a second filing. */
   linkTicket(workItemId: string, ticket: string): Promise<Filed>;
 
@@ -82,6 +87,7 @@ export interface FakeOffice extends OfficeClient {
   attached: { workItemId: string; target: string; confirmed: boolean; request?: string }[];
   chatMessages: ChatMessageRequest[];
   chatReports: { workItemId: string; kind: ChatReportKind }[];
+  ticketPrsAsked: TicketPrsRequest[];
 }
 
 export function createFakeOffice(
@@ -95,6 +101,9 @@ export function createFakeOffice(
     chatMessage?: (m: ChatMessageRequest) => ChatMessageResult;
     chatReport?: (workItemId: string, kind: ChatReportKind) => ChatReportResult;
     currentWork?: string;
+
+    /** What the office answers about the pull requests of the ticket a draft links to; by default none. */
+    ticketPrs?: (draft: TicketPrsRequest) => TicketPrsResult;
 
     /** What the office answers when a chat session files work; by default the person is idle. */
     filed?: Partial<Filed>;
@@ -111,8 +120,14 @@ export function createFakeOffice(
   const attached: FakeOffice["attached"] = [];
   const chatMessages: ChatMessageRequest[] = [];
   const chatReports: FakeOffice["chatReports"] = [];
+  const ticketPrsAsked: TicketPrsRequest[] = [];
   const seen = new Set<string>();
   return {
+    ticketPrsAsked,
+    async ticketPrs(draft) {
+      ticketPrsAsked.push(draft);
+      return opts.ticketPrs?.(draft) ?? { prs: [] };
+    },
     asked,
     answered,
     placed,

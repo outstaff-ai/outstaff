@@ -101,6 +101,9 @@ export function createTracker(opts: TrackerOptions) {
 
   const labels: { id: number; projectId: number; name: string }[] = [];
   const issues: Issue[] = [];
+
+  /** Relations the agents made between tickets (`POST /issues/:id/links`). */
+  const related: { from: string; to: string; kind: string }[] = [];
   const activity: Activity[] = [];
   let activityId = 100;
   let labelId = 500;
@@ -326,10 +329,14 @@ export function createTracker(opts: TrackerOptions) {
       method: "POST",
       path: `${base}/issues/:id/links`,
       handler: as((r) => {
+        const from = issueById(r.params["id"]!);
         const to = issueById(String(r.json.targetIssueId));
-        return to
-          ? { status: 201, body: { id: 1, kind: r.json.kind, direction: "outward", issue: to } }
-          : err(404, "issue not found");
+        if (!from || !to) {
+          return err(404, "issue not found");
+        }
+
+        related.push({ from: from.identifier, to: to.identifier, kind: String(r.json.kind) });
+        return { status: 201, body: { id: 1, kind: r.json.kind, direction: "outward", issue: to } };
       }),
     },
     {
@@ -382,8 +389,10 @@ export function createTracker(opts: TrackerOptions) {
       return issues.map((i) => ({
         key: i.identifier,
         title: i.title,
+        description: i.description,
         status: column(i.columnId)?.name,
         assignee: nameOf(i.assigneeUserId),
+        links: related.filter((l) => l.from === i.identifier),
         comments: activity
           .filter((a) => a.issueId === i.id && a.kind === "comment")
           .map((a) => ({ author: nameOf(a.actorUserId), body: a.body })),

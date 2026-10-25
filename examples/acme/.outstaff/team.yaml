@@ -166,6 +166,8 @@ policies:
   hand_back:
     reassign: requester
     fallback: first_human
+  tickets:
+    prs_per_ticket: one
   conflicts:
     follow_up: true
   retry:

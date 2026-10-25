@@ -110,10 +110,10 @@ ost ticket assign ACME-12 none
 
 Create a ticket assigned to you.
 
-Creates a ticket assigned to you. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.
+Creates a ticket assigned to you. Pass parent to make it a sub-ticket of another ticket: it is linked to the parent and its description starts with a Part of line with the parent's link. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.
 
 ```
-ost ticket create --title <title> [--body <body>] [--status <status>]
+ost ticket create --title <title> [--body <body>] [--status <status>] [--parent <parent>]
 ```
 
 Runtime tool: `ticket_create`
@@ -123,11 +123,13 @@ Runtime tool: `ticket_create`
 | `title` | string | yes | Short title. |
 | `body` | string | no | What is asked and why, Markdown. Default: "". |
 | `status` | ready \| active | no | Where it starts; active when you start now (the default inside a work item). |
+| `parent` | string | no | Key of the ticket this one is part of; the new ticket is linked to it. |
 
 Examples:
 
 ```sh
 ost ticket create --title "Add a search page" --body "Asked by Dana in chat."
+ost ticket create --parent ACME-12 --title "Add the search index" --body "The index half of ACME-12."
 ```
 
 ## doc.search
@@ -377,7 +379,7 @@ ost pr resolve shop 42 PRT_abc123
 
 Open a pull request from a pushed branch.
 
-Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch. Push the branch first. Pass draft to open it as a draft.
+Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch. Push the branch first. Pass draft to open it as a draft. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.
 
 ```
 ost pr open [--repo <repo>] [--head <head>] [--base <base>] --title <title> [--body <body>] [--body-file <bodyFile>] [--draft]

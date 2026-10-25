@@ -1243,6 +1243,25 @@
           },
           "additionalProperties": false
         },
+        "tickets": {
+          "default": {
+            "prs_per_ticket": "one"
+          },
+          "description": "How tickets and pull requests relate.",
+          "type": "object",
+          "properties": {
+            "prs_per_ticket": {
+              "default": "one",
+              "description": "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.",
+              "type": "string",
+              "enum": [
+                "one",
+                "many"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
         "conflicts": {
           "default": {
             "follow_up": true
@@ -1943,6 +1962,58 @@
           ],
           "additionalProperties": false,
           "description": "An agent.handed_back event carries one of these statuses: done, waiting or blocked."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ticket_prs_all_closed": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ticket_prs_all_closed"
+          ],
+          "additionalProperties": false,
+          "description": "Every pull request linked to the ticket is closed and at least one of them is merged (or, with false, that does not hold)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ticket_prs_open": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ticket_prs_open"
+          ],
+          "additionalProperties": false,
+          "description": "At least one pull request linked to the ticket is still open (or, with false, none is)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ticket_prs_several": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ticket_prs_several"
+          ],
+          "additionalProperties": false,
+          "description": "The ticket has two or more pull requests that are open or merged (or, with false, fewer). Closed ones that were never merged do not count."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ticket_handed_back": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ticket_handed_back"
+          ],
+          "additionalProperties": false,
+          "description": "The agent's latest work on the ticket ended with a hand-back as done (or, with false, did not)."
         }
       ]
     }

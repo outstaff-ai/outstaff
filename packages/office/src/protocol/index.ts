@@ -13,5 +13,6 @@ export {
   type ChatDesk,
   type Messaging,
   type Offer,
+  type TicketPrs,
   type WorkSource,
 } from "./source.js";

@@ -177,6 +177,17 @@ export const MESSAGE_META = {
     summary: "The caller's current work as text.",
     replies: [],
   },
+  ticket_prs: {
+    from: "agent",
+    summary:
+      "Asks which ticket a pull request about to be opened would link to and which pull requests that ticket already has, so `ost pr open` can keep to one pull request per ticket.",
+    replies: ["ticket_prs_result", "error"],
+  },
+  ticket_prs_result: {
+    from: "office",
+    summary: "The ticket the pull request would link to, and the pull requests it already has.",
+    replies: [],
+  },
   ack: { from: "office", summary: "The request succeeded and has nothing to return.", replies: [] },
   error: {
     from: "both",

@@ -23,7 +23,19 @@ Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-spec
 
 - The tracker is the shared record. Keep the status, assignee and a short comment current with `ost ticket`.
 - If the tracker and a work item disagree, trust the tracker, fix the work item, and mention it in the journal.
-{{else}}
+
+## One pull request per ticket
+
+{{#if policies.tickets.many_prs}}A ticket in {{ team.name }} may have several pull requests. outstaff's automation moves it to `done` only when you have handed its work back as `done` and every pull request linked to it is closed with at least one merged; a merge alone does not close it. Hand back as `done` only once every pull request the ticket needs is open, and list them in the hand-back. Prefer one pull request per ticket: when the parts can be reviewed on their own, split them into sub-tickets as below.
+{{else}}outstaff's automation moves a ticket to `done` the moment its pull request merges, so in {{ team.name }} a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the office comments on the ticket that it now has two, and the first to merge closes it.
+
+Plan the split before you start. When the work needs more than one pull request (independent parts, a stack, a change after a merge):
+
+1. Create a sub-ticket for each extra part: `ost ticket create --parent <ticket> --title "..."`. It is assigned to you and linked to the parent; its description starts with a "Part of" line with the parent's link.
+2. Comment on the parent ticket that you split the work, with the links to the sub-tickets and what each one covers.
+3. Work them one pull request each. Put `Closes <ticket>` for that ticket in the description of its pull request, so it is linked to the right ticket. The parent's pull request covers what is left of the parent.
+   {{/if}}{{else}}
+
 ## Without a tracker
 
 - This team has no tracker. Work items are the record: the journal of each work item says what was done, what is open and where the links are.

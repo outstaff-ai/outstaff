@@ -15,6 +15,7 @@ import {
   createAgentEnv,
   createFakeOffice,
   createRuntimeTools,
+  type FakeOffice,
   describeVerb,
   findVerb,
   renderVerbsReference,
@@ -492,6 +493,103 @@ describe("pr write verbs", () => {
     expect((await f.vcs.events([f.repo])).events.at(-1)).toMatchObject({
       type: "pr.opened",
       actor: "sam",
+    });
+  });
+
+  describe("one pull request per ticket", () => {
+    const linked = (state: "open" | "closed" | "merged") => ({
+      ticket: "SHOP-1",
+      prs: [
+        {
+          ref: "acme/shop#4",
+          number: 4,
+          title: "feat(cart): coupons",
+          url: "https://git.acme.example/acme/shop/pull/4",
+          state,
+          authorKind: "agent" as const,
+        },
+      ],
+    });
+
+    /** What the office says about the ticket's pull requests; the question is recorded as the fake would. */
+    const office = (
+      f: Awaited<ReturnType<typeof setup>>,
+      answer: (draft: {
+        headRef: string;
+        title: string;
+        body: string;
+      }) => ReturnType<FakeOffice["ticketPrs"]> extends Promise<infer R> ? R : never,
+    ) => {
+      f.office.ticketPrs = async (d) => {
+        f.office.ticketPrsAsked.push(d);
+        return answer(d);
+      };
+    };
+
+    const open = (f: Awaited<ReturnType<typeof setup>>) =>
+      run("pr.open", f.env, { title: "feat(cart): more coupons", body: "Closes SHOP-1" }, f.ctx);
+
+    it.each(["open", "merged"] as const)(
+      "refuses a second pull request for a ticket that has one %s, naming it and the split",
+      async (state) => {
+        const f = await setup();
+        office(f, () => linked(state));
+        await rejects(
+          open(f),
+          "conflict",
+          /SHOP-1 already has a pull request: acme\/shop#4 \(.+\) https:\/\/git\.acme\.example\/acme\/shop\/pull\/4.*ost ticket create --parent SHOP-1/s,
+        );
+
+        expect(f.office.ticketPrsAsked).toEqual([
+          { headRef: "feat/coupons", title: "feat(cart): more coupons", body: "Closes SHOP-1" },
+        ]);
+
+        expect((await f.vcs.events([f.repo])).events).toEqual([]);
+      },
+    );
+
+    it("allows it when the earlier pull request was closed without merging", async () => {
+      const f = await setup();
+      office(f, () => linked("closed"));
+      await open(f);
+      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
+    });
+
+    it("allows the pull request of a sub-ticket, which has none yet", async () => {
+      const f = await setup();
+      office(f, (d) =>
+        d.body.includes("SHOP-2") ? { ticket: "SHOP-2", prs: [] } : linked("open"),
+      );
+
+      await run("pr.open", f.env, { title: "feat(cart): index", body: "Closes SHOP-2" }, f.ctx);
+      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-2");
+    });
+
+    it("allows a pull request that links to no ticket", async () => {
+      const f = await setup();
+      office(f, () => ({ prs: [] }));
+      await open(f);
+      expect((await f.vcs.getPullRequest(f.repo, 1)).title).toBe("feat(cart): more coupons");
+    });
+
+    it("allows several with policies.tickets.prs_per_ticket: many, without asking", async () => {
+      const f = await setup();
+      f.env.team = {
+        ...f.env.team,
+        policies: { ...f.env.team.policies!, tickets: { prs_per_ticket: "many" } },
+      };
+
+      office(f, () => linked("open"));
+      await open(f);
+      expect(f.office.ticketPrsAsked).toEqual([]);
+      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
+    });
+
+    it("asks nothing when the agent is not connected to an office", async () => {
+      const f = await setup();
+      delete f.env.office;
+      await open(f);
+      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
     });
   });
 
@@ -1041,6 +1139,52 @@ describe("office verbs", () => {
     ]);
 
     await rejects(run("work.queue", f.env, { title: "x" }), "invalid", /chat session/);
+  });
+
+  it("creates a sub-ticket from inside the work item of its parent, linked and assigned to the caller", async () => {
+    const f = fakeEnv();
+    const parent = await f.tracker.createIssue({ title: "Fix checkout", body: "All of it." });
+    const r = await run(
+      "ticket.create",
+      f.env,
+      { title: "Fix the cart half", body: "Only the cart.", parent: parent.key },
+      { workItemId: "w1" },
+    );
+
+    const url = f.tracker.links.issue(parent.key);
+    const issue = await f.tracker.getIssue("SHOP-2");
+
+    expect(issue.body).toBe(`Part of ${parent.key}: ${url}\n\nOnly the cart.`);
+    expect(issue.status.canonical).toBe("active");
+    expect(f.tracker.relations).toEqual([
+      { key: "SHOP-2", otherKey: parent.key, relation: "relates" },
+    ]);
+
+    expect(r.text).toContain(`Part of ${parent.key}: ${url}`);
+    expectLinks(r);
+  });
+
+  it("creates a sub-ticket with an empty body as just the Part of line, and refuses an unknown parent", async () => {
+    const f = fakeEnv();
+    const parent = await f.tracker.createIssue({ title: "Fix checkout", body: "" });
+    await run("ticket.create", f.env, { title: "Half", parent: parent.key });
+    expect((await f.tracker.getIssue("SHOP-2")).body).toBe(
+      `Part of ${parent.key}: ${f.tracker.links.issue(parent.key)}`,
+    );
+
+    await rejects(run("ticket.create", f.env, { title: "Orphan", parent: "SHOP-99" }), "not_found");
+    expect(await f.tracker.listIssues({})).toHaveLength(2);
+  });
+
+  it("keeps the sub-ticket when the tracker cannot link it", async () => {
+    const f = fakeEnv();
+    const parent = await f.tracker.createIssue({ title: "Fix checkout", body: "" });
+    f.tracker.link = async () => {
+      throw new PortError("unsupported", "No links.");
+    };
+
+    const r = await run("ticket.create", f.env, { title: "Half", parent: parent.key });
+    expect(r.text).toContain("Created SHOP-2.");
   });
 
   it("refuses a second ticket for an item that has one", async () => {

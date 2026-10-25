@@ -41,6 +41,9 @@ interface Ctx {
 }
 
 type Check = { ok: boolean; detail: string };
+
+/** The pull requests that count toward a ticket's share: a closed one that never merged does not. */
+const livePrs = (prs: WorkflowPr[]) => prs.filter((p) => p.state !== "closed");
 const list = (xs: readonly string[]) => `[${xs.join(", ")}]`;
 
 function check(c: Condition, ctx: Ctx): Check {
@@ -164,6 +167,43 @@ function check(c: Condition, ctx: Ctx): Check {
     };
   }
 
+  if ("ticket_prs_all_closed" in c) {
+    const all = ctx.ticket ? ctx.state.pullRequestsOf(ctx.ticket) : [];
+    const closed = all.length > 0 && all.every((p) => p.state !== "open");
+    const merged = all.filter((p) => p.state === "merged").length;
+    return {
+      ok: (closed && merged > 0) === c.ticket_prs_all_closed,
+      detail: `ticket has ${all.length} pull request${all.length === 1 ? "" : "s"}, ${merged} merged, ${all.filter((p) => p.state === "open").length} open; wanted ${c.ticket_prs_all_closed ? "all closed with one merged" : "not all closed with one merged"}`,
+    };
+  }
+
+  if ("ticket_prs_open" in c) {
+    const open = (ctx.ticket ? ctx.state.pullRequestsOf(ctx.ticket) : []).filter(
+      (p) => p.state === "open",
+    ).length;
+
+    return {
+      ok: open > 0 === c.ticket_prs_open,
+      detail: `ticket has ${open} open pull request${open === 1 ? "" : "s"}, wanted ${c.ticket_prs_open ? "some" : "none"}`,
+    };
+  }
+
+  if ("ticket_prs_several" in c) {
+    const live = ctx.ticket ? livePrs(ctx.state.pullRequestsOf(ctx.ticket)) : [];
+    return {
+      ok: live.length > 1 === c.ticket_prs_several,
+      detail: `ticket has ${live.length} open or merged pull request${live.length === 1 ? "" : "s"}, wanted ${c.ticket_prs_several ? "several" : "at most one"}`,
+    };
+  }
+
+  if ("ticket_handed_back" in c) {
+    const back = ctx.ticket ? ctx.state.handedBack(ctx.ticket) : false;
+    return {
+      ok: back === c.ticket_handed_back,
+      detail: `ticket ${back ? "was" : "was not"} handed back as done, wanted ${c.ticket_handed_back ? "handed back" : "not handed back"}`,
+    };
+  }
+
   const st = ctx.event.data["state"];
   return {
     ok: typeof st === "string" && c.review_state.includes(st),
@@ -204,6 +244,10 @@ function key(ref: PrRef): string {
 function variables(ctx: Ctx): Record<string, string> {
   const pr = ctx.pr;
   const stack = pr ? stackOf(pr, ctx.state) : [];
+  const ticketPrs = ctx.ticket
+    ? livePrs(ctx.state.pullRequestsOf(ctx.ticket)).toSorted((a, b) => a.ref.number - b.ref.number)
+    : [];
+
   return {
     ticket: ctx.ticket ?? "",
     status: (ctx.ticket && ctx.state.ticketStatus(ctx.ticket)) || "",
@@ -217,6 +261,10 @@ function variables(ctx: Ctx): Record<string, string> {
     "pr.base": pr?.baseRef ?? "",
     "pr.head": pr?.headRef ?? "",
     "pr.author": pr?.author.person ?? pr?.author.login ?? "",
+    "ticket.prs": ticketPrs
+      .map((p) => `- #${p.ref.number} ${p.title}${p.url ? ` (${p.url})` : ""}`)
+      .join("\n"),
+    "ticket.prs.count": String(ticketPrs.length),
     stack: stack
       .map((p, i) => `${i + 1}. #${p.ref.number} ${p.title}${p.url ? ` (${p.url})` : ""}`)
       .join("\n"),

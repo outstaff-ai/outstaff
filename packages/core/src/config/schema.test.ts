@@ -130,6 +130,7 @@ describe("parseTeamConfig", () => {
       acknowledge: { chat: true, vcs: true },
       feedback: { follow_up_round: true, merged_prs: true },
       hand_back: { reassign: "requester", fallback: "first_human" },
+      tickets: { prs_per_ticket: "one" },
       conflicts: { follow_up: true },
       retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },

@@ -333,6 +333,19 @@ const policiesSchema = z
       })
       .default({ reassign: "requester", fallback: "first_human" })
       .meta(d("What happens to a ticket when an agent hands its work back.")),
+    tickets: z
+      .strictObject({
+        prs_per_ticket: z
+          .enum(["one", "many"])
+          .default("one")
+          .meta(
+            d(
+              "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.",
+            ),
+          ),
+      })
+      .default({ prs_per_ticket: "one" })
+      .meta(d("How tickets and pull requests relate.")),
     conflicts: z
       .strictObject({
         follow_up: z

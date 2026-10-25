@@ -1,5 +1,5 @@
 import type { Capability } from "../capabilities.js";
-import type { Rule } from "../workflow/rules.js";
+import type { Condition, Rule } from "../workflow/rules.js";
 
 /** A switch holds `true`/`false`, or one of a few named choices; `none` always means off. */
 export type PolicyValue = boolean | string;
@@ -11,8 +11,8 @@ export interface PolicySwitch {
   /** Value when team.yaml says nothing. Everything that happens today is on by default. */
   default: PolicyValue;
 
-  /** The value that turns the behaviour off. */
-  off: false | "none";
+  /** The value that turns the behaviour off (or, for a limit, lifts it). */
+  off: false | "none" | "many";
 
   /** What outstaff does while the switch is on, for `ost policies` and the docs. */
   behaviour: string;
@@ -31,6 +31,45 @@ export interface PolicySwitch {
 
   /** The capability the configured adapter needs for the switch to do anything; `validate` warns when it lacks it. */
   needs?: Capability;
+}
+
+/** `tickets.prs_per_ticket: many`: the ticket is done when the agent says so and every pull request is settled. */
+function manyPrs(rule: Rule): Rule {
+  const settled: Condition = { ticket_prs_all_closed: true };
+  switch (rule.id) {
+    case "pr-merged-done":
+      // Whichever of the three happens last closes the ticket: the last merge or close, or the hand-back.
+      return {
+        ...rule,
+        on: ["pr.merged", "pr.closed", "agent.handed_back"],
+        if: {
+          all: [
+            ...(rule.if ? [rule.if] : []),
+            settled,
+            { any: [{ hand_back_status: ["done"] }, { ticket_handed_back: true }] },
+          ],
+        },
+      };
+    case "pr-closed-ready":
+      // Only the last pull request closed unmerged sends the ticket back: none other open, none merged.
+      return {
+        ...rule,
+        if: {
+          all: [
+            ...(rule.if ? [rule.if] : []),
+            { not: { ticket_prs_open: true } },
+            { not: settled },
+          ],
+        },
+      };
+    case "hand-back-to-requester":
+      // The hand-back that settles the ticket closes it instead of asking the requester to review.
+      return { ...rule, if: { all: [...(rule.if ? [rule.if] : []), { not: settled }] } };
+    case "second-pr-comment":
+      return { ...rule, do: [{ comment: "second_pr_many" }] };
+    default:
+      return rule;
+  }
 }
 
 /**
@@ -100,6 +139,18 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     kind: "option",
     behaviour:
       "When a ticket has no known requester, hand it back to the first human in `humans`. With none, a rule that needs a requester is skipped when the ticket has none.",
+  },
+  {
+    path: "tickets.prs_per_ticket",
+    default: "one",
+    off: "many",
+
+    // The verb enforces it whatever the preset; the rules only follow it, so a preset without them is no reason to call it off.
+    kind: "agent",
+    rules: ["pr-merged-done", "pr-closed-ready", "hand-back-to-requester", "second-pr-comment"],
+    behaviour:
+      "One pull request per ticket, because the ticket moves to done when its pull request merges: `ost pr open` refuses a second pull request for a ticket (open or merged) and points to `ost ticket create --parent`, and a second pull request a person opens gets a comment on the ticket that says which merge closes it. With many, several pull requests are allowed and the ticket moves to done only when the agent hands its work back as done and every pull request linked to it is closed with at least one merged; a merge alone does not close it.",
+    rewrite: manyPrs,
   },
   {
     path: "conflicts.follow_up",

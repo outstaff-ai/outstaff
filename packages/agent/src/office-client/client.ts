@@ -504,6 +504,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       return (await call("current_work", {}, "current_work_result")).text;
     },
 
+    ticketPrs: (draft) => call("ticket_prs", draft, "ticket_prs_result"),
+
     async ask(q): Promise<OfficeAnswer> {
       const r = await call("ask", q, "ask_result");
       return {

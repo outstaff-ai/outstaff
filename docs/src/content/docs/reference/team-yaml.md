@@ -192,6 +192,8 @@ policies:
   hand_back:
     reassign: requester
     fallback: first_human
+  tickets:
+    prs_per_ticket: one
   conflicts:
     follow_up: true
   retry:
@@ -966,6 +968,26 @@ Condition that must hold.
 - Optional
 - Allowed values: `done`, `waiting`, `blocked`
 
+#### workflow.rules[].if.ticket_prs_all_closed
+
+- Type: `boolean`
+- Required
+
+#### workflow.rules[].if.ticket_prs_open
+
+- Type: `boolean`
+- Required
+
+#### workflow.rules[].if.ticket_prs_several
+
+- Type: `boolean`
+- Required
+
+#### workflow.rules[].if.ticket_handed_back
+
+- Type: `boolean`
+- Required
+
 #### workflow.rules[].do
 
 Actions, run in order.
@@ -1217,6 +1239,23 @@ Who stands in when a ticket has no known requester: the first human in humans, o
 - Optional
 - Default: `first_human`
 - Allowed values: `first_human`, `none`
+
+### policies.tickets
+
+How tickets and pull requests relate.
+
+- Type: `object`
+- Optional
+- Default: `{"prs_per_ticket":"one"}`
+
+#### policies.tickets.prs_per_ticket
+
+How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.
+
+- Type: `string`
+- Optional
+- Default: `one`
+- Allowed values: `one`, `many`
 
 ### policies.conflicts
 

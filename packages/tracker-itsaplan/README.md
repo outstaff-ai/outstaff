@@ -42,7 +42,7 @@ A key carries its owner's permissions. The office uses a member key of its own.
 
 - Issue keys are the identifier (`SHOP-12`); the key's project must be the configured one.
 - Lists and search carry no description in the API, so each result is read in full (five at a time); `listIssues` and `search` cost one extra call per issue.
-- Labels are created by name when missing. `link` kinds: `blocks`, `relates`, `duplicates`.
+- Labels are created by name when missing. `link` kinds: `blocks`, `relates`, `duplicates`. There is no parent field: a sub-ticket (`ost ticket create --parent`) carries a `Part of <key>: <link>` line in its description and a `relates` link to its parent.
 - `assign` and the `assignee` filter take a member id, a username or a display name.
 - Events come from the project activity feed (`GET /projects/{project}/analytics/activity`, which needs the dashboards read permission). Mapped: `created`, status moves (`moved`), assignee changes (`assigned`) and comments (`commented`); everything else (labels, priority and so on) is skipped. `externalId` is `itsaplan:<activity id>`. The cursor is opaque (it holds the highest activity id seen); the first call without one returns the feed's history, oldest first, up to 2,000 entries.
 - Comment URLs are the issue URL plus `#comment-<id>`.

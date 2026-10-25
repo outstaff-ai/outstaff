@@ -220,6 +220,25 @@ describe("office connection", () => {
       const work = conn.currentWork();
       current().reply(current().last(), "current_work_result", { text: "Ticket ACME-1" });
       expect(await work).toBe("Ticket ACME-1");
+
+      const draft = { headRef: "feat/x", title: "ACME-1: x", body: "Closes ACME-1" };
+      const prs = conn.ticketPrs(draft);
+      expect(current().last()).toMatchObject({ type: "ticket_prs", payload: draft });
+      const found = {
+        ticket: "ACME-1",
+        prs: [
+          {
+            ref: "acme/app#4",
+            number: 4,
+            title: "ACME-1: x",
+            state: "merged" as const,
+            authorKind: "agent" as const,
+          },
+        ],
+      };
+
+      current().reply(current().last(), "ticket_prs_result", found);
+      expect(await prs).toEqual(found);
     });
 
     it("maps ask, work and team onto the protocol", async () => {

@@ -23,7 +23,11 @@ export type Condition =
   | { pr_merged: boolean }
   | { has_body: boolean }
   | { review_state: string[] }
-  | { hand_back_status: HandBackStatus[] };
+  | { hand_back_status: HandBackStatus[] }
+  | { ticket_prs_all_closed: boolean }
+  | { ticket_prs_open: boolean }
+  | { ticket_prs_several: boolean }
+  | { ticket_handed_back: boolean };
 
 /** How an agent ended its turn on a work item: finished, waiting for an answer, or unable to continue. */
 export const HAND_BACK_STATUSES = ["done", "waiting", "blocked"] as const;
@@ -71,6 +75,34 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .strictObject({ hand_back_status: z.array(z.enum(HAND_BACK_STATUSES)).min(1) })
       .meta(
         d("An agent.handed_back event carries one of these statuses: done, waiting or blocked."),
+      ),
+    z
+      .strictObject({ ticket_prs_all_closed: z.boolean() })
+      .meta(
+        d(
+          "Every pull request linked to the ticket is closed and at least one of them is merged (or, with false, that does not hold).",
+        ),
+      ),
+    z
+      .strictObject({ ticket_prs_open: z.boolean() })
+      .meta(
+        d(
+          "At least one pull request linked to the ticket is still open (or, with false, none is).",
+        ),
+      ),
+    z
+      .strictObject({ ticket_prs_several: z.boolean() })
+      .meta(
+        d(
+          "The ticket has two or more pull requests that are open or merged (or, with false, fewer). Closed ones that were never merged do not count.",
+        ),
+      ),
+    z
+      .strictObject({ ticket_handed_back: z.boolean() })
+      .meta(
+        d(
+          "The agent's latest work on the ticket ended with a hand-back as done (or, with false, did not).",
+        ),
       ),
   ]),
 );

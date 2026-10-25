@@ -42,6 +42,19 @@ const kanbanRules: Rule[] = [
     do: [{ move: "done" }],
   },
   {
+    id: "second-pr-comment",
+    // A person opened it, so `ost pr open` could not refuse it: the ticket is told instead.
+    on: "pr.opened",
+    if: {
+      all: [
+        { pr_author_kind: "human" },
+        { ticket_prs_several: true },
+        { not: { ticket_status: ["done", "canceled"] } },
+      ],
+    },
+    do: [{ comment: "second_pr" }],
+  },
+  {
     id: "pr-closed-ready",
     on: "pr.closed",
     if: { ticket_status: ["active", "review"] },

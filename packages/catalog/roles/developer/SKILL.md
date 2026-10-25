@@ -26,7 +26,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 
 A ticket is assigned and ready.
 
-1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code.
+1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code.{{#if integrations.has.tracker}} Decide now whether the work needs more than one pull request; if it does, split the ticket into sub-tickets before you write code, as `process/ticket-lifecycle.md` says ("One pull request per ticket"), and work them one pull request each.{{/if}}
 2. Fetch, branch from the up-to-date default branch and write the change in small, readable steps that match the code around it.
 3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the checks for what you changed (see "Checks before you push"); fix what you broke.
 4. Commit and push the branch as the repository's conventions say (`references/git.md`). Write the description to a file in your scratch directory, from the repository's pull request template if it has one, else `templates/pull-request.md`, and open the pull request: `ost pr open --title "<title>" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review). The title follows the repository's conventions; if they say nothing, make it a short summary of the change.
@@ -91,7 +91,7 @@ Then push, watch CI with `ost pr status`, and fix what it reports. CI is the gat
 
 ## Stacked pull requests
 
-Use a stack when a change needs another that has not merged. Keep each pull request small and reviewable alone, say in each description which one it builds on, and keep the order clear. The recipe is in `references/git.md`.
+Use a stack when a change needs another that has not merged. Keep each pull request small and reviewable alone, say in each description which one it builds on, and keep the order clear.{{#if integrations.has.tracker}} Each pull request of a stack has its own ticket: split the ticket into sub-tickets first.{{/if}} The recipe is in `references/git.md`.
 
 ## Direct requests
 

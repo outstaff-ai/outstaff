@@ -1,6 +1,7 @@
 import {
   createTicketLinker,
   PortError,
+  policyValue,
   type ReviewComment,
   type ReviewVerdict,
 } from "@outstaff/core";
@@ -105,11 +106,40 @@ function commentsOf(
   return parsed.data.map((c) => ({ ...c, body: guarded(env, c.body) }));
 }
 
+/**
+ * With one pull request per ticket (the default), a pull request for a ticket that already has one, open or merged,
+ * is refused. The office says which ticket the new one would link to, by the rule it links existing ones with, and
+ * what that ticket has; a closed pull request that never merged does not count.
+ */
+async function oneForTicket(
+  env: AgentEnv,
+  draft: { headRef: string; title: string; body: string },
+): Promise<void> {
+  if (!env.office || policyValue(env.team.policies, "tickets.prs_per_ticket") !== "one") {
+    return;
+  }
+
+  const { ticket, prs } = await env.office.ticketPrs(draft);
+  const existing = prs.filter((p) => p.state !== "closed");
+  if (!ticket || existing.length === 0) {
+    return;
+  }
+
+  const named = existing
+    .map((p) => `${p.ref} (${p.state === "merged" ? "merged" : "open"})${p.url ? ` ${p.url}` : ""}`)
+    .join(", ");
+
+  throw new PortError(
+    "conflict",
+    `${ticket} already has ${existing.length === 1 ? "a pull request" : "pull requests"}: ${named}. One ticket takes one pull request, because outstaff moves the ticket to done when its pull request merges. Split the work: create a ticket for this part with \`ost ticket create --parent ${ticket} --title "..."\`, then open the pull request for that new ticket, with \`Closes <new ticket>\` in its body. To change the pull request ${ticket} already has, use \`ost pr update\` or push to its branch.`,
+  );
+}
+
 export const prOpen = defineVerb({
   name: "pr.open",
   summary: "Open a pull request from a pushed branch.",
   description:
-    "Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch. Push the branch first. Pass draft to open it as a draft.",
+    "Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch. Push the branch first. Pass draft to open it as a draft. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.",
   input: z.strictObject({
     repo,
     head: z
@@ -139,6 +169,7 @@ export const prOpen = defineVerb({
     const ref = await repoOrWorktree(env, ctx, input.repo);
     const head = input.head ?? (await currentBranch(ctx));
     const text = textOf(env, ctx, input, true) ?? "";
+    await oneForTicket(env, { headRef: head, title: input.title, body: text });
     const pr = await vcs.openPullRequest(ref, {
       head,
       title: input.title,
