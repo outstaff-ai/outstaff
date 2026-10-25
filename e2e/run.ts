@@ -659,6 +659,132 @@ async function main() {
     `attach: a chat request about #${pr1.pr.number} in review -> asked first, then pushed to that pull request, no new ticket`,
   );
 
+  // ---- 3e. replies in the thread of running work: a review round is held at the gate, and a request about it is
+  // attached from a chat thread, which links the thread to the running round. A question in that thread is answered
+  // by a chat session beside the round; an instruction is attached to the round and leads to one follow-up round.
+  const sha5 = added.pr.head.sha;
+  await until("the agent idle again after the attached round", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+      ? true
+      : undefined,
+  );
+
+  const loose = "Keep the greeting short.";
+  await stub("POST", "/_test/gates/review/close");
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, { state: "commented", body: loose });
+  await until(
+    "the second review round running and held at the gate",
+    (s) => s.chat.gates.review?.arrived,
+  );
+
+  const first3e = await stub("POST", "/_test/chat/say", {
+    text: `For PR #${pr1.pr.number}, also add a farewell line.`,
+  });
+
+  await until("the agent asking about the pull request in review", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === first3e.id && /follow-up\?/.test(p.text)),
+  );
+
+  await stub("POST", "/_test/chat/say", { text: "This PR.", thread: first3e.id });
+  const joined = await until("the request attached to the running round", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === first3e.id && p.text.startsWith("Adding this to")),
+  );
+
+  assertEq(
+    joined.text.includes("I'll pick it up when the current round ends."),
+    true,
+    `the first reply says the running round picks it up later (${joined.text})`,
+  );
+
+  const posted = (s: Json) => s.chat.posts.filter((p: Json) => p.thread === first3e.id).length;
+  const quiet = posted(await state());
+
+  await stub("POST", "/_test/chat/say", {
+    text: "Anything else on the greetings?",
+    thread: first3e.id,
+  });
+
+  const spoken = await until("an answer in the thread of the running round", (s) =>
+    posted(s) > quiet ? s.chat.posts.findLast((p: Json) => p.thread === first3e.id) : undefined,
+  );
+
+  assertEq(spoken.text.includes("greeting.txt"), true, "the question in the thread is answered");
+  const held = await state();
+  assertEq(
+    held.github.pulls.find((p: Json) => p.number === pr1.pr.number).head.sha,
+    sha5,
+    "the round has not pushed when the answer comes",
+  );
+
+  assertEq(
+    held.tickets.find((x: Json) => x.key === first).status,
+    "In Progress",
+    "the round is still running when the thread is answered",
+  );
+
+  const instruction = "Also end the greeting with a full stop.";
+  const seen = posted(held);
+  await stub("POST", "/_test/chat/say", { text: instruction, thread: first3e.id });
+  const noted = await until("the instruction noted in the thread while the round runs", (s) =>
+    posted(s) > seen ? s.chat.posts.findLast((p: Json) => p.thread === first3e.id) : undefined,
+  );
+
+  assertEq(
+    noted.text.includes("I'll pick it up when the current round ends."),
+    true,
+    "the instruction is noted for the next round",
+  );
+
+  assertEq(
+    (await state()).github.pulls.find((p: Json) => p.number === pr1.pr.number).head.sha,
+    sha5,
+    "the instruction did not interrupt the round",
+  );
+
+  step(
+    "thread: a question in the thread of a running round is answered at once, an instruction is noted for the next round",
+  );
+
+  await stub("POST", "/_test/gates/review/open");
+  const roundTwo = await until(
+    "the follow-up round answered both requests on the pull request, the ticket back in review",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === first);
+      const notes = pr.conversation.filter((c: Json) => c.body.includes("end the greeting"));
+      const results = s.chat.posts.filter(
+        (p: Json) => p.thread === first3e.id && p.text.includes("Addressed"),
+      );
+
+      const farewell = pr.conversation.filter((c: Json) => c.body.includes("add a farewell line"));
+      return pr.head.sha !== sha5 &&
+        notes.length > 0 &&
+        farewell.length > 0 &&
+        results.length >= 2 &&
+        t.status === "In Review"
+        ? { pr, notes, results, tickets: s.tickets.length }
+        : undefined;
+    },
+  );
+
+  assertEq(
+    roundTwo.results.length,
+    2,
+    "the agent posted the result of the running round and of its follow-up in the attached thread, once each",
+  );
+
+  assertEq(roundTwo.notes.length, 1, "the instruction was handled once, in one follow-up round");
+  assertEq(
+    roundTwo.pr.conversation.filter((c: Json) => c.body.includes("add a farewell line")).length,
+    1,
+    "the request attached earlier was handled once too, in the same follow-up round",
+  );
+
+  assertEq(roundTwo.tickets, ticketsBefore, "no ticket was created for the instruction");
+  step(
+    "thread: the instruction became one follow-up round after the running round, answered on the pull request",
+  );
+
   // ---- 4. the human merges; the ticket is done; the other pull request now conflicts and the agent rebases it
   await stub("POST", `/_test/pulls/${pr1.pr.number}/merge`);
   await until(

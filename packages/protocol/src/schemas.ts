@@ -73,6 +73,15 @@ export const chatOriginSchema = z.strictObject({
     .describe(
       "The requester started the thread or replied in it, so the chat already notifies them.",
     ),
+  about: z
+    .strictObject({
+      id: z.string().min(1),
+      title: z.string(),
+    })
+    .optional()
+    .describe(
+      "For a chat session started by a reply in the thread of running work: that work item. Its ticket, pull request and journal are in the offer's context.",
+    ),
 });
 
 export const workItemSchema = z.strictObject({
@@ -440,6 +449,12 @@ export const messageSchema = z.discriminatedUnion("type", [
         .describe("False when nothing should be posted: no chat origin, or already reported."),
       requester: z.string().optional().describe("Id of the requester to mention."),
       links: z.array(linkSchema).describe("The ticket and pull requests of the item."),
+      threads: z
+        .array(chatOriginSchema.omit({ about: true }))
+        .optional()
+        .describe(
+          "Every thread linked to the item now, to post the result in: the one it came from and the ones attached later. Absent when nothing should be posted.",
+        ),
     }),
   ),
   message("current_work", empty),

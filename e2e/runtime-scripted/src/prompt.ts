@@ -23,6 +23,9 @@ export interface ItemContext {
   /** The reviews and comments a review round covers, oldest first. */
   feedback: Feedback[];
 
+  /** For a chat session answering in the thread of running work: that work item. */
+  about?: { itemId: string; title: string };
+
   /** For a chat session: the messages of the conversation, oldest first. */
   conversation?: { from: string; agent: boolean; text: string }[];
 }
@@ -94,6 +97,10 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     .filter((m) => m !== null)
     .map((m) => ({ from: m[1]!, agent: m[2] !== undefined, text: m[3]! }));
 
+  const about = /reply in the thread of your running work item (\S+) \((.*?)\)\. Its ticket/.exec(
+    prompt,
+  );
+
   return {
     itemId: head[1]!,
     kind: head[2]!,
@@ -106,5 +113,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     journal,
     feedback,
     ...(conversation?.length ? { conversation } : {}),
+    ...(about ? { about: { itemId: about[1]!, title: about[2]! } } : {}),
   };
 }

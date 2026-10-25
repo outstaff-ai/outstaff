@@ -2,6 +2,7 @@ import type { Logger } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { REPO, teamConfig } from "../intake/test-support.js";
 import { schedulerWorkSource } from "../work-source.js";
+import { readOrigin } from "../chat/origin.js";
 import { readFeedback } from "./feedback.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
@@ -123,6 +124,39 @@ describe("feedback during a review round", () => {
     expect(bodies(next.context.feedback)).toEqual(["And add a test."]);
     await work.handBack("sam", next.workItem.id, result);
     expect((await h.items("sam")).filter((i) => i.status === "queued")).toEqual([]);
+  });
+
+  it("offers the follow-up round with its feedback and the origin of every linked thread", async () => {
+    const pr = await pullRequest();
+    const work = source();
+    await comment(pr.number, "Rename the flag.");
+    const offer = (await work.next("sam"))!;
+    await work.accept("sam", offer.workItem.id);
+    await h.store.upsertSubject("chat_origin", offer.workItem.id, {
+      channel: "D1",
+      thread: "t1",
+      requester: { id: "U-a" },
+      awaitingPlacement: false,
+      claimed: ["ack"],
+      also: [{ channel: "D1", thread: "t2", requester: { id: "U-b" } }],
+    });
+
+    await comment(pr.number, "And add a test.");
+    await work.handBack("sam", offer.workItem.id, { summary: "Done.", links: [], status: "done" });
+
+    // The origin and the feedback are stored before the item can start, so its first offer has both.
+    const next = (await work.next("sam"))!;
+    expect(bodies(next.context.feedback)).toEqual(["And add a test."]);
+    expect(next.workItem.origin).toEqual({
+      channel: "D1",
+      thread: "t1",
+      requester: { id: "U-a" },
+    });
+
+    expect(await readOrigin(h.store, next.workItem.id)).toMatchObject({
+      claimed: [],
+      also: [{ thread: "t2" }],
+    });
   });
 
   it("starts no follow-up round when policies.feedback.follow_up_round is off", async () => {

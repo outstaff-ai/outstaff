@@ -135,6 +135,16 @@ describe("parsePrompt", () => {
       { from: "Ada Admin", agent: false, text: "This PR." },
     ]);
 
+    asked.workItem.origin = {
+      ...asked.workItem.origin,
+      about: { id: "w9", title: "review feedback: PR #3" },
+    };
+
+    expect(parsePrompt(buildWorkPrompt(asked, { resumed: false }))?.about).toEqual({
+      itemId: "w9",
+      title: "review feedback: PR #3",
+    });
+
     const round = buildWorkPrompt(
       {
         ...offer("review_feedback"),

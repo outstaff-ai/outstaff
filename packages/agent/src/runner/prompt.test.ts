@@ -210,3 +210,30 @@ describe("buildWorkPrompt conventions", () => {
     expect(prompt).toContain("references/git.md");
   });
 });
+
+describe("buildWorkPrompt reply in the thread of running work", () => {
+  it("names the running work and how to attach an instruction to it", () => {
+    const base = offer();
+    const prompt = buildWorkPrompt(
+      {
+        ...base,
+        workItem: {
+          ...base.workItem,
+          kind: "chat",
+          origin: {
+            channel: "D1",
+            thread: "t1",
+            requester: { id: "U1", name: "Dana" },
+            direct: true,
+            participant: true,
+            about: { id: "w3", title: "assigned: ACME-1" },
+          },
+        },
+      },
+      { resumed: false },
+    );
+
+    expect(prompt).toContain("reply in the thread of your running work item w3 (assigned: ACME-1)");
+    expect(prompt).toContain("ost work attach");
+  });
+});

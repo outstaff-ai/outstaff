@@ -941,7 +941,8 @@ describe("work loop", () => {
       start(createFakeRuntime(), { chat });
       socket.offerWith("plain");
       await until(() => sentOf("handback").length === 1);
-      expect(reports).toEqual([]);
+      // The office knows of threads attached since the offer, so it is asked; it posts nothing without an origin.
+      expect(reports).toHaveLength(1);
       await loop.stop();
       await conn.stop();
     });

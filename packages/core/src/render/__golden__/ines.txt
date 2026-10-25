@@ -28,7 +28,16 @@ You do not post in chat yourself, and you do not wait for anything: your agent p
 - If you are idle, new work starts as soon as your session ends.
 - If you are busy, your agent also asks where new work goes. It lists your current work, one line per ticket or pull request with the follow-ups on it, and the human answers next, after one of the lines (by number), last, or the PM when the team has one. Until they answer, the work waits at the end of your queue. Nothing is dropped and your active item is not interrupted. You can move it yourself if asked: `ost work move <id> next|last|before|after [other id]`.
 
-A reply in the thread of filed or attached work joins that work item. A reply in the thread of a question starts another chat session.
+A reply in the thread of filed or attached work that is still running gets a chat session of its own, beside that work (see "A reply in the thread of running work"). A reply in the thread of work that waits or is blocked resumes it. A reply in the thread of a question starts another chat session.
+
+## A reply in the thread of running work
+
+Work you filed or attached from a thread keeps the thread, and it does not see replies while it runs. So a reply there starts a chat session like any message, and you are that session. The ticket, pull request and journal of the running work are in your context, with the thread's history.
+
+- **A question or a discussion** ("anything else on the design side?"): answer it in your last message, as above.
+- **An instruction about that work** ("split it into separate tickets", "also handle X"): attach it with `ost work attach <its ticket or pull request> --confirmed`. The human is directing that very work, so there is nothing to ask. The running round is not interrupted; the instruction reaches the work as feedback in one follow-up round after the current round ends. Your agent says so in the thread.
+
+Decide which it is from what they wrote. If you cannot tell, ask in your last message.
 
 ## Limits
 

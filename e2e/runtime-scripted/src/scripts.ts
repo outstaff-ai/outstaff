@@ -326,6 +326,27 @@ export async function* chat(ctx: ItemContext): Script {
   const talk = ctx.conversation ?? [];
   const humans = talk.filter((m) => !m.agent);
   const latest = humans.at(-1)?.text ?? "";
+  if (ctx.about) {
+    // A reply in the thread of running work: an instruction is attached to that work, a question is answered.
+    const target = ctx.ticket ?? (ctx.pr === undefined ? undefined : String(ctx.pr));
+    // A session that goes on with the thread's conversation has no history in its prompt: the reply is in the journal.
+    const said =
+      [...ctx.journal.matchAll(/replied in chat \(thread \S+\):\n([^\n]*)/g)].at(-1)?.[1] ?? latest;
+
+    if (target && /^(also|please|split)\b/i.test(said)) {
+      yield {
+        type: "tool",
+        tool: "work_attach",
+        input: { target, confirmed: true, request: said },
+      };
+
+      return `Noted for ${target}.`;
+    }
+
+    const work = yield { type: "tool", tool: "work", input: {} };
+    return `Greetings live in greeting.txt on the main branch. Right now I am on: ${work.split("\n")[0] ?? ""}`;
+  }
+
   const asked = talk.find((m) => m.agent && QUESTION.test(m.text));
   const pr = /PR #(\d+)/i.exec(asked ? asked.text : latest)?.[1];
   if (!pr) {
@@ -336,7 +357,8 @@ export async function* chat(ctx: ItemContext): Script {
 
   if (asked) {
     // The human answered: this pull request, or a follow-up. The request is what they said first.
-    const request = humans.find((m) => /PR #\d+/i.test(m.text))?.text ?? latest;
+    const before = talk.slice(0, talk.indexOf(asked)).filter((m) => !m.agent);
+    const request = before.findLast((m) => /PR #\d+/i.test(m.text))?.text ?? latest;
     if (/follow-?up/i.test(latest)) {
       yield {
         type: "tool",
