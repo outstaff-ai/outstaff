@@ -70,22 +70,33 @@ export function createStubFetch(routes: Route[], origin = "https://api.github.te
       typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
     );
 
-    expect(url.origin, "requests must stay on the API host").toBe(origin);
     const headers = new Headers(init?.headers);
-    // Every call identifies itself the way GitHub requires.
-    expect(
-      headers.get("authorization"),
-      `${init?.method} ${url.pathname} is unauthenticated`,
-    ).toMatch(/^Bearer \S+/);
+    // A route whose path is a full URL serves another host (a log download); it must never get the token.
+    const external = url.origin !== origin;
+    if (external) {
+      expect(
+        compiled.some(({ r }) => r.path.startsWith(url.origin)),
+        `requests must stay on the API host, not ${url.origin}`,
+      ).toBe(true);
 
-    expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
-      headers.get("accept"),
-    );
+      expect(headers.get("authorization"), `${url.origin} must not receive the token`).toBeNull();
+    } else {
+      // Every call identifies itself the way GitHub requires.
+      expect(
+        headers.get("authorization"),
+        `${init?.method} ${url.pathname} is unauthenticated`,
+      ).toMatch(/^Bearer \S+/);
 
-    expect(headers.get("x-github-api-version")).toBe("2022-11-28");
+      expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
+        headers.get("accept"),
+      );
+
+      expect(headers.get("x-github-api-version")).toBe("2022-11-28");
+    }
+
     expect(headers.get("user-agent")).toBeTruthy();
     const method = (init?.method ?? "GET").toUpperCase();
-    const path = url.pathname;
+    const path = external ? `${url.origin}${url.pathname}` : url.pathname;
     for (const { r, match } of compiled) {
       if (r.method !== method) {
         continue;

@@ -47,6 +47,7 @@ export const CHAT_VERBS = [
   "ticket.comment",
   "ticket.create",
   "pr.status",
+  "pr.checks",
   "pr.threads",
   "pr.diff",
   "pr.comment",

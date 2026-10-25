@@ -10,6 +10,7 @@ import {
   defineAdapter,
   PortError,
   envSecretSource,
+  maskSecrets,
   scrubEnv,
   splitAtLines,
 } from "./index.js";
@@ -216,6 +217,53 @@ describe("scrubEnv", () => {
     expect(
       scrubEnv({ PATH: "/bin", GH_APP_PRIVATE_KEY: "k", EMPTY: undefined }, ["GH_APP_PRIVATE_KEY"]),
     ).toEqual({ PATH: "/bin" });
+  });
+});
+
+describe("maskSecrets", () => {
+  it("masks known values, token shapes, bearer headers, URL passwords and assigned secrets", () => {
+    // Fake values are built at runtime so the repository holds no token-shaped literal for secret scanners.
+    const fake = (prefix: string, length: number) => prefix + "z9".repeat(length).slice(0, length);
+    const assigned = fake("", 14);
+    const bearer = fake("", 21);
+    const github = fake(["gh", "p_"].join(""), 36);
+    const token = fake("", 13);
+    const pem = ["-----BEGIN RSA PRIVATE", "KEY-----\nabc\n-----END RSA PRIVATE", "KEY-----"].join(
+      " ",
+    );
+
+    const out = maskSecrets(
+      [
+        `api_key=${assigned} plain`,
+        `Authorization: Bearer ${bearer}`,
+        github,
+        "https://ci:s3cretpass@git.acme.example/x",
+        `API_TOKEN: ${token}`,
+        pem,
+        "short ab and exact-known-value",
+      ].join("\n"),
+      ["exact-known-value", "ab"],
+    );
+
+    for (const secret of [
+      assigned,
+      bearer,
+      github,
+      token,
+      "s3cretpass",
+      "PRIVATE KEY",
+      "exact-known",
+    ]) {
+      expect(out).not.toContain(secret);
+    }
+
+    expect(out).toContain("short ab and ***");
+    expect(out).toContain("https://ci:***@git.acme.example/x");
+  });
+
+  it("leaves ordinary log text alone", () => {
+    const text = "PASS src/cart.test.ts (12 tests)\nError: expected 3 but got 4 at cart.ts:12";
+    expect(maskSecrets(text)).toBe(text);
   });
 });
 

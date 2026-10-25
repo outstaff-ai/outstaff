@@ -1215,3 +1215,147 @@ describe("links and options", () => {
     await expect(ghe.vcs.reviewThreads(REPO, 1)).resolves.toEqual([]);
   });
 });
+
+describe("check logs", () => {
+  const agent = { ...officeSecrets, ...ownSecrets, OUTSTAFF_PERSON: "sam" };
+  const LOGS = "https://logs.github.test";
+  const log = [
+    "2026-01-01T00:00:00.0000001Z ##[group]Set up job",
+    "2026-01-01T00:00:00.0000002Z Runner ready",
+    "2026-01-01T00:00:01.0000000Z ##[group]Run pnpm test",
+    "2026-01-01T00:00:01.0000001Z shell: /usr/bin/bash -e {0}",
+    "2026-01-01T00:00:01.0000002Z ##[endgroup]",
+    "2026-01-01T00:00:02.0000000Z line one",
+    "2026-01-01T00:00:02.0000001Z \u001b[31mline two\u001b[0m",
+    "2026-01-01T00:00:02.0000002Z token ghp_abcdefghijklmnopqrstuvwxyz0123456789 leaked",
+    "2026-01-01T00:00:02.0000003Z line four",
+    "2026-01-01T00:00:03.0000000Z ##[error]Process completed with exit code 1.",
+    "2026-01-01T00:00:04.0000000Z ##[group]Post job cleanup",
+    "2026-01-01T00:00:04.0000001Z cleaned",
+  ].join("\n");
+
+  const routes = (
+    permissions: Record<string, string>,
+    logReply: () => unknown = () => ({
+      status: 302,
+      headers: { location: `${LOGS}/blob/1?sig=x` },
+    }),
+  ): Route[] => [
+    ...appRoutes(),
+    { method: "GET", path: "/app/installations/7", handler: () => ({ permissions }) },
+    {
+      method: "GET",
+      path: "/repos/acme/app/actions/jobs/42",
+      handler: () => ({
+        steps: [
+          { name: "Set up job", conclusion: "success" },
+          { name: "Run pnpm test", conclusion: "failure" },
+        ],
+      }),
+    },
+    { method: "GET", path: "/repos/acme/app/actions/jobs/42/logs", handler: logReply },
+    { method: "GET", path: `${LOGS}/blob/1`, handler: () => ({ text: log }) },
+  ];
+
+  it("follows the redirect without the token and returns the tail of the failed step, masked and without timestamps", async () => {
+    const { vcs, stub } = build(routes({ actions: "read" }), agent);
+    const out = await vcs.checkLog!(REPO, "42", { tail: 3 });
+    expect(out.failedSteps).toEqual([
+      {
+        name: "Run pnpm test",
+        lines: ["token *** leaked", "line four", "##[error]Process completed with exit code 1."],
+        omitted: 3,
+      },
+    ]);
+
+    const tokenCalls = stub.called("POST", "/app/installations/7/access_tokens");
+    expect(tokenCalls.at(-1)!.json.permissions).toEqual({ contents: "read", actions: "read" });
+    const fetched = stub.calls.find((c) => c.path === `${LOGS}/blob/1`)!;
+    expect(fetched.headers.get("authorization")).toBeNull();
+  });
+
+  it("keeps the default of 200 lines and the whole step when it is shorter", async () => {
+    const { vcs } = build(routes({ actions: "read" }), agent);
+    const out = await vcs.checkLog!(REPO, "42");
+    expect(out.failedSteps[0]).toMatchObject({ name: "Run pnpm test", omitted: 0 });
+    expect(out.failedSteps[0]!.lines).toHaveLength(6);
+    const text = out.failedSteps[0]!.lines.join("\n");
+    expect(text).not.toMatch(/\d{4}-\d\d-\d\dT|ghp_/);
+    expect(text.includes("\u001b")).toBe(false);
+  });
+
+  it("asks for Actions: read only when the installation grants it", async () => {
+    const without = build(routes({ contents: "write" }), agent);
+    await without.vcs.checkLog!(REPO, "42");
+    expect(
+      without.stub.called("POST", "/app/installations/7/access_tokens").at(-1)!.json.permissions,
+    ).toEqual({ contents: "read" });
+  });
+
+  it("names the missing permission when GitHub refuses the logs", async () => {
+    const { vcs } = build(
+      routes({}, () => ({
+        status: 403,
+        body: { message: "Resource not accessible by integration" },
+      })),
+      agent,
+    );
+
+    const e = await expectPortError(vcs.checkLog!(REPO, "42"), "forbidden");
+    expect(e.message).toContain("Actions: read");
+    expect(e.message).toContain("ost doctor");
+  });
+
+  it("refuses a person without a grant and an id that is not a job", async () => {
+    expect.hasAssertions();
+    const { vcs } = build(routes({ actions: "read" }), { ...agent, OUTSTAFF_PERSON: "lee" });
+    await expectPortError(vcs.checkLog!(REPO, "42"), "forbidden");
+    const ok = build(routes({ actions: "read" }), agent);
+    await expectPortError(ok.vcs.checkLog!(REPO, "abc"), "not_found");
+  });
+
+  it("marks Actions jobs with a log id and carries a check's summary", async () => {
+    const run = (over: Record<string, unknown>) => ({
+      name: "ci",
+      status: "completed",
+      conclusion: "failure",
+      ...over,
+    });
+
+    const { vcs } = build(
+      [
+        ...appRoutes(),
+        {
+          method: "GET",
+          path: "/repos/acme/app/commits/abc/check-runs",
+          handler: () => ({
+            check_runs: [
+              run({ id: 42, app: { slug: "github-actions" } }),
+              run({
+                name: "lint",
+                id: 7,
+                details_url: "https://github.com/acme/app/actions/runs/5/job/77",
+              }),
+              run({
+                name: "external",
+                id: 8,
+                app: { slug: "other-ci" },
+                output: { summary: "3 failing" },
+              }),
+            ],
+          }),
+        },
+        {
+          method: "GET",
+          path: "/repos/acme/app/commits/abc/status",
+          handler: () => ({ statuses: [] }),
+        },
+      ],
+      officeSecrets,
+    );
+
+    const checks = await vcs.checks(REPO, "abc");
+    expect(checks.map((c) => c.logId)).toEqual(["42", "77", undefined]);
+    expect(checks[2]!.summary).toBe("3 failing");
+  });
+});

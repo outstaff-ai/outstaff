@@ -21,6 +21,28 @@ export interface Check {
   name: string;
   status: "pending" | "success" | "failure" | "neutral";
   url: string;
+
+  /** What the check reports about itself (a check run's output summary), when it has one. */
+  summary?: string;
+
+  /** Set when the host can show this check's log through `Vcs.checkLog`; pass it back as is. */
+  logId?: string;
+}
+
+/** The log of one failed step of a check. */
+export interface CheckLogStep {
+  name: string;
+
+  /** The last lines of the step's log, oldest first, timestamps removed. */
+  lines: string[];
+
+  /** Lines of the step's log before `lines`. */
+  omitted: number;
+}
+
+export interface CheckLog {
+  /** Steps that failed; empty when the check did not fail or the host reports no failed step. */
+  failedSteps: CheckLogStep[];
 }
 
 export interface ReviewThread {
@@ -124,6 +146,13 @@ export interface Vcs {
     opts?: { waitForMergeable?: boolean },
   ): Promise<PullRequest>;
   checks(repo: RepoRef, sha: string): Promise<Check[]>;
+
+  /**
+   * The failed steps of a check and the last `tail` lines (default 200) of each, for a check with a `logId`.
+   * Secrets are masked. `forbidden` when the person's credentials cannot read logs; `not_found` for an unknown log.
+   * Adapters whose host has no step logs leave it out.
+   */
+  checkLog?(repo: RepoRef, logId: string, opts?: { tail?: number }): Promise<CheckLog>;
   reviewThreads(repo: RepoRef, number: number): Promise<ReviewThread[]>;
 
   /**

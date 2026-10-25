@@ -73,6 +73,9 @@ export function toPullRequest(
 }
 
 export interface RestCheckRun {
+  id?: number;
+  app?: { slug?: string } | null;
+  output?: { title?: string | null; summary?: string | null } | null;
   name: string;
   status: string;
   conclusion: string | null;
@@ -219,4 +222,28 @@ export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
     default:
       return undefined;
   }
+}
+
+const ACTIONS_JOB = /\/actions\/runs\/\d+\/job\/(\d+)/;
+
+/** The GitHub Actions job id of a check run, whose log can be read; undefined for any other provider. */
+export function actionsJobId(run: RestCheckRun): string | undefined {
+  const fromUrl = ACTIONS_JOB.exec(run.details_url ?? "")?.[1];
+  if (fromUrl) {
+    return fromUrl;
+  }
+
+  return run.app?.slug === "github-actions" && run.id !== undefined ? String(run.id) : undefined;
+}
+
+const SUMMARY_MAX = 500;
+
+/** What a check run says about itself, trimmed; undefined when it says nothing. */
+export function checkSummary(run: RestCheckRun): string | undefined {
+  const text = (run.output?.summary || run.output?.title || "").trim();
+  if (!text) {
+    return undefined;
+  }
+
+  return text.length > SUMMARY_MAX ? `${text.slice(0, SUMMARY_MAX)}...` : text;
 }

@@ -20,6 +20,7 @@ const sam = {
 };
 
 const WRITE = {
+  actions: "read",
   metadata: "read",
   contents: "write",
   pull_requests: "write",
@@ -28,7 +29,8 @@ const WRITE = {
   statuses: "read",
 };
 
-const READ = { ...WRITE, contents: "read", pull_requests: "read", issues: "read" };
+const { actions: _actions, ...READ_BASE } = WRITE;
+const READ = { ...READ_BASE, contents: "read", pull_requests: "read", issues: "read" };
 
 interface Fake {
   app?: { status?: number; slug?: string };
@@ -264,6 +266,30 @@ describe("doctorGithub", () => {
     // A developer is not asked for it.
     const dev = await doctorGithub(secrets(), ctx(fake(good).impl));
     expect(by(dev, "GitHub App: permissions")[0]!.detail).not.toContain("workflows");
+  });
+
+  it("fails and names actions:read when a writer's App cannot read CI logs", async () => {
+    const { actions: _a, ...noActions } = WRITE;
+    const lacking = fake({
+      ...good,
+      "11": { ...good["11"]!, installation: { permissions: noActions } },
+    });
+
+    const r = await doctorGithub(secrets(), ctx(lacking.impl));
+    const found = by(r, "GitHub App: permissions")[0]!;
+    expect(found).toMatchObject({ status: "fail" });
+    expect(found.detail).toContain("actions:read");
+    expect(found.detail).toContain("ost pr checks");
+
+    // Actions: write covers it, and the full set passes without a surplus warning.
+    const ok = fake({
+      ...good,
+      "11": { ...good["11"]!, installation: { permissions: { ...WRITE, actions: "write" } } },
+    });
+
+    expect((await doctorGithub(secrets(), ctx(ok.impl))).filter((c) => c.status !== "ok")).toEqual(
+      [],
+    );
   });
 
   it("warns about permissions the role does not need, including Workflows for a developer", async () => {

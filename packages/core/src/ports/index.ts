@@ -1,7 +1,14 @@
 export { CANONICAL_STATUSES, type CanonicalStatus, type StatusMap } from "./status.js";
 export type { Links } from "./links.js";
 export { PORT_ERROR_CODES, PortError, type PortErrorCode } from "./errors.js";
-export { envSecretSource, scrubEnv, type SecretSource, type SecretSpec } from "./secrets.js";
+export {
+  envSecretSource,
+  maskSecrets,
+  scrubEnv,
+  type SecretSource,
+  type SecretSpec,
+} from "./secrets.js";
+
 export { silentLogger, type Logger } from "./logger.js";
 export type {
   AdapterContext,
@@ -22,6 +29,8 @@ export type { Comment, Issue, Member, NewIssue, Tracker, TrackerEvent } from "./
 export type { Doc, DocComment, Knowledge } from "./knowledge.js";
 export type {
   Check,
+  CheckLog,
+  CheckLogStep,
   NewPullRequest,
   PullRequest,
   PullRequestUpdate,
