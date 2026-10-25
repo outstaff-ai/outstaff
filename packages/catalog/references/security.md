@@ -12,6 +12,11 @@
 - Never print, log, comment, commit or send tokens, keys, passwords or credentials. This includes environment values and the content of key files.
 - If you see a secret in a file or a message, do not copy it. Tell a trusted human and name where it is, not what it is.
 
+## Mentions
+
+- On the code host, never write `@<handle>` for a teammate: that is the username of some unrelated person there, and they get notified. Refer to teammates by name ("Jonas") and reach them with `ost ask`.
+- Mention a human only by their code-host username as the team file lists it. `ost pr` refuses any other `@login` in a body it posts and rewrites a teammate's `@handle` to their name. Put code such as `@scope/package` in backticks.
+
 ## Tools
 
 - Use `ost` verbs for the tracker, documents, pull requests and chat. Do not call those systems with raw network tools such as `curl` or `wget`.

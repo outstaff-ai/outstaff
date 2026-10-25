@@ -2,6 +2,7 @@ import { PortError, type ReviewComment, type ReviewVerdict } from "@outstaff/cor
 import { z } from "zod";
 import { repoLabel, requireVcs } from "./support.js";
 import { readInputFile } from "./files.js";
+import { mentionGuard } from "./mentions.js";
 import { defineVerb, result, type AgentEnv, type VerbContext } from "./types.js";
 import { currentBranch, repoOrWorktree } from "./worktree.js";
 
@@ -27,7 +28,7 @@ const bodyFile = z
     "File with the text, Markdown (in the worktree or your scratch directory; the read policy applies). Use it for long text.",
   );
 
-/** The text from `body` or `body-file`; `undefined` when neither is given and it is optional. */
+/** The text from `body` or `body-file`, with @-mentions guarded; `undefined` when neither is given and it is optional. */
 function textOf(
   env: AgentEnv,
   ctx: VerbContext,
@@ -38,15 +39,16 @@ function textOf(
     throw new PortError("invalid", "Pass either body or body-file, not both.");
   }
 
+  const guard = mentionGuard(env.team);
   if (input.bodyFile !== undefined) {
-    return readInputFile(env, ctx, input.bodyFile, "body file");
+    return guard.apply(readInputFile(env, ctx, input.bodyFile, "body file"));
   }
 
   if (input.body === undefined && required) {
     throw new PortError("invalid", "Pass body or body-file.");
   }
 
-  return input.body;
+  return input.body === undefined ? undefined : guard.apply(input.body);
 }
 
 const inlineComments = z
@@ -88,7 +90,8 @@ function commentsOf(
     );
   }
 
-  return parsed.data;
+  const guard = mentionGuard(env.team);
+  return parsed.data.map((c) => ({ ...c, body: guard.apply(c.body) }));
 }
 
 export const prOpen = defineVerb({
