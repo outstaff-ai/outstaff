@@ -428,6 +428,56 @@ describe("protocol server", () => {
       a.send("ask", { to: "noor", question: "Ok?" });
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
+
+    it("says ticket_prs is unsupported without a ticket desk", async () => {
+      const a = await login("ada", tokens.ada);
+      a.send("ticket_prs", { headRef: "feat/x", title: "x", body: "" });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+  });
+});
+
+describe("protocol server with a ticket desk", () => {
+  it("answers which ticket a pull request would link to and what it has", async () => {
+    const asked: unknown[] = [];
+    const server = createProtocolServer({
+      source: createFakeSource(),
+      tickets: {
+        async forDraft(draft) {
+          asked.push(draft);
+          return {
+            ticket: "ACME-1",
+            prs: [
+              {
+                ref: "acme/app#3",
+                number: 3,
+                title: "ACME-1: x",
+                state: "open",
+                authorKind: "agent",
+              },
+            ],
+          };
+        },
+      },
+      auth: createAgentAuth(tokens),
+      clock: manualClock(),
+      port: 0,
+      host: "127.0.0.1",
+    });
+
+    await server.start();
+    const a = await Agent.connect(server.port());
+    await a.hello("ada", tokens.ada);
+    await a.next("welcome");
+    a.send("ticket_prs", { headRef: "feat/x", title: "x", body: "Closes ACME-1" });
+    expect((await a.next("ticket_prs_result")).payload).toMatchObject({
+      ticket: "ACME-1",
+      prs: [{ number: 3, state: "open" }],
+    });
+
+    expect(asked).toEqual([{ headRef: "feat/x", title: "x", body: "Closes ACME-1" }]);
+    a.ws.terminate();
+    await server.stop();
   });
 });
 

@@ -269,6 +269,11 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       data: { workItem: item.id, kind: item.kind, status: item.status },
     };
 
+    // The rules read whether the ticket was handed back as done from the state, so it is refreshed first.
+    await workState.refreshWorkers().catch((error: unknown) => {
+      log.warn("refreshing who worked on what failed", { error: String(error) });
+    });
+
     await track(
       engine.handle(event, {
         source: "workstate",
@@ -276,10 +281,6 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
         trusted: true,
       }),
     );
-
-    await workState.refreshWorkers().catch((error: unknown) => {
-      log.warn("refreshing who worked on what failed", { error: String(error) });
-    });
 
     log.info(handedBackText(item), { person: item.person });
   };
@@ -342,6 +343,37 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     messaging,
     usage,
     chat: chatDesk,
+    tickets: {
+      async forDraft(draft) {
+        // A pull request opened a moment ago may not have reached the state yet; the answer must not depend on that.
+        await workState.catchUp().catch((error: unknown) => {
+          log.warn("could not look for new pull requests", { error: String(error) });
+        });
+
+        const ticket = await workState.ticketForDraft({
+          headRef: draft.headRef,
+          title: draft.title,
+          body: draft.body,
+        });
+
+        return {
+          ...(ticket ? { ticket } : {}),
+          prs: ticket
+            ? workState
+                .prsOfTicket(ticket)
+                .toSorted((a, b) => a.ref.number - b.ref.number)
+                .map((p) => ({
+                  ref: workState.prSubject(p.ref),
+                  number: p.ref.number,
+                  title: p.title,
+                  ...(p.url ? { url: p.url } : {}),
+                  state: p.state,
+                  authorKind: p.author.kind,
+                }))
+            : [],
+        };
+      },
+    },
     auth: agentAuthFromSecrets(
       input.secrets,
       team.people.map((p) => p.handle),

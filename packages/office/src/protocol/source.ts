@@ -112,6 +112,11 @@ export interface ChatDesk {
   ): Promise<Filed>;
 }
 
+/** Which ticket a pull request about to be opened would link to, and what that ticket already has. Optional: without it `ticket_prs` is unsupported. */
+export interface TicketPrs {
+  forDraft(draft: PayloadOf<"ticket_prs">): Promise<PayloadOf<"ticket_prs_result">>;
+}
+
 /** Agent-to-agent questions. Optional until the messaging component exists; without it `ask` is unsupported. */
 export interface Messaging {
   ask(

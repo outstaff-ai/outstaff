@@ -78,6 +78,9 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const prs = new Map<string, PrRecord>();
   const tickets = new Map<string, TicketRecord>();
   const workers = new Map<string, string>();
+
+  /** Tickets whose latest work item ended as a hand-back as done. */
+  const handedBack = new Set<string>();
   const notTickets = new Set<string>();
   const handlers: WorkstateHandler[] = [];
 
@@ -292,8 +295,12 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     return false;
   };
 
-  const inferTicket = async (pr: PullRequest, prev?: PrRecord): Promise<string | undefined> => {
-    const candidates = ticketCandidates({ headRef: pr.head.ref, title: pr.title, body: pr.body });
+  /** The ticket a pull request links to: the first candidate by `ticketCandidates` that the tracker knows. */
+  const ticketOfDraft = async (
+    draft: { headRef: string; title: string; body?: string },
+    prev?: PrRecord,
+  ): Promise<string | undefined> => {
+    const candidates = ticketCandidates(draft);
     if (prev?.ticket && candidates.includes(prev.ticket)) {
       return prev.ticket;
     }
@@ -306,6 +313,9 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     return undefined;
   };
+
+  const inferTicket = (pr: PullRequest, prev?: PrRecord) =>
+    ticketOfDraft({ headRef: pr.head.ref, title: pr.title, body: pr.body }, prev);
 
   // Pull requests
 
@@ -432,7 +442,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   // Who last worked on what
 
   const refreshWorkers = async () => {
-    const latest = new Map<string, { at: string; person: string }>();
+    const latest = new Map<string, { at: string; person: string; done: boolean }>();
     for (const item of await store.listItems()) {
       if (!item.subject || item.status === "queued") {
         continue;
@@ -447,13 +457,17 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
       const seen = key && latest.get(key);
       if (key && (!seen || seen.at < item.updatedAt)) {
-        latest.set(key, { at: item.updatedAt, person: item.person });
+        latest.set(key, { at: item.updatedAt, person: item.person, done: item.status === "done" });
       }
     }
 
     workers.clear();
+    handedBack.clear();
     for (const [key, v] of latest) {
       workers.set(key, v.person);
+      if (v.done) {
+        handedBack.add(key);
+      }
     }
   };
 
@@ -637,6 +651,22 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     refreshWorkers: () => locked(refreshWorkers),
 
+    async catchUp() {
+      const ctx: Ctx = { fresh: [] };
+      await locked(async () => {
+        for (const repo of repos) {
+          for (const listed of await vcs.listPullRequests(repo, { state: "open" })) {
+            const ref = { repo: listed.repo, number: listed.number };
+            if (!prs.has(prSubject(ref))) {
+              await refreshPr(ctx, ref, { baseline: true });
+            }
+          }
+        }
+      });
+
+      await deliver(ctx.fresh);
+    },
+
     async start() {
       if (running) {
         return;
@@ -661,6 +691,10 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       return rec && toWorkflowPr(rec);
     },
     pullRequests: (number) => [...prs.values()].filter((p) => p.ref.number === number),
+    pullRequestsOf: (t) => [...prs.values()].filter((p) => p.ticket === t).map(toWorkflowPr),
+    prsOfTicket: (t) => [...prs.values()].filter((p) => p.ticket === t),
+    ticketForDraft: (draft) => locked(() => ticketOfDraft(draft)),
+    handedBack: (t) => handedBack.has(t),
     ticket: (key) => tickets.get(key),
     lastWorker: (t) => workers.get(t),
     requester: (t) => tickets.get(t)?.requester,

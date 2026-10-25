@@ -476,6 +476,37 @@ export const messageSchema = z.discriminatedUnion("type", [
   ),
   message("current_work", empty),
   message("current_work_result", z.strictObject({ text: z.string() })),
+  message(
+    "ticket_prs",
+    z.strictObject({
+      headRef: z.string().min(1).max(250).describe("Branch the pull request would be opened from."),
+      title: z.string().min(1).max(256).describe("Title it would have."),
+      body: z.string().max(65_000).describe("Description it would have."),
+    }),
+  ),
+  message(
+    "ticket_prs_result",
+    z.strictObject({
+      ticket: z
+        .string()
+        .optional()
+        .describe(
+          "The ticket the pull request would link to, by the rule that links existing ones (closing keyword in the body, then branch, title, any key in the body); absent when it would link to none.",
+        ),
+      prs: z
+        .array(
+          z.strictObject({
+            ref: z.string().describe("Pull request, for example `acme/shop#12`."),
+            number: z.number().int(),
+            title: z.string(),
+            url: z.string().optional(),
+            state: z.enum(["open", "closed", "merged"]),
+            authorKind: z.enum(["human", "agent", "bot"]),
+          }),
+        )
+        .describe("The pull requests already linked to that ticket, in any state."),
+    }),
+  ),
   message("ack", empty),
   message(
     "error",

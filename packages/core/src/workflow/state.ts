@@ -8,6 +8,9 @@ export interface StaticTicket {
   lastWorker?: string;
   requester?: string;
   labels?: string[];
+
+  /** The agent's latest work on the ticket ended as a hand-back as done. */
+  handedBack?: boolean;
 }
 
 export interface StaticWorkflowData {
@@ -29,6 +32,8 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
     ticketStatus: (t) => data.tickets?.[t]?.status,
     assignee: (t) => data.tickets?.[t]?.assignee,
     pullRequest: (pr) => prs.find((p) => k(p.ref) === k(pr)),
+    pullRequestsOf: (t) => prs.filter((p) => data.links?.[p.ref.number] === t),
+    handedBack: (t) => data.tickets?.[t]?.handedBack ?? false,
     lastWorker: (t) => data.tickets?.[t]?.lastWorker,
     requester: (t) => data.tickets?.[t]?.requester,
     hasLabel: (t, label) => data.tickets?.[t]?.labels?.includes(label) ?? false,

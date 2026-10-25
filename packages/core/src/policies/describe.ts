@@ -61,7 +61,7 @@ export function describePolicies(
       };
     }
 
-    const missing = ids.filter((id) => !preset.has(id));
+    const missing = sw.kind === "rule" ? ids.filter((id) => !preset.has(id)) : [];
     if (configured !== sw.off && missing.length > 0) {
       return {
         switch: sw,

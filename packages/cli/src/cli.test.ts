@@ -314,6 +314,7 @@ policies.feedback.follow_up_round  true         team.yaml
 policies.feedback.merged_prs       true         team.yaml
 policies.hand_back.reassign        requester    team.yaml
 policies.hand_back.fallback        first_human  team.yaml
+policies.tickets.prs_per_ticket    one          team.yaml
 policies.conflicts.follow_up       true         team.yaml
 policies.retry.on_signal           true         team.yaml
 `);

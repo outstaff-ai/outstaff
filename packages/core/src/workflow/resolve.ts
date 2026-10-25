@@ -1,5 +1,5 @@
 import type { TeamConfig } from "../config/schema.js";
-import { POLICY_SWITCHES, policyOn, policyValue, type PolicySwitch } from "../policies/switches.js";
+import { POLICY_SWITCHES, policyOn, policyValue } from "../policies/switches.js";
 import { presetRules, type WorkflowPreset } from "./presets.js";
 import type { Rule, RuleInput } from "./rules.js";
 import { createStatusMap, type WorkflowStatusMap } from "./status-map.js";
@@ -52,23 +52,28 @@ export function applySwitches(
 ): { rules: Rule[]; switched: SwitchedRule[] } {
   const switched: SwitchedRule[] = [];
   const rules: Rule[] = [];
-  for (const rule of preset) {
-    const sw: PolicySwitch | undefined = POLICY_SWITCHES.find((s) => s.rules?.includes(rule.id));
-    if (!sw || policyValue(policies, sw.path) === sw.default) {
-      rules.push(rule);
-      continue;
+  for (const presetRule of preset) {
+    // A rule can be governed by more than one switch; each one that is off its default changes it in turn.
+    let rule: Rule | undefined = presetRule;
+    for (const sw of POLICY_SWITCHES.filter((s) => s.rules?.includes(presetRule.id))) {
+      const value = policyValue(policies, sw.path);
+      if (!rule || value === sw.default) {
+        continue;
+      }
+
+      const next: Rule | undefined = sw.rewrite ? sw.rewrite(rule, value) : undefined;
+      switched.push({
+        rule: presetRule.id,
+        on: presetRule.on,
+        switch: sw.path,
+        effect: next ? "edited" : "removed",
+      });
+
+      rule = next;
     }
 
-    const next = sw.rewrite ? sw.rewrite(rule, policyValue(policies, sw.path)) : undefined;
-    switched.push({
-      rule: rule.id,
-      on: rule.on,
-      switch: sw.path,
-      effect: next ? "edited" : "removed",
-    });
-
-    if (next) {
-      rules.push(next);
+    if (rule) {
+      rules.push(rule);
     }
   }
 

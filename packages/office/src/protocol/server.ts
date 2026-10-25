@@ -14,7 +14,13 @@ import {
 import { WebSocketServer, type WebSocket } from "ws";
 import type { Clock } from "../clock.js";
 import type { AgentAuth } from "./auth.js";
-import { ProtocolError, type ChatDesk, type Messaging, type WorkSource } from "./source.js";
+import {
+  ProtocolError,
+  type ChatDesk,
+  type Messaging,
+  type TicketPrs,
+  type WorkSource,
+} from "./source.js";
 
 export const CLOSE_AUTH = 4401;
 export const CLOSE_VERSION = 4426;
@@ -27,6 +33,9 @@ export interface ProtocolServerOptions {
   /** Receives the usage windows agents report. Without it a report is refused as unsupported. */
   usage?: { report(person: string, windows: PayloadOf<"usage">["windows"]): Promise<void> };
   chat?: ChatDesk;
+
+  /** Answers `ticket_prs`. Without it the request is refused as unsupported. */
+  tickets?: TicketPrs;
   auth: AgentAuth;
   clock: Clock;
   logger?: Logger;
@@ -275,6 +284,17 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         );
       case "current_work":
         return reply("current_work_result", { text: await desk().currentWork(person) });
+      case "ticket_prs": {
+        if (!opts.tickets) {
+          throw new ProtocolError(
+            "unsupported",
+            "This office does not track tickets and pull requests.",
+          );
+        }
+
+        return reply("ticket_prs_result", await opts.tickets.forDraft(m.payload));
+      }
+
       default:
         throw new ProtocolError("invalid", `Agents do not send "${m.type}".`);
     }

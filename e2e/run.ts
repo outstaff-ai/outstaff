@@ -2,7 +2,9 @@
 // request, a human asks for changes while another asks a question in chat (answered by a chat session before the round ends), the agent fixes and resolves the thread, a review with only a summary gets a
 // pull request comment, a batch review with two inline comments gets a reply in each thread, a short "yes" to the agent's own earlier comment is answered from the conversation, the human merges, a
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
-// request gets a reply and a follow-up pull request. The office, Postgres and the agent are the real images; GitHub,
+// request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
+// requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
+// ticket). The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -933,6 +935,85 @@ async function main() {
   assertEq(added4.forcePushes, 0, "nothing was rewritten");
   step(
     `conventions: ${fourth} in a repo that asks for added commits -> the fix on #${pr4.pr.number} is a new commit, no force push`,
+  );
+
+  // ---- 8. a ticket that needs two pull requests: the agent splits it first, then opens one pull request per ticket
+  const pullsBeforeSplit = (await state()).github.pulls.length;
+  const { key: parent } = await stub("POST", "/_test/tickets", {
+    title: "Add a farewell page",
+    description: "It takes two pull requests.\n\nsplit: Add a farewell footer",
+    assignee: "sam",
+  });
+
+  const split = await until(
+    "a sub-ticket, one pull request per ticket, both tickets in review",
+    (s) => {
+      const child = s.tickets.find((t: Json) => t.description.includes(`Part of ${parent}:`));
+      const forParent = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${parent}`));
+      const forChild =
+        child && s.github.pulls.find((p: Json) => p.body.includes(`Closes ${child.key}`));
+
+      const t = s.tickets.find((x: Json) => x.key === parent);
+      return forParent &&
+        forChild &&
+        t.status === "In Review" &&
+        t.assignee !== "sam" &&
+        child.status === "In Review"
+        ? { child, forParent, forChild, t }
+        : undefined;
+    },
+  );
+
+  assertEq(split.child.assignee, "sam", "the sub-ticket is assigned to the agent who made it");
+  assertEq(
+    JSON.stringify(split.child.links),
+    JSON.stringify([{ from: split.child.key, to: parent, kind: "relates" }]),
+    "the sub-ticket is linked to its parent",
+  );
+
+  assertEq(
+    split.t.comments.some((c: Json) => c.body.includes(split.child.key)),
+    true,
+    "the parent says it was split, with the sub-ticket's key",
+  );
+
+  const afterSplit = await state();
+  assertEq(
+    afterSplit.github.pulls.length,
+    pullsBeforeSplit + 2,
+    "two pull requests, one per ticket: the second one for the parent was refused",
+  );
+
+  assertEq(
+    afterSplit.github.pulls.filter((p: Json) => p.body.includes(`Closes ${parent}`)).length,
+    1,
+    "the parent has one pull request",
+  );
+
+  step(
+    `split: ${parent} split into ${split.child.key} -> #${split.forParent.number} and #${split.forChild.number}, one pull request per ticket; a second for ${parent} refused`,
+  );
+
+  await stub("POST", `/_test/pulls/${split.forParent.number}/merge`);
+  await until(
+    `${parent} done`,
+    (s) => s.tickets.find((x: Json) => x.key === parent).status === "Done",
+  );
+
+  assertEq(
+    (await state()).tickets.find((x: Json) => x.key === split.child.key).status,
+    "In Review",
+    "merging the parent's pull request leaves the sub-ticket alone",
+  );
+
+  await stub("POST", `/_test/pulls/${split.forChild.number}/merge`);
+  await until(
+    `${split.child.key} done`,
+    (s) => s.tickets.find((x: Json) => x.key === split.child.key).status === "Done",
+  );
+
+  step(
+    `split merge: #${split.forParent.number} merged -> only ${parent} is done; #${split.forChild.number} merged -> ${split.child.key} is done`,
   );
 
   const final = await state();

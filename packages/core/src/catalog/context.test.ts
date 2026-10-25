@@ -99,6 +99,16 @@ describe("buildContext", () => {
     });
   });
 
+  it("tells a template whether the team allows several pull requests per ticket", () => {
+    expect(ctx.policies.tickets).toEqual({ many_prs: false });
+    const many = buildContext({
+      ...acme,
+      policies: { ...acme.policies!, tickets: { prs_per_ticket: "many" } },
+    });
+
+    expect(many.policies.tickets).toEqual({ many_prs: true });
+  });
+
   it("renders a template end to end and keeps typos strict", () => {
     const t =
       "{{team.name}} on {{team.product}}: {{#each people.byRole.developer}}{{this.handle}} {{/each}}{{#if integrations.has.avatars}}avatars{{/if}}";

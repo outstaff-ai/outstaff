@@ -164,6 +164,86 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(ws.ticketForPr(prRef(third.number))).toBeUndefined();
     });
 
+    it("tells which ticket a pull request about to be opened links to, and what that ticket has", async () => {
+      const a = await tracker.createIssue({ title: "A", body: "" });
+      const b = await tracker.createIssue({ title: "B", body: "" });
+      const p = await pr({ title: `${a.key}: index`, head: { ref: "sam/index" } });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      await vcs.seed.merge(REPO, p.number, "dana");
+      await ws.apply(prEvent("pr.merged", p.number), meta());
+
+      // By the rule that links existing ones: a closing keyword outranks the branch and the title.
+      const draft = {
+        headRef: `sam/${a.key.toLowerCase()}-ui`,
+        title: "ui",
+        body: `Closes ${b.key}`,
+      };
+
+      expect(await ws.ticketForDraft(draft)).toBe(b.key);
+      expect(await ws.ticketForDraft({ ...draft, body: "" })).toBe(a.key);
+      expect(await ws.ticketForDraft({ headRef: "sam/ui", title: "ui", body: "" })).toBeUndefined();
+      expect(await ws.ticketForDraft({ headRef: "sam/ui", title: "SHOP-77: ui", body: "" })).toBe(
+        undefined,
+      );
+
+      expect(ws.prsOfTicket(a.key).map((r) => [r.ref.number, r.state])).toEqual([
+        [p.number, "merged"],
+      ]);
+
+      expect(ws.prsOfTicket(b.key)).toEqual([]);
+      expect(ws.pullRequestsOf(a.key).map((r) => r.state)).toEqual(["merged"]);
+    });
+
+    it("takes in an open pull request whose event has not arrived, without raising events", async () => {
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      const p = await pr({
+        title: `${issue.key}: index`,
+        head: { ref: "sam/index" },
+        mergeable: ["conflicting"],
+      });
+
+      expect(ws.prsOfTicket(issue.key)).toEqual([]);
+      await ws.catchUp();
+      expect(ws.prsOfTicket(issue.key).map((r) => r.ref.number)).toEqual([p.number]);
+      expect(seen).toEqual([]);
+
+      // What it knows is left as it is.
+      const before = ws.pullRequest(prRef(p.number));
+      await ws.catchUp();
+      expect(ws.pullRequest(prRef(p.number))).toEqual(before);
+    });
+
+    it("knows a ticket was handed back as done while its latest work item is done", async () => {
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      const item = await store.enqueue({
+        person: "sam",
+        kind: "assigned",
+        title: "assigned",
+        trigger: "human",
+        subject: { type: "ticket", ref: issue.key },
+      });
+
+      await store.updateItem(item.id, { status: "active" });
+      await ws.refreshWorkers();
+      expect(ws.handedBack(issue.key)).toBe(false);
+      await store.updateItem(item.id, { status: "done" });
+      await ws.refreshWorkers();
+      expect(ws.handedBack(issue.key)).toBe(true);
+
+      clock.advance(1000);
+      const later = await store.enqueue({
+        person: "sam",
+        kind: "review_feedback",
+        title: "feedback",
+        trigger: "human",
+        subject: { type: "ticket", ref: issue.key },
+      });
+
+      await store.updateItem(later.id, { status: "active" });
+      await ws.refreshWorkers();
+      expect(ws.handedBack(issue.key)).toBe(false);
+    });
+
     it("links the ticket assignee to the person", async () => {
       const issue = await tracker.createIssue({ title: "A", body: "", assignee: "u-sam" });
       await ws.apply(ticketEvent("ticket.assigned", issue.key), meta());

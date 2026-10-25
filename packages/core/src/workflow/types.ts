@@ -64,6 +64,12 @@ export interface WorkflowState {
   assignee(ticket: string): { id: string; kind: "human" | "agent" } | undefined;
   pullRequest(pr: PrRef): WorkflowPr | undefined;
 
+  /** Every pull request linked to the ticket, in any state. */
+  pullRequestsOf(ticket: string): WorkflowPr[];
+
+  /** True while the agent's latest work on the ticket ended as a hand-back as done. */
+  handedBack(ticket: string): boolean;
+
   /** Handle of the agent who last worked on the ticket. */
   lastWorker(ticket: string): string | undefined;
 

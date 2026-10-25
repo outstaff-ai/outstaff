@@ -149,7 +149,7 @@ export const ticketCreate = defineVerb({
   name: "ticket.create",
   summary: "Create a ticket assigned to you.",
   description:
-    "Creates a ticket assigned to you. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.",
+    "Creates a ticket assigned to you. Pass parent to make it a sub-ticket of another ticket: it is linked to the parent and its description starts with a Part of line with the parent's link. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.",
   input: z.strictObject({
     title: z.string().min(1).max(300).describe("Short title."),
     body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),
@@ -157,9 +157,15 @@ export const ticketCreate = defineVerb({
       .enum(["ready", "active"])
       .optional()
       .describe("Where it starts; active when you start now (the default inside a work item)."),
+    parent: key
+      .optional()
+      .describe("Key of the ticket this one is part of; the new ticket is linked to it."),
   }),
   args: [],
-  examples: ['ost ticket create --title "Add a search page" --body "Asked by Dana in chat."'],
+  examples: [
+    'ost ticket create --title "Add a search page" --body "Asked by Dana in chat."',
+    'ost ticket create --parent ACME-12 --title "Add the search index" --body "The index half of ACME-12."',
+  ],
   async run(env, input, ctx) {
     const tracker = requireTracker(env);
     const current = ctx.workItemId
@@ -168,7 +174,8 @@ export const ticketCreate = defineVerb({
         )
       : undefined;
 
-    if (current?.ticketKey) {
+    // A sub-ticket is made from inside the work item of its parent: that is what splitting a ticket is.
+    if (current?.ticketKey && !input.parent) {
       throw new PortError(
         "invalid",
         `This work item already has ticket ${current.ticketKey}; use it instead of creating another.`,
@@ -182,17 +189,33 @@ export const ticketCreate = defineVerb({
       ? (await tracker.members()).find((m) => m.id === handle || m.username === handle)
       : undefined;
 
+    const parent = input.parent ? await tracker.getIssue(input.parent) : undefined;
+    const partOf = parent ? `Part of ${parent.key}: ${tracker.links.issue(parent.key)}` : undefined;
     const issue = await tracker.createIssue({
       title: input.title,
-      body: input.body,
+      body: partOf ? `${partOf}\n\n${input.body}`.trimEnd() : input.body,
       status: input.status ?? (ctx.workItemId && !chat ? "active" : "ready"),
       ...(member ? { assignee: member.id } : {}),
     });
 
+    // The body line is the link every tracker can show; a tracker that relates tickets gets the relation as well.
+    if (parent) {
+      await tracker.link(issue.key, parent.key, "relates").catch((error: unknown) => {
+        if (!(error instanceof PortError)) {
+          throw error;
+        }
+      });
+    }
+
     const url = tracker.links.issue(issue.key);
     const filed = chat ? await requireOffice(env).linkTicket(current.id, issue.key) : undefined;
     return result(
-      [`Created ${issue.key}.`, ...summary(issue, url), ...(filed ? [filedLine(filed)] : [])],
+      [
+        `Created ${issue.key}.`,
+        ...summary(issue, url),
+        ...(partOf ? [partOf] : []),
+        ...(filed ? [filedLine(filed)] : []),
+      ],
       { issue, ...(filed ? { filed } : {}) },
       [url],
     );

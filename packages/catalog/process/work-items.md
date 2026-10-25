@@ -8,7 +8,8 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 - Never mix items. Do not carry code, branches, decisions or assumptions from one item into another. Anything that applies to later items goes in memory (see `references/memory.md`).
 - Start from the current state the office gives you (ticket, pull request, CI, open review threads), not from what you remember.
 - Stay inside the item. If you find unrelated work, file or mention it; do not do it now.
-- Use `ost work list` to see your current item and your queue.
+- Use `ost work list` to see your current item and your queue.{{#if integrations.has.tracker}}
+- A ticket is one pull request. If its work needs several, split it into sub-tickets before you start (`process/ticket-lifecycle.md`, "One pull request per ticket").{{/if}}
 
 ## Journal
 

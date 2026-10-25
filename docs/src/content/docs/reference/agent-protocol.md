@@ -646,6 +646,35 @@ Sent by: office.
 | ------ | ------ | -------- | ----------- |
 | `text` | string | yes      |             |
 
+### `ticket_prs`
+
+Asks which ticket a pull request about to be opened would link to and which pull requests that ticket already has, so `ost pr open` can keep to one pull request per ticket.
+
+Sent by: agent. Answered by: `ticket_prs_result`, `error`.
+
+| Field     | Type   | Required | Description                                   |
+| --------- | ------ | -------- | --------------------------------------------- |
+| `headRef` | string | yes      | Branch the pull request would be opened from. |
+| `title`   | string | yes      | Title it would have.                          |
+| `body`    | string | yes      | Description it would have.                    |
+
+### `ticket_prs_result`
+
+The ticket the pull request would link to, and the pull requests it already has.
+
+Sent by: office.
+
+| Field              | Type                           | Required | Description                                                                                                                                                                                |
+| ------------------ | ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ticket`           | string                         | no       | The ticket the pull request would link to, by the rule that links existing ones (closing keyword in the body, then branch, title, any key in the body); absent when it would link to none. |
+| `prs`              | list of objects                | yes      | The pull requests already linked to that ticket, in any state.                                                                                                                             |
+| `prs[].ref`        | string                         | yes      | Pull request, for example `acme/shop#12`.                                                                                                                                                  |
+| `prs[].number`     | integer                        | yes      |                                                                                                                                                                                            |
+| `prs[].title`      | string                         | yes      |                                                                                                                                                                                            |
+| `prs[].url`        | string                         | no       |                                                                                                                                                                                            |
+| `prs[].state`      | `open` or `closed` or `merged` | yes      |                                                                                                                                                                                            |
+| `prs[].authorKind` | `human` or `agent` or `bot`    | yes      |                                                                                                                                                                                            |
+
 ### `ack`
 
 The request succeeded and has nothing to return.
