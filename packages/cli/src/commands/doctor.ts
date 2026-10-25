@@ -1,9 +1,12 @@
 import { statSync } from "node:fs";
-import { createOfficeConnection } from "@outstaff/agent";
+import { homedir } from "node:os";
+import { createOfficeConnection, loadToolsets, runMise, verifyTools } from "@outstaff/agent";
 import { join } from "node:path";
 import {
+  effectiveTools,
   envSecretSource,
   formatIssue,
+  renderPerson,
   validateTeam,
   type DoctorCheck,
   type SecretSource,
@@ -14,6 +17,7 @@ import {
   loadCatalogs,
   roleProfile,
   roleRegistry,
+  stockCatalogDir,
   type TeamCatalogs,
 } from "../catalogs.js";
 import { defineCommand, type Context } from "../define.js";
@@ -268,6 +272,75 @@ async function officeChecks(
   return out;
 }
 
+/**
+ * Does every tool the person's toolsets and `tools:` declare resolve through mise from the home directory, the
+ * way a shim does for the agent? Only the agent's own container has them installed, so from anywhere else a
+ * failure is a warning.
+ */
+async function toolChecks(
+  ctx: Context,
+  team: TeamConfig,
+  person: TeamConfig["people"][number],
+  catalogs: TeamCatalogs | undefined,
+  inContainer: boolean,
+): Promise<DoctorCheck[]> {
+  if (!catalogs) {
+    return [];
+  }
+
+  let extended: string[];
+  try {
+    extended = renderPerson({
+      team,
+      handle: person.handle,
+      catalog: catalogs.stock,
+      ...(catalogs.ejected ? { ejected: catalogs.ejected } : {}),
+    }).extends;
+  } catch {
+    return [];
+  }
+
+  const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
+  const toolsets = loadToolsets(stockCatalogDir(ctx), roles, person.role, extended);
+  const tools = effectiveTools({ toolsets, team: team.tools, person: person.tools });
+  if (tools.length === 0) {
+    return [];
+  }
+
+  const status: Status = inContainer ? "fail" : "warn";
+  const home = ctx.home ?? homedir();
+  const mise = ctx.mise ?? runMise;
+  const probe = await mise(["--version"], { cwd: home, env: ctx.env });
+  if (probe.code !== 0) {
+    return [
+      {
+        name: "Tools resolve",
+        status,
+        detail: "mise is not installed here, so the declared tools were not checked.",
+        fix: `Run \`ost doctor ${person.handle}\` inside the agent container.`,
+      },
+    ];
+  }
+
+  const failed = await verifyTools({ tools, home, env: ctx.env, mise });
+  if (failed.length === 0) {
+    return [
+      {
+        name: "Tools resolve",
+        status: "ok",
+        detail: `${plural(tools.length, "tool")} resolve${tools.length === 1 ? "s" : ""}: ${tools.map((t) => `${t.name}@${t.version}`).join(", ")}.`,
+      },
+    ];
+  }
+
+  return failed.map((t) => ({
+    name: `Tool ${t.name} resolves`,
+    status,
+    detail: t.error ?? `${t.name}@${t.version} does not resolve.`,
+    fix: "Restart the agent so it installs its tools and writes the global mise config; check the egress to the tool sources.",
+  }));
+}
+
 interface ScopeReport {
   scope: string;
   checks: (DoctorCheck & { adapter?: string })[];
@@ -303,6 +376,11 @@ async function checkScope(
 
   if (scope === "person") {
     checks.push(...(await officeChecks(ctx, secrets, handle)));
+    if (person) {
+      checks.push(
+        ...(await toolChecks(ctx, team, person, catalogs, dir === CONTAINER_SECRETS_DIR)),
+      );
+    }
   } else if (dir !== CONTAINER_SECRETS_DIR) {
     checks.push({
       name: "Office checks itself",
@@ -376,7 +454,7 @@ export const doctor = defineCommand<{ secretsDir?: string }>({
   name: "doctor",
   summary: "Verify the secrets and the setup of the office and of each person.",
   description:
-    "Validates the team file, then for each scope checks that every required secret is present (as a file in the secrets directory or in the environment, the same way the containers read them), that secret files are mode 0600, and each adapter's live checks: the GitHub App key signs and the office App covers the granted repositories and the person's own App exactly the ones they can write, with the right permissions, the office App is read-only, the Slack bot token and ids match, the Its a Plan key works and belongs to the configured member, and a Claude credential is supplied. Every finding names the value to fix and never prints a secret. Without a handle it checks the office and every person from one secrets directory.",
+    "Validates the team file, then for each scope checks that every required secret is present (as a file in the secrets directory or in the environment, the same way the containers read them), that secret files are mode 0600, and each adapter's live checks: the GitHub App key signs and the office App covers the granted repositories and the person's own App exactly the ones they can write, with the right permissions, the office App is read-only, the Slack bot token and ids match, the Its a Plan key works and belongs to the configured member, a Claude credential is supplied, and every tool declared for the person resolves through mise (a failure inside the agent container, a warning elsewhere). Every finding names the value to fix and never prints a secret. Without a handle it checks the office and every person from one secrets directory.",
   args: "[handle|office]",
   options: [
     {

@@ -250,6 +250,13 @@ workflow:
     done: Done
     canceled: Canceled
 office: { events: poll, poll_interval_seconds: 10 }
+policies:
+  commands:
+    # The code toolset allows pnpm's verbs, not \`pnpm --version\`; the scripted agent checks the tool with it.
+    allow:
+      - program: pnpm
+        args: [{ kind: flag, names: [--version], present: true }]
+        reason: Prints the version of the tool the toolset installed.
 `;
 
 /**

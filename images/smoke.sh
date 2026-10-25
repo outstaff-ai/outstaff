@@ -3,6 +3,7 @@
 #   images/smoke.sh <repository-prefix> <tag> [image...]
 # Example: images/smoke.sh ost dev agent office   (images default to all four)
 # Images run with a read-only root filesystem and only /tmp and HOME writable, as the docs advise.
+# The agent check installs pnpm and yarn from the code toolset with mise, so it needs outbound HTTPS to the tool sources.
 set -euo pipefail
 
 prefix="${1:?usage: smoke.sh <repository-prefix> <tag> [image...]}"
@@ -18,6 +19,13 @@ ref() { echo "${prefix}/$1:${tag}"; }
 run() {
   local image="$1"; shift
   docker run --rm --read-only --tmpfs /tmp --tmpfs /home/outstaff:uid=10001,gid=10001 \
+    --cap-drop ALL --security-opt no-new-privileges "$(ref "$image")" "$@"
+}
+
+# Like run, but HOME may hold executables: mise installs the tools there, as it does on a real home volume.
+run_exec() {
+  local image="$1"; shift
+  docker run --rm --read-only --tmpfs /tmp --tmpfs /home/outstaff:exec,uid=10001,gid=10001 \
     --cap-drop ALL --security-opt no-new-privileges "$(ref "$image")" "$@"
 }
 
@@ -42,6 +50,40 @@ smoke_agent() {
   expect "$image" '^bubblewrap [0-9]' bwrap --version
   expect "$image" '^not setuid$' sh -c 'test -u "$(command -v bwrap)" && echo setuid || echo not setuid'
   expect "$image" 'socat version' socat -V
+  smoke_toolset "$image"
+}
+
+# Installs a sample of the code toolset (pnpm and yarn) the way agent start does, then runs each tool in an unrelated
+# directory: the global mise config must make the shims resolve there, and a tool that does not fails the install.
+SAMPLE_TOOLSET='
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { effectiveTools, loadToolset } from "@outstaff/core";
+import { installTools } from "@outstaff/agent";
+const catalog = dirname(fileURLToPath(import.meta.resolve("@outstaff/catalog/package.json")));
+const code = loadToolset(join(catalog, "toolsets", "code.yaml"));
+const tools = effectiveTools({ toolsets: [code] }).filter((t) => ["pnpm", "yarn"].includes(t.name));
+const { statuses } = await installTools({ tools, home: process.env.HOME });
+const bad = statuses.filter((s) => s.state === "unavailable");
+if (bad.length > 0 || tools.length !== 2) {
+  console.error(bad.map((s) => s.error).join("\n") || "the code toolset no longer declares pnpm and yarn");
+  process.exit(1);
+}
+process.chdir("/tmp");
+for (const t of tools) {
+  console.log(`${t.name} ${execFileSync(t.name, ["--version"], { encoding: "utf8" }).trim()}`);
+}
+'
+
+smoke_toolset() {
+  local image="$1" out
+  out="$(run_exec "$image" sh -c 'cd /opt/outstaff && exec node --input-type=module -e "$0"' "$SAMPLE_TOOLSET" 2>&1)" \
+    || fail "$image: installing the sample toolset failed: $out"
+  for tool in pnpm yarn; do
+    grep -Eq "^$tool [0-9]+\.[0-9]+\.[0-9]+" <<<"$out" || fail "$image: '$tool --version' printed '$out'"
+    echo "ok   $image: $tool --version resolves after the toolset is installed"
+  done
 }
 
 smoke_office() {

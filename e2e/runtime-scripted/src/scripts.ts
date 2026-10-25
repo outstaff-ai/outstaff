@@ -72,6 +72,12 @@ export async function* assigned(ctx: ItemContext): Script {
   const branch = need(ctx.branch, "the branch");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
+  // The toolset's tools work in the worktree: the mise shim has a version set, not just an install behind it.
+  const pnpm = (yield { type: "shell", command: "pnpm --version", cwd }).trim();
+  if (!/^\d+\.\d+\.\d+/.test(pnpm)) {
+    throw new Error(`pnpm --version printed "${pnpm}", not a version.`);
+  }
+
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield { type: "write", path: `${cwd}/${FILE}`, text: withGreeting(current, key) };
   yield { type: "shell", command: "git add -A", cwd };

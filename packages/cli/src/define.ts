@@ -1,4 +1,4 @@
-import type { AgentEnv, OfficeClient } from "@outstaff/agent";
+import type { AgentEnv, MiseRunner, OfficeClient } from "@outstaff/agent";
 import type { AdapterRegistry, ConfigFs, GitClient } from "@outstaff/core";
 
 /** Everything a command touches outside its own arguments, so tests can run commands in-process. */
@@ -34,6 +34,9 @@ export type Context = {
 
   /** How long `ost doctor` waits for the office's handshake; tests only. */
   officeTimeoutMs?: number;
+
+  /** Runs mise for `ost doctor`'s tool check; defaults to the `mise` on the PATH (tests only). */
+  mise?: MiseRunner;
 
   /** Home directory, where `ost setup --derive` looks for a downloaded key in `Downloads`; defaults to the user's. */
   home?: string;

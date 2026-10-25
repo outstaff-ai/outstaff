@@ -67,9 +67,17 @@ Outstaff's built-in denies still win over everything here: raw network tools, sh
 
 The agent works out the person's effective tool list, writes `mise.toml` to `$HOME/.config/outstaff/tools/`, and runs mise. The first start locks the versions (`mise lock`, which records checksums in `mise.lock`) and installs them. Later starts compare a hash of the list and the lockfile and do nothing when it has not changed. A changed version refreshes the lock and installs the new version. If the lockfile is there for the same list but the hash is lost, the agent installs from it with `mise install --locked`. The mise shims are put on the `PATH` of the programs the runtime starts.
 
+Installing a version does not make it the active one, so the agent also writes the global mise config, `$HOME/.config/mise/config.toml`, listing every declared tool at its version (set `MISE_GLOBAL_CONFIG_FILE` to keep it elsewhere, for example on the data volume). It does this on every start. A shim such as `pnpm` then resolves in any directory. A repository's own mise config or `.tool-versions` still wins inside that repository.
+
+Last, the agent asks mise, from the home directory, which version of each tool is active and whether it is installed.
+
 Installing costs time on the first start: allow for it in the startup probe or grace period ([container contract](/reference/container-contract/#resources)). Keep the mise data and cache directories on the home volume so a replaced container does not install again.
 
-If a tool cannot be installed, the agent still starts. The error names the tool and version, is written to the startup log, and `ost me` lists the tool as `UNAVAILABLE`. The agent will not retry within the session; fix the declaration or the egress and restart. Nothing is recorded for a failed install, so the next start tries again.
+If a tool cannot be installed, or is installed but does not resolve, the agent does not start. The error names the tool and version and is written to the startup log, so the problem shows at start and not at the first command. Fix the declaration or the egress and restart. Nothing is recorded for a failed install, so the next start tries again. `ost doctor <handle>` runs the same check: inside the agent container a tool that does not resolve is a failure; elsewhere it is a warning, or a note that mise is not installed there.
+
+## Repositories that pin their own package manager
+
+A repository can ask for its own pnpm: `packageManager` in `package.json`, or `devEngines.packageManager` with `onFail: "download"`. The pnpm the toolset installs starts, sees the request and switches itself to that version, so the declared version is only the starting point. The same goes for yarn and `packageManager`. This needs egress to the npm registry on first use of each version.
 
 ## Egress
 

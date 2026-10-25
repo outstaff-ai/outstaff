@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createOfficeConnection } from "../office-client/index.js";
 import { FakeSocket } from "../office-client/testing.js";
+import { withGlobalConfig } from "../tools/testing.js";
 import { StartupError, prepareAgent } from "./startup.js";
 
 const stockCatalogDir = fileURLToPath(new URL("../../../catalog", import.meta.url));
@@ -94,7 +95,7 @@ function setup(extra: Record<string, string> = {}, team = TEAM) {
     connection,
     // The developer role's stock tools would otherwise run the real mise and change this process's PATH.
     tools: {
-      mise: async () => ({ code: 0, stdout: "", stderr: "" }),
+      mise: withGlobalConfig(async () => ({ code: 0, stdout: "", stderr: "" })),
       addToPath: () => {},
     },
   };
@@ -199,15 +200,28 @@ describe("prepareAgent", () => {
     const agent = await prepareAgent({
       ...options,
       tools: {
-        mise: async (args) => {
+        mise: (args, o) => {
           calls.push(args);
-          return { code: 0, stdout: "", stderr: "" };
+          return withGlobalConfig(async () => ({ code: 0, stdout: "", stderr: "" }))(args, o);
         },
         addToPath: (dir) => paths.push(dir),
       },
     });
 
-    expect(calls).toEqual([["lock"], ["install"]]);
+    expect(calls.filter((c) => c[0] === "lock" || c[0] === "install")).toEqual([
+      ["lock"],
+      ["install"],
+    ]);
+
+    // Every tool is asked for once more, outside the generated config, as a shim would be.
+    expect(calls.filter((c) => c[0] === "current").map((c) => c[1])).toEqual([
+      "go",
+      "pnpm",
+      "python",
+      "ubi:vendor/their-cli",
+      "yarn",
+    ]);
+
     expect(paths).toEqual([join(home, ".local/share/mise/shims")]);
     // The team's go replaces the code toolset's; the toolset's other tools stay.
     expect(agent.tools.map((t) => [t.name, t.version])).toEqual([
@@ -228,12 +242,10 @@ describe("prepareAgent", () => {
     expect(run("their-cli deploy").effect).toBe("ask");
   });
 
-  it("starts anyway when a tool cannot be installed and says which", async () => {
+  it("fails to start, naming the tool, when one cannot be installed", async () => {
     const { options } = setup({}, TOOLS_TEAM);
-    const logged: string[] = [];
-    const agent = await prepareAgent({
+    const error = await prepareAgent({
       ...options,
-      log: { debug() {}, info() {}, warn() {}, error: (m) => logged.push(m) },
       tools: {
         mise: async () => ({
           code: 127,
@@ -242,11 +254,33 @@ describe("prepareAgent", () => {
         }),
         addToPath: () => {},
       },
-    });
+    }).catch((e: unknown) => e);
 
-    expect(agent.tools.every((t) => t.state === "unavailable")).toBe(true);
-    expect(logged.some((m) => m.includes("go@1.23.4 is unavailable"))).toBe(true);
-    expect(agent.env.tools).toBe(agent.tools);
+    expect(error).toBeInstanceOf(StartupError);
+    expect((error as Error).message).toContain("go@1.23.4 could not be installed");
+    expect((error as Error).message).toContain("pnpm@12.9.1 could not be installed");
+  });
+
+  it("fails to start when an installed tool does not resolve", async () => {
+    const { options } = setup({}, TOOLS_TEAM);
+    const error = await prepareAgent({
+      ...options,
+      tools: {
+        mise: withGlobalConfig(async (args) =>
+          args[0] === "where" && args[1] === "pnpm@12.9.1"
+            ? { code: 1, stdout: "", stderr: "mise ERROR pnpm@12.9.1 is not installed" }
+            : { code: 0, stdout: "", stderr: "" },
+        ),
+        addToPath: () => {},
+      },
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(StartupError);
+    expect((error as Error).message).toContain(
+      "pnpm@12.9.1 does not resolve: pnpm@12.9.1 is not installed",
+    );
+
+    expect((error as Error).message).not.toContain("go@");
   });
 
   it("does not run mise when no tool is declared", async () => {
