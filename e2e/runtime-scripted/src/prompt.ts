@@ -14,6 +14,9 @@ export interface ItemContext {
   branch?: string;
   scratch?: string;
 
+  /** The convention files the prompt lists in the worktree, for example CONTRIBUTING.md. */
+  conventionFiles: string[];
+
   /** The journal of earlier rounds, as one text. */
   journal: string;
 
@@ -46,6 +49,10 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
   );
 
   const scratch = /Scratch space: (\S+?)\.$/m.exec(prompt)?.[1];
+  const listed = /Read these files in the worktree before you change anything[^:]*: (.+?)\.$/m.exec(
+    prompt,
+  )?.[1];
+
   const journal = /Journal of earlier rounds:\n([\s\S]*?)(?:\n\n|$)/.exec(prompt)?.[1] ?? "";
   const feedback = prompt
     .split(/^(?=Triggered by )/m)
@@ -95,6 +102,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...(pr ? { pr: Number(pr) } : {}),
     ...(tree ? { worktree: tree[1]!, repo: tree[2]!.replace(/,$/, ""), branch: tree[3]! } : {}),
     ...(scratch ? { scratch } : {}),
+    conventionFiles: listed ? listed.split(", ") : [],
     journal,
     feedback,
     ...(conversation?.length ? { conversation } : {}),

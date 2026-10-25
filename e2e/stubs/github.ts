@@ -685,6 +685,7 @@ export function createGithub(opts: GithubOptions) {
               state: p.merged ? "merged" : p.state,
               mergeable: r.mergeable,
               forcePushes: p.forcePushes,
+              commits: await repo.ahead(p.base, p.head),
               containsMain: await repo.isAncestor(p.base, p.head),
               conversation: p.conversation,
               threads: [...threads.values()]

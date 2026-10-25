@@ -102,8 +102,11 @@ export function buildWorkPrompt(
       "",
       `Your worktree for this item is ${w.worktree} (repository ${w.repo}, branch ${w.branch}). Scratch space: ${w.scratch}.`,
       head
-        ? `The branch to push to is ${head}, the head of your open pull request: git push origin HEAD:${head} (amend and use --force-with-lease as references/git.md says), so the pull request itself changes. Never open a new branch or pull request for this round, and never push to the default branch.`
+        ? `The branch to push to is ${head}, the head of your open pull request: git push origin HEAD:${head} (with --force-with-lease if you rewrite commits that are already pushed), so the pull request itself changes. Never open a new branch or pull request for this round, and never push to the default branch.`
         : "Commit there and push that branch; never push to the default branch.",
+      w.conventionFiles.length
+        ? `The repository says how work is done in it. Read these files in the worktree before you change anything, and follow them for commits, branches, the pull request and checks: ${w.conventionFiles.join(", ")}.`
+        : "The repository has no contribution guide, agent guide or pull request template. Follow the defaults in references/git.md and the style of its history.",
     );
   }
 

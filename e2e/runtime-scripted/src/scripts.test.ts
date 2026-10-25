@@ -20,6 +20,7 @@ const ctx = {
   branch: "assigned/w1-add-a-greeting",
   journal: "",
   feedback: [],
+  conventionFiles: ["CONTRIBUTING.md"],
 };
 
 /** Plays a script, answering each action with `answer`, and returns the actions and the final message. */
@@ -268,5 +269,48 @@ describe("reviewFeedback", () => {
   it("starts at the review gate, so a driver can hold the round", async () => {
     const script = reviewFeedback({ ...ctx, kind: "review_feedback", pr: 1 });
     expect((await script.next()).value).toEqual({ type: "gate", name: "review" });
+  });
+});
+
+describe("reviewFeedback follows the repository's own commit rules", () => {
+  const round = (rules: string) =>
+    play(
+      reviewFeedback({
+        ...ctx,
+        kind: "review_feedback",
+        pr: 1,
+        feedback: [{ kind: "review", body: "Please fix.", threads: ["PRRT_1"] }],
+      }),
+      (a) =>
+        a.type === "read" && a.path.endsWith("CONTRIBUTING.md")
+          ? rules
+          : a.type === "read"
+            ? "hello\nworld\n"
+            : a.type === "shell" && a.command === "git rev-parse --abbrev-ref HEAD"
+              ? "assigned/w1-add-a-greeting"
+              : a.type === "shell" && a.command.startsWith("git log")
+                ? "origin/assigned/w1-add-a-greeting|SHOP-1: Add a greeting"
+                : a.type === "tool" && a.tool === "pr_threads"
+                  ? "PRRT_1 open"
+                  : "abc123",
+    );
+
+  const shells = (seen: Action[]) => seen.flatMap((a) => (a.type === "shell" ? [a.command] : []));
+
+  it("amends and pushes with a lease when the rules ask for one commit", async () => {
+    const { seen } = await round("One commit per pull request.");
+    expect(shells(seen)).toContain("git commit --amend --no-edit");
+    expect(shells(seen)).toContain(
+      "git push --force-with-lease origin HEAD:'assigned/w1-add-a-greeting'",
+    );
+
+    expect(shells(seen).some((c) => c.startsWith("git commit -m"))).toBe(false);
+  });
+
+  it("adds a commit and pushes plainly when the rules say nothing about one commit", async () => {
+    const { seen } = await round("Add commits for review feedback; never rewrite pushed history.");
+    expect(shells(seen)).toContain("git commit -m 'SHOP-1: address review'");
+    expect(shells(seen)).toContain("git push origin HEAD:'assigned/w1-add-a-greeting'");
+    expect(shells(seen).some((c) => c.includes("--amend"))).toBe(false);
   });
 });

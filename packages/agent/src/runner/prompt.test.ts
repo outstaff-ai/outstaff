@@ -117,7 +117,13 @@ describe("buildWorkPrompt feedback", () => {
 });
 
 describe("buildWorkPrompt branch", () => {
-  const workspace = { repo: "app", worktree: "/w/app/w7", branch: "feat/x", scratch: "/s/w7" };
+  const workspace = {
+    repo: "app",
+    worktree: "/w/app/w7",
+    branch: "feat/x",
+    scratch: "/s/w7",
+    conventionFiles: [],
+  };
 
   it("tells a round on a pull request to push to its head branch", () => {
     const o = offer();
@@ -171,4 +177,36 @@ describe("buildWorkPrompt chat requests", () => {
       expect(prompt).not.toContain("mentioning");
     },
   );
+});
+
+describe("buildWorkPrompt conventions", () => {
+  const workspace = {
+    repo: "shop",
+    worktree: "/home/sam/worktrees/shop/w7",
+    branch: "ticket/w7",
+    scratch: "/home/sam/scratch/w7",
+  };
+
+  it("lists the convention files found in the worktree, to read first", () => {
+    const prompt = buildWorkPrompt(offer(), {
+      resumed: false,
+      workspace: {
+        ...workspace,
+        conventionFiles: ["CONTRIBUTING.md", ".github/pull_request_template.md"],
+      },
+    });
+
+    expect(prompt).toContain("Read these files in the worktree before you change anything");
+    expect(prompt).toContain("CONTRIBUTING.md, .github/pull_request_template.md.");
+  });
+
+  it("says so when the repository has none, and points at the defaults", () => {
+    const prompt = buildWorkPrompt(offer(), {
+      resumed: false,
+      workspace: { ...workspace, conventionFiles: [] },
+    });
+
+    expect(prompt).toContain("has no contribution guide");
+    expect(prompt).toContain("references/git.md");
+  });
 });

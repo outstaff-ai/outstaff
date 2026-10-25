@@ -117,6 +117,25 @@ export class BareRepo {
     return r.code === 0;
   }
 
+  /** How many commits `head` has that `base` does not. */
+  async ahead(base: string, head: string): Promise<number> {
+    return Number(await must(["rev-list", "--count", `${base}..${head}`], this.dir));
+  }
+
+  /** Commits one file on a branch, as a person would with a clone of their own. */
+  async commitFile(branch: string, path: string, text: string, message: string): Promise<void> {
+    const work = mkdtempSync(join(tmpdir(), "edit-"));
+    try {
+      await must(["clone", "--branch", branch, this.dir, work]);
+      writeFileSync(join(work, path), text);
+      await must(["add", "-A"], work);
+      await must(["commit", "-m", message], work);
+      await must(["push", "origin", branch], work);
+    } finally {
+      rmSync(work, { recursive: true, force: true });
+    }
+  }
+
   async isAncestor(ancestor: string, descendant: string): Promise<boolean> {
     return (await git(["merge-base", "--is-ancestor", ancestor, descendant], this.dir)).code === 0;
   }

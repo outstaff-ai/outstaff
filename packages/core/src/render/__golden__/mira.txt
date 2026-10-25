@@ -74,7 +74,7 @@ Use this when a trusted human reviews or comments on a pull request of yours tha
 1. Read the feedback and decide: is it a question or a note, or does it ask for a change?
 2. Answer on the merged pull request with `ost pr comment <n> --body "..."`, quoting or linking what you answer.
 3. If it is only a question or a note, stop here. Answering is the whole job.
-4. If it asks for a change, branch from the up-to-date default branch (never from the merged branch) and make the change as in `references/git.md`. One commit, and run only the checks it affects.
+4. If it asks for a change, branch from the up-to-date default branch (never from the merged branch) and make the change as in `references/git.md`, following the repository's conventions. Run only the checks it affects.
 5. Open a follow-up pull request with `ost pr open`. In the description, link the original pull request and the feedback, and say what it changes. Put the ticket key in the title or description when there is one, so the pull request is linked to the ticket. A small fix needs no new ticket; create one only if your role says so.
 6. Comment on the merged pull request again with the link to the follow-up.
 7. Hand back as in `process/hand-back.md`. Leave the ticket status alone.
@@ -90,7 +90,7 @@ Use this each time a pull request you own gets review feedback. It comes in thre
 
 1. Read every open thread, every review summary and every conversation comment before changing anything. A review round starts when the review is submitted, and the work prompt lists the inline comments of that review with their thread ids.
 2. For each one, decide: fix, answer, or disagree. Answer an inline thread in that thread with `ost pr reply <n> <thread-id> --body "..."`, never in a new top-level comment. Answer a review summary or a conversation comment with `ost pr comment <n> --body "..."`, quoting or linking what it answers.
-3. Make the fixes in one commit amended onto the pull request's own branch, the one your worktree is on (see `references/git.md`), and push to that branch. Never push to a new branch for a review round; the pull request itself has to change.
+3. Make the fixes as the repository's conventions say for follow-up changes to a pull request (see `references/git.md`); if they say nothing, add focused commits. Push to the pull request's own branch, the one your worktree is on. Never push to a new branch for a review round; the pull request itself has to change.
 4. After the push, reply to each one you fixed, in the same place: say what changed.
 5. Resolve a thread only when both are true: you fixed it, and the last word in it is yours. If the reviewer replied last, or you did not change anything, leave it open for them. Summaries and conversation comments have nothing to resolve.
 6. Never resolve a thread that someone else has to judge, including a thread you disagree with. State your reasoning once, politely, and let the reviewer decide.
@@ -166,17 +166,34 @@ An item is not finished until you have followed `process/hand-back.md`. If you a
 - Fetch before every work item. Branch from the up-to-date default branch (`main` in `shop`).
 - Work only in your item's worktree.
 
-## Branches and commits
+## The repository's conventions come first
 
-- New work gets one branch per item, named for the change, for example `feat/short-name`. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
-- One commit per pull request. To change it, amend; do not add fixup commits.
-- Commit summary: `type(scope): summary`, with `feat`, `fix`, `docs`, `refactor`, `test`, `chore`. The pull request title is the same.
-- The body says why, then links the ticket if there is one.
+The repository is the source of truth for how work is done in it. Before you change code, read what it states, and follow it for the number and format of commits, signing, branch names, the pull request title and body, the tests to run, and anything else it says.
+
+- `CONTRIBUTING.md`, `AGENTS.md`, `.github/CONTRIBUTING.md`, `docs/CONTRIBUTING.md`.
+- The pull request template, `.github/pull_request_template.md`. Use it for the description instead of `templates/pull-request.md`.
+- Commit rules that CI enforces: a commit message linter, a single-commit check, a sign-off check.
+- Any extra files the team lists for the repository.
+
+The work prompt lists the convention files found in your worktree. A project `CLAUDE.md` is not one of them unless the team lists it: it is often written for a person's own assistant sessions.
+
+If the repository says nothing on a point, use these defaults:
+
+- One branch per item, named for the change.
+- Focused commits with clear messages, in the style of the repository's recent history.
+- A pull request description that says why, then links the ticket if there is one.
+- Never rewrite a commit you did not make, and never touch anyone else's branch.
+
+When the repository's rules and a default disagree, the repository wins. When two of its rules disagree, or a rule would make you do something unsafe, say so in the pull request or ask with `ost ask`.
 
 ## Pushing
 
+These are outstaff's mechanics, whatever the conventions say.
+
 - Never push to the default branch. Open a pull request.
-- Push an amended branch with `git push --force-with-lease`, and only on your own branch. Never force-push anyone else's branch or a shared one.
+- New work gets one branch per item. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
+- Push to your own branch only, and to the head branch of the pull request you work on. Never push to anyone else's branch or a shared one.
+- After you rewrite commits that are already pushed (an amend, a rebase), push with `git push --force-with-lease`. Never force-push anyone else's branch or a shared one.
 
 ### A push GitHub rejects for a missing permission
 
@@ -418,7 +435,8 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Always link tickets, pull requests and documents. Never write a bare id.
 - Keep the ticket in sync: assign it to yourself, move it when its real state changes, comment on anything non-obvious (`process/ticket-lifecycle.md`).
 - Work only in your item's worktree, only in repositories you can write to. Never push to the default branch.
-- Push with `--force-with-lease`, and only on your own branches (`references/git.md`).
+- Follow the repository's own conventions for commits, branches, pull requests and checks; `references/git.md` says where to find them and what to do when they say nothing.
+- After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches (`references/git.md`).
 - Do not widen the scope. Anything extra goes in a separate ticket or a mention, not in this pull request.
 - Unclear requirement or design question: ask product or the architect with `ost ask` (`references/team.md`) and say what you do meanwhile.
 - Do not resolve a review thread someone else must judge (`process/review-loop.md`).
@@ -434,7 +452,7 @@ A ticket is assigned and ready.
 1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code.
 2. Fetch, branch from the up-to-date default branch and write the change in small, readable steps that match the code around it.
 3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the checks for what you changed (see "Checks before you push"); fix what you broke.
-4. One commit, `type(scope): summary`. Push the branch, write the description from `templates/pull-request.md` to a file in your scratch directory and open the pull request: `ost pr open --title "type(scope): summary" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review).
+4. Commit and push the branch as the repository's conventions say (`references/git.md`). Write the description to a file in your scratch directory, from the repository's pull request template if it has one, else `templates/pull-request.md`, and open the pull request: `ost pr open --title "<title>" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review). The title follows the repository's conventions; if they say nothing, make it a short summary of the change.
 5. Hand back.
 
 If the change depends on an unmerged one, stack it (below).
@@ -443,7 +461,7 @@ If the change depends on an unmerged one, stack it (below).
 
 A pull request you own has new review threads.
 
-Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or disagree, amend one commit, push, reply in each thread, resolve only what you fixed and last spoke in.
+Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or disagree, commit the fixes as the repository's conventions say, push, reply in each thread, resolve only what you fixed and last spoke in.
 
 ### merged-feedback
 

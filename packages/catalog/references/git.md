@@ -5,17 +5,46 @@
 - Fetch before every work item. Branch from the up-to-date default branch{{#if repos.primary}} (`{{ repos.primary.default_branch }}` in `{{ repos.primary.name }}`){{/if}}.
 - Work only in your item's worktree.
 
-## Branches and commits
+## The repository's conventions come first
 
-- New work gets one branch per item, named for the change, for example `feat/short-name`. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
-- One commit per pull request. To change it, amend; do not add fixup commits.
-- Commit summary: `type(scope): summary`, with `feat`, `fix`, `docs`, `refactor`, `test`, `chore`. The pull request title is the same.
-- The body says why, then links the ticket if there is one.
+The repository is the source of truth for how work is done in it. Before you change code, read what it states, and follow it for the number and format of commits, signing, branch names, the pull request title and body, the tests to run, and anything else it says.
+
+- `CONTRIBUTING.md`, `AGENTS.md`, `.github/CONTRIBUTING.md`, `docs/CONTRIBUTING.md`.
+- The pull request template, `.github/pull_request_template.md`. Use it for the description instead of `templates/pull-request.md`.
+- Commit rules that CI enforces: a commit message linter, a single-commit check, a sign-off check.
+- Any extra files the team lists for the repository.
+{{#if repos.has_conventions}}
+
+The team also states these conventions, which apply in addition to the repository's files:
+{{#each repos.list}}
+{{#if this.conventions}}
+
+`{{this.name}}`:
+
+{{this.conventions}}
+{{/if}}
+{{/each}}
+{{/if}}
+
+The work prompt lists the convention files found in your worktree. A project `CLAUDE.md` is not one of them unless the team lists it: it is often written for a person's own assistant sessions.
+
+If the repository says nothing on a point, use these defaults:
+
+- One branch per item, named for the change.
+- Focused commits with clear messages, in the style of the repository's recent history.
+- A pull request description that says why, then links the ticket if there is one.
+- Never rewrite a commit you did not make, and never touch anyone else's branch.
+
+When the repository's rules and a default disagree, the repository wins. When two of its rules disagree, or a rule would make you do something unsafe, say so in the pull request or ask with `ost ask`.
 
 ## Pushing
 
+These are outstaff's mechanics, whatever the conventions say.
+
 - Never push to the default branch. Open a pull request.
-- Push an amended branch with `git push --force-with-lease`, and only on your own branch. Never force-push anyone else's branch or a shared one.
+- New work gets one branch per item. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
+- Push to your own branch only, and to the head branch of the pull request you work on. Never push to anyone else's branch or a shared one.
+- After you rewrite commits that are already pushed (an amend, a rebase), push with `git push --force-with-lease`. Never force-push anyone else's branch or a shared one.
 
 ### A push GitHub rejects for a missing permission
 

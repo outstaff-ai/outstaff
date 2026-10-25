@@ -9,8 +9,9 @@ import type { TeamConfig } from "../config/schema.js";
  * at runtime.
  *
  *   team.name, team.product
- *   repos.list[] {name,url,kind,default_branch,checks[]}, repos.primary (null when none),
- *                  repos.has_checks (true when any repo lists checks)
+ *   repos.list[] {name,url,kind,default_branch,checks[],conventions,instructions[]}, repos.primary (null when none),
+ *                  repos.has_checks (true when any repo lists checks),
+ *                  repos.has_conventions (true when any repo has conventions text)
  *   people.list[] {handle,name,pronouns,role,role_title,role_summary,model},
  *   people.byRole.<role>[] (a key, possibly empty, for every catalog role)
  *   roles[] {name,title,summary,people[]} for every catalog role; people is the
@@ -30,6 +31,10 @@ export type RepoContext = {
 
   /** The repo's configured affected-check commands; empty when none. */
   checks: string[];
+
+  /** The repo's free-text conventions from team.yaml; "" when none. */
+  conventions: string;
+  instructions: string[];
 };
 
 export type PersonContext = {
@@ -52,7 +57,12 @@ type Port = (typeof PORTS)[number];
 
 export type CatalogContext = {
   team: { name: string; product: string };
-  repos: { list: RepoContext[]; primary: RepoContext | null; has_checks: boolean };
+  repos: {
+    list: RepoContext[];
+    primary: RepoContext | null;
+    has_checks: boolean;
+    has_conventions: boolean;
+  };
   people: { list: PersonContext[]; byRole: Record<string, PersonContext[]> };
   roles: (RoleInfo & { people: PersonContext[] })[];
   humans: { list: HumanContext[]; has: boolean; default_trust: boolean };
@@ -102,6 +112,8 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
     kind: r.kind,
     default_branch: r.default_branch,
     checks: r.checks ?? [],
+    conventions: r.conventions ?? "",
+    instructions: r.instructions ?? [],
   }));
 
   const messages = team.policies?.messages;
@@ -119,6 +131,7 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
       list: repos,
       primary: repos.find((r) => r.kind === "primary") ?? null,
       has_checks: repos.some((r) => r.checks.length > 0),
+      has_conventions: repos.some((r) => r.conventions !== ""),
     },
     people: { list, byRole },
     roles: roles.map((r) => ({

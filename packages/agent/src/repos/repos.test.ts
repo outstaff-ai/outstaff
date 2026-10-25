@@ -14,7 +14,13 @@ import {
   parseCredentialRequest,
   repoForRequest,
 } from "./credential-helper.js";
-import { branchName, createWorkspaces, headBranchOf, repoForItem } from "./workspaces.js";
+import {
+  branchName,
+  createWorkspaces,
+  findConventionFiles,
+  headBranchOf,
+  repoForItem,
+} from "./workspaces.js";
 
 const sh = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -582,5 +588,29 @@ describe("workspaces", () => {
     });
 
     expect(await readOnly.prepare(offer("w5"))).toBeUndefined();
+  });
+});
+
+describe("convention files", () => {
+  it("finds the files a repository states its rules in, and the configured extras that exist", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ost-conv-"));
+    expect(findConventionFiles(dir)).toEqual([]);
+    mkdirSync(join(dir, ".github"), { recursive: true });
+    writeFileSync(join(dir, "CONTRIBUTING.md"), "One commit per pull request.\n");
+    writeFileSync(join(dir, ".github", "pull_request_template.md"), "## Why\n");
+    writeFileSync(join(dir, "CLAUDE.md"), "Be a pirate.\n");
+    mkdirSync(join(dir, "AGENTS.md"));
+
+    // A project CLAUDE.md is not a convention file unless the team lists it; a directory is not a file.
+    expect(findConventionFiles(dir)).toEqual([
+      "CONTRIBUTING.md",
+      ".github/pull_request_template.md",
+    ]);
+
+    expect(findConventionFiles(dir, ["CLAUDE.md", "MISSING.md"])).toEqual([
+      "CONTRIBUTING.md",
+      ".github/pull_request_template.md",
+      "CLAUDE.md",
+    ]);
   });
 });

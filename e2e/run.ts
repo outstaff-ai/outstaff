@@ -529,6 +529,9 @@ async function main() {
     "the eyes reaction came before the agent's reply",
   );
 
+  // The shop's CONTRIBUTING.md asks for one commit per pull request: the fix was amended and pushed with a lease.
+  assertEq(fixed.pr.commits, 1, "the repository's rule is one commit: the fix was amended into it");
+  assertEq(fixed.pr.forcePushes > 0, true, "the amended commit was pushed with a lease");
   const rounds = fixed.t.moves.map((m: Json) => `${m.from}>${m.to}`);
   assertIncludes(rounds, "In Review>In Progress", "the review sent the ticket back to active");
   step(
@@ -732,6 +735,44 @@ async function main() {
 
   step(
     `created assigned: ${third} created already assigned to sam -> pull request #${pr3.pr.number} follows`,
+  );
+
+  // ---- 7. a repository whose rules ask for added commits: the review fix is a new commit, nothing is rewritten
+  await stub("POST", "/_test/repo/file", {
+    path: "CONTRIBUTING.md",
+    message: "Keep every commit",
+    text: "# Contributing to Acme Shop\n\n## Commits\n\nReview feedback is answered with new commits on the branch. Do not rewrite pushed history.\n",
+  });
+
+  const { key: fourth } = await stub("POST", "/_test/tickets", {
+    title: "Add a greeting footer",
+    assignee: "sam",
+  });
+
+  const pr4 = await until(`a pull request for ${fourth}`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${fourth}`));
+    const t = s.tickets.find((x: Json) => x.key === fourth);
+    return pr && t.status === "In Review" && t.assignee !== "sam" ? { pr } : undefined;
+  });
+
+  assertEq(pr4.pr.commits, 1, "the pull request starts as one commit");
+  await stub("POST", `/_test/pulls/${pr4.pr.number}/review`, {
+    state: "changes_requested",
+    comments: [{ path: "greeting.txt", line: 1, body: "Say it louder." }],
+  });
+
+  const added4 = await until(`a fix on #${pr4.pr.number} as a new commit`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.number === pr4.pr.number);
+    const t = s.tickets.find((x: Json) => x.key === fourth);
+    return pr.head.sha !== pr4.pr.head.sha && pr.threads[0]?.resolved && t.status === "In Review"
+      ? pr
+      : undefined;
+  });
+
+  assertEq(added4.commits, 2, "the repository's rule is to add commits: the fix is a new commit");
+  assertEq(added4.forcePushes, 0, "nothing was rewritten");
+  step(
+    `conventions: ${fourth} in a repo that asks for added commits -> the fix on #${pr4.pr.number} is a new commit, no force push`,
   );
 
   const final = await state();
