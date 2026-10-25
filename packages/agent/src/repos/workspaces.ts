@@ -1,7 +1,6 @@
 import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseRepoUrl, silentLogger, type Layout, type Logger } from "@outstaff/core";
-import type { OfferedWorkItem } from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
 import type { ClonedRepo } from "./clone.js";
 import { runGit, type RunGit } from "./git.js";
@@ -10,7 +9,9 @@ import { runGit, type RunGit } from "./git.js";
 export interface Workspace {
   repo: string;
   worktree: string;
-  branch: string;
+
+  /** The branch checked out. Undefined while HEAD is detached: new work starts that way and the agent creates its branch. */
+  branch: string | undefined;
   scratch: string;
 
   /** Convention files found in the worktree, relative to it, plus the `instructions` files team.yaml lists that exist. */
@@ -47,29 +48,13 @@ export interface Workspaces {
   release(workItemId: string): Promise<void>;
 }
 
-const slugify = (text: string, max: number) =>
-  text
-    .toLowerCase()
-    .replaceAll(/[^a-z0-9]+/g, "-")
-    .replaceAll(/^-+|-+$/g, "")
-    .slice(0, max)
-    .replaceAll(/-+$/g, "");
-
 /** Path-safe form of an item id. */
 export const safeId = (id: string) => id.replaceAll(/[^\w.-]/g, "-").replace(/^\.+/, "_");
-
-/** `<kind>/<item-id>-<slug of the title>`, for example `ticket/w42-fix-checkout`. */
-export function branchName(item: Pick<OfferedWorkItem, "id" | "kind" | "title">): string {
-  const kind = slugify(item.kind, 20) || "work";
-  const id = slugify(item.id, 40) || "item";
-  const slug = slugify(item.title, 40);
-  return `${kind}/${id}${slug ? `-${slug}` : ""}`;
-}
 
 /**
  * The branch an item continues on instead of a new one: the head of the open pull request the person opened that the
  * item is about, either as its subject or as the only such pull request of its ticket. Undefined means new work, which
- * gets its own branch. A follow-up after a merge always starts afresh from the default branch.
+ * starts detached at the default branch; the agent creates the branch once it knows the work. A follow-up after a merge always starts afresh from the default branch.
  */
 export function headBranchOf(offer: Offer): string | undefined {
   const { workItem: item, context } = offer;
@@ -148,7 +133,12 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       .split("\n")
       .includes(`branch refs/heads/${branch}`);
 
-  const space = (repo: ClonedRepo, worktree: string, branch: string, scratch: string) => ({
+  const space = (
+    repo: ClonedRepo,
+    worktree: string,
+    branch: string | undefined,
+    scratch: string,
+  ) => ({
     repo: repo.name,
     worktree,
     branch,
@@ -172,18 +162,30 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       mkdirSync(scratch, { recursive: true });
 
       if (existsSync(worktree)) {
-        const branch = (await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })).trim();
-        return space(repo, worktree, branch, scratch);
+        const current = (
+          await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })
+        ).trim();
+
+        return space(repo, worktree, current === "HEAD" ? undefined : current, scratch);
       }
 
       const head = headBranchOf(offer);
       mkdirSync(join(opts.layout.worktreesDir, repo.name), { recursive: true });
       await git(["worktree", "prune"], { cwd: repo.dir });
 
+      if (!head) {
+        // New work names no branch: the agent creates one, by the repository's conventions, once it has the work.
+        await git(["worktree", "add", "--detach", worktree, `origin/${repo.defaultBranch}`], {
+          cwd: repo.dir,
+        });
+
+        return space(repo, worktree, undefined, scratch);
+      }
+
       // A branch can be checked out in one worktree only. When an earlier item that is still waiting holds the pull
       // request's head, this round gets a local branch of its own on the same commit and pushes to the head by name.
-      let branch = head ?? branchName(item);
-      if (head && (await checkedOut(repo.dir, head))) {
+      let branch = head;
+      if (await checkedOut(repo.dir, head)) {
         branch = `${head}-${safeId(item.id)}`;
         await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${head}`], {
           cwd: repo.dir,

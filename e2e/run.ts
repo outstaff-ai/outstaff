@@ -396,6 +396,12 @@ async function main() {
   assertEq(pr1.pr.author, "acme-sam[bot]", "the pull request is opened by the agent's own App");
   assertEq(pr1.pr.state, "open", "the pull request is open");
   assertEq(pr1.t.assignee, "ada.admin", "the ticket went back to the human who asked");
+  assertEq(
+    pr1.pr.head.ref,
+    `feat/${first}-add-a-greeting`,
+    "the repository names no branch format: the agent named the branch by the default <type>/<key>-<slug>",
+  );
+
   const moved = pr1.t.moves.map((m: Json) => `${m.from}>${m.to}`);
   assertIncludes(moved, "Ready>In Progress", "sam moved the ticket to active");
   assertIncludes(moved, "In Progress>In Review", "the ticket went to review");
@@ -903,7 +909,7 @@ async function main() {
   await stub("POST", "/_test/repo/file", {
     path: "CONTRIBUTING.md",
     message: "Keep every commit",
-    text: "# Contributing to Acme Shop\n\n## Commits\n\nReview feedback is answered with new commits on the branch. Do not rewrite pushed history.\n",
+    text: "# Contributing to Acme Shop\n\n## Commits\n\nReview feedback is answered with new commits on the branch. Do not rewrite pushed history.\n\n## Branches\n\nName branches `feature/<key>-<slug>`.\n",
   });
 
   const { key: fourth } = await stub("POST", "/_test/tickets", {
@@ -918,6 +924,12 @@ async function main() {
   });
 
   assertEq(pr4.pr.commits, 1, "the pull request starts as one commit");
+  assertEq(
+    pr4.pr.head.ref,
+    `feature/${fourth}-add-a-greeting-footer`,
+    "the repository's CONTRIBUTING.md names branches feature/<key>-<slug>: the agent followed it",
+  );
+
   await stub("POST", `/_test/pulls/${pr4.pr.number}/review`, {
     state: "changes_requested",
     comments: [{ path: "greeting.txt", line: 1, body: "Say it louder." }],

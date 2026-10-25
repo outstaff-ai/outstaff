@@ -126,10 +126,12 @@ export function buildWorkPrompt(
     const head = headBranchOf(offer);
     lines.push(
       "",
-      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, branch ${w.branch}). Scratch space: ${w.scratch}.`,
+      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, ${w.branch ? `branch ${w.branch}` : "detached HEAD at the default branch"}). Scratch space: ${w.scratch}.`,
       head
         ? `The branch to push to is ${head}, the head of your open pull request: git push origin HEAD:${head} (with --force-with-lease if you rewrite commits that are already pushed), so the pull request itself changes. Never open a new branch or pull request for this round, and never push to the default branch.`
-        : "Commit there and push that branch; never push to the default branch.",
+        : w.branch
+          ? "Commit there and push that branch; never push to the default branch."
+          : "The worktree is on a detached HEAD at the default branch: no branch exists for this work yet, and outstaff does not name one. Once you know what the work is, and before your first commit, create the branch with git switch -c <name>. Name it the way the repository says (the convention files below); if it says nothing, use <type>/<ticket key>-<short slug>, for example feat/ACME-106-di-scopes, or <type>/<short slug> without a ticket. Keep the ticket key in the branch name or the pull request title. Then commit there and push that branch; never push to the default branch. If the item ends without code changes, create no branch.",
       w.conventionFiles.length
         ? `The repository says how work is done in it. Read these files in the worktree before you change anything, and follow them for commits, branches, the pull request and checks: ${w.conventionFiles.join(", ")}.`
         : "The repository has no contribution guide, agent guide or pull request template. Follow the defaults in references/git.md and the style of its history.",

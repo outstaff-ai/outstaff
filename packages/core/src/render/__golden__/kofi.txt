@@ -185,7 +185,7 @@ An item is not finished until you have followed `process/hand-back.md`. If you a
 ## Before you start
 
 - Fetch before every work item. Branch from the up-to-date default branch (`main` in `shop`).
-- Work only in your item's worktree.
+- Work only in your item's worktree. For new work it starts on a detached HEAD at the default branch: outstaff names no branch for you. Create yours with `git switch -c <name>` before your first commit. An item that ends without code changes leaves no branch.
 
 ## The repository's conventions come first
 
@@ -200,7 +200,7 @@ The work prompt lists the convention files found in your worktree. A project `CL
 
 If the repository says nothing on a point, use these defaults:
 
-- One branch per item, named for the change.
+- One branch per item, created by you once you know the work, before the first commit. Name it `<type>/<ticket key>-<short slug>`, for example `feat/ACME-106-di-scopes`, or `<type>/<short slug>` without a ticket. Keep the ticket key in the branch name or the pull request title: that is how the office links the pull request to its ticket.
 - Focused commits with clear messages, in the style of the repository's recent history.
 - A pull request description that says why, then links the ticket if there is one.
 - Never rewrite a commit you did not make, and never touch anyone else's branch.
@@ -212,7 +212,7 @@ When the repository's rules and a default disagree, the repository wins. When tw
 These are outstaff's mechanics, whatever the conventions say.
 
 - Never push to the default branch. Open a pull request.
-- New work gets one branch per item. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
+- New work gets one branch per item, the one you create. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
 - Push to your own branch only, and to the head branch of the pull request you work on. Never push to anyone else's branch or a shared one.
 - After you rewrite commits that are already pushed (an amend, a rebase), push with `git push --force-with-lease`. Never force-push anyone else's branch or a shared one.
 

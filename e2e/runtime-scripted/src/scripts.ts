@@ -32,6 +32,23 @@ export const keepBoth = (text: string, keys: string[]) =>
 /** The work item's title is `<kind>: <key> <ticket title>`; the ticket title is what the pull request is about. */
 const subject = (title: string) => title.replace(/^[\w-]+: [A-Z]+-\d+ /, "");
 
+const slug = (text: string) =>
+  text
+    .toLowerCase()
+    .replaceAll(/[^a-z0-9]+/g, "-")
+    .replaceAll(/^-+|-+$/g, "")
+    .slice(0, 40)
+    .replaceAll(/-+$/g, "");
+
+/**
+ * The branch to create: the repository's own rule when its files give one as `<type>/<key>-<slug>` in backticks,
+ * else the default `feat/<key>-<slug>`, or `feat/<slug>` without a ticket.
+ */
+export function branchFor(rules: string, key: string | undefined, text: string): string {
+  const type = /`([a-z]+)\/<key>-<slug>`/.exec(rules)?.[1] ?? "feat";
+  return `${type}/${key ? `${key}-` : ""}${slug(text)}`;
+}
+
 const q = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
 
 function need<T>(value: T | undefined, what: string): T {
@@ -117,7 +134,6 @@ export async function* assigned(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
-  const branch = need(ctx.branch, "the branch");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
   // The toolset's tools work in the worktree: the mise shim has a version set, not just an install behind it.
@@ -148,6 +164,10 @@ export async function* assigned(ctx: ItemContext): Script {
     };
   }
 
+  // The worktree is detached at the default branch: now that the work is known, name the branch by the repo's rules.
+  const rules = yield* conventions(ctx, cwd);
+  const branch = branchFor(rules, key, subject(ctx.title));
+  yield { type: "shell", command: `git switch -c ${q(branch)}`, cwd };
   if (sub) {
     yield { type: "write", path: `${cwd}/${PART_ONE}`, text: `goodbye from ${key}\n` };
   } else {
@@ -167,9 +187,9 @@ export async function* assigned(ctx: ItemContext): Script {
   const url = firstUrl(opened);
   if (sub) {
     // The sub-ticket's change is on a branch of its own, from the default branch, in a file of its own.
-    const second = `${branch}-part-two`;
+    const second = branchFor(rules, sub.key, part!);
     yield { type: "shell", command: "git fetch --prune origin", cwd };
-    yield { type: "shell", command: `git checkout -B ${q(second)} origin/main`, cwd };
+    yield { type: "shell", command: `git switch -c ${q(second)} origin/main`, cwd };
     yield { type: "write", path: `${cwd}/${PART_TWO}`, text: `goodbye from ${sub.key}\n` };
     yield { type: "shell", command: "git add -A", cwd };
     yield { type: "shell", command: `git commit -m ${q(`${sub.key}: ${part}`)}`, cwd };
@@ -300,7 +320,6 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   const number = need(ctx.pr, "the pull request");
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
-  const branch = need(ctx.branch, "the branch");
   // A merged pull request gets one comment per round; the first piece of feedback is the one to answer.
   const feedback = need(ctx.feedback?.[0], "the feedback");
   const quote = feedback.body
@@ -333,7 +352,13 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
 
   // The item's worktree may predate the merge: start from the default branch as it is now.
   yield { type: "shell", command: "git fetch --prune origin", cwd };
-  yield { type: "shell", command: `git checkout -B ${q(branch)} origin/main`, cwd };
+  const branch = branchFor(
+    yield* conventions(ctx, cwd),
+    own ?? ctx.ticket,
+    `follow up on ${number}`,
+  );
+
+  yield { type: "shell", command: `git switch -c ${q(branch)} origin/main`, cwd };
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
     type: "write",

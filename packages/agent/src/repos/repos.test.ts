@@ -14,13 +14,7 @@ import {
   parseCredentialRequest,
   repoForRequest,
 } from "./credential-helper.js";
-import {
-  branchName,
-  createWorkspaces,
-  findConventionFiles,
-  headBranchOf,
-  repoForItem,
-} from "./workspaces.js";
+import { createWorkspaces, findConventionFiles, headBranchOf, repoForItem } from "./workspaces.js";
 
 const sh = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -382,14 +376,6 @@ describe("workspaces", () => {
     return { ...r, layout, repos, workspaces: createWorkspaces({ layout, repos }) };
   }
 
-  it("names branches from kind, id and title", () => {
-    expect(branchName({ id: "W42", kind: "ticket", title: "Fix the Checkout (again)!" })).toBe(
-      "ticket/w42-fix-the-checkout-again",
-    );
-
-    expect(branchName({ id: "x", kind: "Review Round", title: "" })).toBe("review-round/x");
-  });
-
   it("picks the repo a subject points at, else the primary one", async () => {
     const s = await setup();
     const url = "https://github.com/acme-example/design-system/pull/3";
@@ -405,13 +391,19 @@ describe("workspaces", () => {
     const w1 = await s.workspaces.prepare(offer("w1"));
     expect(w1).toMatchObject({
       repo: "shop",
-      branch: "ticket/w1-fix-w1-now",
+      branch: undefined,
       worktree: join(s.layout.worktreesDir, "shop/w1"),
       scratch: join(s.layout.scratchDir, "w1"),
     });
 
     expect(readFileSync(join(w1!.worktree, "README.md"), "utf8")).toContain("shop");
-    expect(sh(w1!.worktree, "rev-parse", "--abbrev-ref", "HEAD").trim()).toBe(w1!.branch);
+    // New work starts detached at the default branch; no branch is created or named.
+    expect(sh(w1!.worktree, "rev-parse", "--abbrev-ref", "HEAD").trim()).toBe("HEAD");
+    expect(sh(w1!.worktree, "rev-parse", "HEAD").trim()).toBe(
+      sh(w1!.worktree, "rev-parse", "origin/main").trim(),
+    );
+
+    expect(sh(join(s.dir, "home/repos/shop"), "branch", "--list").trim()).not.toContain("w1");
     expect(existsSync(w1!.scratch)).toBe(true);
 
     // Round two: the work of round one is still there.
@@ -423,10 +415,6 @@ describe("workspaces", () => {
     await s.workspaces.release("w1");
     expect(existsSync(w1!.worktree)).toBe(false);
     expect(existsSync(w1!.scratch)).toBe(false);
-    // The branch survives, so nothing committed is lost.
-    expect(sh(join(s.dir, "home/repos/shop"), "branch", "--list", w1!.branch)).toContain(
-      w1!.branch,
-    );
   });
 
   it("starts from the up-to-date default branch", async () => {
@@ -441,29 +429,23 @@ describe("workspaces", () => {
     expect(existsSync(join(w!.worktree, "LATER.md"))).toBe(true);
   });
 
-  it("builds on a branch someone else already pushed instead of overwriting it", async () => {
-    const s = await setup();
-    const seed = join(s.dir, "seed/shop");
-    sh(seed, "checkout", "-q", "-b", "ticket/w3-fix-w3-now");
-    writeFileSync(join(seed, "THEIRS.md"), "theirs\n");
-    sh(seed, "add", ".");
-    sh(seed, "commit", "-q", "-m", "theirs");
-    sh(seed, "push", "-q", s.bare("shop"), "ticket/w3-fix-w3-now");
-
-    const w = await s.workspaces.prepare(offer("w3"));
-    expect(readFileSync(join(w!.worktree, "THEIRS.md"), "utf8")).toBe("theirs\n");
-  });
-
-  it("picks the branch up again after the worktree was removed", async () => {
+  it("keeps the branch the agent created when the worktree is prepared again, and stays detached otherwise", async () => {
     const s = await setup();
     const w = await s.workspaces.prepare(offer("w4"));
+    expect(w!.branch).toBeUndefined();
+    expect((await s.workspaces.prepare(offer("w4")))!.branch).toBeUndefined();
+
+    sh(w!.worktree, "switch", "-q", "-c", "feat/ACME-4-kept");
     writeFileSync(join(w!.worktree, "kept.txt"), "kept\n");
     sh(w!.worktree, "add", ".");
     sh(w!.worktree, "commit", "-q", "-m", "kept");
-    await s.workspaces.release("w4");
+    expect((await s.workspaces.prepare(offer("w4")))!.branch).toBe("feat/ACME-4-kept");
 
-    const back = await s.workspaces.prepare(offer("w4"));
-    expect(readFileSync(join(back!.worktree, "kept.txt"), "utf8")).toBe("kept\n");
+    // Released with a branch the agent made: the commits survive on it.
+    await s.workspaces.release("w4");
+    expect(sh(join(s.dir, "home/repos/shop"), "branch", "--list", "feat/ACME-4-kept")).toContain(
+      "feat/ACME-4-kept",
+    );
   });
 
   describe("on a pull request's own branch", () => {
@@ -551,7 +533,7 @@ describe("workspaces", () => {
       expect(w!.branch).toBe("feat/x");
     });
 
-    it("keeps its own branch for new work, other people's and several pull requests", () => {
+    it("names no branch for new work, other people's and several pull requests", () => {
       const t = { type: "ticket", ref: "ACME-1" };
       const prSubject = { type: "pr", ref: pr().ref };
       const head = (o: Offer) => headBranchOf(o);
@@ -572,11 +554,12 @@ describe("workspaces", () => {
       expect(head(roundOn("f", "merged_feedback", prSubject, [pr()]))).toBeUndefined();
     });
 
-    it("gives a new ticket its own branch from the default branch", async () => {
+    it("starts a new ticket detached at the default branch", async () => {
       const s = await setup();
       const t = { type: "ticket", ref: "ACME-2" };
       const w = await s.workspaces.prepare(roundOn("assigned-7", "assigned", t, [{ ...t }]));
-      expect(w!.branch).toBe("assigned/assigned-7-fix-assigned-7-now");
+      expect(w!.branch).toBeUndefined();
+      expect(sh(w!.worktree, "rev-parse", "--abbrev-ref", "HEAD").trim()).toBe("HEAD");
     });
   });
 

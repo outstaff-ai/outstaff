@@ -19,7 +19,6 @@ export {
 
 export { runGit, type RunGit } from "./git.js";
 export {
-  branchName,
   createWorkspaces,
   headBranchOf,
   repoForItem,
