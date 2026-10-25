@@ -3,7 +3,14 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { effectiveTools } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { installTools, renderMiseToml } from "./install.js";
+import {
+  globalConfigFile,
+  installTools,
+  renderGlobalMiseToml,
+  renderMiseToml,
+  verifyTools,
+} from "./install.js";
+import { withGlobalConfig } from "./testing.js";
 import type { MiseRunner } from "./types.js";
 
 const tools = (version = "1.31.3") =>
@@ -14,18 +21,11 @@ const tools = (version = "1.31.3") =>
     },
   });
 
-/** A fake mise: records calls, writes a lockfile on `lock`, and fails the commands `fail` says to. */
+/** A fake mise: records calls, writes a lockfile on `lock`, reads versions from the global config, and fails the commands `fail` says to. */
 function fakeMise(fail: (args: string[]) => string | undefined = () => undefined) {
   const calls: string[][] = [];
   let home = "";
-  const runner: MiseRunner = async (args, opts) => {
-    calls.push(args);
-    home = opts.cwd;
-    const error = fail(args);
-    if (error) {
-      return { code: error.includes("not installed") ? 127 : 1, stdout: "", stderr: error };
-    }
-
+  const ok = withGlobalConfig(async (args, opts) => {
     if (args[0] === "lock") {
       const { writeFileSync } = await import("node:fs");
       writeFileSync(
@@ -35,6 +35,17 @@ function fakeMise(fail: (args: string[]) => string | undefined = () => undefined
     }
 
     return { code: 0, stdout: "", stderr: "" };
+  });
+
+  const runner: MiseRunner = async (args, opts) => {
+    calls.push(args);
+    home = opts.cwd;
+    const error = fail(args);
+    if (error) {
+      return { code: error.includes("not installed") ? 127 : 1, stdout: "", stderr: error };
+    }
+
+    return ok(args, opts);
   };
 
   return { runner, calls, dir: () => home };
@@ -53,7 +64,11 @@ describe("installTools", () => {
     expect(toml).toContain('"kubectl" = "1.31.3"');
     expect(toml).toContain('"ubi:vendor/their-cli" = "0.9.1"');
     expect(toml).toContain("lockfile = true");
-    expect(m.calls).toEqual([["lock"], ["install"]]);
+    expect(m.calls.filter((c) => c[0] !== "where" && c[0] !== "current")).toEqual([
+      ["lock"],
+      ["install"],
+    ]);
+
     expect(existsSync(join(dir, "mise.lock"))).toBe(true);
     expect(r.statuses.map((s) => [s.name, s.state])).toEqual([
       ["kubectl", "installed"],
@@ -81,7 +96,7 @@ describe("installTools", () => {
     m.calls.length = 0;
     const again = await installTools({ tools: tools(), home, env: {}, mise: m.runner });
 
-    expect(m.calls).toEqual([]);
+    expect(m.calls.filter((c) => c[0] !== "where" && c[0] !== "current")).toEqual([]);
     expect(again.statuses.every((s) => s.state === "cached")).toBe(true);
   });
 
@@ -92,7 +107,11 @@ describe("installTools", () => {
     m.calls.length = 0;
     const r = await installTools({ tools: tools("1.32.0"), home, env: {}, mise: m.runner });
 
-    expect(m.calls).toEqual([["lock"], ["install"]]);
+    expect(m.calls.filter((c) => c[0] !== "where" && c[0] !== "current")).toEqual([
+      ["lock"],
+      ["install"],
+    ]);
+
     expect(r.statuses[0]).toMatchObject({ name: "kubectl", version: "1.32.0", state: "installed" });
   });
 
@@ -111,7 +130,10 @@ describe("installTools", () => {
 
     m.calls.length = 0;
     await installTools({ tools: tools(), home, env: {}, mise: m.runner });
-    expect(m.calls).toEqual([["install", "--locked"]]);
+    expect(m.calls.filter((c) => c[0] !== "where" && c[0] !== "current")).toEqual([
+      ["install", "--locked"],
+    ]);
+
     rmSync(dir, { recursive: true });
   });
 
@@ -162,6 +184,108 @@ describe("installTools", () => {
     const r = await installTools({ tools: tools(), home: homeDir(), env: {}, mise: m.runner });
     expect(r.statuses.map((s) => s.state)).toEqual(["unavailable", "unavailable"]);
     expect(r.statuses[0]?.error).toContain("mise is not installed");
+  });
+
+  it("writes the global config with every declared tool, where mise reads it", async () => {
+    const home = homeDir();
+    await installTools({ tools: tools(), home, env: {}, mise: fakeMise().runner });
+
+    const file = join(home, ".config/mise/config.toml");
+    expect(globalConfigFile(home, {})).toBe(file);
+    const toml = readFileSync(file, "utf8");
+    expect(toml).toBe(renderGlobalMiseToml(tools()));
+    expect(toml).toContain('"kubectl" = "1.31.3"');
+    expect(toml).toContain('"ubi:vendor/their-cli" = "0.9.1"');
+    expect(toml).not.toContain("lockfile");
+  });
+
+  it("writes the global config again on a cached start, and follows a version change", async () => {
+    const home = homeDir();
+    const m = fakeMise();
+    await installTools({ tools: tools(), home, env: {}, mise: m.runner });
+    const { rmSync } = await import("node:fs");
+    rmSync(join(home, ".config/mise"), { recursive: true });
+    const again = await installTools({ tools: tools(), home, env: {}, mise: m.runner });
+    expect(again.statuses.every((s) => s.state === "cached")).toBe(true);
+    expect(readFileSync(join(home, ".config/mise/config.toml"), "utf8")).toContain('"1.31.3"');
+
+    await installTools({ tools: tools("1.32.0"), home, env: {}, mise: m.runner });
+    expect(readFileSync(join(home, ".config/mise/config.toml"), "utf8")).toContain('"1.32.0"');
+  });
+
+  it("honours MISE_GLOBAL_CONFIG_FILE", async () => {
+    const home = homeDir();
+    const file = join(home, "data/mise-global.toml");
+    await installTools({
+      tools: tools(),
+      home,
+      env: { MISE_GLOBAL_CONFIG_FILE: file },
+      mise: fakeMise().runner,
+    });
+
+    expect(existsSync(file)).toBe(true);
+    expect(existsSync(join(home, ".config/mise/config.toml"))).toBe(false);
+  });
+
+  it("asks mise from the home directory whether each tool resolves", async () => {
+    const home = homeDir();
+    const m = fakeMise();
+    await installTools({ tools: tools(), home, env: {}, mise: m.runner });
+    expect(m.calls.filter((c) => c[0] === "current")).toEqual([
+      ["current", "kubectl"],
+      ["current", "ubi:vendor/their-cli"],
+    ]);
+
+    expect(m.calls.filter((c) => c[0] === "where")).toEqual([
+      ["where", "kubectl@1.31.3"],
+      ["where", "ubi:vendor/their-cli@0.9.1"],
+    ]);
+
+    expect(m.dir()).toBe(home);
+  });
+
+  it("marks a tool that installed but does not resolve as unavailable, naming it", async () => {
+    const m = fakeMise((a) =>
+      a[0] === "where" && a[1] === "kubectl@1.31.3"
+        ? "mise ERROR kubectl@1.31.3 is not installed\nmise ERROR Version: 2026.10.18"
+        : undefined,
+    );
+
+    const r = await installTools({ tools: tools(), home: homeDir(), env: {}, mise: m.runner });
+    expect(r.statuses).toEqual([
+      {
+        name: "kubectl",
+        version: "1.31.3",
+        state: "unavailable",
+        error: "kubectl@1.31.3 does not resolve: kubectl@1.31.3 is not installed",
+      },
+      { name: "their-cli", version: "0.9.1", state: "installed" },
+    ]);
+  });
+
+  it("marks a tool that installed but has no active version as unavailable", async () => {
+    const home = homeDir();
+    const m = fakeMise();
+    await installTools({ tools: tools(), home, env: {}, mise: m.runner });
+    const { writeFileSync } = await import("node:fs");
+    // A config that sets no version for the tool, as before the global config was written.
+    writeFileSync(join(home, ".config/mise/config.toml"), "[tools]\n");
+    const failed = await verifyTools({ tools: tools(), home, env: {}, mise: m.runner });
+    expect(failed.map((s) => s.error)).toEqual([
+      expect.stringContaining("kubectl@1.31.3 does not resolve: no version is active"),
+      expect.stringContaining("their-cli@0.9.1 does not resolve: no version is active"),
+    ]);
+  });
+
+  it("verifyTools returns only the tools that fail", async () => {
+    const m = fakeMise((a) =>
+      a[0] === "current" && a[1] === "kubectl" ? "not installed" : undefined,
+    );
+
+    const home = homeDir();
+    await installTools({ tools: tools(), home, env: {}, mise: fakeMise().runner });
+    const failed = await verifyTools({ tools: tools(), home, env: {}, mise: m.runner });
+    expect(failed.map((s) => s.name)).toEqual(["kubectl"]);
   });
 
   it("does nothing without tools", async () => {

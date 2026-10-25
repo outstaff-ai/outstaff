@@ -110,6 +110,9 @@ RUN pnpm --filter @outstaff/runtime-scripted... run build \
 
 FROM agent AS agent-e2e
 COPY --from=builder-e2e /out/e2e /opt/outstaff-e2e
+# The developer toolset's pnpm, installed now because the test downloads nothing at start. The agent still writes
+# the global mise config at start, which is what makes the shim work in the worktree.
+RUN mise install pnpm@12.9.1
 CMD ["node", "/opt/outstaff-e2e/dist/bin.js"]
 
 # Stand-ins for GitHub (API and git remote) and the tracker. It binds port 443 for git, so it runs as root.

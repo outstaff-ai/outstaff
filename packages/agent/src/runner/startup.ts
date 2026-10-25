@@ -141,6 +141,25 @@ function loadCatalogs(
   }
 }
 
+/** The toolsets of a role and the roles it extends, in the order they apply, from the stock catalog's `toolsets/`. */
+export function loadToolsets(
+  stockCatalogDir: string,
+  roles: Record<string, { toolset?: string | undefined } | undefined>,
+  role: string,
+  extended: string[],
+): Toolset[] {
+  const names = [...new Set([role, ...extended].map((r) => roles[r]?.toolset).filter((t) => t))];
+  const toolsets: Toolset[] = [];
+  for (const name of names as string[]) {
+    const file = join(stockCatalogDir, "toolsets", `${name}.yaml`);
+    if (existsSync(file)) {
+      toolsets.push(loadToolset(file));
+    }
+  }
+
+  return toolsets;
+}
+
 /** The runtime starts its children with the process environment, so the shims go on this process's PATH. */
 function addToPath(shimsDir: string): void {
   const parts = (process.env["PATH"] ?? "").split(delimiter);
@@ -221,17 +240,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
 
   const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
   const role = roles[me.role];
-  const toolsetNames = [
-    ...new Set([me.role, ...rendered.extends].map((r) => roles[r]?.toolset).filter((t) => t)),
-  ] as string[];
-
-  const toolsets: Toolset[] = [];
-  for (const name of toolsetNames) {
-    const file = join(opts.stockCatalogDir, "toolsets", `${name}.yaml`);
-    if (existsSync(file)) {
-      toolsets.push(loadToolset(file));
-    }
-  }
+  const toolsets = loadToolsets(opts.stockCatalogDir, roles, me.role, rendered.extends);
 
   // Person beats team beats toolset. Installing a tool allows nothing; its `allow` becomes policy rules below.
   const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });
@@ -245,8 +254,11 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     });
 
     toolStatuses = installed.statuses;
-    for (const t of toolStatuses.filter((x) => x.state === "unavailable")) {
-      log.error(`tool ${t.name}@${t.version} is unavailable: ${t.error ?? "install failed"}`);
+    const unavailable = toolStatuses.filter((x) => x.state === "unavailable");
+    if (unavailable.length > 0) {
+      throw new StartupError(
+        `Tools declared for ${person} are not usable:\n${unavailable.map((t) => t.error ?? `${t.name}@${t.version} could not be installed`).join("\n")}\nFix the declaration or the egress to the tool sources and restart.`,
+      );
     }
 
     env.tools = toolStatuses;

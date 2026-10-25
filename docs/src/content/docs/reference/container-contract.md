@@ -111,6 +111,7 @@ The office URL is the only address an agent needs. Use `wss://` when the connect
 | agent     | `$HOME/scratch`                                | Throwaway files.                                                                               | No.                                                          |
 | agent     | `$HOME/work`                                   | The person's rendered working files (skills, references, templates), written on every start.   | No.                                                          |
 | agent     | `$HOME/.local/share/mise`, `$HOME/.cache/mise` | The tools installed from the declared toolsets and `tools:` (mise data and cache directories). | Yes. The first start installs them, later starts reuse them. |
+| agent     | `$HOME/.config/mise`                           | The global mise config the agent writes at start, which makes the declared tools active.       | No. Written on every start.                                  |
 | both      | `$HOME/.cache/outstaff/teams`                  | Clone of the team repository when `OUTSTAFF_TEAM_REPO` is used (`XDG_CACHE_HOME` moves it).    | No.                                                          |
 
 The agent's own directories are all below `$HOME`, so mount that writable if you run with a read-only root filesystem. The agent keeps no session or journal on its own disk: the office stores both, and a replaced container resumes from them. What a lost volume costs is work that was never pushed, which is why `worktrees` is worth keeping.

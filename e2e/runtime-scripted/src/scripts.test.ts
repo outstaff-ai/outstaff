@@ -61,7 +61,9 @@ describe("assigned", () => {
         ? "Opened acme/shop#1\nhttps://github.acme.example/acme/shop/pull/1"
         : a.type === "tool" && a.tool === "ticket_show"
           ? "SHOP-1 Add a greeting"
-          : "";
+          : a.type === "shell" && a.command === "pnpm --version"
+            ? "12.9.1\n"
+            : "";
 
   it("takes the ticket, commits, pushes and opens a pull request that closes it", async () => {
     const { seen, text } = await play(assigned(ctx), answer);
@@ -70,6 +72,7 @@ describe("assigned", () => {
     ).toEqual([
       "ticket_show",
       "ticket_move",
+      "pnpm --version",
       "read",
       "write",
       "git add -A",
@@ -80,6 +83,16 @@ describe("assigned", () => {
 
     expect(seen.at(-1)).toMatchObject({ input: { body: "Closes SHOP-1\n" } });
     expect(text).toContain("https://github.acme.example/acme/shop/pull/1");
+  });
+
+  it("fails when pnpm does not print a version", async () => {
+    await expect(
+      play(assigned(ctx), (a) =>
+        a.type === "shell" && a.command === "pnpm --version"
+          ? "mise use -g pnpm@12.9.1"
+          : answer(a),
+      ),
+    ).rejects.toThrow("not a version");
   });
 
   it("asks the architect when the ticket says so, after the pull request is open", async () => {

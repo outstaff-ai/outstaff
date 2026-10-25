@@ -206,6 +206,89 @@ describe("ost doctor", () => {
     ]);
   });
 
+  describe("tools", () => {
+    // The versions of the developer toolset's tools, with the team's go.
+    const VERSIONS: Record<string, string> = {
+      go: "1.23.4",
+      pnpm: "12.9.1",
+      python: "3.13.9",
+      yarn: "1.22.22",
+    };
+
+    const withTools = () => project((t) => `${t}\ntools:\n  go: { version: 1.23.4, allow: all }\n`);
+
+    const env = { FAKE_TOKEN: VALUE, FAKE_ID: "1", OUTSTAFF_AGENT_TOKEN: "fake-agent-token" };
+
+    it("passes when every declared tool resolves", async () => {
+      const calls: string[][] = [];
+      const r = await ost(withTools(), ["doctor", "mira"], {
+        env,
+        registry: fakeRegistry(() => []),
+        home: root,
+        mise: async (args) => {
+          calls.push(args);
+          return {
+            code: 0,
+            stdout: args[0] === "current" ? `${VERSIONS[args[1]!]}\n` : "",
+            stderr: "",
+          };
+        },
+      });
+
+      expect(r.code).toBe(0);
+      expect(r.out).toContain("ok    Tools resolve:");
+      expect(r.out).toContain("go@1.23.4");
+      expect(calls).toContainEqual(["current", "go"]);
+    });
+
+    it("names a tool that does not resolve: a failure in the agent container, a warning elsewhere", async () => {
+      const mise = async (args: string[]) =>
+        args[0] === "current" && args[1] === "go"
+          ? { code: 0, stdout: "", stderr: "mise WARN Plugin go does not have a version set" }
+          : { code: 0, stdout: `${VERSIONS[args[1]!]}\n`, stderr: "" };
+
+      const here = await ost(withTools(), ["doctor", "mira"], {
+        env,
+        registry: fakeRegistry(() => []),
+        home: root,
+        mise,
+      });
+
+      expect(here.code).toBe(0);
+      expect(here.out).toContain(
+        "warn  Tool go resolves: go@1.23.4 does not resolve: no version is active",
+      );
+
+      const inside = await ost(
+        withTools(),
+        ["doctor", "mira", "--secrets-dir", "/run/secrets/outstaff"],
+        {
+          env,
+          registry: fakeRegistry(() => []),
+          home: root,
+          mise,
+        },
+      );
+
+      expect(inside.out).toContain("fail  Tool go resolves:");
+    });
+
+    it("says so when mise is not installed", async () => {
+      const r = await ost(withTools(), ["doctor", "mira"], {
+        env,
+        registry: fakeRegistry(() => []),
+        home: root,
+        mise: async () => ({
+          code: 127,
+          stdout: "",
+          stderr: "mise is not installed in this image.",
+        }),
+      });
+
+      expect(r.out).toContain("warn  Tools resolve: mise is not installed here");
+    });
+  });
+
   it("rejects an unknown person and an invalid team", async () => {
     const dir = project();
     const unknown = await ost(dir, ["doctor", "nobody"], { registry: fakeRegistry(() => []) });

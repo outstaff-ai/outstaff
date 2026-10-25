@@ -23,6 +23,13 @@ export {
   type UsageThresholds,
 } from "./usage.js";
 
-export { StartupError, prepareAgent, type PreparedAgent, type StartupOptions } from "./startup.js";
+export {
+  StartupError,
+  loadToolsets,
+  prepareAgent,
+  type PreparedAgent,
+  type StartupOptions,
+} from "./startup.js";
+
 export { agentRegistry } from "./registry.js";
 export { createChatRelay, type ChatOffice, type ChatRelay, type ChatRelayOptions } from "./chat.js";

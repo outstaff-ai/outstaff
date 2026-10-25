@@ -73,4 +73,4 @@ docker build -f images/Dockerfile --target office -t outstaff/office:dev .
 images/smoke.sh outstaff dev
 ```
 
-`images/smoke.sh` starts each image with a read-only root, checks the version commands (including `mise --version`), and starts the office on SQLite with a minimal team file until its health check passes. The `Images` workflow does the same on every pull request that touches `images/` or `packages/`, for both architectures, and publishes on `v*` tags.
+`images/smoke.sh` starts each image with a read-only root, checks the version commands (including `mise --version`), installs pnpm and yarn from the code toolset with mise and runs `pnpm --version` and `yarn --version` in an unrelated directory (this needs egress to the tool sources), and starts the office on SQLite with a minimal team file until its health check passes. The `Images` workflow does the same on every pull request that touches `images/` or `packages/`, for both architectures, and publishes on `v*` tags.
