@@ -15,6 +15,7 @@ interface Message {
   authorName: string;
   text: string;
   at: string;
+  files?: { id: string; name: string; mimetype: string; size: number; url: string }[];
 }
 
 export const HUMAN = { id: "U0ADA00001", name: "Ada Admin" };
@@ -25,6 +26,7 @@ export function createChat() {
   const posts: { id: string; channel: string; thread?: string; text: string; at: string }[] = [];
   const reactions: { channel: string; messageId: string; name: string }[] = [];
   const profiles: { userId: string; profile: Record<string, any>; at: string }[] = [];
+  const files = new Map<string, { mimetype: string; data: Buffer }>();
   const gates = new Map<string, { open: boolean; arrived: boolean }>();
   let counter = 0;
   const id = () => `${Date.now()}.${String(++counter).padStart(4, "0")}`;
@@ -97,6 +99,7 @@ export function createChat() {
             author: { id: m.authorId, name: m.authorName, trusted: true, bot: false },
             text: m.text,
             at: m.at,
+            ...(m.files ? { files: m.files } : {}),
           })),
           ...posts.map((p) => ({
             id: p.id,
@@ -129,8 +132,35 @@ export function createChat() {
           at: new Date().toISOString(),
         };
 
+        // Files come as base64; the agent downloads them from the stub by the url the message carries.
+        const shared = (r.json.files ?? []) as { name: string; mimetype: string; base64: string }[];
+        if (shared.length) {
+          message.files = shared.map((f) => {
+            const fileId = `F${files.size + 1}`;
+            const data = Buffer.from(f.base64, "base64");
+            files.set(fileId, { mimetype: f.mimetype, data });
+            return {
+              id: fileId,
+              name: f.name,
+              mimetype: f.mimetype,
+              size: data.length,
+              url: `/chat/files/${fileId}`,
+            };
+          });
+        }
+
         messages.push(message);
         return { id: message.id };
+      },
+    },
+    {
+      method: "GET",
+      path: "/chat/files/:id",
+      handler: (r) => {
+        const f = files.get(r.params["id"]!);
+        return f
+          ? { buffer: f.data, headers: { "content-type": f.mimetype } }
+          : { status: 404, body: { error: "no such file" } };
       },
     },
     // The scripted runtime asks; a closed gate holds it, and the driver sees that it arrived.

@@ -60,6 +60,23 @@ export const journalEntrySchema = z.strictObject({
   text: z.string(),
 });
 
+/** Most files of one message the office keeps and the agent considers. */
+export const MAX_CHAT_FILES = 10;
+
+export const chatFileSchema = z.strictObject({
+  id: z.string().min(1).max(200).describe("Id of the file in the chat workspace."),
+  name: z.string().min(1).max(500).describe("File name, as the sender named it. Data from them."),
+  mimetype: z.string().min(1).max(200),
+  size: z.number().int().min(0).describe("Size in bytes."),
+  url: z
+    .string()
+    .min(1)
+    .max(2000)
+    .describe(
+      "Where the chat adapter fetches the bytes from. Only the agent's chat adapter uses it; the office stores it as it is and never fetches it.",
+    ),
+});
+
 export const chatOriginSchema = z.strictObject({
   channel: z.string().min(1).describe("Chat channel of the request."),
   thread: z.string().min(1).describe("Thread the agent answers in."),
@@ -72,6 +89,13 @@ export const chatOriginSchema = z.strictObject({
     .boolean()
     .describe(
       "The requester started the thread or replied in it, so the chat already notifies them.",
+    ),
+  files: z
+    .array(chatFileSchema)
+    .max(MAX_CHAT_FILES)
+    .optional()
+    .describe(
+      "Files shared in the message that started the chat session. Metadata only: the agent fetches the bytes from chat. Data from the requester.",
     ),
   about: z
     .strictObject({
@@ -421,13 +445,21 @@ export const messageSchema = z.discriminatedUnion("type", [
         .max(200)
         .optional()
         .describe("Thread of the message; absent for a top-level message."),
-      text,
+      text: z
+        .string()
+        .max(100_000)
+        .describe("What the author wrote; empty for a message that only shares files."),
       author: z.strictObject({
         id: z.string().min(1).max(200),
         name: z.string().max(200).optional(),
       }),
       direct: z.boolean().describe("The message is in a direct message with the author."),
       participant: z.boolean().describe("The author started the thread or replied in it."),
+      files: z
+        .array(chatFileSchema)
+        .max(MAX_CHAT_FILES)
+        .optional()
+        .describe("Files shared in the message: metadata only, no bytes. Data from the author."),
     }),
   ),
   message(
@@ -467,7 +499,7 @@ export const messageSchema = z.discriminatedUnion("type", [
       requester: z.string().optional().describe("Id of the requester to mention."),
       links: z.array(linkSchema).describe("The ticket and pull requests of the item."),
       threads: z
-        .array(chatOriginSchema.omit({ about: true }))
+        .array(chatOriginSchema.omit({ about: true, files: true }))
         .optional()
         .describe(
           "Every thread linked to the item now, to post the result in: the one it came from and the ones attached later. Absent when nothing should be posted.",
@@ -539,6 +571,7 @@ export type Attached = PayloadOf<"work_attach_result">;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
 export type MemberUsage = z.infer<typeof memberUsageSchema>;
 export type ChatOrigin = z.infer<typeof chatOriginSchema>;
+export type ChatFile = z.infer<typeof chatFileSchema>;
 export type Human = z.infer<typeof humanSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type AnswerState = z.infer<typeof answerStateSchema>;

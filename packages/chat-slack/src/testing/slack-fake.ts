@@ -2,6 +2,7 @@ import type { ChatSeed, InboundMessage } from "@outstaff/core/contracts";
 import type { ChatMessage } from "@outstaff/core";
 import type {
   SlackEvent,
+  SlackFile,
   SlackHomeView,
   SlackMessage,
   SlackSocket,
@@ -10,6 +11,8 @@ import type {
 } from "../api.js";
 
 export const BOT_USER = "U-bot";
+export const BOT_TOKEN = "xoxb-test";
+export const FILES_HOST = "https://files.slack.com";
 
 /** A Slack platform error as the SDK throws it. */
 export function slackError(error: string): Error {
@@ -23,6 +26,12 @@ export interface FakeSlack {
   web: SlackWeb;
   socket: SlackSocket & { started: boolean };
   seed: ChatSeed;
+
+  /** What a download from Slack's file host sees: the bytes of every file seeded, by file id. */
+  files: Map<string, { name: string; mimetype: string; data: Uint8Array }>;
+
+  /** The file host: serves the seeded files to the bot token only, like `url_private_download`. */
+  fetch: typeof fetch;
 
   /** Every chat.postMessage, in order. */
   posts: { channel: string; text: string; thread_ts?: string }[];
@@ -48,6 +57,7 @@ export function createFakeSlack(): FakeSlack {
   const reactions: FakeSlack["reactions"] = [];
   const views: FakeSlack["views"] = [];
   const usersInfoCalls: string[] = [];
+  const files: FakeSlack["files"] = new Map();
   let handler: ((e: SlackEvent) => Promise<void>) | undefined;
 
   const nextTs = () => `${clock++}.${String(++counter).padStart(6, "0")}`;
@@ -167,11 +177,24 @@ export function createFakeSlack(): FakeSlack {
       }
 
       const ts = nextTs();
+      const shared: SlackFile[] = (m.files ?? []).map((f) => {
+        const id = `F${files.size + 1}`;
+        files.set(id, f);
+        return {
+          id,
+          name: f.name,
+          mimetype: f.mimetype,
+          size: f.data.byteLength,
+          url_private_download: `${FILES_HOST}/files-pri/T0-${id}/download/${encodeURIComponent(f.name)}`,
+        };
+      });
+
       const row = {
         ts,
         text: m.text,
         user: m.authorId,
         ...(m.thread ? { thread_ts: m.thread } : {}),
+        ...(shared.length ? { files: shared } : {}),
       };
 
       inChannel(m.channel).push(row);
@@ -183,6 +206,7 @@ export function createFakeSlack(): FakeSlack {
         text: `<@${BOT_USER}> ${m.text}`,
         ...(bot ? { bot_id: m.authorId } : {}),
         ...(m.thread ? { thread_ts: m.thread } : {}),
+        ...(shared.length ? { files: shared } : {}),
       });
 
       return {
@@ -195,10 +219,32 @@ export function createFakeSlack(): FakeSlack {
     },
   };
 
+  const fileHost = (async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(input instanceof Request ? input.url : input);
+    const id = /\/files-pri\/T0-(F\d+)\//.exec(url.pathname)?.[1];
+    const file = id ? files.get(id) : undefined;
+    if (url.origin !== FILES_HOST || !file) {
+      return new Response("not found", { status: 404 });
+    }
+
+    // Slack answers a token without files:read with a sign-in page, not an error status.
+    const auth = new Headers(init?.headers).get("authorization");
+    if (auth !== `Bearer ${BOT_TOKEN}`) {
+      return new Response("<html>Sign in</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" },
+      });
+    }
+
+    return new Response(file.data.slice(), { headers: { "content-type": file.mimetype } });
+  }) as typeof fetch;
+
   return {
     web,
     socket,
     seed,
+    files,
+    fetch: fileHost,
     posts,
     reactions,
     views,

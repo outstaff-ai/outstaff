@@ -10,12 +10,18 @@ export interface StubRequest {
   headers: Headers;
   params: Record<string, string>;
   json: any; // oxlint-disable-line no-explicit-any
+
+  /** The multipart body of an upload. */
+  form?: FormData;
 }
 
 export interface StubReply {
   status?: number;
   headers?: Record<string, string>;
   body?: unknown;
+
+  /** Raw bytes, sent as they are instead of `body`. */
+  buffer?: Uint8Array;
 }
 
 export type Handler = (req: StubRequest) => StubReply | unknown;
@@ -59,7 +65,7 @@ const isReply = (v: unknown): v is StubReply =>
   typeof v === "object" &&
   v !== null &&
   !Array.isArray(v) &&
-  Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body");
+  Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body" || k === "buffer");
 
 /** A fetch that serves JSON by method and path and records every call. Unmatched requests fail the test. */
 export function createStubFetch(routes: Route[], origin = API_ORIGIN, apiKey = API_KEY) {
@@ -96,12 +102,17 @@ export function createStubFetch(routes: Route[], origin = API_ORIGIN, apiKey = A
         headers,
         params,
         json: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+        ...(init?.body instanceof FormData ? { form: init.body } : {}),
       };
 
       calls.push(req);
       const out = await r.handler(req);
       const reply: StubReply = isReply(out) ? out : { body: out };
       const status = reply.status ?? 200;
+      if (reply.buffer) {
+        return new Response(reply.buffer.slice(), { status, headers: reply.headers ?? {} });
+      }
+
       const body = status === 304 || status === 204 ? null : JSON.stringify(reply.body ?? {});
       return new Response(body, {
         status,

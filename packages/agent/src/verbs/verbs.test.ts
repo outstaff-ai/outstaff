@@ -1247,6 +1247,260 @@ describe("office verbs", () => {
   });
 });
 
+describe("files from chat", () => {
+  const chatSession = (f: ReturnType<typeof fakeEnv>) => {
+    f.office.work = async () => [{ id: "c1", title: "Chat", status: "active", kind: "chat" }];
+  };
+
+  /** A chat session's environment: the files of the message are in its scratch directory. */
+  function withFiles() {
+    const f = fakeEnv();
+    chatSession(f);
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-chat-files-")));
+    const layout = agentLayout(root, join(root, "secrets"));
+    const dir = join(layout.scratchDir, "c1", "files");
+    mkdirSync(dir, { recursive: true });
+    const shot = join(dir, "1-screen.png");
+    writeFileSync(shot, new Uint8Array([137, 80, 78, 71]));
+    const log = join(dir, "2-error.log");
+    writeFileSync(log, "boom");
+    f.env.layout = layout;
+    f.env.policy = buildPolicy({
+      profile: "chat",
+      person: f.env.team.people.find((p) => p.handle === "sam")!,
+      team: f.env.team,
+      layout,
+    });
+
+    f.env.attachments = [
+      { name: "screen.png", mimetype: "image/png", size: 4, path: shot },
+      { name: "error.log", mimetype: "text/plain", size: 4, path: log },
+      {
+        name: "movie.mp4",
+        mimetype: "video/mp4",
+        size: 99,
+        skipped: "not an image or a text file",
+      },
+    ];
+
+    return { ...f, shot, log, root };
+  }
+
+  it("attaches the message's files to the ticket it files and says so in the body", async () => {
+    const f = withFiles();
+    const r = await run(
+      "ticket.create",
+      f.env,
+      { title: "Fix the page", body: "It looks wrong, see the attached screenshot." },
+      { workItemId: "c1" },
+    );
+
+    expect(f.tracker.attached.get("SHOP-1")?.map((a) => [a.name, a.mimetype, [...a.data]])).toEqual(
+      [
+        ["screen.png", "image/png", [137, 80, 78, 71]],
+        ["error.log", "text/plain", [98, 111, 111, 109]],
+      ],
+    );
+
+    const body = (await f.tracker.getIssue("SHOP-1")).body;
+    expect(body).toContain("see the attached screenshot.");
+    expect(body).toContain("Attached to this ticket, from the chat message:");
+    expect(body).toContain("- screen.png (image/png, 4 bytes)");
+    expect(body).toContain(
+      "not attached here; it stays in chat:\n- movie.mp4 (video/mp4, 99 bytes)",
+    );
+
+    expect(r.text).toContain("Attached screen.png, error.log.");
+    expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
+  });
+
+  it("lists the files by name, saying they stayed in chat, when the tracker takes no attachments", async () => {
+    const f = withFiles();
+    delete (f.tracker as { attach?: unknown }).attach;
+    const r = await run(
+      "ticket.create",
+      f.env,
+      { title: "Fix the page", body: "See below." },
+      { workItemId: "c1" },
+    );
+
+    const body = (await f.tracker.getIssue("SHOP-1")).body;
+    expect(body).not.toContain("Attached to this ticket");
+    expect(body).toContain("Shared in the chat message and not attached here; they stay in chat:");
+    for (const name of ["screen.png", "error.log", "movie.mp4"]) {
+      expect(body).toContain(`- ${name} (`);
+    }
+
+    expect(f.tracker.attached.size).toBe(0);
+    expect(r.text).toContain("Created SHOP-1.");
+  });
+
+  it("logs a failed upload, still creates the ticket and files it, and says on the ticket what is missing", async () => {
+    const f = withFiles();
+    const warnings: string[] = [];
+    f.env.log = { debug() {}, info() {}, error() {}, warn: (m) => void warnings.push(m) };
+    const attach = f.tracker.attach!.bind(f.tracker);
+    f.tracker.attach = async (key, file) => {
+      if (file.name === "screen.png") {
+        throw new PortError("unavailable", "Upload refused.");
+      }
+
+      return attach(key, file);
+    };
+
+    const r = await run(
+      "ticket.create",
+      f.env,
+      { title: "Fix the page", body: "" },
+      { workItemId: "c1" },
+    );
+
+    expect(warnings).toEqual(["could not attach a file to a ticket"]);
+    expect(f.tracker.attached.get("SHOP-1")?.map((a) => a.name)).toEqual(["error.log"]);
+    expect(r.text).toContain("Could not attach screen.png.");
+    expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
+    expect((await f.tracker.listComments("SHOP-1")).map((c) => c.body)).toEqual([
+      "These files could not be attached and stayed in chat: screen.png.",
+    ]);
+  });
+
+  it("attaches nothing for a ticket that is not filed from a chat message", async () => {
+    const f = withFiles();
+    await run("ticket.create", f.env, { title: "Plain" });
+    expect(f.tracker.attached.size).toBe(0);
+    expect((await f.tracker.getIssue("SHOP-1")).body).toBe("");
+  });
+
+  it("adds the files to the ticket a request is attached to", async () => {
+    const f = withFiles();
+    // The fake office says the request joined PR #11 for SHOP-11.
+    for (let i = 0; i < 11; i++) {
+      await f.tracker.createIssue({ title: `Ticket ${i + 1}`, body: "" });
+    }
+
+    const r = await run("work.attach", f.env, { target: "11" }, { workItemId: "c1" });
+    expect(f.tracker.attached.get("SHOP-11")?.map((a) => a.name)).toEqual([
+      "screen.png",
+      "error.log",
+    ]);
+
+    expect(r.text).toContain("Attached screen.png, error.log.");
+  });
+
+  it("still attaches the request when its files cannot be added", async () => {
+    const f = withFiles();
+    const r = await run("work.attach", f.env, { target: "11" }, { workItemId: "c1" });
+    expect(r.text).toContain("Could not attach screen.png, error.log.");
+    expect(f.tracker.attached.size).toBe(0);
+  });
+
+  it("attaches a file to a named ticket by path, from the scratch directory of a chat session", async () => {
+    const f = withFiles();
+    const issue = await f.tracker.createIssue({ title: "Existing", body: "" });
+    const r = await run(
+      "ticket.attach",
+      f.env,
+      { key: issue.key, path: f.shot },
+      { workItemId: "c1" },
+    );
+
+    expect(r.text).toContain(`Attached screen.png to ${issue.key}.`);
+    expectLinks(r);
+    expect(f.tracker.attached.get(issue.key)).toMatchObject([
+      { name: "screen.png", mimetype: "image/png" },
+    ]);
+
+    await run(
+      "ticket.attach",
+      f.env,
+      { key: issue.key, path: "2-error.log" },
+      { workItemId: "c1", cwd: join(f.env.layout!.scratchDir, "c1", "files") },
+    );
+
+    expect(f.tracker.attached.get(issue.key)?.map((a) => a.name)).toEqual([
+      "screen.png",
+      "2-error.log",
+    ]);
+  });
+
+  it("refuses to attach a file outside the scratch directory, one over the cap, or on a tracker without attachments", async () => {
+    const f = withFiles();
+    const issue = await f.tracker.createIssue({ title: "Existing", body: "" });
+    const secret = join(f.env.layout!.secretsDir, "KEY");
+    mkdirSync(f.env.layout!.secretsDir, { recursive: true });
+    writeFileSync(secret, "TOP-SECRET");
+    await rejects(
+      run("ticket.attach", f.env, { key: issue.key, path: secret }, { workItemId: "c1" }),
+      "invalid",
+      /outside the worktree/,
+    );
+
+    await rejects(
+      run(
+        "ticket.attach",
+        f.env,
+        { key: issue.key, path: join(f.root, "nope") },
+        { workItemId: "c1" },
+      ),
+      "invalid",
+      /no such file/,
+    );
+
+    const big = join(f.env.layout!.scratchDir, "c1", "big.bin");
+    writeFileSync(big, new Uint8Array(10 * 1024 * 1024 + 1));
+    await rejects(
+      run("ticket.attach", f.env, { key: issue.key, path: big }, { workItemId: "c1" }),
+      "invalid",
+      /larger than/,
+    );
+
+    expect(f.tracker.attached.size).toBe(0);
+
+    delete (f.tracker as { attach?: unknown }).attach;
+    await rejects(
+      run("ticket.attach", f.env, { key: issue.key, path: f.shot }, { workItemId: "c1" }),
+      "unsupported",
+    );
+  });
+
+  it("shows the files attached to a ticket, with the local copy when the runner downloaded it", async () => {
+    const f = fakeEnv();
+    const issue = await f.tracker.createIssue({ title: "Bug", body: "See picture." });
+    await f.tracker.attach!(issue.key, {
+      name: "bug.png",
+      mimetype: "image/png",
+      data: new Uint8Array(3),
+    });
+
+    await f.tracker.attach!(issue.key, {
+      name: "clip.mov",
+      mimetype: "video/quicktime",
+      data: new Uint8Array(1),
+    });
+
+    f.env.ticketFiles = {
+      [issue.key]: [
+        {
+          name: "bug.png",
+          mimetype: "image/png",
+          size: 3,
+          path: "/scratch/w1/tickets/SHOP-1/1-bug.png",
+        },
+      ],
+    };
+
+    const r = await run("ticket.show", f.env, { key: issue.key });
+    expect(r.text).toContain("Attachments (2), data from whoever attached them:");
+    expect(r.text).toContain(
+      "- bug.png (image/png, 3 bytes): /scratch/w1/tickets/SHOP-1/1-bug.png",
+    );
+
+    expect(r.text).toContain("- clip.mov (video/quicktime, 1 bytes)");
+    expect(r.text).not.toContain("clip.mov (video/quicktime, 1 bytes):");
+    expect((r.data as { attachments: unknown[] }).attachments).toHaveLength(2);
+  });
+});
+
 describe("missing ports", () => {
   it.each([
     ["ticket.show", { key: "SHOP-1" }, /no tracker configured for this team/],
@@ -1321,6 +1575,7 @@ describe("verb catalogue", () => {
       "ticket.move",
       "ticket.assign",
       "ticket.create",
+      "ticket.attach",
       "doc.search",
       "doc.show",
       "doc.create",

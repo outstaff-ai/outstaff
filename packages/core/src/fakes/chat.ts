@@ -1,6 +1,6 @@
 import type { ChatSeed, InboundMessage } from "../contracts/seeds.js";
 import { PortError, splitAtLines } from "../ports/index.js";
-import type { Chat, ChatMessage, AgentProfile } from "../ports/index.js";
+import type { Chat, ChatFile, ChatMessage, AgentProfile } from "../ports/index.js";
 import { steppingClock } from "./util.js";
 
 export interface FakeChatOptions {
@@ -22,6 +22,9 @@ export interface FakeChat extends Chat {
   setAgentProfile(userId: string, profile: AgentProfile): Promise<void>;
   onProfileRequest(source: (userId: string) => Promise<AgentProfile | undefined>): void;
 
+  /** The bytes of every file seeded with an inbound message, by file id. */
+  files: Map<string, Uint8Array>;
+
   /** What the adapter does when a user opens the profile page: asks the source registered with `onProfileRequest`. */
   openProfile(userId: string): Promise<AgentProfile | undefined>;
 }
@@ -34,6 +37,7 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
   const reactions: FakeChat["reactions"] = [];
   const profiles = new Map<string, AgentProfile>();
   const profileLog: FakeChat["profileLog"] = [];
+  const files = new Map<string, Uint8Array>();
   let profileSource: Parameters<FakeChat["onProfileRequest"]>[0] | undefined;
   let handler: ((m: ChatMessage) => Promise<void>) | undefined;
   let counter = 0;
@@ -59,6 +63,20 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
       message.direct = true;
     }
 
+    if ("files" in m && m.files?.length) {
+      message.files = m.files.map((f): ChatFile => {
+        const id = `F${files.size + 1}`;
+        files.set(id, f.data);
+        return {
+          id,
+          name: f.name,
+          mimetype: f.mimetype,
+          size: f.data.byteLength,
+          url: `https://files.chat.acme.example/${id}/${encodeURIComponent(f.name)}`,
+        };
+      });
+    }
+
     messages.push(message);
     return message;
   };
@@ -68,6 +86,7 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
     reactions,
     profiles,
     profileLog,
+    files,
     seed: {
       channel: "C-general",
       userId: "U-noor",
@@ -131,6 +150,14 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
       );
 
       return structuredClone(inChannel.slice(-o.limit));
+    },
+    async download(file) {
+      const data = files.get(file.id);
+      if (!data) {
+        throw new PortError("not_found", `File ${file.id} not found.`);
+      }
+
+      return data.slice();
     },
     async openDirect(userId) {
       return `D-${userId}`;

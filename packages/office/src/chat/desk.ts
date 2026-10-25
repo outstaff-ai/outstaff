@@ -80,6 +80,12 @@ const firstLine = (text: string, max = 80) => {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 };
 
+/** The message's text with a line naming its files, for the journal. The files are data from the author. */
+const withFiles = (m: Pick<Message, "text" | "files">) =>
+  m.files?.length
+    ? `${m.text}\n(Shared ${m.files.map((f) => `${f.name} (${f.mimetype})`).join(", ")}.)`.trimStart()
+    : m.text;
+
 /** The mention with its trailing space, or nothing when the requester is notified anyway. */
 const mention = (origin: Pick<ChatOriginRecord, "requester" | "direct" | "participant">) =>
   needsMention(origin) ? `<@${origin.requester.id}> ` : "";
@@ -153,7 +159,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     const created = await scheduler.enqueue({
       person,
       kind: CHAT_KIND,
-      title: `Chat: ${firstLine(m.text)}`,
+      title: `Chat: ${firstLine(m.text) || m.files?.[0]?.name || "(no text)"}`,
       trigger: "human",
       subject: { type: "chat", ref: threadKey(m.channel, thread) },
       ...(follow ? { parentId: follow.item.id } : {}),
@@ -173,6 +179,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       awaitingPlacement: false,
       claimed: [],
       text: m.text,
+      ...(m.files?.length ? { files: m.files } : {}),
       ...(beside ? { about: { id: beside.id, title: beside.title } } : {}),
     };
 
@@ -186,7 +193,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     await store.appendJournal(
       created.id,
       "office",
-      `${m.author.name ?? m.author.id} ${beside ? "replied" : "asked"} in chat (thread ${thread}):\n${m.text}`,
+      `${m.author.name ?? m.author.id} ${beside ? "replied" : "asked"} in chat (thread ${thread}):\n${withFiles(m)}`,
     );
 
     opts.notify(person);
@@ -628,7 +635,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     await store.appendJournal(
       item.id,
       m.author.name ?? m.author.id,
-      `In the chat thread: ${m.text}`,
+      `In the chat thread: ${withFiles(m)}`,
     );
 
     // The running work does not see the reply, so a chat session beside it answers at once.

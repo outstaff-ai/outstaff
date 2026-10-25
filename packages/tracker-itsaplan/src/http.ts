@@ -20,6 +20,9 @@ export interface HttpConfig {
 export interface RequestOptions {
   query?: Record<string, string | number | boolean | undefined>;
   body?: unknown;
+
+  /** A multipart body, for a file upload. Sent instead of `body`; fetch sets the content type and boundary. */
+  form?: FormData;
 }
 
 const DEFAULT_RETRY_MS = 30_000;
@@ -69,7 +72,7 @@ export class ItsaplanHttp {
       }
     }
 
-    let { res, burst } = await this.send(method, url, opts.body);
+    let { res, burst } = await this.send(method, url, opts);
     // Past its burst limit the service answers 500 until the key has been idle for a second.
     if (res.status === 500 && burst > 1 && IDEMPOTENT.has(method)) {
       this.cfg.log?.warn("rate limited", {
@@ -80,7 +83,7 @@ export class ItsaplanHttp {
       });
 
       await this.clock.sleep(RETRY_AFTER_BURST_MS);
-      ({ res } = await this.send(method, url, opts.body));
+      ({ res } = await this.send(method, url, opts));
     }
 
     const raw = await res.text();
@@ -109,10 +112,22 @@ export class ItsaplanHttp {
     return data as T;
   }
 
+  /** The bytes behind a path, for a file download. Failures leave as PortErrors like `request`. */
+  async bytes(path: string): Promise<Uint8Array> {
+    const url = new URL(`${this.cfg.apiUrl}${path}`);
+    const { res } = await this.send("GET", url, {});
+    if (!res.ok) {
+      const code = errorCode(res.status);
+      throw new PortError(code, `Its a Plan GET ${path} -> ${res.status}: ${res.statusText}`);
+    }
+
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   private async send(
     method: string,
     url: URL,
-    body: unknown,
+    { body, form }: RequestOptions,
   ): Promise<{ res: Response; burst: number }> {
     const burst = await this.pacer.acquire();
     try {
@@ -122,9 +137,9 @@ export class ItsaplanHttp {
           "x-api-key": this.cfg.apiKey,
           accept: "application/json",
           origin: this.cfg.webUrl,
-          ...(body === undefined ? {} : { "content-type": "application/json" }),
+          ...(body === undefined || form ? {} : { "content-type": "application/json" }),
         },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+        ...(form ? { body: form } : body === undefined ? {} : { body: JSON.stringify(body) }),
       });
 
       return { res, burst };

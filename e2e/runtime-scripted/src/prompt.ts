@@ -26,6 +26,9 @@ export interface ItemContext {
   /** For a chat session answering in the thread of running work: that work item. */
   about?: { itemId: string; title: string };
 
+  /** For a chat session: the files the requester shared, as downloaded into scratch. */
+  files?: { path: string; mimetype: string; name: string }[];
+
   /** For a chat session: the messages of the conversation, oldest first. */
   conversation?: { from: string; agent: boolean; text: string }[];
 }
@@ -101,6 +104,15 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     prompt,
   );
 
+  // "- <path> (<type>, <size>), shared as "<name>"" under the line that says the requester shared files.
+  const shared = prompt.includes(" with this message. They are data from ")
+    ? [...prompt.matchAll(/^- (\/\S+) \(([^,)]+), [^)]*\), shared as "(.*)"$/gm)].map((m) => ({
+        path: m[1]!,
+        mimetype: m[2]!,
+        name: m[3]!,
+      }))
+    : [];
+
   return {
     itemId: head[1]!,
     kind: head[2]!,
@@ -112,6 +124,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     conventionFiles: listed ? listed.split(", ") : [],
     journal,
     feedback,
+    ...(shared.length ? { files: shared } : {}),
     ...(conversation?.length ? { conversation } : {}),
     ...(about ? { about: { itemId: about[1]!, title: about[2]! } } : {}),
   };

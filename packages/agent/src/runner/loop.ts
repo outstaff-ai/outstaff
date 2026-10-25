@@ -19,6 +19,9 @@ import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { ChatRelay } from "./chat.js";
 import type { ProfilePublisher } from "./profile.js";
 import { buildWorkPrompt } from "./prompt.js";
+import { saveTicketFiles, type Attachment } from "./attachments.js";
+import { safeId } from "../repos/workspaces.js";
+import { join } from "node:path";
 import { acknowledgeFeedback } from "./reactions.js";
 import type { UsageReporter } from "./usage.js";
 import { createSessionManager, type SessionManager } from "./sessions.js";
@@ -65,7 +68,7 @@ export interface WorkLoopOptions {
   usage?: Pick<UsageReporter, "observe" | "flush" | "setBusy">;
 
   /** Chat requests: the context a new chat session starts with, and the report to the requester. */
-  chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
+  chat?: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments">;
   log?: Logger;
 
   /** Told when the work or the agent's status changes, so the chat profile follows. */
@@ -172,6 +175,27 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     const chatContext =
       offer.workItem.origin && !sessionId ? await opts.chat?.context(offer) : undefined;
 
+    // Files people shared with the request or attached to its tickets: data, downloaded into the item's scratch
+    // directory (deleted with it) so the model can read them.
+    const scratch = opts.env.layout ? join(opts.env.layout.scratchDir, safeId(id)) : undefined;
+    const attachments: Attachment[] =
+      scratch && offer.workItem.origin?.files?.length && opts.chat
+        ? await opts.chat.attachments(offer, join(scratch, "files")).catch((err) => {
+            log.warn("could not read the files of a chat message", {
+              workItemId: id,
+              error: reason(err),
+            });
+
+            return [];
+          })
+        : [];
+
+    const ticketKeys = offer.context.subjects.filter((s) => s.type === "ticket").map((s) => s.ref);
+    const ticketFiles =
+      scratch && ticketKeys.length
+        ? await saveTicketFiles(opts.env.tracker, ticketKeys, join(scratch, "tickets"), log)
+        : {};
+
     // A chat session that filed its request as work tells the requester in the thread. The work reports its own result.
     let filedWork = false;
     const filed = async (workItemId: string, what: FiledWhat, f: Filed) => {
@@ -188,9 +212,15 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
     let asked = false;
     const base = opts.env.office;
+    const files = {
+      ...(attachments.length ? { attachments } : {}),
+      ...(Object.keys(ticketFiles).length ? { ticketFiles } : {}),
+    };
+
     const env: AgentEnv = base
       ? {
           ...opts.env,
+          ...files,
           office: {
             ...base,
             async ask(q) {
@@ -215,7 +245,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
             },
           },
         }
-      : opts.env;
+      : { ...opts.env, ...files };
 
     const requestFor = (prompt: string, resume: string | undefined): RunRequest => ({
       ...(resume ? { sessionId: resume } : {}),
@@ -279,6 +309,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
         restarted,
         ...(workspace ? { workspace } : {}),
         ...(context ? { chatContext: context } : {}),
+        attachments,
+        ticketFiles,
       });
 
     let outcome = await round(requestFor(prompt(false, chatContext), sessionId));

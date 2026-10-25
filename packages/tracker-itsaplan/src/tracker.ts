@@ -25,6 +25,17 @@ interface ApiIssue {
   updatedAt: string;
 }
 
+/** The API names these fields in more than one way across versions; the first present one wins. */
+interface ApiAttachment {
+  publicId?: string;
+  id?: string | number;
+  filename?: string;
+  name?: string;
+  mimeType?: string;
+  contentType?: string;
+  size?: number;
+}
+
 interface ApiFeedItem {
   id: number;
   kind: string;
@@ -298,6 +309,39 @@ function buildTracker(api: Itsaplan): Tracker {
       await api.http.request("POST", `/issues/${from.id}/links`, {
         body: { targetIssueId: to.id, kind: relation },
       });
+    },
+
+    async attach(key, file) {
+      const issue = await fetchIssue(key);
+      const form = new FormData();
+      form.set("file", new Blob([file.data.slice()], { type: file.mimetype }), file.name);
+      await api.http.request("POST", `/issues/${issue.id}/attachments`, { form });
+    },
+
+    async attachments(key) {
+      const issue = await fetchIssue(key);
+      const res = await api.http.request<ApiAttachment[] | { items: ApiAttachment[] }>(
+        "GET",
+        `/issues/${issue.id}/attachments`,
+      );
+
+      return (Array.isArray(res) ? res : res.items).flatMap((a) => {
+        const id = a.publicId ?? (a.id === undefined ? undefined : String(a.id));
+        return id
+          ? [
+              {
+                id,
+                name: a.filename ?? a.name ?? id,
+                mimetype: a.mimeType ?? a.contentType ?? "application/octet-stream",
+                size: a.size ?? 0,
+              },
+            ]
+          : [];
+      });
+    },
+
+    async download(attachment) {
+      return api.http.bytes(`/attachments/${encodeURIComponent(attachment.id)}/raw`);
     },
 
     async members() {

@@ -1,6 +1,17 @@
 // The slice of Slack's Web API and Socket Mode the adapter uses. The real clients satisfy these shapes; tests
 // inject a fake. Fields are optional because Slack omits them freely.
 
+/** A file shared in a message. The download needs the bot token and the `files:read` scope. */
+export interface SlackFile {
+  id?: string;
+  name?: string;
+  title?: string;
+  mimetype?: string;
+  size?: number;
+  url_private_download?: string;
+  url_private?: string;
+}
+
 export interface SlackMessage {
   ts?: string;
   thread_ts?: string;
@@ -8,6 +19,7 @@ export interface SlackMessage {
   bot_id?: string;
   subtype?: string;
   text?: string;
+  files?: SlackFile[];
 }
 
 export interface SlackUser {
@@ -73,6 +85,7 @@ export interface SlackEvent {
   ts?: string;
   thread_ts?: string;
   tab?: string;
+  files?: SlackFile[];
 }
 
 export interface SlackSocket {

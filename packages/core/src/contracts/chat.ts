@@ -111,6 +111,26 @@ export function chatContract(name: string, setup: ContractSetupFn<Chat, ChatSeed
       ).toEqual(["two", "three"]);
     });
 
+    it("delivers the files of a message and downloads their bytes", async (t) => {
+      const s = get();
+      requireCapability(t, s, "chat.messages", "chat.files");
+      const inbound = requireSeed(t, s.seed, "inbound");
+      const received: ChatMessage[] = [];
+      await s.subject.start(async (m) => void received.push(m));
+      const data = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+      await inbound({
+        channel: channelOf(t, s),
+        authorId: "U-noor",
+        text: "see the screenshot",
+        files: [{ name: "screen.png", mimetype: "image/png", data }],
+      });
+
+      const file = received[0]?.files?.[0];
+      expect(file).toMatchObject({ name: "screen.png", mimetype: "image/png", size: data.length });
+      expect(s.subject.download).toBeTypeOf("function");
+      expect([...(await s.subject.download!(file!))]).toEqual([...data]);
+    });
+
     it("opens the same direct channel for the same user", async (t) => {
       const s = get();
       requireCapability(t, s, "chat.messages");

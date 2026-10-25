@@ -40,7 +40,7 @@ const apiKey = (scope: "person" | "office"): SecretSpec[] => [
 export const itsaplanTracker = defineAdapter({
   port: "tracker",
   name: "itsaplan",
-  capabilities: ["tracker.issues", "tracker.assign"],
+  capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments"],
   options: trackerOptions,
   secrets: apiKey,
   create: (ctx) => createItsaplanTracker(ctx),

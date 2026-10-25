@@ -46,6 +46,23 @@ export interface NewIssue {
   labels?: string[];
 }
 
+/** A file attached to a ticket, as the tracker lists it. */
+export interface TicketAttachment {
+  id: string;
+  name: string;
+  mimetype: string;
+
+  /** Size in bytes; 0 when the tracker does not say. */
+  size: number;
+}
+
+/** A file to attach to a ticket. */
+export interface NewAttachment {
+  name: string;
+  mimetype: string;
+  data: Uint8Array;
+}
+
 export interface Tracker {
   links: Pick<Links, "issue">;
 
@@ -72,6 +89,15 @@ export interface Tracker {
   setLabels(key: string, add: string[], remove: string[]): Promise<Issue>;
   link(key: string, otherKey: string, relation: "blocks" | "relates" | "duplicates"): Promise<void>;
   members(): Promise<Member[]>;
+
+  /** Capability `tracker.attachments`. Adds a file to the ticket. */
+  attach?(key: string, file: NewAttachment): Promise<void>;
+
+  /** Capability `tracker.attachments`. The files attached to the ticket, by whoever attached them. */
+  attachments?(key: string): Promise<TicketAttachment[]>;
+
+  /** Capability `tracker.attachments`. The bytes of a file `attachments` listed. */
+  download?(attachment: TicketAttachment): Promise<Uint8Array>;
   events(cursor?: string): Promise<EventPage<TrackerEvent>>;
 
   /** Webhook mode; same contract as `Vcs.parseWebhook`. */

@@ -33,6 +33,32 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       });
     });
 
+    it("attaches a file to an issue and rejects an unknown key", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues", "tracker.attachments");
+      expect(s.subject.attach).toBeTypeOf("function");
+      const issue = await s.subject.createIssue({ title: "With a picture", body: "" });
+      const file = { name: "screen.png", mimetype: "image/png", data: new Uint8Array([1, 2, 3]) };
+      await expect(s.subject.attach!(issue.key, file)).resolves.toBeUndefined();
+      await expectPortError(s.subject.attach!("NOPE-99999", file), "not_found");
+    });
+
+    it("lists the files attached to an issue and downloads their bytes", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues", "tracker.attachments");
+      expect(s.subject.attachments).toBeTypeOf("function");
+      expect(s.subject.download).toBeTypeOf("function");
+      const issue = await s.subject.createIssue({ title: "Screenshot attached", body: "" });
+      expect(await s.subject.attachments!(issue.key)).toEqual([]);
+      const data = new Uint8Array([9, 8, 7, 6]);
+      await s.subject.attach!(issue.key, { name: "bug.png", mimetype: "image/png", data });
+      const listed = await s.subject.attachments!(issue.key);
+      expect(listed).toHaveLength(1);
+      expect(listed[0]).toMatchObject({ name: "bug.png", mimetype: "image/png", size: 4 });
+      expect([...(await s.subject.download!(listed[0]!))]).toEqual([...data]);
+      await expectPortError(s.subject.attachments!("NOPE-99999"), "not_found");
+    });
+
     it("reports not_found for an unknown key", async (t) => {
       expect.hasAssertions();
       const s = get();

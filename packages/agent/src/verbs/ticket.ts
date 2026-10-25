@@ -6,6 +6,16 @@ import {
   type Member,
 } from "@outstaff/core";
 import { z } from "zod";
+import { basename } from "node:path";
+import { MAX_ATTACHMENT_BYTES, humanSize } from "../runner/attachments.js";
+import {
+  attachmentsSection,
+  canAttach,
+  mimetypeOf,
+  uploadAttachments,
+  uploadedLines,
+} from "./attachments.js";
+import { readInputBytes } from "./files.js";
 import { mentionGuard } from "./mentions.js";
 import { filedLine, requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./types.js";
@@ -41,10 +51,23 @@ export const ticketShow = defineVerb({
     ]);
 
     const url = tracker.links.issue(issue.key);
+    // Files people attached are data from them; a copy is on disk when the runner downloaded it.
+    const files = await (tracker.attachments?.(input.key) ?? Promise.resolve([])).catch(() => []);
+    const local = env.ticketFiles?.[issue.key] ?? [];
     const lines = [
       ...summary(issue, url),
       "",
       issue.body.trim() || "(no description)",
+      ...(files.length
+        ? [
+            "",
+            `Attachments (${files.length}), data from whoever attached them:`,
+            ...files.map((f) => {
+              const path = local.find((l) => l.name === f.name && l.path)?.path;
+              return `- ${f.name} (${f.mimetype}${f.size ? `, ${humanSize(f.size)}` : ""})${path ? `: ${path}` : ""}`;
+            }),
+          ]
+        : []),
       ...(comments.length
         ? [
             "",
@@ -54,7 +77,10 @@ export const ticketShow = defineVerb({
         : []),
     ];
 
-    return result(lines, { issue, comments }, [url, ...comments.map((c) => c.url)]);
+    return result(lines, { issue, comments, attachments: files }, [
+      url,
+      ...comments.map((c) => c.url),
+    ]);
   },
 });
 
@@ -149,7 +175,7 @@ export const ticketCreate = defineVerb({
   name: "ticket.create",
   summary: "Create a ticket assigned to you.",
   description:
-    "Creates a ticket assigned to you. Pass parent to make it a sub-ticket of another ticket: it is linked to the parent and its description starts with a Part of line with the parent's link. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.",
+    'Creates a ticket assigned to you. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). Pass parent to make it a sub-ticket of another ticket: it is linked to the parent and its description starts with a Part of line with the parent\'s link. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.',
   input: z.strictObject({
     title: z.string().min(1).max(300).describe("Short title."),
     body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),
@@ -191,9 +217,14 @@ export const ticketCreate = defineVerb({
 
     const parent = input.parent ? await tracker.getIssue(input.parent) : undefined;
     const partOf = parent ? `Part of ${parent.key}: ${tracker.links.issue(parent.key)}` : undefined;
+
+    // The files of the chat message go with the ticket; the body says where they are.
+    const files = chat ? (env.attachments ?? []) : [];
+    const described = files.length ? attachmentsSection(files, canAttach(tracker)) : "";
+    const text = [partOf, input.body, described].filter(Boolean).join("\n\n").trimEnd();
     const issue = await tracker.createIssue({
       title: input.title,
-      body: partOf ? `${partOf}\n\n${input.body}`.trimEnd() : input.body,
+      body: text,
       status: input.status ?? (ctx.workItemId && !chat ? "active" : "ready"),
       ...(member ? { assignee: member.id } : {}),
     });
@@ -207,12 +238,24 @@ export const ticketCreate = defineVerb({
       });
     }
 
+    const uploaded = await uploadAttachments(env, issue.key, files);
+    if (uploaded.failed.length) {
+      // The body says they are attached; say here that they are not.
+      await tracker
+        .comment(
+          issue.key,
+          `These files could not be attached and stayed in chat: ${uploaded.failed.map((f) => f.name).join(", ")}.`,
+        )
+        .catch(() => {});
+    }
+
     const url = tracker.links.issue(issue.key);
     const filed = chat ? await requireOffice(env).linkTicket(current.id, issue.key) : undefined;
     return result(
       [
         `Created ${issue.key}.`,
         ...summary(issue, url),
+        ...uploadedLines(uploaded),
         ...(partOf ? [partOf] : []),
         ...(filed ? [filedLine(filed)] : []),
       ],
@@ -222,4 +265,42 @@ export const ticketCreate = defineVerb({
   },
 });
 
-export const ticketVerbs = [ticketShow, ticketComment, ticketMove, ticketAssign, ticketCreate];
+export const ticketAttach = defineVerb({
+  name: "ticket.attach",
+  summary: "Attach a file to a ticket.",
+  description:
+    "Attaches a file to a ticket. The file is one in the scratch directory of this item (for example a shared file the prompt lists) or in the worktree, up to 10 MB. Needs a tracker that takes attachments.",
+  input: z.strictObject({
+    key,
+    path: z.string().min(1).max(1000).describe("Path of the file to attach."),
+  }),
+  args: ["key", "path"],
+  examples: ["ost ticket attach ACME-12 /scratch/w1/files/1-screenshot.png"],
+  async run(env, input, ctx) {
+    const tracker = requireTracker(env);
+    if (!canAttach(tracker)) {
+      throw new PortError("unsupported", "This tracker does not take attachments.");
+    }
+
+    const data = readInputBytes(env, ctx, input.path, "attachment", MAX_ATTACHMENT_BYTES);
+    const known = env.attachments?.find((a) => a.path === input.path);
+    const name = known?.name ?? basename(input.path);
+    await tracker.attach!(input.key, {
+      name,
+      mimetype: known?.mimetype ?? mimetypeOf(name),
+      data,
+    });
+
+    const url = tracker.links.issue(input.key);
+    return result([`Attached ${name} to ${input.key}.`, url], { key: input.key, name }, [url]);
+  },
+});
+
+export const ticketVerbs = [
+  ticketShow,
+  ticketComment,
+  ticketMove,
+  ticketAssign,
+  ticketCreate,
+  ticketAttach,
+];

@@ -10,6 +10,7 @@ import type {
   Vcs,
 } from "@outstaff/core";
 import type { z } from "zod";
+import type { Attachment } from "../runner/attachments.js";
 import type { ToolStatus } from "../tools/types.js";
 import type { OfficeClient } from "./office.js";
 
@@ -45,6 +46,15 @@ export interface AgentEnv {
 
   /** The tools declared for this person and whether each installed; set at startup. */
   tools?: ToolStatus[];
+
+  /**
+   * The files shared in the chat message this chat session answers, downloaded to its scratch directory. Filing
+   * the request as a ticket attaches them to it. Data from the requester.
+   */
+  attachments?: Attachment[];
+
+  /** The files attached to tickets of this run, by ticket key, downloaded to the scratch directory. Data from whoever attached them. */
+  ticketFiles?: Record<string, Attachment[]>;
 }
 
 export interface VerbContext {

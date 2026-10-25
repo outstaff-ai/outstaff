@@ -6,7 +6,7 @@ import {
 } from "@outstaff/core";
 import { createSlackChat } from "../chat.js";
 import type { SlackOptions } from "../options.js";
-import { createFakeSlack, type FakeSlack } from "./slack-fake.js";
+import { BOT_TOKEN, createFakeSlack, type FakeSlack } from "./slack-fake.js";
 
 export const secretMap = (values: Record<string, string>): SecretSource => ({
   get: (k) => values[k],
@@ -37,10 +37,10 @@ export function slackWith(
   const fake: FakeSlack = createFakeSlack();
   const ctx: AdapterContext<SlackOptions> = {
     options: {},
-    secrets: secretMap({}),
+    secrets: secretMap({ SLACK_BOT_TOKEN: BOT_TOKEN }),
     team,
     log: onWarn ? { ...silentLogger, warn: onWarn } : silentLogger,
-    fetch,
+    fetch: fake.fetch,
     now,
   };
 

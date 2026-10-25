@@ -1,4 +1,7 @@
-import { parseTeamConfig, type ChatMessage, type TeamConfig } from "@outstaff/core";
+import { parseTeamConfig, silentLogger, type ChatMessage, type TeamConfig } from "@outstaff/core";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, join } from "node:path";
 import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createFakeOffice, type ChatMessageResult, type FakeOffice } from "../verbs/office.js";
@@ -654,6 +657,138 @@ describe("chat relay", () => {
       );
 
       expect(chat.posts[1]!.text).not.toContain("stack trace");
+    });
+  });
+
+  describe("files", () => {
+    const png = new Uint8Array([137, 80, 78, 71, 1]);
+    const withFiles = (files: NonNullable<ChatMessage["files"]>): Offer => ({
+      ...offerOf(),
+      workItem: {
+        ...offerOf().workItem,
+        origin: { ...offerOf().workItem.origin!, files },
+      },
+    });
+
+    const dir = () => mkdtempSync(join(tmpdir(), "ost-relay-files-"));
+
+    it("passes the files of a message to the office, metadata only", async () => {
+      await setup();
+      const sent = await chat.seed.inbound({
+        channel: "D-U0DANA0001",
+        authorId: "U0DANA0001",
+        authorName: "Dana",
+        text: "",
+        files: [{ name: "screen.png", mimetype: "image/png", data: png }],
+      });
+
+      expect(office.chatMessages).toHaveLength(1);
+      expect(office.chatMessages[0]).toMatchObject({
+        messageId: sent.id,
+        text: "",
+        files: [{ name: "screen.png", mimetype: "image/png", size: png.length }],
+      });
+
+      expect(JSON.stringify(office.chatMessages[0])).not.toContain("137");
+    });
+
+    it("downloads images and text files into the directory and lists the rest", async () => {
+      await setup();
+      const sent = await chat.seed.inbound({
+        channel: "D-U0DANA0001",
+        authorId: "U0DANA0001",
+        text: "x",
+        files: [
+          { name: "screen.png", mimetype: "image/png", data: png },
+          {
+            name: "../../etc/notes.txt",
+            mimetype: "text/plain",
+            data: new TextEncoder().encode("hi"),
+          },
+          { name: "movie.mp4", mimetype: "video/mp4", data: new Uint8Array(3) },
+        ],
+      });
+
+      const where = dir();
+      const saved = await relay.attachments(withFiles(sent.files!), where);
+      expect(saved.map((f) => [f.name, f.path ? basename(f.path) : f.skipped])).toEqual([
+        ["screen.png", "1-screen.png"],
+        ["../../etc/notes.txt", "2-notes.txt"],
+        ["movie.mp4", "not an image or a text file"],
+      ]);
+
+      expect([...readFileSync(saved[0]!.path!)]).toEqual([...png]);
+      // Whatever the sender called the file, it stays in the directory.
+      expect(saved[1]!.path!.startsWith(where)).toBe(true);
+      expect(readFileSync(saved[1]!.path!, "utf8")).toBe("hi");
+    });
+
+    it("does not download a file over the size cap, by its stated size or its real one", async () => {
+      await setup();
+      const cap = 10 * 1024 * 1024;
+      const big = { id: "F-big", name: "big.png", mimetype: "image/png", size: cap + 1, url: "u" };
+      const liar = { id: "F-liar", name: "liar.png", mimetype: "image/png", size: 5, url: "u" };
+      let downloads = 0;
+      chat.download = async (file) => {
+        downloads++;
+        return file.id === "F-liar" ? new Uint8Array(cap + 1) : png;
+      };
+
+      relay = createChatRelay({ chat, office, team: team(), person: "sam", tracker });
+      const saved = await relay.attachments(withFiles([big, liar]), dir());
+      expect(downloads).toBe(1);
+      expect(saved.map((f) => f.path)).toEqual([undefined, undefined]);
+      expect(saved.map((f) => f.skipped)).toEqual(["larger than 10.0 MB", "larger than 10.0 MB"]);
+    });
+
+    it("logs a failed download and lists the file; the other files still arrive", async () => {
+      await setup();
+      const warnings: string[] = [];
+      chat.download = async (file) => {
+        if (file.id === "F1") {
+          throw new Error("Slack refused");
+        }
+
+        return png;
+      };
+
+      relay = createChatRelay({
+        chat,
+        office,
+        team: team(),
+        person: "sam",
+        tracker,
+        log: { ...silentLogger, warn: (m) => void warnings.push(m) },
+      });
+
+      const file = (id: string) => ({
+        id,
+        name: `${id}.png`,
+        mimetype: "image/png",
+        size: 5,
+        url: "u",
+      });
+
+      const saved = await relay.attachments(withFiles([file("F1"), file("F2")]), dir());
+      expect(warnings).toEqual(["could not download a file"]);
+      expect(saved[0]).toMatchObject({ name: "F1.png", skipped: "the download failed" });
+      expect(saved[1]!.path).toBeTruthy();
+    });
+
+    it("downloads nothing for a message without files, and lists earlier messages' files by name in the history", async () => {
+      await setup();
+      expect(await relay.attachments(offerOf(), dir())).toEqual([]);
+      const first = await chat.seed.inbound({
+        channel: "D-U0DANA0001",
+        authorId: "U0DANA0001",
+        authorName: "Dana",
+        text: "the page looks off",
+        files: [{ name: "screen.png", mimetype: "image/png", data: png }],
+      });
+
+      const context = await relay.context(offerOf("c1", true, { direct: true, participant: true }));
+      expect(context).toContain(`Dana: the page looks off [shared "screen.png" (image/png)]`);
+      expect(first.files).toHaveLength(1);
     });
   });
 });

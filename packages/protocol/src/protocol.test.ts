@@ -34,6 +34,41 @@ describe("protocol", () => {
     expect(decode(encode(m))).toEqual({ ok: true, message: m });
   });
 
+  it("carries the metadata of a chat message's files, and a message that only shares files", () => {
+    const base = {
+      messageId: "m1",
+      channel: "D1",
+      text: "",
+      author: { id: "U1" },
+      direct: true,
+      participant: true,
+    };
+
+    const file = {
+      id: "F1",
+      name: "screen.png",
+      mimetype: "image/png",
+      size: 10,
+      url: "https://f.example/F1",
+    };
+
+    const m = { id: "1", type: "chat_message" as const, payload: { ...base, files: [file] } };
+    expect(decode(encode(m))).toEqual({ ok: true, message: m });
+    expect(
+      decode(encode({ ...m, payload: { ...base, files: [{ ...file, data: "AAAA" }] } } as never))
+        .ok,
+    ).toBe(false);
+
+    expect(
+      decode(
+        encode({
+          ...m,
+          payload: { ...base, files: Array.from({ length: 11 }, () => file) },
+        } as never),
+      ).ok,
+    ).toBe(false);
+  });
+
   it("carries usage windows and refuses malformed ones", () => {
     const windows = [{ name: "five_hour", utilization: 0.4, resetsAt: "2030-01-01T05:00:00Z" }];
     const m = { id: "1", type: "usage", payload: { windows } } as const;

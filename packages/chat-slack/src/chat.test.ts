@@ -18,7 +18,13 @@ describe("adapter definition", () => {
   it("declares the chat capabilities and the person secrets", () => {
     expect(slackChat.port).toBe("chat");
     expect(slackChat.name).toBe("slack");
-    expect(slackChat.capabilities).toEqual(["chat.messages", "chat.history", "chat.agentProfile"]);
+    expect(slackChat.capabilities).toEqual([
+      "chat.messages",
+      "chat.history",
+      "chat.agentProfile",
+      "chat.files",
+    ]);
+
     const secrets = slackChat.secrets("person");
     expect(secrets.map((s) => s.key)).toEqual([
       "SLACK_BOT_TOKEN",
@@ -180,6 +186,194 @@ describe("inbound events", () => {
     });
 
     await expect(s.fake.directMessage("U-noor", "hi")).resolves.toBeUndefined();
+  });
+});
+
+describe("files", () => {
+  const png = new Uint8Array([137, 80, 78, 71, 13, 10]);
+  const shot = { name: "screen.png", mimetype: "image/png", data: png };
+
+  it("delivers a file_share direct message with its files, and a broadcast reply", async () => {
+    const { fake, received } = await started();
+    fake.users.set("U-noor", { id: "U-noor", name: "noor" });
+    await fake.seed.inbound({
+      channel: "D-U-noor",
+      authorId: "U-noor",
+      text: "see the screenshot",
+      files: [shot],
+    });
+
+    // Slack delivers a message with files as a direct message with the file_share subtype.
+    await fake.emit({
+      type: "message",
+      channel_type: "im",
+      channel: "D-U-noor",
+      user: "U-noor",
+      ts: "5.1",
+      subtype: "file_share",
+      text: "",
+      files: [
+        {
+          id: "F9",
+          name: "notes.txt",
+          mimetype: "text/plain",
+          size: 12,
+          url_private_download: "https://files.slack.com/files-pri/T0-F9/download/notes.txt",
+        },
+      ],
+    });
+
+    await fake.emit({
+      type: "message",
+      channel_type: "im",
+      channel: "D-U-noor",
+      user: "U-noor",
+      ts: "5.2",
+      thread_ts: "5.1",
+      subtype: "thread_broadcast",
+      text: "and more",
+    });
+
+    expect(received.map((m) => m.text)).toEqual(["see the screenshot", "", "and more"]);
+    expect(received[0]?.files).toEqual([
+      expect.objectContaining({ name: "screen.png", mimetype: "image/png", size: png.length }),
+    ]);
+
+    expect(received[1]?.files).toEqual([
+      {
+        id: "F9",
+        name: "notes.txt",
+        mimetype: "text/plain",
+        size: 12,
+        url: "https://files.slack.com/files-pri/T0-F9/download/notes.txt",
+      },
+    ]);
+
+    expect(received[2]).not.toHaveProperty("files");
+  });
+
+  it("still ignores edits, deletes, joins and bot messages in a direct message", async () => {
+    const { fake, received } = await started();
+    fake.users.set("U-noor", { id: "U-noor", name: "noor" });
+    for (const subtype of ["message_changed", "message_deleted", "channel_join", "bot_message"]) {
+      await fake.emit({
+        type: "message",
+        channel_type: "im",
+        channel: "D1",
+        user: "U-noor",
+        ts: `7.${subtype.length}`,
+        subtype,
+        text: "x",
+      });
+    }
+
+    await fake.emit({
+      type: "message",
+      channel_type: "im",
+      channel: "D1",
+      subtype: "file_share",
+      bot_id: "B1",
+      ts: "7.9",
+      text: "from a bot",
+    });
+
+    expect(received).toEqual([]);
+  });
+
+  it("skips a file Slack no longer serves", async () => {
+    const { fake, received } = await started();
+    fake.users.set("U-noor", { id: "U-noor", name: "noor" });
+    await fake.emit({
+      type: "message",
+      channel_type: "im",
+      channel: "D1",
+      user: "U-noor",
+      ts: "8.1",
+      subtype: "file_share",
+      text: "gone",
+      files: [{ id: "F1", name: "gone.png", mimetype: "image/png", size: 3 }],
+    });
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).not.toHaveProperty("files");
+  });
+
+  it("lists the files of earlier messages in the history", async () => {
+    const { fake, chat } = await started();
+    fake.users.set("U-noor", { id: "U-noor", name: "noor" });
+    await fake.seed.inbound({
+      channel: "D-U-noor",
+      authorId: "U-noor",
+      text: "the page",
+      files: [shot],
+    });
+
+    const [first] = await chat.history("D-U-noor", { limit: 5 });
+    expect(first?.files?.map((f) => f.name)).toEqual(["screen.png"]);
+  });
+
+  it("downloads the bytes with the bot token", async () => {
+    const { fake, received, chat } = await started();
+    fake.users.set("U-noor", { id: "U-noor", name: "noor" });
+    await fake.seed.inbound({ channel: "D-U-noor", authorId: "U-noor", text: "x", files: [shot] });
+    expect([...(await chat.download!(received[0]!.files![0]!))]).toEqual([...png]);
+  });
+
+  it("refuses a file that is not on a Slack host, without sending the token", async () => {
+    const { chat } = slackWith();
+    const sent: string[] = [];
+    const guarded = createSlackChat(
+      {
+        options: {},
+        secrets: secretMap({ SLACK_BOT_TOKEN: "xoxb-secret" }),
+        team: teamWith(),
+        log: silentLogger,
+        fetch: (async (url: URL) => void sent.push(String(url))) as never,
+        now: () => new Date(),
+      },
+      { web: slackWith().fake.web },
+    );
+
+    const file = { id: "F1", name: "a.png", mimetype: "image/png", size: 1 };
+    for (const url of [
+      "https://files.slack.com.evil.example/a.png",
+      "http://files.slack.com/a.png",
+      "https://evil.example/a.png",
+      "not a url",
+    ]) {
+      await expect(guarded.download!({ ...file, url })).rejects.toMatchObject({ code: "invalid" });
+    }
+
+    expect(sent).toEqual([]);
+    expect(chat.download).toBeTypeOf("function");
+  });
+
+  it("says the files:read scope is missing when Slack answers with a sign-in page", async () => {
+    const s = slackWith();
+    const bad = createSlackChat(
+      {
+        options: {},
+        secrets: secretMap({ SLACK_BOT_TOKEN: "xoxb-wrong" }),
+        team: teamWith(),
+        log: silentLogger,
+        fetch: s.fake.fetch,
+        now: () => new Date(),
+      },
+      { web: s.fake.web, socket: s.fake.socket },
+    );
+
+    s.fake.files.set("F1", { name: "a.png", mimetype: "image/png", data: png });
+    const error = await bad.download!({
+      id: "F1",
+      name: "a.png",
+      mimetype: "image/png",
+      size: 6,
+      url: "https://files.slack.com/files-pri/T0-F1/download/a.png",
+    }).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(PortError);
+    expect((error as PortError).code).toBe("forbidden");
+    expect((error as PortError).message).toContain("files:read");
   });
 });
 
