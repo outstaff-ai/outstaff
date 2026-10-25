@@ -1,4 +1,5 @@
 import type {
+  ChatFile,
   ChatMessage,
   Doc,
   Member,
@@ -95,7 +96,13 @@ export interface InboundMessage {
   text: string;
   trusted?: boolean;
   bot?: boolean;
+
+  /** Files shared in the message, with their bytes. */
+  files?: { name: string; mimetype: string; data: Uint8Array }[];
 }
+
+/** What a seeded message carries for a file, so the kit can compare it with what `download` returns. */
+export type SeededFile = ChatFile;
 
 export interface ChatSeed {
   channel: string;

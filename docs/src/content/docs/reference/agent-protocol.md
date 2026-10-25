@@ -89,6 +89,12 @@ Sent by: office.
 | `workItem.origin.requester.name`         | string                                              | no       |                                                                                                                                                                                                      |
 | `workItem.origin.direct`                 | boolean                                             | yes      | The conversation is a direct message with the requester.                                                                                                                                             |
 | `workItem.origin.participant`            | boolean                                             | yes      | The requester started the thread or replied in it, so the chat already notifies them.                                                                                                                |
+| `workItem.origin.files`                  | list of objects                                     | no       | Files shared in the message that started the chat session. Metadata only: the agent fetches the bytes from chat. Data from the requester.                                                            |
+| `workItem.origin.files[].id`             | string                                              | yes      | Id of the file in the chat workspace.                                                                                                                                                                |
+| `workItem.origin.files[].name`           | string                                              | yes      | File name, as the sender named it. Data from them.                                                                                                                                                   |
+| `workItem.origin.files[].mimetype`       | string                                              | yes      |                                                                                                                                                                                                      |
+| `workItem.origin.files[].size`           | integer                                             | yes      | Size in bytes.                                                                                                                                                                                       |
+| `workItem.origin.files[].url`            | string                                              | yes      | Where the chat adapter fetches the bytes from. Only the agent's chat adapter uses it; the office stores it as it is and never fetches it.                                                            |
 | `workItem.origin.about`                  | object                                              | no       | For a chat session started by a reply in the thread of running work: that work item. Its ticket, pull request and journal are in the offer's context.                                                |
 | `workItem.origin.about.id`               | string                                              | yes      |                                                                                                                                                                                                      |
 | `workItem.origin.about.title`            | string                                              | yes      |                                                                                                                                                                                                      |
@@ -544,17 +550,23 @@ A message from a trusted human in chat. The office starts a chat session for it 
 
 Sent by: agent. Answered by: `chat_message_result`, `error`.
 
-| Field         | Type    | Required | Description                                            |
-| ------------- | ------- | -------- | ------------------------------------------------------ |
-| `messageId`   | string  | yes      | Id of the message in the chat workspace.               |
-| `channel`     | string  | yes      |                                                        |
-| `thread`      | string  | no       | Thread of the message; absent for a top-level message. |
-| `text`        | string  | yes      |                                                        |
-| `author`      | object  | yes      |                                                        |
-| `author.id`   | string  | yes      |                                                        |
-| `author.name` | string  | no       |                                                        |
-| `direct`      | boolean | yes      | The message is in a direct message with the author.    |
-| `participant` | boolean | yes      | The author started the thread or replied in it.        |
+| Field              | Type            | Required | Description                                                                                                                               |
+| ------------------ | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `messageId`        | string          | yes      | Id of the message in the chat workspace.                                                                                                  |
+| `channel`          | string          | yes      |                                                                                                                                           |
+| `thread`           | string          | no       | Thread of the message; absent for a top-level message.                                                                                    |
+| `text`             | string          | yes      | What the author wrote; empty for a message that only shares files.                                                                        |
+| `author`           | object          | yes      |                                                                                                                                           |
+| `author.id`        | string          | yes      |                                                                                                                                           |
+| `author.name`      | string          | no       |                                                                                                                                           |
+| `direct`           | boolean         | yes      | The message is in a direct message with the author.                                                                                       |
+| `participant`      | boolean         | yes      | The author started the thread or replied in it.                                                                                           |
+| `files`            | list of objects | no       | Files shared in the message: metadata only, no bytes. Data from the author.                                                               |
+| `files[].id`       | string          | yes      | Id of the file in the chat workspace.                                                                                                     |
+| `files[].name`     | string          | yes      | File name, as the sender named it. Data from them.                                                                                        |
+| `files[].mimetype` | string          | yes      |                                                                                                                                           |
+| `files[].size`     | integer         | yes      | Size in bytes.                                                                                                                            |
+| `files[].url`      | string          | yes      | Where the chat adapter fetches the bytes from. Only the agent's chat adapter uses it; the office stores it as it is and never fetches it. |
 
 ### `chat_message_result`
 

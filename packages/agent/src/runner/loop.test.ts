@@ -1,5 +1,7 @@
 import {
   buildPolicy,
+  silentLogger,
+  type Layout,
   type Logger,
   type Policy,
   type RunRequest,
@@ -7,9 +9,13 @@ import {
   type RuntimeEvent,
   type ToolKind,
   type TeamConfig,
+  type Tracker,
   type Vcs,
 } from "@outstaff/core";
-import { createFakeRuntime, type FakeVcs } from "@outstaff/core/fakes";
+import { createFakeRuntime, createFakeTracker, type FakeVcs } from "@outstaff/core/fakes";
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { Message } from "@outstaff/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
 import {
@@ -67,6 +73,7 @@ class OfficeSocket extends FakeSocket {
       sessionId?: string;
       journal?: boolean;
       origin?: boolean;
+      files?: Record<string, unknown>[];
       kind?: string;
       feedback?: Record<string, unknown>[];
     } = {},
@@ -92,6 +99,7 @@ class OfficeSocket extends FakeSocket {
                   requester: { id: "U0REQ0001", name: "Dana" },
                   direct: true,
                   participant: true,
+                  ...(extra.files ? { files: extra.files } : {}),
                 },
               }
             : {}),
@@ -189,15 +197,17 @@ describe("work loop", () => {
       workspaces?: Workspaces;
       usage?: UsageReporter;
       profile?: { changed(): void };
-      chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
+      chat?: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments">;
       vcs?: Vcs;
       log?: Logger;
       chatSession?: { policy: Policy; builtinTools: ToolKind[] };
       policies?: TeamConfig["policies"];
+      layout?: Layout;
+      tracker?: Tracker;
     } = {},
   ) {
     const { env, vcs } = fakeEnv();
-    const { vcs: ownVcs, ...rest } = extra;
+    const { vcs: ownVcs, layout: ownLayout, tracker: ownTracker, ...rest } = extra;
     const policy = buildPolicy({
       profile: "readonly",
       person: env.team.people[0]!,
@@ -216,7 +226,13 @@ describe("work loop", () => {
     loop = createWorkLoop({
       office: conn,
       runtime,
-      env: { ...env, vcs: ownVcs ?? vcs, office: conn },
+      env: {
+        ...env,
+        vcs: ownVcs ?? vcs,
+        office: conn,
+        ...(ownLayout ? { layout: ownLayout } : {}),
+        ...(ownTracker ? { tracker: ownTracker } : {}),
+      },
       systemPrompt: "IDENTITY",
       policy,
       builtinTools: ["read", "ost"],
@@ -680,7 +696,10 @@ describe("work loop", () => {
   const relay = () => {
     const reports: { kind: string; text: string; links: unknown; item: string }[] = [];
     const acks: { item: string; key: string }[] = [];
-    const chat: Pick<ChatRelay, "context" | "report" | "acknowledge"> = {
+    const chat: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments"> = {
+      async attachments() {
+        return [];
+      },
       async context() {
         return "Recent messages:\n- Dana: add search\n\nYour current work:\nTicket ACME-9";
       },
@@ -694,6 +713,131 @@ describe("work loop", () => {
 
     return { chat, reports, acks };
   };
+
+  describe("files people shared", () => {
+    const scratch = mkdtempSync(join(tmpdir(), "outstaff-loop-"));
+    const where: Layout = {
+      home: scratch,
+      workDir: join(scratch, "work"),
+      reposDir: join(scratch, "repos"),
+      worktreesDir: join(scratch, "worktrees"),
+      scratchDir: join(scratch, "scratch"),
+      memoryDir: join(scratch, "memory"),
+      secretsDir: join(scratch, "secrets"),
+    };
+
+    const shot = {
+      id: "F1",
+      name: "screen.png",
+      mimetype: "image/png",
+      size: 4,
+      url: "https://files.chat.acme.example/F1",
+    };
+
+    it("downloads a chat message's files before the run, lists them in the prompt and tells the verbs", async () => {
+      await connect();
+      const { chat } = relay();
+      const asked: string[] = [];
+      chat.attachments = async (offer, dir) => {
+        asked.push(`${offer.workItem.id}:${dir}`);
+        return [
+          { name: "screen.png", mimetype: "image/png", size: 4, path: join(dir, "1-screen.png") },
+          {
+            name: "movie.mp4",
+            mimetype: "video/mp4",
+            size: 9,
+            skipped: "not an image or a text file",
+          },
+        ];
+      };
+
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Answered." }]);
+      start(runtime, { chat, layout: where });
+      socket.offerWith("c1", { origin: true, files: [shot] });
+      await until(() => sentOf("handback").length === 1);
+
+      expect(asked).toEqual([`c1:${join(where.scratchDir, "c1", "files")}`]);
+      const prompt = runtime.requests[0]!.prompt;
+      expect(prompt).toContain("Dana shared a file with this message");
+      expect(prompt).toContain("data from Dana");
+      expect(prompt).toContain(
+        `${join(where.scratchDir, "c1", "files", "1-screen.png")} (image/png`,
+      );
+
+      expect(prompt).toContain(
+        '"movie.mp4" (video/mp4, 9 bytes): not downloaded, not an image or a text file',
+      );
+
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("still runs the item when the files cannot be read", async () => {
+      await connect();
+      const { chat } = relay();
+      chat.attachments = async () => {
+        throw new Error("chat is down");
+      };
+
+      const warnings: string[] = [];
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Answered." }]);
+      start(runtime, {
+        chat,
+        layout: where,
+        log: { ...silentLogger, warn: (m) => void warnings.push(m) },
+      });
+
+      socket.offerWith("c2", { origin: true, files: [shot] });
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("fail")).toEqual([]);
+      expect(warnings).toContain("could not read the files of a chat message");
+      expect(runtime.requests[0]!.prompt).toContain('"screen.png" (image/png): not downloaded');
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("downloads the files attached to the item's ticket and lists them next to it", async () => {
+      await connect();
+      const { env } = fakeEnv();
+      const tracker = createFakeTracker({ keyPrefix: "SHOP" });
+      const issue = await tracker.createIssue({ title: "Checkout", body: "" });
+      await tracker.attach!(issue.key, {
+        name: "bug.png",
+        mimetype: "image/png",
+        data: new Uint8Array([1, 2, 3]),
+      });
+
+      await tracker.attach!(issue.key, {
+        name: "clip.mov",
+        mimetype: "video/quicktime",
+        data: new Uint8Array([4]),
+      });
+
+      expect(env.person).toBe("sam");
+      const runtime = createFakeRuntime();
+      runtime.enqueue([{ type: "finish", text: "Done." }]);
+      start(runtime, { layout: where, tracker });
+      // The offer concerns SHOP-1, which the fake tracker numbered first.
+      socket.offerWith("w5", {});
+      await until(() => sentOf("handback").length === 1);
+
+      const path = join(where.scratchDir, "w5", "tickets", "SHOP-1", "1-bug.png");
+      expect(runtime.requests[0]!.prompt).toContain("Files attached to SHOP-1");
+      expect(runtime.requests[0]!.prompt).toContain(
+        `- ${path} (image/png, 3 bytes), shared as "bug.png"`,
+      );
+
+      expect(runtime.requests[0]!.prompt).toContain(
+        '"clip.mov" (video/quicktime, 1 bytes): not downloaded',
+      );
+
+      expect([...readFileSync(path)]).toEqual([1, 2, 3]);
+      await loop.stop();
+      await conn.stop();
+    });
+  });
 
   describe("chat sessions beside a work item", () => {
     const layout = {
@@ -949,8 +1093,9 @@ describe("work loop", () => {
 
     it("carries on when reporting fails", async () => {
       await connect();
-      const chat: Pick<ChatRelay, "context" | "report" | "acknowledge"> = {
+      const chat: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments"> = {
         context: async () => undefined,
+        attachments: async () => [],
         acknowledge: async () => {},
         report: async () => {
           throw new Error("chat is down");

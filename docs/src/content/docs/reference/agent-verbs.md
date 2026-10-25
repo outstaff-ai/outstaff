@@ -110,7 +110,7 @@ ost ticket assign ACME-12 none
 
 Create a ticket assigned to you.
 
-Creates a ticket assigned to you. Pass parent to make it a sub-ticket of another ticket: it is linked to the parent and its description starts with a Part of line with the parent's link. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.
+Creates a ticket assigned to you. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). Pass parent to make it a sub-ticket of another ticket: it is linked to the parent and its description starts with a Part of line with the parent's link. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the ticket files the request as work: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. A chat session files one request. Create a ticket only for a request that is work; answer a question directly.
 
 ```
 ost ticket create --title <title> [--body <body>] [--status <status>] [--parent <parent>]
@@ -130,6 +130,29 @@ Examples:
 ```sh
 ost ticket create --title "Add a search page" --body "Asked by Dana in chat."
 ost ticket create --parent ACME-12 --title "Add the search index" --body "The index half of ACME-12."
+```
+
+## ticket.attach
+
+Attach a file to a ticket.
+
+Attaches a file to a ticket. The file is one in the scratch directory of this item (for example a shared file the prompt lists) or in the worktree, up to 10 MB. Needs a tracker that takes attachments.
+
+```
+ost ticket attach <key> <path>
+```
+
+Runtime tool: `ticket_attach`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `key` | string | yes | Ticket key, for example ACME-12. |
+| `path` | string | yes | Path of the file to attach. |
+
+Examples:
+
+```sh
+ost ticket attach ACME-12 /scratch/w1/files/1-screenshot.png
 ```
 
 ## doc.search
@@ -675,7 +698,7 @@ ost work queue "Add a search page" "Asked by Dana in chat."
 
 Add a chat request to work you already have.
 
-Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket.
+Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket. The files the requester shared in their message are attached to the ticket, when the tracker takes attachments.
 
 ```
 ost work attach <target> [--confirmed] [--request <request>]

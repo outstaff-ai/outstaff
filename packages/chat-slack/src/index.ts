@@ -14,7 +14,7 @@ export type { SlackWeb, SlackSocket, SlackEvent } from "./api.js";
 export const slackChat = defineAdapter({
   port: "chat",
   name: "slack",
-  capabilities: ["chat.messages", "chat.history", "chat.agentProfile"],
+  capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
   options: slackOptions,
   // Each agent has its own Slack app, and the office has one more (`<team>-outstaff-office`) that only posts and
   // reads history: no app token, since the office never listens.

@@ -18,6 +18,7 @@ describe("slackSetupGuide", () => {
     expect(manifest).toContain("socket_mode_enabled: true");
     expect(manifest).toContain("- app_mention");
     expect(manifest).toContain("- chat:write");
+    expect(manifest).toContain("- files:read");
     expect(manifest).toContain('display_name: "sam"');
   });
 

@@ -11,7 +11,7 @@ integrations:
     adapter: slack
 ```
 
-There are no options. Capabilities: `chat.messages`, `chat.history`, `chat.agentProfile`.
+There are no options. Capabilities: `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`.
 
 ## Set up an app
 
@@ -38,6 +38,7 @@ oauth_config:
     bot:
       - app_mentions:read
       - chat:write
+      - files:read
       - im:history
       - im:read
       - im:write
@@ -97,6 +98,14 @@ If `integrations.chat` is set and `SLACK_OFFICE_BOT_TOKEN` is missing, the offic
 | `SLACK_OFFICE_BOT_TOKEN` | Office container only: bot token of the office app (`xoxb-...`). |
 
 The first three are in each agent's container; the last is only in the office's.
+
+## Pictures and files
+
+A message with pictures or files is a request like any other. The adapter takes the `file_share` and `thread_broadcast` message subtypes and ignores edits, deletes, joins and bot messages. The agent downloads images and text files up to 10 MB with its bot token into the scratch directory of the work item and lists their paths in its prompt, so the model can read them. Other files, and larger ones, are listed by name and type. Files are data from the sender, like the message text, and are deleted with the scratch directory. Earlier messages of the conversation list their files by name.
+
+Downloading needs the `files:read` scope. An app created before it was added must add `files:read` under OAuth & Permissions > Bot Token Scopes, reinstall, and copy the new bot token; without it the agent still answers but only sees the file names. `ost doctor` warns when the bot token lacks the scope.
+
+When the request becomes a ticket, `ost ticket create` attaches the message's files to it if the tracker takes attachments (capability `tracker.attachments`, supported by the Its a Plan adapter), and the ticket description lists them. Otherwise the description lists the files by name and says they stayed in chat. `ost work attach` adds the files to the existing ticket the same way, and `ost ticket attach <key> <path>` attaches a file by path later.
 
 ## Checking identities
 

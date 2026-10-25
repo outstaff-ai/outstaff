@@ -105,6 +105,10 @@ export function createTracker(opts: TrackerOptions) {
   /** Relations the agents made between tickets (`POST /issues/:id/links`). */
   const related: { from: string; to: string; kind: string }[] = [];
   const activity: Activity[] = [];
+
+  /** Files attached to tickets, and the public ids a download was served for. */
+  const attachments: { issueId: number; name: string; mimetype: string; data: Buffer }[] = [];
+  const served: string[] = [];
   let activityId = 100;
   let labelId = 500;
 
@@ -309,6 +313,73 @@ export function createTracker(opts: TrackerOptions) {
       }),
     },
     {
+      method: "POST",
+      path: `${base}/issues/:id/attachments`,
+      handler: as(async (r) => {
+        const issue = issueById(r.params["id"]!);
+        if (!issue) {
+          return err(404, "issue not found");
+        }
+
+        const form = await new Response(new Uint8Array(r.raw), {
+          headers: { "content-type": String(r.headers["content-type"] ?? "") },
+        })
+          .formData()
+          .catch(() => undefined);
+
+        const file = form?.get("file");
+        if (!(file instanceof File)) {
+          return err(400, "file is required");
+        }
+
+        attachments.push({
+          issueId: issue.id,
+          name: file.name,
+          mimetype: file.type,
+          data: Buffer.from(await file.arrayBuffer()),
+        });
+
+        touch(issue);
+        return {
+          status: 201,
+          body: { publicId: `pub-${attachments.length}`, filename: file.name },
+        };
+      }),
+    },
+    {
+      method: "GET",
+      path: `${base}/issues/:id/attachments`,
+      handler: as((r) => {
+        const issue = issueById(r.params["id"]!);
+        if (!issue) {
+          return err(404, "issue not found");
+        }
+
+        return attachments
+          .map((a, i) => ({ a, publicId: `pub-${i + 1}` }))
+          .filter(({ a }) => a.issueId === issue.id)
+          .map(({ a, publicId }) => ({
+            publicId,
+            filename: a.name,
+            mimeType: a.mimetype,
+            size: a.data.length,
+          }));
+      }),
+    },
+    {
+      method: "GET",
+      path: `${base}/attachments/:publicId/raw`,
+      handler: as((r) => {
+        const a = attachments[Number(r.params["publicId"]!.replace("pub-", "")) - 1];
+        if (!a) {
+          return err(404, "attachment not found");
+        }
+
+        served.push(r.params["publicId"]!);
+        return { buffer: a.data, headers: { "content-type": a.mimetype } };
+      }),
+    },
+    {
       method: "GET",
       path: `${base}/issues/:id/feed`,
       handler: as((r) => {
@@ -385,6 +456,9 @@ export function createTracker(opts: TrackerOptions) {
       touch(issue);
     },
 
+    /** Public ids of the attachments the agents downloaded. */
+    served: () => served,
+
     state() {
       return issues.map((i) => ({
         key: i.identifier,
@@ -393,6 +467,14 @@ export function createTracker(opts: TrackerOptions) {
         status: column(i.columnId)?.name,
         assignee: nameOf(i.assigneeUserId),
         links: related.filter((l) => l.from === i.identifier),
+        attachments: attachments
+          .filter((a) => a.issueId === i.id)
+          .map((a) => ({
+            name: a.name,
+            mimetype: a.mimetype,
+            size: a.data.length,
+            base64: a.data.toString("base64"),
+          })),
         comments: activity
           .filter((a) => a.issueId === i.id && a.kind === "comment")
           .map((a) => ({ author: nameOf(a.actorUserId), body: a.body })),

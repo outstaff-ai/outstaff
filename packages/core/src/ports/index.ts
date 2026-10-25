@@ -25,7 +25,17 @@ export type { EventPage, UnmappedEvent } from "./events.js";
 
 export { AdapterRegistry, defineAdapter, type PortImpls } from "./define.js";
 export { parseRepoUrl, repoKey, type RepoRef } from "./repo.js";
-export type { Comment, Issue, Member, NewIssue, Tracker, TrackerEvent } from "./tracker.js";
+export type {
+  Comment,
+  Issue,
+  Member,
+  NewAttachment,
+  NewIssue,
+  TicketAttachment,
+  Tracker,
+  TrackerEvent,
+} from "./tracker.js";
+
 export type { Doc, DocComment, Knowledge } from "./knowledge.js";
 export type {
   Check,
@@ -47,6 +57,13 @@ export type {
   VcsPermission,
 } from "./vcs.js";
 
-export { splitAtLines, type Chat, type ChatMessage, type AgentProfile } from "./chat.js";
+export {
+  splitAtLines,
+  type Chat,
+  type ChatFile,
+  type ChatMessage,
+  type AgentProfile,
+} from "./chat.js";
+
 export type { RunRequest, Runtime, RuntimeEvent, RuntimeTool, UsageEvent } from "./runtime.js";
 export type { Avatars } from "./avatars.js";

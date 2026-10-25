@@ -18,6 +18,9 @@ export interface FakeTracker extends Tracker {
   as(identity: Member): FakeTracker;
   seed: TrackerSeed;
   relations: { key: string; otherKey: string; relation: string }[];
+
+  /** Every file attached, by ticket key. */
+  attached: Map<string, { name: string; mimetype: string; data: Uint8Array }[]>;
 }
 
 export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
@@ -33,6 +36,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const comments = new Map<string, Comment[]>();
   const log = new EventLog<TrackerEvent>();
   const relations: FakeTracker["relations"] = [];
+  const attached: FakeTracker["attached"] = new Map();
   let counter = 0;
   let eventCounter = 0;
 
@@ -74,6 +78,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const tracker: FakeTracker = {
     links,
     relations,
+    attached,
     as(identity) {
       return new Proxy(tracker, {
         get(target, prop) {
@@ -215,6 +220,31 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
     },
     async members() {
       return structuredClone([...members.values()]);
+    },
+    async attach(key, file) {
+      need(key);
+      const list = attached.get(key) ?? [];
+      list.push({ name: file.name, mimetype: file.mimetype, data: file.data.slice() });
+      attached.set(key, list);
+    },
+    async attachments(key) {
+      need(key);
+      return (attached.get(key) ?? []).map((a, i) => ({
+        id: `${key}-a${i + 1}`,
+        name: a.name,
+        mimetype: a.mimetype,
+        size: a.data.byteLength,
+      }));
+    },
+    async download(attachment) {
+      for (const [key, list] of attached) {
+        const hit = list.find((_, i) => `${key}-a${i + 1}` === attachment.id);
+        if (hit) {
+          return hit.data.slice();
+        }
+      }
+
+      throw new PortError("not_found", `Attachment ${attachment.id} not found.`);
     },
     async events(cursor) {
       return log.since(cursor);

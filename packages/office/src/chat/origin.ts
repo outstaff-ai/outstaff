@@ -56,6 +56,7 @@ export const publicOrigin = ({
   requester,
   direct,
   participant,
+  files,
   about,
 }: ChatOriginRecord): ChatOrigin => ({
   channel,
@@ -63,6 +64,7 @@ export const publicOrigin = ({
   requester,
   direct,
   participant,
+  ...(files?.length ? { files } : {}),
   ...(about ? { about } : {}),
 });
 

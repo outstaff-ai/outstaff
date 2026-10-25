@@ -6,7 +6,12 @@ const team = { team: { name: "acme" }, repos: [], people: [] } as unknown as Tea
 const person = (chat?: string) =>
   ({ handle: "sam", name: "Sam", ...(chat ? { identities: { chat } } : {}) }) as never;
 
-const ctx = (body: unknown, who = person("U0BOT"), scope: "person" | "office" = "person") => {
+const ctx = (
+  body: unknown,
+  who = person("U0BOT"),
+  scope: "person" | "office" = "person",
+  headers: Record<string, string> = {},
+) => {
   const calls: string[] = [];
   const c: DeriveContext = {
     team,
@@ -19,7 +24,7 @@ const ctx = (body: unknown, who = person("U0BOT"), scope: "person" | "office" = 
         throw body;
       }
 
-      return new Response(JSON.stringify(body), { status: 200 });
+      return new Response(JSON.stringify(body), { status: 200, headers });
     }) as typeof fetch,
     now: () => new Date(),
     warn: () => {},
@@ -39,6 +44,32 @@ describe("doctorSlack", () => {
     const { c } = ctx({ ok: true, user_id: "U0BOT" });
     const checks = await doctorSlack(secrets({ SLACK_BOT_USER_ID: "U0BOT" }), c);
     expect(checks.map((x) => x.status)).toEqual(["ok", "ok", "ok"]);
+  });
+
+  it("warns when the token lacks files:read, and says nothing when it has it or Slack does not list scopes", async () => {
+    const missing = ctx({ ok: true, user_id: "U0BOT" }, person("U0BOT"), "person", {
+      "x-oauth-scopes": "chat:write,im:history",
+    });
+
+    const checks = await doctorSlack(secrets(), missing.c);
+    expect(checks.find((x) => x.name === "Slack files scope")).toMatchObject({
+      key: "SLACK_BOT_TOKEN",
+      status: "warn",
+      fix: expect.stringContaining("files:read"),
+    });
+
+    const granted = ctx({ ok: true, user_id: "U0BOT" }, person("U0BOT"), "person", {
+      "x-oauth-scopes": "chat:write, files:read",
+    });
+
+    expect(
+      (await doctorSlack(secrets(), granted.c)).some((x) => x.name === "Slack files scope"),
+    ).toBe(false);
+
+    const unlisted = ctx({ ok: true, user_id: "U0BOT" });
+    expect(
+      (await doctorSlack(secrets(), unlisted.c)).some((x) => x.name === "Slack files scope"),
+    ).toBe(false);
   });
 
   it("fails when auth.test rejects the bot token", async () => {

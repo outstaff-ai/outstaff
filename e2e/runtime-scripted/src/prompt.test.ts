@@ -180,4 +180,40 @@ describe("parsePrompt", () => {
       { kind: "chat", body: "Say goodbye.", threads: [] },
     ]);
   });
+
+  it("reads the files a requester shared with a chat session", () => {
+    const asked = offer("chat");
+    asked.workItem.origin = {
+      channel: "D1",
+      thread: "t1",
+      requester: { id: "U1", name: "Ada" },
+      direct: true,
+      participant: true,
+      files: [{ id: "F1", name: "screen.png", mimetype: "image/png", size: 4, url: "u" }],
+    };
+
+    const prompt = buildWorkPrompt(asked, {
+      resumed: false,
+      attachments: [
+        {
+          name: "screen.png",
+          mimetype: "image/png",
+          size: 4,
+          path: "/scratch/c1/files/1-screen.png",
+        },
+        {
+          name: "movie.mp4",
+          mimetype: "video/mp4",
+          size: 4,
+          skipped: "not an image or a text file",
+        },
+      ],
+    });
+
+    expect(parsePrompt(prompt)?.files).toEqual([
+      { path: "/scratch/c1/files/1-screen.png", mimetype: "image/png", name: "screen.png" },
+    ]);
+
+    expect(parsePrompt(buildWorkPrompt(offer("chat"), { resumed: false }))?.files).toBeUndefined();
+  });
 });

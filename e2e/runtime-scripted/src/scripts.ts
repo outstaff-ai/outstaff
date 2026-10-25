@@ -470,6 +470,20 @@ export async function* chat(ctx: ItemContext): Script {
     return `Greetings live in greeting.txt on the main branch. Right now I am on: ${work.split("\n")[0] ?? ""}`;
   }
 
+  // A message with pictures is a request to file: the ticket gets the files, which the agent attaches itself.
+  if (ctx.files?.length) {
+    yield {
+      type: "tool",
+      tool: "ticket_create",
+      input: {
+        title: "Fix the page in the screenshot",
+        body: "The page looks wrong, see the attached screenshot.",
+      },
+    };
+
+    return "Filed it.";
+  }
+
   const asked = talk.find((m) => m.agent && QUESTION.test(m.text));
   const pr = /PR #(\d+)/i.exec(asked ? asked.text : latest)?.[1];
   if (!pr) {

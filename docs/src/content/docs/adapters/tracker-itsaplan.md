@@ -68,6 +68,7 @@ Its a Plan answers HTTP 500 (not 429) once a key has made about 100 requests in 
 ## What it does
 
 - **Tracker:** read, list, search and create issues; move them between columns by canonical status; assign; comment; set labels (missing labels are created); link issues (`blocks`, `relates`, `duplicates`); list members; poll the project activity feed with an opaque cursor.
+- **Attachments** (capability `tracker.attachments`): upload a file to an issue (`ost ticket attach`, and the files of a chat message when a chat session files a ticket), and list and download the files attached to an issue. The agent downloads the images and small text files (up to 10 MB) attached to the tickets of its work item into the item's scratch directory and lists them in its prompt as data from whoever attached them; `ost ticket show` lists them too.
 - **Sub-tickets:** the project has no parent field, so `ost ticket create --parent <key>` starts the new ticket's description with a `Part of <key>: <link>` line and also links the two with `relates`.
 - **Knowledge:** a document tree addressed by path or id; search; create (missing parent pages are made); update with a version check (a stale `baseVersion` is a `conflict`); inline comments anchored to a quoted passage, replies and resolve. Markdown is converted to and from the editor's JSON.
 - **Errors** map to the port error codes: 401 and 403 `forbidden`, 404 `not_found`, 409 `conflict`, 429 `rate_limited`, 400 and 422 `invalid`, 5xx and network failures `unavailable`.

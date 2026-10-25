@@ -139,6 +139,7 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
 
   const isProject = (p: string) => p === key || p === ref;
   const issueBySeq = (seq: string) => issues.find((i) => i.sequenceNumber === Number(seq));
+  const attachments: { issueId: number; name: string; mimetype: string; data: Uint8Array }[] = [];
   const issueById = (id: string) => issues.find((i) => i.id === Number(id));
   const touch = (i: Issue) => void (i.updatedAt = clock());
 
@@ -338,6 +339,60 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
             payload: {},
           }),
         };
+      },
+    },
+    {
+      method: "POST",
+      path: "/issues/:id/attachments",
+      handler: async (r) => {
+        const issue = issueById(r.params["id"]!);
+        if (!issue) {
+          return err(404, "issue not found");
+        }
+
+        const file = r.form?.get("file");
+        if (!(file instanceof File)) {
+          return err(400, "file is required", "validation");
+        }
+
+        touch(issue);
+        attachments.push({
+          issueId: issue.id,
+          name: file.name,
+          mimetype: file.type,
+          data: new Uint8Array(await file.arrayBuffer()),
+        });
+
+        return { status: 201, body: { id: attachments.length, name: file.name } };
+      },
+    },
+    {
+      method: "GET",
+      path: "/issues/:id/attachments",
+      handler: (r) => {
+        const issue = issueById(r.params["id"]!);
+        if (!issue) {
+          return err(404, "issue not found");
+        }
+
+        return attachments
+          .filter((a) => a.issueId === issue.id)
+          .map((a) => ({
+            publicId: `pub-${attachments.indexOf(a) + 1}`,
+            filename: a.name,
+            mimeType: a.mimetype,
+            size: a.data.byteLength,
+          }));
+      },
+    },
+    {
+      method: "GET",
+      path: "/attachments/:publicId/raw",
+      handler: (r) => {
+        const a = attachments[Number(r.params["publicId"]!.replace("pub-", "")) - 1];
+        return a
+          ? { buffer: a.data, headers: { "content-type": a.mimetype } }
+          : err(404, "attachment not found");
       },
     },
     {
@@ -572,7 +627,7 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
     fetch: stub.fetch,
     calls: stub.calls,
     called: stub.called,
-    state: { issues, docs, docComments, activity, columns, labels, assignees },
+    state: { issues, docs, docComments, activity, columns, labels, assignees, attachments },
     trackerSeed,
     knowledgeSeed,
     project: { key, ref },

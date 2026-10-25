@@ -17,7 +17,11 @@ import {
 
 trackerContract("fake", async () => {
   const subject = createFakeTracker();
-  return { subject, seed: subject.seed, capabilities: ["tracker.issues", "tracker.assign"] };
+  return {
+    subject,
+    seed: subject.seed,
+    capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments"],
+  };
 });
 
 knowledgeContract("fake", async () => {
@@ -39,7 +43,7 @@ chatContract("fake", async () => {
   return {
     subject,
     seed: subject.seed,
-    capabilities: ["chat.messages", "chat.history", "chat.agentProfile"],
+    capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
   };
 });
 

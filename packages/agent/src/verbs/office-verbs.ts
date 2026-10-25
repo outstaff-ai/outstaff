@@ -1,6 +1,7 @@
 import { PortError } from "@outstaff/core";
 import { formatWorkGroups, groupWork } from "@outstaff/protocol";
 import { z } from "zod";
+import { uploadAttachments, uploadedLines, type Uploaded } from "./attachments.js";
 import { filedLine, requireOffice } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
@@ -158,7 +159,7 @@ export const workAttach = defineVerb({
   name: "work.attach",
   summary: "Add a chat request to work you already have.",
   description:
-    "Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket.",
+    "Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket. The files the requester shared in their message are attached to the ticket, when the tracker takes attachments.",
   input: z.strictObject({
     target: z
       .string()
@@ -199,9 +200,15 @@ export const workAttach = defineVerb({
 
     const pr = done.attached.pr;
     const ticket = done.attached.ticket;
+    // The files of the message join the ticket the request was added to.
+    const uploaded: Uploaded = ticket
+      ? await uploadAttachments(env, ticket.ref, env.attachments ?? [])
+      : { attached: [], failed: [] };
+
     return result(
       [
         `Added the request to ${[pr && `PR ${pr.ref}`, ticket?.ref].filter(Boolean).join(" for ")}.`,
+        ...uploadedLines(uploaded),
         "It is part of that work now and keeps its place. Finish with a short note.",
       ],
       { attached: done.attached },

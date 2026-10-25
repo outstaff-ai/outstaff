@@ -1,3 +1,14 @@
+/** A file shared in a message. The adapter fills `url` with whatever it needs to fetch the bytes in `Chat.download`. */
+export interface ChatFile {
+  id: string;
+  name: string;
+  mimetype: string;
+
+  /** Size in bytes. */
+  size: number;
+  url: string;
+}
+
 export interface ChatMessage {
   id: string;
   channel: string;
@@ -8,6 +19,9 @@ export interface ChatMessage {
 
   /** The conversation is a direct message (a private chat). Adapters set it; absent means a channel. */
   direct?: boolean;
+
+  /** Files shared in the message: data from the author, like the text. Absent when there are none. */
+  files?: ChatFile[];
 }
 
 export interface AgentProfile {
@@ -48,6 +62,12 @@ export interface Chat {
 
   /** Capability `chat.history`. */
   history(channel: string, opts: { thread?: string; limit: number }): Promise<ChatMessage[]>;
+
+  /**
+   * Capability `chat.files`. The bytes of a file shared in a message, fetched with the adapter's own credentials.
+   * Refuses a file that did not come from this chat (`invalid`).
+   */
+  download?(file: ChatFile): Promise<Uint8Array>;
 
   /** Channel id of a direct message with the user. */
   openDirect(userId: string): Promise<string>;

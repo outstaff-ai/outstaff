@@ -6,7 +6,7 @@ import { createScheduler } from "../scheduler/scheduler.js";
 import { openStore } from "../store/index.js";
 import type { Store, WorkItem } from "../store/types.js";
 import { createChatDesk, type ChatRequests } from "./desk.js";
-import { readOrigin, threadsOf, withThread } from "./origin.js";
+import { publicOrigin, readOrigin, threadsOf, withThread } from "./origin.js";
 import type { PrRecord, TicketRecord } from "../workstate/index.js";
 import { addFeedback, readFeedback } from "../engine/feedback.js";
 import { parsePlacement } from "./placement.js";
@@ -306,6 +306,43 @@ describe("chat requests", () => {
 
     expect(await tracker.listIssues({})).toEqual([]);
     expect((await store.readJournal(item.id))[0]!.text).toContain("why is CI failing?");
+  });
+
+  it("keeps the files of a message on the chat origin, as metadata the agent gets with the offer", async () => {
+    const files = [
+      {
+        id: "F1",
+        name: "screen.png",
+        mimetype: "image/png",
+        size: 2048,
+        url: "https://files.chat.acme.example/F1",
+      },
+    ];
+
+    const r = await desk.message("sam", {
+      messageId: "m-files",
+      channel: "D1",
+      text: "",
+      author: DANA,
+      direct: true,
+      participant: true,
+      files,
+    });
+
+    expect(r.disposition).toBe("started");
+    const item = (await store.getItem(r.item.id))!;
+    expect(item.title).toBe("Chat: screen.png");
+    const origin = (await readOrigin(store, item.id))!;
+    expect(origin.files).toEqual(files);
+    expect(publicOrigin(origin).files).toEqual(files);
+    expect((await store.readJournal(item.id))[0]!.text).toContain(
+      "(Shared screen.png (image/png).)",
+    );
+
+    // A message without files leaves them out of what the agent sees, and a linked thread never carries them.
+    const plain = (await readOrigin(store, (await say("no files")).item.id))!;
+    expect(publicOrigin(plain)).not.toHaveProperty("files");
+    expect(threadsOf(origin)[0]).not.toHaveProperty("files");
   });
 
   describe("filing work", () => {

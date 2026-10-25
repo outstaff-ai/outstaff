@@ -4,9 +4,17 @@ import {
   type AdapterContext,
   type AgentProfile,
   type Chat,
+  type ChatFile,
   type ChatMessage,
 } from "@outstaff/core";
-import type { SlackEvent, SlackMessage, SlackPage, SlackSocket, SlackWeb } from "./api.js";
+import type {
+  SlackEvent,
+  SlackFile,
+  SlackMessage,
+  SlackPage,
+  SlackSocket,
+  SlackWeb,
+} from "./api.js";
 import { slackErrorName, toPortError } from "./errors.js";
 import { splitMrkdwn, toMrkdwn } from "./mrkdwn.js";
 import type { SlackOptions } from "./options.js";
@@ -28,6 +36,29 @@ export interface SlackDeps {
   socket?: SlackSocket;
 }
 
+/** Message subtypes that are a person's own content; edits, deletes, joins and bot messages are not requests. */
+const CONTENT_SUBTYPES = new Set(["file_share", "thread_broadcast"]);
+
+/** Files are served from slack.com hosts only; the bot token is never sent anywhere else. */
+const isSlackHost = (host: string) => host === "slack.com" || host.endsWith(".slack.com");
+
+const filesOf = (files: SlackFile[] | undefined): ChatFile[] =>
+  (files ?? []).flatMap((f) => {
+    const url = f.url_private_download ?? f.url_private;
+    // A file Slack no longer serves (deleted, over the workspace's limit) has no URL.
+    return f.id && url
+      ? [
+          {
+            id: f.id,
+            name: f.name ?? f.title ?? f.id,
+            mimetype: f.mimetype ?? "application/octet-stream",
+            size: f.size ?? 0,
+            url,
+          },
+        ]
+      : [];
+  });
+
 const isoOf = (ts: string) => new Date(Number(ts) * 1000).toISOString();
 
 function requireToken(ctx: AdapterContext<SlackOptions>, key: string): string {
@@ -48,8 +79,8 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
   // WebClient's response types are wider than the slice used here.
   const office = ctx.scope === "office";
   const tokenKey = office ? "SLACK_OFFICE_BOT_TOKEN" : "SLACK_BOT_TOKEN";
-  const web: SlackWeb =
-    deps.web ?? (new WebClient(requireToken(ctx, tokenKey)) as unknown as SlackWeb);
+  const token = deps.web ? (ctx.secrets.get(tokenKey) ?? "") : requireToken(ctx, tokenKey);
+  const web: SlackWeb = deps.web ?? (new WebClient(token) as unknown as SlackWeb);
 
   let socket = deps.socket;
   let botUserId = ctx.secrets.get("SLACK_BOT_USER_ID");
@@ -104,6 +135,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     const thread = m.thread_ts;
     // A direct message channel has an id that starts with D.
     const direct = channel.startsWith("D");
+    const files = filesOf(m.files);
     return {
       id: m.ts!,
       channel,
@@ -117,6 +149,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
       text: clean(m.text),
       at: isoOf(m.ts!),
       ...(direct ? { direct } : {}),
+      ...(files.length ? { files } : {}),
     };
   };
 
@@ -164,8 +197,12 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
         return;
       }
 
-      // Direct messages and mentions only; edits, joins and other subtypes are not requests.
-      if (e.type === "message" && (e.channel_type !== "im" || e.subtype)) {
+      // Direct messages and mentions only; edits, joins and other subtypes are not requests. A message with files
+      // arrives as `file_share`.
+      if (
+        e.type === "message" &&
+        (e.channel_type !== "im" || (e.subtype && !CONTENT_SUBTYPES.has(e.subtype)))
+      ) {
         return;
       }
 
@@ -315,6 +352,48 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
           );
 
       return Promise.all(raw.filter((m) => m.ts).map((m) => toMessage(channel, m)));
+    },
+
+    async download(file) {
+      let url: URL;
+      try {
+        url = new URL(file.url);
+      } catch {
+        throw new PortError("invalid", `File ${file.id} has no valid download address.`);
+      }
+
+      if (url.protocol !== "https:" || !isSlackHost(url.hostname)) {
+        throw new PortError("invalid", `File ${file.id} is not hosted by Slack.`);
+      }
+
+      let res: Response;
+      try {
+        res = await ctx.fetch(url, { headers: { authorization: `Bearer ${token}` } });
+      } catch (error) {
+        throw new PortError("unavailable", `Slack could not be reached for file ${file.id}.`, {
+          cause: error,
+        });
+      }
+
+      if (!res.ok) {
+        throw new PortError(
+          res.status === 401 || res.status === 403 ? "forbidden" : "unavailable",
+          `Slack refused file ${file.id}: ${res.status}.`,
+        );
+      }
+
+      // Without the files:read scope Slack answers 200 with a sign-in page instead of the file.
+      if (
+        res.headers.get("content-type")?.startsWith("text/html") &&
+        !file.mimetype.startsWith("text/html")
+      ) {
+        throw new PortError(
+          "forbidden",
+          "Slack sent a web page instead of the file: the app needs the files:read scope.",
+        );
+      }
+
+      return new Uint8Array(await res.arrayBuffer());
     },
 
     async openDirect(userId) {

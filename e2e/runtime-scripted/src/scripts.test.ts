@@ -315,6 +315,31 @@ describe("chat", () => {
     expect(text).toContain("SHOP-1 Add a greeting");
   });
 
+  it("files a message with pictures as a ticket, which gets the files from the agent", async () => {
+    const { seen, text } = await play(
+      chat({
+        ...talk([false, "The page looks wrong"]),
+        files: [
+          { path: "/scratch/c1/files/1-screen.png", mimetype: "image/png", name: "screen.png" },
+        ],
+      }),
+      () => "Created SHOP-3.",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "ticket_create",
+        input: {
+          title: "Fix the page in the screenshot",
+          body: "The page looks wrong, see the attached screenshot.",
+        },
+      },
+    ]);
+
+    expect(text).toBe("Filed it.");
+  });
+
   it("asks first when the pull request is in review, because the verb refuses", async () => {
     const { seen, text } = await play(
       chat(talk([false, "For PR #1, also say goodbye."])),

@@ -17,7 +17,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "tracker",
         name: "fake",
-        capabilities: ["tracker.issues", "tracker.assign"],
+        capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments"],
         options,
         secrets: none,
         create: (ctx) =>
@@ -48,7 +48,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "chat",
         name: "fake",
-        capabilities: ["chat.messages", "chat.history", "chat.agentProfile"],
+        capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
         options,
         secrets: none,
         create: (ctx) => createFakeChat({ now: ctx.now }),

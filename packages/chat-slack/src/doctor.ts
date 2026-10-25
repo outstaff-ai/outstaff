@@ -1,6 +1,14 @@
 import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
 
-type AuthTest = { ok: boolean; user_id?: string; user?: string; error?: string };
+type AuthTest = {
+  ok: boolean;
+  user_id?: string;
+  user?: string;
+  error?: string;
+
+  /** The scopes the token holds, from the `x-oauth-scopes` header. Absent when Slack did not say. */
+  scopes?: string[];
+};
 
 async function authTest(token: string, ctx: DeriveContext): Promise<AuthTest | Error> {
   try {
@@ -9,7 +17,9 @@ async function authTest(token: string, ctx: DeriveContext): Promise<AuthTest | E
       headers: { authorization: `Bearer ${token}` },
     });
 
-    return (await res.json()) as AuthTest;
+    const body = (await res.json()) as AuthTest;
+    const scopes = res.headers?.get("x-oauth-scopes");
+    return scopes ? { ...body, scopes: scopes.split(",").map((s) => s.trim()) } : body;
   } catch (e) {
     return e as Error;
   }
@@ -147,6 +157,18 @@ export async function doctorSlack(
     status: "ok",
     detail: `SLACK_BOT_TOKEN is valid for bot user ${body.user_id}.`,
   });
+
+  // Without files:read the bot cannot download what people send; chat itself keeps working.
+  if (body.scopes && !body.scopes.includes("files:read")) {
+    out.push({
+      key: "SLACK_BOT_TOKEN",
+      name: "Slack files scope",
+      status: "warn",
+      detail:
+        "The bot token lacks the files:read scope, so the agent cannot read pictures and files people send it; it only sees their names.",
+      fix: "Add files:read under OAuth & Permissions > Bot Token Scopes, then reinstall the app and copy the new bot token.",
+    });
+  }
 
   const wanted = ctx.person.identities?.chat;
   if (!wanted) {

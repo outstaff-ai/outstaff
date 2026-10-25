@@ -1,4 +1,4 @@
-import { defineAdapter, type Chat, type ChatMessage } from "@outstaff/core";
+import { defineAdapter, type Chat, type ChatFile, type ChatMessage } from "@outstaff/core";
 import { z } from "zod";
 
 const POLL_MS = 500;
@@ -12,6 +12,7 @@ interface Inbound {
   authorName: string;
   text: string;
   at: string;
+  files?: ChatFile[];
 }
 
 /** A chat for the end-to-end test: the messages of one trusted human come from the stub workspace over HTTP. */
@@ -54,6 +55,7 @@ export function createStubChat(baseUrl: string): Chat {
                 author: { id: m.authorId, name: m.authorName, trusted: true, bot: false },
                 text: m.text,
                 at: m.at,
+                ...(m.files ? { files: m.files } : {}),
               };
 
               await onMessage(message);
@@ -90,6 +92,15 @@ export function createStubChat(baseUrl: string): Chat {
       return (await call<{ messages: ChatMessage[] }>(`/chat/history?${query}`)).messages;
     },
 
+    async download(file) {
+      const res = await fetch(`${baseUrl}${file.url}`);
+      if (!res.ok) {
+        throw new Error(`${file.url}: ${res.status}`);
+      }
+
+      return new Uint8Array(await res.arrayBuffer());
+    },
+
     openDirect: async (userId) => `D-${userId}`,
 
     async setAgentProfile(userId, profile) {
@@ -105,7 +116,7 @@ export function createStubChat(baseUrl: string): Chat {
 export const stubChat = defineAdapter({
   port: "chat",
   name: "slack",
-  capabilities: ["chat.messages", "chat.history", "chat.agentProfile"],
+  capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
   options: z.strictObject({}),
   secrets: () => [],
   create: () => createStubChat(process.env["E2E_STUB_URL"] ?? "http://tracker.acme.example:8081"),

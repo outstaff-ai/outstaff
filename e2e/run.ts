@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket). The office, Postgres and the agent are the real images; GitHub,
+// ticket), and a direct message with a picture is answered and its ticket gets the picture. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -1026,6 +1026,58 @@ async function main() {
 
   step(
     `split merge: #${split.forParent.number} merged -> only ${parent} is done; #${split.forChild.number} merged -> ${split.child.key} is done`,
+  );
+
+  // ---- 9. a direct message with a picture: it is answered (it used to be dropped), the ticket it becomes gets the
+  // picture, and the agent that works the ticket downloads the picture from the tracker.
+  const picture =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+  const shot = await stub("POST", "/_test/chat/say", {
+    text: "The farewell page looks wrong.",
+    files: [{ name: "screen.png", mimetype: "image/png", base64: picture }],
+  });
+
+  const withPicture = await until(
+    "a ticket filed from the picture message, with the picture",
+    (s) => s.tickets.find((t: Json) => t.attachments.length > 0),
+  );
+
+  assertEq(withPicture.attachments.length, 1, "one file attached");
+  assertEq(withPicture.attachments[0].name, "screen.png", "the file keeps its name");
+  assertEq(withPicture.attachments[0].mimetype, "image/png", "the file keeps its type");
+  assertEq(withPicture.attachments[0].base64, picture, "the tracker got the picture's bytes");
+  assertIncludes(
+    [withPicture.description.includes("see the attached screenshot") ? "yes" : "no"],
+    "yes",
+    "the ticket refers to the picture",
+  );
+
+  assertEq(
+    withPicture.description.includes(
+      "Attached to this ticket, from the chat message:\n- screen.png",
+    ),
+    true,
+    "the ticket lists the picture",
+  );
+
+  const afterShot = await state();
+  assertEq(
+    afterShot.chat.reactions.some((r: Json) => r.messageId === shot.id && r.name === "eyes"),
+    true,
+    "the message with the picture got the eyes reaction",
+  );
+
+  await until("the reply in the picture's thread", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === shot.id && p.text.includes(withPicture.key)),
+  );
+
+  await until("the agent downloading the ticket's picture to work from", (s) =>
+    s.attachmentsServed.length > 0 ? s.attachmentsServed : undefined,
+  );
+
+  step(
+    `chat files: a direct message with a picture was answered; ${withPicture.key} has the picture attached and the working agent downloaded it`,
   );
 
   const final = await state();

@@ -99,6 +99,64 @@ describe("tracker", () => {
     ).toBe(true);
   });
 
+  it("uploads a file to the issue as multipart, by the issue's id", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const issue = await tracker.createIssue({ title: "With a picture", body: "" });
+    await tracker.attach!(issue.key, {
+      name: "screen.png",
+      mimetype: "image/png",
+      data: new Uint8Array([137, 80, 78, 71]),
+    });
+
+    const [upload] = fake.state.attachments;
+    expect(upload).toMatchObject({
+      issueId: Number(issue.id),
+      name: "screen.png",
+      mimetype: "image/png",
+    });
+
+    expect([...upload!.data]).toEqual([137, 80, 78, 71]);
+    const call = fake.called("POST", `/issues/${issue.id}/attachments`)[0]!;
+    // No content type of our own: fetch sets multipart with its boundary.
+    expect(call.form).toBeInstanceOf(FormData);
+    expect(call.headers.get("content-type")).toBeNull();
+    expect(call.headers.get("x-api-key")).toBe(API_KEY);
+  });
+
+  it("lists the files of an issue and downloads them by their public id", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const issue = await tracker.createIssue({ title: "Has a picture", body: "" });
+    const other = await tracker.createIssue({ title: "Has none", body: "" });
+    await tracker.attach!(issue.key, {
+      name: "bug.png",
+      mimetype: "image/png",
+      data: new Uint8Array([1, 2, 3]),
+    });
+
+    const listed = await tracker.attachments!(issue.key);
+    expect(listed).toEqual([{ id: "pub-1", name: "bug.png", mimetype: "image/png", size: 3 }]);
+    expect(await tracker.attachments!(other.key)).toEqual([]);
+    expect([...(await tracker.download!(listed[0]!))]).toEqual([1, 2, 3]);
+    expect(fake.called("GET", "/attachments/pub-1/raw")).toHaveLength(1);
+    await expect(tracker.download!({ ...listed[0]!, id: "pub-9" })).rejects.toMatchObject({
+      code: "not_found",
+    });
+  });
+
+  it("names the missing issue when an upload targets an unknown key", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    await expect(
+      tracker.attach!("SHOP-404", {
+        name: "a.txt",
+        mimetype: "text/plain",
+        data: new Uint8Array(),
+      }),
+    ).rejects.toMatchObject({ code: "not_found" });
+  });
+
   it("marks agents by team handle or the agents option, and accepts a username to assign", async () => {
     const fake = createItsaplanFake();
     const tracker = await createItsaplanTracker({

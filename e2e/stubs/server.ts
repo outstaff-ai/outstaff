@@ -90,6 +90,7 @@ const control: Route[] = [
       github: await github.state(),
       tickets: tracker.state(),
       chat: chat.state(),
+      attachmentsServed: tracker.served(),
     }),
   },
   {
