@@ -105,6 +105,14 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     needs: "chat.agentProfile",
   },
   {
+    path: "design.canvas",
+    default: true,
+    off: false,
+    kind: "agent",
+    behaviour:
+      "Let a role that declares the design.canvas capability (the stock designer) use Claude's Artifact tools to work on a private Design canvas, with a persistent artifacts folder in its home. Roles without the capability never get them. Needs the claude-agent-sdk runtime signed in with a Claude account; `ost doctor` checks it.",
+  },
+  {
     path: "feedback.follow_up_round",
     default: true,
     off: false,

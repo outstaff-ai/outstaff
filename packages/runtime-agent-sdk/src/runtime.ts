@@ -60,7 +60,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
   const log = config.log ?? silentLogger;
 
   /** Options that every run shares: nothing outside what outstaff renders is loaded. */
-  function childEnv(): Record<string, string> {
+  function childEnv(canvas: boolean): Record<string, string> {
     const base = config.env ?? process.env;
     const secrets = config.secrets ?? envSecretSource(base);
     // Nothing an adapter declares as a secret reaches the agent's shell. Only the credential Claude Code itself needs goes back in.
@@ -89,6 +89,16 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
       env["CLAUDE_CODE_SUBPROCESS_ENV_SCRUB"] = "1";
     }
 
+    // Claude Code withholds the Artifact tool from SDK sessions unless CLAUDE_CODE_ARTIFACT is set. Only a session whose
+    // role has the design.canvas capability turns it on; an inherited value of either variable never decides.
+    delete env["CLAUDE_CODE_ARTIFACT"];
+    delete env["CLAUDE_CODE_DISABLE_ARTIFACT"];
+    if (canvas) {
+      env["CLAUDE_CODE_ARTIFACT"] = "1";
+    } else {
+      env["CLAUDE_CODE_DISABLE_ARTIFACT"] = "1";
+    }
+
     return env;
   }
 
@@ -107,7 +117,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     return CREDENTIAL_KEYS.map((k) => join(dir, k)).filter((p) => existsSync(p));
   }
 
-  function isolated(): Options {
+  function isolated(canvas = false): Options {
     const files = credentialFiles();
     return {
       settingSources: ["project"],
@@ -116,6 +126,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
         // Claude Code's own skills are removed; the `skills` allowlist in run() then limits the rest to the rendered ones.
         disableClaudeAiConnectors: true,
         disableBundledSkills: true,
+        enableArtifact: canvas,
         ...(files.length > 0
           ? {
               sandbox: {
@@ -124,7 +135,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
             }
           : {}),
       },
-      env: childEnv(),
+      env: childEnv(canvas),
       ...(config.options.claudeCodePath
         ? { pathToClaudeCodeExecutable: config.options.claudeCodePath }
         : {}),
@@ -149,7 +160,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
 
     const maxTurns = req.maxTurns ?? config.options.maxTurns;
     const options: Options = {
-      ...isolated(),
+      ...isolated(req.builtinTools.includes("artifact")),
       cwd: req.workdir,
       skills: renderedSkillNames(req.workdir),
       additionalDirectories: req.addDirs,

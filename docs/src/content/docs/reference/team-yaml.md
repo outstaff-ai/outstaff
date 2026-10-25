@@ -186,6 +186,8 @@ policies:
     vcs: true
   chat:
     profile: true
+  design:
+    canvas: true
   feedback:
     follow_up_round: true
     merged_prs: true
@@ -1356,6 +1358,22 @@ Details left out of chat messages.
 - Type: `string`
 - Optional
 - Allowed values: `ci`, `mergeability`, `hashes`, `file_lists`
+
+### policies.design
+
+What design roles may use.
+
+- Type: `object`
+- Optional
+- Default: `{"canvas":true}`
+
+#### policies.design.canvas
+
+Let roles that declare the design.canvas capability use Claude's Artifact tools (the Design canvas). Needs the claude-agent-sdk runtime signed in with a Claude account. Default on; it does nothing for a role without the capability.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
 
 ### policies.chat
 

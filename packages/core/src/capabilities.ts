@@ -16,6 +16,7 @@ export const CAPABILITIES = [
   "runtime.sessions",
   "runtime.usage",
   "avatars.generate",
+  "design.canvas",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
@@ -37,4 +38,5 @@ export const CAPABILITY_PORT: Record<Capability, AdapterPort> = {
   "runtime.sessions": "runtime",
   "runtime.usage": "runtime",
   "avatars.generate": "avatars",
+  "design.canvas": "runtime",
 };

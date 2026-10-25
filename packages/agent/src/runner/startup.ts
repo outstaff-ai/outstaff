@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { delimiter, dirname, join, resolve } from "node:path";
 import {
   PROFILE_SPECS,
+  artifactsDir,
   policyOn,
   buildPolicy,
   effectiveTools,
@@ -19,6 +20,7 @@ import {
   CatalogError,
   RenderError,
   type AdapterRegistry,
+  type Capability,
   type Catalog,
   type Logger,
   type Policy,
@@ -280,12 +282,22 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     opts.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
   );
 
+  // The Design canvas: roles that declare the capability (their own or an extended role's), unless the team switched it off.
+  const declared = [me.role, ...(rendered.extends ?? [])].flatMap((name) => {
+    const r = roles[name];
+    return r ? [...r.needs, ...r.optional_needs] : [];
+  });
+
+  const canvas = declared.includes("design.canvas") && policyOn(team.policies, "design.canvas");
+  const capabilities: Capability[] = canvas ? ["design.canvas"] : [];
+
   for (const dir of [
     layout.workDir,
     layout.reposDir,
     layout.worktreesDir,
     layout.scratchDir,
     layout.memoryDir,
+    ...(canvas ? [artifactsDir(layout)] : []),
   ]) {
     mkdirSync(dir, { recursive: true });
   }
@@ -345,7 +357,14 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     packs.push(teamPack);
   }
 
-  const policy = buildPolicy({ profile: rendered.profile, person: me, team, layout, packs });
+  const policy = buildPolicy({
+    profile: rendered.profile,
+    person: me,
+    team,
+    layout,
+    packs,
+    capabilities,
+  });
 
   // Chat sessions run beside the active item, so they get a profile that cannot disturb it.
   const chatPolicy = buildPolicy({ profile: "chat", person: me, team, layout, packs });
@@ -416,7 +435,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     env: { ...env, policy, layout },
     systemPrompt,
     policy,
-    builtinTools: [...PROFILE_SPECS[rendered.profile].tools],
+    builtinTools: [...policy.tools.allow],
     workdir: layout.workDir,
     workspaces: createWorkspaces({
       layout,
@@ -424,7 +443,13 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
       log,
       ...(opts.repositories?.git ? { git: opts.repositories.git } : {}),
     }),
-    addDirs: [layout.reposDir, layout.worktreesDir, layout.scratchDir, layout.memoryDir],
+    addDirs: [
+      layout.reposDir,
+      layout.worktreesDir,
+      layout.scratchDir,
+      layout.memoryDir,
+      ...(canvas ? [artifactsDir(layout)] : []),
+    ],
     ...(model ? { model } : {}),
     ...(team.policies ? { policies: team.policies } : {}),
     log,

@@ -1,5 +1,5 @@
 import type { TeamConfig } from "../config/schema.js";
-import { policyValue } from "../policies/switches.js";
+import { policyOn, policyValue } from "../policies/switches.js";
 
 /**
  * The values a template can use. Every key below always exists, so a template
@@ -24,6 +24,7 @@ import { policyValue } from "../policies/switches.js";
  *                  adapters fill them later. issue, pr and doc always exist.
  *   policies.messages.{max_lines,always_link,omit[]}
  *   policies.tickets.many_prs (true when policies.tickets.prs_per_ticket is many)
+ *   policies.design.canvas (true unless policies.design.canvas is switched off)
  */
 export type RepoContext = {
   name: string;
@@ -73,6 +74,7 @@ export type CatalogContext = {
   policies: {
     messages: { max_lines: number; always_link: boolean; omit: string[] };
     tickets: { many_prs: boolean };
+    design: { canvas: boolean };
   };
 };
 
@@ -159,6 +161,7 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
         omit: messages?.omit ?? DEFAULT_OMIT,
       },
       tickets: { many_prs: policyValue(team.policies, "tickets.prs_per_ticket") === "many" },
+      design: { canvas: policyOn(team.policies, "design.canvas") },
     },
   };
 }

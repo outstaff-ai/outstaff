@@ -160,6 +160,8 @@ policies:
     vcs: true
   chat:
     profile: true
+  design:
+    canvas: true
   feedback:
     follow_up_round: true
     merged_prs: true

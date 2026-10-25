@@ -163,6 +163,39 @@ describe("prepareAgent", () => {
     expect(agent.policy.git.repos).toEqual({});
   });
 
+  describe("Design canvas", () => {
+    const withLeo = (team = TEAM) =>
+      team.replace(
+        "integrations:",
+        "  - { handle: leo, name: Leo Fischer, pronouns: he/him, role: designer }\nintegrations:",
+      );
+
+    it("gives the designer the artifact tool and a persistent artifacts folder", async () => {
+      const { home, options } = setup({ OUTSTAFF_PERSON: "leo" }, withLeo());
+      const agent = await prepareAgent(options);
+      expect(agent.policy.tools.allow).toContain("artifact");
+      expect(existsSync(join(home, "artifacts"))).toBe(true);
+      expect(
+        evaluate(agent.policy, { kind: "write", path: join(home, "artifacts/home.html") }).effect,
+      ).toBe("allow");
+    });
+
+    it("leaves it out when the team switches design.canvas off", async () => {
+      const team = withLeo().replace("policies:", "policies:\n  design: { canvas: false }");
+      const { home, options } = setup({ OUTSTAFF_PERSON: "leo" }, team);
+      const agent = await prepareAgent(options);
+      expect(agent.policy.tools.allow).not.toContain("artifact");
+      expect(existsSync(join(home, "artifacts"))).toBe(false);
+    });
+
+    it("leaves it out for the developer", async () => {
+      const { home, options } = setup();
+      const agent = await prepareAgent(options);
+      expect(agent.policy.tools.allow).not.toContain("artifact");
+      expect(existsSync(join(home, "artifacts"))).toBe(false);
+    });
+  });
+
   it("explains a missing person or an unknown one", async () => {
     const { options } = setup();
     await expect(

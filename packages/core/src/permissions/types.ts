@@ -6,6 +6,7 @@ export const TOOL_KINDS = [
   "shell",
   "web_fetch",
   "subagent",
+  "artifact",
   "ost",
 ] as const;
 
@@ -95,6 +96,9 @@ export interface Policy {
 export interface ToolCall {
   kind: ToolKind;
   path?: string;
+
+  /** More files the call reads (an artifact publish names its sources); each must pass the read rules. */
+  paths?: string[];
   command?: string;
   cwd?: string;
 

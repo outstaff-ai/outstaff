@@ -28,7 +28,12 @@ const run = (
   env: Record<string, string>,
   scope: "person" | "office" = "person",
   options: unknown = {},
-) => claudeAgentSdk.doctor!(envSecretSource(env, "/nonexistent"), ctx(scope, options));
+  extra: Partial<DeriveContext> = {},
+) =>
+  claudeAgentSdk.doctor!(envSecretSource(env, "/nonexistent"), {
+    ...ctx(scope, options),
+    ...extra,
+  });
 
 const KEY = { ANTHROPIC_API_KEY: "fake-api-key" };
 const BWRAP = { sandbox: "bubblewrap" };
@@ -105,5 +110,33 @@ describe("claude-agent-sdk doctor", () => {
 
   it("needs nothing for the office", async () => {
     expect(await run({}, "office")).toEqual([]);
+  });
+});
+
+describe("claude-agent-sdk doctor: Design canvas", () => {
+  const canvas = { roleCapabilities: ["design.canvas" as const] };
+  const checkOf = async (env: Record<string, string>, extra: Partial<DeriveContext> = canvas) =>
+    (await run(env, "person", {}, extra)).find((c) => c.name === "Design canvas");
+
+  it("passes with a Claude account token", async () => {
+    expect(await checkOf({ CLAUDE_CODE_OAUTH_TOKEN: "fake-oauth" })).toMatchObject({
+      status: "ok",
+    });
+  });
+
+  it.each([{ ANTHROPIC_API_KEY: "fake-api-key" }, { CLAUDE_CODE_USE_BEDROCK: "1" }, {}])(
+    "warns without one: %o",
+    async (env) => {
+      const check = await checkOf(env);
+      expect(check).toMatchObject({ status: "warn" });
+      expect(check!.fix).toContain("CLAUDE_CODE_OAUTH_TOKEN");
+      expect(JSON.stringify(check)).not.toContain("fake");
+    },
+  );
+
+  it("says nothing for a role without the capability, or with the switch off", async () => {
+    expect(await checkOf({ ANTHROPIC_API_KEY: "fake-api-key" }, {})).toBeUndefined();
+    const off = { ...canvas, team: { policies: { design: { canvas: false } } } as TeamConfig };
+    expect(await checkOf({ ANTHROPIC_API_KEY: "fake-api-key" }, off)).toBeUndefined();
   });
 });

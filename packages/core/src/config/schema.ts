@@ -425,6 +425,19 @@ const policiesSchema = z
       })
       .default({ max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] })
       .meta(d("How agents write chat messages.")),
+    design: z
+      .strictObject({
+        canvas: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Let roles that declare the design.canvas capability use Claude's Artifact tools (the Design canvas). Needs the claude-agent-sdk runtime signed in with a Claude account. Default on; it does nothing for a role without the capability.",
+            ),
+          ),
+      })
+      .default({ canvas: true })
+      .meta(d("What design roles may use.")),
     chat: z
       .strictObject({
         parallel_sessions: z
