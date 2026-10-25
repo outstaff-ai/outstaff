@@ -388,6 +388,15 @@ describe("kanban preset", () => {
     ).toEqual([]);
   });
 
+  it("an interrupted hand-back matches no rule", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "interrupted" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([]);
+  });
+
   it("a blocked hand-back leaves a done ticket alone", () => {
     expect(
       run(

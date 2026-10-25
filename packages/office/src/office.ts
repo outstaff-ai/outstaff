@@ -294,6 +294,11 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     notify,
     onBlocked: (b) => chatDesk.notifyBlocked(b.item, b.reason),
     onHandedBack: async (item, result) => {
+      // An interrupted item is still the same round: nothing is reported, no rule runs, no follow-up starts.
+      if (result.status === "interrupted") {
+        return;
+      }
+
       await chatDesk.handedBack(item, result);
       await handedBack(item);
       await track(engine.followUp(item.id));

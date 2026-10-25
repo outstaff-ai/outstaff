@@ -937,6 +937,64 @@ async function main() {
     `conventions: ${fourth} in a repo that asks for added commits -> the fix on #${pr4.pr.number} is a new commit, no force push`,
   );
 
+  // ---- 7b. the agent container restarts in the middle of a round: the round is handed back as interrupted, goes
+  // first in the queue and resumes when the agent is back, with nothing moved or reassigned meanwhile
+  await stub("POST", "/_test/gates/review/close");
+  await stub("POST", `/_test/pulls/${pr4.pr.number}/review`, {
+    state: "changes_requested",
+    comments: [{ path: "greeting.txt", line: 1, body: "Add a comma." }],
+  });
+
+  await until("the review round running and held at the gate", (s) => s.chat.gates.review?.arrived);
+
+  const beforeRestart = await state();
+  const ticketBefore = beforeRestart.tickets.find((x: Json) => x.key === fourth);
+  const restarted = dc("restart", "sam");
+  if (restarted.status !== 0) {
+    throw new Error(`could not restart the agent: ${restarted.stderr}`);
+  }
+
+  // The gate stays closed; closing it again only clears the arrival of the first run.
+  await stub("POST", "/_test/gates/review/close");
+  await until(
+    "the interrupted round offered again after the restart and held at the gate",
+    (s) => s.chat.gates.review?.arrived,
+  );
+
+  const resumed = await state();
+  const ticketResumed = resumed.tickets.find((x: Json) => x.key === fourth);
+  assertEq(
+    JSON.stringify([ticketResumed.status, ticketResumed.assignee]),
+    JSON.stringify([ticketBefore.status, ticketBefore.assignee]),
+    "the interrupted round moved and reassigned nothing",
+  );
+
+  assertEq(
+    resumed.github.pulls.find((p: Json) => p.number === pr4.pr.number).head.sha,
+    added4.head.sha,
+    "the round has not pushed while it was held",
+  );
+
+  await stub("POST", "/_test/gates/review/open");
+  const finished4 = await until(
+    `the resumed round fixed #${pr4.pr.number} and the ticket is back in review`,
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr4.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === fourth);
+      return pr.head.sha !== added4.head.sha &&
+        pr.threads.length > 1 &&
+        pr.threads.every((th: Json) => th.resolved) &&
+        t.status === "In Review"
+        ? pr
+        : undefined;
+    },
+  );
+
+  assertEq(finished4.commits, 3, "the resumed round added one commit, no more");
+  step(
+    `restart: the agent restarted mid-round on #${pr4.pr.number} -> the round was interrupted, queued first, resumed and finished`,
+  );
+
   // ---- 8. a ticket that needs two pull requests: the agent splits it first, then opens one pull request per ticket
   const pullsBeforeSplit = (await state()).github.pulls.length;
   const { key: parent } = await stub("POST", "/_test/tickets", {

@@ -124,7 +124,7 @@ A run of an agent- or automation-triggered item is counted when it starts. When 
 
 When an agent reports that a run failed, `fail(itemId, error)` ends the run as `failed`, counts a consecutive failure on the item, and puts it back in the queue with `not_before = now + min(base * 2^(n-1), cap)`. The defaults are 1 minute and 30 minutes (so 1, 2, 4, 8, 16, 30, 30 ...) and come from `policies.retry` (`base_minutes`, `cap_minutes`, `max_failures`). `next` skips an item whose `not_before` is still in the future, so the person's other queued items run meanwhile, and `markActive` refuses it with `backoff`. The count and `not_before` are columns of the work item, so a restart keeps them; nothing is a timer in memory. Every `tick()` clears the `not_before` that ran out and the office tells the agent there is work again.
 
-After `policies.retry.max_failures` failures in a row (default 3) the item is blocked with the reason `failed N times: <first line of the last error>`. It goes through the same path as a loop-guard block: the reason is written to the journal and the office announces it to the requester and the person's chat. A successful hand-back (`done` or `waiting`) resets the count, and so does blocking, so a human who unblocks the item starts with a clean count. A stale run is not a failure; it keeps its own retry-once rule.
+After `policies.retry.max_failures` failures in a row (default 3) the item is blocked with the reason `failed N times: <first line of the last error>`. It goes through the same path as a loop-guard block: the reason is written to the journal and the office announces it to the requester and the person's chat. A successful hand-back (`done` or `waiting`) resets the count, and so does blocking, so a human who unblocks the item starts with a clean count. A stale run is not a failure; it keeps its own retry-once rule. A run that an agent shutdown cut short (`interrupted`) is not a failure either: the item goes first in the person's queue with its session and worktree, and neither the failure count nor the loop guard counts the run.
 
 ### Blocked work
 
@@ -160,7 +160,7 @@ Only an agent's runtime sees its usage limits, so agents report them with the `u
 
 ### Stale runs
 
-An active item with no heartbeat for `staleAfterMinutes` (default 10) is sent back to the queue once. If the retry also goes stale, the item is blocked with a reason. A good run in between resets the allowance. `heartbeat(itemId)` marks activity; `tick()` does the sweep, and `start()` runs it on the clock.
+An active item with no heartbeat for `staleAfterMinutes` (default 10) is sent back to the queue once. If the retry also goes stale, the item is blocked with a reason. A good run in between resets the allowance. `heartbeat(itemId)` marks activity; `tick()` does the sweep, and `start()` runs it on the clock. A stale item goes back to the queue and is offered again with its session, like an interrupted one.
 
 ### Pause and resume
 

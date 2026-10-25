@@ -125,3 +125,58 @@ describe("work source: a chat session beside running work", () => {
     await store.close();
   });
 });
+
+describe("work source: a run cut short by a shutdown", () => {
+  let store: Store;
+  let clock: ManualClock;
+
+  beforeEach(async () => {
+    clock = manualClock();
+    store = await openStore("sqlite://:memory:", { now: () => clock.now() });
+  });
+
+  afterEach(async () => {
+    await store.close();
+  });
+
+  it("queues the item first and offers it again with its session, without a failure or a loop count", async () => {
+    const scheduler = createScheduler({ store, team, clock });
+    const handedBack: string[] = [];
+    const source = schedulerWorkSource({
+      scheduler,
+      store,
+      team,
+      onHandedBack: async (_item, result) => void handedBack.push(result.status),
+    });
+
+    const a = await scheduler.enqueue({
+      person: "ann",
+      kind: "task",
+      title: "a",
+      trigger: "agent",
+    });
+
+    await scheduler.enqueue({ person: "ann", kind: "task", title: "b", trigger: "agent" });
+
+    const first = await source.next("ann");
+    expect(first?.workItem.id).toBe(a.id);
+    expect(first?.interrupted).toBeUndefined();
+    await source.setSession("ann", a.id, "s-1");
+    await source.handBack("ann", a.id, { summary: "stopped", links: [], status: "interrupted" });
+
+    expect(await store.getItem(a.id)).toMatchObject({
+      status: "queued",
+      failures: 0,
+      sessionId: "s-1",
+      notBefore: null,
+    });
+
+    expect(await store.countLoopGuard(a.id, 3_600_000)).toBe(0);
+    expect((await store.listRuns(a.id))[0]).toMatchObject({ outcome: "interrupted" });
+
+    const again = await source.next("ann");
+    expect(again?.workItem.id).toBe(a.id);
+    expect(again).toMatchObject({ sessionId: "s-1", interrupted: true });
+    expect(handedBack).toEqual(["interrupted"]);
+  });
+});

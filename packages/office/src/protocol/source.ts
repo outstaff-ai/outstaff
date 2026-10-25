@@ -52,7 +52,11 @@ export interface WorkSource {
   handBack(
     person: string,
     workItemId: string,
-    result: { summary: string; links: Link[]; status: "done" | "waiting" | "blocked" },
+    result: {
+      summary: string;
+      links: Link[];
+      status: "done" | "waiting" | "blocked" | "interrupted";
+    },
   ): Promise<void>;
 
   /** Counts a failed run: the item is held back with backoff, and blocked after repeated failures. */

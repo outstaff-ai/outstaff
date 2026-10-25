@@ -272,6 +272,12 @@ export const messageSchema = z.discriminatedUnion("type", [
         .max(200)
         .optional()
         .describe("Runtime session of this item from an earlier round; resume it when present."),
+      interrupted: z
+        .boolean()
+        .optional()
+        .describe(
+          "True when the item's previous run was cut short by an agent shutdown; the prompt says so.",
+        ),
     }),
   ),
   message("accept", z.strictObject({ workItemId: itemId })),
@@ -311,8 +317,10 @@ export const messageSchema = z.discriminatedUnion("type", [
       summary: text.describe("What was done, decisions and open points."),
       links: z.array(linkSchema).describe("Pull requests, documents and tickets touched."),
       status: z
-        .enum(["done", "waiting", "blocked"])
-        .describe("Whether the item is finished, waits for something, or is stuck."),
+        .enum(["done", "waiting", "blocked", "interrupted"])
+        .describe(
+          "Whether the item is finished, waits for something, is stuck, or was cut short by the agent shutting down. An interrupted item goes back to the front of the queue and is offered again with its session.",
+        ),
     }),
   ),
   message("fail", z.strictObject({ workItemId: itemId, reason: text })),

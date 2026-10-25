@@ -86,7 +86,7 @@ export interface WorkLoop {
    */
   run(): Promise<void>;
 
-  /** Interrupts the running item, hands it back as waiting, and ends `run`. */
+  /** Interrupts the running item, hands it back as interrupted, and ends `run`. */
   stop(): Promise<void>;
 }
 
@@ -277,6 +277,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       buildWorkPrompt(offer, {
         resumed: sessionId !== undefined && !restarted,
         restarted,
+        ...(offer.interrupted ? { interrupted: true } : {}),
         ...(workspace ? { workspace } : {}),
         ...(context ? { chatContext: context } : {}),
       });
@@ -331,7 +332,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       await opts.office.handBack(id, {
         summary: `Stopped before finishing because the agent shut down. ${text ? `Last message: ${text}` : "Nothing to report yet."}`,
         links: linksIn(text),
-        status: "waiting",
+        status: "interrupted",
       });
 
       return;

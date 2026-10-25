@@ -560,6 +560,24 @@ export function createSqlStore({ db, dialect, now }: StoreInternals): Store {
       return Number(row.n);
     },
 
+    async forgetLatestLoopGuard(workItemId) {
+      const latest = await db
+        .selectFrom("loop_guard")
+        .select("at")
+        .where("work_item_id", "=", workItemId)
+        .orderBy("at", "desc")
+        .limit(1)
+        .executeTakeFirst();
+
+      if (latest) {
+        await db
+          .deleteFrom("loop_guard")
+          .where("work_item_id", "=", workItemId)
+          .where("at", "=", latest.at)
+          .execute();
+      }
+    },
+
     async clearLoopGuard(workItemId) {
       await db.deleteFrom("loop_guard").where("work_item_id", "=", workItemId).execute();
     },

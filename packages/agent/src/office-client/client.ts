@@ -102,7 +102,11 @@ export interface OfficeConnection extends OfficeClient {
   journal(workItemId: string, text: string): Promise<void>;
   handBack(
     workItemId: string,
-    result: { summary: string; links?: Link[]; status: "done" | "waiting" | "blocked" },
+    result: {
+      summary: string;
+      links?: Link[];
+      status: "done" | "waiting" | "blocked" | "interrupted";
+    },
   ): Promise<void>;
   fail(workItemId: string, reason: string): Promise<void>;
 

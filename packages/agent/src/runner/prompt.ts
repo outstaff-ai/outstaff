@@ -7,6 +7,7 @@ export function buildWorkPrompt(
   opts: {
     resumed: boolean;
     restarted?: boolean;
+    interrupted?: boolean;
     workspace?: Workspace;
     chatContext?: string;
   },
@@ -140,9 +141,11 @@ export function buildWorkPrompt(
     "",
     opts.restarted
       ? "Your earlier session on this item could not be resumed, so this is a new one. The journal above is what you recorded before; nothing else carried over. Check the worktree, the pull request and the other state above before you carry on."
-      : opts.resumed
-        ? "This continues your earlier session on this item. Check the current state before you carry on, since things may have changed since you stopped."
-        : "Start from the state above and what you can read with your tools.",
+      : opts.interrupted
+        ? `Your previous run on this item was interrupted because the agent shut down, for example during a restart.${opts.resumed ? " This continues your earlier session." : ""} Check the worktree, the pull request and the other state above, then carry on from where you stopped.`
+        : opts.resumed
+          ? "This continues your earlier session on this item. Check the current state before you carry on, since things may have changed since you stopped."
+          : "Start from the state above and what you can read with your tools.",
     `Work only on this item. Pass work item ${item.id} where a tool asks for it. When you stop, your last message is the hand-back summary.`,
   );
 

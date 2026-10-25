@@ -143,7 +143,7 @@ Both containers log one line per event to stdout (office, JSON) or stderr (agent
 Both containers stop on `SIGTERM` and on `SIGINT`, and exit 0 when they stopped cleanly.
 
 - **Office:** stops intake, lets the handlers that are running finish, closes the agent connections and the store, then exits. Give the platform's grace period enough time for that; 30 seconds is a sensible floor. Events that were recorded but not handled are handled on the next start; handlers are idempotent, so a repeat does no harm.
-- **Agent:** interrupts the runtime and hands the work item back as `waiting` with the last message, then closes its connection. The office queues the item again and a later round resumes the same session. A run that was cut off without that, because the container was killed or crashed, is also retried: the restarted agent declines the items it had accepted, which puts them back in the queue without counting a failure.
+- **Agent:** interrupts the runtime and hands the work item back as `interrupted` with the last message, then closes its connection. The office puts the item first in the person's queue with its session and worktree, and when the agent reconnects it is offered again and the session resumes. An interrupted run counts as neither a failure nor a loop-guard run, and no workflow rule reacts to it, so a rollout resumes running work. A run that was cut off without that, because the container was killed or crashed, is also retried: the restarted agent declines the items it had accepted, which puts them back in the queue without counting a failure.
 
 Rolling either container is therefore safe at any moment.
 
