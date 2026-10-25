@@ -349,22 +349,66 @@ describe("kanban preset", () => {
     expect(x.rules.find((r) => r.id === "active-human-takeback")?.skipped).toHaveLength(2);
   });
 
-  it("hand-back moves to review and assigns the requester", () => {
+  it("a done hand-back moves to review and assigns the requester", () => {
     expect(
-      run(ev("agent.handed_back", { ...tk, actor: agent }), world({ status: "active" })),
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } }),
+        world({ status: "active" }),
+      ),
     ).toEqual([
       { type: "move", ticket: "ACME-1", to: "review" },
       { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
     ]);
   });
 
+  it("a blocked hand-back moves to blocked, assigns the requester and notifies them", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "blocked" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([
+      { type: "move", ticket: "ACME-1", to: "blocked" },
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+      expect.objectContaining({
+        type: "notify",
+        to: { kind: "human", id: "grace" },
+        template: "hand_back_blocked",
+        ticket: "ACME-1",
+      }),
+    ]);
+  });
+
+  it("a waiting hand-back changes nothing", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "waiting" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("a blocked hand-back leaves a done ticket alone", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "blocked" } }),
+        world({ status: "done" }),
+      ),
+    ).toEqual([]);
+  });
+
   it("hand-back leaves a done ticket alone", () => {
-    expect(run(ev("agent.handed_back", { actor: agent }), world({ status: "done" }))).toEqual([]);
+    expect(
+      run(
+        ev("agent.handed_back", { actor: agent, data: { status: "done" } }),
+        world({ status: "done" }),
+      ),
+    ).toEqual([]);
   });
 
   it("hand-back falls back to the first listed human when the ticket has no requester", () => {
     const state = world({ status: "active", ticket: { requester: undefined as never } });
-    const handBack = ev("agent.handed_back", { ...tk, actor: agent });
+    const handBack = ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } });
     expect(evaluateWorkflow(handBack, state, kanban, { fallbackRequester: "ada.admin" })).toEqual([
       { type: "move", ticket: "ACME-1", to: "review" },
       { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "ada.admin" } },
@@ -380,7 +424,12 @@ describe("kanban preset", () => {
 
   it("hand-back without a requester or a humans list skips the assignment and names the ticket", () => {
     const state = world({ status: "active", ticket: { requester: undefined as never } });
-    const x = explainWorkflow(ev("agent.handed_back", { ...tk, actor: agent }), state, kanban);
+    const x = explainWorkflow(
+      ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } }),
+      state,
+      kanban,
+    );
+
     expect(x.effects).toEqual([{ type: "move", ticket: "ACME-1", to: "review" }]);
     expect(x.rules.find((r) => r.id === "hand-back-to-requester")?.skipped).toEqual([
       "assign: ticket ACME-1 has no known requester and there is no first-human fallback (the team lists no humans, or policies.hand_back.fallback is none)",
@@ -436,6 +485,17 @@ describe("kanban preset", () => {
       );
 
       expect(rule?.do).toEqual([{ move: "review" }]);
+    });
+
+    it("hand_back.reassign: none keeps the move to blocked and the notice, and drops the assignment", () => {
+      const rule = ids({ hand_back: { reassign: "none" } }).rules.find(
+        (r) => r.id === "hand-back-blocked-to-requester",
+      );
+
+      expect(rule?.do).toEqual([
+        { move: "blocked" },
+        { notify: { to: "requester", template: "hand_back_blocked" } },
+      ]);
     });
 
     it("hand_back.fallback: none leaves out the first-human fallback", () => {

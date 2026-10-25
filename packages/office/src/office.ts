@@ -242,7 +242,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   };
 
   const handedBack = async (item: WorkItem) => {
-    if (item.status !== "done" || !item.subject) {
+    if (
+      (item.status !== "done" && item.status !== "waiting" && item.status !== "blocked") ||
+      !item.subject
+    ) {
       return;
     }
 
@@ -263,7 +266,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       type: "agent.handed_back",
       subject,
       actor: { kind: "agent", id: item.person },
-      data: { workItem: item.id, kind: item.kind },
+      data: { workItem: item.id, kind: item.kind, status: item.status },
     };
 
     await track(

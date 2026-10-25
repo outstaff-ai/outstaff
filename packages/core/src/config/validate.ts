@@ -58,6 +58,7 @@ const LACKING: Record<Capability, string> = {
   "knowledge.docs": "write design docs",
   "vcs.pullRequests": "open or update pull requests",
   "vcs.reviewThreads": "reply to review threads",
+  "vcs.workflows": "push changes to CI workflow files",
   "vcs.webhooks": "react to repository changes instantly",
   "vcs.reactions": "react to pull request comments",
   "chat.messages": "send chat messages",

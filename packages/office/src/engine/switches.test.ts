@@ -109,7 +109,13 @@ describe("policies.hand_back", () => {
     h = await harness({ team: team(policies) });
     await h.human("Dana");
     const key = await ticket("active");
-    await h.deliver({ type: "agent.handed_back", subject: { ticket: key }, actor: sam, data: {} });
+    await h.deliver({
+      type: "agent.handed_back",
+      subject: { ticket: key },
+      actor: sam,
+      data: { status: "done" },
+    });
+
     return key;
   };
 

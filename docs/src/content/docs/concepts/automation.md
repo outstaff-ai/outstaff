@@ -20,22 +20,22 @@ Run `ost policies` to see every switch with its effective value and where the va
 
 ## The behaviours
 
-| Switch                              | Default       | What outstaff does while it is on                                                                                                                                                   |
-| ----------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `policies.acknowledge.chat`         | `true`        | Reacts with eyes to a chat message from a trusted person as soon as the agent has seen it.                                                                                          |
-| `policies.acknowledge.vcs`          | `true`        | Reacts with eyes to each pull request comment the agent is about to answer, when its round starts. Needs a vcs adapter with `vcs.reactions`; `ost validate` warns when it lacks it. |
-| `policies.feedback.follow_up_round` | `true`        | Starts another round when feedback arrived after the agent was offered its work, so nothing written during a round is lost.                                                         |
-| `policies.feedback.merged_prs`      | `true`        | Schedules the author to answer a trusted person's review or comment on an already merged pull request, and to open a follow-up pull request if a change is asked for.               |
-| `policies.hand_back.reassign`       | `requester`   | When an agent hands work back, moves the ticket to review and assigns it to the person who asked. With `none` the ticket still moves to review and keeps its assignee.              |
-| `policies.hand_back.fallback`       | `first_human` | When a ticket has no known requester, uses the first human in `humans`. With `none`, a rule that needs a requester is skipped when the ticket has none.                             |
-| `policies.conflicts.follow_up`      | `true`        | When a pull request starts to conflict with its base, for example after another one merged, sends it back to its agent author to rebase.                                            |
-| `policies.retry.on_signal`          | `true`        | Retries a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread.                              |
+| Switch                              | Default       | What outstaff does while it is on                                                                                                                                                                                                                |
+| ----------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `policies.acknowledge.chat`         | `true`        | Reacts with eyes to a chat message from a trusted person as soon as the agent has seen it.                                                                                                                                                       |
+| `policies.acknowledge.vcs`          | `true`        | Reacts with eyes to each pull request comment the agent is about to answer, when its round starts. Needs a vcs adapter with `vcs.reactions`; `ost validate` warns when it lacks it.                                                              |
+| `policies.feedback.follow_up_round` | `true`        | Starts another round when feedback arrived after the agent was offered its work, so nothing written during a round is lost.                                                                                                                      |
+| `policies.feedback.merged_prs`      | `true`        | Schedules the author to answer a trusted person's review or comment on an already merged pull request, and to open a follow-up pull request if a change is asked for.                                                                            |
+| `policies.hand_back.reassign`       | `requester`   | When an agent hands work back, moves the ticket to review (done) or to blocked and tells the person who asked (blocked), and assigns it to them. A waiting hand-back changes nothing. With `none` the ticket still moves and keeps its assignee. |
+| `policies.hand_back.fallback`       | `first_human` | When a ticket has no known requester, uses the first human in `humans`. With `none`, a rule that needs a requester is skipped when the ticket has none.                                                                                          |
+| `policies.conflicts.follow_up`      | `true`        | When a pull request starts to conflict with its base, for example after another one merged, sends it back to its agent author to rebase.                                                                                                         |
+| `policies.retry.on_signal`          | `true`        | Retries a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread.                                                                                           |
 
 `policies.retry` also holds the backoff settings (`base_minutes`, `cap_minutes`, `max_failures`) that decide when a failing item is blocked in the first place.
 
 ## Switches and workflow rules
 
-Three switches act on preset [workflow](/reference/team-yaml/#workflow) rules: `feedback.merged_prs` removes `merged-feedback-follow-up`, `conflicts.follow_up` removes `conflict-back-to-author`, and `hand_back.reassign: none` drops the assignment from `hand-back-to-requester`. The others are carried out by the agent or the office and have no rule behind them.
+Three switches act on preset [workflow](/reference/team-yaml/#workflow) rules: `feedback.merged_prs` removes `merged-feedback-follow-up`, `conflicts.follow_up` removes `conflict-back-to-author`, and `hand_back.reassign: none` drops the assignment from `hand-back-to-requester` and `hand-back-blocked-to-requester`. The others are carried out by the agent or the office and have no rule behind them.
 
 Precedence, strongest first:
 

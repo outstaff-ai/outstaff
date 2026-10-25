@@ -17,7 +17,16 @@ export interface InstallationToken {
 export interface TokenScope {
   repositories?: string[];
   permissions?: Record<string, "read" | "write">;
+
+  /**
+   * Permissions to add only when the installation has been granted them. Asking GitHub for a permission the
+   * installation lacks makes it refuse the token, so these are checked against the installation first.
+   */
+  optionalPermissions?: Record<string, "read" | "write">;
 }
+
+/** How long a read of an installation's granted permissions is reused. */
+const PERMISSIONS_TTL_MS = 10 * 60_000;
 
 /** Refresh this long before the token really expires. */
 export const REFRESH_MARGIN_MS = 5 * 60_000;
@@ -26,6 +35,7 @@ export const REFRESH_MARGIN_MS = 5 * 60_000;
 export class AppAuth {
   private readonly installations = new Map<string, string>();
   private readonly tokens = new Map<string, InstallationToken>();
+  private readonly granted = new Map<string, { at: number; permissions: Record<string, string> }>();
   private slugPromise: Promise<string> | undefined;
 
   constructor(
@@ -79,10 +89,45 @@ export class AppAuth {
     return String(match.id);
   }
 
+  /** What the installation was granted (`GET /app/installations/{id}`), reused for a while. Empty when it cannot be read. */
+  private async grantedPermissions(id: string): Promise<Record<string, string>> {
+    const known = this.granted.get(id);
+    if (known && this.now().getTime() - known.at < PERMISSIONS_TTL_MS) {
+      return known.permissions;
+    }
+
+    try {
+      const res = await this.http.request<{ permissions?: Record<string, string> }>(
+        "GET",
+        `/app/installations/${id}`,
+        { token: this.jwt() },
+      );
+
+      const permissions = res.data.permissions ?? {};
+      this.granted.set(id, { at: this.now().getTime(), permissions });
+      return permissions;
+    } catch {
+      // Without the answer the token is requested without the optional permissions, as before.
+      return {};
+    }
+  }
+
   /** An installation token for `repo`'s owner, optionally narrowed. Reused until five minutes before it expires. */
   async token(repo: RepoRef, scope: TokenScope = {}): Promise<InstallationToken> {
     const id = await this.installationId(repo.owner);
-    const key = JSON.stringify([id, scope.repositories ?? null, scope.permissions ?? null]);
+    let permissions = scope.permissions;
+    if (scope.optionalPermissions) {
+      const granted = await this.grantedPermissions(id);
+      const extra = Object.entries(scope.optionalPermissions).filter(([name, level]) =>
+        level === "read" ? granted[name] !== undefined : granted[name] === "write",
+      );
+
+      if (extra.length > 0) {
+        permissions = { ...permissions, ...Object.fromEntries(extra) };
+      }
+    }
+
+    const key = JSON.stringify([id, scope.repositories ?? null, permissions ?? null]);
     const cached = this.tokens.get(key);
     if (cached && Date.parse(cached.expiresAt) - this.now().getTime() > REFRESH_MARGIN_MS) {
       return cached;
@@ -93,8 +138,8 @@ export class AppAuth {
       body["repositories"] = scope.repositories;
     }
 
-    if (scope.permissions) {
-      body["permissions"] = scope.permissions;
+    if (permissions) {
+      body["permissions"] = permissions;
     }
 
     const res = await this.http.request<{ token: string; expires_at: string }>(

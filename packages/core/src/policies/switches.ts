@@ -78,9 +78,9 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     default: "requester",
     off: "none",
     kind: "rule",
-    rules: ["hand-back-to-requester"],
+    rules: ["hand-back-to-requester", "hand-back-blocked-to-requester"],
     behaviour:
-      "When an agent hands work back, move the ticket to review and assign it to the person who asked for it. With none the ticket still moves to review and keeps its assignee.",
+      "When an agent hands work back, move the ticket to review (done), or to blocked and tell the requester (blocked), and assign it to the person who asked for it. A waiting hand-back changes nothing. With none the ticket still moves but keeps its assignee.",
     rewrite: (rule, value) =>
       value === "none" ? { ...rule, do: rule.do.filter((a) => !("assign" in a)) } : rule,
   },

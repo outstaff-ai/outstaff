@@ -237,7 +237,12 @@ describe("ost workflow explain", () => {
       "off       conflict-back-to-author: removed by policies.conflicts.follow_up",
     );
 
-    const handed = JSON.stringify({ type: "agent.handed_back", subject: { ticket: "ACME-1" } });
+    const handed = JSON.stringify({
+      type: "agent.handed_back",
+      subject: { ticket: "ACME-1" },
+      data: { status: "done" },
+    });
+
     const on = await ost(acme(), ["workflow", "explain", handed]);
     expect(on.out).toContain("switch policies.hand_back.reassign");
     expect(on.out).not.toContain("removed by");

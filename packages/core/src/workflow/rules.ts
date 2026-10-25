@@ -22,7 +22,12 @@ export type Condition =
   | { pr_open: boolean }
   | { pr_merged: boolean }
   | { has_body: boolean }
-  | { review_state: string[] };
+  | { review_state: string[] }
+  | { hand_back_status: HandBackStatus[] };
+
+/** How an agent ended its turn on a work item: finished, waiting for an answer, or unable to continue. */
+export const HAND_BACK_STATUSES = ["done", "waiting", "blocked"] as const;
+export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
 
 export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
   z.union([
@@ -62,6 +67,11 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z
       .strictObject({ review_state: z.array(z.string().min(1)).min(1) })
       .meta(d('The review state in the event, for example "approved".')),
+    z
+      .strictObject({ hand_back_status: z.array(z.enum(HAND_BACK_STATUSES)).min(1) })
+      .meta(
+        d("An agent.handed_back event carries one of these statuses: done, waiting or blocked."),
+      ),
   ]),
 );
 

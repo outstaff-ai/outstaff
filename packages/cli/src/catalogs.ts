@@ -60,15 +60,21 @@ export function roleRegistry({ stock, ejected }: TeamCatalogs): Map<string, Role
   return roles;
 }
 
-/** The permission profile of a role in the merged catalog; a client role replaces a stock one of the same name. */
+/**
+ * The permission profile and the capabilities (`needs` and `optional_needs`) of a role in the merged catalog; a
+ * client role replaces a stock one of the same name. Empty when the role is unknown.
+ */
 export const roleProfile = (
   catalogs: TeamCatalogs | undefined,
   role: string,
-): { profile: Profile } | Record<string, never> => {
-  const profile =
-    catalogs && { ...catalogs.stock.roles, ...catalogs.ejected?.roles }[role]?.permissions;
-
-  return profile ? { profile } : {};
+): { profile: Profile; roleCapabilities: Capability[] } | Record<string, never> => {
+  const found = catalogs && { ...catalogs.stock.roles, ...catalogs.ejected?.roles }[role];
+  return found
+    ? {
+        profile: found.permissions,
+        roleCapabilities: [...found.needs, ...found.optional_needs] as Capability[],
+      }
+    : {};
 };
 
 export const catalogIssue = (i: CatalogIssue): LocatedIssue => ({

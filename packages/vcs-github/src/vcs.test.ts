@@ -205,6 +205,29 @@ describe("credentials", () => {
     expect(stub.called("POST", "/app/installations/8/access_tokens")).toHaveLength(1);
   });
 
+  it("adds the workflows permission to the write token only when the installation has it", async () => {
+    const granted = (permissions: Record<string, string>): Route =>
+      ({ method: "GET", path: "/app/installations/8", handler: () => ({ permissions }) }) as Route;
+
+    const withIt = build(routes([granted({ contents: "write", workflows: "write" })]), agent);
+    await withIt.vcs.credentials("sam", REPO, "write");
+    expect(withIt.stub.called("POST", "/app/installations/8/access_tokens")[0]!.json).toEqual({
+      repositories: ["app"],
+      permissions: {
+        contents: "write",
+        pull_requests: "write",
+        issues: "write",
+        workflows: "write",
+      },
+    });
+
+    const without = build(routes([granted({ contents: "write" })]), agent);
+    await without.vcs.credentials("sam", REPO, "write");
+    expect(
+      without.stub.called("POST", "/app/installations/8/access_tokens")[0]!.json.permissions,
+    ).not.toHaveProperty("workflows");
+  });
+
   it("gates credentials on grants: none is forbidden, read grants read only, write grants both", async () => {
     const { vcs } = build(routes(), agent);
     await expectPortError(vcs.credentials("lee", REPO, "read"), "forbidden");

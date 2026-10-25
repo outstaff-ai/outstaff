@@ -6,7 +6,7 @@ import {
 } from "@outstaff/core";
 import { githubOptions } from "./options.js";
 import { signAppJwt } from "./jwt.js";
-import { grantedRepos, privateKey, writableRepos } from "./setup.js";
+import { grantedRepos, needsWorkflows, privateKey, writableRepos } from "./setup.js";
 
 const READ_PERMISSIONS = [
   "metadata",
@@ -126,6 +126,9 @@ interface AppExpectation {
   extraCanWrite?: boolean;
   readOnly: boolean;
   wantWrite: boolean;
+
+  /** The person's role changes CI workflow files, so the App needs the Workflows permission. */
+  wantWorkflows?: boolean;
 
   /** The bot login the team file names for this App. */
   login?: string;
@@ -264,7 +267,14 @@ async function checkApp(
   const granted = inst.data.permissions ?? {};
   const level = (p: string) => granted[p] ?? "none";
   const missingRead = READ_PERMISSIONS.filter((p) => level(p) === "none");
-  const missingWrite = want.wantWrite ? WRITE_PERMISSIONS.filter((p) => level(p) !== "write") : [];
+  const missingWrite: string[] = want.wantWrite
+    ? WRITE_PERMISSIONS.filter((p) => level(p) !== "write")
+    : [];
+
+  const missingWorkflows = want.wantWorkflows && level("workflows") !== "write";
+  if (missingWorkflows) {
+    missingWrite.push("workflows");
+  }
 
   if (missingRead.length > 0 || missingWrite.length > 0) {
     out.push(
@@ -274,12 +284,35 @@ async function checkApp(
         `The App lacks ${[
           ...missingRead.map((p) => `${p}:read`),
           ...missingWrite.map((p) => `${p}:write`),
-        ].join(", ")}${want.wantWrite ? " (this person has a write grant)" : ""}.`,
+        ].join(
+          ", ",
+        )}${want.wantWrite ? " (this person has a write grant)" : ""}${missingWorkflows ? ". Without Workflows, GitHub refuses to push a change under .github/workflows/ (this person's role changes CI)" : ""}.`,
         "Edit the App's permissions, then accept the new permissions on the installation.",
       ),
     );
   } else {
     out.push(ok(`${label}: permissions`, "The App has the permissions the grants need."));
+  }
+
+  // Least privilege: a permission outside what the grants and the role need is advice, not a failure.
+  const needed = new Set<string>([
+    ...READ_PERMISSIONS,
+    ...(want.wantWorkflows ? ["workflows"] : []),
+  ]);
+
+  const surplus = Object.entries(granted)
+    .filter(([name, v]) => v !== "none" && !needed.has(name))
+    .map(([name, v]) => `${name}:${v}`);
+
+  if (surplus.length > 0) {
+    out.push(
+      bad(
+        "warn",
+        `${label}: surplus permissions`,
+        `The App has ${surplus.join(", ")}, which neither the grants nor this person's role need.`,
+        "Remove those permissions from the App, then accept the change on the installation.",
+      ),
+    );
   }
 
   const writes = Object.entries(granted)
@@ -406,6 +439,7 @@ export async function doctorGithub(
       extraCanWrite: true,
       readOnly: false,
       wantWrite: writable.length > 0,
+      wantWorkflows: writable.length > 0 && needsWorkflows(ctx),
       ...(person.identities?.vcs ? { login: person.identities.vcs } : {}),
     });
 

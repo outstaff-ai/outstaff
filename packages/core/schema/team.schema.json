@@ -1209,7 +1209,7 @@
           "properties": {
             "reassign": {
               "default": "requester",
-              "description": "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves to review). Edits the preset rule hand-back-to-requester. Default requester.",
+              "description": "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.",
               "type": "string",
               "enum": [
                 "requester",
@@ -1900,6 +1900,28 @@
           ],
           "additionalProperties": false,
           "description": "The review state in the event, for example \"approved\"."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "hand_back_status": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "done",
+                  "waiting",
+                  "blocked"
+                ]
+              }
+            }
+          },
+          "required": [
+            "hand_back_status"
+          ],
+          "additionalProperties": false,
+          "description": "An agent.handed_back event carries one of these statuses: done, waiting or blocked."
         }
       ]
     }

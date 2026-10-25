@@ -17,6 +17,14 @@
 - Never push to the default branch. Open a pull request.
 - Push an amended branch with `git push --force-with-lease`, and only on your own branch. Never force-push anyone else's branch or a shared one.
 
+### A push GitHub rejects for a missing permission
+
+A message such as "refusing to allow a GitHub App to create or update workflow" for a file under `.github/workflows/`, ending in "without `workflows` permission", means your App lacks the Workflows permission. Retrying, rewording or pushing another way does not help, and you cannot grant it yourself.
+
+- Keep the commit on its branch. Do not drop or rewrite it.
+- Hand back as **blocked**, not done: name the missing permission (here `workflows`), the file, and the branch that holds the commit. A person with admin rights on the GitHub App has to add it. See `process/hand-back.md`.
+- Do not move the change into another file or path to get around the rejection.
+
 ## Stacked pull requests
 
 Use a stack when a change depends on another that is not merged yet.

@@ -291,7 +291,7 @@ const policiesSchema = z
           .default("requester")
           .meta(
             d(
-              "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves to review). Edits the preset rule hand-back-to-requester. Default requester.",
+              "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.",
             ),
           ),
         fallback: z
