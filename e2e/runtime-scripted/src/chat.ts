@@ -91,6 +91,10 @@ export function createStubChat(baseUrl: string): Chat {
     },
 
     openDirect: async (userId) => `D-${userId}`,
+
+    async setAgentProfile(userId, profile) {
+      await call("/chat/profile", { userId, profile });
+    },
   };
 }
 
@@ -101,7 +105,7 @@ export function createStubChat(baseUrl: string): Chat {
 export const stubChat = defineAdapter({
   port: "chat",
   name: "slack",
-  capabilities: ["chat.messages", "chat.history"],
+  capabilities: ["chat.messages", "chat.history", "chat.agentProfile"],
   options: z.strictObject({}),
   secrets: () => [],
   create: () => createStubChat(process.env["E2E_STUB_URL"] ?? "http://tracker.acme.example:8081"),

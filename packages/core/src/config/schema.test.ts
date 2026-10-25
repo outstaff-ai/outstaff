@@ -133,7 +133,7 @@ describe("parseTeamConfig", () => {
       conflicts: { follow_up: true },
       retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
-      chat: { parallel_sessions: 2 },
+      chat: { parallel_sessions: 2, profile: true },
     });
   });
 

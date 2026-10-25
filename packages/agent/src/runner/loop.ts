@@ -17,6 +17,7 @@ import type { ChatReportKind } from "../verbs/office.js";
 import type { AgentEnv } from "../verbs/types.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { ChatRelay } from "./chat.js";
+import type { ProfilePublisher } from "./profile.js";
 import { buildWorkPrompt } from "./prompt.js";
 import { acknowledgeFeedback } from "./reactions.js";
 import type { UsageReporter } from "./usage.js";
@@ -66,6 +67,9 @@ export interface WorkLoopOptions {
   /** Chat requests: the context a new chat session starts with, and the report to the requester. */
   chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
   log?: Logger;
+
+  /** Told when the work or the agent's status changes, so the chat profile follows. */
+  profile?: Pick<ProfilePublisher, "changed">;
 
   /** The team's `policies`; `acknowledge.vcs` decides whether feedback gets a reaction. */
   policies?: TeamConfig["policies"];
@@ -383,6 +387,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       abort.abort();
     }
 
+    opts.profile?.changed();
     opts.usage?.setBusy(true);
     try {
       // Before the run starts, so the people who wrote the feedback see at once that it was taken.
@@ -398,6 +403,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       running.delete(id);
       opts.usage?.setBusy(running.size > 0);
       opts.usage?.flush();
+      // Handed back or failed: the status is idle now, or the next item.
+      opts.profile?.changed();
     }
   }
 
@@ -415,6 +422,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
           break;
         }
 
+        opts.profile?.changed();
         if (offer.workItem.kind === CHAT_KIND && opts.chatSession) {
           track(handle(offer));
         } else {

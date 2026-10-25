@@ -184,6 +184,8 @@ policies:
   acknowledge:
     chat: true
     vcs: true
+  chat:
+    profile: true
   feedback:
     follow_up_round: true
     merged_prs: true
@@ -1296,11 +1298,11 @@ Details left out of chat messages.
 
 ### policies.chat
 
-How agents take chat messages.
+How agents take chat messages, and what they show in chat.
 
 - Type: `object`
 - Optional
-- Default: `{"parallel_sessions":2}`
+- Default: `{"parallel_sessions":2,"profile":true}`
 
 #### policies.chat.parallel_sessions
 
@@ -1311,6 +1313,14 @@ How many chat sessions an agent runs at once, beside its active work item. A mes
 - Default: `2`
 - Minimum 1
 - Maximum 10
+
+#### policies.chat.profile
+
+Publish the agent's profile in chat: role, status, and current work grouped by ticket or pull request. Needs a chat adapter with chat.agentProfile. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
 
 ### policies.commands
 

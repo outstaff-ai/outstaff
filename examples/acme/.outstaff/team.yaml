@@ -158,6 +158,8 @@ policies:
   acknowledge:
     chat: true
     vcs: true
+  chat:
+    profile: true
   feedback:
     follow_up_round: true
     merged_prs: true

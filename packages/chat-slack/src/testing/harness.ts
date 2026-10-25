@@ -29,7 +29,11 @@ export const teamWith = (chatIdentities?: string[]) =>
       : {}),
   }) as unknown as TeamConfig;
 
-export function slackWith(team: TeamConfig = teamWith(), onWarn?: (message: string) => void) {
+export function slackWith(
+  team: TeamConfig = teamWith(),
+  onWarn?: (message: string) => void,
+  now: () => Date = () => new Date("2026-01-01T00:00:00Z"),
+) {
   const fake: FakeSlack = createFakeSlack();
   const ctx: AdapterContext<SlackOptions> = {
     options: {},
@@ -37,7 +41,7 @@ export function slackWith(team: TeamConfig = teamWith(), onWarn?: (message: stri
     team,
     log: onWarn ? { ...silentLogger, warn: onWarn } : silentLogger,
     fetch,
-    now: () => new Date("2026-01-01T00:00:00Z"),
+    now,
   };
 
   const chat = createSlackChat(ctx, { web: fake.web, socket: fake.socket });

@@ -16,6 +16,14 @@ export interface FakeChat extends Chat {
   posts: ChatMessage[];
   reactions: { channel: string; messageId: string; name: string }[];
   profiles: Map<string, AgentProfile>;
+
+  /** Every profile published, in order, with the user it was published for. */
+  profileLog: { userId: string; profile: AgentProfile }[];
+  setAgentProfile(userId: string, profile: AgentProfile): Promise<void>;
+  onProfileRequest(source: (userId: string) => Promise<AgentProfile | undefined>): void;
+
+  /** What the adapter does when a user opens the profile page: asks the source registered with `onProfileRequest`. */
+  openProfile(userId: string): Promise<AgentProfile | undefined>;
 }
 
 export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
@@ -25,6 +33,8 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
   const posts: ChatMessage[] = [];
   const reactions: FakeChat["reactions"] = [];
   const profiles = new Map<string, AgentProfile>();
+  const profileLog: FakeChat["profileLog"] = [];
+  let profileSource: Parameters<FakeChat["onProfileRequest"]>[0] | undefined;
   let handler: ((m: ChatMessage) => Promise<void>) | undefined;
   let counter = 0;
 
@@ -52,6 +62,7 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
     posts,
     reactions,
     profiles,
+    profileLog,
     seed: {
       channel: "C-general",
       userId: "U-noor",
@@ -119,8 +130,15 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
     async openDirect(userId) {
       return `D-${userId}`;
     },
+    onProfileRequest(source) {
+      profileSource = source;
+    },
+    async openProfile(userId) {
+      return profileSource?.(userId);
+    },
     async setAgentProfile(userId, profile) {
       profiles.set(userId, structuredClone(profile));
+      profileLog.push({ userId, profile: structuredClone(profile) });
     },
   };
 }

@@ -1330,9 +1330,10 @@
         },
         "chat": {
           "default": {
-            "parallel_sessions": 2
+            "parallel_sessions": 2,
+            "profile": true
           },
-          "description": "How agents take chat messages.",
+          "description": "How agents take chat messages, and what they show in chat.",
           "type": "object",
           "properties": {
             "parallel_sessions": {
@@ -1341,6 +1342,11 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 10
+            },
+            "profile": {
+              "default": true,
+              "description": "Publish the agent's profile in chat: role, status, and current work grouped by ticket or pull request. Needs a chat adapter with chat.agentProfile. Default on.",
+              "type": "boolean"
             }
           },
           "additionalProperties": false

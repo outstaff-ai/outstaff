@@ -16,6 +16,10 @@ import { createTrust } from "./trust.js";
 
 const REACTIONS = { eyes: "eyes", done: "white_check_mark", error: "x" } as const;
 const SEEN_LIMIT = 500;
+
+/** A held profile is shown as it is for this long after it was published; then the agent is asked again. */
+const PROFILE_FRESH_MS = 60_000;
+const ZONE_TTL_MS = 10 * 60_000;
 const PAGE = 200;
 
 /** Replace the web or socket client; tests inject fakes, production builds the real ones from secrets. */
@@ -52,7 +56,9 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
   let handler: ((m: ChatMessage) => Promise<void>) | undefined;
   const seen = new Set<string>();
   const direct = new Map<string, string>();
-  const profiles = new Map<string, AgentProfile>();
+  const profiles = new Map<string, { profile: AgentProfile; at: number }>();
+  const zones = new Map<string, { tz?: string; at: number }>();
+  let profileSource: ((userId: string) => Promise<AgentProfile | undefined>) | undefined;
 
   const trust = createTrust({
     web,
@@ -127,9 +133,25 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
   const onEvent = async (e: SlackEvent) => {
     try {
       if (e.type === "app_home_opened" && e.tab === "home" && e.user) {
-        const profile = profiles.get(e.user);
-        if (profile) {
-          await publish(e.user, profile);
+        let held = profiles.get(e.user);
+        const stale = !held || ctx.now().getTime() - held.at >= PROFILE_FRESH_MS;
+        // Only trusted people see the work; a profile held for a person was published for them.
+        if (profileSource && stale && (held || (await trust.resolve(e.user)).trusted)) {
+          try {
+            const fresh = await profileSource(e.user);
+            if (fresh) {
+              held = { profile: structuredClone(fresh), at: ctx.now().getTime() };
+              profiles.set(e.user, held);
+            }
+          } catch (error) {
+            ctx.log.warn("could not refresh the profile; showing the one held", {
+              error: String(error),
+            });
+          }
+        }
+
+        if (held) {
+          await publish(e.user, held.profile);
         }
 
         return;
@@ -165,8 +187,29 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     }
   };
 
-  const publish = (userId: string, profile: AgentProfile) =>
-    call(() => web.views.publish({ user_id: userId, view: homeView(profile) }));
+  /** The viewer's timezone from Slack, cached with the other lookups; unknown when the lookup fails. */
+  const zoneOf = async (userId: string) => {
+    const now = ctx.now().getTime();
+    const hit = zones.get(userId);
+    if (hit && now - hit.at < ZONE_TTL_MS) {
+      return hit.tz;
+    }
+
+    let tz: string | undefined;
+    try {
+      tz = (await web.users.info({ user: userId })).user?.tz || undefined;
+    } catch {
+      // Times show in UTC.
+    }
+
+    zones.set(userId, { ...(tz ? { tz } : {}), at: now });
+    return tz;
+  };
+
+  const publish = async (userId: string, profile: AgentProfile) => {
+    const tz = profile.lastActiveAt ? await zoneOf(userId) : undefined;
+    await call(() => web.views.publish({ user_id: userId, view: homeView(profile, tz) }));
+  };
 
   const pages = async (
     fetchPage: (cursor?: string) => Promise<SlackPage>,
@@ -288,8 +331,12 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     },
 
     async setAgentProfile(userId, profile) {
-      profiles.set(userId, structuredClone(profile));
+      profiles.set(userId, { profile: structuredClone(profile), at: ctx.now().getTime() });
       await publish(userId, profile);
+    },
+
+    onProfileRequest(source) {
+      profileSource = source;
     },
   };
 }

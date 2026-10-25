@@ -396,9 +396,17 @@ const policiesSchema = z
               "How many chat sessions an agent runs at once, beside its active work item. A message beyond that waits for a free session.",
             ),
           ),
+        profile: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Publish the agent's profile in chat: role, status, and current work grouped by ticket or pull request. Needs a chat adapter with chat.agentProfile. Default on.",
+            ),
+          ),
       })
-      .default({ parallel_sessions: 2 })
-      .meta(d("How agents take chat messages.")),
+      .default({ parallel_sessions: 2, profile: true })
+      .meta(d("How agents take chat messages, and what they show in chat.")),
     commands: teamCommandsSchema.optional(),
   })
   .meta(d("Team-wide guardrails, message style and switches for what outstaff does on its own."));

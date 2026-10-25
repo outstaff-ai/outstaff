@@ -220,7 +220,7 @@ const TEAM = `version: 1
 team: { name: acme, product: Acme Shop }
 humans:
   - name: Ada Admin
-    identities: { vcs: ada-admin, tracker: ada.admin }
+    identities: { vcs: ada-admin, tracker: ada.admin, chat: U0ADA00001 }
   - name: Grace Lead
     identities: { vcs: grace-lead }
 catalog: { version: 0.0.0 }
@@ -435,6 +435,25 @@ async function main() {
   });
 
   await until("the review round running and held at the gate", (s) => s.chat.gates.review?.arrived);
+
+  // The agent publishes its profile for the trusted human while the round runs: working on the ticket, linked.
+  const published = await until("a chat profile with the active item", (s) =>
+    s.chat.profiles.findLast(
+      (p: Json) =>
+        p.userId === "U0ADA00001" &&
+        p.profile.status === "working" &&
+        p.profile.current?.title.includes(first),
+    ),
+  );
+
+  assertEq(
+    published.profile.sections[0].lines.some((l: string) => l.includes(first)),
+    true,
+    "the profile lists the current work, grouped by ticket",
+  );
+
+  step(`profile: published for the trusted human while the review round runs, working on ${first}`);
+
   const asked = await stub("POST", "/_test/chat/say", { text: "Where do the greetings live?" });
   const reply = await until("an answer in chat while the review round is held", (s) =>
     s.chat.posts.find((p: Json) => p.thread === asked.id),

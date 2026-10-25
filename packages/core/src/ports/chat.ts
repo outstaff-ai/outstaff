@@ -10,8 +10,20 @@ export interface ChatMessage {
 export interface AgentProfile {
   name: string;
   role: string;
+
+  /** One line on what the agent does. */
+  description?: string;
+  model?: string;
   status: "idle" | "working" | "paused";
+
+  /** The active item, linked when `url` is given. */
   current?: { title: string; url?: string };
+
+  /** When the agent last worked (ISO-8601). The adapter shows it in the viewer's timezone where it knows it. */
+  lastActiveAt?: string;
+
+  /** Markdown shown under the status: how to talk to the agent. */
+  hint?: string;
   sections?: { heading: string; lines: string[] }[];
 }
 
@@ -42,6 +54,12 @@ export interface Chat {
    * platform's equivalent (for example Slack's Home tab).
    */
   setAgentProfile?(userId: string, profile: AgentProfile): Promise<void>;
+
+  /**
+   * Capability `chat.agentProfile`. Gives the adapter a way to get a fresh profile for a user when they open the
+   * agent's profile page and the one it holds is older than a minute. `undefined` keeps the held profile.
+   */
+  onProfileRequest?(source: (userId: string) => Promise<AgentProfile | undefined>): void;
 }
 
 /** Split text into chunks of at most `max` characters, breaking at line breaks where possible. */

@@ -24,6 +24,7 @@ export function createChat() {
   const messages: Message[] = [];
   const posts: { id: string; channel: string; thread?: string; text: string; at: string }[] = [];
   const reactions: { channel: string; messageId: string; name: string }[] = [];
+  const profiles: { userId: string; profile: Record<string, any>; at: string }[] = [];
   const gates = new Map<string, { open: boolean; arrived: boolean }>();
   let counter = 0;
   const id = () => `${Date.now()}.${String(++counter).padStart(4, "0")}`;
@@ -66,6 +67,19 @@ export function createChat() {
       path: "/chat/react",
       handler: (r) => {
         reactions.push({ channel: r.json.channel, messageId: r.json.messageId, name: r.json.name });
+        return { ok: true };
+      },
+    },
+    {
+      method: "POST",
+      path: "/chat/profile",
+      handler: (r) => {
+        profiles.push({
+          userId: r.json.userId,
+          profile: r.json.profile,
+          at: new Date().toISOString(),
+        });
+
         return { ok: true };
       },
     },
@@ -155,6 +169,7 @@ export function createChat() {
     state: () => ({
       posts,
       reactions,
+      profiles,
       messages,
       gates: Object.fromEntries(gates),
     }),

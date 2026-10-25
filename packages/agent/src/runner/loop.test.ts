@@ -186,6 +186,7 @@ describe("work loop", () => {
       progressEveryMs?: number;
       workspaces?: Workspaces;
       usage?: UsageReporter;
+      profile?: { changed(): void };
       chat?: Pick<ChatRelay, "context" | "report" | "acknowledge">;
       vcs?: Vcs;
       log?: Logger;
@@ -269,6 +270,28 @@ describe("work loop", () => {
     expect(req.prompt).toContain("Work item w1 (ticket): Fix w1");
     expect(req.prompt).toContain("ticket SHOP-1 Checkout (https://t.acme.example/SHOP-1)");
     expect(req.prompt).toContain("sam: Plan: a");
+
+    await loop.stop();
+    await conn.stop();
+    await running;
+  });
+
+  it("tells the chat profile when an item is offered, accepted and handed back", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    runtime.enqueue([{ type: "finish", text: "Done." }]);
+    const order: string[] = [];
+    const profile = { changed: () => order.push(types().at(-1) ?? "start") };
+
+    start(runtime, { profile });
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+    await until(() => order.length >= 3);
+
+    // At the offer, after accepting it, and once the hand-back is through.
+    expect(order[0]).toBeDefined();
+    expect(order).toContain("accept");
+    expect(order.at(-1)).toBe("handback");
 
     await loop.stop();
     await conn.stop();
