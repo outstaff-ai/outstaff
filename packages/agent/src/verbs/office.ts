@@ -1,16 +1,7 @@
-import type { PayloadOf } from "@outstaff/protocol";
+import type { PayloadOf, WorkSummary } from "@outstaff/protocol";
 
 /** What the office tells an agent; the wire protocol is defined separately (the verbs only need this). */
-export interface OfficeWorkItem {
-  id: string;
-  title: string;
-  status: string;
-
-  /** The ticket the work item is about, when it has one. */
-  ticketKey?: string;
-  prUrl?: string;
-  current?: boolean;
-}
+export type OfficeWorkItem = WorkSummary;
 
 export interface OfficeTeamMember {
   handle: string;

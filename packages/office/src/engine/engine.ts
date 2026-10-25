@@ -299,10 +299,17 @@ export function createEngine(opts: EngineOptions): Engine {
 
     const ticket = e.ticket ?? (e.pr ? workState.ticketForPr(e.pr) : undefined);
     const prTitle = e.pr ? workState.pullRequest(e.pr)?.title : undefined;
+    // The ticket key goes in only when the title does not have it already.
+    const mentions = (text: string | undefined, key: string) =>
+      text?.toLowerCase().includes(key.toLowerCase()) ?? false;
+
+    const ticketText = e.ticket ? await ticketTitle(e.ticket) : undefined;
     const subjectText = e.pr
-      ? `PR #${e.pr.number}${prTitle ? ` ${prTitle}` : ""}${ticket ? ` (${ticket})` : ""}`
+      ? `PR #${e.pr.number}${prTitle ? ` ${prTitle}` : ""}${ticket && !mentions(prTitle, ticket) ? ` (${ticket})` : ""}`
       : e.ticket
-        ? `${e.ticket} ${(await ticketTitle(e.ticket)) ?? ""}`.trim()
+        ? mentions(ticketText, e.ticket)
+          ? ticketText!
+          : `${e.ticket} ${ticketText ?? ""}`.trim()
         : "";
 
     // The earlier work on the same ticket or pull request, so the history reads as one thread.

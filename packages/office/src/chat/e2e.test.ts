@@ -242,7 +242,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     // A new chat session starts with the conversation and the person's current work.
     const prompt = runtime.requests[0]!.prompt;
     expect(prompt).toContain("please add a search page to the shop");
-    expect(prompt).toContain("Your current work:");
+    expect(prompt).toContain("Your current work, one line per ticket or pull request:");
     expect(runtime.requests[0]!.sessionId).toBeUndefined();
   });
 
@@ -317,8 +317,11 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     const busy = agentChat.posts[0]!;
     expect(busy.thread).toBe(sent.id);
     expect(busy.text).toContain("busy");
-    expect(busy.text).toContain(`1. [Checkout bug](${tracker.links.issue("ACME-77")}) (running)`);
-    expect(busy.text).toContain(`2. [Search page](${tracker.links.issue("ACME-78")})`);
+    expect(busy.text).toContain(
+      `1. [ACME-77 Checkout bug](${tracker.links.issue("ACME-77")}) (running)`,
+    );
+
+    expect(busy.text).toContain(`2. [ACME-78 Search page](${tracker.links.issue("ACME-78")})`);
     expect(busy.text).toContain("Where does this go");
 
     const titles = async () =>

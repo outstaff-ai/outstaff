@@ -6,12 +6,12 @@ import {
   type TeamConfig,
   type Tracker,
 } from "@outstaff/core";
-import type { Link, WorkSummary } from "@outstaff/protocol";
+import { formatWorkGroups, groupWork, type Link, type WorkSummary } from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
 import type { ChatMessageResult, ChatReportKind, OfficeClient } from "../verbs/office.js";
 
 /** What the relay uses of the office connection. */
-export type ChatOffice = Pick<OfficeClient, "chatMessage" | "chatReport" | "currentWork">;
+export type ChatOffice = Pick<OfficeClient, "chatMessage" | "chatReport" | "currentWork" | "work">;
 
 export interface ChatRelayOptions {
   chat: Chat;
@@ -72,13 +72,10 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
   };
 
-  const ticketLink = (i: WorkSummary) =>
-    i.ticketKey && opts.tracker ? opts.tracker.links.issue(i.ticketKey) : undefined;
+  const ticketUrl = (key: string) => opts.tracker?.links.issue(key);
 
-  const describe = (i: WorkSummary, n: number) => {
-    const url = ticketLink(i) ?? i.prUrl;
-    return `${n}. ${url ? `[${i.title}](${url})` : i.title}${i.status === "active" ? " (running)" : ""}`;
-  };
+  /** The numbered list the requester picks a place from: one line per piece of work. */
+  const describe = (work: WorkSummary[]) => formatWorkGroups(groupWork(work), ticketUrl);
 
   function replyFor(r: ChatMessageResult): string | undefined {
     switch (r.disposition) {
@@ -92,7 +89,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
         return [
           `I'm busy right now. My work, in the order it runs:`,
-          ...r.work.map((w, i) => describe(w, i + 1)),
+          ...describe(r.work),
           `Where does this go: ${where}? It waits at the end until you say.`,
         ].join("\n");
       }
@@ -105,7 +102,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         return [
           "I did not get where this goes. Say next, last or after one of these (by number)" +
             (hasPm ? ", or ask me to check with the PM:" : ":"),
-          ...r.work.map((w, i) => describe(w, i + 1)),
+          ...describe(r.work),
         ].join("\n");
       case "joined":
         return undefined;
@@ -194,7 +191,16 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       }
 
       try {
-        sections.push("", "Your current work:", await office.currentWork());
+        sections.push(
+          "",
+          "Your current work, one line per ticket or pull request:",
+          ...describe(
+            (await office.work({ workItemId: offer.workItem.id })).filter((w) => !w.current),
+          ),
+          "",
+          "Their state:",
+          await office.currentWork(),
+        );
       } catch (e) {
         log.warn("could not read the current work", { error: reason(e) });
       }

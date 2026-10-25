@@ -294,6 +294,37 @@ describe("chat requests", () => {
     expect(notified).toEqual(["sam"]);
   });
 
+  it("numbers the grouped list: a follow-up is not a place of its own, and 'after 1' goes behind the whole group", async () => {
+    const add = (title: string, kind: string, ticket: string) =>
+      scheduler.enqueue({
+        person: "sam",
+        kind,
+        title,
+        trigger: "human",
+        subject: { type: "ticket", ref: ticket },
+      });
+
+    const running = await add("Checkout", "ticket", "ACME-5");
+    await add("Search", "ticket", "ACME-6");
+    await add("review feedback: Checkout", "review_feedback", "ACME-5");
+    await scheduler.markActive(running.id);
+
+    const first = await say("Fix the footer");
+    expect(first.work).toHaveLength(3);
+    notified.length = 0;
+
+    const r = await say("after 1", "m1");
+    expect(r).toMatchObject({ disposition: "placed", placement: "after Checkout" });
+    expect(await queueOrder()).toEqual([
+      "Search",
+      "review feedback: Checkout",
+      "Chat: Fix the footer",
+    ]);
+
+    const second = await say("Another", "m9x");
+    expect(second.disposition).toBe("waiting");
+  });
+
   it("asks the PM to prioritize when the requester wants that", async () => {
     await busyWith("Running thing", "Queued A");
     await say("Fix the footer");
@@ -532,17 +563,18 @@ describe("chat requests", () => {
 
 describe("parsePlacement", () => {
   const items = [
-    { id: "w1", title: "Checkout bug", ticketKey: "ACME-4" },
-    { id: "w2", title: "Search page" },
+    { ids: ["w1", "w1b"], title: "Checkout bug", ticketKey: "ACME-4" },
+    { ids: ["w2"], title: "Search page" },
   ];
 
   it.each([
     ["next", { type: "next" }],
     ["Last, no rush", { type: "last" }],
-    ["after #2", { type: "after", itemId: "w2" }],
-    ["after acme-4", { type: "after", itemId: "w1" }],
-    ["after w2", { type: "after", itemId: "w2" }],
-    ["after the search page", { type: "after", itemId: "w2" }],
+    ["after #2", { type: "after", itemIds: ["w2"] }],
+    ["after acme-4", { type: "after", itemIds: ["w1", "w1b"] }],
+    ["after w1b", { type: "after", itemIds: ["w1", "w1b"] }],
+    ["after w2", { type: "after", itemIds: ["w2"] }],
+    ["after the search page", { type: "after", itemIds: ["w2"] }],
     ["ask the PM please", { type: "pm" }],
     ["after 7", undefined],
     ["thanks", undefined],

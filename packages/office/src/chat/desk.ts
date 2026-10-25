@@ -5,7 +5,13 @@ import {
   type TeamConfig,
   type Tracker,
 } from "@outstaff/core";
-import type { Link, PayloadOf, WorkSummary } from "@outstaff/protocol";
+import {
+  formatWorkGroups,
+  groupWork,
+  type Link,
+  type PayloadOf,
+  type WorkSummary,
+} from "@outstaff/protocol";
 import type { Cancel, Clock } from "../clock.js";
 import { ProtocolError, type ChatDesk, type Messaging } from "../protocol/source.js";
 import { CHAT_KIND, orderQueue } from "../scheduler/policy.js";
@@ -97,6 +103,14 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const summaries = async (items: WorkItem[]): Promise<WorkSummary[]> =>
     Promise.all(items.map((i) => summarizeItem(store, i)));
 
+  /** What the requester picks from: the lines of the grouped list, each with all its items. */
+  const candidatesOf = (list: WorkSummary[]) =>
+    groupWork(list).map((g) => ({
+      ids: g.items.map((i) => i.id),
+      title: g.ticketTitle ?? g.prTitle ?? g.title,
+      ...(g.ticketKey ? { ticketKey: g.ticketKey } : {}),
+    }));
+
   async function newRequest(
     person: string,
     m: Message,
@@ -182,7 +196,10 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       }
 
       try {
-        const list = others.map((i) => `- ${i.title} (${i.status})`).join("\n");
+        const list = formatWorkGroups(groupWork(await summaries(others)), (key) =>
+          opts.tracker?.links.issue(key),
+        ).join("\n");
+
         await opts.messaging.ask(person, {
           to: PM_ROLE,
           workItemId: item.id,
@@ -201,10 +218,18 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
 
     let placement: string;
     if (parsed.type === "after") {
-      const anchor = others.find((i) => i.id === parsed.itemId);
-      if (anchor?.status === "queued") {
+      // After the whole piece of work: behind its last queued item.
+      const anchor = others
+        .filter((i) => parsed.itemIds.includes(i.id) && i.status === "queued")
+        .at(-1);
+
+      if (anchor) {
         await placeQueued({ store, scheduler }, item.id, { after: anchor.id });
-        placement = `after ${anchor.title}`;
+        const group = candidatesOf(await summaries(others)).find((c) =>
+          c.ids.some((id) => parsed.itemIds.includes(id)),
+        );
+
+        placement = `after ${group?.title ?? anchor.title}`;
       } else {
         await placeQueued({ store, scheduler }, item.id, "next");
         placement = "next, right after the current item";
@@ -247,10 +272,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     if (origin?.awaitingPlacement && item.status === "queued") {
       const others = await open(person, item.id);
       const candidates = await summaries(others);
-      const parsed = parsePlacement(
-        m.text,
-        candidates.map((c) => ({ id: c.id, title: c.title, ticketKey: c.ticketKey })),
-      );
+      const parsed = parsePlacement(m.text, candidatesOf(candidates));
 
       if (parsed) {
         return place(person, item, origin, parsed, others, m);
