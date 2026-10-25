@@ -31,7 +31,12 @@ function team(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   return result.config;
 }
 
-const offerOf = (id = "c1", withOrigin = true): Offer => ({
+/** By default a channel thread the requester is not in, where a mention adds a notification. */
+const offerOf = (
+  id = "c1",
+  withOrigin = true,
+  where: { direct: boolean; participant: boolean } = { direct: false, participant: false },
+): Offer => ({
   workItem: {
     id,
     kind: "chat",
@@ -44,6 +49,7 @@ const offerOf = (id = "c1", withOrigin = true): Offer => ({
             channel: "D-U0DANA0001",
             thread: "m1",
             requester: { id: "U0DANA0001", name: "Dana" },
+            ...where,
           },
         }
       : {}),
@@ -107,6 +113,8 @@ describe("chat relay", () => {
         channel: "D-U0DANA0001",
         text: "add a search page",
         author: { id: "U0DANA0001", name: "Dana" },
+        direct: true,
+        participant: true,
       },
     ]);
 
@@ -151,6 +159,72 @@ describe("chat relay", () => {
     await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, filed);
     expect(chat.posts).toHaveLength(1);
     expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
+  });
+
+  it("tags the requester in the acknowledgement and placement question only where it adds a notification", async () => {
+    await setup();
+    const filed = {
+      item: { id: "w3", title: "assigned: ACME-2", status: "queued" },
+      waiting: true,
+      work: [{ id: "w1", title: "Checkout bug", status: "active", ticketKey: "ACME-1" }],
+    };
+
+    const what = { key: "ACME-2", title: "Fix the footer" };
+    await relay.acknowledge(offerOf("c1", true, { direct: true, participant: true }), what, filed);
+    expect(chat.posts[0]!.text).toMatch(/^On it\./);
+    expect(chat.posts[0]!.text).toContain("Where does this go");
+    expect(chat.posts[0]!.text).not.toContain("<@");
+
+    await relay.acknowledge(offerOf("c2", true, { direct: false, participant: true }), what, filed);
+    expect(chat.posts[1]!.text).not.toContain("<@");
+
+    await relay.acknowledge(offerOf("c3"), what, filed);
+    expect(chat.posts[2]!.text).toMatch(/^<@U0DANA0001> On it\./);
+  });
+
+  it("tells the office whether the message is in a direct message and whether the author is in the thread", async () => {
+    await setup();
+    const root = await chat.post("C-general", "Is the build green?");
+    await chat.seed.inbound({
+      channel: "C-general",
+      thread: root.thread,
+      authorId: "U0LEE0001",
+      text: "Same here.",
+    });
+
+    await chat.seed.inbound({
+      channel: "C-general",
+      thread: root.thread,
+      authorId: "U0DANA0001",
+      authorName: "Dana",
+      text: "add a search page",
+    });
+
+    await chat.seed.inbound({ channel: "C-general", authorId: "U0DANA0001", text: "new topic" });
+    await dana("and in a direct message");
+    expect(office.chatMessages.map((m) => [m.direct, m.participant])).toEqual([
+      [false, true],
+      [false, true],
+      [false, true],
+      [true, true],
+    ]);
+  });
+
+  it("assumes the author is not in the thread when it cannot read it, so a mention is not lost", async () => {
+    const root = await chat.post("C-general", "Is the build green?");
+    chat.history = async () => {
+      throw new Error("history unavailable");
+    };
+
+    await setup();
+    await chat.seed.inbound({
+      channel: "C-general",
+      thread: root.thread,
+      authorId: "U0DANA0001",
+      text: "add a search page",
+    });
+
+    expect(office.chatMessages.map((m) => m.participant)).toEqual([false]);
   });
 
   it("answers a request filed while busy with the grouped work and asks where it goes", async () => {
@@ -203,7 +277,7 @@ describe("chat relay", () => {
     );
 
     expect(chat.posts[0]!.text).toBe(
-      `Adding this to [PR #11](https://git.acme.example/acme/app/pull/11) for [ACME-11](${tracker.links.issue("ACME-11")}).`,
+      `<@U0DANA0001> Adding this to [PR #11](https://git.acme.example/acme/app/pull/11) for [ACME-11](${tracker.links.issue("ACME-11")}).`,
     );
   });
 
@@ -358,7 +432,13 @@ describe("chat relay", () => {
         ...offerOf(),
         workItem: {
           ...offerOf().workItem,
-          origin: { channel: "D-U0DANA0001", thread: root.id, requester: { id: "U0DANA0001" } },
+          origin: {
+            channel: "D-U0DANA0001",
+            thread: root.id,
+            requester: { id: "U0DANA0001" },
+            direct: true,
+            participant: true,
+          },
         },
       });
 
@@ -381,7 +461,13 @@ describe("chat relay", () => {
         ...offerOf(),
         workItem: {
           ...offerOf().workItem,
-          origin: { channel: "D-U0DANA0001", thread: root.id, requester: { id: "U0DANA0001" } },
+          origin: {
+            channel: "D-U0DANA0001",
+            thread: root.id,
+            requester: { id: "U0DANA0001" },
+            direct: true,
+            participant: true,
+          },
         },
       });
 
@@ -409,7 +495,13 @@ describe("chat relay", () => {
         ...offerOf(),
         workItem: {
           ...offerOf().workItem,
-          origin: { channel: "D-U0DANA0001", thread: root.id, requester: { id: "U0DANA0001" } },
+          origin: {
+            channel: "D-U0DANA0001",
+            thread: root.id,
+            requester: { id: "U0DANA0001" },
+            direct: true,
+            participant: true,
+          },
         },
       });
 
@@ -439,6 +531,34 @@ describe("chat relay", () => {
           `- ACME-1: ${tracker.links.issue("ACME-1")}`,
         ].join("\n"),
       );
+    });
+
+    it("does not mention the requester in a direct message", async () => {
+      await setup({ chatReport: () => ({ post: true, requester: "U0DANA0001", links: [] }) });
+      await relay.report(
+        offerOf("c1", true, { direct: true, participant: false }),
+        "result",
+        "Search page is up.",
+      );
+
+      expect(chat.posts[0]!.text).toBe("Search page is up.");
+    });
+
+    it("does not mention a requester who started or joined the channel thread", async () => {
+      await setup({ chatReport: () => ({ post: true, requester: "U0DANA0001", links: [] }) });
+      await relay.report(
+        offerOf("c1", true, { direct: false, participant: true }),
+        "result",
+        "Search page is up.",
+      );
+
+      expect(chat.posts[0]!.text).toBe("Search page is up.");
+    });
+
+    it("mentions a requester who is not in the channel thread", async () => {
+      await setup({ chatReport: () => ({ post: true, requester: "U0DANA0001", links: [] }) });
+      await relay.report(offerOf(), "result", "Search page is up.");
+      expect(chat.posts[0]!.text).toBe("<@U0DANA0001> Search page is up.");
     });
 
     it("keeps to the line limit of the message style and does not repeat links the text has", async () => {

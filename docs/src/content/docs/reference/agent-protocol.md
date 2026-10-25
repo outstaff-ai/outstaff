@@ -87,6 +87,8 @@ Sent by: office.
 | `workItem.origin.requester`              | object                                              | yes      |                                                                                                                                                                                     |
 | `workItem.origin.requester.id`           | string                                              | yes      | Id of the requester in the chat workspace.                                                                                                                                          |
 | `workItem.origin.requester.name`         | string                                              | no       |                                                                                                                                                                                     |
+| `workItem.origin.direct`                 | boolean                                             | yes      | The conversation is a direct message with the requester.                                                                                                                            |
+| `workItem.origin.participant`            | boolean                                             | yes      | The requester started the thread or replied in it, so the chat already notifies them.                                                                                               |
 | `context`                                | object                                              | yes      | What the agent needs to start.                                                                                                                                                      |
 | `context.journal`                        | list of objects                                     | yes      | What earlier rounds of this item recorded.                                                                                                                                          |
 | `context.journal[].at`                   | string                                              | yes      | ISO-8601 timestamp.                                                                                                                                                                 |
@@ -532,15 +534,17 @@ A message from a trusted human in chat. The office starts a chat session for it 
 
 Sent by: agent. Answered by: `chat_message_result`, `error`.
 
-| Field         | Type   | Required | Description                                            |
-| ------------- | ------ | -------- | ------------------------------------------------------ |
-| `messageId`   | string | yes      | Id of the message in the chat workspace.               |
-| `channel`     | string | yes      |                                                        |
-| `thread`      | string | no       | Thread of the message; absent for a top-level message. |
-| `text`        | string | yes      |                                                        |
-| `author`      | object | yes      |                                                        |
-| `author.id`   | string | yes      |                                                        |
-| `author.name` | string | no       |                                                        |
+| Field         | Type    | Required | Description                                            |
+| ------------- | ------- | -------- | ------------------------------------------------------ |
+| `messageId`   | string  | yes      | Id of the message in the chat workspace.               |
+| `channel`     | string  | yes      |                                                        |
+| `thread`      | string  | no       | Thread of the message; absent for a top-level message. |
+| `text`        | string  | yes      |                                                        |
+| `author`      | object  | yes      |                                                        |
+| `author.id`   | string  | yes      |                                                        |
+| `author.name` | string  | no       |                                                        |
+| `direct`      | boolean | yes      | The message is in a direct message with the author.    |
+| `participant` | boolean | yes      | The author started the thread or replied in it.        |
 
 ### `chat_message_result`
 

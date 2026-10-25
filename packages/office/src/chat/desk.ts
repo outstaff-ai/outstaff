@@ -33,6 +33,7 @@ import {
   CHAT_MESSAGE_SUBJECT,
   CHAT_ORIGIN_SUBJECT,
   CHAT_THREAD_SUBJECT,
+  needsMention,
   readOrigin,
   threadKey,
   type ChatOriginRecord,
@@ -76,7 +77,9 @@ const firstLine = (text: string, max = 80) => {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 };
 
-const mention = (origin: ChatOriginRecord) => `<@${origin.requester.id}>`;
+/** The mention with its trailing space, or nothing when the requester is notified anyway. */
+const mention = (origin: ChatOriginRecord) =>
+  needsMention(origin) ? `<@${origin.requester.id}> ` : "";
 
 export interface ChatRequests extends ChatDesk {
   /** Tells the requester of a chat item that the scheduler blocked it. Needs the office's chat port. */
@@ -154,6 +157,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       channel: m.channel,
       thread,
       requester: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
+      direct: m.direct,
+      participant: m.participant,
       awaitingPlacement: false,
       claimed: [],
       text: m.text,
@@ -228,6 +233,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       channel: origin.channel,
       thread: origin.thread,
       requester: origin.requester,
+      direct: origin.direct,
+      participant: origin.participant,
       awaitingPlacement: busy,
       claimed: [],
     } satisfies ChatOriginRecord);
@@ -426,6 +433,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       channel: origin.channel,
       thread: origin.thread,
       requester: origin.requester,
+      direct: origin.direct,
+      participant: origin.participant,
       awaitingPlacement: false,
       claimed: [],
     } satisfies ChatOriginRecord);
@@ -673,7 +682,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     );
 
     const text = [
-      `${mention(origin)} ${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
+      `${mention(origin)}${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
       "(My agent went offline before it could post this, so the office is posting it.)",
       ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
     ].join("\n");
@@ -835,7 +844,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
 
       const links = await opts.linksOf(item);
       const text = [
-        `${mention(origin)} I could not carry on with this: ${firstLine(reason, 200)}`,
+        `${mention(origin)}I could not carry on with this: ${firstLine(reason, 200)}`,
         ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
       ].join("\n");
 

@@ -176,6 +176,8 @@ describe("office connection", () => {
         channel: "D1",
         text: "hi",
         author: { id: "U1" },
+        direct: true,
+        participant: true,
       });
 
       expect(current().last()).toMatchObject({

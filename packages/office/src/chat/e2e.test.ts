@@ -231,7 +231,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     expect(ack!.text).toContain(ticket);
     expect(ack!.text).not.toContain("busy");
     expect(result).toMatchObject({ channel: DM, thread: sent.id });
-    expect(result!.text).toContain(`<@${DANA}>`);
+    expect(result!.text).not.toContain("<@");
     expect(result!.text).toContain("https://git.acme.example/acme/app/pull/4");
     expect(result!.text).toContain(ticket);
 
@@ -266,7 +266,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     await dana("why is CI failing?");
     startLoop();
     await until(() => agentChat.posts.length === 1);
-    expect(agentChat.posts[0]!.text).toContain("<@U0DANA0001> It fails on the lint step");
+    expect(agentChat.posts[0]!.text).toContain("It fails on the lint step");
     expect(await tracker.listIssues({})).toEqual([]);
     await office.parts.intake.pollOnce();
     expect(await store.listItems({ person: "sam" })).toHaveLength(1);
@@ -288,7 +288,13 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
           title: "x",
           priority: 0,
           trigger: "human",
-          origin: { channel: DM, thread: sent.id, requester: { id: DANA } },
+          origin: {
+            channel: DM,
+            thread: sent.id,
+            requester: { id: DANA },
+            direct: true,
+            participant: true,
+          },
         },
         context: { journal: [], subjects: [], links: [] },
       },
@@ -301,6 +307,8 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       channel: DM,
       text: "please add a search page",
       author: { id: DANA },
+      direct: true,
+      participant: true,
     });
 
     expect(dup.repeated).toBe(true);
@@ -516,7 +524,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       await handBackOnly();
       clock.advance(60_000);
       await until(() => officeChat.posts.length === 1);
-      expect(officeChat.posts[0]!.text).toContain(`<@${DANA}>`);
+      expect(officeChat.posts[0]!.text).not.toContain("<@");
       expect(officeChat.posts[0]!.text).toContain("pull/7");
 
       const [item] = await store.listItems({ person: "sam" });

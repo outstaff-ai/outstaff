@@ -94,6 +94,8 @@ describe("chat requests", () => {
       channel: "D1",
       text,
       author: DANA,
+      direct: true,
+      participant: true,
       ...(thread ? { thread } : {}),
     });
 
@@ -177,7 +179,7 @@ describe("chat requests", () => {
       return item;
     };
 
-    it("posts it once, mentioning the requester, after the grace period", async () => {
+    it("posts it once, without a mention in a direct message, after the grace period", async () => {
       await finished();
       clock.advance(59_000);
       expect(chat.posts).toEqual([]);
@@ -186,13 +188,50 @@ describe("chat requests", () => {
       await until(() => chat.posts.length === 1);
       const [post] = chat.posts;
       expect(post).toMatchObject({ channel: "D1", thread: "m1" });
-      expect(post!.text).toContain("<@U0DANA0001> The search page is up.");
+      expect(post!.text).toContain("The search page is up.");
+      expect(post!.text).not.toContain("<@");
       expect(post!.text).toContain("offline");
       expect(post!.text).toContain("https://git.acme.example/acme/app/pull/4");
       expect(post!.text).not.toContain("Third line");
 
       clock.advance(600_000);
       expect(chat.posts).toHaveLength(1);
+    });
+
+    describe("mentions", () => {
+      const posted = async (where: { channel: string; direct: boolean; participant: boolean }) => {
+        const r = await desk.message("sam", {
+          messageId: "x1",
+          text: "please add a search page",
+          author: DANA,
+          ...where,
+        });
+
+        await scheduler.markActive(r.item.id);
+        const item = await scheduler.finish(r.item.id, { outcome: "Done.", status: "done" });
+        await desk.handedBack(item, { summary: "Done.", links: [] });
+        clock.advance(60_000);
+        await until(() => chat.posts.length === 1);
+        return chat.posts[0]!.text;
+      };
+
+      it("does not mention the requester in a direct message", async () => {
+        expect(await posted({ channel: "D1", direct: true, participant: false })).not.toContain(
+          "<@",
+        );
+      });
+
+      it("does not mention a requester who started or replied in the channel thread", async () => {
+        expect(await posted({ channel: "C1", direct: false, participant: true })).not.toContain(
+          "<@",
+        );
+      });
+
+      it("mentions a requester who is not in the channel thread", async () => {
+        expect(await posted({ channel: "C1", direct: false, participant: false })).toContain(
+          "<@U0DANA0001> Done.",
+        );
+      });
     });
 
     it("stays quiet when the agent claimed the report in time, and refuses a late claim after the office posted", async () => {
@@ -735,6 +774,8 @@ describe("chat requests", () => {
       channel: "D1",
       text: "Hi",
       author: DANA,
+      direct: true,
+      participant: true,
     });
 
     await scheduler.markActive(session.item.id);
@@ -745,6 +786,8 @@ describe("chat requests", () => {
       thread: "a",
       text: "ask the pm",
       author: DANA,
+      direct: true,
+      participant: true,
     });
 
     expect(pm.disposition).toBe("unclear");
@@ -754,6 +797,8 @@ describe("chat requests", () => {
       thread: "a",
       text: "hmm let me think",
       author: DANA,
+      direct: true,
+      participant: true,
     });
 
     expect(vague.disposition).toBe("unclear");
@@ -884,7 +929,7 @@ describe("chat requests", () => {
       await desk.notifyBlocked(item, "Stale again: no heartbeat for 10 minutes on the retry.");
       expect(chat.posts).toHaveLength(1);
       expect(chat.posts[0]).toMatchObject({ channel: "D1", thread: "m1" });
-      expect(chat.posts[0]!.text).toContain("<@U0DANA0001>");
+      expect(chat.posts[0]!.text).not.toContain("<@");
       expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
       // The agent's own blocked note is now already granted.
       expect((await desk.report("sam", id, "blocked")).post).toBe(false);

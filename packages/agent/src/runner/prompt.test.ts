@@ -142,3 +142,33 @@ describe("buildWorkPrompt branch", () => {
     expect(prompt).toContain("Commit there and push that branch");
   });
 });
+
+describe("buildWorkPrompt chat requests", () => {
+  const chatOffer = (kind: string): Offer => {
+    const base = offer();
+    return {
+      ...base,
+      workItem: {
+        ...base.workItem,
+        kind,
+        origin: {
+          channel: "D1",
+          thread: "t1",
+          requester: { id: "U1", name: "Ada" },
+          direct: true,
+          participant: true,
+        },
+      },
+    } as Offer;
+  };
+
+  it.each(["chat", "assigned"])(
+    "tells a %s item not to greet, address or tag the requester, because the reply goes to their thread",
+    (kind) => {
+      const prompt = buildWorkPrompt(chatOffer(kind), { resumed: false });
+      expect(prompt).toContain("posted in the requester's thread");
+      expect(prompt).toContain("Do not greet or address them by name or tag them");
+      expect(prompt).not.toContain("mentioning");
+    },
+  );
+});

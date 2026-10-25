@@ -67,6 +67,12 @@ export const chatOriginSchema = z.strictObject({
     id: z.string().min(1).describe("Id of the requester in the chat workspace."),
     name: z.string().optional(),
   }),
+  direct: z.boolean().describe("The conversation is a direct message with the requester."),
+  participant: z
+    .boolean()
+    .describe(
+      "The requester started the thread or replied in it, so the chat already notifies them.",
+    ),
 });
 
 export const workItemSchema = z.strictObject({
@@ -394,6 +400,8 @@ export const messageSchema = z.discriminatedUnion("type", [
         id: z.string().min(1).max(200),
         name: z.string().max(200).optional(),
       }),
+      direct: z.boolean().describe("The message is in a direct message with the author."),
+      participant: z.boolean().describe("The author started the thread or replied in it."),
     }),
   ),
   message(
