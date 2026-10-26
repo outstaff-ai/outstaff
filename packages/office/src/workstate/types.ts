@@ -2,6 +2,7 @@ import type {
   CanonicalStatus,
   Logger,
   PrRef,
+  PrVerdict,
   TeamConfig,
   Tracker,
   Vcs,
@@ -63,6 +64,9 @@ export interface PrRecord {
 
   /** State of the latest submitted review, for example "approved" or "changes_requested". */
   review?: string;
+
+  /** Latest decisive review of each reviewer the office trusts (not of untrusted people). */
+  verdicts?: PrVerdict[];
   ticket?: string;
 
   /** Subject ref of the open pull request this one is stacked on. */

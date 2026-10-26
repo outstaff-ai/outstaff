@@ -163,7 +163,7 @@ const control: Route[] = [
 
       await github.review(
         Number(r.params["n"]),
-        "grace-lead",
+        r.json.actor ?? "grace-lead",
         event,
         r.json.body ?? "",
         r.json.comments,

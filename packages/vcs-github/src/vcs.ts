@@ -8,7 +8,9 @@ import {
   type AdapterContext,
   type Check,
   type ConversationEntry,
+  type MergeOptions,
   type PullRequest,
+  type PullRequestReview,
   type RepoRef,
   type ReviewInlineComment,
   type ReviewThread,
@@ -59,6 +61,45 @@ const OPTIONAL_WRITE = { workflows: "write" } as const;
 const LOG_PERMISSIONS = { contents: "read" } as const;
 const OPTIONAL_LOGS = { actions: "read" } as const;
 const DEFAULT_TAIL = 200;
+
+const REQUIRED_CHECKS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{__typename ... on CheckRun{name status conclusion detailsUrl isRequired(pullRequestNumber:$number)} ... on StatusContext{context state targetUrl isRequired(pullRequestNumber:$number)}}}}}}}}}}`;
+const MERGE_QUEUE_QUERY = `query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){id}}}`;
+const REQUIRED_CHECK_PAGES = 5;
+
+interface RequiredChecksData {
+  repository: {
+    pullRequest: {
+      commits: {
+        nodes: {
+          commit: {
+            statusCheckRollup: {
+              contexts: {
+                pageInfo: { hasNextPage: boolean; endCursor: string | null };
+                nodes: (
+                  | {
+                      __typename: "CheckRun";
+                      name: string;
+                      status: string;
+                      conclusion: string | null;
+                      detailsUrl: string | null;
+                      isRequired: boolean;
+                    }
+                  | {
+                      __typename: "StatusContext";
+                      context: string;
+                      state: string;
+                      targetUrl: string | null;
+                      isRequired: boolean;
+                    }
+                )[];
+              };
+            } | null;
+          };
+        }[];
+      };
+    } | null;
+  } | null;
+}
 
 const REPLY_MUTATION = `mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}`;
 const READY_MUTATION = `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
@@ -137,6 +178,7 @@ interface RestReview {
   body?: string | null;
   state: string;
   submitted_at?: string | null;
+  commit_id?: string | null;
   html_url: string;
 }
 
@@ -840,6 +882,148 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         `${repoPath(repo)}/${path}/comments/${encodeURIComponent(target.id)}/reactions`,
         { token, body: { content: reaction } },
       );
+    },
+
+    async reviewState(repo, number) {
+      const token = await apiToken(repo);
+      const [reviews, pull] = await Promise.all([
+        http.paginate<RestReview[], RestReview>(
+          `${repoPath(repo)}/pulls/${number}/reviews`,
+          { token, query: { per_page: 100 } },
+          (d) => d,
+          CONVERSATION_PAGES,
+        ),
+        http.request<RestPull>("GET", `${repoPath(repo)}/pulls/${number}`, { token }),
+      ]);
+
+      const states: Record<string, PullRequestReview["state"] | undefined> = {
+        approved: "approved",
+        changes_requested: "changes_requested",
+        commented: "commented",
+        dismissed: "dismissed",
+      };
+
+      return {
+        reviews: reviews
+          .flatMap((r): PullRequestReview[] => {
+            const state = states[r.state.toLowerCase()];
+            // Pending reviews are invisible to others.
+            if (!state || !r.submitted_at) {
+              return [];
+            }
+
+            return [
+              {
+                id: String(r.id),
+                author: r.user?.login ?? "ghost",
+                state,
+                at: r.submitted_at,
+                ...(r.commit_id ? { commitSha: r.commit_id } : {}),
+              },
+            ];
+          })
+          .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at)),
+        requestedReviewers: (pull.data.requested_reviewers ?? []).map((u) => u.login),
+      };
+    },
+
+    async requiredChecks(repo, number) {
+      const token = await apiToken(repo);
+      const fallback = links.pr(repo, number);
+      const out: Check[] = [];
+      let after: string | null = null;
+      for (let page = 0; page < REQUIRED_CHECK_PAGES; page++) {
+        const data: RequiredChecksData = await http.graphql<RequiredChecksData>(
+          token,
+          REQUIRED_CHECKS_QUERY,
+          { owner: repo.owner, name: repo.name, number, after },
+        );
+
+        const pr = data.repository?.pullRequest;
+        if (!pr) {
+          throw new PortError(
+            "not_found",
+            `Pull request ${repo.owner}/${repo.name}#${number} not found.`,
+          );
+        }
+
+        const contexts = pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
+        for (const c of contexts?.nodes ?? []) {
+          if (!c.isRequired) {
+            continue;
+          }
+
+          out.push(
+            c.__typename === "CheckRun"
+              ? {
+                  name: c.name,
+                  status: checkRunStatus({
+                    name: c.name,
+                    status: c.status.toLowerCase(),
+                    conclusion: c.conclusion?.toLowerCase() ?? null,
+                  }),
+                  url: c.detailsUrl ?? fallback,
+                }
+              : {
+                  name: c.context,
+                  status: commitStatusState(c.state.toLowerCase()),
+                  url: c.targetUrl ?? fallback,
+                },
+          );
+        }
+
+        if (!contexts?.pageInfo.hasNextPage) {
+          break;
+        }
+
+        after = contexts.pageInfo.endCursor;
+      }
+
+      return out;
+    },
+
+    async mergeOptions(repo, base): Promise<MergeOptions> {
+      const token = await apiToken(repo);
+      const [info, queue] = await Promise.all([
+        http.request<{ allow_merge_commit?: boolean; allow_squash_merge?: boolean }>(
+          "GET",
+          repoPath(repo),
+          { token },
+        ),
+        http.graphql<{ repository: { mergeQueue: { id: string } | null } | null }>(
+          token,
+          MERGE_QUEUE_QUERY,
+          { owner: repo.owner, name: repo.name, branch: base },
+        ),
+      ]);
+
+      return {
+        queue: !!queue.repository?.mergeQueue,
+        methods: [
+          ...(info.data.allow_merge_commit === false ? [] : (["merge"] as const)),
+          ...(info.data.allow_squash_merge === false ? [] : (["squash"] as const)),
+        ],
+      };
+    },
+
+    async mergePullRequest(repo, number, input) {
+      const { token } = await actingToken(repo, "write", PERMISSIONS.write);
+      if (input.method === "queue") {
+        // The async endpoint also queues what the GraphQL mutation refuses (pull requests of a stack).
+        await http.request("PUT", `${repoPath(repo)}/pulls/${number}/merge-async`, {
+          token,
+          body: { merge_action: "merge_queue", sha: input.sha },
+        });
+
+        return { outcome: "queued" };
+      }
+
+      await http.request("PUT", `${repoPath(repo)}/pulls/${number}/merge`, {
+        token,
+        body: { merge_method: input.method, sha: input.sha },
+      });
+
+      return { outcome: "merged" };
     },
 
     async diff(repo, number) {

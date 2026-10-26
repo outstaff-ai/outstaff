@@ -8,14 +8,14 @@ An adapter is a package that implements one port for one product (for example a 
 
 ### Ports
 
-| Port        | What it does                                                                  | Capabilities                                                                              |
-| ----------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `tracker`   | issues, comments, assignment, status moves, events                            | `tracker.issues`, `tracker.assign`, `tracker.webhooks`, `tracker.attachments`             |
-| `knowledge` | documents, search, comments                                                   | `knowledge.docs`                                                                          |
-| `vcs`       | pull requests, checks, review threads, repo credentials, permissions, events  | `vcs.pullRequests`, `vcs.reviewThreads`, `vcs.workflows`, `vcs.reactions`, `vcs.webhooks` |
-| `chat`      | inbound messages (trust-filtered), posting, reactions, history, agent profile | `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`                        |
-| `runtime`   | runs an LLM session under a permission `Policy` and streams events            | `runtime.sessions`, `runtime.usage`                                                       |
-| `avatars`   | deterministic avatar images                                                   | `avatars.generate`                                                                        |
+| Port        | What it does                                                                  | Capabilities                                                                                           |
+| ----------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `tracker`   | issues, comments, assignment, status moves, events                            | `tracker.issues`, `tracker.assign`, `tracker.webhooks`, `tracker.attachments`                          |
+| `knowledge` | documents, search, comments                                                   | `knowledge.docs`                                                                                       |
+| `vcs`       | pull requests, checks, review threads, repo credentials, permissions, events  | `vcs.pullRequests`, `vcs.reviewThreads`, `vcs.workflows`, `vcs.reactions`, `vcs.merge`, `vcs.webhooks` |
+| `chat`      | inbound messages (trust-filtered), posting, reactions, history, agent profile | `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`                                     |
+| `runtime`   | runs an LLM session under a permission `Policy` and streams events            | `runtime.sessions`, `runtime.usage`                                                                    |
+| `avatars`   | deterministic avatar images                                                   | `avatars.generate`                                                                                     |
 
 The interfaces live in `src/ports/` and are exported from `@outstaff/core`. `tracker` and `knowledge` are optional for a team; `vcs`, `chat` and `runtime` are required.
 

@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -230,6 +230,8 @@ humans:
     identities: { vcs: ada-admin, tracker: ada.admin, chat: U0ADA00001 }
   - name: Grace Lead
     identities: { vcs: grace-lead }
+  - name: Mona Merge
+    identities: { vcs: merge-approver }
 catalog: { version: 0.0.0 }
 repos:
   - { name: shop, url: github.acme.example/acme/shop, kind: primary }
@@ -260,6 +262,8 @@ workflow:
     canceled: Canceled
 office: { events: poll, poll_interval_seconds: 10 }
 policies:
+  # Only this approver's approval merges: the other steps approve nothing, and a human here changes none of them.
+  merge: { on_approval: true, approvers: [human:merge-approver] }
   commands:
     # The code toolset allows pnpm's verbs, not \`pnpm --version\`; the scripted agent checks the tool with it.
     allow:
@@ -1367,9 +1371,40 @@ async function main() {
     `ticket comment: a comment on the handed-back ${design} sent it back to its agent (active), who answered and handed it back`,
   );
 
+  // Before the last step: merging another pull request makes the second one conflict with main again.
   const final = await state();
   const t2 = final.tickets.find((x: Json) => x.key === second);
   assertEq(t2.status, "In Review", "the second ticket waits in review");
+
+  // ---- 12. merge on approval (policies.merge.on_approval): an approver's approval makes the author enqueue the
+  // pull request in the merge queue, the host merges it, and the ticket is done
+  const head12 = (await state()).github.pulls.find((p: Json) => p.number === made.pr.number).head
+    .sha;
+
+  await stub("POST", `/_test/pulls/${made.pr.number}/review`, {
+    state: "approved",
+    actor: "merge-approver",
+  });
+
+  const queued = await until(`#${made.pr.number} put in the merge queue by its author`, (s) =>
+    s.github.pulls.find((p: Json) => p.number === made.pr.number && p.queued),
+  );
+
+  assertEq(queued.head.sha, head12, "the queue took the head the approver saw");
+  const done12 = await until(
+    `#${made.pr.number} merged by the queue and ${made.t.key} done`,
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === made.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === made.t.key);
+      return pr.state === "merged" && t.status === "Done" ? pr : undefined;
+    },
+  );
+
+  assertEq(done12.state, "merged", "the pull request merged");
+  step(
+    `merge on approval: #${made.pr.number} approved -> enqueued by its author, merged by the queue, ${made.t.key} done`,
+  );
+
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
 

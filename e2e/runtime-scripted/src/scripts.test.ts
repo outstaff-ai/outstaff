@@ -6,6 +6,7 @@ import {
   conflict,
   docFeedback,
   keepBoth,
+  merge,
   mergedFeedback,
   reviewFeedback,
   ticketComment,
@@ -595,5 +596,14 @@ describe("ticket comment", () => {
     });
 
     expect(text).toContain("SHOP-1");
+  });
+});
+
+describe("merge", () => {
+  it("runs the merge verb on the pull request and does nothing else", async () => {
+    const { seen } = await play(merge({ ...ctx, kind: "merge", pr: 7 }), () => "");
+    expect(seen).toEqual([
+      { type: "tool", tool: "pr_merge", input: { repo: ctx.repo, number: 7 } },
+    ]);
   });
 });

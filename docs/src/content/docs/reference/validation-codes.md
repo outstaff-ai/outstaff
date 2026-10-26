@@ -28,6 +28,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `people.unknown_role` | A person's role is not in the catalog. |
 | `people.write_without_vcs` | A person has a write grant but no vcs integration supports pull requests. |
 | `policies.command_program` | A policies.commands entry names git, which repository grants govern. |
+| `policies.merge_unknown_repo` | policies.merge.repos names a repo that is not listed in repos. |
 | `policies.retry_backoff_order` | base_minutes is higher than cap_minutes. |
 | `policies.usage_shared_overlap` | A person appears in more than one policies.usage.shared group. |
 | `policies.usage_shared_unknown_person` | A policies.usage.shared group names someone who is not in people. |
@@ -67,4 +68,5 @@ A warning describes something that will not work as written or a default that ap
 | `people.missing_vcs_identity` | A person has a write grant but no identities.vcs, while a vcs integration is configured. |
 | `people.reviewer_without_github` | A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves. |
 | `policies.capability_missing` | A policies switch is on, but the configured adapter lacks the capability it needs. |
+| `policies.merge_without_checks` | policies.merge.on_approval is on for a repo with no checks configured, so an approval merges untested code. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

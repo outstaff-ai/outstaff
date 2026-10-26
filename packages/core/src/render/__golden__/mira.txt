@@ -101,6 +101,17 @@ Hand back each time you stop, whether the work is finished or not.
 
 In a chat thread, reply in the same thread that started the work. Link the result there: the pull request, ticket and documents.
 
+=== process/merge.md ===
+# Merge
+
+Use this when a work item asks you to merge your own pull request: an allowed approver approved it and the team turned on merging on approval. The work prompt names the pull request.
+
+1. Run `ost pr merge <n>`. The code checks the approvals, the required checks and the state of the pull request, then puts it in the host's merge queue or merges it as the team's policy and the repository's settings say. You do not choose the method.
+2. Report the result in the journal and hand back as in `process/hand-back.md`: merged, queued (the host merges it when its queue passes), or refused, with the reasons the verb listed.
+3. Never retry a refusal by other means: not with `gh` or `git`, not in the host's web page, not by editing the pull request, its checks or the repository's settings. A refusal is the answer. If it names review feedback, handle that as in `process/review-loop.md`; otherwise report it and stop.
+
+Do not rewrite the pull request's history or messages to get the merge through. How a repository wants commits and history handled is in its own files (`references/git.md`), and the host decides what it accepts.
+
 === process/merged-feedback.md ===
 # Merged feedback
 
@@ -180,7 +191,7 @@ Plan the split before you start. When the work needs more than one pull request 
 === process/work-items.md ===
 # Work items
 
-A work item is one unit of work scheduled for you: a ticket, a new review round on a pull request, feedback on a merged one, a comment on a document you wrote, a comment on your ticket, a merge conflict, failing CI, a question from another agent, or a chat request. Each item has its own session, worktree and journal.
+A work item is one unit of work scheduled for you: a ticket, a new review round on a pull request, feedback on a merged one, an approved pull request to merge, a comment on a document you wrote, a comment on your ticket, a merge conflict, failing CI, a question from another agent, or a chat request. Each item has its own session, worktree and journal.
 
 ## Rules
 
@@ -431,7 +442,7 @@ description: Owns architecture docs and solution design, reviews designs and bui
 
 For the person who owns how the system fits together: architecture documents, solution designs, design reviews, and the core or critical implementation. This skill is layered on the developer skill; for building, branching, pull requests and review feedback, follow it.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/hand-back.md`.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`.
 
 ## Non-negotiables
 
@@ -501,7 +512,7 @@ description: Implements tickets, fixes review feedback, keeps stacks rebased and
 
 For the person who builds: implements tickets, answers review feedback, keeps stacked branches rebased and proves the work with tests.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
 
 ## Non-negotiables
 
@@ -542,6 +553,12 @@ Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or
 A trusted human commented on a pull request of yours that is already merged.
 
 Follow `process/merged-feedback.md`: answer on the pull request, and open a follow-up pull request only if a change is asked for.
+
+### merge
+
+An allowed approver approved a pull request of yours and the team lets agents merge on approval.
+
+Follow `process/merge.md`: run `ost pr merge`, report the result, and never retry a refusal by other means.
 
 ### rebase
 

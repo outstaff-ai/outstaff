@@ -10,4 +10,5 @@ export {
   type PolicyValue,
 } from "./switches.js";
 
+export { isApprover, type ApproverCandidate } from "./approvers.js";
 export { describePolicies, type PolicyReport, type PolicySource } from "./describe.js";

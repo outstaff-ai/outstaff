@@ -11,6 +11,8 @@ modes:
     when: A ticket is assigned and ready.
   - name: review-feedback
     when: A pull request you own has new review threads.
+  - name: merge
+    when: An allowed approver approved a pull request you own and merging on approval is on.
   - name: rebase
     when: A branch has a conflict or its parent in a stack merged.
   - name: ci-fix

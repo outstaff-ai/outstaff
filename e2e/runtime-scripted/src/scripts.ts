@@ -646,11 +646,20 @@ export async function* chat(ctx: ItemContext): Script {
   }
 }
 
+/** An allowed approver approved the pull request: run the verb and report; a refusal is the answer. */
+export async function* merge(ctx: ItemContext): Script {
+  const number = need(ctx.pr, "the pull request");
+  const repo = need(ctx.repo, "the repository");
+  yield { type: "tool", tool: "pr_merge", input: { repo, number } };
+  return "Ran pr merge.";
+}
+
 export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   assigned,
   ticket: assigned,
   review_feedback: reviewFeedback,
   merged_feedback: mergedFeedback,
+  merge,
   doc_feedback: docFeedback,
   ticket_comment: ticketComment,
   conflict,

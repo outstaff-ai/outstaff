@@ -963,6 +963,11 @@ Condition that must hold.
 - Required
 - Allowed values: `human`, `agent`, `bot`
 
+#### workflow.rules[].if.approver
+
+- Type: `boolean`
+- Required
+
 #### workflow.rules[].if.pr_draft
 
 - Type: `boolean`
@@ -1007,6 +1012,23 @@ Condition that must hold.
 - Type: `string`
 - Optional
 - Allowed values: `done`, `waiting`, `blocked`
+
+#### workflow.rules[].if.hand_back_kind
+
+- Type: `list of string`
+- Required
+- Minimum items 1
+
+#### workflow.rules[].if.hand_back_kind[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### workflow.rules[].if.pr_approved
+
+- Type: `boolean`
+- Required
 
 #### workflow.rules[].if.ticket_prs_all_closed
 
@@ -1371,6 +1393,59 @@ Consecutive failed runs after which the work item is blocked and its requester t
 - Optional
 - Default: `3`
 - Minimum 1
+
+### policies.merge
+
+Merging an agent's pull request when an allowed approver approves it (opt-in).
+
+- Type: `object`
+- Optional
+- Default: `{"on_approval":false,"approvers":["humans"]}`
+
+#### policies.merge.on_approval
+
+Let an agent merge its own pull request, with ost pr merge, when an allowed approver approves it. Off by default: without it the verb refuses and nothing is scheduled. Adds the preset rules approved-merge and approved-merge-after-feedback. Needs a vcs adapter with vcs.merge. It never bypasses branch protection or rulesets; the code host stays the final gate.
+
+- Type: `boolean`
+- Optional
+- Default: `false`
+
+#### policies.merge.approvers
+
+Who may approve a merge: humans (the people in humans, or anyone with write access when humans is omitted), human:<id> (one human, by vcs identity), role:<role> (the agent playing a catalog role) or a handle (an agent, or a human by vcs login). Default humans.
+
+- Type: `list of string`
+- Optional
+- Default: `["humans"]`
+- Minimum items 1
+
+#### policies.merge.approvers[]
+
+- Type: `string`
+- Optional
+- Must match `^(humans|human:\S+|role:[a-z][a-z0-9-]*|[A-Za-z0-9][A-Za-z0-9._[\]-]*)$`
+
+#### policies.merge.method
+
+How the pull request is merged: queue (the host's merge queue), merge or squash. When omitted, outstaff uses what the repository has: its merge queue, else a method its settings allow.
+
+- Type: `string`
+- Optional
+- Allowed values: `queue`, `merge`, `squash`
+
+#### policies.merge.repos
+
+Names of the repos (from repos) whose pull requests may be merged this way. Default: every repo an agent can write to.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+#### policies.merge.repos[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
 
 ### policies.messages
 

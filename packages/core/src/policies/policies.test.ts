@@ -37,7 +37,7 @@ describe("policy switches", () => {
     for (const sw of POLICY_SWITCHES) {
       expect(policyValue(parsed, sw.path)).toBe(sw.default);
       expect(policyValue(undefined, sw.path)).toBe(sw.default);
-      expect(policyOn(undefined, sw.path)).toBe(true);
+      expect(policyOn(undefined, sw.path)).toBe(sw.default !== sw.off);
     }
   });
 

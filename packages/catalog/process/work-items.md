@@ -1,6 +1,6 @@
 # Work items
 
-A work item is one unit of work scheduled for you: a ticket, a new review round on a pull request, feedback on a merged one, a comment on a document you wrote, a comment on your ticket, a merge conflict, failing CI, a question from another agent, or a chat request. Each item has its own session, worktree and journal.
+A work item is one unit of work scheduled for you: a ticket, a new review round on a pull request, feedback on a merged one, an approved pull request to merge, a comment on a document you wrote, a comment on your ticket, a merge conflict, failing CI, a question from another agent, or a chat request. Each item has its own session, worktree and journal.
 
 ## Rules
 

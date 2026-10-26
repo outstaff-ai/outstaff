@@ -18,12 +18,15 @@ export type Condition =
   | { assignee_kind: "human" | "agent" | "none" }
   | { has_label: string }
   | { pr_author_kind: "human" | "agent" | "bot" }
+  | { approver: boolean }
   | { pr_draft: boolean }
   | { pr_open: boolean }
   | { pr_merged: boolean }
   | { has_body: boolean }
   | { review_state: string[] }
   | { hand_back_status: HandBackStatus[] }
+  | { hand_back_kind: string[] }
+  | { pr_approved: boolean }
   | { ticket_prs_all_closed: boolean }
   | { ticket_prs_open: boolean }
   | { ticket_prs_several: boolean }
@@ -58,6 +61,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z
       .strictObject({ pr_author_kind: z.enum(["human", "agent", "bot"]) })
       .meta(d("Who authored the pull request.")),
+    z
+      .strictObject({ approver: z.boolean() })
+      .meta(
+        d(
+          "The actor of the event is (or is not) an allowed approver of a merge, as policies.merge.approvers says.",
+        ),
+      ),
     z.strictObject({ pr_draft: z.boolean() }).meta(d("The pull request is (or is not) a draft.")),
     z.strictObject({ pr_open: z.boolean() }).meta(d("The pull request is (or is not) open.")),
     z.strictObject({ pr_merged: z.boolean() }).meta(d("The pull request is (or is not) merged.")),
@@ -75,6 +85,20 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .strictObject({ hand_back_status: z.array(z.enum(HAND_BACK_STATUSES)).min(1) })
       .meta(
         d("An agent.handed_back event carries one of these statuses: done, waiting or blocked."),
+      ),
+    z
+      .strictObject({ hand_back_kind: z.array(z.string().min(1)).min(1) })
+      .meta(
+        d(
+          'An agent.handed_back event is for a work item of one of these kinds, for example "review_feedback".',
+        ),
+      ),
+    z
+      .strictObject({ pr_approved: z.boolean() })
+      .meta(
+        d(
+          "An allowed approver (policies.merge.approvers) has approved the pull request and none has requested changes since (or, with false, that does not hold).",
+        ),
       ),
     z
       .strictObject({ ticket_prs_all_closed: z.boolean() })

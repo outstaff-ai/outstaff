@@ -6,6 +6,7 @@ const WHAT: Record<string, string> = {
   merged_feedback: "following up after merge",
   doc_feedback: "answering document comments",
   ticket_comment: "answering a ticket comment",
+  merge: "merging",
   conflict: "resolving conflicts",
   ci_failed: "CI failed",
 };

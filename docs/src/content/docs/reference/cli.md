@@ -1049,6 +1049,32 @@ ost pr diff 42
 ost pr diff 42 --json
 ```
 
+## ost pr merge
+
+Merge your own approved pull request, or put it in the merge queue.
+
+Merges your own pull request after an allowed approver approved it (policies.merge.approvers). Refused outright unless the team turned on policies.merge.on_approval. The code checks every condition and lists each one that fails: the pull request is yours, open, not a draft and mergeable; an allowed approver approved its current head and none has requested changes or still has a review pending; the required checks passed. Then it puts the pull request in the host's merge queue, or merges it with policies.merge.method (when that is unset, with what the repository has: its merge queue, else a method its settings allow). It never bypasses branch protection or rulesets: when the host refuses, report why and stop; do not merge another way.
+
+```
+ost pr merge <number> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr merge 42
+ost pr merge 42 --json
+```
+
 ## ost me
 
 Show who you are on this team.

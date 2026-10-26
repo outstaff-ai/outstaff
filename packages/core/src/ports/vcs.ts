@@ -83,6 +83,45 @@ export interface ConversationEntry {
   state?: string;
 }
 
+/** One submitted review of a pull request: a verdict, or a comment without one. */
+export interface PullRequestReview {
+  id: string;
+
+  /** Login as the host reports it (an App is `name[bot]`). */
+  author: string;
+  state: "approved" | "changes_requested" | "commented" | "dismissed";
+
+  /** When the host recorded the submission (ISO-8601). */
+  at: string;
+
+  /** The commit the review was written against, when the host reports it. */
+  commitSha?: string;
+}
+
+export interface PullRequestReviewState {
+  /** Submitted reviews, oldest first. Pending (unsubmitted) reviews are not here. */
+  reviews: PullRequestReview[];
+
+  /** Logins asked to review who have not done so (or whose review was dismissed and re-requested). */
+  requestedReviewers: string[];
+}
+
+/** How a repository lets a pull request into a branch. */
+export interface MergeOptions {
+  /** The branch has a merge queue. */
+  queue: boolean;
+
+  /** The direct methods the repository's settings allow. */
+  methods: ("merge" | "squash")[];
+}
+
+export type MergeMethod = "queue" | "merge" | "squash";
+
+export interface MergeResult {
+  /** `merged` when the pull request is in, `queued` when the host's queue took it and will merge it. */
+  outcome: "merged" | "queued";
+}
+
 export interface NewPullRequest {
   /** Branch with the changes; it must already be pushed. */
   head: string;
@@ -223,6 +262,26 @@ export interface Vcs {
    * error and adds nothing. Needs a write grant; `not_found` for an unknown comment.
    */
   react(repo: RepoRef, target: ReactionTarget, reaction: Reaction): Promise<void>;
+
+  /**
+   * Merge support, for adapters with the `vcs.merge` capability; leave all four out otherwise.
+   *
+   * `reviewState`: the submitted reviews and the reviewers still asked (read grant).
+   * `requiredChecks`: the checks the host requires of this pull request before it merges, at its head, with
+   * their status; empty when it requires none (read grant).
+   * `mergeOptions`: the merge queue and the direct merge methods the repository allows for `base` (read grant).
+   * `mergePullRequest`: queues or merges as the person this port instance belongs to (write grant). `sha` is
+   * the head the caller checked; a head that moved is refused (`conflict`). The host's protection and
+   * rulesets stay the final gate: what it refuses is `invalid` or `conflict` with the host's reason, never bypassed.
+   */
+  reviewState?(repo: RepoRef, number: number): Promise<PullRequestReviewState>;
+  requiredChecks?(repo: RepoRef, number: number): Promise<Check[]>;
+  mergeOptions?(repo: RepoRef, base: string): Promise<MergeOptions>;
+  mergePullRequest?(
+    repo: RepoRef,
+    number: number,
+    input: { method: MergeMethod; sha: string },
+  ): Promise<MergeResult>;
 
   /** The unified diff of the pull request (read grant). */
   diff(repo: RepoRef, number: number): Promise<string>;

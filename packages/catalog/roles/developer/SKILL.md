@@ -2,7 +2,7 @@
 
 For the person who builds: implements tickets, answers review feedback, keeps stacked branches rebased and proves the work with tests.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
 
 ## Non-negotiables
 
@@ -45,6 +45,12 @@ Follow `process/review-loop.md` exactly: read all threads, decide fix, answer or
 A trusted human commented on a pull request of yours that is already merged.
 
 Follow `process/merged-feedback.md`: answer on the pull request, and open a follow-up pull request only if a change is asked for.
+
+### merge
+
+An allowed approver approved a pull request of yours and the team lets agents merge on approval.
+
+Follow `process/merge.md`: run `ost pr merge`, report the result, and never retry a refusal by other means.
 
 ### rebase
 

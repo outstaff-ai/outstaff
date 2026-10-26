@@ -38,7 +38,13 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "vcs",
         name: "fake",
-        capabilities: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.workflows", "vcs.reactions"],
+        capabilities: [
+          "vcs.pullRequests",
+          "vcs.reviewThreads",
+          "vcs.workflows",
+          "vcs.reactions",
+          "vcs.merge",
+        ],
         options,
         secrets: none,
         create: (ctx) => createFakeVcs({ now: ctx.now }),

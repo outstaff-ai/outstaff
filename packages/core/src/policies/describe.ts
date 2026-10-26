@@ -55,7 +55,7 @@ export function describePolicies(
       const on = overridden.some((id) => active.has(id));
       return {
         switch: sw,
-        value: on ? sw.default : sw.off,
+        value: on ? (sw.default === sw.off ? true : sw.default) : sw.off,
         source: "workflow.rules",
         note: `workflow.rules has an entry for ${overridden.join(", ")}, which wins over the switch`,
       };

@@ -1093,6 +1093,197 @@ describe("pr write verbs", () => {
     expect(await open.handler({ title: "t", body: "b" }, {})).toContain("Opened");
     expect((await f.vcs.getPullRequest(f.repo, 1)).head.ref).toBe("feat/coupons");
   });
+
+  describe("pr.merge", () => {
+    /** The team opted in; sam is known on the host as "sam" (the fake's login); an open pull request of sam's. */
+    async function mergeSetup(policy: Record<string, unknown> = {}) {
+      const f = await setup();
+      f.env.team.policies!.merge = { on_approval: true, approvers: ["humans"], ...policy } as never;
+      f.env.team.people.find((p) => p.handle === "sam")!.identities!.vcs = "sam";
+      const pr = await f.vcs.seed.pullRequest(f.repo, {
+        title: "Mine",
+        author: { login: "sam", kind: "agent" },
+      });
+
+      const approve = (who = "ada-admin") => f.vcs.seed.review(f.repo, pr.number, who, "approved");
+      const merge = () => run("pr.merge", f.env, { number: pr.number }, f.ctx);
+      const refused = (...problems: RegExp[]) =>
+        merge().then(
+          () => {
+            throw new Error("expected a refusal");
+          },
+          (e: unknown) => {
+            expect(e).toBeInstanceOf(PortError);
+            expect((e as PortError).code).toBe("conflict");
+            for (const p of problems) {
+              expect((e as PortError).message).toMatch(p);
+            }
+          },
+        );
+
+      return { ...f, pr, approve, merge, refused };
+    }
+
+    it("is refused outright when the policy is off, and for a repo outside policies.merge.repos", async () => {
+      const off = await mergeSetup({ on_approval: false });
+      await off.approve();
+      await rejects(off.merge(), "forbidden", /policies\.merge\.on_approval/);
+      expect((await off.vcs.getPullRequest(off.repo, off.pr.number)).state).toBe("open");
+
+      const scoped = await mergeSetup({ repos: ["infra"] });
+      await scoped.approve();
+      await rejects(scoped.merge(), "forbidden", /policies\.merge\.repos/);
+    });
+
+    it("merges with the method the repository allows when none is configured", async () => {
+      const f = await mergeSetup();
+      await f.approve();
+      const r = await f.merge();
+      expect(r.text).toContain("Merged");
+      expect(r.text).toContain("(merge)");
+      expectLinks(r);
+      expect((await f.vcs.getPullRequest(f.repo, f.pr.number)).state).toBe("merged");
+    });
+
+    it("never defaults to a method the repository forbids", async () => {
+      const f = await mergeSetup();
+      await f.vcs.seed.mergeSettings!(f.repo, { methods: ["squash"] });
+      await f.approve();
+      expect((await f.merge()).text).toContain("(squash)");
+
+      const none = await mergeSetup();
+      await none.vcs.seed.mergeSettings!(none.repo, { methods: [] });
+      await none.approve();
+      await none.refused(/allows no merge method/);
+    });
+
+    it("queues when the repository has a merge queue", async () => {
+      const f = await mergeSetup();
+      await f.vcs.seed.mergeSettings!(f.repo, { queue: true });
+      await f.approve();
+      const r = await f.merge();
+      expect(r.text).toContain("merge queue");
+      expect((r.data as { outcome: string }).outcome).toBe("queued");
+      expect((await f.vcs.getPullRequest(f.repo, f.pr.number)).state).toBe("open");
+    });
+
+    it.each([
+      ["squash", { methods: ["merge", "squash"] }],
+      ["merge", { methods: ["merge", "squash"], queue: true }],
+    ] as [string, { methods: ("merge" | "squash")[]; queue?: boolean }][])(
+      "uses the configured method %s",
+      async (method, settings) => {
+        const f = await mergeSetup({ method });
+        await f.vcs.seed.mergeSettings!(f.repo, settings);
+        await f.approve();
+        expect((await f.merge()).text).toContain(`(${method})`);
+      },
+    );
+
+    it("refuses a configured method the repository does not allow", async () => {
+      const f = await mergeSetup({ method: "queue" });
+      await f.approve();
+      await f.refused(/no merge queue/);
+      const g = await mergeSetup({ method: "squash" });
+      await g.vcs.seed.mergeSettings!(g.repo, { methods: ["merge"] });
+      await g.approve();
+      await g.refused(/does not allow it/);
+    });
+
+    it("refuses a pull request that is not the caller's", async () => {
+      const f = await mergeSetup();
+      const theirs = await f.theirs();
+      await f.vcs.seed.review(f.repo, theirs.number, "ada-admin", "approved");
+      await rejects(
+        run("pr.merge", f.env, { number: theirs.number }, f.ctx),
+        "conflict",
+        /not your pull request/,
+      );
+    });
+
+    it("refuses without an approval, and for an approval from someone who may not approve", async () => {
+      const f = await mergeSetup();
+      await f.refused(/no allowed approver/);
+      await f.approve("mallory");
+      await f.refused(/no allowed approver/);
+      await f.vcs.seed.review(f.repo, f.pr.number, "grace-lead", "commented", "looks fine");
+      await f.refused(/no allowed approver/);
+    });
+
+    it("accepts the approvers the policy names", async () => {
+      const f = await mergeSetup({ approvers: ["human:grace-lead"] });
+      await f.approve("ada-admin");
+      await f.refused(/policies\.merge\.approvers: human:grace-lead/);
+      await f.approve("grace-lead");
+      expect((await f.merge()).text).toContain("Merged");
+    });
+
+    it("refuses while an allowed approver's latest review requests changes, until they approve again", async () => {
+      const f = await mergeSetup();
+      await f.approve("ada-admin");
+      await f.vcs.seed.review(f.repo, f.pr.number, "grace-lead", "approved");
+      await f.vcs.seed.review(f.repo, f.pr.number, "grace-lead", "changes_requested", "no");
+      await f.refused(/grace-lead requested changes/);
+      await f.vcs.seed.review(f.repo, f.pr.number, "grace-lead", "approved");
+      expect((await f.merge()).text).toContain("Merged");
+    });
+
+    it("refuses while a review is pending from a requested allowed approver, not from others", async () => {
+      const f = await mergeSetup();
+      await f.approve("ada-admin");
+      await f.vcs.seed.requestReview!(f.repo, f.pr.number, "mallory");
+      await f.vcs.seed.requestReview!(f.repo, f.pr.number, "grace-lead");
+      await f.refused(/pending from grace-lead/);
+      await f.vcs.seed.review(f.repo, f.pr.number, "grace-lead", "approved");
+      expect((await f.merge()).text).toContain("Merged");
+    });
+
+    it("refuses an approval of an earlier commit", async () => {
+      const f = await mergeSetup();
+      await f.approve();
+      await f.vcs.seed.push(f.repo, f.pr.number, "sam");
+      await f.refused(/earlier commit/);
+      await f.approve();
+      expect((await f.merge()).text).toContain("Merged");
+    });
+
+    it("refuses a draft and a conflicting pull request, listing every problem", async () => {
+      const f = await mergeSetup();
+      const draft = await f.vcs.seed.pullRequest(f.repo, {
+        title: "Draft",
+        draft: true,
+        mergeable: ["conflicting"],
+        author: { login: "sam", kind: "agent" },
+      });
+
+      await rejects(
+        run("pr.merge", f.env, { number: draft.number }, f.ctx),
+        "conflict",
+        /is a draft[\s\S]*conflicts with its base[\s\S]*no allowed approver/,
+      );
+    });
+
+    it("refuses while a required check has not passed, and merges once it has", async () => {
+      const f = await mergeSetup();
+      await f.approve();
+      await f.vcs.seed.check(f.repo, f.pr.head.sha, { name: "ci", status: "pending" });
+      await f.vcs.seed.check(f.repo, f.pr.head.sha, { name: "lint", status: "failure" });
+      await f.vcs.seed.requireCheck!(f.repo, f.pr.number, "ci");
+      await f.refused(/required checks have not passed: ci \(pending\)/);
+      await f.vcs.seed.check(f.repo, f.pr.head.sha, { name: "ci", status: "success" });
+      expect((await f.merge()).text).toContain("Merged");
+    });
+
+    it("needs a host that can merge and a write grant", async () => {
+      const f = await mergeSetup();
+      await f.approve();
+      const bare = { ...f.vcs, reviewState: undefined } as never;
+      await rejects(
+        run("pr.merge", { ...f.env, vcs: bare }, { number: f.pr.number }, f.ctx),
+        "unsupported",
+      );
+    });
+  });
 });
 
 describe("me", () => {
@@ -1688,6 +1879,7 @@ describe("verb catalogue", () => {
       "pr.reply",
       "pr.comment",
       "pr.diff",
+      "pr.merge",
       "me",
       "ask",
       "question.answer",
@@ -1698,7 +1890,9 @@ describe("verb catalogue", () => {
       "team",
     ]);
 
-    expect(VERBS.map((v) => v.name).join(" ")).not.toMatch(/delete|remove|merge|close|push|force/);
+    // The one verb that merges is opt-in and gated by the team's policy; nothing else may.
+    const names = VERBS.map((v) => v.name).filter((n) => n !== "pr.merge");
+    expect(names.join(" ")).not.toMatch(/delete|remove|merge|close|push|force/);
   });
 
   it("positional args exist in every schema", () => {

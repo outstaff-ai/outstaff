@@ -265,7 +265,12 @@ export function createEngine(opts: EngineOptions): Engine {
     }
 
     // What a person did themselves never starts work for them, for example assigning a ticket to oneself.
-    if (event.actor.kind === "agent" && event.actor.id === e.person) {
+    // A hand-back is the exception: the merge that follows an agent's own round on an approval is for that agent.
+    if (
+      event.actor.kind === "agent" &&
+      event.actor.id === e.person &&
+      event.type !== "agent.handed_back"
+    ) {
       throw new Skip(`${e.person} caused the event themselves`);
     }
 

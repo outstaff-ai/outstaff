@@ -1,3 +1,4 @@
+import type { TeamConfig } from "../config/schema.js";
 import type { RepoRef } from "../ports/repo.js";
 import type { CanonicalStatus } from "../ports/status.js";
 
@@ -43,6 +44,14 @@ export interface WorkflowEvent {
   data: Record<string, unknown>;
 }
 
+/** The latest decisive review one reviewer left on a pull request (a comment-only review decides nothing). */
+export interface PrVerdict {
+  /** Login of a human, handle of an agent. */
+  actor: string;
+  kind: ActorKind;
+  state: "approved" | "changes_requested" | "dismissed";
+}
+
 export interface WorkflowPr {
   ref: PrRef;
   title: string;
@@ -54,6 +63,9 @@ export interface WorkflowPr {
 
   /** `person` is the agent's handle when the author is one of our agents. */
   author: { login: string; kind: "human" | "agent" | "bot"; person?: string };
+
+  /** Latest decisive review of each reviewer the office trusts. */
+  verdicts?: PrVerdict[];
 }
 
 /** Read-only snapshot of the office's world, taken after the event happened. */
@@ -121,6 +133,12 @@ export interface WorkflowOptions {
 
   /** Label meaning "leave this to a human". Default `needs-human`. */
   needsHumanLabel?: string;
+
+  /** `policies.merge.approvers`: who counts for the `approver` condition. */
+  approvers?: string[];
+
+  /** The team's `humans`, for matching `human:<id>` approvers. */
+  humans?: TeamConfig["humans"];
 
   /** Who a ticket goes back to when no requester is known: the tracker identity of the first listed human. */
   fallbackRequester?: string;

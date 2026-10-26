@@ -1361,6 +1361,54 @@
           },
           "additionalProperties": false
         },
+        "merge": {
+          "default": {
+            "on_approval": false,
+            "approvers": [
+              "humans"
+            ]
+          },
+          "description": "Merging an agent's pull request when an allowed approver approves it (opt-in).",
+          "type": "object",
+          "properties": {
+            "on_approval": {
+              "default": false,
+              "description": "Let an agent merge its own pull request, with ost pr merge, when an allowed approver approves it. Off by default: without it the verb refuses and nothing is scheduled. Adds the preset rules approved-merge and approved-merge-after-feedback. Needs a vcs adapter with vcs.merge. It never bypasses branch protection or rulesets; the code host stays the final gate.",
+              "type": "boolean"
+            },
+            "approvers": {
+              "default": [
+                "humans"
+              ],
+              "description": "Who may approve a merge: humans (the people in humans, or anyone with write access when humans is omitted), human:<id> (one human, by vcs identity), role:<role> (the agent playing a catalog role) or a handle (an agent, or a human by vcs login). Default humans.",
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^(humans|human:\\S+|role:[a-z][a-z0-9-]*|[A-Za-z0-9][A-Za-z0-9._[\\]-]*)$"
+              }
+            },
+            "method": {
+              "description": "How the pull request is merged: queue (the host's merge queue), merge or squash. When omitted, outstaff uses what the repository has: its merge queue, else a method its settings allow.",
+              "type": "string",
+              "enum": [
+                "queue",
+                "merge",
+                "squash"
+              ]
+            },
+            "repos": {
+              "description": "Names of the repos (from repos) whose pull requests may be merged this way. Default: every repo an agent can write to.",
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "additionalProperties": false
+        },
         "messages": {
           "default": {
             "max_lines": 3,
@@ -1934,6 +1982,19 @@
         {
           "type": "object",
           "properties": {
+            "approver": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "approver"
+          ],
+          "additionalProperties": false,
+          "description": "The actor of the event is (or is not) an allowed approver of a merge, as policies.merge.approvers says."
+        },
+        {
+          "type": "object",
+          "properties": {
             "pr_draft": {
               "type": "boolean"
             }
@@ -2022,6 +2083,37 @@
           ],
           "additionalProperties": false,
           "description": "An agent.handed_back event carries one of these statuses: done, waiting or blocked."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "hand_back_kind": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "hand_back_kind"
+          ],
+          "additionalProperties": false,
+          "description": "An agent.handed_back event is for a work item of one of these kinds, for example \"review_feedback\"."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "pr_approved": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pr_approved"
+          ],
+          "additionalProperties": false,
+          "description": "An allowed approver (policies.merge.approvers) has approved the pull request and none has requested changes since (or, with false, that does not hold)."
         },
         {
           "type": "object",

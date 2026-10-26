@@ -46,6 +46,7 @@ export const WARNING_CODES = {
   identityVcsNotBotLogin: "identities.vcs_not_bot_login",
   identityTrackerEmpty: "identities.tracker_empty",
   policyCapabilityMissing: "policies.capability_missing",
+  policyMergeWithoutChecks: "policies.merge_without_checks",
 } as const;
 
 export type WarningCode = (typeof WARNING_CODES)[keyof typeof WARNING_CODES];
@@ -62,6 +63,7 @@ const LACKING: Record<Capability, string> = {
   "vcs.workflows": "push changes to CI workflow files",
   "vcs.webhooks": "react to repository changes instantly",
   "vcs.reactions": "react to pull request comments",
+  "vcs.merge": "merge pull requests",
   "chat.messages": "send chat messages",
   "chat.history": "read earlier chat messages",
   "chat.agentProfile": "show the agent's profile and status in chat",
@@ -135,6 +137,9 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "identities.vcs_not_bot_login":
     "A person's vcs identity is not a GitHub App bot login (<slug>[bot]), so the agent's own activity is not recognized.",
   "identities.tracker_empty": "A tracker identity is blank.",
+  "policies.merge_unknown_repo": "policies.merge.repos names a repo that is not listed in repos.",
+  "policies.merge_without_checks":
+    "policies.merge.on_approval is on for a repo with no checks configured, so an approval merges untested code.",
   "policies.capability_missing":
     "A policies switch is on, but the configured adapter lacks the capability it needs.",
 };
@@ -302,6 +307,26 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       code: WARNING_CODES.policyCapabilityMissing,
       message: `policies.${sw.path} is ${String(policyValue(config.policies, sw.path))}, but the ${CAPABILITY_PORT[cap]} adapter "${ref.adapter}" does not provide ${cap}.`,
       consequence: `policies.${sw.path} does nothing: the ${CAPABILITY_PORT[cap]} adapter cannot ${LACKING[cap]}; set it to ${String(sw.off)} to silence this.`,
+    });
+  }
+
+  if (policyOn(config.policies, "merge.on_approval")) {
+    const scope = config.policies?.merge.repos;
+    config.repos.forEach((repo, i) => {
+      const writable = config.people.some((p) =>
+        [repo.name, `kind:${repo.kind}`, "*"].some((key) => p.repos[key] === "write"),
+      );
+
+      if ((scope ? !scope.includes(repo.name) : !writable) || repo.checks?.length) {
+        return;
+      }
+
+      warnings.push({
+        path: ["repos", i, "checks"],
+        code: WARNING_CODES.policyMergeWithoutChecks,
+        message: `policies.merge.on_approval is on for repo "${repo.name}", which has no checks.`,
+        consequence: `an approval merges untested code in ${repo.name}; list its checks under repos[].checks, or limit policies.merge.repos.`,
+      });
     });
   }
 

@@ -4,6 +4,7 @@ import type {
   Issue,
   Member,
   PrRef,
+  PrVerdict,
   PullRequest,
   RepoRef,
   WorkflowEvent,
@@ -414,7 +415,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const refreshPr = async (
     ctx: Ctx,
     ref: PrRef,
-    o: { baseline?: boolean; wait?: boolean; review?: string } = {},
+    o: { baseline?: boolean; wait?: boolean; review?: string; verdict?: PrVerdict } = {},
   ): Promise<void> => {
     const known = prs.get(prSubject(ref));
     let pr: PullRequest;
@@ -446,6 +447,10 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     const person = vcsPeople.get(pr.author.login.toLowerCase());
     const review = o.review ?? prev?.review;
+    const verdicts = o.verdict
+      ? [...(prev?.verdicts ?? []).filter((v) => v.actor !== o.verdict!.actor), o.verdict]
+      : prev?.verdicts;
+
     const ticket = await inferTicket(pr, prev);
     const rec: PrRecord = {
       ref: { repo: pr.repo, number: pr.number },
@@ -463,6 +468,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       ci: ciOf(checks),
       unresolvedThreads: unresolved,
       ...(review ? { review } : {}),
+      ...(verdicts?.length ? { verdicts } : {}),
       ...(ticket ? { ticket } : {}),
       ...(prev?.stackedOn ? { stackedOn: prev.stackedOn } : {}),
       updatedAt: clock.now().toISOString(),
@@ -556,7 +562,20 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
             ? state
             : undefined;
 
-        await refreshPr(ctx, pr, review ? { review } : {});
+        // A trusted reviewer's approval or request for changes replaces their earlier verdict.
+        const verdict: PrVerdict | undefined =
+          review &&
+          (review === "approved" || review === "changes_requested" || review === "dismissed") &&
+          event.data["untrusted"] !== true &&
+          event.actor.kind !== "automation"
+            ? { actor: event.actor.id, kind: event.actor.kind, state: review }
+            : undefined;
+
+        await refreshPr(ctx, pr, {
+          ...(review ? { review } : {}),
+          ...(verdict ? { verdict } : {}),
+        });
+
         if (event.type === "pr.review_submitted" || event.type === "pr.comment") {
           await recordFeedbackRequester(event, pr);
         }
@@ -689,6 +708,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     draft: p.draft,
     state: p.state,
     author: { ...p.author },
+    ...(p.verdicts?.length ? { verdicts: p.verdicts } : {}),
   });
 
   let timer: Cancel | undefined;
