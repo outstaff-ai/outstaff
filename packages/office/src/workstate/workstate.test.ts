@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { Client } from "pg";
 import { createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import type { FakeTracker, FakeVcs } from "@outstaff/core/fakes";
-import type { PrRef, WorkflowEvent } from "@outstaff/core";
+import { PortError, type PrRef, type WorkflowEvent } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock, type ManualClock } from "../clock.js";
 import { createIntake } from "../intake/index.js";
@@ -270,6 +270,122 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(await store.queryLinks({ from: { type: "ticket", ref: issue.key } })).toEqual([
         expect.objectContaining({ relation: "assigned_to", to: { type: "person", ref: "sam" } }),
       ]);
+    });
+  });
+
+  describe("deleted tickets", () => {
+    /** The tracker starts answering not_found for these keys; `fetched` lists every lookup. */
+    const deletable = () => {
+      const deleted = new Set<string>();
+      const fetched: string[] = [];
+      const real = tracker.getIssue.bind(tracker);
+      tracker.getIssue = async (key) => {
+        fetched.push(key);
+        if (deleted.has(key)) {
+          throw new PortError("not_found", `Issue ${key} not found.`);
+        }
+
+        return real(key);
+      };
+
+      const list = tracker.listIssues.bind(tracker);
+      tracker.listIssues = async (f) => (await list(f)).filter((i) => !deleted.has(i.key));
+
+      return { deleted, fetched };
+    };
+
+    it("marks a ticket the tracker no longer has as gone, closes what hung on it and stops asking", async () => {
+      const { deleted, fetched } = deletable();
+      const warnings: string[] = [];
+      ws = await createWorkState({
+        store,
+        ports: { vcs, tracker },
+        team: teamConfig(),
+        clock,
+        logger: { ...silent, warn: (m: string) => void warnings.push(m) },
+      });
+
+      const issue = await tracker.createIssue({ title: "A", body: "", assignee: "u-sam" });
+      const p = await pr({ title: "work", head: { ref: `sam/${issue.key}` } });
+      await ws.apply(ticketEvent("ticket.created", issue.key), meta());
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      expect(ws.ticketForPr(prRef(p.number))).toBe(issue.key);
+      const queued = await store.enqueue({
+        person: "sam",
+        kind: "assigned",
+        title: "assigned",
+        trigger: "human",
+        subject: { type: "ticket", ref: issue.key },
+      });
+
+      const waiting = await store.enqueue({
+        person: "sam",
+        kind: "review_feedback",
+        title: "feedback",
+        trigger: "human",
+        subject: { type: "pr", ref: ws.prSubject(prRef(p.number)) },
+      });
+
+      await store.updateItem(waiting.id, { status: "waiting" });
+      const other = await store.enqueue({
+        person: "sam",
+        kind: "assigned",
+        title: "other",
+        trigger: "human",
+        subject: { type: "ticket", ref: "ACME-999" },
+      });
+
+      deleted.add(issue.key);
+      await ws.rescan();
+      expect(ws.ticket(issue.key)?.goneAt).toBeDefined();
+      expect(ws.ticketStatus(issue.key)).toBeUndefined();
+      expect(ws.ticketForPr(prRef(p.number))).toBeUndefined();
+      expect(await store.queryLinks({ from: { type: "ticket", ref: issue.key } })).toEqual([]);
+      expect(
+        await store.queryLinks({ to: { type: "ticket", ref: issue.key }, relation: "implements" }),
+      ).toEqual([]);
+
+      expect((await store.getItem(queued.id))?.status).toBe("canceled");
+      expect((await store.getItem(waiting.id))?.status).toBe("canceled");
+      expect((await store.getItem(other.id))?.status).toBe("queued");
+      expect((await store.readJournal(queued.id)).map((j) => j.text)).toEqual([
+        expect.stringContaining(issue.key),
+      ]);
+
+      const before = fetched.filter((k) => k === issue.key).length;
+      await ws.rescan();
+      await ws.rescan();
+      expect(fetched.filter((k) => k === issue.key)).toHaveLength(before);
+      expect(warnings.filter((w) => w.includes("ticket not found"))).toHaveLength(1);
+
+      // The next lookup of the pull request does not bring the link back.
+      await ws.apply(prEvent("pr.comment", p.number), meta("e2"));
+      expect(ws.ticketForPr(prRef(p.number))).toBeUndefined();
+      expect(fetched.filter((k) => k === issue.key)).toHaveLength(before);
+    });
+
+    it("remembers a gone ticket across a restart and brings it back when an event names it", async () => {
+      const { deleted, fetched } = deletable();
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      await ws.apply(ticketEvent("ticket.created", issue.key), meta());
+      deleted.add(issue.key);
+      await ws.rescan();
+      await ws.stop();
+      await build();
+      expect(ws.ticket(issue.key)?.goneAt).toBeDefined();
+      const before = fetched.length;
+      await ws.rescan();
+      expect(fetched).toHaveLength(before);
+
+      // Still gone: the event looks again, quietly, and the ticket stays gone.
+      await ws.apply(ticketEvent("ticket.commented", issue.key), meta("e2"));
+      expect(fetched).toHaveLength(before + 1);
+      expect(ws.ticket(issue.key)?.goneAt).toBeDefined();
+
+      deleted.delete(issue.key);
+      await ws.apply(ticketEvent("ticket.moved", issue.key), meta("e3"));
+      expect(ws.ticket(issue.key)?.goneAt).toBeUndefined();
+      expect(ws.ticket(issue.key)?.title).toBe("A");
     });
   });
 

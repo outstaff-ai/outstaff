@@ -28,6 +28,9 @@ export interface TicketRecord {
 
   /** When the requester was recorded; a later human assignment or send-back replaces it. */
   requesterAt?: string;
+
+  /** When the tracker answered that the ticket does not exist. It is not refreshed again unless an event names it. */
+  goneAt?: string;
   updatedAt: string;
 }
 
