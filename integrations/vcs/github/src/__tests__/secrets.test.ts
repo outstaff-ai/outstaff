@@ -1,5 +1,6 @@
-import type { SecretSpec, TeamConfig } from "@outstaff/core";
+import { silentLogger, type SecretSpec, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
+import { githubOptions } from "../options.js";
 import { githubVcs } from "../index.js";
 
 const team = {
@@ -70,5 +71,22 @@ describe("github secrets by grants", () => {
     );
 
     expect(githubVcs.unavailableFor!({ team, person: person({ shop: "read" }) })).toBeUndefined();
+  });
+});
+
+describe("github adapter factory", () => {
+  it("creates a VCS from the adapter context, with the default options", async () => {
+    const vcs = await githubVcs.create({
+      options: githubOptions.parse({}),
+      secrets: { get: () => undefined, require: () => "x" },
+      team,
+      log: silentLogger,
+      fetch: globalThis.fetch,
+      now: () => new Date(),
+    });
+
+    expect(vcs.links.pr({ owner: "acme", name: "app" }, 3)).toBe(
+      "https://github.com/acme/app/pull/3",
+    );
   });
 });

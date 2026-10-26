@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { deriveGithub, githubSetupGuide } from "../setup.js";
@@ -155,5 +158,90 @@ describe("deriveGithub", () => {
     expect(out).toEqual({ GH_APP_BOT_EMAIL: "1234+acme-sam[bot]@users.noreply.github.com" });
     expect(calls).toEqual(["/users/acme-sam%5Bbot%5D"]);
     expect(warnings.at(-1)).toContain("GH_OFFICE_APP_ID is set but there is no private key");
+  });
+
+  const derive = (env: Record<string, string>, over: Partial<DeriveContext> = {}) => {
+    const warned: string[] = [];
+    const run = deriveGithub(envSecretSource(env, "/nonexistent"), {
+      ...ctx(),
+      warn: (m) => warned.push(m),
+      ...over,
+    });
+
+    return run.then((out) => ({ out, warned }));
+  };
+
+  const app = { GH_APP_ID: "42", GH_APP_PRIVATE_KEY: testKey.privateKey };
+
+  it("reads the private key from the file named by the _FILE key", async () => {
+    const file = join(mkdtempSync(join(tmpdir(), "outstaff-gh-")), "key.pem");
+    writeFileSync(file, testKey.privateKey);
+    const { out, warned } = await derive({ GH_APP_ID: "42", GH_APP_PRIVATE_KEY_FILE: file });
+    expect(out).toMatchObject({ GH_APP_SLUG: "acme-sam", GH_APP_INSTALLATION_ID: "99" });
+    expect(warned).toEqual([]);
+  });
+
+  it("warns and skips an App whose key file cannot be read", async () => {
+    const { out, warned } = await derive({
+      GH_APP_ID: "42",
+      GH_APP_PRIVATE_KEY_FILE: "/nonexistent/key.pem",
+    });
+
+    expect(out).toEqual({});
+    expect(warned).toEqual(["GH_APP_PRIVATE_KEY_FILE points at a file that cannot be read."]);
+  });
+
+  it("warns, and still derives the rest, when the App is installed on none of the team's owners", async () => {
+    const noMatch = (async (url: string | URL) => {
+      const path = decodeURIComponent(new URL(String(url)).pathname);
+      return new Response(
+        JSON.stringify(
+          path === "/app"
+            ? { slug: "acme-sam" }
+            : path === "/app/installations"
+              ? [{ id: 1, account: null }]
+              : { id: 1234 },
+        ),
+      );
+    }) as typeof fetch;
+
+    const { out, warned } = await derive(app, { fetch: noMatch });
+    expect(out).not.toHaveProperty("GH_APP_INSTALLATION_ID");
+    expect(out).toHaveProperty("GH_APP_BOT_EMAIL");
+    expect(warned).toEqual([
+      expect.stringContaining("The App acme-sam is not installed on acme-example"),
+    ]);
+  });
+
+  it("leaves a given bot email alone", async () => {
+    const { out } = await derive({ ...app, GH_APP_BOT_EMAIL: "x@y.z" });
+    expect(out).not.toHaveProperty("GH_APP_BOT_EMAIL");
+  });
+
+  it("warns with the failing App's prefix when GitHub refuses, and carries on with the next", async () => {
+    const refuse = (async () => new Response("{}", { status: 401 })) as typeof fetch;
+    const { out, warned } = await derive(
+      { ...app, GH_OFFICE_APP_ID: "43", GH_OFFICE_APP_PRIVATE_KEY: testKey.privateKey },
+      { fetch: refuse },
+    );
+
+    expect(out).toEqual({});
+    expect(warned).toEqual([
+      "GitHub GH_APP_: GET /app returned 401",
+      "GitHub GH_OFFICE_APP_: GET /app returned 401",
+    ]);
+  });
+
+  it("derives only the office App for the office scope, with default options", async () => {
+    const { out } = await derive(
+      { ...app, GH_OFFICE_APP_ID: "43", GH_OFFICE_APP_PRIVATE_KEY: testKey.privateKey },
+      { scope: "office", options: undefined as never },
+    );
+
+    expect(Object.keys(out).sort()).toEqual([
+      "GH_OFFICE_APP_BOT_EMAIL",
+      "GH_OFFICE_APP_INSTALLATION_ID",
+      "GH_OFFICE_APP_SLUG",
+    ]);
   });
 });

@@ -380,4 +380,139 @@ describe("doctorGithub", () => {
 
     expect(calls).toEqual([]);
   });
+
+  /** Answers some paths itself and leaves the rest to the fake. */
+  const override = (
+    impl: typeof fetch,
+    answer: (path: string, url: URL) => Response | undefined,
+  ): typeof fetch =>
+    (async (url: string | URL, init?: RequestInit) => {
+      const u = new URL(String(url));
+      return answer(u.pathname, u) ?? impl(url, init);
+    }) as typeof fetch;
+
+  const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+  const failing = (check: { name: string; status: string; detail: string }[], name: string) =>
+    check.filter((c) => c.name.includes(name) && c.status === "fail");
+
+  it("fails when the private key file cannot be read", async () => {
+    const { impl, calls } = fake(good);
+    const checks = await doctorGithub(
+      secrets({ GH_APP_PRIVATE_KEY: "", GH_APP_PRIVATE_KEY_FILE: "/nonexistent/key.pem" }),
+      ctx(impl),
+    );
+
+    expect(by(checks, "GitHub App: private key file")[0]).toMatchObject({
+      status: "fail",
+      detail: expect.stringContaining("cannot be read"),
+    });
+
+    expect(calls.every((c) => !c.includes("/app/installations/100"))).toBe(true);
+  });
+
+  it("names a clock problem only for a 401 from /app", async () => {
+    const forbidden = fake({ ...good, "11": { app: { status: 403 } } });
+    const [check] = by(await doctorGithub(secrets(), ctx(forbidden.impl)), "authenticates");
+    expect(check!.detail).toContain("answered 403");
+    expect(check!.detail).not.toContain("clock");
+
+    const unauthorized = fake({ ...good, "11": { app: { status: 401 } } });
+    const [clock] = by(await doctorGithub(secrets(), ctx(unauthorized.impl)), "authenticates");
+    expect(clock!.detail).toContain("clock");
+  });
+
+  it("stops after the identity checks when the App has no installation id", async () => {
+    const { impl, calls } = fake(good);
+    const checks = await doctorGithub(
+      secrets({ GH_APP_INSTALLATION_ID: "", GH_OFFICE_APP_INSTALLATION_ID: "" }),
+      ctx(impl),
+    );
+
+    expect(by(checks, "installation")).toEqual([]);
+    expect(calls.some((c) => /\/app\/installations/.test(c))).toBe(false);
+  });
+
+  it("treats an installation without a permissions field as granting nothing", async () => {
+    const { impl } = fake(good);
+    const f = override(impl, (path) =>
+      path === "/app/installations/200"
+        ? json(200, { account: { login: "acme-example" }, repository_selection: "selected" })
+        : undefined,
+    );
+
+    const [permissions] = failing(await doctorGithub(secrets(), ctx(f, "office")), "permissions");
+    expect(permissions!.detail).toContain("metadata:read");
+    expect(permissions!.detail).not.toContain("write grant");
+    expect(permissions!.detail).not.toContain("Actions");
+  });
+
+  it("gives the office App its own advice when it is installed on all repositories", async () => {
+    const { impl } = fake({
+      ...good,
+      "22": { ...good["22"]!, installation: { selection: "all" } },
+    });
+
+    const [repositories] = by(await doctorGithub(secrets(), ctx(impl, "office")), "repositories");
+    expect(repositories).toMatchObject({ status: "warn" });
+    expect(JSON.stringify(repositories)).toContain("exactly the granted ones");
+  });
+
+  it("fails with the status when the installation token cannot be minted", async () => {
+    const { impl } = fake(good);
+    const f = override(impl, (path) =>
+      path === "/app/installations/200/access_tokens" ? json(403, {}) : undefined,
+    );
+
+    const [repositories] = failing(await doctorGithub(secrets(), ctx(f, "office")), "repositories");
+    expect(repositories!.detail).toContain("GitHub answered 403");
+    expect(repositories!.detail).toContain("installation 200");
+  });
+
+  it("fails with the status when listing the repositories fails", async () => {
+    const { impl } = fake(good);
+    const f = override(impl, (path) =>
+      path === "/installation/repositories" ? json(500, {}) : undefined,
+    );
+
+    const [repositories] = failing(await doctorGithub(secrets(), ctx(f, "office")), "repositories");
+    expect(repositories!.detail).toContain("GitHub answered 500");
+  });
+
+  it("reads every page of the installation's repositories", async () => {
+    const { impl } = fake(good);
+    const names = Array.from({ length: 100 }, (_, i) => `acme-example/other-${i}`);
+    const pages: string[] = [];
+    const f = override(impl, (path, url) => {
+      if (path !== "/installation/repositories" || url.searchParams.get("page") === null) {
+        return undefined;
+      }
+
+      pages.push(url.searchParams.get("page")!);
+      return url.searchParams.get("page") === "1"
+        ? json(200, { repositories: names.map((full_name) => ({ full_name })) })
+        : json(200, {
+            repositories: [{ full_name: "acme-example/shop" }, { full_name: "acme-example/infra" }],
+          });
+    });
+
+    const checks = await doctorGithub(secrets(), ctx(f, "office"));
+    expect(pages).toEqual(["1", "2"]);
+    // Page 2 holds the team's repositories (none missing); page 1 holds the extras the warning names.
+    expect(checks.filter((c) => c.status === "fail")).toEqual([]);
+    expect(by(checks, "repositories")[0]).toMatchObject({
+      status: "warn",
+      detail: expect.stringContaining("other-0"),
+    });
+  });
+
+  it("checks a person without a team-file identity without comparing logins", async () => {
+    const { impl } = fake(good);
+    const checks = await doctorGithub(secrets(), {
+      ...ctx(impl),
+      person: { ...sam, identities: undefined } as never,
+    });
+
+    expect(by(checks, "identity")).toEqual([]);
+    expect(checks.filter((c) => c.status === "fail")).toEqual([]);
+  });
 });
