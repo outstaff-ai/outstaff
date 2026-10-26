@@ -3,6 +3,7 @@ import { rootCertificates } from "node:tls";
 import {
   PortError,
   type AdapterContext,
+  type Logger,
   type CanonicalStatus,
   type Member,
   type StatusMap,
@@ -35,7 +36,7 @@ export interface ApiAssignee {
 }
 
 export interface ApiProject {
-  project: { id: number; key: string; ref: string; name: string };
+  project: { id: number; key: string; ref: string; name: string; teamRef?: string };
   columns: ApiColumn[];
   labels: ApiLabel[];
   assignees: ApiAssignee[];
@@ -49,6 +50,10 @@ export interface ClientDeps {
 }
 
 const SETUP_TTL_MS = 30_000;
+
+/** First wait before asking for the workspace again after a failure; doubles up to the maximum. */
+const WORKSPACE_RETRY_MS = 5_000;
+const WORKSPACE_RETRY_MAX_MS = 300_000;
 
 /** Default status names, Title Case; `team.workflow.statuses` overrides them. */
 const DEFAULT_NAMES: Record<CanonicalStatus, string> = {
@@ -111,10 +116,16 @@ export class Itsaplan {
   private setup: { at: number; value: ApiProject } | undefined;
   readonly statusMap: StatusMap;
 
+  /** The team's segment in web URLs (`teamRef` of the project); resolved on first use, never at start. */
+  workspace: string | undefined;
+
+  private retry = { at: 0, delayMs: WORKSPACE_RETRY_MS };
+  private warned = false;
+
   constructor(
     readonly http: ItsaplanHttp,
     readonly conn: Connection,
-    private readonly ctx: Pick<AdapterContext<unknown>, "team" | "now">,
+    private readonly ctx: Pick<AdapterContext<unknown>, "team" | "now"> & { log?: Logger },
   ) {
     const configured = ctx.team?.workflow?.statuses ?? {};
     this.statusMap = { ...DEFAULT_NAMES, ...configured };
@@ -132,6 +143,7 @@ export class Itsaplan {
 
     const value = await this.http.request<ApiProject>("GET", this.projectPath);
     this.setup = { at: now, value };
+    this.workspace ||= value.project.teamRef || undefined;
     return value;
   }
 
@@ -224,18 +236,91 @@ export class Itsaplan {
     return hit.userId;
   }
 
+  /** Reads the workspace slug from the project setup; fails when the API is unreachable or names none. Used by `ost doctor`. */
+  async loadWorkspace(): Promise<void> {
+    const ref = (await this.http.request<ApiProject>("GET", this.projectPath)).project.teamRef;
+    if (!ref) {
+      throw new PortError(
+        "invalid",
+        `Its a Plan did not name the workspace of project ${this.conn.project}, so links cannot be built.`,
+      );
+    }
+
+    this.workspace = ref;
+  }
+
+  /**
+   * Resolves the workspace if it is not known yet, without ever failing: an unreachable API only delays it. After a
+   * failure it is not asked again until a backoff (5 s, doubling to 5 min) has passed.
+   */
+  async ensureWorkspace(): Promise<void> {
+    if (this.workspace !== undefined || this.ctx.now().getTime() < this.retry.at) {
+      return;
+    }
+
+    try {
+      await this.project(true);
+      if (this.workspace === undefined) {
+        throw new PortError("invalid", "The project names no workspace.");
+      }
+
+      this.retry = { at: 0, delayMs: WORKSPACE_RETRY_MS };
+    } catch (error) {
+      this.retry = {
+        at: this.ctx.now().getTime() + this.retry.delayMs,
+        delayMs: Math.min(this.retry.delayMs * 2, WORKSPACE_RETRY_MAX_MS),
+      };
+
+      this.ctx.log?.debug("could not resolve the Its a Plan workspace", {
+        error: (error as Error).message,
+      });
+    }
+  }
+
   issueUrl(key: string): string {
-    return this.template(this.conn.issue_url ?? "{url}/{key}", { key });
+    return this.link(this.conn.issue_url, "{url}/{workspace}/issue/{key}", "{url}/{key}", { key });
   }
 
   docUrl(id: string): string {
-    return this.template(this.conn.doc_url ?? "{url}/{project}/docs/{id}", { id });
+    return this.link(
+      this.conn.doc_url,
+      "{url}/{workspace}/{project}/docs/{id}",
+      "{url}/{project}/docs/{id}",
+      { id },
+    );
+  }
+
+  /**
+   * Builds a link. While the workspace is unknown, a template that needs it gives way to `bare` (the shape without
+   * the workspace), warns once, and starts resolving the workspace in the background.
+   */
+  private link(
+    explicit: string | undefined,
+    byDefault: string,
+    bare: string,
+    vars: Record<string, string>,
+  ): string {
+    const tpl = explicit ?? byDefault;
+    if (this.workspace !== undefined || !tpl.includes("{workspace}")) {
+      return this.template(tpl, vars);
+    }
+
+    if (!this.warned) {
+      this.warned = true;
+      this.ctx.log?.warn(
+        "The Its a Plan workspace is not known yet, so links leave it out until the API answers.",
+      );
+    }
+
+    void this.ensureWorkspace();
+    return this.template(bare, vars);
   }
 
   private template(tpl: string, vars: Record<string, string>): string {
     const all: Record<string, string> = {
       url: this.conn.url.replace(/\/+$/, ""),
       project: this.conn.project,
+      ...(this.workspace === undefined ? {} : { workspace: this.workspace }),
       ...vars,
     };
 
@@ -251,7 +336,7 @@ export async function createClient(
 ): Promise<Itsaplan> {
   const conn = resolveConnection(ctx, ctx.options);
   const fetchImpl = await buildFetch(ctx.fetch, conn, deps);
-  return new Itsaplan(
+  const api = new Itsaplan(
     new ItsaplanHttp({
       fetch: fetchImpl,
       apiUrl: conn.api_url,
@@ -262,4 +347,6 @@ export async function createClient(
     conn,
     ctx,
   );
+
+  return api;
 }

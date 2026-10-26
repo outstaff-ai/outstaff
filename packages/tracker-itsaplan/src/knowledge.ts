@@ -96,15 +96,20 @@ export function createItsaplanKnowledge(
 function buildKnowledge(api: Itsaplan): Knowledge {
   const docs = `${api.projectPath}/documents`;
 
-  const list = (q?: string) =>
-    api.http.request<ApiDocSummary[]>("GET", docs, { query: q ? { q } : {} });
+  const list = async (q?: string) => {
+    await api.ensureWorkspace();
+    return api.http.request<ApiDocSummary[]>("GET", docs, { query: q ? { q } : {} });
+  };
 
   const treeOf = async (): Promise<Tree> => {
     const items = await list();
     return { items, byId: new Map(items.map((d) => [d.id, d])) };
   };
 
-  const read = (id: number | string) => api.http.request<ApiDoc>("GET", `${docs}/${id}`);
+  const read = async (id: number | string) => {
+    await api.ensureWorkspace();
+    return api.http.request<ApiDoc>("GET", `${docs}/${id}`);
+  };
 
   const toDoc = (d: ApiDoc, path: string): Doc => ({
     id: String(d.id),

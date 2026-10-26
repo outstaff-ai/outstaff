@@ -207,7 +207,15 @@ export function createTracker(opts: TrackerOptions) {
       handler: as((r) =>
         isProject(r.params["p"]!)
           ? {
-              project: { id: 1, key, ref, name: "Shop" },
+              project: {
+                id: 1,
+                teamId: 1,
+                teamName: "Acme",
+                teamRef: "acme",
+                key,
+                ref,
+                name: "Shop",
+              },
               columns,
               labels,
               assignees: opts.members,

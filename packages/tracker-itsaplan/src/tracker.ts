@@ -265,6 +265,7 @@ function buildTracker(api: Itsaplan): Tracker {
     },
 
     async comment(key, body) {
+      await api.ensureWorkspace();
       const issue = await fetchIssue(key);
       const made = await api.http.request<ApiFeedItem>("POST", `/issues/${issue.id}/comments`, {
         body: { body },

@@ -37,15 +37,17 @@ workflow:
     review: In Review
 ```
 
-| Option      | Meaning                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `url`       | Web address of the instance, used for links. Required on the tracker.                                                    |
-| `project`   | Project key, or `<team>.<KEY>` when more than one of your teams has a project with that key. Required on the tracker.    |
-| `api_url`   | API root. Defaults to the web address with `api.` in front of the host.                                                  |
-| `ca_file`   | PEM file with the CA that signed a self-hosted instance's certificate.                                                   |
-| `agents`    | Extra usernames that are agents. Members whose username is a handle in `team.people` are agents already.                 |
-| `issue_url` | Link template for issues, default `{url}/{key}`.                                                                         |
-| `doc_url`   | Link template for documents, default `{url}/{project}/docs/{id}`. Change it if your instance serves documents elsewhere. |
+| Option      | Meaning                                                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `url`       | Web address of the instance, used for links. Required on the tracker.                                                                |
+| `project`   | Project key, or `<team>.<KEY>` when more than one of your teams has a project with that key. Required on the tracker.                |
+| `api_url`   | API root. Defaults to the web address with `api.` in front of the host.                                                              |
+| `ca_file`   | PEM file with the CA that signed a self-hosted instance's certificate.                                                               |
+| `agents`    | Extra usernames that are agents. Members whose username is a handle in `team.people` are agents already.                             |
+| `issue_url` | Link template for issues, default `{url}/{workspace}/issue/{key}`.                                                                   |
+| `doc_url`   | Link template for documents, default `{url}/{workspace}/{project}/docs/{id}`. Change it if your instance serves documents elsewhere. |
+
+Link templates may use `{url}` (the web address without a trailing slash), `{workspace}`, `{project}` and `{key}` (issues) or `{id}` (documents). `{workspace}` is the team's segment in web URLs (the project's `teamRef`, its slug or id); the adapter reads it from the project the first time it needs it (never at start, so an unreachable instance does not stop the office) and retries with a backoff after a failure. Until it is known, default templates fall back to the shape without the workspace and a warning is logged once; explicit templates without `{workspace}` are not affected. It never has to be configured. A real instance serves `https://tracker.acme.example/acme/issue/SHOP-12` and `https://tracker.acme.example/acme/SHOP/docs/3`. `ost doctor` prints one issue link and one doc link to click, and fails when the workspace cannot be determined.
 
 The knowledge integration can repeat any of these; what it leaves out comes from the tracker integration when that is `itsaplan` too.
 

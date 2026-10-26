@@ -23,11 +23,15 @@ const connection = {
   issue_url: z
     .string()
     .optional()
-    .describe("Link template for issues; `{url}`, `{project}` and `{key}` are replaced."),
+    .describe(
+      "Link template for issues; `{url}`, `{workspace}`, `{project}` and `{key}` are replaced; default `{url}/{workspace}/issue/{key}`.",
+    ),
   doc_url: z
     .string()
     .optional()
-    .describe("Link template for documents; `{url}`, `{project}` and `{id}` are replaced."),
+    .describe(
+      "Link template for documents; `{url}`, `{workspace}`, `{project}` and `{id}` are replaced; default `{url}/{workspace}/{project}/docs/{id}`.",
+    ),
 };
 
 export const trackerOptions = z.strictObject(connection);

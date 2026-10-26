@@ -14,8 +14,8 @@ integrations:
     # api_url: https://api.tracker.acme.example   # default: the web address with `api.` in front of the host
     # ca_file: /etc/acme/ca.pem                   # CA of a self-hosted instance
     # agents: [sam, kit]                          # usernames that are agents, besides the team's people handles
-    # issue_url: "{url}/{key}"                    # link templates; {url}, {project}, {key} / {id}
-    # doc_url: "{url}/{project}/docs/{id}"
+    # issue_url: "{url}/{workspace}/issue/{key}"  # link templates; {url}, {workspace}, {project}, {key} / {id}
+    # doc_url: "{url}/{workspace}/{project}/docs/{id}"
   knowledge:
     adapter: itsaplan # url, project, api_url, ca_file and agents fall back to the tracker integration
 ```
