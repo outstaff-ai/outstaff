@@ -59,7 +59,7 @@ describe("the greeting edits", () => {
 });
 
 describe("assigned, retrying a blocked ticket", () => {
-  it("moves nothing and says it is still blocked", async () => {
+  it("moves nothing and hands back that it is still blocked", async () => {
     const shown = (status: string) =>
       `SHOP-1 Stage\nStatus: ${status}\nblocked: the staging credentials are missing`;
 

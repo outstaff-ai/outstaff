@@ -49,7 +49,7 @@ A reply in the thread of work you handed back (done or canceled) starts a chat s
 - **A follow-up, a correction or more of the same work** ("also handle X", "that is wrong, change it"): continue the ticket. Run `ost work attach <its ticket or pull request> --confirmed`, even though the ticket moved to review and was assigned to the requester when you handed back: the human is directing that very work, and it is yours. It reopens or re-queues the work and assigns the ticket to you again when it starts. Do not file a second ticket for it.
 - **Clearly new work**, unrelated to that ticket: file it as new work (above).
 
-If the ticket is merged or done, it is never reopened: file a follow-up ticket, linking it.
+A merged or closed pull request, or a done ticket with no open pull request, is never reopened: file a follow-up ticket, linking it. A ticket marked done while one of its pull requests is still open (for example after a merge into another pull request's branch) is not finished: attach to that pull request, and the ticket goes back to active.
 
 ## Limits
 
@@ -180,7 +180,7 @@ Every ticket in acme is in exactly one canonical status. Tracker-specific names 
 
 ## One pull request per ticket
 
-outstaff's automation moves a ticket to `done` the moment its pull request merges, so in acme a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the office comments on the ticket that it now has two, and the first to merge closes it.
+outstaff's automation moves a ticket to `done` when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is), so in acme a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the office comments on the ticket that it now has two, and the last to merge closes it.
 
 Plan the split before you start. When the work needs more than one pull request (independent parts, a stack, a change after a merge):
 

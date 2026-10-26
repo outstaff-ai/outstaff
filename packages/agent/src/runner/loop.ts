@@ -15,7 +15,7 @@ import type { ClonedRepo, Workspaces } from "../repos/index.js";
 import { VERBS, createRuntimeTools } from "../verbs/index.js";
 import type { ChatReportKind } from "../verbs/office.js";
 import type { AgentEnv } from "../verbs/types.js";
-import { anyBlocked, saysBlocked } from "./blocked.js";
+import { anyBlocked } from "./blocked.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { ChatRelay } from "./chat.js";
 import type { ProfilePublisher } from "./profile.js";
@@ -417,12 +417,11 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       .filter(([k]) => offeredTickets.size === 0 || offeredTickets.has(k))
       .at(-1);
 
-    // A retry of a blocked ticket that ends "still blocked" in free text moved nothing: the ticket is still blocked,
-    // and the message says so. That is a blocked hand-back, not a finished one.
+    // A ticket that is blocked in the tracker at the end of a run that moved nothing and asked nothing was not got past:
+    // a blocked hand-back, whatever the final message says.
     const stillBlocked =
       !asked &&
       last?.[1] === undefined &&
-      saysBlocked(text) &&
       (await anyBlocked(
         baseTracker,
         [...offeredTickets].filter((k) => !moved.has(k)),
@@ -433,7 +432,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     if (blocked && !asked) {
       log.warn(
         stillBlocked
-          ? "the agent says its blocked ticket is still blocked; handing back as blocked"
+          ? "the agent left its blocked ticket blocked; handing back as blocked"
           : "the agent left its ticket blocked; handing back as blocked",
         { workItemId: id },
       );

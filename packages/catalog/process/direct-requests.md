@@ -52,7 +52,7 @@ A reply in the thread of work you handed back (done or canceled) starts a chat s
 - **A follow-up, a correction or more of the same work** ("also handle X", "that is wrong, change it"): continue the ticket. Run `ost work attach <its ticket or pull request> --confirmed`, even though the ticket moved to review and was assigned to the requester when you handed back: the human is directing that very work, and it is yours. It reopens or re-queues the work and assigns the ticket to you again when it starts. Do not file a second ticket for it.
 - **Clearly new work**, unrelated to that ticket: file it as new work (above).
 
-If the ticket is merged or done, it is never reopened: file a follow-up ticket, linking it.
+A merged or closed pull request, or a done ticket with no open pull request, is never reopened: file a follow-up ticket, linking it. A ticket marked done while one of its pull requests is still open (for example after a merge into another pull request's branch) is not finished: attach to that pull request, and the ticket goes back to active.
 
 ## Limits
 

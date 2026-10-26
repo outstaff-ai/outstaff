@@ -1,6 +1,7 @@
 import type { TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { REPO, teamConfig } from "../intake/test-support.js";
+import { readFeedback } from "./feedback.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
 // Stacked pull requests and blocked retries: a merge into another pull request's branch is not the ticket's end, a
@@ -178,6 +179,39 @@ describe("a stack of pull requests for one ticket", () => {
     await h.engine.started(late.id);
     expect(await status(key)).toBe("done");
   });
+});
+
+describe("failing CI on an open pull request", () => {
+  it.each(["review", "done"] as const)(
+    "goes to the author with the failing checks, whatever the ticket's status (%s)",
+    async (from) => {
+      const key = await ticket("active");
+      const pr = await open(key, "a");
+      await h.tracker.transition(key, from);
+      await h.ws.apply(
+        { type: "ticket.moved", subject: { ticket: key }, actor: sam, data: { to: from } },
+        { source: "tracker", externalId: "mv-from", trusted: true },
+      );
+
+      const sha = (await h.vcs.getPullRequest(REPO, pr)).head.sha;
+      await h.vcs.seed.check(REPO, sha, { name: "build", status: "pending" });
+      await h.poll();
+      await h.vcs.seed.check(REPO, sha, { name: "build", status: "failure" });
+      await h.ws.rescan();
+
+      const items = (await h.items("sam")).filter((i) => i.kind === "ci_failed");
+      expect(items).toHaveLength(1);
+      expect(items[0]!.subject?.ref).toBe(`git.acme.example/acme/app#${pr}`);
+      expect(await status(key)).toBe("active");
+      const [fb] = await readFeedback(h.store, items[0]!.id);
+      expect(fb).toMatchObject({ kind: "ci_failure" });
+      expect(fb!.body).toContain("build (");
+
+      // The same head raises nothing more.
+      await h.ws.rescan();
+      expect((await h.items("sam")).filter((i) => i.kind === "ci_failed")).toHaveLength(1);
+    },
+  );
 });
 
 describe("a retry of a blocked ticket", () => {

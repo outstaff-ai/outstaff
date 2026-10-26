@@ -252,6 +252,23 @@ const kanbanRules: Rule[] = [
     ],
   },
   {
+    id: "ci-failed-back-to-author",
+    on: "pr.ci_failed",
+    // Like a conflict: whatever the ticket's status, while the pull request is open.
+    if: {
+      all: [
+        { pr_author_kind: "agent" },
+        { pr_open: true },
+        { not: { ticket_status: ["canceled"] } },
+      ],
+    },
+    do: [
+      { assign: "author" },
+      { move: "active" },
+      { schedule: { person: "author", kind: "ci_failed", priority: "high" } },
+    ],
+  },
+  {
     id: "active-human-takeback",
     on: "ticket.moved",
     if: {

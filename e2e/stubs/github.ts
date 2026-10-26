@@ -378,6 +378,7 @@ export function createGithub(opts: GithubOptions) {
   };
 
   const pulls = `${API}/repos/${full}/pulls`;
+  const checkRuns = new Map<string, { name: string }[]>();
   const routes: Route[] = [
     {
       method: "GET",
@@ -699,7 +700,7 @@ export function createGithub(opts: GithubOptions) {
     {
       method: "GET",
       path: `${API}/repos/${full}/commits/:sha/check-runs`,
-      handler: () => ({ check_runs: [] }),
+      handler: (r) => ({ check_runs: checkRuns.get(r.params["sha"]!) ?? [] }),
     },
     {
       method: "GET",
@@ -820,6 +821,25 @@ export function createGithub(opts: GithubOptions) {
           html_url: `https://github.example/${full}/pull/${pr.number}#issuecomment-${id}`,
         },
       });
+    },
+
+    /** A completed check run on the pull request's head commit, as a CI service would report it. */
+    async setCheck(n: number, name: string, conclusion: string) {
+      const pr = need(n);
+      const sha = pr && ((await repo.sha(pr.head)) ?? pr.lastSha);
+      if (!sha) {
+        throw new Error(`Pull request ${n} has no head commit.`);
+      }
+
+      const run = {
+        name,
+        status: "completed",
+        conclusion,
+        html_url: `https://github.acme.example/${full}/runs/${name}`,
+        output: { title: `${name} ${conclusion}`, summary: `${name} ${conclusion}` },
+      };
+
+      checkRuns.set(sha, [...(checkRuns.get(sha) ?? []).filter((c) => c.name !== name), run]);
     },
 
     async merge(n: number, actor: string) {

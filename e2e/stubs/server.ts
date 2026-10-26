@@ -183,6 +183,14 @@ const control: Route[] = [
   },
   {
     method: "POST",
+    path: "/_test/pulls/:n/check",
+    handler: async (r) => {
+      await github.setCheck(Number(r.params["n"]), r.json.name, r.json.conclusion);
+      return ok();
+    },
+  },
+  {
+    method: "POST",
     path: "/_test/pulls/:n/merge",
     handler: async (r) => {
       await github.merge(Number(r.params["n"]), "grace-lead");

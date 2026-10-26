@@ -28,7 +28,7 @@ Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-spec
 ## One pull request per ticket
 
 {{#if policies.tickets.many_prs}}A ticket in {{ team.name }} may have several pull requests. outstaff's automation moves it to `done` only when you have handed its work back as `done` and every pull request linked to it is closed with at least one merged; a merge alone does not close it. Hand back as `done` only once every pull request the ticket needs is open, and list them in the hand-back. Prefer one pull request per ticket: when the parts can be reviewed on their own, split them into sub-tickets as below.
-{{else}}outstaff's automation moves a ticket to `done` the moment its pull request merges, so in {{ team.name }} a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the office comments on the ticket that it now has two, and the first to merge closes it.
+{{else}}outstaff's automation moves a ticket to `done` when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is), so in {{ team.name }} a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the office comments on the ticket that it now has two, and the last to merge closes it.
 
 Plan the split before you start. When the work needs more than one pull request (independent parts, a stack, a change after a merge):
 

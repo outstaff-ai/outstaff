@@ -531,6 +531,15 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(seen.map((e) => e.data["sha"])).toEqual([p.head.sha, pushed.head.sha]);
     });
 
+    it("delivers what a rescan raised even when the rest of the rescan fails", async () => {
+      const p = await pr({ title: "p" });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      await vcs.seed.check(REPO, p.head.sha, { name: "build", status: "failure" });
+      tracker.listIssues = () => Promise.reject(new Error("not a member"));
+      await expect(ws.rescan()).rejects.toThrow("not a member");
+      expect(types()).toEqual([`pr.ci_failed#${p.number}`]);
+    });
+
     it("polls on the clock once started", async () => {
       const p = await pr({ title: "p" });
       await ws.apply(prEvent("pr.opened", p.number), meta());
