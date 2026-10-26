@@ -169,6 +169,26 @@
               "type": "string",
               "minLength": 1
             }
+          },
+          "tracker": {
+            "description": "Which tracker tickets this repository serves. Agents use it to decide where a ticket's work goes when the ticket does not name a repository.",
+            "type": "object",
+            "properties": {
+              "labels": {
+                "minItems": 1,
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "description": "Ticket labels that mean the work belongs in this repository."
+              }
+            },
+            "required": [
+              "labels"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [

@@ -16,6 +16,22 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 - `doc_feedback`: a trusted human commented on a document you wrote. Read the comments, act, and reply (`process/doc-feedback.md`).
 - `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back, which then comes back to you as active. Read the comment, act, and reply on the ticket.
 
+{{#if repos.many}}
+## Which repository
+
+{{ team.name }} has more than one repository. Before you change anything, decide which one the work belongs in, from the ticket and the team's configuration:
+
+- a repository the ticket names, by name or URL;
+- a repository your prompt lists as serving the ticket's project or labels;
+- the repositories of pull requests, files or commits the ticket links.
+
+The worktree you are given is only a default, and write access is not a reason to choose a repository. Follow each repository's own conventions for the work itself.
+
+If nothing settles it, or the repository it most likely means is one you can only read, do not use another repository instead. Ask in the ticket with `ost ask`, naming the candidates, and hand back as `waiting`, or as `blocked` when the likely repository is read-only for you. Make no change meanwhile.
+
+When you choose a repository the ticket did not name, say which and why in your first ticket comment or in the pull request description.
+{{/if}}
+
 ## Journal
 
 Append to the journal every time you hand back, whatever the outcome:

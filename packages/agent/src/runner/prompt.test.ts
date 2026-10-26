@@ -452,3 +452,40 @@ describe("buildWorkPrompt reply in the thread of finished work", () => {
     expect(prompt).not.toContain("running work item");
   });
 });
+
+describe("buildWorkPrompt repositories", () => {
+  const repo = (
+    name: string,
+    kind: string,
+    access: "read" | "write",
+    trackerLabels: string[] = [],
+  ) =>
+    ({
+      name,
+      kind,
+      access,
+      trackerLabels,
+      ref: { host: "github.acme.example", owner: "acme", name },
+    }) as never;
+
+  it("lists the repositories with their access and the labels they serve", () => {
+    const prompt = buildWorkPrompt(offer(), {
+      resumed: false,
+      repos: [repo("app", "primary", "read", ["web"]), repo("infra", "infra", "write")],
+    });
+
+    expect(prompt).toContain(
+      "- app (primary, read): github.acme.example/acme/app; tickets labeled web belong here",
+    );
+
+    expect(prompt).toContain("- infra (infra, write): github.acme.example/acme/infra");
+  });
+
+  it("lists nothing for a chat session", () => {
+    const chat = offer();
+    chat.workItem.kind = "chat";
+    expect(
+      buildWorkPrompt(chat, { resumed: false, repos: [repo("app", "primary", "write")] }),
+    ).not.toContain("Your repositories");
+  });
+});

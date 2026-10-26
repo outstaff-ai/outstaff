@@ -48,8 +48,13 @@ await repo.init({
     "# Contributing to Acme Shop\n\n## Commits\n\nOne commit per pull request. To change it, amend it and push with `git push --force-with-lease`.\n",
 });
 
+// A second repository of the team, so that an agent can write to two.
+const ops = new BareRepo(env("STUB_DATA_DIR"), "acme", "ops");
+await ops.init({ "README.md": "# Acme Ops\n" });
+
 const github = createGithub({
   repo,
+  more: [ops],
   apps: pairs(env("STUB_APPS")),
   publicKey: readFileSync(env("STUB_APP_PUBLIC_KEY"), "utf8"),
   permissions: { "ada-admin": "write", "grace-lead": "write" },
