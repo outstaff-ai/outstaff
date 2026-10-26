@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
 import { teamCommandsSchema, toolsSchema } from "../permissions/schema.js";
 import { customIssue } from "./issues.js";
+import { networkSchema, roleOverridesSchema } from "./network.js";
 import { ruleInputSchema } from "../workflow/rules.js";
 import { checkWorkflowConfig } from "../workflow/validate.js";
 
@@ -205,6 +206,9 @@ const peopleSchema = z
     tools: toolsSchema
       .optional()
       .meta(d("Tools for this agent only; they replace team-level tools of the same name.")),
+    network: networkSchema
+      .optional()
+      .meta(d("Network grants for this agent, merged over those of its roles.")),
     avatar: z
       .strictObject({
         seed: z.string().optional().meta(d("Seed for a generated avatar.")),
@@ -694,6 +698,13 @@ export const teamConfigSchema = z
     tools: toolsSchema
       .optional()
       .meta(d("Tools every agent of the team installs at start, with the commands they may run.")),
+    roles: z
+      .record(
+        z.string().regex(SLUG, "Use a role name: lowercase letters, digits and dashes."),
+        roleOverridesSchema,
+      )
+      .optional()
+      .meta(d("Settings per catalog role, for everyone who plays it.")),
     workflow: workflowSchema.optional(),
     policies: policiesSchema.optional(),
   })

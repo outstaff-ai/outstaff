@@ -1,5 +1,7 @@
 import { PortError, type RuntimeTool } from "@outstaff/core";
+import { adbVerbs } from "./adb.js";
 import { docVerbs } from "./doc.js";
+import { http } from "./http.js";
 import { me } from "./me.js";
 import { officeVerbs } from "./office-verbs.js";
 import { prVerbs } from "./pr.js";
@@ -25,7 +27,15 @@ export { cliPath, describeVerb, kebab, type VerbField } from "./describe.js";
 export { renderVerbsReference } from "./reference.js";
 export type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 
-export const VERBS: readonly Verb[] = [...ticketVerbs, ...docVerbs, ...prVerbs, me, ...officeVerbs];
+export const VERBS: readonly Verb[] = [
+  ...ticketVerbs,
+  ...docVerbs,
+  ...prVerbs,
+  me,
+  ...officeVerbs,
+  http,
+  ...adbVerbs,
+];
 
 export const findVerb = (name: string): Verb | undefined => VERBS.find((v) => v.name === name);
 

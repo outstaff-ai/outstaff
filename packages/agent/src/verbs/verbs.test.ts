@@ -1891,6 +1891,10 @@ describe("verb catalogue", () => {
       "work.queue",
       "work.attach",
       "team",
+      "http",
+      "adb.pair",
+      "adb.connect",
+      "adb.run",
     ]);
 
     // The one verb that merges is opt-in and gated by the team's policy; nothing else may.

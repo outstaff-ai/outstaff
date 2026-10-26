@@ -87,7 +87,12 @@ export interface Policy {
     /** Same keys as `repos`. */
     defaultBranches: Record<string, string>;
   };
-  network: { raw: "deny" };
+
+  /**
+   * Raw network tools are denied. With `raw: "http"`, `curl` is allowed for simple requests to the granted origins
+   * (`ost http` is the way to services that need a token).
+   */
+  network: { raw: "deny" } | { raw: "http"; origins: string[] };
 
   /** The `ost` verbs the profile may call, by verb name (`ticket.create`). Every verb when omitted. */
   ost?: { allow: string[] };

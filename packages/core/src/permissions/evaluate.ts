@@ -1,3 +1,4 @@
+import { curlProblem } from "./curl.js";
 import { evaluateGit, repoFor } from "./git.js";
 import { judgePath, resolvePath } from "./paths.js";
 import { lex, type Segment } from "./shell.js";
@@ -214,6 +215,13 @@ function evaluateSegment(policy: Policy, seg: Segment, cwd: string, call: ToolCa
       }
     } else if (program === "git") {
       checks.push(evaluateGit(policy, words, cwd, call));
+    } else if (program === "curl" && policy.network.raw === "http") {
+      const problem = curlProblem(words, policy.network.origins);
+      checks.push(
+        problem
+          ? deny(problem, "network.curl")
+          : allow("curl to a granted origin.", "network.curl.granted"),
+      );
     } else if (program === "pushd" || program === "popd") {
       checks.push(ask(`${program} is not tracked.`, "shell.cd"));
     } else {

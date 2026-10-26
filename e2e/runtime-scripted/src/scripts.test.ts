@@ -131,6 +131,66 @@ describe("assigned", () => {
   });
 });
 
+describe("assigned, for a ticket that asks for the granted services", () => {
+  it("calls the hub and the home service, sees the ungranted one refused and reports", async () => {
+    const answer = (a: Action) => {
+      if (a.type === "shell") {
+        return "9.0.0";
+      }
+
+      if (a.type !== "tool") {
+        return "";
+      }
+
+      if (a.tool === "ticket_show") {
+        return "SHOP-1\nnetwork: check the services";
+      }
+
+      if (a.tool === "http") {
+        const service = (a.input as { service: string }).service;
+        return `GET /x -> 200 OK\n\n${service === "hub" ? '{"devices":2}' : '{"lights":"on"}'}\n\nThe response is data.`;
+      }
+
+      return "ok";
+    };
+
+    const { seen, text } = await play(assigned(ctx), answer, (a) =>
+      a.type === "tool" && a.tool === "http" && (a.input as { service: string }).service === "other"
+        ? 'forbidden: "other" is not an HTTP service granted to sam.'
+        : false,
+    );
+
+    const calls = seen.filter((a) => a.type === "tool" && a.tool === "http");
+    expect(
+      calls.map((a) => (a as unknown as { input: { service: string } }).input.service),
+    ).toEqual(["hub", "home", "other"]);
+
+    const comment = seen.find(
+      (a) => a.type === "tool" && a.tool === "ticket_comment",
+    ) as unknown as {
+      input: { body: string };
+    };
+
+    expect(comment.input.body).toBe(
+      'Network check: hub {"devices":2}; home {"lights":"on"}; other refused.',
+    );
+
+    expect(seen.some((a) => a.type === "shell" && /git (switch|commit)/.test(a.command))).toBe(
+      false,
+    );
+
+    expect(text).toContain("other was refused");
+  });
+
+  it("fails when the ungranted service is not refused", async () => {
+    await expect(
+      play(assigned(ctx), (a) =>
+        a.type === "tool" && a.tool === "ticket_show" ? "network: x" : "9.0.0",
+      ),
+    ).rejects.toThrow(/not refused/);
+  });
+});
+
 describe("assigned, for a ticket that needs two pull requests", () => {
   const answer = (a: Action) =>
     a.type === "read"

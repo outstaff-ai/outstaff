@@ -21,6 +21,10 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `email.missing_placeholder` | email.pattern does not contain {handle}. |
 | `integrations.invalid_options` | An integration's options are rejected by its adapter. |
 | `integrations.unknown_adapter` | An integration names an adapter that is not installed for that port. |
+| `network.adb_mode` | An adb grant gives both port and pairing, or neither. |
+| `network.duplicate_name` | Two network grants of the same kind share a name. |
+| `network.invalid_url` | A network http grant url is not an origin (scheme, host and optional port only). |
+| `network.reserved_token` | A network token names a secret the framework or an adapter reads, so it cannot be a service token. |
 | `people.duplicate_handle` | Two people share the same handle. |
 | `people.invalid_grant_key` | A repo grant key is not a repo name, kind:<kind> or *. |
 | `people.unknown_extends` | An extends entry names a role that is not in the catalog. |
@@ -35,6 +39,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `policies.usage_threshold_order` | defer_scheduled_at is higher than pause_automatic_at. |
 | `repos.duplicate_name` | Two repos share the same name. |
 | `repos.multiple_primary` | More than one repo has kind primary. |
+| `roles.unknown_role` | A roles entry names a role that is not in the catalog. |
 | `schema.invalid` | A value fails a schema rule not covered by a more specific code. |
 | `schema.invalid_format` | A value does not match the required format. |
 | `schema.invalid_type` | A value has the wrong type. |

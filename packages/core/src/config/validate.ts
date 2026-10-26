@@ -4,6 +4,7 @@ import { CONFIG_CODES, type ConfigCode } from "./codes.js";
 import type { ConfigIssue } from "./issues.js";
 import { repoAccess } from "../permissions/build.js";
 import { POLICY_SWITCHES, policyOn, policyValue } from "../policies/switches.js";
+import type { Network } from "./network.js";
 import type { TeamConfig } from "./schema.js";
 
 export type RoleNeeds = { needs: Capability[]; optionalNeeds?: Capability[] };
@@ -24,6 +25,9 @@ export type ValidationContext = {
 
   /** Capabilities of installed adapters keyed `<port>/<adapter>`, for the `policies` switch checks. Defaults to `adapters`; independent of it, so a host can check switches without checking adapter names. */
   adapterCapabilities?: Map<string, AdapterInfo>;
+
+  /** Secret keys the framework and the installed adapters read. A network token may not name one of them. */
+  secretKeys?: ReadonlySet<string>;
 };
 
 export type ConfigWarning = ConfigIssue & {
@@ -111,6 +115,13 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
     "A person has a write grant but no vcs integration supports pull requests.",
   "integrations.unknown_adapter":
     "An integration names an adapter that is not installed for that port.",
+  "network.invalid_url":
+    "A network http grant url is not an origin (scheme, host and optional port only).",
+  "network.duplicate_name": "Two network grants of the same kind share a name.",
+  "network.adb_mode": "An adb grant gives both port and pairing, or neither.",
+  "network.reserved_token":
+    "A network token names a secret the framework or an adapter reads, so it cannot be a service token.",
+  "roles.unknown_role": "A roles entry names a role that is not in the catalog.",
   "workflow.duplicate_rule_id": "Two workflow rules share the same id.",
   "workflow.unknown_rule": "A rule is disabled by id but the preset has no rule with that id.",
   "workflow.unknown_template":
@@ -180,6 +191,38 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
   const adaptersKnown = ctx.adapters.size > 0;
   const canWrite = !adaptersKnown || provided.has("vcs.pullRequests");
   const checkRoles = ctx.roles.size > 0;
+
+  for (const role of Object.keys(config.roles ?? {})) {
+    if (checkRoles && !ctx.roles.has(role)) {
+      errors.push({
+        path: ["roles", role],
+        code: CONFIG_CODES.rolesUnknownRole,
+        message: `"${role}" is not a role in the catalog.`,
+      });
+    }
+  }
+
+  const networks: [(string | number)[], Network | undefined][] = [
+    ...Object.entries(config.roles ?? {}).map(
+      ([role, r]): [(string | number)[], Network | undefined] => [["roles", role], r.network],
+    ),
+    ...config.people.map((p, i): [(string | number)[], Network | undefined] => [
+      ["people", i],
+      p.network,
+    ]),
+  ];
+
+  for (const [base, network] of networks) {
+    network?.http?.forEach((g, n) => {
+      if (g.token && ctx.secretKeys?.has(g.token)) {
+        errors.push({
+          path: [...base, "network", "http", n, "token"],
+          code: CONFIG_CODES.networkReservedToken,
+          message: `${g.token} is a secret an integration reads; use a key of its own for the token of "${g.name}".`,
+        });
+      }
+    });
+  }
 
   config.people.forEach((person, i) => {
     if (checkRoles && !ctx.roles.has(person.role)) {

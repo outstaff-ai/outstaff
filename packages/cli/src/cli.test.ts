@@ -128,6 +128,66 @@ describe("ost validate", () => {
     ]);
   });
 
+  describe("network grants", () => {
+    const withNetwork = (block: string) =>
+      project(
+        "net-1",
+        readFileSync(ACME_TEAM_FILE, "utf8").replace(
+          "  - handle: mira\n",
+          `  - handle: mira\n${block}`,
+        ),
+      );
+
+    it("accepts grants on a person and on a role", async () => {
+      const dir = project(
+        "net-2",
+        readFileSync(ACME_TEAM_FILE, "utf8")
+          .replace(
+            "  - handle: mira\n",
+            "  - handle: mira\n    network:\n      adb:\n        - { name: wall-panel, host: 10.0.0.18, port: 5555 }\n",
+          )
+          .replace(
+            "\npeople:",
+            '\nroles:\n  developer:\n    network:\n      http:\n        - { name: hub, url: "https://hub.acme.example", token: HUB_TOKEN }\npeople:',
+          ),
+      );
+
+      const r = await ost(dir, ["validate"]);
+      expect(r.out).toContain("0 errors, 0 warnings");
+      expect(r.code).toBe(0);
+    });
+
+    it("rejects a role that is not in the catalog and a token that an integration reads", async () => {
+      const dir = project(
+        "net-3",
+        readFileSync(ACME_TEAM_FILE, "utf8")
+          .replace(
+            "  - handle: mira\n",
+            '  - handle: mira\n    network:\n      http:\n        - { name: hub, url: "https://hub.acme.example", token: GH_APP_PRIVATE_KEY }\n',
+          )
+          .replace("\npeople:", "\nroles:\n  wizard:\n    network: {}\npeople:"),
+      );
+
+      const r = await ost(dir, ["validate", "--json"]);
+      expect(r.code).toBe(1);
+      expect(
+        JSON.parse(r.out)
+          .errors.map((e: { code: string }) => e.code)
+          .toSorted(),
+      ).toEqual(["network.reserved_token", "roles.unknown_role"]);
+    });
+
+    it("rejects a url with a path", async () => {
+      const dir = withNetwork(
+        '    network:\n      http:\n        - { name: hub, url: "https://hub.acme.example/api" }\n',
+      );
+
+      const r = await ost(dir, ["validate"]);
+      expect(r.code).toBe(1);
+      expect(r.out).toContain("network.invalid_url");
+    });
+  });
+
   it("lists warnings with their consequence and still exits 0", async () => {
     const r = await ost(warned(), ["validate"]);
     expect(r.code).toBe(0);

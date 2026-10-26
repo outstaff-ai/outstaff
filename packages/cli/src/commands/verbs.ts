@@ -27,6 +27,7 @@ export const groupSummaries: Record<string, string> = {
   pr: "Open, update, review and diff pull requests, and work their review threads.",
   role: "Add custom roles to the team's catalog.",
   workflow: "Inspect how the team workflow reacts to events.",
+  adb: "Pair with, connect to and run adb commands on the Android devices granted to you.",
 };
 
 /** The adapters this build can create; teams using others get a clear message from the verbs that need them. */
@@ -76,8 +77,10 @@ export async function buildEnv(ctx: Context, options: GlobalOptions): Promise<Ag
 function toInput(verb: Verb, args: string[], options: Record<string, unknown>) {
   const input: Record<string, unknown> = {};
   for (const f of describeVerb(verb)) {
-    const raw = f.arg === undefined ? options[f.name] : args[f.arg];
-    if (raw === undefined) {
+    const raw =
+      f.arg === undefined ? options[f.name] : f.type === "array" ? args.slice(f.arg) : args[f.arg];
+
+    if (raw === undefined || (f.type === "array" && f.arg !== undefined && args.length <= f.arg)) {
       continue;
     }
 
@@ -93,7 +96,10 @@ function command(verb: Verb): CommandDef {
   const positional = fields
     .filter((f) => f.arg !== undefined)
     .toSorted((a, b) => a.arg! - b.arg!)
-    .map((f) => (f.required ? `<${f.name}>` : `[${f.name}]`));
+    .map((f) => {
+      const name = f.type === "array" ? `${f.name}...` : f.name;
+      return f.required ? `<${name}>` : `[${name}]`;
+    });
 
   return defineCommand({
     ...(path.length > 1 ? { group: path[0]! } : {}),
@@ -104,7 +110,7 @@ function command(verb: Verb): CommandDef {
     options: fields
       .filter((f) => f.arg === undefined)
       .map((f) => ({
-        flags: `--${kebab(f.name)}${f.type === "boolean" ? "" : ` <${f.name}>`}`,
+        flags: `--${kebab(f.name)}${f.type === "boolean" ? "" : ` <${f.name}${f.type === "array" ? "..." : ""}>`}`,
         description: f.description,
       })),
     examples: [...verb.examples, `${verb.examples[0]} --json`],

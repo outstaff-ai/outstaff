@@ -605,6 +605,110 @@ What the agent may run: "all" (any arguments), a list of first subcommands, or s
 - Optional
 - Minimum length 1
 
+### people[].network
+
+Network grants for this agent, merged over those of its roles.
+
+- Type: `object`
+- Optional
+
+#### people[].network.http
+
+Services reachable with `ost http`.
+
+- Type: `list of object`
+- Optional
+
+#### people[].network.http[]
+
+A service the agent may reach with `ost http`.
+
+- Type: `object`
+- Optional
+
+#### people[].network.http[].name
+
+Name the agent gives to `ost http`, for example hub.
+
+- Type: `string`
+- Required
+- Minimum length 1
+- Maximum length 30
+- Must match `^[a-z][a-z0-9-]*$`
+
+#### people[].network.http[].url
+
+Origin of the service, for example https://hub.acme.example.
+
+- Type: `string`
+- Required
+
+#### people[].network.http[].token
+
+Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>` to this service. The agent never sees the value.
+
+- Type: `string`
+- Optional
+- Must match `^[A-Za-z0-9_]+$`
+
+#### people[].network.adb
+
+Devices reachable with `ost adb`.
+
+- Type: `list of object`
+- Optional
+
+#### people[].network.adb[]
+
+An Android device the agent may reach with `ost adb`.
+
+- Type: `object`
+- Optional
+
+#### people[].network.adb[].name
+
+Name the agent gives to `ost adb`, for example test-tablet.
+
+- Type: `string`
+- Required
+- Minimum length 1
+- Maximum length 30
+- Must match `^[a-z][a-z0-9-]*$`
+
+#### people[].network.adb[].host
+
+Host name or IP address of the device, for example 10.0.0.16.
+
+- Type: `string`
+- Required
+- Minimum length 1
+- Maximum length 253
+- Must match `^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`
+
+#### people[].network.adb[].port
+
+Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.
+
+- Type: `integer`
+- Optional
+- Minimum 1
+- Maximum 65535
+
+#### people[].network.adb[].pairing
+
+Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.
+
+- Type: `string`
+- Optional
+- Must be `wireless`
+
+#### people[].network.raw_http
+
+Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.
+
+- Type: `boolean`
+- Optional
+
 ### people[].avatar
 
 Avatar settings.
@@ -821,6 +925,124 @@ What the agent may run: "all" (any arguments), a list of first subcommands, or s
 - Type: `string`
 - Optional
 - Minimum length 1
+
+## roles
+
+Settings per catalog role, for everyone who plays it.
+
+- Type: `map`
+- Optional
+
+### roles.<key>
+
+Settings for everyone who plays this role.
+
+- Type: `object`
+- Optional
+
+#### roles.<key>.network
+
+Network grants every person with this role gets, merged with their own.
+
+- Type: `object`
+- Optional
+
+#### roles.<key>.network.http
+
+Services reachable with `ost http`.
+
+- Type: `list of object`
+- Optional
+
+#### roles.<key>.network.http[]
+
+A service the agent may reach with `ost http`.
+
+- Type: `object`
+- Optional
+
+#### roles.<key>.network.http[].name
+
+Name the agent gives to `ost http`, for example hub.
+
+- Type: `string`
+- Required
+- Minimum length 1
+- Maximum length 30
+- Must match `^[a-z][a-z0-9-]*$`
+
+#### roles.<key>.network.http[].url
+
+Origin of the service, for example https://hub.acme.example.
+
+- Type: `string`
+- Required
+
+#### roles.<key>.network.http[].token
+
+Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>` to this service. The agent never sees the value.
+
+- Type: `string`
+- Optional
+- Must match `^[A-Za-z0-9_]+$`
+
+#### roles.<key>.network.adb
+
+Devices reachable with `ost adb`.
+
+- Type: `list of object`
+- Optional
+
+#### roles.<key>.network.adb[]
+
+An Android device the agent may reach with `ost adb`.
+
+- Type: `object`
+- Optional
+
+#### roles.<key>.network.adb[].name
+
+Name the agent gives to `ost adb`, for example test-tablet.
+
+- Type: `string`
+- Required
+- Minimum length 1
+- Maximum length 30
+- Must match `^[a-z][a-z0-9-]*$`
+
+#### roles.<key>.network.adb[].host
+
+Host name or IP address of the device, for example 10.0.0.16.
+
+- Type: `string`
+- Required
+- Minimum length 1
+- Maximum length 253
+- Must match `^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`
+
+#### roles.<key>.network.adb[].port
+
+Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.
+
+- Type: `integer`
+- Optional
+- Minimum 1
+- Maximum 65535
+
+#### roles.<key>.network.adb[].pairing
+
+Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.
+
+- Type: `string`
+- Optional
+- Must be `wireless`
+
+#### roles.<key>.network.raw_http
+
+Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.
+
+- Type: `boolean`
+- Optional
 
 ## workflow
 

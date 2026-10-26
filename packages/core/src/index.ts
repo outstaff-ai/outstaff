@@ -11,6 +11,17 @@ export {
   type TeamConfigInput,
 } from "./config/schema.js";
 
+export {
+  grantTokenKeys,
+  networkGrants,
+  networkSchema,
+  originOf,
+  type AdbGrant,
+  type HttpGrant,
+  type Network,
+  type NetworkGrants,
+} from "./config/network.js";
+
 export { parseTeamConfig, type ParseResult } from "./config/parse.js";
 export { buildTeamJsonSchema } from "./config/json-schema.js";
 export {

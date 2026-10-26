@@ -1,5 +1,8 @@
 import type { ItemContext } from "./prompt.js";
 
+/** The JSON body of an `http` answer: the line between the headers and the data note. */
+const body = (text: string) => /\n\n(\{.*\})\n/.exec(text)?.[1] ?? "(no body)";
+
 /** One thing a script does. The runtime judges it with the policy, runs it and hands the result back. */
 export type Action =
   | { type: "tool"; tool: string; input: Record<string, unknown> }
@@ -148,6 +151,48 @@ export async function* assigned(ctx: ItemContext): Script {
   const pnpm = (yield { type: "shell", command: "pnpm --version", cwd }).trim();
   if (!/^\d+\.\d+\.\d+/.test(pnpm)) {
     throw new Error(`pnpm --version printed "${pnpm}", not a version.`);
+  }
+
+  // A ticket that says `network: <what>` asks for the services the team granted: the hub needs no token, the home
+  // service does (added by the verb, never shown), and a service that was not granted is refused.
+  if (/^network: /m.test(shown)) {
+    const hub = yield {
+      type: "tool",
+      tool: "http",
+      input: { service: "hub", method: "GET", path: "/hub/status" },
+    };
+
+    const home = yield {
+      type: "tool",
+      tool: "http",
+      input: { service: "home", method: "GET", path: "/hub/secure" },
+    };
+
+    let refusal = "";
+    try {
+      yield {
+        type: "tool",
+        tool: "http",
+        input: { service: "other", method: "GET", path: "/hub/status" },
+      };
+    } catch (e) {
+      refusal = String(e);
+    }
+
+    if (!refusal.includes("is not an HTTP service granted")) {
+      throw new Error(`The ungranted service was not refused: ${refusal}`);
+    }
+
+    yield {
+      type: "tool",
+      tool: "ticket_comment",
+      input: {
+        key,
+        body: `Network check: hub ${body(hub)}; home ${body(home)}; other refused.`,
+      },
+    };
+
+    return `Reached hub and home; other was refused.`;
   }
 
   // A ticket that says `which repo: unclear` names no repository, and there are two the agent can write to: the
