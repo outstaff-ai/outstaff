@@ -62,12 +62,17 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 FROM base AS agent
 ARG BUBBLEWRAP_VERSION=0.8.0-2+deb12u1
 ARG SOCAT_VERSION=1.7.4.4-2
+ARG ADB_VERSION=1:34.0.5-12~bpo12+1
 # Claude Code runs each of the agent's commands in a bubblewrap sandbox (user and PID namespaces, a fresh /proc) so
 # they cannot read its credential; it needs socat for that sandbox too. bwrap must not be setuid: it works through an
 # unprivileged user namespace, which the container's seccomp and AppArmor profiles allow (examples/k8s).
-RUN apt-get update \
- && apt-get install -y --no-install-recommends "bubblewrap=${BUBBLEWRAP_VERSION}" "socat=${SOCAT_VERSION}" \
- && rm -rf /var/lib/apt/lists/* \
+# adb is Debian's package (amd64 and arm64) for `ost adb`; Google's platform-tools download is x86-64 only. It comes from
+# bookworm-backports because bookworm's own adb (29.0.6) has no `adb pair`, which wireless debugging needs (30.0.0 and
+# later). Backports is enabled for this one install (-t); only adb and its android-* libraries come from it.
+RUN echo "deb http://deb.debian.org/debian bookworm-backports main" >/etc/apt/sources.list.d/backports.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends -t bookworm-backports "bubblewrap=${BUBBLEWRAP_VERSION}" "socat=${SOCAT_VERSION}" "adb=${ADB_VERSION}" \
+ && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/backports.list \
  && test ! -u /usr/bin/bwrap
 # mise installs the tools a team's toolsets ask for at agent start; keep its data on the home volume.
 ENV MISE_DATA_DIR=/home/outstaff/.local/share/mise \

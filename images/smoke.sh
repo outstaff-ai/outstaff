@@ -50,6 +50,10 @@ smoke_agent() {
   expect "$image" '^bubblewrap [0-9]' bwrap --version
   expect "$image" '^not setuid$' sh -c 'test -u "$(command -v bwrap)" && echo setuid || echo not setuid'
   expect "$image" 'socat version' socat -V
+  # adb for `ost adb`, from Debian's package so it exists on both architectures.
+  expect "$image" '^Android Debug Bridge version' adb version
+  # Wireless debugging needs `adb pair` (platform-tools 30.0.0 and later).
+  expect "$image" '^ pair HOST' sh -c 'adb help 2>&1 || true'
   smoke_toolset "$image"
 }
 

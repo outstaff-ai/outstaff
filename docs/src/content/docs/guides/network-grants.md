@@ -78,18 +78,18 @@ A service with no authentication can also be reached with `curl` when `network.r
 
 ## Android devices
 
-`ost adb` uses `adb` from Android platform-tools. Raw `adb` is always denied, whatever the tool declaration allows, because the verb is what keeps the agent on the devices it was granted.
+`ost adb` uses `adb`. Raw `adb` is always denied, whatever the tool declaration allows, because the verb is what keeps the agent on the devices it was granted.
 
-### Install adb
+### adb in the agent image
 
-Outstaff does not ship adb and does not name a mise source for it, because none is maintained for platform-tools that Outstaff can pin. Either put `adb` on the `PATH` of an image you build ([Container images](/guides/images/)), or declare it as a tool with a source your team trusts ([Tools](/guides/tools/)):
+The agent image ships Debian's `adb` package, pinned to an exact version, on both amd64 and arm64, so there is nothing to install. The verb runs whichever `adb` is first on the agent's `PATH`, and `ost doctor <handle>` reports whether it runs.
+
+A team that wants another build can still declare `adb` as a tool with a source it trusts ([Tools](/guides/tools/)); the mise shim comes first on the `PATH`, so it takes over. `allow: []` installs the tool and allows no commands from the shell, which is what you want: the agent reaches the device through `ost adb`.
 
 ```yaml
 tools:
   adb: { version: 35.0.2, source: "<backend>:<name>", allow: [] }
 ```
-
-`allow: []` installs the tool and allows no commands from the shell, which is what you want: the agent reaches the device through `ost adb`. The verb runs whichever `adb` is first on the agent's `PATH`. `ost doctor <handle>` reports whether `adb` runs.
 
 ### Classic adb over TCP
 
