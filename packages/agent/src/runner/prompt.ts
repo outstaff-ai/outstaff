@@ -1,5 +1,5 @@
 import type { Offer } from "../office-client/index.js";
-import { headBranchOf, type Workspace } from "../repos/index.js";
+import { headBranchOf, type ClonedRepo, type Workspace } from "../repos/index.js";
 import { attachmentLines, type Attachment } from "./attachments.js";
 
 /** The user prompt of a run, from what the office sent with the offer. */
@@ -10,6 +10,9 @@ export function buildWorkPrompt(
     restarted?: boolean;
     interrupted?: boolean;
     workspace?: Workspace;
+
+    /** The repositories the person has a grant on, with their access. */
+    repos?: ClonedRepo[];
     chatContext?: string;
 
     /** Files from the chat message that started the item, downloaded to scratch or listed. */
@@ -173,12 +176,30 @@ export function buildWorkPrompt(
     }
   }
 
+  if (opts.repos?.length && item.kind !== "chat") {
+    lines.push(
+      "",
+      "Your repositories (access is what you can do in them; a read-only one cannot take your change):",
+      ...opts.repos.map((r) => {
+        const labels = r.trackerLabels.length
+          ? `; tickets labeled ${r.trackerLabels.join(", ")} belong here`
+          : "";
+
+        return `- ${r.name} (${r.kind}, ${r.access}): ${r.ref.host}/${r.ref.owner}/${r.ref.name}${labels}`;
+      }),
+    );
+  }
+
   if (opts.workspace) {
     const w = opts.workspace;
     const head = headBranchOf(offer);
     lines.push(
       "",
-      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, ${w.branch ? `branch ${w.branch}` : "detached HEAD at the default branch"}). Scratch space: ${w.scratch}.`,
+      `Your worktree for this item is ${w.worktree} (repository ${w.repo}, ${w.branch ? `branch ${w.branch}` : "detached HEAD at the default branch"}). Scratch space: ${w.scratch}.${
+        (opts.repos?.length ?? 0) > 1 && !headBranchOf(offer)
+          ? " That is the repository outstaff opened by default, not a decision about where the work belongs: settle the target repository as process/work-items.md says before you change anything."
+          : ""
+      }`,
       head
         ? `The branch to push to is ${head}, the head of your open pull request: git push origin HEAD:${head} (with --force-with-lease if you rewrite commits that are already pushed), so the pull request itself changes. Never open a new branch or pull request for this round, and never push to the default branch.`
         : w.branch

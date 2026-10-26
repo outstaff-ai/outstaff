@@ -131,6 +131,20 @@ const repoSchema = z
           'Extra files in this repository that agents read before they work, relative to its root, for example ["CLAUDE.md"]. A project CLAUDE.md is not loaded into agent sessions unless it is listed here.',
         ),
       ),
+    tracker: z
+      .strictObject({
+        labels: z
+          .array(z.string().trim().min(1, "A label cannot be empty."))
+          .min(1)
+          .max(20)
+          .meta(d("Ticket labels that mean the work belongs in this repository.")),
+      })
+      .optional()
+      .meta(
+        d(
+          "Which tracker tickets this repository serves. Agents use it to decide where a ticket's work goes when the ticket does not name a repository.",
+        ),
+      ),
   })
   .meta(d("A repository the team works in."));
 

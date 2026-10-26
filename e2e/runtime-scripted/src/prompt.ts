@@ -14,6 +14,9 @@ export interface ItemContext {
   branch?: string;
   scratch?: string;
 
+  /** The repositories the prompt lists, with the access to each. */
+  repos?: { name: string; kind: string; access: string; location: string }[];
+
   /** The convention files the prompt lists in the worktree, for example CONTRIBUTING.md. */
   conventionFiles: string[];
 
@@ -63,6 +66,10 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
   const listed = /Read these files in the worktree before you change anything[^:]*: (.+?)\.$/m.exec(
     prompt,
   )?.[1];
+
+  const repos = [...prompt.matchAll(/^- (\S+) \(([\w-]+), (read|write)\): (\S+?)(?:;.*)?$/gm)].map(
+    (m) => ({ name: m[1]!, kind: m[2]!, access: m[3]!, location: m[4]! }),
+  );
 
   const journal = /Journal of earlier rounds:\n([\s\S]*?)(?:\n\n|$)/.exec(prompt)?.[1] ?? "";
   const feedback = prompt
@@ -149,6 +156,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
         }
       : {}),
     ...(scratch ? { scratch } : {}),
+    ...(repos.length ? { repos } : {}),
     conventionFiles: listed ? listed.split(", ") : [],
     journal,
     feedback,

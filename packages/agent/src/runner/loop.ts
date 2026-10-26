@@ -11,7 +11,7 @@ import {
 import type { Filed, Link } from "@outstaff/protocol";
 import type { FiledWhat } from "./chat.js";
 import type { Offer, OfficeConnection } from "../office-client/index.js";
-import type { Workspaces } from "../repos/index.js";
+import type { ClonedRepo, Workspaces } from "../repos/index.js";
 import { VERBS, createRuntimeTools } from "../verbs/index.js";
 import type { ChatReportKind } from "../verbs/office.js";
 import type { AgentEnv } from "../verbs/types.js";
@@ -60,6 +60,9 @@ export interface WorkLoopOptions {
 
   /** Per-item worktree and scratch directory. Without it items run in `workdir` alone. */
   workspaces?: Workspaces;
+
+  /** The repositories the person has a grant on, listed in the work prompt with their access. */
+  repos?: ClonedRepo[];
   model?: string;
   maxTurns?: number;
   sessions?: SessionManager;
@@ -328,6 +331,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
         restarted,
         ...(offer.interrupted ? { interrupted: true } : {}),
         ...(workspace ? { workspace } : {}),
+        ...(opts.repos?.length ? { repos: opts.repos } : {}),
         ...(context ? { chatContext: context } : {}),
         attachments,
         ticketFiles,

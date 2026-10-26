@@ -105,6 +105,15 @@ describe("golden output per acme person", () => {
     expect(git).toContain("Squash merge. Titles start with the ticket key.");
   });
 
+  it("tells agents to settle the target repository only when the team has more than one", () => {
+    const work = (team: TeamConfig) =>
+      renderPerson({ team, handle: "sam", catalog: real }).files.get("process/work-items.md");
+
+    expect(acme.repos.length).toBeGreaterThan(1);
+    expect(work(acme)).toContain("## Which repository");
+    expect(work({ ...acme, repos: acme.repos.slice(0, 1) })).not.toContain("## Which repository");
+  });
+
   it("has no stale golden files", () => {
     expect(readdirSync(GOLDEN).toSorted()).toEqual(
       acme.people.map((p) => `${p.handle}.txt`).toSorted(),

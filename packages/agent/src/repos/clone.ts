@@ -28,6 +28,9 @@ export interface ClonedRepo {
 
   /** Extra files from team.yaml `repos[].instructions` that the agent reads first. */
   instructions: string[];
+
+  /** Ticket labels from team.yaml `repos[].tracker.labels` that mean work belongs in this repo. */
+  trackerLabels: string[];
 }
 
 export interface SyncRepositoriesOptions {
@@ -150,6 +153,7 @@ export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<C
         access,
         kind: repo.kind,
         instructions: repo.instructions ?? [],
+        trackerLabels: repo.tracker?.labels ?? [],
       });
     } catch (e) {
       log.warn("could not prepare a repository", { repo: repo.name, error: reason(e) });

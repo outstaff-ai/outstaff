@@ -150,6 +150,26 @@ export async function* assigned(ctx: ItemContext): Script {
     throw new Error(`pnpm --version printed "${pnpm}", not a version.`);
   }
 
+  // A ticket that says `which repo: unclear` names no repository, and there are two the agent can write to: the
+  // agent asks in the ticket, linking the candidates, and waits. It does not take whichever one it was given.
+  const writable = (ctx.repos ?? []).filter((r) => r.access === "write");
+  if (/^which repo: unclear$/m.test(shown) && writable.length > 1) {
+    const named = writable.filter((r) => shown.includes(r.name) || shown.includes(r.location));
+    if (named.length !== 1) {
+      const candidates = writable.map((r) => `\`${r.name}\` (${r.location})`).join(" or ");
+      yield {
+        type: "tool",
+        tool: "ask",
+        input: {
+          to: "architect",
+          question: `Which repository is ${key} for: ${candidates}? The ticket does not say, so I have changed nothing.`,
+        },
+      };
+
+      return `Asked which repository ${key} is for; waiting for the answer. No change made.`;
+    }
+  }
+
   const part = /^split: (.+)$/m.exec(shown)?.[1];
   let sub: { key: string; url: string } | undefined;
   if (part) {

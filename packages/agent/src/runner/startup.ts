@@ -437,6 +437,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     policy,
     builtinTools: [...policy.tools.allow],
     workdir: layout.workDir,
+    repos,
     workspaces: createWorkspaces({
       layout,
       repos,

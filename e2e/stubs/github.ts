@@ -50,6 +50,9 @@ type Json = Record<string, any>; // oxlint-disable-line no-explicit-any
 export interface GithubOptions {
   repo: BareRepo;
 
+  /** Further repositories of the same owner, served over git only (clone, fetch, push). */
+  more?: BareRepo[];
+
   /** App id to slug. The slug is what `GET /app` answers and the login of its pull requests, plus `[bot]`. */
   apps: Record<string, string>;
 
@@ -631,6 +634,27 @@ export function createGithub(opts: GithubOptions) {
           ? { status: 304 }
           : { headers: { etag: etag(), "content-type": "application/json" }, body: events },
     },
+    // The further repositories have no pull requests and no events; the office still polls them.
+    ...(opts.more ?? []).flatMap((r): Route[] => {
+      const base = `${API}/repos/${r.owner}/${r.name}`;
+      return [
+        { method: "GET", path: base, handler: () => ({ default_branch: "main" }) },
+        { method: "GET", path: `${base}/pulls`, handler: () => [] },
+        {
+          method: "GET",
+          path: `${base}/events`,
+          handler: () => ({
+            headers: { etag: '"none"', "content-type": "application/json" },
+            body: [],
+          }),
+        },
+        {
+          method: "GET",
+          path: `${base}/collaborators/:login/permission`,
+          handler: (q) => ({ permission: opts.permissions[q.params["login"]!] ?? "none" }),
+        },
+      ];
+    }),
     { method: "POST", path: "/api/graphql", handler: graphql },
   ];
 
@@ -655,7 +679,11 @@ export function createGithub(opts: GithubOptions) {
       };
     }
 
-    const out = await repo.backend({
+    const served = [repo, ...(opts.more ?? [])].find((r) =>
+      req.path.startsWith(`/${r.owner}/${r.name}.git/`),
+    );
+
+    const out = await (served ?? repo).backend({
       method: req.method,
       path: req.path,
       query: req.query.toString(),
@@ -675,7 +703,8 @@ export function createGithub(opts: GithubOptions) {
   return {
     routes,
     serveGit,
-    isGitPath: (path: string) => path.startsWith(`/${full}.git/`),
+    isGitPath: (path: string) =>
+      [repo, ...(opts.more ?? [])].some((r) => path.startsWith(`/${r.owner}/${r.name}.git/`)),
 
     // The test driver acts as humans through these.
     async review(n: number, actor: string, event: string, body: string, comments?: Json[]) {

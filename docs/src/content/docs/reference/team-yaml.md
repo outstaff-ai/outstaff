@@ -433,6 +433,27 @@ Extra files in this repository that agents read before they work, relative to it
 - Optional
 - Minimum length 1
 
+### repos[].tracker
+
+Which tracker tickets this repository serves. Agents use it to decide where a ticket's work goes when the ticket does not name a repository.
+
+- Type: `object`
+- Optional
+
+#### repos[].tracker.labels
+
+Ticket labels that mean the work belongs in this repository.
+
+- Type: `list of string`
+- Required
+- Minimum items 1
+
+#### repos[].tracker.labels[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 ## people
 
 The agents on the team; may be empty.

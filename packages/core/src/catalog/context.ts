@@ -10,6 +10,7 @@ import { policyOn, policyValue } from "../policies/switches.js";
  * at runtime.
  *
  *   team.name, team.product
+ *   repos.many (true when the team has more than one repo),
  *   repos.list[] {name,url,kind,default_branch,checks[],conventions,instructions[]}, repos.primary (null when none),
  *                  repos.has_checks (true when any repo lists checks),
  *                  repos.has_conventions (true when any repo has conventions text)
@@ -63,6 +64,7 @@ export type CatalogContext = {
   repos: {
     list: RepoContext[];
     primary: RepoContext | null;
+    many: boolean;
     has_checks: boolean;
     has_conventions: boolean;
   };
@@ -137,6 +139,7 @@ export function buildContext(team: TeamConfig, extras: ContextExtras = {}): Cata
     repos: {
       list: repos,
       primary: repos.find((r) => r.kind === "primary") ?? null,
+      many: repos.length > 1,
       has_checks: repos.some((r) => r.checks.length > 0),
       has_conventions: repos.some((r) => r.conventions !== ""),
     },

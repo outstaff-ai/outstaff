@@ -128,6 +128,11 @@ function teardown(code: number): never {
   process.exit(code);
 }
 
+// A killed run takes down its own compose project (and only that one) instead of leaving the stack behind.
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+  process.once(signal, () => teardown(128));
+}
+
 // ---------------------------------------------------------------- inputs: keys, certificates, team, secrets
 
 function write(path: string, text: string) {
@@ -228,6 +233,7 @@ humans:
 catalog: { version: 0.0.0 }
 repos:
   - { name: shop, url: github.acme.example/acme/shop, kind: primary }
+  - { name: ops, url: github.acme.example/acme/ops, kind: infra }
 people: []
 integrations:
   chat: { adapter: slack }
@@ -287,7 +293,7 @@ function hire() {
         "--pronouns",
         p.pronouns,
         "--repos",
-        "shop=write",
+        "shop=write,ops=write",
         "--yes",
         "--out",
         dir,
@@ -1170,6 +1176,40 @@ async function main() {
   assertEq(stays.github.pulls.length, blockedAt.pulls, "no pull request was opened for it");
   step(
     `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, assigned to the requester`,
+  );
+
+  // ---- 10b. a ticket that names no repository, for an agent that can write to two: it asks and waits
+  const { key: unsure } = await stub("POST", "/_test/tickets", {
+    title: "Require a single commit per pull request",
+    description: "which repo: unclear",
+    assignee: "sam",
+  });
+
+  const asks = await until(`${unsure} asked about its repository`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === unsure);
+    const question = t.comments.find((c: Json) => c.body.includes("Which repository is"));
+    return question ? { t, asked: question, pulls: s.github.pulls.length } : undefined;
+  });
+
+  assertEq(asks.asked.body.includes("`shop`"), true, "the question names the first candidate");
+  assertEq(asks.asked.body.includes("`ops`"), true, "the question names the second candidate");
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+      ? true
+      : undefined,
+  );
+
+  const stillAsking = await state();
+  const unsureTicket = stillAsking.tickets.find((x: Json) => x.key === unsure);
+  assertEq(unsureTicket.status, "In Progress", "the ticket waits for the answer, not in review");
+  assertEq(
+    stillAsking.github.pulls.length,
+    asks.pulls,
+    "no pull request was opened in either repository",
+  );
+
+  step(
+    `repository: ${unsure} names no repository and sam can write to two -> asked in the ticket, no pull request`,
   );
 
   // ---- 11. a reply in the thread of a done item continues its ticket instead of filing a duplicate
