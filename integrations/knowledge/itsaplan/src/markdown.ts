@@ -52,8 +52,8 @@ export function inline(s: string, marks: Mark[] = []): PmNode[] {
       out.push(text(m[4], [{ type: "code" }]));
     } else if (m[5] !== undefined) {
       out.push(...inline(m[5], [...marks, { type: "link", attrs: { ...LINK_ATTRS, href: m[6] } }]));
-    } else if (m[7] !== undefined) {
-      out.push(...inline(m[7], [...marks, { type: "italic" }]));
+    } else {
+      out.push(...inline(m[7]!, [...marks, { type: "italic" }]));
     }
 
     pos = start + m[0].length;
