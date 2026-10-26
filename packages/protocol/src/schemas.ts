@@ -534,7 +534,7 @@ export const messageSchema = z.discriminatedUnion("type", [
         .string()
         .optional()
         .describe(
-          "The ticket the pull request would link to, by the rule that links existing ones (closing keyword in the body, then branch, title, any key in the body); absent when it would link to none.",
+          "The ticket the pull request would link to, by the rule that links existing ones (branch, then title, then a closing keyword in the body; a bare mention links nothing); absent when it would link to none.",
         ),
       prs: z
         .array(

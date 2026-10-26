@@ -208,6 +208,8 @@ export async function* assigned(ctx: ItemContext): Script {
       input: { repo, title: `${sub.key}: ${part}`, body: `Closes ${sub.key}\n` },
     };
 
+    // Back on the parent's branch: the branch names the ticket a pull request links to.
+    yield { type: "shell", command: `git switch ${q(branch)}`, cwd };
     // A second pull request for the parent is refused; the answer names the pull request it has.
     try {
       yield {

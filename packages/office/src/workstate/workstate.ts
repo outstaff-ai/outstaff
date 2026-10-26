@@ -66,6 +66,11 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     return { host, owner, name };
   });
 
+  const ticketLinks = (repo?: RepoRef): string[] =>
+    team.repos.flatMap((r, i) =>
+      (r.ticket_link ?? []).filter(() => !repo || (repos[i] && sameRepo(repos[i], repo))),
+    );
+
   const defaultHost = repos[0]?.host ?? "git.acme.example";
   const vcsPeople = vcsAgentLogins(team);
   const trackerPeople = new Map<string, string>();
@@ -295,18 +300,27 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     return false;
   };
 
-  /** The ticket a pull request links to: the first candidate by `ticketCandidates` that the tracker knows. */
+  /** The ticket a pull request links to: the first candidate by `ticketCandidates` (branch, title, closing keyword) that the tracker knows. */
   const ticketOfDraft = async (
     draft: { headRef: string; title: string; body?: string },
     prev?: PrRecord,
+    repo?: RepoRef,
   ): Promise<string | undefined> => {
-    const candidates = ticketCandidates(draft);
-    if (prev?.ticket && candidates.includes(prev.ticket)) {
-      return prev.ticket;
+    // A draft names no repository, so every repository's patterns apply to it.
+    const candidates = ticketCandidates(draft, ticketLinks(repo));
+    const kept = candidates.find((c) => c.key === prev?.ticket);
+    if (kept) {
+      return kept.key;
     }
 
-    for (const key of candidates) {
+    for (const { key, source } of candidates) {
       if (!tracker || (await ensureTicket(key))) {
+        logger.info("pull request linked to ticket", {
+          headRef: draft.headRef,
+          ticket: key,
+          source,
+        });
+
         return key;
       }
     }
@@ -315,7 +329,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   };
 
   const inferTicket = (pr: PullRequest, prev?: PrRecord) =>
-    ticketOfDraft({ headRef: pr.head.ref, title: pr.title, body: pr.body }, prev);
+    ticketOfDraft({ headRef: pr.head.ref, title: pr.title, body: pr.body }, prev, pr.repo);
 
   // Pull requests
 

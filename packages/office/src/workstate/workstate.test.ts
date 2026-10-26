@@ -164,6 +164,21 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(ws.ticketForPr(prRef(third.number))).toBeUndefined();
     });
 
+    it("does not link a pull request that only mentions a ticket, and merging it leaves the ticket alone", async () => {
+      const a = await tracker.createIssue({ title: "A", body: "" });
+      const p = await pr({
+        title: "Retry docs",
+        body: `After deploying, ask the agent to retry ${a.key}.`,
+      });
+
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      await vcs.seed.merge(REPO, p.number, "dana");
+      await ws.apply(prEvent("pr.merged", p.number), meta());
+
+      expect(ws.ticketForPr(prRef(p.number))).toBeUndefined();
+      expect(ws.prsOfTicket(a.key)).toEqual([]);
+    });
+
     it("tells which ticket a pull request about to be opened links to, and what that ticket has", async () => {
       const a = await tracker.createIssue({ title: "A", body: "" });
       const b = await tracker.createIssue({ title: "B", body: "" });
@@ -172,15 +187,19 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       await vcs.seed.merge(REPO, p.number, "dana");
       await ws.apply(prEvent("pr.merged", p.number), meta());
 
-      // By the rule that links existing ones: a closing keyword outranks the branch and the title.
+      // By the rule that links existing ones: the branch outranks a closing keyword in the body.
       const draft = {
         headRef: `sam/${a.key.toLowerCase()}-ui`,
         title: "ui",
         body: `Closes ${b.key}`,
       };
 
-      expect(await ws.ticketForDraft(draft)).toBe(b.key);
-      expect(await ws.ticketForDraft({ ...draft, body: "" })).toBe(a.key);
+      expect(await ws.ticketForDraft(draft)).toBe(a.key);
+      expect(await ws.ticketForDraft({ ...draft, headRef: "sam/ui" })).toBe(b.key);
+      expect(await ws.ticketForDraft({ ...draft, headRef: "sam/ui", body: `See ${b.key}` })).toBe(
+        undefined,
+      );
+
       expect(await ws.ticketForDraft({ headRef: "sam/ui", title: "ui", body: "" })).toBeUndefined();
       expect(await ws.ticketForDraft({ headRef: "sam/ui", title: "SHOP-77: ui", body: "" })).toBe(
         undefined,

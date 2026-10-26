@@ -30,9 +30,9 @@ The work prompt lists the convention files found in your worktree. A project `CL
 
 If the repository says nothing on a point, use these defaults:
 
-- One branch per item, created by you once you know the work, before the first commit. Name it `<type>/<ticket key>-<short slug>`, for example `feat/ACME-106-di-scopes`, or `<type>/<short slug>` without a ticket. Keep the ticket key in the branch name or the pull request title: that is how the office links the pull request to its ticket.
+- One branch per item, created by you once you know the work, before the first commit. Name it `<type>/<ticket key>-<short slug>`, for example `feat/ACME-106-di-scopes`, or `<type>/<short slug>` without a ticket. The office links a pull request to its ticket from the key in the branch name, in the title, or after a closing keyword in the description (`Closes ACME-12`). Follow the repository's conventions for how to reference the ticket, and make sure one of these carries the key; a key mentioned anywhere else links nothing. If the repository says nothing, put `Closes <ticket key>` in the description.
 - Focused commits with clear messages, in the style of the repository's recent history.
-- A pull request description that says why, then links the ticket if there is one.
+- A pull request description that says why, then references the ticket if there is one, as above.
 - Never rewrite a commit you did not make, and never touch anyone else's branch.
 
 When the repository's rules and a default disagree, the repository wins. When two of its rules disagree, or a rule would make you do something unsafe, say so in the pull request or ask with `ost ask`.

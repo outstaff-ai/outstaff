@@ -1,4 +1,4 @@
-{{#if integrations.has.tracker}}Part of <ticket link>
+{{#if integrations.has.tracker}}Closes <ticket key>
 {{/if}}
 ## What and why
 

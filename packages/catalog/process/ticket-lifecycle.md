@@ -33,7 +33,7 @@ Plan the split before you start. When the work needs more than one pull request 
 
 1. Create a sub-ticket for each extra part: `ost ticket create --parent <ticket> --title "..."`. It is assigned to you and linked to the parent; its description starts with a "Part of" line with the parent's link.
 2. Comment on the parent ticket that you split the work, with the links to the sub-tickets and what each one covers.
-3. Work them one pull request each. Put `Closes <ticket>` for that ticket in the description of its pull request, so it is linked to the right ticket. The parent's pull request covers what is left of the parent.
+3. Work them one pull request each. Reference that ticket in its pull request as the repository's conventions say (its key in the branch name or the title, or `Closes <ticket>` in the description if they say nothing), so the pull request is linked to the right ticket; a mention of a key alone links nothing. The parent's pull request covers what is left of the parent.
    {{/if}}{{else}}
 
 ## Without a tracker
