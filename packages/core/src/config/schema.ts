@@ -6,6 +6,25 @@ import { customIssue } from "./issues.js";
 import { ruleInputSchema } from "../workflow/rules.js";
 import { checkWorkflowConfig } from "../workflow/validate.js";
 
+/** A ticket key such as ACME-12. */
+export const TICKET_KEY = "[A-Za-z][A-Za-z0-9]{1,9}-\\d+";
+
+/**
+ * Compiles a `ticket_link` pattern: a regular expression with one `{key}` placeholder, matched
+ * case-insensitively; the key is the group `key`. Returns the reason when the pattern is unusable.
+ */
+export function compileTicketLink(pattern: string): RegExp | string {
+  if (pattern.split("{key}").length !== 2) {
+    return "Use exactly one {key} placeholder for the ticket key.";
+  }
+
+  try {
+    return new RegExp(pattern.replace("{key}", `(?<key>${TICKET_KEY})`), "gi");
+  } catch {
+    return "Not a valid regular expression.";
+  }
+}
+
 const d = (description: string) => ({ description });
 
 const SLUG = /^[a-z][a-z0-9-]*$/;
@@ -71,6 +90,27 @@ const repoSchema = z
       .meta(
         d(
           "How work is done in this repository, as free text: commits, branches, pull request title and body, tests. For repositories whose own files (CONTRIBUTING.md, AGENTS.md, the pull request template) cannot say it. Agents read it in addition to those files.",
+        ),
+      ),
+    ticket_link: z
+      .array(
+        z
+          .string()
+          .min(1)
+          .max(200)
+          .superRefine((pattern, ctx) => {
+            const compiled = compileTicketLink(pattern);
+            if (typeof compiled === "string") {
+              ctx.addIssue({ code: "custom", message: compiled });
+            }
+          }),
+      )
+      .min(1)
+      .max(10)
+      .optional()
+      .meta(
+        d(
+          "Extra ways this repository's pull request body names its ticket, as regular expressions with one {key} placeholder for the ticket key (for example `Ticket: {key}`). A pull request is always linked by the ticket key in its branch name, its title, or a closing keyword in its body (`Closes ACME-12`); these patterns add to the last. A key mentioned in the body in any other way links nothing.",
         ),
       ),
     instructions: z

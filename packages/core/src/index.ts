@@ -5,6 +5,8 @@ export { type ConfigIssue } from "./config/issues.js";
 export {
   teamConfigSchema,
   adapterRefSchema,
+  compileTicketLink,
+  TICKET_KEY,
   type TeamConfig,
   type TeamConfigInput,
 } from "./config/schema.js";

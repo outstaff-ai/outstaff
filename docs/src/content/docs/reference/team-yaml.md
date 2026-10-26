@@ -404,6 +404,21 @@ How work is done in this repository, as free text: commits, branches, pull reque
 - Optional
 - Minimum length 1
 
+### repos[].ticket_link
+
+Extra ways this repository's pull request body names its ticket, as regular expressions with one {key} placeholder for the ticket key (for example `Ticket: {key}`). A pull request is always linked by the ticket key in its branch name, its title, or a closing keyword in its body (`Closes ACME-12`); these patterns add to the last. A key mentioned in the body in any other way links nothing.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+### repos[].ticket_link[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+- Maximum length 200
+
 ### repos[].instructions
 
 Extra files in this repository that agents read before they work, relative to its root, for example ["CLAUDE.md"]. A project CLAUDE.md is not loaded into agent sessions unless it is listed here.

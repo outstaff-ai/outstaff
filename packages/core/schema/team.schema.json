@@ -149,6 +149,17 @@
             "type": "string",
             "minLength": 1
           },
+          "ticket_link": {
+            "description": "Extra ways this repository's pull request body names its ticket, as regular expressions with one {key} placeholder for the ticket key (for example `Ticket: {key}`). A pull request is always linked by the ticket key in its branch name, its title, or a closing keyword in its body (`Closes ACME-12`); these patterns add to the last. A key mentioned in the body in any other way links nothing.",
+            "minItems": 1,
+            "maxItems": 10,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
           "instructions": {
             "description": "Extra files in this repository that agents read before they work, relative to its root, for example [\"CLAUDE.md\"]. A project CLAUDE.md is not loaded into agent sessions unless it is listed here.",
             "minItems": 1,

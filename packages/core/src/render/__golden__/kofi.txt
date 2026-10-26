@@ -174,7 +174,7 @@ Plan the split before you start. When the work needs more than one pull request 
 
 1. Create a sub-ticket for each extra part: `ost ticket create --parent <ticket> --title "..."`. It is assigned to you and linked to the parent; its description starts with a "Part of" line with the parent's link.
 2. Comment on the parent ticket that you split the work, with the links to the sub-tickets and what each one covers.
-3. Work them one pull request each. Put `Closes <ticket>` for that ticket in the description of its pull request, so it is linked to the right ticket. The parent's pull request covers what is left of the parent.
+3. Work them one pull request each. Reference that ticket in its pull request as the repository's conventions say (its key in the branch name or the title, or `Closes <ticket>` in the description if they say nothing), so the pull request is linked to the right ticket; a mention of a key alone links nothing. The parent's pull request covers what is left of the parent.
    
 
 === process/work-items.md ===
@@ -232,9 +232,9 @@ The work prompt lists the convention files found in your worktree. A project `CL
 
 If the repository says nothing on a point, use these defaults:
 
-- One branch per item, created by you once you know the work, before the first commit. Name it `<type>/<ticket key>-<short slug>`, for example `feat/ACME-106-di-scopes`, or `<type>/<short slug>` without a ticket. Keep the ticket key in the branch name or the pull request title: that is how the office links the pull request to its ticket.
+- One branch per item, created by you once you know the work, before the first commit. Name it `<type>/<ticket key>-<short slug>`, for example `feat/ACME-106-di-scopes`, or `<type>/<short slug>` without a ticket. The office links a pull request to its ticket from the key in the branch name, in the title, or after a closing keyword in the description (`Closes ACME-12`). Follow the repository's conventions for how to reference the ticket, and make sure one of these carries the key; a key mentioned anywhere else links nothing. If the repository says nothing, put `Closes <ticket key>` in the description.
 - Focused commits with clear messages, in the style of the repository's recent history.
-- A pull request description that says why, then links the ticket if there is one.
+- A pull request description that says why, then references the ticket if there is one, as above.
 - Never rewrite a commit you did not make, and never touch anyone else's branch.
 
 When the repository's rules and a default disagree, the repository wins. When two of its rules disagree, or a rule would make you do something unsafe, say so in the pull request or ask with `ost ask`.
@@ -495,7 +495,7 @@ Follow `process/hand-back.md`. Link the pull request, ticket and runbook. Say wh
 <Open point or risk, only if there is one.>
 
 === templates/pull-request.md ===
-Part of <ticket link>
+Closes <ticket key>
 ## What and why
 
 - <what changed, one bullet each>
