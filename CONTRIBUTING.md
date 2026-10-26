@@ -81,6 +81,8 @@ Maintainers: signatures are stored in the separate `outstaff-ai/cla-signatures` 
 - Keep modules small. Put tests in a `__tests__` folder inside the folder they test, as `__tests__/*.test.ts`, and run them with vitest. Test-only fixtures and helpers go in the same `__tests__` folder. `pnpm check:tests` (run in CI) fails on a test file outside a `__tests__` folder.
 - Write comments only where the why is not obvious. Match the style of the code around your change.
 
+- **Coverage.** Integrations (`integrations/*/*`) must have 100% line, branch, function and statement coverage in every file; CI fails below it (`pnpm test:coverage`). Cover a branch with a test, or delete it if it can't run; no coverage-ignore comments.
+
 ## Reporting bugs, asking for features, and security
 
 - Bugs and feature requests: open an issue with the matching form. Pick the adapter or role form when you want a new integration or a new role.
