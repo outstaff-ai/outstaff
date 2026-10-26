@@ -1,6 +1,7 @@
 import type { TrackerSeed } from "../contracts/seeds.js";
 import { PortError, type CanonicalStatus, type StatusMap } from "../ports/index.js";
 import type { Comment, Issue, Member, NewIssue, Tracker, TrackerEvent } from "../ports/index.js";
+import { mentionData } from "../mentions.js";
 import { EventLog, steppingClock } from "./util.js";
 
 export interface FakeTrackerOptions {
@@ -205,7 +206,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       });
 
       comments.set(key, list);
-      emit("commented", key, { commentId: id });
+      emit("commented", key, { commentId: id, body, ...mentionData(body) });
       return { id, url: list[list.length - 1]!.url };
     },
     async listComments(key) {

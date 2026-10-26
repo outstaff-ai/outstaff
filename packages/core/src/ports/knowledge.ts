@@ -44,6 +44,9 @@ export interface DocEvent {
     /** The text of the document the comment is anchored to. */
     anchorText?: string;
     body: string;
+
+    /** The `@name` mentions in the body, as the adapter parsed them; the office maps them to team members. */
+    mentions?: string[];
   };
 }
 

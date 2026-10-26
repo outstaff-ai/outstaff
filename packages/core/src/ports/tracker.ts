@@ -35,6 +35,8 @@ export interface TrackerEvent {
   key: string;
   actor: Member;
   at: string;
+
+  /** A `commented` event carries `body`, `commentId`, `url` and `mentions`: the `@name`s in the body, as the adapter parsed them. */
   data: Record<string, unknown>;
 }
 

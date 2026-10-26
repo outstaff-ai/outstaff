@@ -1,4 +1,4 @@
-import { parseRepoUrl, PortError } from "@outstaff/core";
+import { parseRepoUrl, policyOn, PortError } from "@outstaff/core";
 import type {
   DocEvent,
   RepoRef,
@@ -10,7 +10,13 @@ import type {
 import type { Cancel } from "../clock.js";
 import { clip, prLabel, subjectLabel } from "../log.js";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffOptions } from "./backoff.js";
-import { normalizeDocEvent, normalizeTrackerEvent, normalizeVcsEvent } from "./normalize.js";
+import {
+  agentMentionResolver,
+  normalizeDocEvent,
+  normalizeTrackerEvent,
+  normalizeVcsEvent,
+  resolveMentions,
+} from "./normalize.js";
 import { createTrust } from "./trust.js";
 import type { EventHandler, Intake, IntakeMeta, IntakeOptions } from "./types.js";
 import { createWebhookServer, type WebhookParser, type WebhookServer } from "./webhook.js";
@@ -77,6 +83,11 @@ export function createIntake(opts: IntakeOptions): Intake {
     ...(opts.trustTtlMs === undefined ? {} : { ttlMs: opts.trustTtlMs }),
     ...(opts.resolveAgent ? { resolveAgent: opts.resolveAgent } : {}),
   });
+
+  // A trusted person's @mention of an agent in a comment; with the switch off nobody is mentioned.
+  const mentions = policyOn(team.policies, "feedback.mentions")
+    ? agentMentionResolver(team)
+    : undefined;
 
   const handlers: EventHandler[] = [];
   const maxAttempts = opts.maxAttempts ?? DEFAULT_MAX_ATTEMPTS;
@@ -281,16 +292,19 @@ export function createIntake(opts: IntakeOptions): Intake {
     ingest("tracker", event, event.key, async () => {
       const actor = trust.trackerActor(event.actor);
       const mapped = normalizeTrackerEvent(event, actor);
+      if (mapped) {
+        resolveMentions(mapped, mentions);
+      }
+
       return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
     });
 
   const ingestDoc = (event: DocEvent, ticket: string | undefined) =>
     ingest("knowledge", event, event.doc, async () => {
       const actor = trust.trackerActor(event.actor);
-      return {
-        event: normalizeDocEvent(event, actor, ticket),
-        trusted: actor.kind !== "human" || actor.trusted,
-      };
+      const mapped = normalizeDocEvent(event, actor, ticket);
+      resolveMentions(mapped, mentions);
+      return { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
     });
 
   // With no stored cursor the source returns its recent history; that is not news, so only remember where "now" is.

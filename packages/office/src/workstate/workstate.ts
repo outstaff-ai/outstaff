@@ -354,10 +354,20 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const recordCommentRequester = async (key: string, event: WorkflowEvent) => {
     const person = trustedHuman(event);
     const ticket = tickets.get(key);
+    // A comment that mentions an agent hands the ticket to it, so the next hand-back goes to who wrote the comment.
+    const mentions = event.data["mentions"];
+    const handsOver =
+      Array.isArray(mentions) &&
+      mentions.length > 0 &&
+      ticket?.status !== undefined &&
+      !TERMINAL.has(ticket.status);
+
     if (
       !person ||
-      ticket?.assignee?.kind !== "human" ||
-      (ticket.status !== "review" && ticket.status !== "blocked")
+      !ticket ||
+      (!handsOver &&
+        (ticket.assignee?.kind !== "human" ||
+          (ticket.status !== "review" && ticket.status !== "blocked")))
     ) {
       return;
     }
@@ -572,7 +582,8 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const refreshWorkers = async () => {
     const latest = new Map<string, { at: string; person: string; done: boolean }>();
     for (const item of await store.listItems()) {
-      if (!item.subject || item.status === "queued") {
+      // Answering a question on a ticket does not make the agent the one who worked on it.
+      if (!item.subject || item.status === "queued" || item.kind === "asked") {
         continue;
       }
 

@@ -974,7 +974,7 @@
                           "properties": {
                             "assign": {
                               "type": "string",
-                              "pattern": "^(author|last_worker|requester|none|human:\\S+|role:[a-z][a-z0-9-]*)$",
+                              "pattern": "^(author|last_worker|requester|mentioned|none|human:\\S+|role:[a-z][a-z0-9-]*)$",
                               "description": "Assign the ticket."
                             }
                           },
@@ -1030,7 +1030,7 @@
                               "properties": {
                                 "person": {
                                   "type": "string",
-                                  "pattern": "^(author|assignee|last_worker|doc_author|role:[a-z][a-z0-9-]*)$"
+                                  "pattern": "^(author|assignee|last_worker|doc_author|mentioned|other_mentioned|role:[a-z][a-z0-9-]*)$"
                                 },
                                 "kind": {
                                   "type": "string",
@@ -1231,7 +1231,8 @@
             "follow_up_round": true,
             "merged_prs": true,
             "doc_comments": true,
-            "ticket_comments": true
+            "ticket_comments": true,
+            "mentions": true
           },
           "description": "How agents act on feedback from trusted people beyond the first round.",
           "type": "object",
@@ -1254,6 +1255,11 @@
             "ticket_comments": {
               "default": true,
               "description": "Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.",
+              "type": "boolean"
+            },
+            "mentions": {
+              "default": true,
+              "description": "Hand a ticket to the agent a trusted person mentions in a comment on it (assign, move to active, start a round), and start a round for an agent mentioned in a document comment. Switches the preset rules mention-assigns-agent, doc-mention-feedback and doc-mention-assigns-ticket. Default on.",
               "type": "boolean"
             }
           },
@@ -2043,6 +2049,19 @@
           ],
           "additionalProperties": false,
           "description": "The review or comment in the event has (or lacks) text: a non-blank body, or for a review, inline comments."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "agent_mentioned": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "agent_mentioned"
+          ],
+          "additionalProperties": false,
+          "description": "The comment in the event mentions (or, with false, does not mention) a team agent: event.data.mentions, which the office fills with the handles of the agents a trusted person's comment names."
         },
         {
           "type": "object",

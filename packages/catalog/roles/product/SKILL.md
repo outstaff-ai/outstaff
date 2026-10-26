@@ -49,7 +49,7 @@ Someone asks what is in or out of scope.
 
 ### doc-feedback
 
-A trusted human commented on a document you wrote.
+A trusted human commented on a document you wrote, or mentioned you on one.
 
 Follow `process/doc-feedback.md`: read the comments, act on them, reply, and resolve a thread when you have addressed it and the last word is yours.
 

@@ -382,12 +382,21 @@ const policiesSchema = z
               "Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.",
             ),
           ),
+        mentions: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Hand a ticket to the agent a trusted person mentions in a comment on it (assign, move to active, start a round), and start a round for an agent mentioned in a document comment. Switches the preset rules mention-assigns-agent, doc-mention-feedback and doc-mention-assigns-ticket. Default on.",
+            ),
+          ),
       })
       .default({
         follow_up_round: true,
         merged_prs: true,
         doc_comments: true,
         ticket_comments: true,
+        mentions: true,
       })
       .meta(d("How agents act on feedback from trusted people beyond the first round.")),
     hand_back: z

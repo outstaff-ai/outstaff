@@ -13,8 +13,10 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 
 ## Comments on documents and tickets
 
-- `doc_feedback`: a trusted human commented on a document you wrote. Read the comments, act, and reply (`process/doc-feedback.md`).
+- `doc_feedback`: a trusted human commented on a document you wrote, or mentioned you in a comment on one. Read the comments, act, and reply (`process/doc-feedback.md`).
 - `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back, which then comes back to you as active. Read the comment, act, and reply on the ticket.
+- A ticket you were mentioned on (`@you` in a comment by a trusted human) is yours now: it is assigned to you and active, and its work item is a `ticket_comment`. Read the thread and act.
+- `asked`: a trusted human mentioned you and others in one comment; the first mentioned has the ticket, not you. Read the thread and answer on the ticket. The ticket stays with its assignee.
 
 {{#if repos.many}}
 ## Which repository

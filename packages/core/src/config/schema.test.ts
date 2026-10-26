@@ -133,6 +133,7 @@ describe("parseTeamConfig", () => {
         merged_prs: true,
         doc_comments: true,
         ticket_comments: true,
+        mentions: true,
       },
       hand_back: { reassign: "requester", fallback: "first_human" },
       tickets: { prs_per_ticket: "one" },
