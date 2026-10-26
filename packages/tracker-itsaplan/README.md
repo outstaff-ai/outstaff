@@ -76,4 +76,4 @@ Pacing is per process: several containers using the same key still share the ser
 
 ## Tests
 
-`pnpm test` runs the tracker and knowledge contract kits against the adapters over a stateful stand-in for the REST API (`src/testing/`), plus markdown round-trips, status mapping, events, errors and the CA path. `src/live.test.ts` runs against a real scratch project only when `OUTSTAFF_TEST_ITSAPLAN_URL`, `OUTSTAFF_TEST_ITSAPLAN_PROJECT` and `ITSAPLAN_API_KEY` are set (optionally `OUTSTAFF_TEST_ITSAPLAN_API_URL` and `OUTSTAFF_TEST_ITSAPLAN_CA_FILE`); otherwise it shows as skipped. It creates issues and pages in that project.
+`pnpm test` runs the tracker and knowledge contract kits against the adapters over a stateful stand-in for the REST API (`src/testing/`), plus markdown round-trips, status mapping, events, errors and the CA path. `src/__tests__/live.test.ts` runs against a real scratch project only when `OUTSTAFF_TEST_ITSAPLAN_URL`, `OUTSTAFF_TEST_ITSAPLAN_PROJECT` and `ITSAPLAN_API_KEY` are set (optionally `OUTSTAFF_TEST_ITSAPLAN_API_URL` and `OUTSTAFF_TEST_ITSAPLAN_CA_FILE`); otherwise it shows as skipped. It creates issues and pages in that project.

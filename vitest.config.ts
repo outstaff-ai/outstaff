@@ -40,7 +40,7 @@ export default defineConfig({
         test: {
           name: pkg,
           root: `packages/${pkg}`,
-          include: ["src/**/*.test.ts"],
+          include: ["src/**/__tests__/**/*.test.ts"],
 
           // Office test files share one Postgres database when OUTSTAFF_TEST_POSTGRES_URL is set.
           ...(pkg === "office" ? { fileParallelism: false } : {}),
@@ -48,15 +48,15 @@ export default defineConfig({
       })),
       ...adapters.map((pkg) => ({
         resolve: { alias: coreAlias },
-        test: { name: pkg, root: `packages/${pkg}`, include: ["src/**/*.test.ts"] },
+        test: { name: pkg, root: `packages/${pkg}`, include: ["src/**/__tests__/**/*.test.ts"] },
       })),
       // The scripted runtime of the end-to-end test reads the agent's prompt, so it tests against the agent's source.
       {
         resolve: { alias: coreAlias },
-        test: { name: "e2e", root: "e2e", include: ["**/src/**/*.test.ts"] },
+        test: { name: "e2e", root: "e2e", include: ["**/src/**/__tests__/**/*.test.ts"] },
       },
-      { test: { name: "scripts", root: "scripts", include: ["*.test.ts"] } },
-      { test: { name: "docs", root: "docs", include: ["scripts/**/*.test.mjs"] } },
+      { test: { name: "scripts", root: "scripts", include: ["__tests__/*.test.ts"] } },
+      { test: { name: "docs", root: "docs", include: ["scripts/**/__tests__/**/*.test.mjs"] } },
     ],
   },
 });

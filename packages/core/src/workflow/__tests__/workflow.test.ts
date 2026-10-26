@@ -1,0 +1,1666 @@
+import { describe, expect, it } from "vitest";
+import { parseTeamConfig } from "../../config/parse.js";
+import { buildTeamJsonSchema } from "../../config/json-schema.js";
+import { agent, automation, ev, pr, ref, ticket, world } from "./fixtures.js";
+import { presetRules } from "../presets.js";
+import { createStaticWorkflowState } from "../state.js";
+import { mergeRules, resolveWorkflow } from "../resolve.js";
+import { evaluateWorkflow, explainWorkflow } from "../evaluate.js";
+import { ruleInputSchema } from "../rules.js";
+import { createStatusMap } from "../status-map.js";
+import { renderTemplate, TemplateError } from "../template.js";
+import type { Rule } from "../rules.js";
+import type { WorkflowPr } from "../types.js";
+
+/** The preset as a team gets it by default: approved-merge exists only while policies.merge.on_approval is on. */
+const kanban = presetRules("kanban").filter((r) => !r.id.startsWith("approved-merge"));
+
+const baseConfig = () => ({
+  version: 1,
+  team: { name: "acme" },
+  humans: [{ name: "Ada", identities: { tracker: "Ada" } }],
+  catalog: { version: "1.0.0" },
+  repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
+  people: [{ handle: "ada", name: "Ada", role: "r" }],
+  integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
+});
+
+const feedbackSchedule = (ticket?: string) => ({
+  type: "schedule",
+  person: "ada",
+  kind: "review_feedback",
+  priority: "high",
+  ...(ticket ? { ticket } : {}),
+  pr: ref(10),
+});
+
+const run = (
+  event: ReturnType<typeof ev>,
+  state: ReturnType<typeof world>,
+  rules: Rule[] = kanban,
+) => evaluateWorkflow(event, state, rules);
+
+const tk = { subject: { ticket: "ACME-1" } };
+const mergedPr = (n: number, over: Partial<WorkflowPr> = {}) => pr(n, { state: "merged", ...over });
+
+describe("kanban preset", () => {
+  it("pr opened moves the ticket to review, unless draft or already done", () => {
+    expect(run(ev("pr.opened", { actor: agent }), world({ status: "active" }))).toEqual([
+      { type: "move", ticket: "ACME-1", to: "review" },
+    ]);
+
+    expect(
+      run(ev("pr.opened"), world({ status: "active", prs: [pr(10, { draft: true })] })),
+    ).toEqual([]);
+
+    expect(run(ev("pr.opened"), world({ status: "done" }))).toEqual([]);
+  });
+
+  it("pr opened without a linked ticket does nothing", () => {
+    expect(run(ev("pr.opened", { subject: { pr: ref(99) } }), world())).toEqual([]);
+  });
+
+  it("merged moves to done", () => {
+    expect(run(ev("pr.merged"), world({ status: "review", prs: [mergedPr(10)] }))).toEqual([
+      { type: "move", ticket: "ACME-1", to: "done" },
+    ]);
+
+    expect(run(ev("pr.merged"), world({ status: "done", prs: [mergedPr(10)] }))).toEqual([]);
+  });
+
+  describe("stacked pull requests", () => {
+    const done = { type: "move", ticket: "ACME-1", to: "done" };
+
+    it("a merge into another pull request's branch leaves the ticket where it is", () => {
+      const state = world({
+        status: "review",
+        prs: [mergedPr(10, { baseRef: "feat-11" }), pr(11), pr(12, { baseRef: "feat-11" })],
+      });
+
+      expect(run(ev("pr.merged"), state)).toEqual([]);
+    });
+
+    it("a merge into a feature branch does not close the ticket even with no other pull request open", () => {
+      const state = world({
+        status: "review",
+        prs: [mergedPr(10, { baseRef: "feat-11" })],
+      });
+
+      expect(run(ev("pr.merged"), state)).toEqual([]);
+    });
+
+    it("a merge into the default branch leaves the ticket while another pull request of it is open", () => {
+      const state = world({
+        status: "review",
+        prs: [mergedPr(10), pr(11, { baseRef: "feat-10" })],
+      });
+
+      expect(run(ev("pr.merged"), state)).toEqual([]);
+    });
+
+    it("the last pull request merged into the default branch closes the ticket", () => {
+      const state = world({
+        status: "review",
+        prs: [mergedPr(10, { baseRef: "feat-11" }), mergedPr(11)],
+      });
+
+      expect(run(ev("pr.merged", { subject: { pr: ref(11) } }), state)).toEqual([done]);
+    });
+
+    it("the default branch is the repository's, not always main", () => {
+      const onTrunk = (base: string) =>
+        createStaticWorkflowState({
+          tickets: { "ACME-1": ticket("review") },
+          prs: [mergedPr(10, { baseRef: base })],
+          links: { 10: "ACME-1" },
+          defaultBranch: "trunk",
+        });
+
+      expect(run(ev("pr.merged"), onTrunk("trunk"))).toEqual([done]);
+      expect(run(ev("pr.merged"), onTrunk("main"))).toEqual([]);
+    });
+
+    it("a conflict on an open pull request goes to its author whatever the ticket's status", () => {
+      const conflict = [
+        {
+          type: "schedule",
+          person: "ada",
+          kind: "conflict",
+          priority: "high",
+          ticket: "ACME-1",
+          pr: ref(11),
+        },
+      ];
+
+      for (const status of ["backlog", "ready", "active", "review", "blocked", "done"] as const) {
+        const effects = run(
+          ev("pr.conflicted", { subject: { pr: ref(11) }, actor: automation }),
+          world({ status, prs: [pr(11)] }),
+        );
+
+        expect(effects.filter((e) => e.type === "schedule")).toEqual(conflict);
+        // An active ticket needs no move.
+        expect(effects.filter((e) => e.type === "move")).toHaveLength(status === "active" ? 0 : 1);
+      }
+    });
+
+    it("failing CI on an open pull request goes to its author whatever the ticket's status", () => {
+      const failed = ev("pr.ci_failed", { subject: { pr: ref(11) }, actor: automation });
+      for (const status of ["ready", "active", "review", "blocked", "done"] as const) {
+        const effects = run(failed, world({ status, prs: [pr(11)] }));
+        expect(effects).toContainEqual({
+          type: "schedule",
+          person: "ada",
+          kind: "ci_failed",
+          priority: "high",
+          ticket: "ACME-1",
+          pr: ref(11),
+        });
+      }
+
+      expect(run(failed, world({ status: "canceled", prs: [pr(11)] }))).toEqual([]);
+      expect(run(failed, world({ status: "done", prs: [mergedPr(11)] }))).toEqual([]);
+      expect(
+        run(failed, world({ prs: [pr(11, { author: { login: "grace", kind: "human" } })] })),
+      ).toEqual([]);
+    });
+
+    it("a conflict on a closed pull request or a canceled ticket schedules nothing", () => {
+      const conflicted = ev("pr.conflicted", { subject: { pr: ref(11) }, actor: automation });
+      expect(run(conflicted, world({ status: "done", prs: [mergedPr(11)] }))).toEqual([]);
+      expect(run(conflicted, world({ status: "canceled", prs: [pr(11)] }))).toEqual([]);
+    });
+
+    it("feedback on an open pull request reopens a ticket closed early", () => {
+      expect(run(ev("pr.comment"), world({ status: "done" }))).toEqual([
+        feedbackSchedule("ACME-1"),
+        { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
+        { type: "move", ticket: "ACME-1", to: "active" },
+      ]);
+    });
+  });
+
+  it("closed unmerged moves to ready", () => {
+    expect(run(ev("pr.closed"), world({ status: "review" }))).toEqual([
+      { type: "move", ticket: "ACME-1", to: "ready" },
+    ]);
+
+    expect(run(ev("pr.closed"), world({ status: "done" }))).toEqual([]);
+  });
+
+  it.each(["pr.review_submitted", "pr.comment"] as const)(
+    "human %s on a ticket in review sends the work back to the author",
+    (type) => {
+      expect(
+        run(ev(type, { data: { state: "changes_requested" } }), world({ status: "review" })),
+      ).toEqual([
+        feedbackSchedule("ACME-1"),
+        { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
+        { type: "move", ticket: "ACME-1", to: "active" },
+      ]);
+    },
+  );
+
+  it("feedback also reactivates blocked tickets", () => {
+    expect(run(ev("pr.comment"), world({ status: "blocked" }))).toHaveLength(3);
+  });
+
+  it.each(["backlog", "ready", "active", "canceled"] as const)(
+    "feedback reaches the author but leaves a %s ticket alone",
+    (status) => {
+      expect(run(ev("pr.comment"), world({ status }))).toEqual([feedbackSchedule("ACME-1")]);
+      expect(
+        run(
+          ev("pr.review_submitted", { data: { state: "commented", body: "hm" } }),
+          world({ status }),
+        ),
+      ).toEqual([feedbackSchedule("ACME-1")]);
+    },
+  );
+
+  it("feedback reaches the author when the pull request has no ticket", () => {
+    const noTicket = createStaticWorkflowState({ prs: [pr(10)] });
+    expect(run(ev("pr.comment"), noTicket)).toEqual([feedbackSchedule()]);
+    expect(
+      run(ev("pr.review_submitted", { data: { state: "changes_requested" } }), noTicket),
+    ).toEqual([feedbackSchedule()]);
+  });
+
+  it("an approval with a body is feedback, one without is not", () => {
+    const approved = (body?: string) =>
+      ev("pr.review_submitted", {
+        data: { state: "approved", ...(body === undefined ? {} : { body }) },
+      });
+
+    expect(run(approved("Ship it, but rename the flag."), world({ status: "ready" }))).toEqual([
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    expect(run(approved(""), world())).toEqual([]);
+    expect(run(approved("  \n"), world())).toEqual([]);
+    expect(run(approved(), world())).toEqual([]);
+  });
+
+  it("an inline comment left with an approval still reaches the author", () => {
+    expect(
+      run(ev("pr.comment", { data: { kind: "review_comment", body: "nit" } }), world()),
+    ).toEqual(expect.arrayContaining([feedbackSchedule("ACME-1")]));
+  });
+
+  it("ignores agent feedback, closed pull requests and human-authored ones", () => {
+    expect(run(ev("pr.comment", { actor: agent }), world())).toEqual([]);
+    expect(run(ev("pr.comment"), world({ prs: [pr(10, { state: "closed" })] }))).toEqual([]);
+
+    expect(
+      run(
+        ev("pr.comment"),
+        world({ prs: [pr(10, { author: { login: "grace", kind: "human" } })] }),
+      ),
+    ).toEqual([]);
+
+    expect(
+      run(
+        ev("pr.comment"),
+        world({ prs: [pr(10, { author: { login: "dependabot[bot]", kind: "bot" } })] }),
+      ),
+    ).toEqual([]);
+  });
+
+  describe("merged-feedback-follow-up", () => {
+    const merged = (status: "done" | "review" = "done") =>
+      world({ status, prs: [pr(10, { state: "merged" })] });
+
+    const followUp = (ticket?: string) => ({
+      type: "schedule",
+      person: "ada",
+      kind: "merged_feedback",
+      priority: "high",
+      ...(ticket ? { ticket } : {}),
+      pr: ref(10),
+    });
+
+    it.each(["kanban", "scrum", "minimal"] as const)(
+      "%s: feedback on a merged agent pull request schedules merged_feedback and touches nothing else",
+      (preset) => {
+        const rules = presetRules(preset);
+        for (const type of ["pr.review_submitted", "pr.comment"] as const) {
+          expect(
+            run(ev(type, { data: { state: "commented", body: "hm" } }), merged(), rules),
+          ).toEqual([followUp("ACME-1")]);
+        }
+
+        // The ticket is not reopened, whatever its status.
+        expect(run(ev("pr.comment"), merged("review"), rules)).toEqual([followUp("ACME-1")]);
+      },
+    );
+
+    it("a review that asks for changes counts; a bare approval does not", () => {
+      expect(
+        run(ev("pr.review_submitted", { data: { state: "changes_requested" } }), merged()),
+      ).toEqual([followUp("ACME-1")]);
+
+      const approved = (body?: string) =>
+        ev("pr.review_submitted", {
+          data: { state: "approved", ...(body === undefined ? {} : { body }) },
+        });
+
+      expect(run(approved("Thanks, but the flag name is wrong."), merged())).toEqual([
+        followUp("ACME-1"),
+      ]);
+
+      expect(run(approved(""), merged())).toEqual([]);
+      expect(run(approved("  \n"), merged())).toEqual([]);
+      expect(run(approved(), merged())).toEqual([]);
+    });
+
+    it("an agent or automation commenter, a human-authored pull request or a closed one does nothing", () => {
+      expect(run(ev("pr.comment", { actor: agent }), merged())).toEqual([]);
+      expect(run(ev("pr.comment", { actor: automation }), merged())).toEqual([]);
+      expect(
+        run(
+          ev("pr.comment"),
+          world({
+            prs: [pr(10, { state: "merged", author: { login: "grace", kind: "human" } })],
+          }),
+        ),
+      ).toEqual([]);
+
+      expect(run(ev("pr.comment"), world({ prs: [pr(10, { state: "closed" })] }))).toEqual([]);
+    });
+
+    it("works without a linked ticket", () => {
+      expect(
+        run(ev("pr.comment"), createStaticWorkflowState({ prs: [pr(10, { state: "merged" })] })),
+      ).toEqual([followUp()]);
+    });
+  });
+
+  it("the scrum preset behaves the same", () => {
+    const scrum = presetRules("scrum");
+    expect(run(ev("pr.comment"), world({ status: "review" }), scrum)).toHaveLength(3);
+    expect(run(ev("pr.comment"), world({ status: "backlog" }), scrum)).toEqual([
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    expect(run(ev("pr.comment"), createStaticWorkflowState({ prs: [pr(10)] }), scrum)).toEqual([
+      feedbackSchedule(),
+    ]);
+  });
+
+  it("conflict goes back to the author with recipe and schedule", () => {
+    const out = run(ev("pr.conflicted", { actor: automation }), world());
+    expect(out.map((e) => e.type)).toEqual(["assign", "move", "comment", "schedule"]);
+    const comment = out[2]!;
+    expect(comment).toMatchObject({
+      type: "comment",
+      on: { ticket: "ACME-1" },
+      template: "rebase_conflict",
+    });
+
+    if (comment.type !== "comment") {
+      throw new Error();
+    }
+
+    expect(comment.body).toContain("git rebase origin/main");
+    expect(comment.body).toContain("1. #10 Change 10");
+    expect(out[3]).toMatchObject({
+      type: "schedule",
+      person: "ada",
+      kind: "conflict",
+      priority: "high",
+    });
+  });
+
+  it("stacked conflict comment lists the stack bottom first", () => {
+    const state = world({
+      prs: [
+        pr(12, { headRef: "feat-12", baseRef: "feat-11" }),
+        pr(10),
+        pr(11, { headRef: "feat-11", baseRef: "feat-10" }),
+        pr(20, { headRef: "other", baseRef: "main" }),
+      ],
+    });
+
+    const out = run(ev("pr.conflicted", { actor: automation }), state);
+    const comment = out.find((e) => e.type === "comment");
+    if (comment?.type !== "comment") {
+      throw new Error();
+    }
+
+    const lines = comment.body.split("\n").filter((l) => /^\d+\. #/.test(l));
+    expect(lines.map((l) => l.split(" ")[1])).toEqual(["#10", "#11", "#12"]);
+    expect(comment.body).toContain("(3)");
+    expect(comment.body).not.toContain("#20");
+  });
+
+  it("stack walk survives cyclic data", () => {
+    const state = world({
+      prs: [pr(10, { headRef: "a", baseRef: "b" }), pr(11, { headRef: "b", baseRef: "a" })],
+    });
+
+    expect(() => run(ev("pr.conflicted"), state)).not.toThrow();
+  });
+
+  it("a human moving a ticket to active returns it to the last worker", () => {
+    const state = world({ status: "active", ticket: { assignee: { id: "grace", kind: "human" } } });
+    expect(
+      run(ev("ticket.moved", { ...tk, data: { from: "ready", to: "active" } }), state),
+    ).toEqual([
+      { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
+      { type: "schedule", person: "ada", kind: "assigned", priority: "normal", ticket: "ACME-1" },
+    ]);
+  });
+
+  it("take-back is skipped with the needs-human label, other moves, or an agent assignee", () => {
+    const base = { ...tk, data: { to: "active" } };
+    const humanActor = { id: "grace", kind: "human" as const };
+    expect(
+      run(
+        ev("ticket.moved", base),
+        world({ status: "active", ticket: { assignee: humanActor, labels: ["needs-human"] } }),
+      ),
+    ).toEqual([]);
+
+    expect(
+      run(
+        ev("ticket.moved", { ...tk, data: { to: "review" } }),
+        world({ status: "review", ticket: { assignee: humanActor } }),
+      ),
+    ).toEqual([]);
+
+    expect(
+      run(
+        ev("ticket.moved", base),
+        world({ status: "active", ticket: { assignee: { id: "ada", kind: "agent" } } }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("take-back honours a custom label name", () => {
+    const state = world({
+      status: "active",
+      ticket: { assignee: { id: "grace", kind: "human" }, labels: ["hold"] },
+    });
+
+    const e = ev("ticket.moved", { ...tk, data: { to: "active" } });
+    expect(evaluateWorkflow(e, state, kanban, { needsHumanLabel: "hold" })).toEqual([]);
+    expect(evaluateWorkflow(e, state, kanban)).toHaveLength(2);
+  });
+
+  it("take-back with no previous worker only skips the unresolvable actions", () => {
+    const state = world({ status: "active", ticket: { assignee: { id: "grace", kind: "human" } } });
+    const noWorker = {
+      ...state,
+      lastWorker: () => undefined,
+    };
+
+    const x = explainWorkflow(
+      ev("ticket.moved", { ...tk, data: { to: "active" } }),
+      noWorker,
+      kanban,
+    );
+
+    expect(x.effects).toEqual([]);
+    expect(x.rules.find((r) => r.id === "active-human-takeback")?.skipped).toHaveLength(2);
+  });
+
+  it("a done hand-back moves to review and assigns the requester", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([
+      { type: "move", ticket: "ACME-1", to: "review" },
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+    ]);
+  });
+
+  it("a blocked hand-back moves to blocked, assigns the requester and schedules an unblock round for the PM", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "blocked" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([
+      { type: "move", ticket: "ACME-1", to: "blocked" },
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+      { type: "schedule", person: "pia", kind: "unblock", priority: "high", ticket: "ACME-1" },
+    ]);
+  });
+
+  it("a done hand-back on a blocked ticket is treated as blocked", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } }),
+        world({ status: "blocked" }),
+      ),
+    ).toEqual([
+      // Already blocked: the move is not repeated.
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+      { type: "schedule", person: "pia", kind: "unblock", priority: "high", ticket: "ACME-1" },
+    ]);
+  });
+
+  it("a waiting hand-back changes nothing", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "waiting" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("an interrupted hand-back matches no rule", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "interrupted" } }),
+        world({ status: "active" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("a blocked hand-back leaves a done ticket alone", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { ...tk, actor: agent, data: { status: "blocked" } }),
+        world({ status: "done" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("hand-back leaves a done ticket alone", () => {
+    expect(
+      run(
+        ev("agent.handed_back", { actor: agent, data: { status: "done" } }),
+        world({ status: "done" }),
+      ),
+    ).toEqual([]);
+  });
+
+  it("hand-back falls back to the first listed human when the ticket has no requester", () => {
+    const state = world({ status: "active", ticket: { requester: undefined as never } });
+    const handBack = ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } });
+    expect(evaluateWorkflow(handBack, state, kanban, { fallbackRequester: "ada.admin" })).toEqual([
+      { type: "move", ticket: "ACME-1", to: "review" },
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "ada.admin" } },
+    ]);
+
+    // A known requester beats the fallback.
+    expect(
+      evaluateWorkflow(handBack, world({ status: "active" }), kanban, {
+        fallbackRequester: "ada.admin",
+      }),
+    ).toContainEqual({ type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } });
+  });
+
+  it("hand-back without a requester or a humans list skips the assignment and names the ticket", () => {
+    const state = world({ status: "active", ticket: { requester: undefined as never } });
+    const x = explainWorkflow(
+      ev("agent.handed_back", { ...tk, actor: agent, data: { status: "done" } }),
+      state,
+      kanban,
+    );
+
+    expect(x.effects).toEqual([{ type: "move", ticket: "ACME-1", to: "review" }]);
+    expect(x.rules.find((r) => r.id === "hand-back-to-requester")?.skipped).toEqual([
+      "assign: ticket ACME-1 has no known requester and there is no first-human fallback (the team lists no humans, or policies.hand_back.fallback is none)",
+    ]);
+  });
+
+  it("resolves the fallback requester from the first listed human", () => {
+    const humans = [
+      { name: "Ada", identities: { tracker: "ada.admin" } },
+      { name: "Grace", identities: { vcs: "grace" } },
+    ];
+
+    expect(resolveWorkflow(undefined, humans).options.fallbackRequester).toBe("ada.admin");
+    expect(resolveWorkflow(undefined, [humans[1]!]).options.fallbackRequester).toBe("Grace");
+    expect(resolveWorkflow(undefined).options.fallbackRequester).toBeUndefined();
+  });
+
+  describe("policy switches", () => {
+    const ids = (policies?: Record<string, unknown>, rules?: unknown[]) => {
+      const parsed = parseTeamConfig({
+        ...baseConfig(),
+        ...(rules ? { workflow: { rules } } : {}),
+        ...(policies ? { policies } : {}),
+      });
+
+      if (!parsed.ok) {
+        throw new Error(JSON.stringify(parsed.issues));
+      }
+
+      return resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+    };
+
+    const has = (w: { rules: Rule[] }, id: string) => w.rules.some((r) => r.id === id);
+
+    it("keeps every preset rule by default", () => {
+      expect(ids().rules.map((r) => r.id)).toEqual(kanban.map((r) => r.id));
+      expect(ids().switched).toEqual([]);
+    });
+
+    it("feedback.merged_prs and conflicts.follow_up remove their rule", () => {
+      const w = ids({ feedback: { merged_prs: false }, conflicts: { follow_up: false } });
+      expect(has(w, "merged-feedback-follow-up")).toBe(false);
+      expect(has(w, "conflict-back-to-author")).toBe(false);
+      expect(w.switched.map((s) => [s.rule, s.switch, s.effect])).toEqual([
+        ["merged-feedback-follow-up", "feedback.merged_prs", "removed"],
+        ["conflict-back-to-author", "conflicts.follow_up", "removed"],
+      ]);
+    });
+
+    it("hand_back.reassign: none keeps the move to review and drops the assignment", () => {
+      const rule = ids({ hand_back: { reassign: "none" } }).rules.find(
+        (r) => r.id === "hand-back-to-requester",
+      );
+
+      expect(rule?.do).toEqual([{ move: "review" }]);
+    });
+
+    it("hand_back.reassign: none keeps the move to blocked and the PM round, and drops the assignment", () => {
+      const rule = ids({ hand_back: { reassign: "none" } }).rules.find(
+        (r) => r.id === "hand-back-blocked-to-requester",
+      );
+
+      expect(rule?.do).toEqual([
+        { move: "blocked" },
+        { schedule: { person: "role:pm", kind: "unblock", priority: "high" } },
+      ]);
+    });
+
+    it("hand_back.blocked_notify: agent drops the PM round: the blocked agent reports itself", () => {
+      const rule = ids({ hand_back: { blocked_notify: "agent" } }).rules.find(
+        (r) => r.id === "hand-back-blocked-to-requester",
+      );
+
+      expect(rule?.do).toEqual([{ move: "blocked" }, { assign: "requester" }]);
+    });
+
+    it("hand_back.fallback: none leaves out the first-human fallback", () => {
+      expect(ids().options.fallbackRequester).toBe("Ada");
+      expect(ids({ hand_back: { fallback: "none" } }).options.fallbackRequester).toBeUndefined();
+    });
+
+    it("an explicit workflow rule wins over a switch", () => {
+      const own = {
+        id: "conflict-back-to-author",
+        on: "pr.conflicted",
+        do: [{ comment: "rebase_conflict" }],
+      };
+
+      const w = ids({ conflicts: { follow_up: false } }, [own]);
+      expect(w.rules.find((r) => r.id === "conflict-back-to-author")?.do).toEqual(own.do);
+
+      const disabled = ids({}, [{ id: "conflict-back-to-author", disabled: true }]);
+      expect(has(disabled, "conflict-back-to-author")).toBe(false);
+    });
+  });
+
+  it("assignment to an agent schedules that agent, but not for our own assignments or finished tickets", () => {
+    const a = { id: "ada", kind: "agent" as const };
+    const e = ev("ticket.assigned", { ...tk });
+    expect(run(e, world({ status: "ready", ticket: { assignee: a } }))).toEqual([
+      { type: "schedule", person: "ada", kind: "assigned", priority: "normal", ticket: "ACME-1" },
+    ]);
+
+    expect(run({ ...e, actor: automation }, world({ ticket: { assignee: a } }))).toEqual([]);
+    expect(run(e, world({ status: "done", ticket: { assignee: a } }))).toEqual([]);
+    expect(run(e, world({ ticket: { assignee: { id: "grace", kind: "human" } } }))).toEqual([]);
+  });
+});
+
+describe("a ticket created already assigned", () => {
+  const a = { id: "ada", kind: "agent" as const };
+  const created = ev("ticket.created", { ...tk });
+
+  it("schedules the agent assignee, as a later assignment would", () => {
+    for (const rules of [kanban, presetRules("minimal")]) {
+      expect(run(created, world({ status: "ready", ticket: { assignee: a } }), rules)).toEqual([
+        { type: "schedule", person: "ada", kind: "assigned", priority: "normal", ticket: "ACME-1" },
+      ]);
+    }
+  });
+
+  it("schedules nothing when unassigned, assigned to a human, created by automation or finished", () => {
+    expect(run(created, world({ status: "ready" }))).toEqual([]);
+    expect(run(created, world({ ticket: { assignee: { id: "grace", kind: "human" } } }))).toEqual(
+      [],
+    );
+
+    expect(run({ ...created, actor: automation }, world({ ticket: { assignee: a } }))).toEqual([]);
+    expect(run(created, world({ status: "done", ticket: { assignee: a } }))).toEqual([]);
+  });
+});
+
+describe("scrum and minimal presets", () => {
+  const a = { id: "ada", kind: "agent" as const };
+  const e = ev("ticket.assigned", { ...tk });
+
+  it("scrum does not start uncommitted backlog work", () => {
+    const scrum = presetRules("scrum");
+    expect(run(e, world({ status: "backlog", ticket: { assignee: a } }), scrum)).toEqual([]);
+    expect(run(e, world({ status: "ready", ticket: { assignee: a } }), scrum)).toHaveLength(1);
+    expect(run(e, world({ status: "backlog", ticket: { assignee: a } }), kanban)).toHaveLength(1);
+  });
+
+  it("scrum keeps the other kanban rules", () => {
+    const scrum = presetRules("scrum");
+    expect(scrum.map((r) => r.id)).toEqual(presetRules("kanban").map((r) => r.id));
+    expect(run(ev("pr.merged"), world({ prs: [mergedPr(10)] }), scrum)).toEqual([
+      { type: "move", ticket: "ACME-1", to: "done" },
+    ]);
+  });
+
+  it("minimal never moves a ticket", () => {
+    const minimal = presetRules("minimal");
+    for (const t of [
+      "pr.opened",
+      "pr.merged",
+      "pr.closed",
+      "pr.conflicted",
+      "agent.handed_back",
+    ] as const) {
+      expect(run(ev(t, { ...tk }), world(), minimal)).toEqual([]);
+    }
+
+    expect(run(ev("pr.comment"), world(), minimal)).toEqual([
+      { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    expect(run(e, world({ ticket: { assignee: a } }), minimal)).toHaveLength(1);
+  });
+
+  it("every preset rule is valid against the rule schema", () => {
+    for (const p of ["kanban", "scrum", "minimal"] as const) {
+      for (const r of presetRules(p)) {
+        expect(ruleInputSchema.safeParse(r).success, `${p}/${r.id}`).toBe(true);
+      }
+    }
+  });
+});
+
+describe("overrides", () => {
+  it("replaces in place by id, appends new ids, and removes disabled ones", () => {
+    const custom: Rule = { id: "pr-merged-done", on: "pr.merged", do: [{ move: "review" }] };
+    const extra: Rule = { id: "mine", on: "pr.closed", do: [{ move: "canceled" }] };
+    const merged = mergeRules(kanban, [custom, extra, { id: "pr-opened-review", disabled: true }]);
+    expect(merged.map((r) => r.id)).toEqual([
+      ...kanban.map((r) => r.id).filter((i) => i !== "pr-opened-review"),
+      "mine",
+    ]);
+
+    expect(merged.find((r) => r.id === "pr-merged-done")).toBe(custom);
+    expect(merged.indexOf(custom)).toBe(kanban.findIndex((r) => r.id === "pr-merged-done") - 1);
+    expect(run(ev("pr.opened", { actor: agent }), world({ status: "active" }), merged)).toEqual([]);
+    expect(run(ev("pr.merged"), world({ status: "active" }), merged)).toEqual([
+      { type: "move", ticket: "ACME-1", to: "review" },
+    ]);
+  });
+
+  it("does not mutate the preset", () => {
+    mergeRules(presetRules("kanban"), [{ id: "pr-opened-review", disabled: true }]);
+    expect(presetRules("kanban").some((r) => r.id === "pr-opened-review")).toBe(true);
+  });
+
+  it("resolves from team config, including custom templates and label", () => {
+    const base = {
+      version: 1,
+      team: { name: "acme" },
+      catalog: { version: "1.0.0" },
+      repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
+      people: [{ handle: "ada", name: "Ada", role: "r" }],
+      integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
+    };
+
+    const r = parseTeamConfig({
+      ...base,
+      workflow: {
+        preset: "minimal",
+        statuses: { review: "In Review" },
+        needs_human_label: "hold",
+        templates: { ping: "{{ticket}} needs {{actor.id}}" },
+        rules: [
+          {
+            id: "ping-requester",
+            on: "pr.opened",
+            do: [{ comment: "ping" }],
+          },
+        ],
+      },
+    });
+
+    if (!r.ok) {
+      throw new Error(JSON.stringify(r.issues));
+    }
+
+    const w = resolveWorkflow(r.config.workflow);
+    expect(w.rules.map((x) => x.id)).toEqual([
+      "human-feedback-back-to-author",
+      "merged-feedback-follow-up",
+      "doc-feedback-to-author",
+      "doc-mention-feedback",
+      "doc-mention-assigns-ticket",
+      "ticket-comment-to-assignee",
+      "mention-assigns-agent",
+      "assigned-agent-scheduled",
+      "ping-requester",
+    ]);
+
+    expect(w.statuses.toTracker("review")).toBe("In Review");
+    expect(evaluateWorkflow(ev("pr.opened"), world(), w.rules, w.options)).toEqual([
+      {
+        type: "comment",
+        on: { ticket: "ACME-1" },
+        template: "ping",
+        body: "ACME-1 needs grace",
+      },
+    ]);
+
+    expect(resolveWorkflow(undefined).rules).toHaveLength(kanban.length);
+  });
+});
+
+describe("config validation", () => {
+  const base = {
+    version: 1,
+    team: { name: "acme" },
+    catalog: { version: "1.0.0" },
+    repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
+    people: [{ handle: "ada", name: "Ada", role: "r" }],
+    integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
+  };
+
+  const codes = (workflow: unknown) => {
+    const r = parseTeamConfig({ ...base, workflow });
+    return r.ok ? [] : r.issues.map((i) => i.code);
+  };
+
+  const rule = { id: "x", on: "pr.opened", do: [{ move: "review" }] };
+
+  it("accepts good rules and rejects unknown keys and values", () => {
+    expect(codes({ rules: [rule] })).toEqual([]);
+    expect(codes({ rules: [{ ...rule, when: "x" }] }).length).toBeGreaterThan(0);
+    expect(codes({ rules: [{ ...rule, on: "pr.exploded" }] }).length).toBeGreaterThan(0);
+    expect(codes({ rules: [{ ...rule, do: [{ move: "wip" }] }] }).length).toBeGreaterThan(0);
+    expect(codes({ rules: [{ ...rule, do: [{ assign: "nobody" }] }] }).length).toBeGreaterThan(0);
+    expect(
+      codes({ rules: [{ ...rule, if: { actor_kind: "human", pr_draft: true } }] }).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("accepts nested conditions and applies the schedule priority default", () => {
+    const r = parseTeamConfig({
+      ...base,
+      workflow: {
+        rules: [
+          {
+            ...rule,
+            if: {
+              any: [
+                { not: { actor_kind: "agent" } },
+                { all: [{ has_label: "x" }, { pr_draft: false }] },
+              ],
+            },
+            do: [{ schedule: { person: "role:reviewer", kind: "review" } }],
+          },
+        ],
+      },
+    });
+
+    if (!r.ok) {
+      throw new Error(JSON.stringify(r.issues));
+    }
+
+    expect(JSON.stringify(r.config.workflow?.rules)).toContain('"priority":"normal"');
+  });
+
+  it("reports duplicate ids, unknown disables, unknown templates and placeholders, duplicate status names", () => {
+    expect(codes({ rules: [rule, rule] })).toContain("workflow.duplicate_rule_id");
+    expect(codes({ rules: [{ id: "nope", disabled: true }] })).toContain("workflow.unknown_rule");
+    expect(codes({ rules: [{ ...rule, do: [{ comment: "missing" }] }] })).toContain(
+      "workflow.unknown_template",
+    );
+
+    expect(codes({ templates: { t: "{{bogus}}" } })).toContain("workflow.unknown_placeholder");
+    expect(codes({ templates: { t: "{{ticket" } })).toContain("workflow.unknown_placeholder");
+    expect(codes({ statuses: { review: "Doing", active: "doing" } })).toContain(
+      "workflow.duplicate_status_name",
+    );
+  });
+
+  it("publishes the rule shape in the JSON Schema", () => {
+    const json = JSON.stringify(buildTeamJsonSchema());
+    expect(json).toContain("ticket_status");
+    expect(json).toContain("needs_human_label");
+  });
+});
+
+describe("explain", () => {
+  it("says why each rule did or did not match", () => {
+    const x = explainWorkflow(ev("pr.comment"), world({ status: "active" }), kanban);
+    const by = Object.fromEntries(x.rules.map((r) => [r.id, r]));
+    expect(by["pr-merged-done"]).toMatchObject({
+      matched: false,
+      reason: "listens to pr.merged, not pr.comment",
+    });
+
+    expect(by["human-feedback-back-to-author"]).toMatchObject({ matched: true });
+    expect(by["human-feedback-reactivates-ticket"]).toMatchObject({ matched: false });
+    expect(by["human-feedback-reactivates-ticket"]?.reason).toBe(
+      "ticket status active in [review, blocked, done]",
+    );
+
+    expect(x.effects).toEqual([
+      expect.objectContaining({ type: "schedule", kind: "review_feedback" }),
+    ]);
+  });
+
+  it("lists effects and skipped actions of matching rules", () => {
+    const x = explainWorkflow(ev("pr.merged"), world({ prs: [mergedPr(10)] }), kanban);
+    expect(x.rules.find((r) => r.id === "pr-merged-done")).toMatchObject({
+      matched: true,
+      effects: [{ type: "move", ticket: "ACME-1", to: "done" }],
+      skipped: [],
+    });
+
+    const none = explainWorkflow(ev("pr.merged", { subject: { pr: ref(99) } }), world(), kanban);
+    expect(none.rules.find((r) => r.id === "pr-merged-done")?.reason).toContain("no linked ticket");
+  });
+
+  it("reports a move that is already in effect", () => {
+    const rules: Rule[] = [{ id: "r", on: "pr.merged", do: [{ move: "review" }] }];
+    const x = explainWorkflow(ev("pr.merged"), world(), rules);
+    expect(x.rules[0]?.skipped).toEqual(["move: ticket is already review"]);
+  });
+});
+
+describe("determinism and dedupe", () => {
+  it("returns identical output for identical input and dedupes identical effects", () => {
+    const rules: Rule[] = [
+      { id: "a", on: "pr.merged", do: [{ move: "done" }, { move: "done" }] },
+      { id: "b", on: "pr.merged", do: [{ move: "done" }, { assign: "none" }] },
+    ];
+
+    const state = world();
+    const first = evaluateWorkflow(ev("pr.merged"), state, rules);
+    expect(first).toEqual([
+      { type: "move", ticket: "ACME-1", to: "done" },
+      { type: "assign", ticket: "ACME-1", to: null },
+    ]);
+
+    for (let i = 0; i < 5; i++) {
+      expect(evaluateWorkflow(ev("pr.merged"), state, rules)).toEqual(first);
+    }
+  });
+
+  it("supports role targets, human targets and pr-targeted comments", () => {
+    const rules: Rule[] = [
+      {
+        id: "r",
+        on: "pr.opened",
+        do: [
+          { assign: "role:reviewer" },
+          { assign: "human:grace" },
+          { schedule: { person: "role:reviewer", kind: "review", priority: "low" } },
+          { comment: { template: "rebase_conflict", on: "pr" } },
+        ],
+      },
+    ];
+
+    const out = evaluateWorkflow(ev("pr.opened"), world(), rules);
+    expect(out.map((e) => e.type)).toEqual(["assign", "assign", "schedule", "comment"]);
+    expect(out[0]).toMatchObject({ to: { kind: "agent", id: "rex" } });
+    expect(out[3]).toMatchObject({ on: { pr: ref(10) } });
+  });
+
+  it("matches multiple event types", () => {
+    const rules: Rule[] = [{ id: "r", on: ["pr.opened", "pr.closed"], do: [{ move: "canceled" }] }];
+    expect(evaluateWorkflow(ev("pr.closed"), world(), rules)).toHaveLength(1);
+    expect(evaluateWorkflow(ev("pr.merged"), world(), rules)).toHaveLength(0);
+  });
+});
+
+describe("status map and templates", () => {
+  it("defaults to Title Case and maps both ways case-insensitively", () => {
+    const m = createStatusMap({ review: "In Review" });
+    expect(m.toTracker("backlog")).toBe("Backlog");
+    expect(m.toTracker("review")).toBe("In Review");
+    expect(m.toCanonical("in review")).toBe("review");
+    expect(m.toCanonical("Canceled")).toBe("canceled");
+    expect(m.toCanonical("Review")).toBeUndefined();
+    expect(m.toCanonical("Nope")).toBeUndefined();
+  });
+
+  it("renders strictly", () => {
+    expect(renderTemplate("a {{ x }} b {{y.z}}", { x: "1", "y.z": "2" })).toBe("a 1 b 2");
+    expect(() => renderTemplate("{{missing}}", {})).toThrow(TemplateError);
+    expect(() => renderTemplate("{{oops", {})).toThrow(TemplateError);
+    expect(() => renderTemplate("}}", {})).toThrow(TemplateError);
+  });
+
+  it("skips a comment whose custom template uses an unknown variable instead of throwing", () => {
+    const rules: Rule[] = [{ id: "r", on: "pr.opened", do: [{ comment: "bad" }] }];
+    const x = explainWorkflow(ev("pr.opened"), world(), rules, { templates: { bad: "{{nope}}" } });
+    expect(x.effects).toEqual([]);
+    expect(x.rules[0]?.skipped[0]).toContain("Unknown template variable");
+  });
+});
+
+describe("one pull request per ticket", () => {
+  const rulesFor = (prsPerTicket: "one" | "many"): Rule[] => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      policies: { tickets: { prs_per_ticket: prsPerTicket } },
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    return resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies)
+      .rules;
+  };
+
+  const many = rulesFor("many");
+  const merged = (n: number) => pr(n, { state: "merged" });
+  const closed = (n: number) => pr(n, { state: "closed" });
+  const handBack = (status: string) =>
+    ev("agent.handed_back", { ...tk, actor: agent, data: { status } });
+
+  const done = { type: "move", ticket: "ACME-1", to: "done" };
+  const toReview = { type: "move", ticket: "ACME-1", to: "review" };
+
+  it("with one, a merge leaves the ticket while another pull request of it is open", () => {
+    expect(run(ev("pr.merged"), world({ status: "review", prs: [merged(10), pr(11)] }))).toEqual(
+      [],
+    );
+  });
+
+  it("with many, a merge alone does not move the ticket", () => {
+    const state = world({ status: "review", prs: [merged(10)] });
+    expect(run(ev("pr.merged"), state, many)).toEqual([]);
+    expect(
+      run(ev("pr.merged"), world({ status: "review", prs: [merged(10), pr(11)] }), many),
+    ).toEqual([]);
+  });
+
+  it("with many, the last merge closes the ticket once the agent handed it back as done", () => {
+    const state = world({
+      status: "review",
+      ticket: { handedBack: true },
+      prs: [merged(10), merged(11)],
+    });
+
+    expect(run(ev("pr.merged", { subject: { pr: ref(11) } }), state, many)).toEqual([done]);
+
+    // Another pull request is still open: not yet.
+    const open = world({
+      status: "review",
+      ticket: { handedBack: true },
+      prs: [merged(10), pr(11)],
+    });
+
+    expect(run(ev("pr.merged"), open, many)).toEqual([]);
+  });
+
+  it("with many, the hand-back as done closes a ticket whose pull requests are all closed", () => {
+    const settled = world({ status: "active", prs: [merged(10), merged(11)] });
+    expect(run(handBack("done"), settled, many)).toEqual([done]);
+
+    // Not settled: it goes to review for the requester, as before.
+    const open = world({ status: "active", prs: [merged(10), pr(11)] });
+    expect(run(handBack("done"), open, many)).toEqual([
+      toReview,
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+    ]);
+
+    // Waiting or blocked never closes it.
+    expect(run(handBack("waiting"), settled, many)).toEqual([]);
+    expect(run(handBack("blocked"), settled, many)).toContainEqual({
+      type: "move",
+      ticket: "ACME-1",
+      to: "blocked",
+    });
+  });
+
+  it("with many, a pull request closed without merging closes the ticket after the others merged", () => {
+    const state = world({
+      status: "review",
+      ticket: { handedBack: true },
+      prs: [merged(10), closed(11)],
+    });
+
+    expect(run(ev("pr.closed", { subject: { pr: ref(11) } }), state, many)).toEqual([done]);
+  });
+
+  it("with many, a closed pull request does not send the ticket back while others are open or merged", () => {
+    expect(
+      run(ev("pr.closed"), world({ status: "review", prs: [closed(10), merged(11)] }), many),
+    ).toEqual([]);
+
+    // Closing one of two open pull requests leaves the ticket where it is.
+    expect(
+      run(ev("pr.closed"), world({ status: "review", prs: [closed(10), pr(11)] }), many),
+    ).toEqual([]);
+
+    // Nothing merged and none left open: back to ready, as with one.
+    expect(run(ev("pr.closed"), world({ status: "review", prs: [closed(10)] }), many)).toEqual([
+      { type: "move", ticket: "ACME-1", to: "ready" },
+    ]);
+  });
+
+  it("with many, a ticket whose only pull request closed unmerged is not settled", () => {
+    const state = world({ status: "active", prs: [closed(10)] });
+    expect(run(handBack("done"), state, many)).toEqual([
+      toReview,
+      { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
+    ]);
+  });
+
+  describe("a person opens a second pull request", () => {
+    const opened = (n: number) => ev("pr.opened", { subject: { pr: ref(n) } });
+    const human = { login: "grace-lead", kind: "human" as const };
+    const second = world({
+      status: "review",
+      prs: [pr(10), pr(11, { author: human })],
+    });
+
+    it("comments on the ticket, saying which merge closes it", () => {
+      const comment = run(opened(11), second).find((e) => e.type === "comment");
+      expect(comment).toMatchObject({ type: "comment", on: { ticket: "ACME-1" } });
+      expect(comment && "body" in comment && comment.body).toContain("2 pull requests");
+      expect(comment && "body" in comment && comment.body).toContain("#10 Change 10");
+      expect(comment && "body" in comment && comment.body).toContain("#11 Change 11");
+      expect(comment && "body" in comment && comment.body).toContain(
+        "last of these to merge closes",
+      );
+    });
+
+    it("says what closes the ticket with many", () => {
+      const comment = run(opened(11), second, many).find((e) => e.type === "comment");
+      expect(comment && "body" in comment && comment.body).toContain(
+        "handed its work back as done",
+      );
+    });
+
+    it("does not comment on a first pull request, an agent's or a closed one", () => {
+      const comments = (state: ReturnType<typeof world>, n: number) =>
+        run(opened(n), state).filter((e) => e.type === "comment");
+
+      expect(comments(world({ prs: [pr(10, { author: human })] }), 10)).toEqual([]);
+      expect(comments(world({ prs: [pr(10), pr(11)] }), 11)).toEqual([]);
+      expect(comments(world({ prs: [closed(10), pr(11, { author: human })] }), 11)).toEqual([]);
+
+      expect(
+        comments(world({ status: "done", prs: [merged(10), pr(11, { author: human })] }), 11),
+      ).toEqual([]);
+    });
+  });
+
+  it("every rewritten preset rule is valid and the default switch changes nothing", () => {
+    for (const rule of many) {
+      expect({ id: rule.id, valid: ruleInputSchema.safeParse(rule).success }).toEqual({
+        id: rule.id,
+        valid: true,
+      });
+    }
+
+    expect(rulesFor("one")).toEqual(kanban);
+  });
+});
+
+describe("comments on documents and tickets", () => {
+  const a = { id: "ada", kind: "agent" as const };
+  const grace = { id: "grace", kind: "human" as const };
+  const docEvent = (over: Partial<ReturnType<typeof ev>> = {}) =>
+    ev("doc.commented", { subject: { doc: "doc-1", ticket: "ACME-1" }, data: {}, ...over });
+
+  const docSchedule = {
+    type: "schedule",
+    person: "ada",
+    kind: "doc_feedback",
+    priority: "high",
+    ticket: "ACME-1",
+    doc: "doc-1",
+  };
+
+  describe("doc-feedback-to-author", () => {
+    it("a human's comment on a document an agent wrote schedules doc_feedback for that agent", () => {
+      expect(run(docEvent(), world())).toEqual([docSchedule]);
+    });
+
+    it("works for a document with no ticket, and leaves the ticket alone whatever its status", () => {
+      const noTicket = run(docEvent({ subject: { doc: "doc-1" } }), world());
+      expect(noTicket).toEqual([
+        { type: "schedule", person: "ada", kind: "doc_feedback", priority: "high", doc: "doc-1" },
+      ]);
+
+      for (const status of ["backlog", "active", "review", "blocked", "done"] as const) {
+        expect(run(docEvent(), world({ status }))).toEqual([docSchedule]);
+      }
+    });
+
+    it("ignores agents, the office, and documents nobody recorded as an agent's", () => {
+      expect(run(docEvent({ actor: a }), world())).toEqual([]);
+      expect(run(docEvent({ actor: automation }), world())).toEqual([]);
+      expect(run(docEvent({ subject: { doc: "doc-9" } }), world())).toEqual([]);
+    });
+
+    it("explains why a document no agent wrote was skipped", () => {
+      const explained = explainWorkflow(
+        docEvent({ subject: { doc: "doc-9" } }),
+        world(),
+        kanban,
+      ).rules.find((r) => r.id === "doc-feedback-to-author");
+
+      expect(explained?.skipped).toEqual([
+        "schedule: no agent is recorded as the author of the document",
+      ]);
+    });
+
+    it("is in every preset", () => {
+      for (const p of ["kanban", "scrum", "minimal"] as const) {
+        expect(run(docEvent(), world(), presetRules(p))).toEqual([docSchedule]);
+      }
+    });
+  });
+
+  describe("ticket-comment-to-assignee", () => {
+    const commented = ev("ticket.commented", { ...tk });
+    const round = {
+      type: "schedule",
+      person: "ada",
+      kind: "ticket_comment",
+      priority: "high",
+      ticket: "ACME-1",
+    };
+
+    it("a human's comment on a ticket assigned to an agent schedules a round for it", () => {
+      for (const status of ["backlog", "ready", "active"] as const) {
+        expect(run(commented, world({ status, ticket: { assignee: a } }))).toEqual([round]);
+      }
+    });
+
+    it("agent and automation comments do nothing", () => {
+      const state = world({ status: "active", ticket: { assignee: a } });
+      expect(run({ ...commented, actor: a }, state)).toEqual([]);
+      expect(run({ ...commented, actor: automation }, state)).toEqual([]);
+    });
+
+    it("leaves finished tickets and tickets nobody is assigned to alone", () => {
+      expect(run(commented, world({ status: "done", ticket: { assignee: a } }))).toEqual([]);
+      expect(run(commented, world({ status: "canceled", ticket: { assignee: a } }))).toEqual([]);
+      expect(run(commented, world({ status: "active" }))).toEqual([]);
+    });
+
+    it("scrum does not start uncommitted backlog work, minimal only schedules", () => {
+      const state = (status: "backlog" | "review") => world({ status, ticket: { assignee: a } });
+      const scrum = presetRules("scrum");
+      expect(run(commented, state("backlog"), scrum)).toEqual([]);
+      expect(run(commented, state("review"), scrum)).toEqual([round]);
+      expect(run(commented, state("review"), presetRules("minimal"))).toEqual([round]);
+    });
+  });
+
+  describe("ticket-comment-reactivates-ticket", () => {
+    const commented = ev("ticket.commented", { ...tk });
+    const handedBack = (status: "review" | "blocked") =>
+      world({ status, ticket: { assignee: grace } });
+
+    it.each(["review", "blocked"] as const)(
+      "a comment on a handed-back ticket in %s goes back to the last worker and reactivates it",
+      (status) => {
+        expect(run(commented, handedBack(status))).toEqual([
+          { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
+          { type: "move", ticket: "ACME-1", to: "active" },
+          {
+            type: "schedule",
+            person: "ada",
+            kind: "ticket_comment",
+            priority: "high",
+            ticket: "ACME-1",
+          },
+        ]);
+      },
+    );
+
+    it("leaves a ticket a person is working on in another status alone", () => {
+      for (const status of ["backlog", "ready", "active", "done"] as const) {
+        expect(run(commented, world({ status, ticket: { assignee: grace } }))).toEqual([]);
+      }
+    });
+
+    it("ignores agent and automation comments", () => {
+      expect(run({ ...commented, actor: a }, handedBack("review"))).toEqual([]);
+      expect(run({ ...commented, actor: automation }, handedBack("review"))).toEqual([]);
+    });
+
+    it("only moves the ticket when no agent has worked on it", () => {
+      const nobody = createStaticWorkflowState({
+        tickets: { "ACME-1": { status: "review", assignee: grace } },
+      });
+
+      expect(run(commented, nobody)).toEqual([{ type: "move", ticket: "ACME-1", to: "active" }]);
+    });
+
+    it("minimal never moves a ticket", () => {
+      expect(run(commented, handedBack("review"), presetRules("minimal"))).toEqual([]);
+    });
+  });
+
+  describe("mention-assigns-agent", () => {
+    const mention = (handles: string[], over: Partial<ReturnType<typeof ev>> = {}) =>
+      ev("ticket.commented", { ...tk, data: { mentions: handles }, ...over });
+
+    const to = (id: string) => ({ type: "assign", ticket: "ACME-1", to: { kind: "agent", id } });
+    const round = (person: string, kind: string) => ({
+      type: "schedule",
+      person,
+      kind,
+      priority: "high",
+      ticket: "ACME-1",
+    });
+
+    const move = { type: "move", ticket: "ACME-1", to: "active" };
+
+    it("a mention on a ticket a person has in review assigns it, activates it and schedules a round", () => {
+      expect(
+        run(mention(["rex"]), world({ status: "review", ticket: { assignee: grace } })),
+      ).toEqual([to("rex"), move, round("rex", "ticket_comment")]);
+    });
+
+    it.each(["backlog", "ready", "blocked"] as const)("activates a ticket in %s", (status) => {
+      expect(run(mention(["rex"]), world({ status, ticket: { assignee: grace } }))).toEqual([
+        to("rex"),
+        move,
+        round("rex", "ticket_comment"),
+      ]);
+    });
+
+    it("an active ticket stays active, and one nobody has is assigned", () => {
+      expect(run(mention(["rex"]), world({ status: "active" }))).toEqual([
+        to("rex"),
+        round("rex", "ticket_comment"),
+      ]);
+    });
+
+    it("goes to the mentioned agent, not to the assignee or the last worker", () => {
+      // The ticket is with ada, who worked on it; the comment is for rex.
+      expect(run(mention(["rex"]), world({ status: "active", ticket: { assignee: a } }))).toEqual([
+        to("rex"),
+        round("rex", "ticket_comment"),
+      ]);
+
+      // A handed-back ticket would go back to its last worker (ada) without the mention.
+      expect(
+        run(mention(["rex"]), world({ status: "review", ticket: { assignee: grace } })).filter(
+          (x) => x.type === "schedule",
+        ),
+      ).toEqual([round("rex", "ticket_comment")]);
+    });
+
+    it("the first agent mentioned takes the ticket and the others are asked without reassignment", () => {
+      expect(
+        run(mention(["rex", "ada"]), world({ status: "review", ticket: { assignee: grace } })),
+      ).toEqual([to("rex"), move, round("rex", "ticket_comment"), round("ada", "asked")]);
+
+      expect(run(mention(["rex", "ada", "sam"]), world({ status: "active" })).slice(-3)).toEqual([
+        round("rex", "ticket_comment"),
+        round("ada", "asked"),
+        round("sam", "asked"),
+      ]);
+    });
+
+    it("never triggers on agents, the office or a comment that mentions nobody", () => {
+      const state = world({ status: "review", ticket: { assignee: grace } });
+      expect(run(mention(["rex"], { actor: a }), state)).toEqual([]);
+      expect(run(mention(["rex"], { actor: automation }), state)).toEqual([]);
+      // Without a mention the comment is plain feedback: the last worker gets it back.
+      expect(run(mention([]), state)).toEqual(run(ev("ticket.commented", { ...tk }), state));
+    });
+
+    it("leaves done and canceled tickets alone", () => {
+      const finished = world({ status: "done", ticket: { assignee: a }, prs: [mergedPr(10)] });
+      expect(run(mention(["rex"]), finished)).toEqual([]);
+      expect(run(mention(["rex"]), world({ status: "canceled" }))).toEqual([]);
+    });
+
+    it("hands a ticket closed early to the agent while a pull request of it is open", () => {
+      const early = world({ status: "done", ticket: { assignee: a } });
+      expect(run(mention(["rex"]), early)).toEqual([
+        to("rex"),
+        move,
+        round("rex", "ticket_comment"),
+      ]);
+    });
+
+    it("minimal assigns and schedules but never moves; the others move", () => {
+      const state = world({ status: "review", ticket: { assignee: grace } });
+      expect(run(mention(["rex"]), state, presetRules("minimal"))).toEqual([
+        to("rex"),
+        round("rex", "ticket_comment"),
+      ]);
+
+      expect(run(mention(["rex"]), state, presetRules("scrum"))).toEqual([
+        to("rex"),
+        move,
+        round("rex", "ticket_comment"),
+      ]);
+    });
+  });
+
+  describe("a mention on a document", () => {
+    const mention = (handles: string[], over: Partial<ReturnType<typeof ev>> = {}) =>
+      docEvent({ data: { mentions: handles }, ...over });
+
+    const round = (person: string) => ({ ...docSchedule, person });
+    const to = { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "rex" } };
+
+    it("schedules doc_feedback for the mentioned agent and gives it the document's ticket held by a person", () => {
+      expect(run(mention(["rex"]), world({ ticket: { assignee: grace } }))).toEqual([
+        round("ada"),
+        round("rex"),
+        to,
+      ]);
+    });
+
+    it("assigns an unassigned ticket, but never takes one from an agent or finished", () => {
+      expect(
+        run(mention(["rex"]), world({ status: "active" })).filter((x) => x.type === "assign"),
+      ).toEqual([to]);
+
+      expect(
+        run(mention(["rex"]), world({ status: "active", ticket: { assignee: a } })).filter(
+          (x) => x.type === "assign",
+        ),
+      ).toEqual([]);
+
+      expect(
+        run(mention(["rex"]), world({ status: "done", ticket: { assignee: grace } })).filter(
+          (x) => x.type === "assign",
+        ),
+      ).toEqual([]);
+    });
+
+    it("schedules every agent mentioned and works for a document with no ticket", () => {
+      expect(
+        run(mention(["rex", "sam"], { subject: { doc: "doc-1" } }), world()).map((x) =>
+          x.type === "schedule" ? x.person : x.type,
+        ),
+      ).toEqual(["ada", "rex", "sam"]);
+    });
+
+    it("never triggers on agents or the office", () => {
+      expect(run(mention(["rex"], { actor: a }), world())).toEqual([]);
+      expect(run(mention(["rex"], { actor: automation }), world())).toEqual([]);
+    });
+  });
+
+  it("the switches remove their rules", () => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      policies: { feedback: { doc_comments: false, ticket_comments: false, mentions: false } },
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    const w = resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+    expect(w.switched.map((s) => [s.rule, s.switch, s.effect])).toEqual([
+      ["doc-feedback-to-author", "feedback.doc_comments", "removed"],
+      ["doc-mention-feedback", "feedback.mentions", "removed"],
+      ["doc-mention-assigns-ticket", "feedback.mentions", "removed"],
+      ["ticket-comment-to-assignee", "feedback.ticket_comments", "removed"],
+      ["ticket-comment-reactivates-ticket", "feedback.ticket_comments", "removed"],
+      ["mention-assigns-agent", "feedback.mentions", "removed"],
+    ]);
+  });
+});
+
+describe("approved-merge (policies.merge.on_approval)", () => {
+  const rulesWith = (
+    merge?: Record<string, unknown>,
+    preset?: string,
+  ): ReturnType<typeof resolveWorkflow> => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      ...(preset ? { workflow: { preset } } : {}),
+      ...(merge ? { policies: { merge } } : {}),
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    return resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+  };
+
+  const on = rulesWith({ on_approval: true });
+  const approved = (over: Partial<ReturnType<typeof ev>> = {}, body = "") =>
+    ev("pr.review_submitted", { data: { state: "approved", body }, ...over });
+
+  const mergeSchedule = {
+    type: "schedule",
+    person: "ada",
+    kind: "merge",
+    priority: "high",
+    ticket: "ACME-1",
+    pr: ref(10),
+  };
+
+  const merges = (
+    w: ReturnType<typeof resolveWorkflow>,
+    e: ReturnType<typeof ev>,
+    state = world(),
+  ) =>
+    evaluateWorkflow(e, state, w.rules, w.options).filter(
+      (x) => x.type === "schedule" && x.kind === "merge",
+    );
+
+  it("is off by default: no rule, nothing scheduled, no switched entry", () => {
+    const off = rulesWith();
+    expect(off.rules.some((r) => r.id === "approved-merge")).toBe(false);
+    expect(off.switched).toEqual([]);
+    expect(merges(off, approved())).toEqual([]);
+    expect(merges(rulesWith({ on_approval: false }), approved())).toEqual([]);
+  });
+
+  it("schedules a merge for the author when an allowed approver approves an open agent pull request", () => {
+    expect(merges(on, approved())).toEqual([mergeSchedule]);
+  });
+
+  it("an approval that carries comments schedules only the review round, not the merge", () => {
+    const withBody = approved({}, "Ship it, but rename the flag.");
+    expect(merges(on, withBody)).toEqual([]);
+    expect(run(withBody, world(), on.rules).filter((e) => e.type === "schedule")).toEqual([
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    const inline = ev("pr.review_submitted", {
+      data: { state: "approved", body: "", comments: [{ path: "a.ts", line: 1, body: "nit" }] },
+    });
+
+    expect(merges(on, inline)).toEqual([]);
+  });
+
+  describe("after the round on an approval's comments", () => {
+    const verdict = (actor: string, state: "approved" | "changes_requested" | "dismissed") => ({
+      actor,
+      kind: "human" as const,
+      state,
+    });
+
+    const handBack = (kind = "review_feedback", status = "done") =>
+      ev("agent.handed_back", { actor: agent, data: { kind, status } });
+
+    const withVerdicts = (...verdicts: ReturnType<typeof verdict>[]) =>
+      world({ prs: [pr(10, { verdicts })] });
+
+    it("schedules the merge when the round is done and an allowed approver's approval stands", () => {
+      expect(merges(on, handBack(), withVerdicts(verdict("grace", "approved")))).toEqual([
+        mergeSchedule,
+      ]);
+    });
+
+    it("waits for a verdict, and stops at changes requested or a dismissed approval", () => {
+      expect(merges(on, handBack(), world())).toEqual([]);
+      expect(merges(on, handBack(), withVerdicts(verdict("grace", "changes_requested")))).toEqual(
+        [],
+      );
+
+      expect(merges(on, handBack(), withVerdicts(verdict("grace", "dismissed")))).toEqual([]);
+      expect(
+        merges(
+          on,
+          handBack(),
+          withVerdicts(verdict("grace", "approved"), verdict("ada-admin", "changes_requested")),
+        ),
+      ).toEqual([]);
+    });
+
+    it("counts only allowed approvers", () => {
+      const only = rulesWith({ on_approval: true, approvers: ["human:linus"] });
+      expect(merges(only, handBack(), withVerdicts(verdict("grace", "approved")))).toEqual([]);
+      expect(merges(only, handBack(), withVerdicts(verdict("linus", "approved")))).toHaveLength(1);
+    });
+
+    it("only for a done review round on an open agent pull request", () => {
+      const approvedState = withVerdicts(verdict("grace", "approved"));
+      expect(merges(on, handBack("review_feedback", "waiting"), approvedState)).toEqual([]);
+      expect(merges(on, handBack("review_feedback", "blocked"), approvedState)).toEqual([]);
+      expect(merges(on, handBack("assigned"), approvedState)).toEqual([]);
+      const closed = world({
+        prs: [pr(10, { state: "closed", verdicts: [verdict("grace", "approved")] })],
+      });
+
+      expect(merges(on, handBack(), closed)).toEqual([]);
+    });
+
+    it("is off with the switch", () => {
+      expect(merges(rulesWith(), handBack(), withVerdicts(verdict("grace", "approved")))).toEqual(
+        [],
+      );
+    });
+  });
+
+  it("is in every preset", () => {
+    for (const preset of ["kanban", "scrum", "minimal"]) {
+      expect(merges(rulesWith({ on_approval: true }, preset), approved())).toHaveLength(1);
+    }
+  });
+
+  it("ignores other review states, human-authored, closed and merged pull requests, and agent actors", () => {
+    const state = (over: Partial<ReturnType<typeof pr>>) => world({ prs: [pr(10, over)] });
+    expect(merges(on, ev("pr.review_submitted", { data: { state: "changes_requested" } }))).toEqual(
+      [],
+    );
+
+    expect(
+      merges(on, ev("pr.review_submitted", { data: { state: "commented", body: "hm" } })),
+    ).toEqual([]);
+
+    expect(merges(on, approved(), state({ author: { login: "grace", kind: "human" } }))).toEqual(
+      [],
+    );
+
+    expect(merges(on, approved(), state({ state: "closed" }))).toEqual([]);
+    expect(merges(on, approved(), state({ state: "merged" }))).toEqual([]);
+    expect(merges(on, approved({ actor: agent }))).toEqual([]);
+    expect(merges(on, approved({ actor: automation }))).toEqual([]);
+    expect(merges(on, ev("pr.comment"))).toEqual([]);
+  });
+
+  it("ignores a disallowed approver", () => {
+    const only = rulesWith({ on_approval: true, approvers: ["human:linus"] });
+    expect(merges(only, approved())).toEqual([]);
+    expect(merges(only, approved({ actor: { kind: "human", id: "linus" } }))).toHaveLength(1);
+  });
+
+  it("accepts an agent by handle or role", () => {
+    const byHandle = rulesWith({ on_approval: true, approvers: ["rex"] });
+    expect(merges(byHandle, approved({ actor: { kind: "agent", id: "rex" } }))).toHaveLength(1);
+    expect(merges(byHandle, approved({ actor: { kind: "agent", id: "ada" } }))).toEqual([]);
+    const byRole = rulesWith({ on_approval: true, approvers: ["role:reviewer"] });
+    expect(merges(byRole, approved({ actor: { kind: "agent", id: "rex" } }))).toHaveLength(1);
+    expect(merges(byRole, approved())).toEqual([]);
+  });
+
+  it("an explicit workflow.rules entry wins over the switch", () => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      workflow: { rules: [{ id: "approved-merge", disabled: true }] },
+      policies: { merge: { on_approval: true } },
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    const w = resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+    expect(merges(w, approved())).toEqual([]);
+  });
+});
