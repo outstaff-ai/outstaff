@@ -1,4 +1,9 @@
-import type { AdapterDefinition, SecretSpec, TeamConfig } from "@outstaff/core";
+import {
+  networkGrants,
+  type AdapterDefinition,
+  type SecretSpec,
+  type TeamConfig,
+} from "@outstaff/core";
 
 export type Scope = "person" | "office";
 
@@ -15,8 +20,26 @@ export const tokenKey = (handle: string) =>
   `OUTSTAFF_AGENT_TOKEN_${handle.toUpperCase().replaceAll("-", "_")}`;
 
 /** Keys the framework itself reads, ahead of the adapters' own. */
-export function coreSpecs(team: TeamConfig, scope: Scope): SecretSpec[] {
+export function coreSpecs(
+  team: TeamConfig,
+  scope: Scope,
+  person?: TeamConfig["people"][number],
+): SecretSpec[] {
   if (scope === "person") {
+    const tokens = person
+      ? networkGrants(team, person).http.flatMap((g) =>
+          g.token
+            ? [
+                {
+                  key: g.token,
+                  description: `Bearer token for the "${g.name}" service (${g.url}), sent by \`ost http\`; the agent never sees it`,
+                  where: "The service's own settings, for example a long-lived access token",
+                },
+              ]
+            : [],
+        )
+      : [];
+
     return [
       {
         key: "OUTSTAFF_AGENT_TOKEN",
@@ -24,6 +47,7 @@ export function coreSpecs(team: TeamConfig, scope: Scope): SecretSpec[] {
           "This person's token for the office, the same value the office holds as OUTSTAFF_AGENT_TOKEN_<HANDLE>. Choose a long random value",
         where: "Generate it yourself, for example with `openssl rand -hex 32`",
       },
+      ...new Map(tokens.map((t) => [t.key, t])).values(),
     ];
   }
 
@@ -42,7 +66,7 @@ export function sections(
   person?: TeamConfig["people"][number],
 ): Section[] {
   const seen = new Set<string>();
-  const out: Section[] = [{ title: "outstaff", specs: coreSpecs(team, scope) }];
+  const out: Section[] = [{ title: "outstaff", specs: coreSpecs(team, scope, person) }];
   for (const s of out[0]!.specs) {
     seen.add(s.key);
   }

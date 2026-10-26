@@ -27,6 +27,47 @@ async function ost(args: string[], f = fakeEnv(), env: Record<string, string> = 
   return { code, out, err, f };
 }
 
+describe("ost http and ost adb", () => {
+  it("takes the request from positional words and repeated headers", async () => {
+    const f = fakeEnv();
+    const sent: { url: string; headers: Headers }[] = [];
+    f.env.network = {
+      http: [{ name: "hub", origin: "https://hub.acme.example" }],
+      adb: [],
+      fetch: (async (url: URL, init: RequestInit) => {
+        sent.push({ url: String(url), headers: new Headers(init.headers) });
+        return new Response("pong", { status: 200 });
+      }) as unknown as typeof fetch,
+    };
+
+    const r = await ost(["http", "hub", "GET", "/ping", "--header", "X-A:1", "X-B:2"], f);
+
+    expect(r.code).toBe(0);
+    expect(r.out).toContain("-> 200");
+    expect(sent[0]!.url).toBe("https://hub.acme.example/ping");
+    expect(sent[0]!.headers.get("x-a")).toBe("1");
+    expect(sent[0]!.headers.get("x-b")).toBe("2");
+  });
+
+  it("passes everything after the device and -- to adb", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "ost-adb-"));
+    const bin = join(dir, "adb");
+    writeFileSync(bin, '#!/bin/sh\necho "$@"\n', { mode: 0o755 });
+    const f = fakeEnv();
+    f.env.layout = { home: dir } as never;
+    f.env.network = {
+      http: [],
+      adb: [{ name: "wall-panel", host: "10.0.0.18", port: 5555 }],
+      adbCommand: bin,
+    };
+
+    const r = await ost(["adb", "run", "wall-panel", "--", "shell", "getprop", "-v"], f);
+    expect(r.err).toBe("");
+    expect(r.out).toContain("-s 10.0.0.18:5555 shell getprop -v");
+    expect(r.code).toBe(0);
+  });
+});
+
 describe("ost verbs", () => {
   it("registers one command per verb", async () => {
     const r = await ost(["--help"]);

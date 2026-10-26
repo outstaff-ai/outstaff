@@ -37,6 +37,11 @@ export const CONFIG_CODES = {
   workflowUnknownTemplate: "workflow.unknown_template",
   workflowUnknownPlaceholder: "workflow.unknown_placeholder",
   workflowDuplicateStatusName: "workflow.duplicate_status_name",
+  networkInvalidUrl: "network.invalid_url",
+  networkDuplicateName: "network.duplicate_name",
+  networkAdbMode: "network.adb_mode",
+  networkReservedToken: "network.reserved_token",
+  rolesUnknownRole: "roles.unknown_role",
 } as const;
 
 export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];

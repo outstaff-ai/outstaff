@@ -35,6 +35,8 @@ services:
       STUB_APPS: ${STUB_APPS:?set by e2e/run.ts}
       STUB_APP_PUBLIC_KEY: /tls/app.pub
       STUB_TRACKER_KEYS: ${STUB_TRACKER_KEYS:?set by e2e/run.ts}
+      # The token the stub's home service wants from sam (network grants).
+      STUB_HOME_TOKEN: ${STUB_HOME_TOKEN:?set by e2e/run.ts}
       STUB_TLS_CERT: /tls/server.pem
       STUB_TLS_KEY: /tls/server.key
     volumes:
@@ -55,7 +57,12 @@ services:
       retries: 30
     networks:
       default:
-        aliases: [github.acme.example, tracker.acme.example]
+        aliases:
+          - github.acme.example
+          - tracker.acme.example
+          - hub.acme.example
+          - home.acme.example
+          - other.acme.example
 
   office:
     <<: *hardening
@@ -126,6 +133,7 @@ services:
       - { source: sam_GH_APP_ID, target: /run/secrets/outstaff/GH_APP_ID }
       - { source: sam_GH_APP_PRIVATE_KEY, target: /run/secrets/outstaff/GH_APP_PRIVATE_KEY }
       - { source: sam_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+      - { source: sam_E2E_HOME_TOKEN, target: /run/secrets/outstaff/E2E_HOME_TOKEN }
       - { source: office_GH_OFFICE_APP_ID, target: /run/secrets/outstaff/GH_OFFICE_APP_ID }
       - {
           source: office_GH_OFFICE_APP_PRIVATE_KEY,
@@ -161,3 +169,5 @@ secrets:
     file: ${E2E_DIR}/secrets/sam/GH_APP_PRIVATE_KEY
   sam_ITSAPLAN_API_KEY:
     file: ${E2E_DIR}/secrets/sam/ITSAPLAN_API_KEY
+  sam_E2E_HOME_TOKEN:
+    file: ${E2E_DIR}/secrets/sam/E2E_HOME_TOKEN

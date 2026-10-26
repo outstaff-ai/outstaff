@@ -209,6 +209,9 @@ function prepareKeys() {
   return privateKey;
 }
 
+/** The bearer token of the stub's home service: sam's secret, which the agent must never see. */
+const homeToken = randomBytes(12).toString("hex");
+
 function prepareSecrets(privateKey: string, keys: { office: string; sam: string }) {
   const s = join(work, "secrets");
   const token = randomBytes(24).toString("hex");
@@ -221,6 +224,7 @@ function prepareSecrets(privateKey: string, keys: { office: string; sam: string 
   write(join(s, "sam/GH_APP_ID"), "201");
   write(join(s, "sam/GH_APP_PRIVATE_KEY"), privateKey);
   write(join(s, "sam/ITSAPLAN_API_KEY"), keys.sam);
+  write(join(s, "sam/E2E_HOME_TOKEN"), homeToken);
 }
 
 const TEAM = `version: 1
@@ -310,9 +314,15 @@ function hire() {
     }
 
     const text = readFileSync(file, "utf8");
+    // Sam may also reach the stub's two services: the hub with no authentication, the home service with a token.
+    const network =
+      p.handle === "sam"
+        ? `    network:\n      http:\n        - { name: hub, url: "http://hub.acme.example:8081" }\n        - { name: home, url: "http://home.acme.example:8081", token: E2E_HOME_TOKEN }\n`
+        : "";
+
     const patched = text.replace(
       new RegExp(`(\\n {4}role: ${p.role}\\n)`),
-      `$1    identities:\n      vcs: acme-${p.handle}[bot]\n      tracker: ${p.handle}\n`,
+      `$1    identities:\n      vcs: acme-${p.handle}[bot]\n      tracker: ${p.handle}\n${network}`,
     );
 
     if (patched === text) {
@@ -346,6 +356,7 @@ async function main() {
     POSTGRES_PASSWORD: randomBytes(12).toString("hex"),
     STUB_APPS: "100=acme-office,201=acme-sam",
     STUB_TRACKER_KEYS: `${keys.office}=office,${keys.sam}=sam`,
+    STUB_HOME_TOKEN: homeToken,
   };
 
   if (process.env["E2E_PREBUILT"] !== "1") {
@@ -1180,6 +1191,48 @@ async function main() {
   assertEq(stays.github.pulls.length, blockedAt.pulls, "no pull request was opened for it");
   step(
     `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, assigned to the requester`,
+  );
+
+  // ---- 10a. a ticket that asks for the services the team granted: the token is added and never shown
+  const { key: network } = await stub("POST", "/_test/tickets", {
+    title: "Check the devices on the hub",
+    description: "network: check the services",
+    assignee: "sam",
+  });
+
+  const checked = await until(`${network} commented with the network check`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === network);
+    return t.comments.find((c: Json) => c.body.includes("Network check:"));
+  });
+
+  for (const part of ['"devices":2', '"lights":"on"', "Bearer ***", "other refused"]) {
+    assertEq(checked.body.includes(part), true, `the network check says ${part}`);
+  }
+
+  assertEq(checked.body.includes(homeToken), false, "the token never reaches the agent's words");
+  const hits = (await stub("GET", "/_test/service-hits")) as unknown as {
+    host: string;
+    path: string;
+    authorized: boolean;
+  }[];
+
+  assertEq(
+    JSON.stringify(hits),
+    JSON.stringify([
+      { host: "hub.acme.example:8081", path: "/hub/status", authorized: false },
+      { host: "home.acme.example:8081", path: "/hub/secure", authorized: true },
+    ]),
+    "the hub was called without a token, the home service with it, and the ungranted origin not at all",
+  );
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+      ? true
+      : undefined,
+  );
+
+  step(
+    `network grants: ${network} -> sam called the granted hub and (with its token, never shown) the home service; an ungranted service was refused`,
   );
 
   // ---- 10b. a ticket that names no repository, for an agent that can write to two: it asks and waits

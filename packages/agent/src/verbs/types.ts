@@ -1,4 +1,5 @@
 import type {
+  AdbGrant,
   Chat,
   Knowledge,
   Layout,
@@ -21,6 +22,22 @@ export interface VerbResult {
   links: string[];
 }
 
+/** The services and devices this person may reach (`network` in team.yaml, roles and person merged). */
+export interface NetworkAccess {
+  http: {
+    name: string;
+    origin: string;
+
+    /** The bearer token, read when a request is made; it never leaves the verb. */
+    token?: () => string;
+  }[];
+  adb: AdbGrant[];
+
+  /** Replaces the global `fetch` and the `adb` binary (tests only). */
+  fetch?: typeof fetch;
+  adbCommand?: string;
+}
+
 /** Everything a verb touches: who is acting, the team, and the ports built from its config. */
 export interface AgentEnv {
   /** Handle of the person (agent) this process runs as. */
@@ -32,6 +49,7 @@ export interface AgentEnv {
   vcs?: Vcs;
   chat?: Chat;
   office?: OfficeClient;
+  network?: NetworkAccess;
 
   /**
    * The person's Policy and directory layout. Verbs that read a file the caller names (`--body-file`) refuse

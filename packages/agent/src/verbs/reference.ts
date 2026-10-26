@@ -8,12 +8,15 @@ export function usage(verb: Verb): string {
   const args = fields
     .filter((f) => f.arg !== undefined)
     .toSorted((a, b) => a.arg! - b.arg!)
-    .map((f) => (f.required ? `<${f.name}>` : `[${f.name}]`));
+    .map((f) => {
+      const name = f.type === "array" ? `${f.name}...` : f.name;
+      return f.required ? `<${name}>` : `[${name}]`;
+    });
 
   const opts = fields
     .filter((f) => f.arg === undefined)
     .map((f) => {
-      const flag = `--${kebab(f.name)}${f.type === "boolean" ? "" : ` <${f.name}>`}`;
+      const flag = `--${kebab(f.name)}${f.type === "boolean" ? "" : ` <${f.name}${f.type === "array" ? "..." : ""}>`}`;
       return f.required ? flag : `[${flag}]`;
     });
 

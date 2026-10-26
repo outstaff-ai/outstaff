@@ -158,6 +158,8 @@ If your nodes do not enable AppArmor, drop the `appArmorProfile` patch from `exa
 - agents to the office on 8080, and nothing else into the office;
 - the office to Postgres on 5432. The example allows `10.0.0.0/8`; put the address of your database, or delete the policy if you use SQLite.
 
+Services and devices you grant to an agent ([Network grants](/guides/network-grants/)) are usually on private addresses, so each needs an egress rule of its own.
+
 This needs a CNI that enforces NetworkPolicy. HTTPS to any public address is broader than the allow-list in the [container contract](/reference/container-contract/) (an agent can run shell commands, and sockets do not ask the permission rules). If your CNI supports it, replace the `ipBlock` rule with FQDN rules for the hosts you name: `api.github.com`, `github.com`, your tracker, `slack.com` and its Socket Mode hosts, and `api.anthropic.com` or your cloud provider's model endpoint. Agents also need the hosts of the tool sources on their first start (the tools install into the home volume and later starts reuse them), so allow those temporarily or build an image with the tools in it ([Container images](/guides/images/)).
 
 ## Sizing

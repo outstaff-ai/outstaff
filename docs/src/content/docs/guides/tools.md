@@ -61,7 +61,7 @@ The default is nothing. `allow` is the only thing that lets the agent run a tool
 - Structured rules take the same fields as `policies.commands` (`subcommand`, `args`, `reason`, `requires_repo`). `program` may be left out; when given it must be the tool's own name.
 - `[]` installs the tool and allows nothing.
 
-Outstaff's built-in denies still win over everything here: raw network tools, shell wrappers such as `sudo` and `env`, and git, which repository grants govern. Declaring `curl` with `allow: all` does not make it runnable.
+Outstaff's built-in denies still win over everything here: raw network tools (`curl` only for the origins a [network grant](/guides/network-grants/) names, and only with `network.raw_http`), `adb` (reached with `ost adb`), shell wrappers such as `sudo` and `env`, and git, which repository grants govern. Declaring `curl` with `allow: all` does not make it runnable.
 
 ## What happens at start
 

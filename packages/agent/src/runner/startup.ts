@@ -7,6 +7,8 @@ import {
   buildPolicy,
   effectiveTools,
   envSecretSource,
+  grantTokenKeys,
+  networkGrants,
   formatCatalogIssue,
   formatIssue,
   loadCatalog,
@@ -329,6 +331,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     writeFileSync(target, text);
   }
 
+  const network = networkGrants(team, me);
   const { adapter: _adapter, ...rawOptions } = runtimeRef;
   const runtime = (await runtimeDef.create({
     options: runtimeDef.options.parse(rawOptions),
@@ -336,6 +339,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     secretKeys: [
       ...new Set([
         "OUTSTAFF_AGENT_TOKEN",
+        ...grantTokenKeys(network),
         ...opts.registry.list().flatMap((d) => d.secrets("person").map((s) => s.key)),
       ]),
     ],
@@ -364,6 +368,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     layout,
     packs,
     capabilities,
+    network,
   });
 
   // Chat sessions run beside the active item, so they get a profile that cannot disturb it.

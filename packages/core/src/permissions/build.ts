@@ -1,4 +1,5 @@
 import type { Capability } from "../capabilities.js";
+import { originOf, type NetworkGrants } from "../config/network.js";
 import type { TeamConfig } from "../config/schema.js";
 import type { CommandRule, GitMode, Layout, Policy, Profile, RulePack, ToolKind } from "./types.js";
 
@@ -19,6 +20,9 @@ export interface BuildPolicyInput {
    * the artifacts folder; no profile has them by itself.
    */
   capabilities?: readonly Capability[];
+
+  /** The person's merged network grants (`networkGrants`). `curl` is allowed to their origins only when `rawHttp` is on. */
+  network?: NetworkGrants;
 }
 
 /** Where a person's Design canvas files live; the folder stays across items. */
@@ -155,6 +159,9 @@ const NETWORK_TOOLS = [
   "socat",
 ];
 
+/** Reached only through a verb that checks the device against the person's grants. */
+const VERB_ONLY_TOOLS: Record<string, string> = { adb: "ost adb" };
+
 const WRAPPERS = [
   "sh",
   "bash",
@@ -187,6 +194,17 @@ export function commandRules(spec: ProfileSpec): CommandRule[] {
         program,
         effect: "deny",
         reason: `Raw network tool ${program} is denied; use ost verbs.`,
+      }),
+    );
+  }
+
+  for (const [program, verb] of Object.entries(VERB_ONLY_TOOLS)) {
+    rules.push(
+      rule({
+        id: `network.${program}`,
+        program,
+        effect: "deny",
+        reason: `Raw ${program} is denied; use ${verb}, which reaches only the devices granted to you.`,
       }),
     );
   }
@@ -309,6 +327,12 @@ export function repoAccess(
   return access;
 }
 
+function curlOrigins(network: NetworkGrants | undefined): Policy["network"] {
+  const origins = [...new Set((network?.http ?? []).flatMap((g) => originOf(g.url) ?? []))];
+
+  return network?.rawHttp && origins.length > 0 ? { raw: "http", origins } : { raw: "deny" };
+}
+
 export function buildPolicy({
   profile,
   person,
@@ -316,6 +340,7 @@ export function buildPolicy({
   layout,
   packs = [],
   capabilities = [],
+  network,
 }: BuildPolicyInput): Policy {
   for (const [name, dir] of [
     ["reposDir", layout.reposDir],
@@ -392,7 +417,7 @@ export function buildPolicy({
         .flatMap((p) => p.rules),
     ],
     git: { repos, defaultBranches },
-    network: { raw: "deny" },
+    network: curlOrigins(network),
     ...(spec.verbs ? { ost: { allow: [...spec.verbs] } } : {}),
   };
 }

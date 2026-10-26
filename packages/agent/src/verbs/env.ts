@@ -1,5 +1,7 @@
 import {
   PortError,
+  networkGrants,
+  originOf,
   silentLogger,
   type AdapterRegistry,
   type Logger,
@@ -87,6 +89,23 @@ export async function createAgentEnv(opts: CreateAgentEnvOptions): Promise<Agent
 
   if (opts.office) {
     env.office = opts.office;
+  }
+
+  const me = team.people.find((p) => p.handle === person)!;
+  const grants = networkGrants(team, me);
+  if (grants.http.length > 0 || grants.adb.length > 0) {
+    env.network = {
+      http: grants.http.map((g) => {
+        const key = g.token;
+        return {
+          name: g.name,
+          origin: originOf(g.url)!,
+          ...(key ? { token: () => opts.secrets.require(key) } : {}),
+        };
+      }),
+      adb: grants.adb,
+      ...(opts.fetch ? { fetch: opts.fetch } : {}),
+    };
   }
 
   return env;

@@ -30,6 +30,13 @@ export const me = defineVerb({
         ? `${t.name} ${t.version} UNAVAILABLE (${t.error})`
         : `${t.name} ${t.version}`;
 
+    const http = env.network?.http ?? [];
+    const adb = env.network?.adb ?? [];
+    const networkLine = [
+      ...http.map((g) => `http ${g.name}`),
+      ...adb.map((g) => `adb ${g.name}${g.pairing ? " (wireless)" : ""}`),
+    ].join(", ");
+
     const email = env.team.email?.pattern.replace("{handle}", person.handle);
     return result(
       [
@@ -37,6 +44,7 @@ export const me = defineVerb({
         ...(email ? [`Email: ${email}`] : []),
         `Repositories: ${grants.length ? grants.join(", ") : "none"}`,
         `Tools: ${tools.length ? tools.map(toolLine).join("; ") : "none"}`,
+        `Network: ${networkLine || "none"}`,
         `Connected: ${Object.entries(connected)
           .map(([k, v]) => `${k} ${v ? "yes" : "no"}`)
           .join(", ")}`,
@@ -49,6 +57,7 @@ export const me = defineVerb({
         email: email ?? null,
         repos: person.repos,
         tools,
+        network: { http: http.map((g) => g.name), adb: adb.map((g) => g.name) },
         connected,
       },
       [],

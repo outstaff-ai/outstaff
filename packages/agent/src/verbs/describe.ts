@@ -3,7 +3,7 @@ import type { Verb } from "./types.js";
 
 export interface VerbField {
   name: string;
-  type: "string" | "integer" | "number" | "boolean";
+  type: "string" | "integer" | "number" | "boolean" | "array";
   required: boolean;
   description: string;
   default?: unknown;

@@ -15,6 +15,7 @@ import { createTracker } from "./tracker.ts";
  *   STUB_APPS          `<app id>=<slug>,...` the GitHub Apps that exist
  *   STUB_APP_PUBLIC_KEY  PEM file; Apps must sign their JWTs with the matching private key
  *   STUB_TRACKER_KEYS  `<api key>=<username>,...`
+ *   STUB_HOME_TOKEN    the bearer token the home service (home.acme.example) wants
  *   STUB_TLS_CERT, STUB_TLS_KEY  PEM files for the https listener (git needs https)
  *   STUB_HTTP_PORT (8081), STUB_HTTPS_PORT (443)
  *
@@ -190,7 +191,45 @@ const control: Route[] = [
   },
 ];
 
-const route = router([...control, ...chat.routes, ...github.routes, ...tracker.routes]);
+// Two services of the team reached by `ost http`: a hub with no authentication and a home service with a bearer
+// token. Both are served by this process under their own host names; every request is recorded.
+const serviceHits: { host: string; path: string; authorized: boolean }[] = [];
+const homeToken = env("STUB_HOME_TOKEN");
+const services: Route[] = [
+  {
+    method: "GET",
+    path: "/_test/service-hits",
+    handler: () => serviceHits,
+  },
+  {
+    method: "GET",
+    path: "/hub/status",
+    handler: (r) => {
+      serviceHits.push({ host: String(r.headers.host), path: r.path, authorized: false });
+      return { devices: 2 };
+    },
+  },
+  {
+    method: "GET",
+    path: "/hub/secure",
+    handler: (r) => {
+      const authorized = r.headers.authorization === `Bearer ${homeToken}`;
+      serviceHits.push({ host: String(r.headers.host), path: r.path, authorized });
+      // The body repeats the credential it was given, so the test can see the agent never gets it back.
+      return authorized
+        ? { status: 200, body: { lights: "on", seen: r.headers.authorization } }
+        : { status: 401, body: { error: "unauthorized" } };
+    },
+  },
+];
+
+const route = router([
+  ...control,
+  ...services,
+  ...chat.routes,
+  ...github.routes,
+  ...tracker.routes,
+]);
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const started = Date.now();

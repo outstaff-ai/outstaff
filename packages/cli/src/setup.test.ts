@@ -391,3 +391,23 @@ describe("ost setup --derive", () => {
     });
   });
 });
+
+describe("ost setup network tokens", () => {
+  it("lists the bearer token of a granted service among the person's secrets", async () => {
+    const dir = project();
+    const team = join(dir, ".outstaff", "team.yaml");
+    writeFileSync(
+      team,
+      readFileSync(team, "utf8").replace(
+        "  - handle: mira\n",
+        '  - handle: mira\n    network:\n      http:\n        - { name: home, url: "https://home.acme.example", token: HOME_TOKEN }\n',
+      ),
+    );
+
+    const r = await ost(dir, ["setup", "mira", "--json"]);
+    expect(r.out).toContain("HOME_TOKEN");
+    expect(r.out).not.toContain("HOME_TOKEN=secret");
+    const other = await ost(dir, ["setup", "ines", "--json"]);
+    expect(other.out).not.toContain("HOME_TOKEN");
+  });
+});

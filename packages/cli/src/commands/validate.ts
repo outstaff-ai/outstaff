@@ -8,6 +8,7 @@ import {
   type LocatedIssue,
   type TeamConfig,
 } from "@outstaff/core";
+import { adapterSecretKeys } from "../secret-keys.js";
 import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
 import { issueJson, loadTeam } from "../load.js";
@@ -33,7 +34,7 @@ export const validate = defineCommand({
   name: "validate",
   summary: "Check the team config for errors and warnings.",
   description:
-    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written, but the options of adapters this build ships are checked against that adapter's schema. The installed adapters check the identities they own (a Slack member id, a GitHub login or App bot login) and warn about malformed ones.",
+    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written, but the options of adapters this build ships are checked against that adapter's schema. Network grants (`network`, per person or under `roles`) are checked for origin-only URLs, unique names, a port or wireless pairing for each device, and tokens that do not reuse a secret an integration reads; whether a token secret exists is checked by `ost doctor`. The installed adapters check the identities they own (a Slack member id, a GitHub login or App bot login) and warn about malformed ones.",
   options: [],
   examples: ["ost validate", "ost validate --team ../acme-team", "ost validate --json"],
   exitCodes: [
@@ -58,6 +59,7 @@ export const validate = defineCommand({
           adapters: new Map(),
           identityValidators: agentRegistry().toIdentityValidators(),
           adapterCapabilities: agentRegistry().toValidationAdapters(),
+          secretKeys: adapterSecretKeys(agentRegistry()),
         });
 
         errors = [...report.errors, ...validateAdapterOptions(loaded.config)].map(loaded.locate);

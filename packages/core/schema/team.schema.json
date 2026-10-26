@@ -469,6 +469,88 @@
               "description": "A tool installed at agent start, with the commands it may run."
             }
           },
+          "network": {
+            "description": "Network grants for this agent, merged over those of its roles.",
+            "type": "object",
+            "properties": {
+              "http": {
+                "description": "Services reachable with `ost http`.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 30,
+                      "pattern": "^[a-z][a-z0-9-]*$",
+                      "description": "Name the agent gives to `ost http`, for example hub."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Origin of the service, for example https://hub.acme.example."
+                    },
+                    "token": {
+                      "description": "Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>` to this service. The agent never sees the value.",
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_]+$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A service the agent may reach with `ost http`."
+                }
+              },
+              "adb": {
+                "description": "Devices reachable with `ost adb`.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 30,
+                      "pattern": "^[a-z][a-z0-9-]*$",
+                      "description": "Name the agent gives to `ost adb`, for example test-tablet."
+                    },
+                    "host": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 253,
+                      "pattern": "^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$",
+                      "description": "Host name or IP address of the device, for example 10.0.0.16."
+                    },
+                    "port": {
+                      "description": "Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.",
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "pairing": {
+                      "description": "Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.",
+                      "type": "string",
+                      "const": "wireless"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "host"
+                  ],
+                  "additionalProperties": false,
+                  "description": "An Android device the agent may reach with `ost adb`."
+                }
+              },
+              "raw_http": {
+                "description": "Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "avatar": {
             "description": "Avatar settings.",
             "type": "object",
@@ -836,6 +918,103 @@
         ],
         "additionalProperties": false,
         "description": "A tool installed at agent start, with the commands it may run."
+      }
+    },
+    "roles": {
+      "description": "Settings per catalog role, for everyone who plays it.",
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "network": {
+            "description": "Network grants every person with this role gets, merged with their own.",
+            "type": "object",
+            "properties": {
+              "http": {
+                "description": "Services reachable with `ost http`.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 30,
+                      "pattern": "^[a-z][a-z0-9-]*$",
+                      "description": "Name the agent gives to `ost http`, for example hub."
+                    },
+                    "url": {
+                      "type": "string",
+                      "description": "Origin of the service, for example https://hub.acme.example."
+                    },
+                    "token": {
+                      "description": "Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>` to this service. The agent never sees the value.",
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9_]+$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "url"
+                  ],
+                  "additionalProperties": false,
+                  "description": "A service the agent may reach with `ost http`."
+                }
+              },
+              "adb": {
+                "description": "Devices reachable with `ost adb`.",
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 30,
+                      "pattern": "^[a-z][a-z0-9-]*$",
+                      "description": "Name the agent gives to `ost adb`, for example test-tablet."
+                    },
+                    "host": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 253,
+                      "pattern": "^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$",
+                      "description": "Host name or IP address of the device, for example 10.0.0.16."
+                    },
+                    "port": {
+                      "description": "Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.",
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 65535
+                    },
+                    "pairing": {
+                      "description": "Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.",
+                      "type": "string",
+                      "const": "wireless"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "host"
+                  ],
+                  "additionalProperties": false,
+                  "description": "An Android device the agent may reach with `ost adb`."
+                }
+              },
+              "raw_http": {
+                "description": "Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.",
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false,
+        "description": "Settings for everyone who plays this role."
       }
     },
     "workflow": {

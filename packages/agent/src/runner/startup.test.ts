@@ -134,6 +134,65 @@ describe("prepareAgent", () => {
     expect(run("curl https://example.com").effect).toBe("deny");
   });
 
+  it("grants a person the network of their role and their own, scrubs the token from the shell and allows curl only with raw_http", async () => {
+    const granted = TEAM.replace(
+      "people:",
+      `roles:
+  developer:
+    network:
+      http: [{ name: hub, url: "https://hub.acme.example" }]
+people:`,
+    ).replace(
+      "role: developer, repos: { shop: write } }",
+      `role: developer, repos: { shop: write }, network: { raw_http: true, http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }], adb: [{ name: wall-panel, host: 10.0.0.18, port: 5555 }] } }`,
+    );
+
+    const { home, options } = setup({ HOME_TOKEN: "home-token-value-123" }, granted);
+    let scrub: readonly string[] | undefined;
+    options.registry = new AdapterRegistry();
+    for (const def of registry().list()) {
+      options.registry.register(
+        def.port === "runtime"
+          ? defineAdapter({
+              port: "runtime",
+              name: "fake",
+              capabilities: ["runtime.sessions", "runtime.usage"],
+              options: z.looseObject({}),
+              secrets: () => [],
+              create: (ctx) => {
+                scrub = ctx.secretKeys;
+                return createFakeRuntime();
+              },
+            })
+          : def,
+      );
+    }
+
+    const agent = await prepareAgent(options);
+    expect(scrub).toContain("HOME_TOKEN");
+    expect(agent.env.network?.http.map((h) => h.name).toSorted()).toEqual(["home", "hub"]);
+    expect(agent.env.network?.http.find((h) => h.name === "home")?.token?.()).toBe(
+      "home-token-value-123",
+    );
+
+    const cwd = join(home, "worktrees/shop");
+    const run = (command: string) => evaluate(agent.policy, { kind: "shell", command, cwd });
+    expect(run("curl -s https://hub.acme.example/status").effect).toBe("allow");
+    expect(run("curl https://other.acme.example/").effect).toBe("deny");
+    expect(run("adb -s 10.0.0.18:5555 shell ls").effect).toBe("deny");
+
+    // Without raw_http the same grants leave curl denied.
+    const off = setup({}, granted.replace("raw_http: true, ", ""));
+    const quiet = await prepareAgent(off.options);
+    expect(
+      evaluate(quiet.policy, {
+        kind: "shell",
+        command: "curl https://hub.acme.example/status",
+        cwd: join(off.home, "worktrees/shop"),
+      }).effect,
+    ).toBe("deny");
+  });
+
   it("starts a person without repository grants with no vcs port", async () => {
     const team = TEAM.replace(
       "integrations:",
