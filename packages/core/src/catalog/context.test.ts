@@ -103,7 +103,10 @@ describe("buildContext", () => {
     expect(ctx.policies.tickets).toEqual({ many_prs: false });
     const many = buildContext({
       ...acme,
-      policies: { ...acme.policies!, tickets: { prs_per_ticket: "many" } },
+      policies: {
+        ...acme.policies!,
+        tickets: { prs_per_ticket: "many", start_moves_active: true },
+      },
     });
 
     expect(many.policies.tickets).toEqual({ many_prs: true });

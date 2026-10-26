@@ -173,6 +173,7 @@ policies:
     fallback: first_human
   tickets:
     prs_per_ticket: one
+    start_moves_active: true
   conflicts:
     follow_up: true
   retry:

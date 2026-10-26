@@ -306,22 +306,23 @@ describe("ost policies", () => {
   it("lists every switch of the acme team with its value and source", async () => {
     const r = await ost(acme(), ["policies"]);
     expect(r.code).toBe(0);
-    expect(r.out).toBe(`SWITCH                             VALUE        SOURCE
-policies.acknowledge.chat          true         team.yaml
-policies.acknowledge.vcs           true         team.yaml
-policies.chat.profile              true         team.yaml
-policies.design.canvas             true         team.yaml
-policies.feedback.follow_up_round  true         team.yaml
-policies.feedback.merged_prs       true         team.yaml
-policies.feedback.doc_comments     true         team.yaml
-policies.feedback.ticket_comments  true         team.yaml
-policies.feedback.mentions         true         team.yaml
-policies.hand_back.reassign        requester    team.yaml
-policies.hand_back.fallback        first_human  team.yaml
-policies.tickets.prs_per_ticket    one          team.yaml
-policies.merge.on_approval         false        default
-policies.conflicts.follow_up       true         team.yaml
-policies.retry.on_signal           true         team.yaml
+    expect(r.out).toBe(`SWITCH                               VALUE        SOURCE
+policies.acknowledge.chat            true         team.yaml
+policies.acknowledge.vcs             true         team.yaml
+policies.chat.profile                true         team.yaml
+policies.design.canvas               true         team.yaml
+policies.feedback.follow_up_round    true         team.yaml
+policies.feedback.merged_prs         true         team.yaml
+policies.feedback.doc_comments       true         team.yaml
+policies.feedback.ticket_comments    true         team.yaml
+policies.feedback.mentions           true         team.yaml
+policies.hand_back.reassign          requester    team.yaml
+policies.hand_back.fallback          first_human  team.yaml
+policies.tickets.prs_per_ticket      one          team.yaml
+policies.tickets.start_moves_active  true         team.yaml
+policies.merge.on_approval           false        default
+policies.conflicts.follow_up         true         team.yaml
+policies.retry.on_signal             true         team.yaml
 `);
   });
 

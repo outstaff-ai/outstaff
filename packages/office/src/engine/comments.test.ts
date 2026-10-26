@@ -172,6 +172,7 @@ describe("a comment on a document", () => {
   it("schedules doc_feedback for the author on the document's ticket, with the anchor and link", async () => {
     h = await harness({ team: team() });
     const key = await ticket("review", "dana");
+    await h.scheduler.finish((await h.items("sam"))[0]!.id, { outcome: "ok", status: "done" });
     await doc(key);
     await h.deliver(docCommented({ subject: { doc: "doc-1", ticket: key } }));
 
@@ -197,6 +198,7 @@ describe("a comment on a document", () => {
   it("keeps one round for a burst of comments, oldest first", async () => {
     h = await harness({ team: team() });
     const key = await ticket("review", "dana");
+    await h.scheduler.finish((await h.items("sam"))[0]!.id, { outcome: "ok", status: "done" });
     await doc(key);
     const second = docCommented({
       subject: { doc: "doc-1", ticket: key },

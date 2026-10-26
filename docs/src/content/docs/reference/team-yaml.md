@@ -199,6 +199,7 @@ policies:
     fallback: first_human
   tickets:
     prs_per_ticket: one
+    start_moves_active: true
   conflicts:
     follow_up: true
   retry:
@@ -1338,7 +1339,7 @@ How tickets and pull requests relate.
 
 - Type: `object`
 - Optional
-- Default: `{"prs_per_ticket":"one"}`
+- Default: `{"prs_per_ticket":"one","start_moves_active":true}`
 
 #### policies.tickets.prs_per_ticket
 
@@ -1348,6 +1349,14 @@ How many pull requests a ticket may have. one: ost pr open refuses a second one 
 - Optional
 - Default: `one`
 - Allowed values: `one`, `many`
+
+#### policies.tickets.start_moves_active
+
+Move a ticket to active when a work item about it starts (assigned, ticket comment), if it is in backlog, ready, review or blocked. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and the minimal preset never moves tickets. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
 
 ### policies.conflicts
 

@@ -3,6 +3,7 @@ import {
   explainWorkflow,
   PortError,
   policyOn,
+  PRESET_MOVES_TICKETS,
   resolveWorkflow,
   type Chat,
   type Effect,
@@ -26,6 +27,15 @@ import type { EffectOutcome, Engine, EngineMeta, EngineOptions } from "./types.j
 const PLAN = "engine";
 const LIVE = new Set(["queued", "active"]);
 const PRIORITY_SHIFT = 5;
+
+/** The kinds of work on a ticket; one round of them covers a schedule for another on the same ticket. */
+const TICKET_WORK = new Set(["assigned", "ticket_comment", "doc_feedback"]);
+
+/** Kinds that only answer something on a ticket; starting one leaves the ticket where it is. */
+const ANSWERS = new Set(["asked", "doc_feedback"]);
+
+/** Where a ticket starts being worked on from. */
+const STARTS_FROM = new Set(["backlog", "ready", "review", "blocked"]);
 const TRANSIENT = new Set(["rate_limited", "unavailable"]);
 
 interface Plan {
@@ -290,14 +300,19 @@ export function createEngine(opts: EngineOptions): Engine {
 
     const mine = await store.listItems({ person: e.person });
     if (subject) {
+      // One round per ticket: ticket work joins the round another ticket-work kind already has on that ticket.
       const dup = mine.find(
-        (i) => LIVE.has(i.status) && i.kind === e.kind && sameSubject(i.subject, subject),
+        (i) =>
+          LIVE.has(i.status) &&
+          sameSubject(i.subject, subject) &&
+          (i.kind === e.kind ||
+            (subject.type === "ticket" && TICKET_WORK.has(i.kind) && TICKET_WORK.has(e.kind))),
       );
 
       if (dup) {
         // Feedback for a round that is queued or running is attached to it instead of being lost: a queued item
         // offers it with the rest, and for a running one the follow-up round after the hand-back picks it up.
-        const feedback = dup.kind === e.kind ? feedbackOf(event) : undefined;
+        const feedback = feedbackOf(event);
         if (feedback) {
           await addFeedback(store, dup.id, feedback);
           throw new Attached(
@@ -608,8 +623,45 @@ export function createEngine(opts: EngineOptions): Engine {
     );
   };
 
+  /** A work item about a ticket moves it to active when it starts: the office's mechanics, not the agent's duty. */
+  const moveOnStart = async (item: WorkItem): Promise<void> => {
+    const key = item.subject?.type === "ticket" ? item.subject.ref : undefined;
+    if (
+      !key ||
+      !tracker ||
+      ANSWERS.has(item.kind) ||
+      !policyOn(team.policies, "tickets.start_moves_active") ||
+      !PRESET_MOVES_TICKETS[team.workflow?.preset ?? "kanban"]
+    ) {
+      return;
+    }
+
+    const status = workState.ticket(key)?.status;
+    if (!status || !STARTS_FROM.has(status)) {
+      return;
+    }
+
+    try {
+      await tracker.transition(key, "active");
+      await sync(key, "ticket.moved", { to: "active" });
+      logger.info(`engine: moved ${key} to active, ${item.kind} work item ${item.id} started`, {
+        ticket: key,
+        item: item.id,
+      });
+    } catch (error) {
+      logger.warn("could not move the ticket to active when its work started", {
+        ticket: key,
+        error: String(error),
+      });
+    }
+  };
+
   const started = async (itemId: string): Promise<void> => {
     const item = await store.getItem(itemId);
+    if (item) {
+      await moveOnStart(item);
+    }
+
     const key = item ? await ticketOfItem(item) : undefined;
     if (!item || !key || !tracker) {
       return;

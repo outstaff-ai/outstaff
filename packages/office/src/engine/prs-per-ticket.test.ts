@@ -92,7 +92,7 @@ describe("a second pull request a person opens", () => {
   });
 
   it("says what closes the ticket when the team allows several", async () => {
-    const key = await start({ tickets: { prs_per_ticket: "many" } });
+    const key = await start({ tickets: { prs_per_ticket: "many", start_moves_active: true } });
     await open(key, "index");
     await open(key, "ui", "human");
     expect((await comments(key))[0]).toContain("handed its work back as done");
@@ -121,7 +121,7 @@ describe("when a ticket with two pull requests is done", () => {
   });
 
   it("with many, a merge alone does not close it", async () => {
-    const key = await start({ tickets: { prs_per_ticket: "many" } });
+    const key = await start({ tickets: { prs_per_ticket: "many", start_moves_active: true } });
     const first = await open(key, "index");
     await open(key, "ui");
     await merge(first);
@@ -129,7 +129,7 @@ describe("when a ticket with two pull requests is done", () => {
   });
 
   it("with many, the hand-back as done after every pull request merged closes it", async () => {
-    const key = await start({ tickets: { prs_per_ticket: "many" } });
+    const key = await start({ tickets: { prs_per_ticket: "many", start_moves_active: true } });
     const first = await open(key, "index");
     const second = await open(key, "ui");
     await merge(first);
@@ -140,7 +140,7 @@ describe("when a ticket with two pull requests is done", () => {
   });
 
   it("with many, the last merge after the hand-back as done closes it", async () => {
-    const key = await start({ tickets: { prs_per_ticket: "many" } });
+    const key = await start({ tickets: { prs_per_ticket: "many", start_moves_active: true } });
     const first = await open(key, "index");
     const second = await open(key, "ui");
     await handBack(key);
@@ -153,7 +153,7 @@ describe("when a ticket with two pull requests is done", () => {
   });
 
   it("with many, a pull request closed unmerged after the others merged still closes it", async () => {
-    const key = await start({ tickets: { prs_per_ticket: "many" } });
+    const key = await start({ tickets: { prs_per_ticket: "many", start_moves_active: true } });
     const first = await open(key, "index");
     const second = await open(key, "ui");
     await handBack(key);

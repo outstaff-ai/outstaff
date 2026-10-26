@@ -336,6 +336,13 @@ const minimalRules: Rule[] = [
   },
 ];
 
+/** Whether the preset moves tickets at all; the office follows it when it moves a ticket on its own. */
+export const PRESET_MOVES_TICKETS: Record<"kanban" | "scrum" | "minimal", boolean> = {
+  kanban: true,
+  scrum: true,
+  minimal: false,
+};
+
 export const WORKFLOW_PRESETS = ["kanban", "scrum", "minimal"] as const;
 export type WorkflowPreset = (typeof WORKFLOW_PRESETS)[number];
 
