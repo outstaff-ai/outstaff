@@ -212,15 +212,76 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     };
   };
 
+  /**
+   * The tracker no longer has the ticket: remember that, close what hung on it, and stop asking.
+   * A ticket the work state never held only gets the warning.
+   */
+  const forgetTicket = async (key: string, prev?: TicketRecord) => {
+    if (!prev) {
+      logger.warn("ticket not found", { key });
+      return;
+    }
+
+    if (prev.goneAt) {
+      return;
+    }
+
+    logger.warn("ticket not found, forgetting it", { key });
+    const note = `Ticket ${key} no longer exists in the tracker.`;
+    const at = clock.now().toISOString();
+    const gone: TicketRecord = {
+      key,
+      title: prev.title,
+      ...(prev.url ? { url: prev.url } : {}),
+      labels: [],
+      goneAt: at,
+      updatedAt: at,
+    };
+
+    tickets.set(key, gone);
+    await store.upsertSubject("ticket", key, gone);
+    const assignee = prev.assignee;
+    if (assignee?.kind === "agent" && team.people.some((p) => p.handle === assignee.id)) {
+      await store.unlink(ticketNode(key), personNode(assignee.id), "assigned_to");
+    }
+
+    const linked = [...prs.values()].filter((p) => p.ticket === key);
+    const prKeys = new Set<string>();
+    for (const rec of linked) {
+      const { ticket: _ticket, ...unlinked } = rec;
+      const prKey = prSubject(rec.ref);
+      prKeys.add(prKey);
+      prs.set(prKey, unlinked);
+      await store.upsertSubject("pr", prKey, unlinked);
+      await store.unlink(prNode(prKey), ticketNode(key), "implements");
+    }
+
+    for (const item of await store.listItems()) {
+      const on = item.subject;
+      if (
+        (item.status === "queued" || item.status === "waiting") &&
+        on &&
+        ((on.type === "ticket" && on.ref === key) || (on.type === "pr" && prKeys.has(on.ref)))
+      ) {
+        await store.updateItem(item.id, { status: "canceled" });
+        await store.appendJournal(item.id, "office", note);
+      }
+    }
+  };
+
   const refreshTicket = async (key: string, event?: WorkflowEvent) => {
     const prev = tickets.get(key);
+    if (prev?.goneAt && !event) {
+      return;
+    }
+
     let rec: TicketRecord;
     if (tracker) {
       try {
         rec = toTicket(await tracker.getIssue(key), prev);
       } catch (error) {
         if (notFound(error)) {
-          logger.warn("ticket not found", { key });
+          await forgetTicket(key, prev);
           return;
         }
 
@@ -332,7 +393,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
   const ensureTicket = async (key: string): Promise<boolean> => {
     if (tickets.has(key)) {
-      return true;
+      return !tickets.get(key)!.goneAt;
     }
 
     if (notTickets.has(key)) {
@@ -341,7 +402,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     await refreshTicket(key);
     if (tickets.has(key)) {
-      return true;
+      return !tickets.get(key)!.goneAt;
     }
 
     notTickets.add(key);
@@ -626,7 +687,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     }
 
     for (const [key, t] of tickets) {
-      if (t.status && TERMINAL.has(t.status) && old(t.updatedAt)) {
+      if (((t.status && TERMINAL.has(t.status)) || t.goneAt) && old(t.updatedAt)) {
         tickets.delete(key);
         await store.unlink(ROOT, ticketNode(key), "tracks");
       }
@@ -659,7 +720,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     if (tracker) {
       for (const rec of tickets.values()) {
-        if (!rec.status || !TERMINAL.has(rec.status)) {
+        if (!rec.goneAt && (!rec.status || !TERMINAL.has(rec.status))) {
           await refreshTicket(rec.key);
         }
       }
