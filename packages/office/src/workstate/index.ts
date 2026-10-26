@@ -3,6 +3,7 @@ export { ticketCandidates } from "./infer.js";
 export type {
   CiState,
   CurrentWork,
+  DocRecord,
   PrRecord,
   TicketRecord,
   WorkState,

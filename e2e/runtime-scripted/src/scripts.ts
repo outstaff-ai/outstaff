@@ -226,6 +226,22 @@ export async function* assigned(ctx: ItemContext): Script {
     throw new Error(`A second pull request for ${key} was not refused.`);
   }
 
+  // A ticket that asks for a design document gets one next to its pull request.
+  const design = /^doc: (.+)$/m.exec(shown)?.[1];
+  if (design) {
+    const written = yield {
+      type: "tool",
+      tool: "doc_create",
+      input: {
+        path: `design/${key}.md`,
+        title: design,
+        body: `# ${design}\n\nKeep the cart in the session.\n\nThe alternative is the database.\n`,
+      },
+    };
+
+    return `Opened ${url}. The design is ${firstUrl(written)}.`;
+  }
+
   const question = /^ask architect: (.+)$/m.exec(shown)?.[1];
   if (question) {
     yield { type: "tool", tool: "ask", input: { to: "architect", question } };
@@ -318,6 +334,75 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   }
 
   return `Addressed ${ids.length} thread${ids.length === 1 ? "" : "s"} on pull request ${number} (${sha}).`;
+}
+
+/**
+ * A trusted human commented on a document the agent wrote: read every open comment, change the document once, reply
+ * to each comment and resolve the threads it answered.
+ */
+export async function* docFeedback(ctx: ItemContext): Script {
+  const feedback = need(ctx.feedback[0], "the feedback");
+  const doc = need(feedback.docId, "the document");
+  if (!feedback.anchor) {
+    throw new Error("The prompt does not give the text the comment is anchored to.");
+  }
+
+  const shown = yield { type: "tool", tool: "doc_show", input: { id: doc } };
+  // `- <id> [resolved] (reply to <id>) <author>: <text>`; the threads to answer are the open top-level comments.
+  const open = [...shown.matchAll(/^- (\S+) (\[resolved\] )?(\(reply to \S+\) )?.+?: /gm)]
+    .filter((m) => m[2] === undefined && m[3] === undefined)
+    .map((m) => m[1]!);
+
+  if (open.length === 0) {
+    throw new Error("The document has no open comment to answer.");
+  }
+
+  const text = /^\S.*\n\S+\n\n([\s\S]*?)\n\nComments \(/.exec(shown)?.[1];
+  if (text === undefined) {
+    throw new Error(`doc_show did not show the text of the document: ${shown}`);
+  }
+
+  yield {
+    type: "tool",
+    tool: "doc_update",
+    input: { id: doc, body: `${text}\n\nRevised after review: ${feedback.body}\n` },
+  };
+
+  for (const comment of open) {
+    yield {
+      type: "tool",
+      tool: "doc_reply",
+      input: { doc, commentId: comment, body: "Updated the document; see the revised section." },
+    };
+  }
+
+  // Resolve only a thread whose last word is ours: read the comments again just before. Comments list their author's name.
+  const after = (yield { type: "tool", tool: "doc_show", input: { id: doc } }).split("\n");
+  for (const comment of open) {
+    const thread = after.filter(
+      (l) => l.startsWith(`- ${comment} `) || l.includes(`(reply to ${comment})`),
+    );
+
+    if (/ Sam Duarte: /.test(thread.at(-1) ?? "")) {
+      yield { type: "tool", tool: "doc_resolve", input: { doc, commentId: comment } };
+    }
+  }
+
+  return `Answered ${open.length} comment${open.length === 1 ? "" : "s"} on the document and updated it.`;
+}
+
+/** A trusted human commented on the ticket: answer on it. */
+export async function* ticketComment(ctx: ItemContext): Script {
+  const key = need(ctx.ticket, "the ticket");
+  const feedback = need(ctx.feedback[0], "the comment");
+  yield { type: "tool", tool: "ticket_show", input: { key } };
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: { key, body: `Noted: ${feedback.body}` },
+  };
+
+  return `Answered the comment on ${key}.`;
 }
 
 /**
@@ -544,6 +629,8 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   ticket: assigned,
   review_feedback: reviewFeedback,
   merged_feedback: mergedFeedback,
+  doc_feedback: docFeedback,
+  ticket_comment: ticketComment,
   conflict,
   chat,
 };

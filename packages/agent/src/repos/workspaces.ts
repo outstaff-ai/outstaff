@@ -58,7 +58,7 @@ export const safeId = (id: string) => id.replaceAll(/[^\w.-]/g, "-").replace(/^\
  */
 export function headBranchOf(offer: Offer): string | undefined {
   const { workItem: item, context } = offer;
-  if (item.kind === "merged_feedback") {
+  if (item.kind === "merged_feedback" || item.kind === "doc_feedback") {
     return undefined;
   }
 

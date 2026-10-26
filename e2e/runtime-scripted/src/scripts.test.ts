@@ -4,9 +4,11 @@ import {
   branchFor,
   chat,
   conflict,
+  docFeedback,
   keepBoth,
   mergedFeedback,
   reviewFeedback,
+  ticketComment,
   withGreeting,
   type Action,
 } from "./scripts.js";
@@ -487,5 +489,111 @@ describe("reviewFeedback follows the repository's own commit rules", () => {
     expect(shells(seen)).toContain("git commit -m 'SHOP-1: address review'");
     expect(shells(seen)).toContain("git push origin HEAD:'assigned/w1-add-a-greeting'");
     expect(shells(seen).some((c) => c.includes("--amend"))).toBe(false);
+  });
+});
+
+describe("doc feedback", () => {
+  const shown = (comments: string[]) =>
+    `Cart design (design/SHOP-1.md)\nhttp://tracker/SHOP/docs/2\n\n# Cart design\n\nKeep the cart in the session.\n\nComments (${comments.length}):\n${comments.join("\n")}`;
+
+  const feedbackCtx = {
+    ...ctx,
+    kind: "doc_feedback",
+    feedback: [
+      {
+        kind: "doc_comment" as const,
+        docId: "2",
+        anchor: "Keep the cart",
+        body: "Why a session?",
+        threads: [],
+      },
+    ],
+  };
+
+  it("reads the open comments, updates the document once, replies to each and resolves the ones it answered", async () => {
+    let reads = 0;
+    const { seen, text } = await play(docFeedback(feedbackCtx), (a) => {
+      if (a.type === "tool" && a.tool === "doc_show") {
+        reads += 1;
+        return reads === 1
+          ? shown([
+              "- 2:c-1 Ada Admin: Why a session?",
+              "- 2:c-2 [resolved] Ada Admin: Old question",
+            ])
+          : shown([
+              "- 2:c-1 Ada Admin: Why a session?",
+              "- 2:c-3 (reply to 2:c-1) Sam Duarte: Updated the document",
+              "- 2:c-2 [resolved] Ada Admin: Old question",
+            ]);
+      }
+
+      return "";
+    });
+
+    const tools = seen.flatMap((a) => (a.type === "tool" ? [[a.tool, a.input]] : []));
+    expect(tools.map(([tool]) => tool)).toEqual([
+      "doc_show",
+      "doc_update",
+      "doc_reply",
+      "doc_show",
+      "doc_resolve",
+    ]);
+
+    expect(tools[1]![1]).toMatchObject({ id: "2" });
+    expect(String((tools[1]![1] as { body: string }).body)).toContain("Why a session?");
+    expect(tools[2]![1]).toMatchObject({ doc: "2", commentId: "2:c-1" });
+    expect(tools[4]![1]).toEqual({ doc: "2", commentId: "2:c-1" });
+    expect(text).toContain("1 comment");
+  });
+
+  it("leaves a thread open when someone replied after it", async () => {
+    let reads = 0;
+    const { seen } = await play(docFeedback(feedbackCtx), (a) => {
+      if (a.type === "tool" && a.tool === "doc_show") {
+        reads += 1;
+        return shown(
+          reads === 1
+            ? ["- 2:c-1 Ada Admin: Why a session?"]
+            : [
+                "- 2:c-1 Ada Admin: Why a session?",
+                "- 2:c-3 (reply to 2:c-1) Sam Duarte: Updated",
+                "- 2:c-4 (reply to 2:c-1) Ada Admin: And caching?",
+              ],
+        );
+      }
+
+      return "";
+    });
+
+    expect(seen.some((a) => a.type === "tool" && a.tool === "doc_resolve")).toBe(false);
+  });
+
+  it("needs the anchor the prompt lists", async () => {
+    await expect(
+      play(
+        docFeedback({ ...feedbackCtx, feedback: [{ ...feedbackCtx.feedback[0]!, anchor: "" }] }),
+        () => "",
+      ),
+    ).rejects.toThrow(/anchored/);
+  });
+});
+
+describe("ticket comment", () => {
+  it("answers the comment on the ticket", async () => {
+    const { seen, text } = await play(
+      ticketComment({
+        ...ctx,
+        kind: "ticket_comment",
+        feedback: [{ kind: "ticket_comment", body: "Mobile too?", threads: [] }],
+      }),
+      () => "",
+    );
+
+    expect(seen.at(-1)).toMatchObject({
+      tool: "ticket_comment",
+      input: { key: "SHOP-1", body: "Noted: Mobile too?" },
+    });
+
+    expect(text).toContain("SHOP-1");
   });
 });

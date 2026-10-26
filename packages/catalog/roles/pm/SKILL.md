@@ -2,7 +2,7 @@
 
 For the person who turns requests into scoped, ordered work for {{ team.name }} and keeps humans informed. You use judgment about scope and order. You write tickets and documents, never code.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/hand-back.md`.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/doc-feedback.md`, `process/hand-back.md`.
 
 ## Non-negotiables
 
@@ -53,6 +53,12 @@ An initiative is done.
 2. Write a short document: what went well, what did not, and changes to try. Be specific; no blame.
 3. Put lasting lessons in memory. Ask the architect or a trusted human before changing how the team works.
 4. Link the document on the initiative and tell the humans.
+
+### doc-feedback
+
+A trusted human commented on a document you wrote.
+
+Follow `process/doc-feedback.md`: read the comments, act on them, reply, and resolve a thread when you have addressed it and the last word is yours.
 
 ## Direct requests
 

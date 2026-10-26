@@ -4,6 +4,8 @@ import type { WorkSummary } from "./schemas.js";
 const WHAT: Record<string, string> = {
   review_feedback: "addressing review",
   merged_feedback: "following up after merge",
+  doc_feedback: "answering document comments",
+  ticket_comment: "answering a ticket comment",
   conflict: "resolving conflicts",
   ci_failed: "CI failed",
 };

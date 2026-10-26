@@ -80,5 +80,36 @@ export function knowledgeContract(
       expect(all.find((x) => x.id === c.id)?.resolved).toBe(true);
       await expectPortError(s.subject.resolve("missing-comment"), "not_found");
     });
+
+    it("reports the comments and replies of the named documents after a cursor, oldest first", async (t) => {
+      const s = get();
+      requireCapability(t, s, "knowledge.docs");
+      const doc = await s.subject.create({
+        path: "n/three",
+        title: "Three",
+        body: "text to anchor",
+      });
+
+      const other = await s.subject.create({ path: "n/four", title: "Four", body: "other text" });
+      const first = await s.subject.events([doc.id, other.id]);
+      const c = await s.subject.comment(doc.id, { body: "why?", anchorText: "anchor" });
+      const r = await s.subject.reply(c.id, "because");
+      await s.subject.comment(other.id, { body: "unrelated", anchorText: "other" });
+
+      const page = await s.subject.events([doc.id], first.cursor);
+      expect(page.events.map((e) => e.data.commentId)).toEqual([c.id, r.id]);
+      expect(page.events.every((e) => e.doc === doc.id && e.type === "commented")).toBe(true);
+      expect(new Set(page.events.map((e) => e.externalId)).size).toBe(2);
+      expect(page.events[0]).toMatchObject({
+        title: "Three",
+        data: { body: "why?", anchorText: "anchor" },
+      });
+
+      expect(page.events[1]?.data.parentId).toBe(c.id);
+      expectAbsoluteUrl(page.events[0]!.url);
+      expect(page.events[0]!.actor.id).not.toBe("");
+      const times = page.events.map((e) => Date.parse(e.at));
+      expect(times).toEqual(times.toSorted((a, b) => a - b));
+    });
   });
 }

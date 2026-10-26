@@ -1,6 +1,6 @@
 import type { KnowledgeSeed } from "../contracts/seeds.js";
 import { PortError } from "../ports/index.js";
-import type { Doc, DocComment, Knowledge } from "../ports/index.js";
+import type { Doc, DocComment, DocEvent, Knowledge } from "../ports/index.js";
 import { steppingClock } from "./util.js";
 
 export interface FakeKnowledgeOptions {
@@ -138,6 +138,46 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     },
     async resolve(commentId) {
       needComment(commentId).resolved = true;
+    },
+    async events(ids, cursor) {
+      const after = cursor === undefined ? undefined : (JSON.parse(cursor) as { since: string });
+      const wanted = new Set(ids.map((id) => find(id).id));
+      const all = [...comments.values()]
+        .filter((c) => wanted.has(c.docId))
+        .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));
+
+      const events = (
+        after ? all.filter((c) => Date.parse(c.at) > Date.parse(after.since)) : []
+      ).map((c): DocEvent => {
+        const doc = docs.get(c.docId)!;
+        return {
+          externalId: `fake:${c.id}`,
+          type: "commented",
+          doc: doc.id,
+          title: doc.title,
+          url: doc.url,
+          actor: { id: c.author, name: c.author, kind: "human" },
+          at: c.at,
+          data: {
+            commentId: c.id,
+            ...(c.parentId ? { parentId: c.parentId } : {}),
+            ...(c.anchorText ? { anchorText: c.anchorText } : {}),
+            body: c.body,
+          },
+        };
+      });
+
+      const newest = Math.max(
+        after ? Date.parse(after.since) : Number.NEGATIVE_INFINITY,
+        ...all.map((c) => Date.parse(c.at)),
+      );
+
+      return {
+        events,
+        cursor: JSON.stringify({
+          since: new Date(Number.isFinite(newest) ? newest : now().getTime()).toISOString(),
+        }),
+      };
     },
   };
 }

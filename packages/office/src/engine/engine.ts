@@ -60,7 +60,7 @@ function retrySignal(event: WorkflowEvent): string | undefined {
 function past(e: Effect): string {
   switch (e.type) {
     case "schedule":
-      return `scheduled ${e.kind} for ${e.person}${e.pr ? ` on ${prLabel(e.pr)}` : e.ticket ? ` on ${e.ticket}` : ""}`;
+      return `scheduled ${e.kind} for ${e.person}${e.pr ? ` on ${prLabel(e.pr)}` : e.ticket ? ` on ${e.ticket}` : e.doc ? ` on doc ${e.doc}` : ""}`;
     case "move":
       return `moved ${e.ticket} to ${e.to}`;
     case "assign":
@@ -279,7 +279,9 @@ export function createEngine(opts: EngineOptions): Engine {
       ? { type: "pr", ref: workState.prSubject(e.pr) }
       : e.ticket
         ? { type: "ticket", ref: e.ticket }
-        : undefined;
+        : e.doc
+          ? { type: "doc", ref: e.doc }
+          : undefined;
 
     const mine = await store.listItems({ person: e.person });
     if (subject) {
@@ -317,7 +319,9 @@ export function createEngine(opts: EngineOptions): Engine {
         ? mentions(ticketText, e.ticket)
           ? ticketText!
           : `${e.ticket} ${ticketText ?? ""}`.trim()
-        : "";
+        : e.doc
+          ? (workState.doc(e.doc)?.title ?? `document ${e.doc}`)
+          : "";
 
     // The earlier work on the same ticket or pull request, so the history reads as one thread.
     const related = (

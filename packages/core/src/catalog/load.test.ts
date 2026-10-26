@@ -161,6 +161,7 @@ describe("shared catalog files", () => {
         "work-items",
         "review-loop",
         "merged-feedback",
+        "doc-feedback",
         "hand-back",
         "direct-requests",
       ]),

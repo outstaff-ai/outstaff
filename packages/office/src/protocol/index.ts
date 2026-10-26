@@ -11,6 +11,7 @@ export {
 export {
   ProtocolError,
   type ChatDesk,
+  type DocLinks,
   type Messaging,
   type Offer,
   type TicketPrs,

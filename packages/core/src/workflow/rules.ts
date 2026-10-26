@@ -143,8 +143,8 @@ export const actionSchema: z.ZodType<Action> = z.union([
         person: z
           .string()
           .regex(
-            new RegExp(`^(author|assignee|last_worker|${ROLE})$`),
-            "Use author, assignee, last_worker or role:<role>.",
+            new RegExp(`^(author|assignee|last_worker|doc_author|${ROLE})$`),
+            "Use author, assignee, last_worker, doc_author or role:<role>.",
           ),
         kind: z.string().regex(SLUG, "Use lowercase letters, digits, dashes and underscores."),
         priority: z.enum(["low", "normal", "high"]).default("normal"),

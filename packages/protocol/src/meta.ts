@@ -167,6 +167,12 @@ export const MESSAGE_META = {
     summary: "Whether to post, whom to mention and which links to include.",
     replies: [],
   },
+  doc_link: {
+    from: "agent",
+    summary:
+      "Tells the office that the caller wrote a document for the ticket of a work item, so comments people leave on the document reach the caller as work.",
+    replies: ["ack", "error"],
+  },
   current_work: {
     from: "agent",
     summary: "Asks for the caller's open tickets and pull requests, as context for a chat session.",

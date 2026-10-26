@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and a direct message with a picture is answered and its ticket gets the picture. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -241,6 +241,7 @@ integrations:
     url: http://tracker.acme.example:8081/tracker
     api_url: http://tracker.acme.example:8081/tracker
     project: SHOP
+  knowledge: { adapter: itsaplan }
 workflow:
   preset: kanban
   statuses:
@@ -1227,6 +1228,103 @@ async function main() {
   assertEq(after10.github.pulls.length, pullsBefore10 + 1, "no second pull request was opened");
   step(
     `thread: a reply after the done hand-back of ${made.t.key} continued it, no duplicate ticket`,
+  );
+
+  // ---- 11. a design document an agent wrote: a human comments on it, and the agent updates it, replies and
+  // resolves; its own reply starts nothing. Then a human comments on the handed-back ticket and it goes back.
+  const { key: design } = await stub("POST", "/_test/tickets", {
+    title: "Decide where the cart lives",
+    description: "Write down the options.\n\ndoc: Cart design options",
+  });
+
+  await stub("POST", `/_test/tickets/${design}/assign`, { to: "sam" });
+  const written = await until("the design document and the ticket handed back", (s) => {
+    const doc = s.docs.find((d: Json) => d.title === "Cart design options");
+    const t = s.tickets.find((x: Json) => x.key === design);
+    return doc && t.status === "In Review" && t.assignee === "ada.admin" ? { doc, t } : undefined;
+  });
+
+  assertEq(written.doc.path, `design/${design}.md`, "the agent created the document at its path");
+  await stub("POST", `/_test/docs/${written.doc.id}/comments`, {
+    body: "Why keep the cart in the session?",
+    quote: "Keep the cart in the session.",
+  });
+
+  const docAnswered = await until(
+    "the comment on the document answered: the document updated, a reply, the thread resolved",
+    (s) => {
+      const doc = s.docs.find((d: Json) => d.id === written.doc.id);
+      const root = doc.comments.find((c: Json) => c.parentId === null);
+      const reply = doc.comments.find((c: Json) => c.parentId === root?.id && c.author === "sam");
+      return root?.resolved && reply && doc.version > written.doc.version
+        ? { doc, root, reply, t: s.tickets.find((x: Json) => x.key === design) }
+        : undefined;
+    },
+  );
+
+  assertEq(
+    docAnswered.doc.body.includes("Revised after review: Why keep the cart in the session?"),
+    true,
+    "the document was updated with the change the comment asked for",
+  );
+
+  assertEq(
+    docAnswered.t.status,
+    "In Review",
+    "answering a comment on a document leaves the ticket",
+  );
+
+  assertEq(docAnswered.t.assignee, "ada.admin", "...and its assignee alone");
+  step(
+    `doc comment: a comment on ${design}'s design document reached its author, who updated the document, replied and resolved the thread`,
+  );
+
+  // The agent's own reply is a comment on the document too; it must not start another round.
+  await sleep(25_000);
+  const docQuiet = (await state()).docs.find((d: Json) => d.id === written.doc.id);
+  assertEq(
+    docQuiet.version,
+    docAnswered.doc.version,
+    "the agent's own reply started no second round",
+  );
+
+  assertEq(
+    docQuiet.comments.filter((c: Json) => c.author === "sam").length,
+    1,
+    "one reply, not one per poll",
+  );
+
+  step("doc comment: the agent's own reply started nothing");
+
+  await stub("POST", `/_test/tickets/${design}/comment`, {
+    body: "Please also cover the mobile layout.",
+  });
+
+  const reactivated = await until(
+    "the comment on the handed-back ticket answered and the ticket handed back again",
+    (s) => {
+      const t = s.tickets.find((x: Json) => x.key === design);
+      const note = t.comments.find(
+        (c: Json) => c.author === "sam" && c.body === "Noted: Please also cover the mobile layout.",
+      );
+
+      return note &&
+        t.status === "In Review" &&
+        t.assignee === "ada.admin" &&
+        t.moves.some((m: Json) => m.from === "In Review" && m.to === "In Progress")
+        ? t
+        : undefined;
+    },
+  );
+
+  assertEq(
+    reactivated.moves.filter((m: Json) => m.from === "In Review" && m.to === "In Progress").length,
+    1,
+    "the comment reactivated the ticket once",
+  );
+
+  step(
+    `ticket comment: a comment on the handed-back ${design} sent it back to its agent (active), who answered and handed it back`,
   );
 
   const final = await state();

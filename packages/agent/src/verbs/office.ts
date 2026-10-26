@@ -37,6 +37,7 @@ export type ChatReportKind = PayloadOf<"chat_report">["kind"];
 export type ChatReportResult = PayloadOf<"chat_report_result">;
 export type TicketPrsRequest = PayloadOf<"ticket_prs">;
 export type TicketPrsResult = PayloadOf<"ticket_prs_result">;
+export type DocLinkRequest = PayloadOf<"doc_link">;
 export type Placement = Pick<PayloadOf<"work_place">, "position" | "relativeTo">;
 
 export interface OfficeClient {
@@ -65,6 +66,12 @@ export interface OfficeClient {
   /** The ticket a pull request about to be opened would link to, and the pull requests that ticket already has. */
   ticketPrs(draft: TicketPrsRequest): Promise<TicketPrsResult>;
 
+  /**
+   * Tells the office the caller wrote a document for the work item's ticket, so that comments people leave on it
+   * come back as work for the caller.
+   */
+  docLink(request: DocLinkRequest): Promise<void>;
+
   /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for a second filing. */
   linkTicket(workItemId: string, ticket: string): Promise<Filed>;
 
@@ -88,6 +95,7 @@ export interface FakeOffice extends OfficeClient {
   chatMessages: ChatMessageRequest[];
   chatReports: { workItemId: string; kind: ChatReportKind }[];
   ticketPrsAsked: TicketPrsRequest[];
+  docsLinked: DocLinkRequest[];
 }
 
 export function createFakeOffice(
@@ -121,9 +129,14 @@ export function createFakeOffice(
   const chatMessages: ChatMessageRequest[] = [];
   const chatReports: FakeOffice["chatReports"] = [];
   const ticketPrsAsked: TicketPrsRequest[] = [];
+  const docsLinked: DocLinkRequest[] = [];
   const seen = new Set<string>();
   return {
     ticketPrsAsked,
+    docsLinked,
+    async docLink(request) {
+      docsLinked.push(request);
+    },
     async ticketPrs(draft) {
       ticketPrsAsked.push(draft);
       return opts.ticketPrs?.(draft) ?? { prs: [] };

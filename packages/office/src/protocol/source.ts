@@ -121,6 +121,12 @@ export interface TicketPrs {
   forDraft(draft: PayloadOf<"ticket_prs">): Promise<PayloadOf<"ticket_prs_result">>;
 }
 
+/** Which documents agents wrote for which work. Optional: without it `doc_link` is unsupported. */
+export interface DocLinks {
+  /** Records that the person wrote the document for the ticket of the work item (if it has one). */
+  link(person: string, workItemId: string, doc: PayloadOf<"doc_link">["doc"]): Promise<void>;
+}
+
 /** Agent-to-agent questions. Optional until the messaging component exists; without it `ask` is unsupported. */
 export interface Messaging {
   ask(

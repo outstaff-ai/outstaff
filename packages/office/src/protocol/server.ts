@@ -17,6 +17,7 @@ import type { AgentAuth } from "./auth.js";
 import {
   ProtocolError,
   type ChatDesk,
+  type DocLinks,
   type Messaging,
   type TicketPrs,
   type WorkSource,
@@ -36,6 +37,9 @@ export interface ProtocolServerOptions {
 
   /** Answers `ticket_prs`. Without it the request is refused as unsupported. */
   tickets?: TicketPrs;
+
+  /** Takes `doc_link`. Without it the request is refused as unsupported. */
+  docs?: DocLinks;
   auth: AgentAuth;
   clock: Clock;
   logger?: Logger;
@@ -282,6 +286,15 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
             ...(m.payload.request ? { request: m.payload.request } : {}),
           }),
         );
+      case "doc_link": {
+        if (!opts.docs) {
+          throw new ProtocolError("unsupported", "This office does not track documents.");
+        }
+
+        await opts.docs.link(person, m.payload.workItemId, m.payload.doc);
+        return reply("ack", {});
+      }
+
       case "current_work":
         return reply("current_work_result", { text: await desk().currentWork(person) });
       case "ticket_prs": {

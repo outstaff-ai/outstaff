@@ -13,6 +13,7 @@ export const WORKFLOW_EVENT_TYPES = [
   "ticket.moved",
   "ticket.commented",
   "ticket.created",
+  "doc.commented",
   "agent.handed_back",
   "agent.asked",
   "schedule.cron",
@@ -30,12 +31,14 @@ export interface PrRef {
 /** A normalized event. The office maps tracker, VCS and agent events onto this shape. */
 export interface WorkflowEvent {
   type: WorkflowEventType;
-  subject: { ticket?: string; pr?: PrRef };
+  subject: { ticket?: string; pr?: PrRef; doc?: string };
   actor: { kind: ActorKind; id: string };
 
   /**
    * Event specific data. `ticket.moved` carries `to` (and `from`) as canonical statuses;
-   * `pr.review_submitted` carries `state` (for example "approved" or "changes_requested").
+   * `pr.review_submitted` carries `state` (for example "approved" or "changes_requested"). `doc.commented`
+   * carries `docId`, `title`, `commentId`, `anchorText` and `url` of a comment or reply on a knowledge document;
+   * its subject is the document and, when the work state knows it, the ticket the document was written for.
    */
   data: Record<string, unknown>;
 }
@@ -80,6 +83,9 @@ export interface WorkflowState {
   /** Open pull requests whose base is `branch`. */
   stackedOn(repo: RepoRef, branch: string): WorkflowPr[];
 
+  /** Handle of the agent who wrote the document, as the work state recorded it. */
+  docAuthor(doc: string): string | undefined;
+
   /** Handle of the agent playing a catalog role, if exactly one is configured. */
   personForRole(role: string): string | undefined;
 }
@@ -98,6 +104,7 @@ export type Effect =
       priority: Priority;
       ticket?: string;
       pr?: PrRef;
+      doc?: string;
     }
   | {
       type: "notify";

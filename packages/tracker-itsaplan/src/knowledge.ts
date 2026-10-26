@@ -3,9 +3,11 @@ import {
   type AdapterContext,
   type Doc,
   type DocComment,
+  type DocEvent,
   type Knowledge,
 } from "@outstaff/core";
 import { createClient, type ClientDeps, type Itsaplan } from "./client.js";
+import { OVERLAP_MS, parseCursor } from "./cursor.js";
 import { findRange, mdToDoc, plainText, type PmNode } from "./markdown.js";
 import type { KnowledgeOptions } from "./options.js";
 
@@ -26,6 +28,7 @@ interface ApiDoc extends ApiDocSummary {
 interface ApiDocComment {
   id: string;
   parentId?: string | null;
+  authorId?: string | null;
   authorName?: string | null;
   body: string;
   quote?: string | null;
@@ -90,10 +93,10 @@ export function createItsaplanKnowledge(
   ctx: AdapterContext<KnowledgeOptions>,
   deps: ClientDeps = {},
 ): Promise<Knowledge> {
-  return createClient(ctx, deps).then((api) => buildKnowledge(api));
+  return createClient(ctx, deps).then((api) => buildKnowledge(api, ctx.now));
 }
 
-function buildKnowledge(api: Itsaplan): Knowledge {
+function buildKnowledge(api: Itsaplan, now: () => Date): Knowledge {
   const docs = `${api.projectPath}/documents`;
 
   const list = (q?: string) =>
@@ -320,6 +323,73 @@ function buildKnowledge(api: Itsaplan): Knowledge {
       await api.http.request("PATCH", `${docs}/${target.docId}/comments/${target.id}`, {
         body: { resolved: true },
       });
+    },
+
+    async events(ids, cursor) {
+      // Document comments are not in the project's activity feed, so the comments of each document are read.
+      const after = parseCursor(cursor);
+      const setup = await api.project();
+      const all: { docId: number; comment: ApiDocComment; at: number }[] = [];
+      for (const id of new Set(ids)) {
+        const docId = await idOf(id);
+        try {
+          const found = await api.http.request<ApiDocComment[]>("GET", `${docs}/${docId}/comments`);
+
+          for (const comment of found) {
+            all.push({ docId, comment, at: Date.parse(comment.createdAt) });
+          }
+        } catch (error) {
+          // A document that was deleted or closed to this account is no longer news; anything else is retried.
+          if (!(error instanceof PortError) || !["not_found", "forbidden"].includes(error.code)) {
+            throw error;
+          }
+        }
+      }
+
+      const key = (r: (typeof all)[number]) => commentId(r.docId, r.comment.id);
+      const times = all.map((r) => r.at).filter((t) => !Number.isNaN(t));
+      // Without a position, the window is what lies within the overlap of the newest comment.
+      const floor = (after?.since ?? Math.max(...times)) - OVERLAP_MS;
+      // No cursor at all is the first poll (the office decides if it is a baseline); a cursor we cannot use baselines here.
+      const baseline = cursor !== undefined && !after;
+      const fresh = baseline
+        ? []
+        : all.filter((r) => r.at >= floor && !(after?.seen.has(key(r)) ?? false));
+
+      const titles = new Map<number, string>();
+      const events: DocEvent[] = [];
+      for (const r of fresh.toSorted((a, b) => a.at - b.at || key(a).localeCompare(key(b)))) {
+        if (!titles.has(r.docId)) {
+          titles.set(r.docId, (await read(r.docId)).title);
+        }
+
+        const c = r.comment;
+        events.push({
+          externalId: `itsaplan-doc:${key(r)}`,
+          type: "commented",
+          doc: String(r.docId),
+          title: titles.get(r.docId)!,
+          url: api.docUrl(String(r.docId)),
+          actor: api.member(setup, c.authorId, c.authorName),
+          at: c.createdAt,
+          data: {
+            commentId: key(r),
+            ...(c.parentId ? { parentId: commentId(r.docId, c.parentId) } : {}),
+            ...(c.quote ? { anchorText: c.quote } : {}),
+            body: c.body,
+          },
+        });
+      }
+
+      const newest = Math.max(after?.since ?? Number.NEGATIVE_INFINITY, ...times);
+      const since = new Date(Number.isFinite(newest) ? newest : now().getTime()).toISOString();
+      // Ids read at baseline time, kept while they are inside the overlap so that history is not handed back as news.
+      const keep = after?.seen;
+      const seen = all
+        .filter((r) => (keep ? keep.has(key(r)) : true) && r.at >= Date.parse(since) - OVERLAP_MS)
+        .map(key);
+
+      return { events, cursor: JSON.stringify({ since, ...(seen.length > 0 ? { seen } : {}) }) };
     },
   };
 }

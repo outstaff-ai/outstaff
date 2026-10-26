@@ -191,6 +191,8 @@ policies:
   feedback:
     follow_up_round: true
     merged_prs: true
+    doc_comments: true
+    ticket_comments: true
   hand_back:
     reassign: requester
     fallback: first_human
@@ -833,13 +835,13 @@ Event type or types that trigger the rule.
 
 - Type: `string or list of string`
 - Required
-- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `agent.handed_back`, `agent.asked`, `schedule.cron`
+- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `doc.commented`, `agent.handed_back`, `agent.asked`, `schedule.cron`
 
 #### workflow.rules[].on[]
 
 - Type: `string`
 - Optional
-- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `agent.handed_back`, `agent.asked`, `schedule.cron`
+- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `doc.commented`, `agent.handed_back`, `agent.asked`, `schedule.cron`
 
 #### workflow.rules[].if
 
@@ -1043,7 +1045,7 @@ Assign the ticket.
 
 - Type: `string`
 - Required
-- Must match `^(author|assignee|last_worker|role:[a-z][a-z0-9-]*)$`
+- Must match `^(author|assignee|last_worker|doc_author|role:[a-z][a-z0-9-]*)$`
 
 #### workflow.rules[].do[].schedule.kind
 
@@ -1198,7 +1200,7 @@ How agents act on feedback from trusted people beyond the first round.
 
 - Type: `object`
 - Optional
-- Default: `{"follow_up_round":true,"merged_prs":true}`
+- Default: `{"follow_up_round":true,"merged_prs":true,"doc_comments":true,"ticket_comments":true}`
 
 #### policies.feedback.follow_up_round
 
@@ -1211,6 +1213,22 @@ Start another round when feedback arrived after the agent was offered its work. 
 #### policies.feedback.merged_prs
 
 Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+#### policies.feedback.doc_comments
+
+Schedule the author of a knowledge document to answer a trusted person's comments on it. Switches the preset rule doc-feedback-to-author. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+#### policies.feedback.ticket_comments
+
+Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.
 
 - Type: `boolean`
 - Optional

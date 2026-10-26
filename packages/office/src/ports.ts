@@ -1,8 +1,10 @@
 import {
   PortError,
+  policyOn,
   type AdapterContext,
   type AdapterRegistry,
   type Chat,
+  type Knowledge,
   type Logger,
   type PortName,
   type SecretSource,
@@ -16,6 +18,9 @@ export interface OfficePorts {
   vcs: Vcs;
   tracker?: Tracker;
   chat?: Chat;
+
+  /** Only to read the comments people leave on documents; the agents write documents through their own port. */
+  knowledge?: Knowledge;
 }
 
 interface Input {
@@ -70,7 +75,9 @@ async function create(port: PortName, input: Input) {
 
 /**
  * The office-scope ports from team.yaml. Version control is required; the tracker and chat are used when the team
- * configures them. Knowledge, runtime and avatars belong to the agents, not the office.
+ * configures them. The knowledge base is read for comments on documents, unless `policies.feedback.doc_comments` is
+ * off; a knowledge adapter this image lacks, or one that fails to start, costs that feedback and nothing else.
+ * Runtime and avatars belong to the agents, not the office.
  */
 export async function createOfficePorts(input: Input): Promise<OfficePorts> {
   const vcs = (await create("vcs", input)) as Vcs | undefined;
@@ -80,5 +87,22 @@ export async function createOfficePorts(input: Input): Promise<OfficePorts> {
 
   const tracker = (await create("tracker", input)) as Tracker | undefined;
   const chat = (await create("chat", input)) as Chat | undefined;
-  return { vcs, ...(tracker ? { tracker } : {}), ...(chat ? { chat } : {}) };
+  let knowledge: Knowledge | undefined;
+  if (policyOn(input.team.policies, "feedback.doc_comments")) {
+    try {
+      knowledge = (await create("knowledge", input)) as Knowledge | undefined;
+    } catch (error) {
+      input.logger.warn(
+        `the office cannot read comments on documents: ${error instanceof Error ? error.message : String(error)}`,
+        { port: "knowledge" },
+      );
+    }
+  }
+
+  return {
+    vcs,
+    ...(tracker ? { tracker } : {}),
+    ...(chat ? { chat } : {}),
+    ...(knowledge ? { knowledge } : {}),
+  };
 }

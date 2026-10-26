@@ -4,7 +4,7 @@ import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { githubVcs } from "@outstaff/vcs-github";
-import { itsaplanTracker } from "@outstaff/tracker-itsaplan";
+import { itsaplanKnowledge, itsaplanTracker } from "@outstaff/tracker-itsaplan";
 import { slackChat } from "@outstaff/chat-slack";
 import {
   AdapterRegistry,
@@ -58,7 +58,11 @@ export function jsonLogger(
 }
 
 export function officeRegistry(): AdapterRegistry {
-  return new AdapterRegistry().register(githubVcs).register(itsaplanTracker).register(slackChat);
+  return new AdapterRegistry()
+    .register(githubVcs)
+    .register(itsaplanTracker)
+    .register(itsaplanKnowledge)
+    .register(slackChat);
 }
 
 const port = (env: Env, key: string, fallback: number): number => {

@@ -128,7 +128,12 @@ describe("parseTeamConfig", () => {
       agent_loop_guard: { max_runs_per_item_per_hour: 12 },
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
       acknowledge: { chat: true, vcs: true },
-      feedback: { follow_up_round: true, merged_prs: true },
+      feedback: {
+        follow_up_round: true,
+        merged_prs: true,
+        doc_comments: true,
+        ticket_comments: true,
+      },
       hand_back: { reassign: "requester", fallback: "first_human" },
       tickets: { prs_per_ticket: "one" },
       conflicts: { follow_up: true },

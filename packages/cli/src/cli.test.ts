@@ -313,6 +313,8 @@ policies.chat.profile              true         team.yaml
 policies.design.canvas             true         team.yaml
 policies.feedback.follow_up_round  true         team.yaml
 policies.feedback.merged_prs       true         team.yaml
+policies.feedback.doc_comments     true         team.yaml
+policies.feedback.ticket_comments  true         team.yaml
 policies.hand_back.reassign        requester    team.yaml
 policies.hand_back.fallback        first_human  team.yaml
 policies.tickets.prs_per_ticket    one          team.yaml

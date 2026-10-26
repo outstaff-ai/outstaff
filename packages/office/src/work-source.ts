@@ -8,7 +8,7 @@ import { previousConversation } from "./conversation-context.js";
 import { placeQueued } from "./chat/placement.js";
 import { INTERRUPTED, type BlockNotice, type Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
-import type { PrRecord, TicketRecord } from "./workstate/index.js";
+import type { DocRecord, PrRecord, TicketRecord } from "./workstate/index.js";
 
 /** The tickets and pull requests an item concerns, as links the agent and the requester can open. */
 export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs }) {
@@ -75,6 +75,18 @@ export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs })
         await prRef(subject.ref, item.person),
         ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
         ...(await Promise.all(stacked.map((l) => prRef(l.to.ref, item.person)))),
+      ];
+    }
+
+    if (subject.type === "doc") {
+      const rec = (await store.getSubject("doc", subject.ref))?.data as DocRecord | undefined;
+      return [
+        {
+          type: "doc",
+          ref: subject.ref,
+          ...(rec ? { title: rec.title, url: rec.url } : {}),
+        },
+        ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
       ];
     }
 

@@ -182,6 +182,46 @@ describe("parsePrompt", () => {
     ]);
   });
 
+  it("reads a comment on a document with its document and anchor, and a comment on a ticket", () => {
+    const prompt = (feedback: object[]) =>
+      buildWorkPrompt(
+        {
+          ...offer("doc_feedback"),
+          context: { ...offer("doc_feedback").context, feedback },
+        } as never,
+        { resumed: false },
+      );
+
+    expect(
+      parsePrompt(
+        prompt([
+          {
+            actor: "ada.admin",
+            kind: "doc_comment",
+            docId: "2",
+            anchorText: "Keep the cart\nin the session",
+            url: "http://tracker/SHOP/docs/2",
+            body: "Why a session?",
+          },
+        ]),
+      )?.feedback,
+    ).toEqual([
+      {
+        kind: "doc_comment",
+        url: "http://tracker/SHOP/docs/2",
+        body: "Why a session?",
+        docId: "2",
+        anchor: "Keep the cart\nin the session",
+        threads: [],
+      },
+    ]);
+
+    expect(
+      parsePrompt(prompt([{ actor: "ada.admin", kind: "ticket_comment", body: "Mobile too?" }]))
+        ?.feedback,
+    ).toEqual([{ kind: "ticket_comment", body: "Mobile too?", threads: [] }]);
+  });
+
   it("reads the files a requester shared with a chat session", () => {
     const asked = offer("chat");
     asked.workItem.origin = {

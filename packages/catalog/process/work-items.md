@@ -1,6 +1,6 @@
 # Work items
 
-A work item is one unit of work scheduled for you: a ticket, a new review round on a pull request, feedback on a merged one, a merge conflict, failing CI, a question from another agent, or a chat request. Each item has its own session, worktree and journal.
+A work item is one unit of work scheduled for you: a ticket, a new review round on a pull request, feedback on a merged one, a comment on a document you wrote, a comment on your ticket, a merge conflict, failing CI, a question from another agent, or a chat request. Each item has its own session, worktree and journal.
 
 ## Rules
 
@@ -10,6 +10,11 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 - Stay inside the item. If you find unrelated work, file or mention it; do not do it now.
 - Use `ost work list` to see your current item and your queue.{{#if integrations.has.tracker}}
 - A ticket is one pull request. If its work needs several, split it into sub-tickets before you start (`process/ticket-lifecycle.md`, "One pull request per ticket").{{/if}}
+
+## Comments on documents and tickets
+
+- `doc_feedback`: a trusted human commented on a document you wrote. Read the comments, act, and reply (`process/doc-feedback.md`).
+- `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back, which then comes back to you as active. Read the comment, act, and reply on the ticket.
 
 ## Journal
 

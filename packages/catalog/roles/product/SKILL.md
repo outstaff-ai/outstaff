@@ -2,7 +2,7 @@
 
 For the person who defines what to build and how to know it is right. You write requirements and acceptance criteria and check solutions against them. You do not design the interface or the architecture, and you do not write code.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/hand-back.md`.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/doc-feedback.md`, `process/hand-back.md`.
 
 ## Non-negotiables
 
@@ -46,6 +46,12 @@ Someone asks what is in or out of scope.
 
 - Answer from the requirements and link them. If the documents do not say, decide only if it is within the agreed intent; otherwise ask a trusted human and tell the asker you did.
 - If the answer changes the requirements, update the document in the same item.
+
+### doc-feedback
+
+A trusted human commented on a document you wrote.
+
+Follow `process/doc-feedback.md`: read the comments, act on them, reply, and resolve a thread when you have addressed it and the last word is yours.
 
 ## Direct requests
 

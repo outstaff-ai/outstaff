@@ -20,6 +20,9 @@ export interface StaticWorkflowData {
   /** Pull request number -> ticket key (same repo assumed per entry's `ref.repo`). */
   links?: Record<number, string>;
   roles?: Record<string, string>;
+
+  /** Document id -> handle of the agent who wrote it. */
+  docs?: Record<string, string>;
 }
 
 const k = (r: PrRef) => `${r.repo.owner}/${r.repo.name}#${r.number}`;
@@ -42,6 +45,7 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
         (p) =>
           p.ref.repo.owner === repo.owner && p.ref.repo.name === repo.name && p.baseRef === branch,
       ),
+    docAuthor: (doc) => data.docs?.[doc],
     personForRole: (role) => data.roles?.[role],
   };
 }

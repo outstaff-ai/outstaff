@@ -17,6 +17,7 @@ import { createOfficePorts, type OfficePorts } from "./ports.js";
 import {
   agentAuthFromSecrets,
   createProtocolServer,
+  ProtocolError,
   type ProtocolServer,
 } from "./protocol/index.js";
 import { recipeFor } from "./recipes.js";
@@ -126,7 +127,17 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const webhook = team.office?.events === "webhook";
   const intake = createIntake({
     store,
-    ports: { vcs: ports.vcs, ...(ports.tracker ? { tracker: ports.tracker } : {}) },
+    ports: {
+      vcs: ports.vcs,
+      ...(ports.tracker ? { tracker: ports.tracker } : {}),
+      ...(ports.knowledge ? { knowledge: ports.knowledge } : {}),
+    },
+    docs: {
+      open: (limit) =>
+        workState
+          .openDocs(limit)
+          .map((d) => ({ id: d.id, ...(d.ticket ? { ticket: d.ticket } : {}) })),
+    },
     team,
     clock,
     logger: log,
@@ -249,6 +260,11 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       return;
     }
 
+    // Answering comments on a document changes nothing on its ticket: the ticket is where the document's work left it.
+    if (item.kind === "doc_feedback") {
+      return;
+    }
+
     let subject: WorkflowEvent["subject"] | undefined;
     if (item.subject.type === "ticket") {
       subject = { ticket: item.subject.ref };
@@ -349,6 +365,30 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     messaging,
     usage,
     chat: chatDesk,
+    docs: {
+      async link(person, workItemId, doc) {
+        const item = await store.getItem(workItemId);
+        if (!item || item.person !== person) {
+          throw new ProtocolError("unknown_item", `No work item ${workItemId} for ${person}.`);
+        }
+
+        let ticket: string | undefined;
+        if (item.subject?.type === "ticket") {
+          ticket = item.subject.ref;
+        } else if (item.subject?.type === "pr") {
+          ticket = ((await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined)
+            ?.ticket;
+        } else if (item.subject?.type === "doc") {
+          ticket = workState.doc(item.subject.ref)?.ticket;
+        }
+
+        await workState.linkDoc({ ...doc, author: person, ...(ticket ? { ticket } : {}) });
+        log.info(`doc ${doc.id} linked to ${ticket ?? "no ticket"} for ${person}`, {
+          person,
+          doc: doc.id,
+        });
+      },
+    },
     tickets: {
       async forDraft(draft) {
         // A pull request opened a moment ago may not have reached the state yet; the answer must not depend on that.
