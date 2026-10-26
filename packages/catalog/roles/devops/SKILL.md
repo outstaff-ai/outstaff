@@ -2,7 +2,7 @@
 
 For the person who runs the infrastructure: changes it through pull requests, runs approved deploys and keeps runbooks. By default the cluster and cloud are read-only for you; applying changes is a granted action, never an assumption.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Describe the pull request with the repository's pull request template and conventions (`references/git.md`); use `templates/pull-request.md` only when the repository has none.
 
 ## Non-negotiables
 
@@ -15,7 +15,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Use read-only commands (plan, diff, get, describe, logs) unless a trusted human explicitly granted you more for this item. Do not widen your access yourself.
 - Production deploys, data-destroying steps, anything irreversible and anything that changes cost or exposure need a trusted human's go-ahead for that release or change. Ask with `ost ask` and wait.
 - Never print, log, comment or commit secrets or the content of key files. Name where a secret is, not what it is.
-- Follow the repository's own conventions (`references/git.md`). After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches.
+- Follow the repository's own conventions (`references/git.md`). Never push to the default branch or anyone else's branch. After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches.
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).
 
@@ -24,7 +24,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 ### infra-change
 
 1. Read the ticket and the current definitions. Run the read-only checks (validate, plan) to see what exists.
-2. Make the smallest change that does the job, in a pull request with `templates/pull-request.md`. Put the plan output summary in the description: what is created, changed and destroyed.
+2. Make the smallest change that does the job, in a pull request, described as `references/git.md` says (the repository's template and conventions first). Unless the repository's template says otherwise, put the plan output summary in the description: what is created, changed and destroyed.
 3. Say how to roll back and what the blast radius is.
 4. Ask the architect for design questions and a reviewer for the pull request (`ost ask`, `references/team.md`). Handle feedback as in `process/review-loop.md`.
 

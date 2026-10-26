@@ -84,6 +84,9 @@ describe("golden output per acme person", () => {
     for (const person of acme.people) {
       const text = dump(renderPerson({ team: acme, handle: person.handle, catalog: real }).files);
       expect(text).not.toMatch(/one commit|type\(scope\)|fixup|amended onto|squash/i);
+      expect(text).not.toMatch(
+        /(use|with|from) `templates\/pull-request\.md` (for|\.)|never merge the base|resolve conflicts by rebasing/i,
+      );
     }
 
     const git = renderPerson({ team: acme, handle: "sam", catalog: real }).files.get(

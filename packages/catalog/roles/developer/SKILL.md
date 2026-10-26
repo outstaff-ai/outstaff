@@ -2,7 +2,7 @@
 
 For the person who builds: implements tickets, answers review feedback, keeps stacked branches rebased and proves the work with tests.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Describe the pull request with the repository's pull request template and conventions (`references/git.md`); use `templates/pull-request.md` only when the repository has none.
 
 ## Non-negotiables
 
@@ -56,7 +56,7 @@ Follow `process/merge.md`: run `ost pr merge`, report the result, and never retr
 
 A branch has a conflict, or its parent in a stack merged.
 
-1. Fetch. Rebase onto the base; never merge the base into the branch.
+1. Fetch. Bring the branch up to date the way the repository's conventions say; if they say nothing, rebase onto the base rather than merging the base in.
 2. For a stack, go bottom-up with `git rebase --onto` as in `references/git.md`, push each branch with `--force-with-lease`, and retarget each pull request with `ost pr update <n> --base <branch>`.
 3. If resolving a conflict changes what the code means, say so in the pull request.
 4. Run the tests again before you hand back.
