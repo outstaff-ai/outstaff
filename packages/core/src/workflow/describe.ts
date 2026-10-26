@@ -11,7 +11,5 @@ export function describeEffect(e: Effect): string {
       return `comment "${e.template}" on ${"ticket" in e.on ? e.on.ticket : `pull request #${e.on.pr.number}`}`;
     case "schedule":
       return `schedule ${e.kind} for ${e.person} (${e.priority})`;
-    case "notify":
-      return `notify ${e.to.kind}${e.to.id ? ` ${e.to.id}` : ""} with "${e.template}"`;
   }
 }

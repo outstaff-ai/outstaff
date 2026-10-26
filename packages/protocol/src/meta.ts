@@ -18,7 +18,8 @@ export const MESSAGE_META = {
   },
   welcome: {
     from: "office",
-    summary: "The connection is accepted. Lists accepted items to resume.",
+    summary:
+      "The connection is accepted. Lists accepted items to resume and the reports to requesters the agent was offline for; the agent posts those itself and confirms each.",
     replies: [],
   },
   offer: {
@@ -159,13 +160,25 @@ export const MESSAGE_META = {
   chat_report: {
     from: "agent",
     summary:
-      "Asks to tell the requester of a chat item how it ended. The office grants it once per ending, so a retried hand-back does not post twice.",
+      "Asks to tell the requester how an item ended: a chat item's result or blocked report in its thread, and for a blocked item the blocked report to the requester's direct message. The office grants it once per ending, so a retried hand-back does not post twice, and never posts anything itself.",
     replies: ["chat_report_result", "error"],
   },
   chat_report_result: {
     from: "office",
     summary: "Whether to post, whom to mention and which links to include.",
     replies: [],
+  },
+  reports: {
+    from: "office",
+    summary:
+      "Reports to requesters for the agent to post as itself, sent while it is connected (the same list the `welcome` carries on connecting). Sent again until the agent confirms each with `report_posted`.",
+    replies: [],
+  },
+  report_posted: {
+    from: "agent",
+    summary:
+      "Confirms the agent posted a queued report. Only then does the office stop sending it, so a crash while posting sends it again.",
+    replies: ["ack", "error"],
   },
   doc_link: {
     from: "agent",

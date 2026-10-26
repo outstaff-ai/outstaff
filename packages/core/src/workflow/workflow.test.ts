@@ -362,7 +362,7 @@ describe("kanban preset", () => {
     ]);
   });
 
-  it("a blocked hand-back moves to blocked, assigns the requester and notifies them", () => {
+  it("a blocked hand-back moves to blocked, assigns the requester and schedules an unblock round for the PM", () => {
     expect(
       run(
         ev("agent.handed_back", { ...tk, actor: agent, data: { status: "blocked" } }),
@@ -371,12 +371,7 @@ describe("kanban preset", () => {
     ).toEqual([
       { type: "move", ticket: "ACME-1", to: "blocked" },
       { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
-      expect.objectContaining({
-        type: "notify",
-        to: { kind: "human", id: "grace" },
-        template: "hand_back_blocked",
-        ticket: "ACME-1",
-      }),
+      { type: "schedule", person: "pia", kind: "unblock", priority: "high", ticket: "ACME-1" },
     ]);
   });
 
@@ -389,7 +384,7 @@ describe("kanban preset", () => {
     ).toEqual([
       // Already blocked: the move is not repeated.
       { type: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
-      expect.objectContaining({ type: "notify", template: "hand_back_blocked", ticket: "ACME-1" }),
+      { type: "schedule", person: "pia", kind: "unblock", priority: "high", ticket: "ACME-1" },
     ]);
   });
 
@@ -510,15 +505,23 @@ describe("kanban preset", () => {
       expect(rule?.do).toEqual([{ move: "review" }]);
     });
 
-    it("hand_back.reassign: none keeps the move to blocked and the notice, and drops the assignment", () => {
+    it("hand_back.reassign: none keeps the move to blocked and the PM round, and drops the assignment", () => {
       const rule = ids({ hand_back: { reassign: "none" } }).rules.find(
         (r) => r.id === "hand-back-blocked-to-requester",
       );
 
       expect(rule?.do).toEqual([
         { move: "blocked" },
-        { notify: { to: "requester", template: "hand_back_blocked" } },
+        { schedule: { person: "role:pm", kind: "unblock", priority: "high" } },
       ]);
+    });
+
+    it("hand_back.blocked_notify: agent drops the PM round: the blocked agent reports itself", () => {
+      const rule = ids({ hand_back: { blocked_notify: "agent" } }).rules.find(
+        (r) => r.id === "hand-back-blocked-to-requester",
+      );
+
+      expect(rule?.do).toEqual([{ move: "blocked" }, { assign: "requester" }]);
     });
 
     it("hand_back.fallback: none leaves out the first-human fallback", () => {
@@ -530,7 +533,7 @@ describe("kanban preset", () => {
       const own = {
         id: "conflict-back-to-author",
         on: "pr.conflicted",
-        do: [{ notify: { to: "channel", template: "rebase_conflict" } }],
+        do: [{ comment: "rebase_conflict" }],
       };
 
       const w = ids({ conflicts: { follow_up: false } }, [own]);
@@ -669,7 +672,7 @@ describe("overrides", () => {
           {
             id: "ping-requester",
             on: "pr.opened",
-            do: [{ notify: { to: "requester", template: "ping" } }],
+            do: [{ comment: "ping" }],
           },
         ],
       },
@@ -695,12 +698,10 @@ describe("overrides", () => {
     expect(w.statuses.toTracker("review")).toBe("In Review");
     expect(evaluateWorkflow(ev("pr.opened"), world(), w.rules, w.options)).toEqual([
       {
-        type: "notify",
-        to: { kind: "human", id: "grace" },
+        type: "comment",
+        on: { ticket: "ACME-1" },
         template: "ping",
         body: "ACME-1 needs grace",
-        ticket: "ACME-1",
-        pr: ref(10),
       },
     ]);
 
@@ -851,16 +852,14 @@ describe("determinism and dedupe", () => {
           { assign: "human:grace" },
           { schedule: { person: "role:reviewer", kind: "review", priority: "low" } },
           { comment: { template: "rebase_conflict", on: "pr" } },
-          { notify: { to: "channel:dev", template: "rebase_conflict" } },
         ],
       },
     ];
 
     const out = evaluateWorkflow(ev("pr.opened"), world(), rules);
-    expect(out.map((e) => e.type)).toEqual(["assign", "assign", "schedule", "comment", "notify"]);
+    expect(out.map((e) => e.type)).toEqual(["assign", "assign", "schedule", "comment"]);
     expect(out[0]).toMatchObject({ to: { kind: "agent", id: "rex" } });
     expect(out[3]).toMatchObject({ on: { pr: ref(10) } });
-    expect(out[4]).toMatchObject({ to: { kind: "channel", id: "dev" } });
   });
 
   it("matches multiple event types", () => {

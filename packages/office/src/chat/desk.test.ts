@@ -1,5 +1,5 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
-import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
+import { createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
 import { manualClock, type ManualClock } from "../clock.js";
 import { createScheduler } from "../scheduler/scheduler.js";
@@ -38,16 +38,6 @@ function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConf
   return result.config;
 }
 
-const until = async (cond: () => boolean) => {
-  for (let i = 0; i < 400 && !cond(); i++) {
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-
-  if (!cond()) {
-    throw new Error("condition not reached");
-  }
-};
-
 const DANA = { id: "U0DANA0001", name: "Dana" };
 
 describe("chat requests", () => {
@@ -55,12 +45,11 @@ describe("chat requests", () => {
   let desk: ChatRequests;
   let scheduler: ReturnType<typeof createScheduler>;
   let tracker: ReturnType<typeof createFakeTracker>;
-  let chat: ReturnType<typeof createFakeChat>;
   let notified: string[];
   let asked: { to: string; question: string; workItemId?: string | undefined }[];
   let n: number;
   let clock: ManualClock;
-  let makeDesk: (withChat?: boolean, over?: TeamConfig) => ChatRequests;
+  let makeDesk: (over?: TeamConfig) => ChatRequests;
   let tickets: TicketRecord[];
   let pulls: PrRecord[];
   let workers: Record<string, string>;
@@ -147,8 +136,7 @@ describe("chat requests", () => {
     scheduler = createScheduler({ store, team, clock });
     tracker = createFakeTracker({ now: clock.now });
     await tracker.seed.member({ name: "Sam", kind: "agent" });
-    chat = createFakeChat({ now: clock.now });
-    makeDesk = (withChat = true, over = team) =>
+    makeDesk = (over = team) =>
       createChatDesk({
         clock,
         store,
@@ -156,7 +144,7 @@ describe("chat requests", () => {
         team: over,
         workState: knownWork(),
         tracker,
-        ...(withChat ? { chat } : {}),
+        requesterChat: async () => DANA.id,
         messaging: {
           async ask(_from, q) {
             asked.push(q);
@@ -173,7 +161,7 @@ describe("chat requests", () => {
     desk = makeDesk();
   });
 
-  describe("a result the agent did not post", () => {
+  describe("a report the agent did not post", () => {
     const finished = async (summary = "The search page is up.\nSecond line.\nThird line.") => {
       const r = await say("please add a search page");
       await scheduler.markActive(r.item.id);
@@ -183,107 +171,210 @@ describe("chat requests", () => {
       return item;
     };
 
-    it("posts it once, without a mention in a direct message, after the grace period", async () => {
-      await finished();
-      clock.advance(59_000);
-      expect(chat.posts).toEqual([]);
+    it("is handed to the agent when it connects, until the agent confirms it posted it", async () => {
+      const item = await finished();
+      const handed = [
+        {
+          id: expect.any(String),
+          workItemId: item.id,
+          kind: "result",
+          text: "The search page is up.\nSecond line.\nThird line.",
+          requester: DANA.id,
+          links: [{ url: "https://git.acme.example/acme/app/pull/4", title: "PR 4" }],
+          threads: [
+            { channel: "D1", thread: "m1", requester: DANA, direct: true, participant: true },
+          ],
+        },
+      ];
 
-      clock.advance(1_000);
-      await until(() => chat.posts.length === 1);
-      const [post] = chat.posts;
-      expect(post).toMatchObject({ channel: "D1", thread: "m1" });
-      expect(post!.text).toContain("The search page is up.");
-      expect(post!.text).not.toContain("<@");
-      expect(post!.text).toContain("offline");
-      expect(post!.text).toContain("https://git.acme.example/acme/app/pull/4");
-      expect(post!.text).not.toContain("Third line");
+      const first = await desk.queued("sam");
+      expect(first).toEqual(handed);
 
-      clock.advance(600_000);
-      expect(chat.posts).toHaveLength(1);
+      // Not confirmed (the agent died while posting): it is handed over again, with the same id.
+      expect(await desk.queued("sam")).toEqual(first);
+      await desk.posted("sam", item.id, first[0]!.id);
+      expect(await desk.queued("sam")).toEqual([]);
+
+      // Confirming twice is harmless, and a late claim of the same ending is refused.
+      await desk.posted("sam", item.id, first[0]!.id);
+      expect(await desk.report("sam", item.id, "result")).toEqual({ post: false, links: [] });
     });
 
-    describe("mentions", () => {
-      const posted = async (where: { channel: string; direct: boolean; participant: boolean }) => {
-        const r = await desk.message("sam", {
-          messageId: "x1",
-          text: "please add a search page",
-          author: DANA,
-          ...where,
-        });
-
-        await scheduler.markActive(r.item.id);
-        const item = await scheduler.finish(r.item.id, { outcome: "Done.", status: "done" });
-        await desk.handedBack(item, { summary: "Done.", links: [] });
-        clock.advance(60_000);
-        await until(() => chat.posts.length === 1);
-        return chat.posts[0]!.text;
-      };
-
-      it("does not mention the requester in a direct message", async () => {
-        expect(await posted({ channel: "D1", direct: true, participant: false })).not.toContain(
-          "<@",
-        );
+    it("keeps whether the requester needs a mention for the agent to decide", async () => {
+      const r = await desk.message("sam", {
+        messageId: "x1",
+        text: "please add a search page",
+        author: DANA,
+        channel: "C1",
+        direct: false,
+        participant: false,
       });
 
-      it("does not mention a requester who started or replied in the channel thread", async () => {
-        expect(await posted({ channel: "C1", direct: false, participant: true })).not.toContain(
-          "<@",
-        );
-      });
-
-      it("mentions a requester who is not in the channel thread", async () => {
-        expect(await posted({ channel: "C1", direct: false, participant: false })).toContain(
-          "<@U0DANA0001> Done.",
-        );
-      });
+      await scheduler.markActive(r.item.id);
+      const item = await scheduler.finish(r.item.id, { outcome: "Done.", status: "done" });
+      await desk.handedBack(item, { summary: "Done.", links: [] });
+      const [report] = await desk.queued("sam");
+      expect(report!.threads).toEqual([
+        { channel: "C1", thread: "x1", requester: DANA, direct: false, participant: false },
+      ]);
     });
 
-    it("stays quiet when the agent claimed the report in time, and refuses a late claim after the office posted", async () => {
+    it("is not queued when the agent claimed the report in time, and a late claim is refused once it confirmed", async () => {
       const item = await finished();
       expect(await desk.report("sam", item.id, "result")).toMatchObject({ post: true });
-      clock.advance(60_000);
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(chat.posts).toEqual([]);
+      expect(await desk.queued("sam")).toEqual([]);
 
       const second = await say("another one");
       await scheduler.markActive(second.item.id);
       const done = await scheduler.finish(second.item.id, { outcome: "Done.", status: "done" });
       await desk.handedBack(done, { summary: "Done.", links: [] });
-      clock.advance(60_000);
-      await until(() => chat.posts.length === 1);
+      const [handed] = await desk.queued("sam");
+      await desk.posted("sam", done.id, handed!.id);
       expect(await desk.report("sam", done.id, "result")).toEqual({ post: false, links: [] });
-      expect(chat.posts).toHaveLength(1);
     });
 
-    it("resumes after a restart from the hand-back time and still posts once", async () => {
+    it("survives a restart of the office: the queue is in the store", async () => {
       await finished();
-      clock.advance(40_000);
-      desk.stop();
-
-      const restarted = makeDesk();
-      await restarted.resume();
-      clock.advance(19_000);
-      expect(chat.posts).toEqual([]);
-
-      clock.advance(1_000);
-      await until(() => chat.posts.length === 1);
-      await restarted.resume();
-      clock.advance(120_000);
-      await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(chat.posts).toHaveLength(1);
+      expect(await makeDesk().queued("sam")).toHaveLength(1);
     });
 
-    it("posts nothing for a session that filed its request as work", async () => {
+    it("is dropped when the item was retried and is not at that ending any more", async () => {
+      const item = await finished();
+      await store.updateItem(item.id, { status: "queued" });
+      expect(await desk.queued("sam")).toEqual([]);
+    });
+
+    it("is for the person's own agent only", async () => {
+      await finished();
+      expect(await desk.queued("pat")).toEqual([]);
+    });
+
+    it("queues nothing for a session that filed its request as work", async () => {
       const { session } = await fileWork("please add a search page", "ACME-1");
       const done = await scheduler.finish(session.id, { outcome: "filed", status: "done" });
       await desk.handedBack(done, { summary: "Filed ACME-1.", links: [] });
-      expect(clock.pending()).toBe(0);
+      expect(await desk.queued("sam")).toEqual([]);
     });
 
-    it("leaves the result alone without a chat port", async () => {
-      desk = makeDesk(false);
-      await finished();
-      expect(clock.pending()).toBe(0);
+    describe("a blocked item", () => {
+      const blockedItem = async (over: TeamConfig, ticket = true) => {
+        desk = makeDesk(over);
+        const item = await scheduler.enqueue({
+          person: "sam",
+          kind: "assigned",
+          title: "Assigned: ACME-3",
+          trigger: "human",
+          ...(ticket ? { subject: { type: "ticket", ref: "ACME-3" } } : {}),
+        });
+
+        await scheduler.markActive(item.id);
+        await scheduler.block(item.id, "Need the staging key.");
+        const blocked = (await store.getItem(item.id))!;
+
+        await desk.handedBack(blocked, { summary: "Need the staging key.", links: [] });
+        return blocked;
+      };
+
+      it("goes to the PM when the team has one: the agent reports nothing", async () => {
+        const item = await blockedItem(teamConfig(true));
+        expect(await desk.report("sam", item.id, "blocked")).toEqual({ post: false, links: [] });
+        expect(await desk.queued("sam")).toEqual([]);
+      });
+
+      it("is reported by the agent to the requester's direct message without a PM", async () => {
+        const item = await blockedItem(teamConfig(false));
+        const granted = await desk.report("sam", item.id, "blocked");
+        expect(granted).toEqual({
+          post: true,
+          requester: DANA.id,
+          direct: DANA.id,
+          links: [{ url: tracker.links.issue("ACME-3"), title: "ACME-3" }],
+        });
+
+        expect((await desk.report("sam", item.id, "blocked")).post).toBe(false);
+        expect(await desk.queued("sam")).toEqual([]);
+      });
+
+      it("is reported by the agent when policies.hand_back.blocked_notify is agent, even with a PM", async () => {
+        const item = await blockedItem(
+          teamConfig(true, { hand_back: { blocked_notify: "agent" } }),
+        );
+
+        expect((await desk.report("sam", item.id, "blocked")).post).toBe(true);
+      });
+
+      it("is queued for the agent to post in a direct message when it was offline", async () => {
+        await blockedItem(teamConfig(false));
+        expect(await desk.queued("sam")).toEqual([
+          {
+            id: expect.any(String),
+            workItemId: expect.any(String),
+            kind: "blocked",
+            text: "Need the staging key.",
+            requester: DANA.id,
+            direct: DANA.id,
+            links: [{ url: tracker.links.issue("ACME-3"), title: "ACME-3" }],
+          },
+        ]);
+      });
+
+      it("is dropped when nobody can be told: no requester chat identity", async () => {
+        desk = createChatDesk({
+          clock,
+          store,
+          scheduler,
+          team: teamConfig(false),
+          workState: knownWork(),
+          requesterChat: async () => undefined,
+          linksOf: async () => [],
+          notify: () => {},
+        });
+
+        const item = await scheduler.enqueue({
+          person: "sam",
+          kind: "assigned",
+          title: "x",
+          trigger: "human",
+          subject: { type: "ticket", ref: "ACME-3" },
+        });
+
+        await scheduler.markActive(item.id);
+        await scheduler.block(item.id, "stuck");
+        const blocked = (await store.getItem(item.id))!;
+        await desk.handedBack(blocked, { summary: "stuck", links: [] });
+        expect(await desk.report("sam", blocked.id, "blocked")).toEqual({ post: false, links: [] });
+        expect(await desk.queued("sam")).toEqual([]);
+      });
+
+      it("gets the agent's reply in its chat thread on a team with a PM", async () => {
+        desk = makeDesk(teamConfig(true));
+        const r = await say("please add a search page");
+        await scheduler.markActive(r.item.id);
+        await scheduler.block(r.item.id, "stuck");
+        const item = (await store.getItem(r.item.id))!;
+        await desk.handedBack(item, { summary: "Need the staging key.", links: [] });
+        expect(await desk.report("sam", item.id, "blocked")).toMatchObject({
+          post: true,
+          threads: [{ channel: "D1", thread: "m1" }],
+        });
+      });
+
+      it("is reported by a blocked PM itself, as nobody else can route it", async () => {
+        desk = makeDesk(teamConfig(true));
+        const item = await scheduler.enqueue({
+          person: "pat",
+          kind: "assigned",
+          title: "Assigned: ACME-4",
+          trigger: "human",
+          subject: { type: "ticket", ref: "ACME-4" },
+        });
+
+        await scheduler.markActive(item.id);
+        await scheduler.block(item.id, "stuck");
+        const blocked = (await store.getItem(item.id))!;
+        await desk.handedBack(blocked, { summary: "stuck", links: [] });
+        expect((await desk.report("pat", blocked.id, "blocked")).post).toBe(true);
+      });
     });
   });
 
@@ -1070,23 +1161,11 @@ describe("chat requests", () => {
     });
 
     it("grants a failure note once and a blocked note once", async () => {
+      desk = makeDesk(teamConfig(false));
       const id = await finished("blocked");
       expect((await desk.report("sam", id, "failed")).post).toBe(true);
       expect((await desk.report("sam", id, "failed")).post).toBe(false);
       expect((await desk.report("sam", id, "blocked")).post).toBe(true);
-      expect((await desk.report("sam", id, "blocked")).post).toBe(false);
-    });
-
-    it("tells the thread itself when the scheduler blocked the item, once", async () => {
-      const id = await finished("blocked");
-      const item = (await store.getItem(id))!;
-      await desk.notifyBlocked(item, "Stale again: no heartbeat for 10 minutes on the retry.");
-      await desk.notifyBlocked(item, "Stale again: no heartbeat for 10 minutes on the retry.");
-      expect(chat.posts).toHaveLength(1);
-      expect(chat.posts[0]).toMatchObject({ channel: "D1", thread: "m1" });
-      expect(chat.posts[0]!.text).not.toContain("<@");
-      expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
-      // The agent's own blocked note is now already granted.
       expect((await desk.report("sam", id, "blocked")).post).toBe(false);
     });
   });
@@ -1107,7 +1186,7 @@ describe("chat requests", () => {
       return item.id;
     };
 
-    it("retries it with a clean count and says so in the thread", async () => {
+    it("retries it with a clean count and posts nothing itself", async () => {
       const id = await blocked();
       const reply = await say("try again please", "m1");
       expect(reply.disposition).toBe("joined");
@@ -1122,18 +1201,12 @@ describe("chat requests", () => {
       const journal = (await store.readJournal(id)).map((j) => j.text);
       expect(journal).toContain("Retried on request by Dana (chat reply).");
       expect(journal).toContain("In the chat thread: try again please");
-      expect(chat.posts.at(-1)).toMatchObject({
-        channel: "D1",
-        thread: "m1",
-        text: "Retrying ACME-1 on request",
-      });
-
       expect(notified).toEqual(["sam"]);
     });
 
     it("leaves it blocked when policies.retry.on_signal is off, and still keeps the reply", async () => {
       const id = await blocked();
-      desk = makeDesk(true, teamConfig(true, { retry: { on_signal: false } }));
+      desk = makeDesk(teamConfig(true, { retry: { on_signal: false } }));
       await say("try again please", "m1");
       expect(await store.getItem(id)).toMatchObject({ status: "blocked" });
       expect((await store.readJournal(id)).map((j) => j.text)).toContain(
@@ -1156,15 +1229,89 @@ describe("chat requests", () => {
       await scheduler.block(item.id, "stuck");
       await say("go on", "t9");
       expect((await store.getItem(item.id))?.status).toBe("queued");
-      expect(chat.posts.at(-1)?.text).toBe("Retrying ACME-2 on request");
     });
 
-    it("leaves a waiting item as it was, without a note", async () => {
+    it("leaves a waiting item as it was", async () => {
       const r = await say("Add a search page");
       await store.updateItem(r.item.id, { status: "waiting" });
       await say("here is more", "m1");
       expect((await store.getItem(r.item.id))?.status).toBe("queued");
-      expect(chat.posts).toHaveLength(0);
+    });
+  });
+
+  describe("an item the scheduler blocked", () => {
+    const stuck = async (over = teamConfig(false), chatThread = false) => {
+      desk = makeDesk(over);
+      const item = chatThread
+        ? (await say("please add a search page")).item
+        : await scheduler.enqueue({
+            person: "sam",
+            kind: "assigned",
+            title: "Assigned: ACME-3",
+            trigger: "human",
+            subject: { type: "ticket", ref: "ACME-3" },
+          });
+
+      await scheduler.markActive(item.id);
+      await scheduler.block(item.id, "failed 3 times: model overloaded\nstack");
+      return (await store.getItem(item.id))!;
+    };
+
+    it("queues a report for the agent to post in a direct message, and pushes it", async () => {
+      const pushed: string[] = [];
+      desk = createChatDesk({
+        clock,
+        store,
+        scheduler,
+        team: teamConfig(false),
+        workState: knownWork(),
+        requesterChat: async () => DANA.id,
+        linksOf: async () => [{ url: tracker.links.issue("ACME-3"), title: "ACME-3" }],
+        notify: () => {},
+        push: (p) => pushed.push(p),
+      });
+
+      const item = await scheduler.enqueue({
+        person: "sam",
+        kind: "assigned",
+        title: "x",
+        trigger: "human",
+        subject: { type: "ticket", ref: "ACME-3" },
+      });
+
+      await scheduler.markActive(item.id);
+      await scheduler.block(item.id, "failed 3 times: model overloaded\nstack");
+      await desk.blocked(
+        (await store.getItem(item.id))!,
+        "failed 3 times: model overloaded\nstack",
+        false,
+      );
+
+      expect(pushed).toEqual(["sam"]);
+      expect(await desk.queued("sam")).toMatchObject([
+        { kind: "blocked", text: "failed 3 times: model overloaded", direct: DANA.id },
+      ]);
+    });
+
+    it("is the PM's on a team with one: nothing is queued for a ticket without a chat thread", async () => {
+      const item = await stuck(teamConfig(true));
+      await desk.blocked(item, "stale twice", true);
+      expect(await desk.queued("sam")).toEqual([]);
+    });
+
+    it("still tells the chat thread a human asked in, PM or not", async () => {
+      const item = await stuck(teamConfig(true), true);
+      await desk.blocked(item, "stale twice", true);
+      expect(await desk.queued("sam")).toMatchObject([
+        { kind: "blocked", threads: [{ channel: "D1", thread: "m1" }] },
+      ]);
+    });
+
+    it("is dropped when the item is not blocked any more by the time the agent connects", async () => {
+      const item = await stuck();
+      await desk.blocked(item, "stale twice", false);
+      await store.updateItem(item.id, { status: "queued" });
+      expect(await desk.queued("sam")).toEqual([]);
     });
   });
 

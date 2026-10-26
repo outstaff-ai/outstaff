@@ -1,4 +1,5 @@
 import type {
+  QueuedReport,
   AnswerState,
   Attached,
   ErrorCode,
@@ -90,6 +91,15 @@ export interface ChatDesk {
 
   /** The person's open tickets and pull requests, as text. */
   currentWork(person: string): Promise<string>;
+
+  /**
+   * The reports to requesters the person's agent has not confirmed posting: sent in the `welcome` and pushed while it
+   * is connected, until `posted`. The agent posts them as itself; the office never does.
+   */
+  queued(person: string): Promise<QueuedReport[]>;
+
+  /** The agent confirmed it posted the queued report `id` of the item: the office stops sending it. */
+  posted(person: string, workItemId: string, id: string): Promise<void>;
 
   /**
    * Files the ticket a chat session created as work: a work item for the ticket, in the session's thread. It starts

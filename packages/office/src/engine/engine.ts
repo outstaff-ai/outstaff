@@ -1,11 +1,11 @@
 import {
   describeEffect,
+  blockedNotify,
   explainWorkflow,
   PortError,
   policyOn,
   PRESET_MOVES_TICKETS,
   resolveWorkflow,
-  type Chat,
   type Effect,
   type EffectTarget,
   type Tracker,
@@ -22,6 +22,7 @@ import {
 import { clip, prLabel, subjectLabel } from "../log.js";
 import { PRIORITY, priorityFor } from "../scheduler/index.js";
 import type { WorkItem, WorkItemTrigger } from "../store/index.js";
+import type { Feedback } from "@outstaff/protocol";
 import type { EffectOutcome, Engine, EngineMeta, EngineOptions } from "./types.js";
 
 const PLAN = "engine";
@@ -32,7 +33,7 @@ const PRIORITY_SHIFT = 5;
 const TICKET_WORK = new Set(["assigned", "ticket_comment", "doc_feedback"]);
 
 /** Kinds that only answer something on a ticket; starting one leaves the ticket where it is. */
-const ANSWERS = new Set(["asked", "doc_feedback"]);
+const ANSWERS = new Set(["asked", "doc_feedback", "unblock"]);
 
 /** Where a ticket starts being worked on from. */
 const STARTS_FROM = new Set(["backlog", "ready", "review", "blocked"]);
@@ -77,8 +78,6 @@ function past(e: Effect): string {
       return e.to ? `assigned ${e.ticket} to ${e.to.id}` : `unassigned ${e.ticket}`;
     case "comment":
       return `commented on ${"ticket" in e.on ? e.on.ticket : prLabel(e.on.pr)}`;
-    case "notify":
-      return `notified ${e.to.kind}${e.to.id ? ` ${e.to.id}` : ""}`;
   }
 }
 
@@ -95,14 +94,7 @@ export function createEngine(opts: EngineOptions): Engine {
   const { store, workState, scheduler, team, clock, logger } = opts;
   const now = () => clock.now().toISOString();
   const tracker: Tracker | undefined = opts.ports?.tracker;
-  const chat: Chat | undefined = opts.ports?.chat;
   const workflow = opts.workflow ?? resolveWorkflow(team.workflow, team.humans, team.policies);
-  const channel =
-    opts.channel ??
-    (typeof team.integrations.chat["channel"] === "string"
-      ? team.integrations.chat["channel"]
-      : undefined);
-
   // One event at a time: effects read the work queue and must not race each other.
   let chain: Promise<unknown> = Promise.resolve();
   const locked = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -128,18 +120,6 @@ export function createEngine(opts: EngineOptions): Engine {
 
       return hit?.id ?? wanted;
     });
-  };
-
-  const chatId = (to: { kind: "human" | "agent"; id?: string }): string | undefined => {
-    if (to.kind === "agent") {
-      return team.people.find((p) => p.handle === to.id)?.identities?.chat;
-    }
-
-    const human = team.humans?.find(
-      (h) => h.identities.tracker === to.id || h.identities.vcs === to.id,
-    );
-
-    return human?.identities.chat;
   };
 
   const triggerOf = (event: WorkflowEvent): WorkItemTrigger => {
@@ -178,6 +158,54 @@ export function createEngine(opts: EngineOptions): Engine {
 
   const humanize = (kind: string) => kind.replaceAll(/[_-]/g, " ");
 
+  /**
+   * What an `unblock` round carries about the blocked hand-back: the agent, and its last comment on the ticket (else
+   * the summary it handed back), as data. The ticket itself is the round's subject.
+   */
+  const blocked = async (event: WorkflowEvent, ticket: string | undefined): Promise<Feedback> => {
+    const agent = event.actor.id;
+    const mine = team.people.find((p) => p.handle === agent)?.identities?.tracker;
+    let body: string | undefined;
+    let url: string | undefined;
+    let at: string | undefined;
+    if (tracker && ticket) {
+      try {
+        const comments = await tracker.listComments(ticket);
+        const byAgent = comments.filter(
+          (c) =>
+            mine !== undefined && [c.author.id, c.author.username, c.author.name].includes(mine),
+        );
+
+        const last = (byAgent.length > 0 ? byAgent : comments)
+          .toSorted((a, b) => a.at.localeCompare(b.at))
+          .at(-1);
+
+        if (last) {
+          ({ body, url, at } = last);
+        }
+      } catch (error) {
+        logger.warn("could not read the last comment of a blocked ticket", {
+          ticket,
+          error: String(error),
+        });
+      }
+    }
+
+    if (body === undefined) {
+      const itemId = event.data["workItem"];
+      const journal = typeof itemId === "string" ? await store.readJournal(itemId) : [];
+      body = journal.filter((j) => j.author === agent).at(-1)?.text ?? "";
+    }
+
+    return {
+      actor: agent,
+      kind: "blocked",
+      body,
+      ...(url ? { url } : {}),
+      ...(at ? { at } : {}),
+    };
+  };
+
   /** The ticket an item is about, directly or through its pull request. */
   const ticketOfItem = async (item: WorkItem): Promise<string | undefined> => {
     if (item.subject?.type === "ticket") {
@@ -210,6 +238,11 @@ export function createEngine(opts: EngineOptions): Engine {
 
     const hits: WorkItem[] = [];
     for (const item of blocked) {
+      // A PM waiting for a human is not the work that was blocked: the agent's own item is the one to retry.
+      if (item.kind === "unblock") {
+        continue;
+      }
+
       const onPr = prKey !== undefined && item.subject?.type === "pr" && item.subject.ref === prKey;
       const onTicket = ticket !== undefined && (await ticketOfItem(item)) === ticket;
       if (!onPr && !onTicket) {
@@ -282,6 +315,11 @@ export function createEngine(opts: EngineOptions): Engine {
       event.type !== "agent.handed_back"
     ) {
       throw new Skip(`${e.person} caused the event themselves`);
+    }
+
+    // A blocked PM has nobody to route it to: the PM tells the requester itself, so no round is scheduled.
+    if (e.kind === "unblock" && event.actor.kind === "agent" && event.actor.id === e.person) {
+      throw new Skip(`${e.person} is the blocked agent itself`);
     }
 
     // The blocked item that was just retried carries the new feedback; a second item would run beside it.
@@ -369,7 +407,9 @@ export function createEngine(opts: EngineOptions): Engine {
       .filter((i) => i !== undefined)
       .toSorted((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0))[0];
 
-    const feedback = feedbackOf(event);
+    const feedback =
+      feedbackOf(event) ?? (e.kind === "unblock" ? await blocked(event, ticket) : undefined);
+
     const trigger = triggerOf(event);
     const item = await scheduler.enqueue({
       person: e.person,
@@ -421,26 +461,6 @@ export function createEngine(opts: EngineOptions): Engine {
 
         await tracker.comment(e.on.ticket, e.body);
         return `commented on ${e.on.ticket}`;
-      case "notify": {
-        if (!chat) {
-          throw new Skip("no chat is configured");
-        }
-
-        let target: string | undefined;
-        if (e.to.kind === "channel") {
-          target = e.to.id ?? channel;
-        } else {
-          const user = chatId({ kind: e.to.kind, ...(e.to.id ? { id: e.to.id } : {}) });
-          target = user ? await chat.openDirect(user) : undefined;
-        }
-
-        if (!target) {
-          throw new Skip(`no chat destination for ${e.to.kind}${e.to.id ? ` ${e.to.id}` : ""}`);
-        }
-
-        await chat.post(target, e.body);
-        return `posted to ${target}`;
-      }
     }
   };
 
@@ -696,7 +716,51 @@ export function createEngine(opts: EngineOptions): Engine {
     }
   };
 
+  const unblock = async (item: WorkItem, reason: string): Promise<boolean> => {
+    const pm = team.people.find((p) => p.role === "pm")?.handle;
+    const ticket = await ticketOfItem(item);
+    if (
+      !pm ||
+      pm === item.person ||
+      !ticket ||
+      blockedNotify(team) !== "pm" ||
+      item.kind === "unblock"
+    ) {
+      return false;
+    }
+
+    const feedback: Feedback = { actor: item.person, kind: "blocked", body: reason, at: now() };
+    const subject = { type: "ticket", ref: ticket };
+    const live = (await store.listItems({ person: pm })).find(
+      (i) => LIVE.has(i.status) && i.kind === "unblock" && sameSubject(i.subject, subject),
+    );
+
+    if (live) {
+      await addFeedback(store, live.id, feedback);
+      return true;
+    }
+
+    const created = await scheduler.enqueue({
+      person: pm,
+      kind: "unblock",
+      title: `Unblock: ${ticket}`,
+      trigger: "automation",
+      priority: priorityNumber("automation", "unblock", "high"),
+      parentId: item.id,
+      subject,
+    });
+
+    await addFeedback(store, created.id, feedback);
+    logger.info(`engine: queued unblock for ${pm} on ${ticket}: ${item.id} was blocked`, {
+      person: pm,
+      item: created.id,
+    });
+
+    return true;
+  };
+
   return {
+    unblock: (item, reason) => locked(() => unblock(item, reason)),
     started: (itemId) => locked(() => started(itemId)),
     handle: (event, meta) => locked(() => run(event, meta)),
     followUp: (itemId) => locked(() => followUp(itemId)),

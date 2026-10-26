@@ -14,5 +14,7 @@ modes:
     when: An initiative needs slicing, ordering or a decision on who does what.
   - name: report
     when: Humans need a status update or a blocker needs a decision.
+  - name: unblock
+    when: A teammate handed a ticket back as blocked.
   - name: retro
     when: An initiative is done and the team should record what it learned.

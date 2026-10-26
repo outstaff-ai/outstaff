@@ -135,7 +135,7 @@ describe("parseTeamConfig", () => {
         ticket_comments: true,
         mentions: true,
       },
-      hand_back: { reassign: "requester", fallback: "first_human" },
+      hand_back: { reassign: "requester", blocked_notify: "pm", fallback: "first_human" },
       tickets: { prs_per_ticket: "one", start_moves_active: true },
       conflicts: { follow_up: true },
       merge: { on_approval: false, approvers: ["humans"] },
@@ -157,7 +157,12 @@ describe("parseTeamConfig", () => {
     }
 
     expect(r.config.policies?.acknowledge).toEqual({ chat: true, vcs: false });
-    expect(r.config.policies?.hand_back).toEqual({ reassign: "none", fallback: "first_human" });
+    expect(r.config.policies?.hand_back).toEqual({
+      reassign: "none",
+      blocked_notify: "pm",
+      fallback: "first_human",
+    });
+
     expect(r.config.policies?.conflicts).toEqual({ follow_up: true });
   });
 

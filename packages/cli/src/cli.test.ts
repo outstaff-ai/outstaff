@@ -377,6 +377,7 @@ policies.feedback.doc_comments       true         team.yaml
 policies.feedback.ticket_comments    true         team.yaml
 policies.feedback.mentions           true         team.yaml
 policies.hand_back.reassign          requester    team.yaml
+policies.hand_back.blocked_notify    pm           default
 policies.hand_back.fallback          first_human  team.yaml
 policies.tickets.prs_per_ticket      one          team.yaml
 policies.tickets.start_moves_active  true         team.yaml

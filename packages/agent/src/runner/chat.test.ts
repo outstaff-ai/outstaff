@@ -684,6 +684,148 @@ describe("chat relay", () => {
     });
   });
 
+  describe("a blocked report to the requester's direct message", () => {
+    it("opens a direct message for an item without a chat thread, links the ticket and says what is needed", async () => {
+      await setup({
+        chatReport: () => ({
+          post: true,
+          requester: "U0DANA0001",
+          direct: "U0DANA0001",
+          links: [
+            { url: tracker.links.issue("ACME-1"), title: "ACME-1: Search" },
+            { url: "https://git.acme.example/acme/app/pull/4", title: "PR 4" },
+          ],
+        }),
+      });
+
+      await relay.report(
+        offerOf("w1", false),
+        "blocked",
+        "Need the staging key from ops to finish ACME-1.",
+      );
+
+      expect(office.chatReports).toEqual([{ workItemId: "w1", kind: "blocked" }]);
+      expect(chat.posts).toHaveLength(1);
+      expect(chat.posts[0]).toMatchObject({ channel: "D-U0DANA0001" });
+      expect(chat.posts[0]!.text).toBe(
+        [
+          `I am blocked. Need the staging key from ops to finish [ACME-1](${tracker.links.issue("ACME-1")}).`,
+          `- ACME-1: Search: ${tracker.links.issue("ACME-1")}`,
+          "- PR 4: https://git.acme.example/acme/app/pull/4",
+        ].join("\n"),
+      );
+    });
+
+    it("posts nothing when the team routes blocked work to the PM", async () => {
+      await setup({ chatReport: () => ({ post: false, links: [] }) });
+      await relay.report(offerOf("w1", false), "blocked", "Need the staging key.");
+      expect(chat.posts).toEqual([]);
+    });
+  });
+
+  describe("reports queued while the agent was offline", () => {
+    it("posts each as the agent, in the thread or in a direct message, and never throws", async () => {
+      await setup();
+      await relay.postQueued([
+        {
+          id: "w1:result:1",
+          workItemId: "w1",
+          kind: "result",
+          text: "Search page is up.",
+          requester: "U0DANA0001",
+          links: [{ url: "https://git.acme.example/acme/app/pull/4", title: "PR 4" }],
+          threads: [
+            {
+              channel: "C1",
+              thread: "t1",
+              requester: { id: "U0DANA0001" },
+              direct: false,
+              participant: false,
+            },
+          ],
+        },
+        {
+          id: "w2:blocked:1",
+          workItemId: "w2",
+          kind: "blocked",
+          text: "Need the staging key.",
+          requester: "U0DANA0001",
+          direct: "U0DANA0001",
+          links: [{ url: tracker.links.issue("ACME-1"), title: "ACME-1" }],
+        },
+      ]);
+
+      expect(chat.posts.map((p) => [p.channel, p.text])).toEqual([
+        [
+          "C1",
+          "<@U0DANA0001> Search page is up.\n- PR 4: https://git.acme.example/acme/app/pull/4",
+        ],
+        [
+          "D-U0DANA0001",
+          `I am blocked. Need the staging key.\n- ACME-1: ${tracker.links.issue("ACME-1")}`,
+        ],
+      ]);
+
+      expect(chat.posts[0]!.thread).toBe("t1");
+
+      // Each is confirmed once posted, and the office is not asked to grant it again.
+      expect(office.reportsPosted).toEqual([
+        { workItemId: "w1", id: "w1:result:1" },
+        { workItemId: "w2", id: "w2:blocked:1" },
+      ]);
+
+      expect(office.chatReports).toEqual([]);
+    });
+
+    it("posts a report the office sent again only once, and confirms it again", async () => {
+      await setup();
+      const report = {
+        id: "w2:blocked:1",
+        workItemId: "w2",
+        kind: "blocked" as const,
+        text: "Need the staging key.",
+        direct: "U0DANA0001",
+        links: [],
+      };
+
+      await relay.postQueued([report]);
+      await relay.postQueued([report]);
+      expect(chat.posts).toHaveLength(1);
+      expect(office.reportsPosted).toHaveLength(2);
+    });
+
+    it("does not confirm a report it could not post, so the office sends it again", async () => {
+      const post = chat.post.bind(chat);
+      let down = true;
+      chat.post = async (...args: Parameters<typeof chat.post>) => {
+        if (down) {
+          throw new Error("chat is down");
+        }
+
+        return post(...args);
+      };
+
+      await setup();
+
+      const report = {
+        id: "w2:blocked:1",
+        workItemId: "w2",
+        kind: "blocked" as const,
+        text: "Need the staging key.",
+        direct: "U0DANA0001",
+        links: [],
+      };
+
+      await relay.postQueued([report]);
+      expect(office.reportsPosted).toEqual([]);
+
+      down = false;
+      await relay.postQueued([report]);
+      expect(chat.posts).toHaveLength(1);
+      expect(office.reportsPosted).toEqual([{ workItemId: "w2", id: "w2:blocked:1" }]);
+    });
+  });
+
   describe("files", () => {
     const png = new Uint8Array([137, 80, 78, 71, 1]);
     const withFiles = (files: NonNullable<ChatMessage["files"]>): Offer => ({

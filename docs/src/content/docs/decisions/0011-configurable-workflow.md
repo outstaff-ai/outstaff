@@ -18,7 +18,7 @@ Teams name their statuses differently and want different automations. Hard-coded
 **Automations are rules:** `on <event> [if <condition>] do <actions>`.
 
 - Events include `pr.opened`, `pr.merged`, `pr.review_submitted`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `agent.handed_back`, `agent.asked` and `schedule.cron`.
-- Actions are move, assign, comment, schedule and notify.
+- Actions are move, assign, comment and schedule. The office posts nothing to people: everything a human reads in chat comes from an agent.
 
 **Presets:** `kanban`, `scrum` and `minimal`. Every rule can be overridden.
 
@@ -30,7 +30,7 @@ Teams name their statuses differently and want different automations. Hard-coded
 - conflicts after a merge go to the authors of the affected pull requests, with the stack listed bottom first;
 - a ticket moved to active while assigned to a human goes to the agent who last worked on it;
 - an agent assignee is scheduled as `assigned`, whether the ticket was assigned later or created already assigned (`assigned-agent-scheduled`, on `ticket.assigned` and `ticket.created`; the assignee is read from the ticket); work the office's own account or a sync bot creates or assigns is not scheduled;
-- a hand-back moves the ticket to `review` and assigns the human who asked for the work, unless the ticket is already `done` or `canceled`;
+- a hand-back moves the ticket to `review` and assigns the human who asked for the work, unless the ticket is already `done` or `canceled`; a blocked hand-back moves it to `blocked`, assigns the requester, and schedules an `unblock` round for the team's PM when it has one (`policies.hand_back.blocked_notify`, default `pm`), otherwise the blocked agent tells the requester itself in its own direct message (`agent`);
 - a merged pull request moves its ticket to `done` (`pr-merged-done`), so a ticket is one pull request (`policies.tickets.prs_per_ticket: one`, the default): `ost pr open` refuses a second pull request for a ticket that has one, open or merged, and points to `ost ticket create --parent` to split the work into sub-tickets; a second pull request a person opens is not refused, and the office comments on the ticket that it now has two and that the first to merge closes it (`second-pr-comment`). With `many` the same switch edits the rules (the conditions `ticket_prs_all_closed`, `ticket_prs_open`, `ticket_prs_several` and `ticket_handed_back`): the ticket is done when the agent has handed its work back as `done` and every pull request linked to it is closed with at least one merged, whichever comes last (the last merge or close, or the hand-back); a merge alone does not close it, and a hand-back that settles the ticket closes it instead of sending it to review.
 
 **Inspection:** `ost workflow explain <event>` shows which rules fire.

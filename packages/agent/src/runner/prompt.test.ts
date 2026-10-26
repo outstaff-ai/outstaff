@@ -94,6 +94,22 @@ describe("buildWorkPrompt feedback", () => {
     );
 
     expect(ticket).not.toContain("The document is");
+
+    const blocked = buildWorkPrompt(
+      offer({
+        actor: "sam",
+        kind: "blocked",
+        url: "https://t.example/ACME-1#c2",
+        body: "Blocked: I need the staging key from ops.",
+      }),
+      { resumed: false },
+    );
+
+    expect(blocked).toContain(
+      "Triggered by a hand-back as blocked from sam: https://t.example/ACME-1#c2",
+    );
+
+    expect(blocked).toContain("> Blocked: I need the staging key from ops.");
   });
 
   it("shows the conversation before a comment-triggered round, under the feedback, as data", () => {

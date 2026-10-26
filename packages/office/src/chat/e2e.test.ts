@@ -29,7 +29,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "../clock.js";
 import { createOffice, type Office } from "../office.js";
-import { readOrigin } from "./origin.js";
+import { PENDING_REPORT_SUBJECT } from "./pending.js";
 import { openStore, type Store } from "../store/index.js";
 
 const DANA = "U0DANA0001";
@@ -182,6 +182,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     });
 
     await relay.start();
+    conn.onReports?.((reports) => void relay.postQueued(reports));
   });
 
   afterEach(async () => {
@@ -514,36 +515,69 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       const { chat: _relay, ...options } = loopOptions(quiet());
       loop = createWorkLoop(options);
       running = loop.run();
-      // The status turns to done a moment before the office records the hand-back and starts its timer.
+      // The status turns to done a moment before the office queues the report.
       await until(async () => {
-        const [item] = await store.listItems({ person: "sam" });
-        return item ? Boolean((await readOrigin(store, item.id))?.handBack) : false;
+        const book = (await store.getSubject(PENDING_REPORT_SUBJECT, "sam"))?.data as
+          | { queue: unknown[] }
+          | undefined;
+
+        return book?.queue.length === 1;
       });
     };
 
-    it("gets one post from the office, and refuses the agent's late report", async () => {
+    it("posts nothing from the office; the agent posts the report itself when it reconnects", async () => {
       await handBackOnly();
-      clock.advance(60_000);
-      await until(() => officeChat.posts.length === 1);
-      expect(officeChat.posts[0]!.text).not.toContain("<@");
-      expect(officeChat.posts[0]!.text).toContain("pull/7");
+      clock.advance(300_000);
+      expect(officeChat.posts).toEqual([]);
+      expect(agentChat.posts).toEqual([]);
 
-      const [item] = await store.listItems({ person: "sam" });
-      // The jump may have cost the agent its connection (its heartbeat runs on the same clock), so let it retry.
-      let late: unknown;
-      void conn.chatReport(item!.id, "result").then((r) => (late = r));
-      await until(() => {
-        clock.advance(1_000);
-        return late !== undefined;
+      await loop?.stop();
+      await relay.stop();
+      await conn.stop();
+      const back = createOfficeConnection({
+        url: `ws://127.0.0.1:${office.agentPort()}/agent`,
+        person: "sam",
+        token: "sam-token",
+        agentVersion: "test",
+        clock,
       });
 
-      expect(late).toMatchObject({ post: false });
-      clock.advance(120_000);
-      expect(officeChat.posts).toHaveLength(1);
-      expect(agentChat.posts).toEqual([]);
+      const again = createChatRelay({
+        chat: agentChat,
+        office: back,
+        team: team(),
+        person: "sam",
+        tracker,
+      });
+
+      back.onReports?.((reports) => void again.postQueued(reports));
+      await again.start();
+      back.start();
+      try {
+        await until(() => agentChat.posts.length === 1);
+        expect(agentChat.posts[0]).toMatchObject({ channel: DM });
+        expect(agentChat.posts[0]!.text).toContain("pull/7");
+        expect(agentChat.posts[0]!.text).not.toContain("<@");
+        expect(officeChat.posts).toEqual([]);
+
+        // The agent confirmed the post, so it is not sent again and a late claim is refused.
+        const [item] = await store.listItems({ person: "sam" });
+        await until(async () => {
+          const book = (await store.getSubject(PENDING_REPORT_SUBJECT, "sam"))?.data as {
+            queue: unknown[];
+          };
+
+          return book.queue.length === 0;
+        });
+
+        expect(await back.chatReport(item!.id, "result")).toMatchObject({ post: false });
+      } finally {
+        await again.stop();
+        await back.stop();
+      }
     });
 
-    it("leaves the office silent when the agent reports within the window", async () => {
+    it("leaves the queue empty when the agent reports within the window", async () => {
       await dana("please add a search page");
       startLoop(quiet());
       await until(() => agentChat.posts.length === 1);
@@ -551,6 +585,76 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(officeChat.posts).toEqual([]);
       expect(agentChat.posts).toHaveLength(1);
+      const book = (await store.getSubject(PENDING_REPORT_SUBJECT, "sam"))?.data as {
+        queue: unknown[];
+      };
+
+      expect(book.queue).toEqual([]);
+    });
+  });
+
+  describe("an item the scheduler blocked, on a team without a PM", () => {
+    it("is reported by the agent itself, live, in a direct message to the requester", async () => {
+      await office.parts.intake.pollOnce();
+      const issue = await tracker.createIssue({
+        title: "Search page",
+        body: "",
+        status: "ready",
+        assignee: "u-2",
+      });
+
+      await office.parts.intake.pollOnce();
+      startLoop({
+        async *run() {
+          yield { type: "finished", ok: false, text: "", error: "model overloaded" };
+        },
+      });
+
+      // A failed item waits out its backoff on the clock; the third failure blocks it.
+      await until(() => {
+        clock.advance(60_000);
+        return agentChat.posts.some((p) => p.text.includes("I am blocked."));
+      });
+
+      const post = agentChat.posts.find((p) => p.text.includes("I am blocked."))!;
+      expect(post.channel).toBe(DM);
+      // The jumps of the manual clock also starve the heartbeat, so the item may block as stale or as failed.
+      expect(post.text).toMatch(/Stale again|failed 3 times/);
+      expect(post.text).toContain(tracker.links.issue(issue.key));
+      expect(officeChat.posts).toEqual([]);
+    });
+  });
+
+  describe("a blocked hand-back on a team without a PM", () => {
+    it("is reported by the agent itself in a direct message to the requester, with the ticket linked and what is needed", async () => {
+      // The first poll only sets the baseline.
+      await office.parts.intake.pollOnce();
+      const issue = await tracker.createIssue({
+        title: "Search page",
+        body: "",
+        status: "ready",
+        assignee: "u-2",
+      });
+
+      await office.parts.intake.pollOnce();
+      startLoop({
+        async *run(req) {
+          yield { type: "started", sessionId: "s1" };
+          await req.tools
+            .find((t) => t.name === "ticket_move")!
+            .handler({ key: issue.key, to: "blocked" }, { workItemId: req.workItemId! });
+
+          yield { type: "finished", ok: true, text: "Need the staging key from ops." };
+        },
+      });
+
+      await until(() => agentChat.posts.length === 1);
+      const [post] = agentChat.posts;
+      expect(post).toMatchObject({ channel: DM });
+      expect(post!.text).toContain("I am blocked. Need the staging key from ops.");
+      expect(post!.text).toContain(tracker.links.issue(issue.key));
+      expect(officeChat.posts).toEqual([]);
+      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("blocked");
     });
   });
 });

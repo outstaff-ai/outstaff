@@ -60,6 +60,9 @@ export interface OfficeClient {
   /** Asks to tell the requester of a chat item how it ended; false in `post` when that was done already. */
   chatReport(workItemId: string, kind: ChatReportKind): Promise<ChatReportResult>;
 
+  /** Confirms a queued report was posted; the office sends it again until then. */
+  reportPosted(workItemId: string, id: string): Promise<void>;
+
   /** The caller's open tickets and pull requests, as text. */
   currentWork(): Promise<string>;
 
@@ -94,6 +97,7 @@ export interface FakeOffice extends OfficeClient {
   attached: { workItemId: string; target: string; confirmed: boolean; request?: string }[];
   chatMessages: ChatMessageRequest[];
   chatReports: { workItemId: string; kind: ChatReportKind }[];
+  reportsPosted: { workItemId: string; id: string }[];
   ticketPrsAsked: TicketPrsRequest[];
   docsLinked: DocLinkRequest[];
 }
@@ -128,6 +132,7 @@ export function createFakeOffice(
   const attached: FakeOffice["attached"] = [];
   const chatMessages: ChatMessageRequest[] = [];
   const chatReports: FakeOffice["chatReports"] = [];
+  const reportsPosted: FakeOffice["reportsPosted"] = [];
   const ticketPrsAsked: TicketPrsRequest[] = [];
   const docsLinked: DocLinkRequest[] = [];
   const seen = new Set<string>();
@@ -190,6 +195,7 @@ export function createFakeOffice(
     },
     chatMessages,
     chatReports,
+    reportsPosted,
     async place(workItemId, placement) {
       placed.push({ workItemId, placement });
       return { id: workItemId, title: workItemId, status: "queued" };
@@ -207,6 +213,9 @@ export function createFakeOffice(
       };
 
       return { ...result, repeated };
+    },
+    async reportPosted(workItemId, id) {
+      reportsPosted.push({ workItemId, id });
     },
     async chatReport(workItemId, kind) {
       chatReports.push({ workItemId, kind });

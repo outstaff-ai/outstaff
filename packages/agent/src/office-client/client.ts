@@ -8,6 +8,7 @@ import {
   type Message,
   type MessageType,
   type PayloadOf,
+  type QueuedReport,
 } from "@outstaff/protocol";
 import { WebSocket } from "ws";
 import type {
@@ -93,6 +94,13 @@ export interface OfficeConnection extends OfficeClient {
   /** Ids of accepted, unfinished items the office listed when the connection was last established. */
   resume(): string[];
 
+  /**
+   * Reports to requesters for the agent to post: the office hands them over each time the connection is established
+   * and pushes new ones while it is up, and repeats each until `reportPosted`. The handler posts them; reports that
+   * arrive before it is set wait for it.
+   */
+  onReports?(handler: (reports: QueuedReport[]) => void): void;
+
   accept(workItemId: string): Promise<void>;
   decline(workItemId: string, reason: string): Promise<void>;
   progress(workItemId: string, text: string): Promise<void>;
@@ -153,6 +161,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   let counter = 0;
   let rejected: { code: ErrorCode; message: string } | undefined;
   let resumeIds: string[] = [];
+  let reportHandler: ((reports: QueuedReport[]) => void) | undefined;
+  let heldReports: QueuedReport[] = [];
   // A work item and chat sessions run at once; each is kept alive by a heartbeat of its own.
   const activeItems = new Set<string>();
   let cancelBackoff: (() => void) | undefined;
@@ -174,6 +184,14 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       waiter({ value: offer, done: false });
     } else {
       offerBuffer.push(offer);
+    }
+  }
+
+  function deliverReports(list: QueuedReport[]) {
+    if (reportHandler) {
+      reportHandler(list);
+    } else {
+      heldReports.push(...list);
     }
   }
 
@@ -257,6 +275,10 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
         attempt = 0;
         state = "connected";
         resumeIds = m.payload.resume;
+        if (m.payload.reports?.length) {
+          deliverReports(m.payload.reports);
+        }
+
         scheduleBeat(m.payload.heartbeatMs);
         settleWaiters();
         return;
@@ -264,6 +286,11 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
 
       if (m.type === "offer") {
         pushOffer(m.payload);
+        return;
+      }
+
+      if (m.type === "reports") {
+        deliverReports(m.payload.reports);
         return;
       }
 
@@ -427,6 +454,14 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     state: () => state,
     rejection: () => rejected,
     resume: () => [...resumeIds],
+    onReports(handler) {
+      reportHandler = handler;
+      if (heldReports.length) {
+        const held = heldReports;
+        heldReports = [];
+        handler(held);
+      }
+    },
 
     whenConnected() {
       if (state === "connected") {
@@ -496,6 +531,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     },
 
     chatMessage: (m): Promise<ChatMessageResult> => call("chat_message", m, "chat_message_result"),
+    reportPosted: (workItemId, id) => ack("report_posted", { workItemId, id }),
     chatReport: (workItemId, kind): Promise<ChatReportResult> =>
       call("chat_report", { workItemId, kind }, "chat_report_result"),
     linkTicket: (workItemId, ticket) =>

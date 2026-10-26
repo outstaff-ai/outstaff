@@ -269,10 +269,12 @@ const kanbanRules: Rule[] = [
         { not: { ticket_status: ["done", "canceled"] } },
       ],
     },
+    // The office posts nothing to humans. With a PM, the blocked hand-back goes to the PM as an `unblock` round;
+    // `policies.hand_back.blocked_notify: agent` removes that, and the blocked agent tells the requester itself.
     do: [
       { move: "blocked" },
       { assign: "requester" },
-      { notify: { to: "requester", template: "hand_back_blocked" } },
+      { schedule: { person: "role:pm", kind: "unblock", priority: "high" } },
     ],
   },
   {

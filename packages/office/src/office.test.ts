@@ -49,16 +49,6 @@ function team(): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
-    workflow: {
-      rules: [
-        {
-          id: "tell-requester",
-          on: "agent.handed_back",
-          do: [{ notify: { to: "requester", template: "ready_for_review" } }],
-        },
-      ],
-      templates: { ready_for_review: "{{ticket}} is ready for your review." },
-    },
   });
 
   if (!result.ok) {
@@ -155,7 +145,7 @@ describe("createOffice", () => {
     await office.stop();
   });
 
-  it("turns a tracker assignment into work for a connected agent, and a hand-back into a move and a message", async () => {
+  it("turns a tracker assignment into work for a connected agent, and a hand-back into a move, with nothing posted to a human", async () => {
     const sam = connect("sam");
     await sam.whenConnected();
 
@@ -183,13 +173,11 @@ describe("createOffice", () => {
 
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
     expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1");
-    expect(chat.posts).toHaveLength(1);
-    expect(chat.posts[0]!.channel).toBe("D-U-dana");
-    expect(chat.posts[0]!.text).toBe(`${issue.key} is ready for your review.`);
+    expect(chat.posts).toEqual([]);
 
     // A retried hand-back is harmless.
     await sam.handBack(offer.workItem.id, { summary: "again", status: "done" });
-    expect(chat.posts).toHaveLength(1);
+    expect(chat.posts).toEqual([]);
   });
 
   it("offers a conflicted stacked pull request to its author with the rebase recipe", async () => {

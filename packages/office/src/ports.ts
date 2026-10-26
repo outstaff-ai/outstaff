@@ -74,8 +74,8 @@ async function create(port: PortName, input: Input) {
 }
 
 /**
- * The office-scope ports from team.yaml. Version control is required; the tracker and chat are used when the team
- * configures them. The knowledge base is read for comments on documents, unless `policies.feedback.doc_comments` is
+ * The office-scope ports from team.yaml. Version control is required; the tracker is used when the team configures
+ * it, and chat only when `office.channel` names the team channel agent questions are mirrored to. The knowledge base is read for comments on documents, unless `policies.feedback.doc_comments` is
  * off; a knowledge adapter this image lacks, or one that fails to start, costs that feedback and nothing else.
  * Runtime and avatars belong to the agents, not the office.
  */
@@ -86,7 +86,11 @@ export async function createOfficePorts(input: Input): Promise<OfficePorts> {
   }
 
   const tracker = (await create("tracker", input)) as Tracker | undefined;
-  const chat = (await create("chat", input)) as Chat | undefined;
+  // The office posts to no person. Its chat app exists only to mirror agent questions to the team channel.
+  const chat = input.team.office?.channel
+    ? ((await create("chat", input)) as Chat | undefined)
+    : undefined;
+
   let knowledge: Knowledge | undefined;
   if (policyOn(input.team.policies, "feedback.doc_comments")) {
     try {

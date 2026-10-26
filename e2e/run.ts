@@ -221,6 +221,7 @@ function prepareSecrets(privateKey: string, keys: { office: string; sam: string 
   write(join(s, "office/SLACK_OFFICE_BOT_TOKEN"), "dummy-not-used");
   write(join(s, "sam/OUTSTAFF_AGENT_TOKEN"), token);
   write(join(s, "office/OUTSTAFF_AGENT_TOKEN_MIRA"), randomBytes(24).toString("hex"));
+  write(join(s, "office/OUTSTAFF_AGENT_TOKEN_PIA"), randomBytes(24).toString("hex"));
   write(join(s, "sam/GH_APP_ID"), "201");
   write(join(s, "sam/GH_APP_PRIVATE_KEY"), privateKey);
   write(join(s, "sam/ITSAPLAN_API_KEY"), keys.sam);
@@ -287,6 +288,8 @@ function hire() {
   for (const p of [
     { role: "developer", handle: "sam", name: "Sam Duarte", pronouns: "they/them" },
     { role: "architect", handle: "mira", name: "Mira Okafor", pronouns: "she/her" },
+    // The PM only receives work in this run: no container is started for it.
+    { role: "pm", handle: "pia", name: "Pia Novak", pronouns: "she/her", repos: false },
   ]) {
     const out = spawnSync(
       "node",
@@ -300,8 +303,7 @@ function hire() {
         p.handle,
         "--pronouns",
         p.pronouns,
-        "--repos",
-        "shop=write,ops=write",
+        ...(p.repos === false ? [] : ["--repos", "shop=write,ops=write"]),
         "--yes",
         "--out",
         dir,
@@ -343,7 +345,7 @@ function hire() {
 
 async function main() {
   hire();
-  step("hire: ost hire developer sam and architect mira, team file validates");
+  step("hire: ost hire developer sam, architect mira and pm pia, team file validates");
 
   const privateKey = prepareKeys();
   const keys = { office: randomBytes(12).toString("hex"), sam: randomBytes(12).toString("hex") };
@@ -1191,6 +1193,24 @@ async function main() {
   assertEq(stays.github.pulls.length, blockedAt.pulls, "no pull request was opened for it");
   step(
     `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, assigned to the requester`,
+  );
+
+  // The team has a PM, so the blocked hand-back is the PM's to deal with: the office queued an unblock round for pia
+  // (she has no container here, so it waits) and nobody posted anything to the requester about it.
+  assertEq(
+    logs("office").includes(`scheduled unblock for pia on ${stuck}`),
+    true,
+    "the office scheduled an unblock round for the PM on the blocked ticket",
+  );
+
+  assertEq(
+    stays.chat.posts.some((p: Json) => p.text.includes(stuck)),
+    false,
+    "no chat message about the blocked ticket: the office posts nothing, and the PM has not run",
+  );
+
+  step(
+    `blocked: an unblock round for the PM was scheduled for ${stuck} and no chat message was posted`,
   );
 
   // ---- 10a. a ticket that asks for the services the team granted: the token is added and never shown

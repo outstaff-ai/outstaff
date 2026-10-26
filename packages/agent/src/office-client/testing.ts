@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, encode, type Message } from "@outstaff/protocol";
+import { PROTOCOL_VERSION, encode, type Message, type PayloadOf } from "@outstaff/protocol";
 import type { ClientClock, ClientSocket } from "./client.js";
 
 export interface ManualClientClock extends ClientClock {
@@ -97,7 +97,13 @@ export class FakeSocket implements ClientSocket {
   }
 
   /** Answers the hello like the office would. */
-  welcome(opts: { heartbeatMs?: number; resume?: string[] } = {}) {
+  welcome(
+    opts: {
+      heartbeatMs?: number;
+      resume?: string[];
+      reports?: PayloadOf<"welcome">["reports"];
+    } = {},
+  ) {
     const hello = this.sentOf("hello")[0];
     this.receive({
       id: "o1",
@@ -107,6 +113,7 @@ export class FakeSocket implements ClientSocket {
         protocolVersion: PROTOCOL_VERSION,
         heartbeatMs: opts.heartbeatMs ?? 1000,
         resume: opts.resume ?? [],
+        ...(opts.reports ? { reports: opts.reports } : {}),
       },
     });
   }

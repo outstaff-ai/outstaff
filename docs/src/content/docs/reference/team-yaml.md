@@ -1347,23 +1347,6 @@ Assign the ticket.
 - Default: `normal`
 - Allowed values: `low`, `normal`, `high`
 
-#### workflow.rules[].do[].notify
-
-- Type: `object`
-- Required
-
-#### workflow.rules[].do[].notify.to
-
-- Type: `string`
-- Required
-- Must match `^(requester|assignee|channel(:\S+)?)$`
-
-#### workflow.rules[].do[].notify.template
-
-- Type: `string`
-- Required
-- Must match `^[a-z][a-z0-9_-]*$`
-
 #### workflow.rules[].disabled
 
 Set to true to remove the rule.
@@ -1535,7 +1518,7 @@ What happens to a ticket when an agent hands its work back.
 
 - Type: `object`
 - Optional
-- Default: `{"reassign":"requester","fallback":"first_human"}`
+- Default: `{"reassign":"requester","blocked_notify":"pm","fallback":"first_human"}`
 
 #### policies.hand_back.reassign
 
@@ -1545,6 +1528,15 @@ Who an agent's hand-back assigns the ticket to: the requester, or none to leave 
 - Optional
 - Default: `requester`
 - Allowed values: `requester`, `none`
+
+#### policies.hand_back.blocked_notify
+
+Who deals with a blocked hand-back: pm schedules an unblock round for the team's PM, who messages the requester only if a human is needed; agent has the blocked agent tell the requester itself, in its own direct message. Without a PM role the agent always does. The office never posts to people. Default pm.
+
+- Type: `string`
+- Optional
+- Default: `pm`
+- Allowed values: `pm`, `agent`
 
 #### policies.hand_back.fallback
 
@@ -1632,7 +1624,7 @@ Longest wait between two attempts at a failing work item.
 
 #### policies.retry.max_failures
 
-Consecutive failed runs after which the work item is blocked and its requester told.
+Consecutive failed runs after which the work item is blocked.
 
 - Type: `integer`
 - Optional

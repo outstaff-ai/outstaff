@@ -256,7 +256,11 @@ describe("work loop", () => {
   });
 
   describe("a ticket the agent moved to blocked", () => {
-    const hand = async (moves: ("blocked" | "review")[], text = "Could not continue.") => {
+    const hand = async (
+      moves: ("blocked" | "review")[],
+      text = "Could not continue.",
+      chat?: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments">,
+    ) => {
       await connect();
       const runtime: Runtime = {
         async *run(req) {
@@ -272,6 +276,7 @@ describe("work loop", () => {
       const logs: string[] = [];
       start(runtime, {
         log: { debug() {}, info() {}, error() {}, warn: (m: string) => void logs.push(m) },
+        ...(chat ? { chat } : {}),
       });
 
       await fake.tracker.createIssue({ title: "Checkout", body: "", status: "active", labels: [] });
@@ -292,6 +297,24 @@ describe("work loop", () => {
 
     it("is done when the agent moved no ticket", async () => {
       expect((await hand([])).status).toBe("done");
+    });
+
+    it("is reported to the requester by the runner, after the hand-back and not through the model", async () => {
+      const { chat, reports } = relay();
+      await hand(["blocked"], "Need the staging key from ops.", chat);
+      await until(() => reports.length === 1);
+      expect(reports[0]).toMatchObject({
+        kind: "blocked",
+        item: "w1",
+        text: "Need the staging key from ops.",
+      });
+    });
+
+    it("is not reported when it was handed back as done", async () => {
+      const { chat, reports } = relay();
+      await hand(["blocked", "review"], "Done.", chat);
+      await until(() => reports.length === 1);
+      expect(reports.map((r) => r.kind)).toEqual(["result"]);
     });
   });
 

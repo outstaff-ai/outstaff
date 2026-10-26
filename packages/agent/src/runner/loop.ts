@@ -434,6 +434,12 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       await report(offer, "result", text || "Done.", linksIn(text));
     }
 
+    // The office says whether the agent tells the requester about a blocked item (when the team has no PM to route it
+    // to, or the switch says so); the runner posts it, so it does not depend on the model.
+    if (status === "blocked" && !filedWork) {
+      await report(offer, "blocked", text || "Blocked.", linksIn(text));
+    }
+
     // Waiting and blocked items keep their worktree for the next round.
     if (status === "done") {
       await opts.workspaces?.release(id).catch((err) => {

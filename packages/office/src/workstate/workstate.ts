@@ -582,8 +582,13 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const refreshWorkers = async () => {
     const latest = new Map<string, { at: string; person: string; done: boolean }>();
     for (const item of await store.listItems()) {
-      // Answering a question on a ticket does not make the agent the one who worked on it.
-      if (!item.subject || item.status === "queued" || item.kind === "asked") {
+      // Answering a question on a ticket, or trying to unblock it, does not make the agent the one who worked on it.
+      if (
+        !item.subject ||
+        item.status === "queued" ||
+        item.kind === "asked" ||
+        item.kind === "unblock"
+      ) {
         continue;
       }
 

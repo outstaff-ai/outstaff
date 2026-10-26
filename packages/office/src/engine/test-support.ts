@@ -1,5 +1,5 @@
 import type { Logger, Member, TeamConfig, WorkflowEvent } from "@outstaff/core";
-import { createFakeChat, createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
+import { createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { manualClock } from "../clock.js";
 import { createIntake } from "../intake/index.js";
 import { REPO, teamConfig } from "../intake/test-support.js";
@@ -13,7 +13,6 @@ export const silent = { debug() {}, info() {}, warn() {}, error() {} };
 
 export interface HarnessOptions {
   noTracker?: boolean;
-  noChat?: boolean;
   team?: TeamConfig;
   workflow?: Record<string, unknown>;
   logger?: Logger;
@@ -29,7 +28,6 @@ export async function harness(o: HarnessOptions = {}) {
     actor: { id: "u-sam", name: "Sam", kind: "agent" },
   });
 
-  const chat = createFakeChat({ now: clock.now });
   const team =
     o.team ??
     teamConfig({
@@ -59,7 +57,7 @@ export async function harness(o: HarnessOptions = {}) {
     team,
     clock,
     logger: o.logger ?? silent,
-    ports: { ...(tracked ? { tracker: tracked } : {}), ...(o.noChat ? {} : { chat }) },
+    ports: tracked ? { tracker: tracked } : {},
   });
 
   intake.onEvent((event, meta) => ws.apply(event, meta));
@@ -72,7 +70,6 @@ export async function harness(o: HarnessOptions = {}) {
     store,
     vcs,
     tracker,
-    chat,
     team,
     ws,
     intake,

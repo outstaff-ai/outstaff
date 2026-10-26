@@ -21,10 +21,6 @@ function templateOf(a: Action): string | undefined {
     return typeof a.comment === "string" ? a.comment : a.comment.template;
   }
 
-  if ("notify" in a) {
-    return a.notify.template;
-  }
-
   return undefined;
 }
 

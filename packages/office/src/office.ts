@@ -1,4 +1,5 @@
 import {
+  policyOn,
   silentLogger,
   type AdapterRegistry,
   type Logger,
@@ -43,9 +44,6 @@ export interface OfficeOptions {
   /** How often the work state rescans open pull requests. */
   refreshIntervalMs?: number;
   staleAfterMinutes?: number;
-
-  /** Seconds the agent has to post a chat result after its hand-back before the office posts it. Default 60. */
-  chatReportGraceSeconds?: number;
 
   /** Minutes after which a usage report counts as unknown. Default 30. */
   usageStaleAfterMinutes?: number;
@@ -205,10 +203,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     team,
     clock,
     logger: log,
-    ports: {
-      ...(ports.tracker ? { tracker: ports.tracker } : {}),
-      ...(ports.chat ? { chat: ports.chat } : {}),
-    },
+    ports: ports.tracker ? { tracker: ports.tracker } : {},
   });
 
   const inFlight = new Set<Promise<unknown>>();
@@ -261,7 +256,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     }
 
     // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
-    if (item.kind === "doc_feedback" || item.kind === "asked") {
+    // Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
+    if (item.kind === "doc_feedback" || item.kind === "asked" || item.kind === "unblock") {
       return;
     }
 
@@ -301,6 +297,17 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     log.info(handedBackText(item), { person: item.person });
   };
 
+  // An item the scheduler blocked: the PM's `unblock` round when the team routes blocked work there, and the report
+  // the blocked agent owes the requester (queued, so the agent posts it as itself). The office posts nothing.
+  const onBlocked = async (b: { item: WorkItem; reason: string }) => {
+    try {
+      const routed = await engine.unblock(b.item, b.reason);
+      await chatDesk.blocked(b.item, b.reason, routed);
+    } catch (error) {
+      log.warn("could not route a blocked item", { item: b.item.id, error: String(error) });
+    }
+  };
+
   const source = schedulerWorkSource({
     scheduler,
     store,
@@ -308,7 +315,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ports: { ...(ports.tracker ? { tracker: ports.tracker } : {}), vcs: ports.vcs },
     roles,
     notify,
-    onBlocked: (b) => chatDesk.notifyBlocked(b.item, b.reason),
+    onBlocked,
     onStarted: (item) => engine.started(item.id),
     onHandedBack: async (item, result) => {
       // An interrupted item is still the same round: nothing is reported, no rule runs, no follow-up starts.
@@ -347,11 +354,34 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     workState,
     messaging,
     notify,
+    push: (person) => server?.reports(person),
     clock,
-    ...(o.chatReportGraceSeconds === undefined ? {} : { graceSeconds: o.chatReportGraceSeconds }),
-    logger: log,
     ...(ports.tracker ? { tracker: ports.tracker } : {}),
-    ...(ports.chat ? { chat: ports.chat } : {}),
+    // The requester of the item's ticket, else the first human (as the workflow's own fallback does).
+    requesterChat: async (item) => {
+      const ticket =
+        item.subject?.type === "ticket"
+          ? item.subject.ref
+          : item.subject?.type === "pr"
+            ? ((await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined)
+                ?.ticket
+            : undefined;
+
+      if (!ticket) {
+        return undefined;
+      }
+
+      const asked = workState.ticket(ticket)?.requester;
+      const human = asked
+        ? team.humans?.find(
+            (h) => h.identities.tracker === asked || h.identities.vcs === asked || h.name === asked,
+          )
+        : policyOn(team.policies, "hand_back.fallback")
+          ? team.humans?.[0]
+          : undefined;
+
+      return human?.identities.chat;
+    },
     linksOf: async (item) =>
       (await refs.subjectsOf(item)).flatMap((r) =>
         r.url && (r.type === "ticket" || r.type === "pr")
@@ -449,7 +479,6 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       await workState.stop();
     }
 
-    chatDesk.stop();
     if (up.scheduler) {
       baseScheduler.stop();
     }
@@ -496,12 +525,11 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
           for (const b of result.blocked) {
             log.warn("work item blocked", { item: b.item.id, code: b.code, reason: b.reason });
-            void chatDesk.notifyBlocked(b.item, b.reason);
+            void onBlocked(b);
           }
         });
 
         up.scheduler = true;
-        await chatDesk.resume();
         state = "running";
         log.info("office started", { team: team.team.name, agentPort: protocol.port() });
       } catch (error) {

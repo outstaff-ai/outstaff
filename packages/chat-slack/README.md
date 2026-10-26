@@ -51,14 +51,14 @@ settings:
 
 To let an agent read the history of a channel it was mentioned in, add `channels:history` (and `groups:history` for private channels) and subscribe to nothing more; threads in direct messages need only `im:history`.
 
-## Create the office app (one per team)
+## Create the office app (optional, one per team)
 
-The office posts notifications and mirrors agent-to-agent questions through its own app, `<team>-outstaff-office`, which posts and reads history only. It has no app-level token or Socket Mode because the office never listens. Install it and copy its Bot User OAuth Token to `SLACK_OFFICE_BOT_TOKEN`. When chat is configured and the key is missing, the office stops at startup naming it.
+The office posts to no person: everything a human reads in chat comes from an agent, as itself. The office app, `<team>-outstaff-office`, exists only to mirror agent-to-agent questions and answers into the team channel, `office.channel` in `team.yaml`. Without that channel, skip this app: the office has no chat port and needs no chat credentials. With it, the app posts and reads history only, has no app-level token or Socket Mode (the office never listens), and its Bot User OAuth Token goes to `SLACK_OFFICE_BOT_TOKEN`. When `office.channel` is set and the key is missing, the office stops at startup naming it.
 
 ```yaml
 display_information:
   name: acme-outstaff-office
-  description: Notifications from the acme team's office
+  description: Mirrors the acme team's agent questions to a channel
 features:
   bot_user:
     display_name: acme-outstaff-office
@@ -80,14 +80,14 @@ settings:
 
 ## Secrets
 
-`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` and `SLACK_BOT_USER_ID` are in the person scope; `SLACK_OFFICE_BOT_TOKEN` is the office scope's only secret.
+`SLACK_BOT_TOKEN`, `SLACK_APP_TOKEN` and `SLACK_BOT_USER_ID` are in the person scope; `SLACK_OFFICE_BOT_TOKEN` is the office scope's only secret, and it is optional (see above).
 
 | Key                      | Meaning                                                  | Derivable                  |
 | ------------------------ | -------------------------------------------------------- | -------------------------- |
 | `SLACK_BOT_TOKEN`        | Bot User OAuth Token (`xoxb-...`)                        | no                         |
 | `SLACK_APP_TOKEN`        | App-level token with `connections:write` (`xapp-`)       | no                         |
 | `SLACK_BOT_USER_ID`      | member id of the bot user, to ignore its own echoes      | yes, `auth.test`; optional |
-| `SLACK_OFFICE_BOT_TOKEN` | office app's Bot User OAuth Token (`xoxb-`), office only | no                         |
+| `SLACK_OFFICE_BOT_TOKEN` | office app's Bot User OAuth Token (`xoxb-`), office only | no; optional               |
 
 ## Trust
 

@@ -143,8 +143,7 @@ export type Action =
   | { move: CanonicalStatus }
   | { assign: string }
   | { comment: string | { template: string; on?: "ticket" | "pr" } }
-  | { schedule: { person: string; kind: string; priority: "low" | "normal" | "high" } }
-  | { notify: { to: string; template: string } };
+  | { schedule: { person: string; kind: string; priority: "low" | "normal" | "high" } };
 
 const templateId = z.string().regex(SLUG, "Use lowercase letters, digits, dashes and underscores.");
 
@@ -185,19 +184,6 @@ export const actionSchema: z.ZodType<Action> = z.union([
       }),
     })
     .meta(d("Schedule a work item for an agent.")),
-  z
-    .strictObject({
-      notify: z.strictObject({
-        to: z
-          .string()
-          .regex(
-            /^(requester|assignee|channel(:\S+)?)$/,
-            "Use requester, assignee, channel or channel:<name>.",
-          ),
-        template: templateId,
-      }),
-    })
-    .meta(d("Send a rendered template to a person or channel.")),
 ]) as z.ZodType<Action>;
 
 const eventType = z.enum(WORKFLOW_EVENT_TYPES);

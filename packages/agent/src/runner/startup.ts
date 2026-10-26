@@ -425,6 +425,10 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
       log,
       ...(env.tracker ? { tracker: env.tracker } : {}),
     });
+
+    // Reports the office queued while this agent was offline are posted by the agent when it connects.
+    const relay = chat;
+    connection.onReports?.((reports) => void relay.postQueued(reports));
   } else if (env.unavailable?.chat) {
     log.warn("chat requests are off", { reason: env.unavailable.chat });
   }

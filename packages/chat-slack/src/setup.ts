@@ -37,11 +37,11 @@ settings:
 `;
 }
 
-// The office app only posts and reads history: no Socket Mode, no events, no app-level token.
+// The office app only posts to the team channel and reads history: no Socket Mode, no events, no app-level token.
 export function slackOfficeManifest(team: string): string {
   return `display_information:
   name: ${quote(`${team}-outstaff-office`)}
-  description: ${quote(`Notifications from the ${team} team's office`)}
+  description: ${quote(`Mirrors the ${team} team's agent questions to a channel`)}
 features:
   bot_user:
     display_name: ${quote(`${team}-outstaff-office`)}
@@ -68,12 +68,12 @@ export function slackSetupGuide(ctx: SetupContext): SetupStep[] {
     return [
       {
         title: "Create the office's Slack app",
-        body: "Go to https://api.slack.com/apps, Create New App > From a manifest, pick the workspace, switch to the YAML tab and paste the manifest. The office only posts and reads history, so the app has no Socket Mode, events or app-level token.",
+        body: "Go to https://api.slack.com/apps, Create New App > From a manifest, pick the workspace, switch to the YAML tab and paste the manifest. The office never messages people: it only mirrors agent-to-agent questions to the team channel (`office.channel`), so skip this app if the team sets none. It posts and reads history only, so the app has no Socket Mode, events or app-level token.",
         manifest: slackOfficeManifest(team.team.name),
       },
       {
         title: "Install the app and copy the bot token",
-        body: "Install App > Install to Workspace. Keep the Bot User OAuth Token (`xoxb-...`) from OAuth & Permissions as `SLACK_OFFICE_BOT_TOKEN`. Invite the app to the channels it should post in. Never use an agent's token here.",
+        body: "Install App > Install to Workspace. Keep the Bot User OAuth Token (`xoxb-...`) from OAuth & Permissions as `SLACK_OFFICE_BOT_TOKEN`. Invite the app to the team channel. Never use an agent's token here.",
       },
     ];
   }
