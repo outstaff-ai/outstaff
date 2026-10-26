@@ -3,14 +3,6 @@ name: Images
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
-    paths:
-      - images/**
-      - packages/**
-      - pnpm-lock.yaml
-      - pnpm-workspace.yaml
-      - package.json
-      - .dockerignore
-      - .github/workflows/images.yml
   # the merge queue tests each PR combined with everything ahead of it
   merge_group:
   push:

@@ -6,16 +6,10 @@ name: End-to-end
 # How it works: CONTRIBUTING.md, "End-to-end test".
 
 on:
-  # Only the parts that make up this test, so changing it is tested; the nightly run covers everything else.
+  # Every pull request, so the check can be required; the nightly run covers the full matrix.
   pull_request:
     types: [opened, synchronize, reopened]
-    paths:
-      - e2e/**
-      - images/**
-      - packages/**
-      - pnpm-lock.yaml
-      - .github/workflows/e2e.yml
-  # the merge queue tests each PR combined with everything ahead of it (not a required check yet)
+  # the merge queue tests each PR combined with everything ahead of it (a required check)
   merge_group:
   schedule:
     - cron: "23 3 * * *"
