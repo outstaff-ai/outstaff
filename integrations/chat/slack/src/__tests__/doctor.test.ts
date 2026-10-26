@@ -161,4 +161,58 @@ describe("doctorSlack", () => {
       detail: "Slack rejected SLACK_OFFICE_BOT_TOKEN: invalid_auth.",
     });
   });
+
+  it("says nothing without a person, and without a bot token makes no call", async () => {
+    const noPerson = ctx({ ok: true });
+    delete (noPerson.c as { person?: unknown }).person;
+    expect(await doctorSlack(secrets(), noPerson.c)).toEqual([]);
+    expect(noPerson.calls).toEqual([]);
+
+    const appOnly = ctx({ ok: true });
+    const checks = await doctorSlack(
+      envSecretSource({ SLACK_APP_TOKEN: "xapp-fake-app" }, "/nonexistent"),
+      appOnly.c,
+    );
+
+    expect(checks.map((x) => [x.key, x.status])).toEqual([["SLACK_APP_TOKEN", "ok"]]);
+    expect(appOnly.calls).toEqual([]);
+  });
+
+  it("does not check the app token when none is set", async () => {
+    const { c } = ctx({ ok: true, user_id: "U0BOT" });
+    const checks = await doctorSlack(
+      envSecretSource({ SLACK_BOT_TOKEN: "xoxb-fake-bot" }, "/nonexistent"),
+      c,
+    );
+
+    expect(checks.some((x) => x.key === "SLACK_APP_TOKEN")).toBe(false);
+  });
+
+  it("fails when auth.test answers ok without a bot user id", async () => {
+    const { c } = ctx({ ok: true });
+    expect((await doctorSlack(secrets(), c)).at(-1)).toMatchObject({
+      status: "fail",
+      detail: "Slack rejected SLACK_BOT_TOKEN: no user id returned.",
+    });
+  });
+
+  it("fails when Slack is unreachable for the office token", async () => {
+    const { c } = ctx(new Error("offline"), person(), "office");
+    expect(await doctorSlack(secrets({ SLACK_OFFICE_BOT_TOKEN: "xoxb-fake-office" }), c)).toEqual([
+      expect.objectContaining({
+        key: "SLACK_OFFICE_BOT_TOKEN",
+        status: "fail",
+        detail: "Slack could not be reached: offline",
+      }),
+    ]);
+  });
+
+  it("fails when auth.test answers ok for the office token without a bot user id", async () => {
+    const { c } = ctx({ ok: true }, person(), "office");
+    const checks = await doctorSlack(secrets({ SLACK_OFFICE_BOT_TOKEN: "xoxb-fake-office" }), c);
+    expect(checks[0]).toMatchObject({
+      status: "fail",
+      detail: "Slack rejected SLACK_OFFICE_BOT_TOKEN: no user id returned.",
+    });
+  });
 });

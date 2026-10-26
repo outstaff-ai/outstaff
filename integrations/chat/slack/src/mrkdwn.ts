@@ -52,7 +52,7 @@ function inline(raw: string): string {
 
   // A link label can itself hold a stashed code span, so restore until none are left.
   while (text.includes(OPEN)) {
-    text = text.replaceAll(stashed, (_, i: string) => spans[Number(i)] ?? "");
+    text = text.replaceAll(stashed, (_, i: string) => spans[Number(i)]!);
   }
 
   return text;
@@ -108,7 +108,7 @@ function tableToCode(rows: string[]): string[] {
   return [
     "```",
     ...cells.map((row) =>
-      escapeSlack(row.map((c, i) => c.padEnd(widths[i] ?? 0)).join("  ")).trimEnd(),
+      escapeSlack(row.map((c, i) => c.padEnd(widths[i]!)).join("  ")).trimEnd(),
     ),
     "```",
   ];

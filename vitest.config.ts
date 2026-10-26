@@ -44,10 +44,10 @@ const integrations = [
 const floors: Record<string, number> = {
   "vcs/github": 100,
   "runtime/claude": 100,
-  "chat/slack": 84,
+  "chat/slack": 100,
   "tracker/itsaplan": 100,
   "knowledge/itsaplan": 100,
-  "avatars/dicebear": 75,
+  "avatars/dicebear": 100,
 };
 
 export default defineConfig({
