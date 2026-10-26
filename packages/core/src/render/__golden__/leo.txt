@@ -295,7 +295,7 @@ Use a stack when a change depends on another that is not merged yet.
 
 ## Conflicts
 
-Resolve conflicts by rebasing onto the base, not by merging the base in. If the conflict changes the meaning of the work, say so in the pull request.
+Resolve conflicts the way the repository's conventions say. If they say nothing, rebase onto the base rather than merging the base in. If the conflict changes the meaning of the work, say so in the pull request.
 
 === references/memory.md ===
 # Memory
