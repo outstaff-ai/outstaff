@@ -189,6 +189,14 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     rewrite: manyPrs,
   },
   {
+    path: "tickets.start_moves_active",
+    default: true,
+    off: false,
+    kind: "office",
+    behaviour:
+      "When a work item about a ticket starts, the office moves the ticket to active if it is in backlog, ready, review or blocked, so the board shows the work without the agent having to say so. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and neither does the minimal preset, which never moves tickets. The agent still keeps the ticket accurate as it goes.",
+  },
+  {
     path: "merge.on_approval",
     default: false,
     off: false,

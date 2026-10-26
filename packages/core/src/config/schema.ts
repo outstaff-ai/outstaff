@@ -430,8 +430,16 @@ const policiesSchema = z
               "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.",
             ),
           ),
+        start_moves_active: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Move a ticket to active when a work item about it starts (assigned, ticket comment), if it is in backlog, ready, review or blocked. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and the minimal preset never moves tickets. Default on.",
+            ),
+          ),
       })
-      .default({ prs_per_ticket: "one" })
+      .default({ prs_per_ticket: "one", start_moves_active: true })
       .meta(d("How tickets and pull requests relate.")),
     conflicts: z
       .strictObject({

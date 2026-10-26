@@ -644,7 +644,10 @@ describe("pr write verbs", () => {
       const f = await setup();
       f.env.team = {
         ...f.env.team,
-        policies: { ...f.env.team.policies!, tickets: { prs_per_ticket: "many" } },
+        policies: {
+          ...f.env.team.policies!,
+          tickets: { prs_per_ticket: "many", start_moves_active: true },
+        },
       };
 
       office(f, () => linked("open"));

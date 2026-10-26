@@ -136,7 +136,7 @@ describe("parseTeamConfig", () => {
         mentions: true,
       },
       hand_back: { reassign: "requester", fallback: "first_human" },
-      tickets: { prs_per_ticket: "one" },
+      tickets: { prs_per_ticket: "one", start_moves_active: true },
       conflicts: { follow_up: true },
       merge: { on_approval: false, approvers: ["humans"] },
       retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },
