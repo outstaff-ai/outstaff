@@ -116,4 +116,48 @@ describe("doctorItsaplan", () => {
   it("does nothing without a key", async () => {
     expect(await doctorItsaplan(envSecretSource({}, "/nonexistent"), ctx(me({})))).toEqual([]);
   });
+
+  it("completes missing options from the team's tracker integration", async () => {
+    const { options: _options, ...rest } = ctx(me({ id: 17 }), "17");
+    const checks = await doctorItsaplan(secrets(), rest as DeriveContext);
+    expect(checks.map((c) => c.status)).toEqual(["ok", "ok", "ok"]);
+  });
+
+  it("reads the member from a nested user object", async () => {
+    const checks = await doctorItsaplan(
+      secrets(),
+      ctx(me({ user: { id: 17, username: "sam" } }), "sam"),
+    );
+
+    expect(checks[0]!.detail).toBe("An authenticated call works (member 17).");
+    expect(checks.at(-1)).toMatchObject({
+      status: "ok",
+      detail: "identities.tracker matches member 17.",
+    });
+  });
+
+  it("does not name a member when /me gives no id, and cannot compare the identity", async () => {
+    const checks = await doctorItsaplan(secrets({ ITSAPLAN_MEMBER_ID: "17" }), ctx(me({}), "sam"));
+    expect(checks[0]!.detail).toBe("An authenticated call works.");
+    expect(checks.map((c) => c.key)).not.toContain("ITSAPLAN_MEMBER_ID");
+    expect(checks.at(-1)).toMatchObject({
+      status: "warn",
+      detail: "Its a Plan did not return a member id, so identities.tracker cannot be compared.",
+    });
+  });
+
+  it("asks for the member id by name in the fix when neither the id nor the identity is known", async () => {
+    const checks = await doctorItsaplan(secrets(), ctx(me({})));
+    expect(checks.at(-1)!.fix).toBe(
+      "Set identities.tracker to the member id for sam in team.yaml.",
+    );
+  });
+
+  it("leaves the username out of the mismatch when /me has none", async () => {
+    const checks = await doctorItsaplan(secrets(), ctx(me({ id: 17 }), "ada"));
+    expect(checks.at(-1)).toMatchObject({
+      status: "fail",
+      detail: 'identities.tracker is "ada" but the API key belongs to member 17.',
+    });
+  });
 });

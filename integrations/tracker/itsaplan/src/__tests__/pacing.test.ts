@@ -148,3 +148,17 @@ describe("burst limit", () => {
     expect(calls).toBe(1);
   });
 });
+
+describe("pacer reset", () => {
+  it("forgets the burst so the next request starts a new one without waiting", async () => {
+    const clock = virtualClock();
+    const pacer = new Pacer(clock, 2);
+    expect(await pacer.acquire()).toBe(1);
+    expect(await pacer.acquire()).toBe(2);
+
+    pacer.reset();
+    const before = clock.at();
+    expect(await pacer.acquire()).toBe(1);
+    expect(clock.at()).toBe(before);
+  });
+});

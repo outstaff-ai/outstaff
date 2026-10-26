@@ -153,12 +153,12 @@ function buildTracker(api: Itsaplan): Tracker {
     return toIssue(updated, await api.project());
   };
 
-  const feed = async (issueId: number, filter?: "comments"): Promise<ApiFeedItem[]> => {
+  const commentFeed = async (issueId: number): Promise<ApiFeedItem[]> => {
     const items: ApiFeedItem[] = [];
     let cursor: string | undefined;
     for (let page = 0; page < 50; page++) {
       const res = await api.http.request<Page<ApiFeedItem>>("GET", `/issues/${issueId}/feed`, {
-        query: { limit: FEED_PAGE, order: "asc", cursor, ...(filter ? { filter } : {}) },
+        query: { limit: FEED_PAGE, order: "asc", cursor, filter: "comments" },
       });
 
       items.push(...res.items);
@@ -259,7 +259,7 @@ function buildTracker(api: Itsaplan): Tracker {
     async listComments(key): Promise<Comment[]> {
       const issue = await fetchIssue(key);
       const setup = await api.project();
-      const items = await feed(issue.id, "comments");
+      const items = await commentFeed(issue.id);
       return items
         .filter((i) => i.kind === "comment")
         .toSorted((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id)

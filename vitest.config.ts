@@ -45,8 +45,8 @@ const floors: Record<string, number> = {
   "vcs/github": 100,
   "runtime/claude": 100,
   "chat/slack": 84,
-  "tracker/itsaplan": 85,
-  "knowledge/itsaplan": 83,
+  "tracker/itsaplan": 100,
+  "knowledge/itsaplan": 100,
   "avatars/dicebear": 75,
 };
 

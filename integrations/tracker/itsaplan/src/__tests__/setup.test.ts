@@ -65,4 +65,52 @@ describe("deriveItsaplan", () => {
   it("does nothing without a key", async () => {
     expect(await deriveItsaplan(envSecretSource({}, "/nonexistent"), ctx({ id: 1 }))).toEqual({});
   });
+
+  it("reads the member id from a nested user object", async () => {
+    const secrets = envSecretSource({ ITSAPLAN_API_KEY: "key" }, "/nonexistent");
+    expect(await deriveItsaplan(secrets, ctx({ user: { id: "u-17" } }))).toEqual({
+      ITSAPLAN_MEMBER_ID: "u-17",
+    });
+  });
+
+  it("completes missing options from the team's tracker integration", async () => {
+    const secrets = envSecretSource({ ITSAPLAN_API_KEY: "key" }, "/nonexistent");
+    const { options: _options, ...rest } = ctx({ id: 3 });
+    const withTracker = {
+      ...rest,
+      team: {
+        integrations: {
+          tracker: { adapter: "itsaplan", url: "https://tracker.acme.example", project: "SHOP" },
+        },
+      },
+    } as unknown as DeriveContext;
+
+    expect(await deriveItsaplan(secrets, withTracker)).toEqual({ ITSAPLAN_MEMBER_ID: "3" });
+  });
+
+  it("warns and derives nothing when /me names no member", async () => {
+    const warnings: string[] = [];
+    const secrets = envSecretSource({ ITSAPLAN_API_KEY: "key" }, "/nonexistent");
+    expect(
+      await deriveItsaplan(secrets, { ...ctx({}), warn: (m) => void warnings.push(m) }),
+    ).toEqual({});
+
+    expect(warnings).toEqual(["Its a Plan /me did not return a member id."]);
+  });
+
+  it("keeps a member id that is already set, without calling the API", async () => {
+    const secrets = envSecretSource(
+      { ITSAPLAN_API_KEY: "key", ITSAPLAN_MEMBER_ID: "5" },
+      "/nonexistent",
+    );
+
+    const unreachable = {
+      ...ctx({}),
+      fetch: (async () => {
+        throw new Error("no call expected");
+      }) as unknown as typeof fetch,
+    };
+
+    expect(await deriveItsaplan(secrets, unreachable)).toEqual({});
+  });
 });

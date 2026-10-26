@@ -37,6 +37,27 @@ describe("options", () => {
     expect(() => resolveConnection({ team: bare }, knowledgeOptions.parse({}))).toThrow(PortError);
   });
 
+  it("merges the agents of the tracker integration and of the options, and accepts options without any", () => {
+    const withTracker = {
+      integrations: {
+        tracker: {
+          adapter: "itsaplan",
+          url: "https://tracker.acme.example",
+          project: "SHOP",
+          agents: ["sam"],
+        },
+      },
+    } as unknown as TeamConfig;
+
+    expect(
+      resolveConnection({ team: withTracker }, knowledgeOptions.parse({ agents: ["kit"] })).agents,
+    ).toEqual(["sam", "kit"]);
+
+    const bare = { integrations: {} } as unknown as TeamConfig;
+    const raw = { url: "https://tracker.acme.example", project: "SHOP" } as never;
+    expect(resolveConnection({ team: bare }, raw).agents).toEqual([]);
+  });
+
   it("requires url and project on the tracker", () => {
     expect(trackerOptions.safeParse({ url: "https://tracker.acme.example" }).success).toBe(false);
   });

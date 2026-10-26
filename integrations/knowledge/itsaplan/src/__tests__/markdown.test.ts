@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { docToMd, findRange, mdToDoc, plainText } from "../markdown.js";
+import { docToMd, findRange, mdToDoc, plainText, type PmNode } from "../markdown.js";
 
 describe("mdToDoc", () => {
   it("builds headings, paragraphs and inline marks", () => {
@@ -124,5 +124,116 @@ describe("findRange", () => {
     const [from, to] = findRange(doc, "target")!;
     expect(to - from).toBe(6);
     expect(from).toBe(1 + "a😀 ".length);
+  });
+});
+
+describe("mdToDoc edge cases", () => {
+  it("starts a paragraph with a mark and keeps empty cells and empty headings empty", () => {
+    const doc = mdToDoc("**lead** text\n\n#  \n\n| a |  |\n| - | - |");
+    expect(doc.content?.[0]?.content?.[0]).toEqual({
+      type: "text",
+      text: "lead",
+      marks: [{ type: "bold" }],
+    });
+
+    expect(doc.content?.[1]).toEqual({ type: "heading", attrs: { level: 1 } });
+    expect(doc.content?.[2]?.content?.[0]?.content?.[1]).toEqual({
+      type: "tableHeader",
+      content: [{ type: "paragraph" }],
+    });
+  });
+
+  it("keeps an empty fenced block without content", () => {
+    expect(mdToDoc("```\n```").content).toEqual([{ type: "codeBlock", attrs: { language: null } }]);
+  });
+
+  it("joins an indented continuation line to its list item, also when the item itself is empty", () => {
+    const wrapped = mdToDoc("- one\n  more text").content?.[0]?.content?.[0]?.content?.[0];
+    expect(wrapped?.content?.map((n) => n.text)).toEqual(["one", " more text"]);
+
+    const empty = mdToDoc("- \n  later").content?.[0]?.content?.[0]?.content?.[0];
+    expect(empty?.content?.map((n) => n.text)).toEqual([" later"]);
+  });
+
+  it("ends a list at an indented blank line", () => {
+    const doc = mdToDoc("- a\n  \n- b");
+    expect(doc.content?.map((b) => b.type)).toEqual(["bulletList", "bulletList"]);
+  });
+});
+
+describe("docToMd of documents the editor may produce", () => {
+  const para = (...content: PmNode[]): PmNode => ({ type: "paragraph", content });
+  const doc = (...content: PmNode[]): PmNode => ({ type: "doc", content });
+
+  it("drops marks it does not know and writes a link without a target as an empty one", () => {
+    const md = docToMd(
+      doc(
+        para(
+          { type: "text", text: "u", marks: [{ type: "underline" }] },
+          { type: "text", text: " l", marks: [{ type: "link" }] },
+        ),
+      ),
+    );
+
+    expect(md).toBe("u[ l]()");
+  });
+
+  it("writes a node without text as nothing", () => {
+    expect(docToMd(doc(para({ type: "text", text: "a" }, { type: "image" })))).toBe("a");
+  });
+
+  it("copes with containers that have no content", () => {
+    expect(docToMd({ type: "doc" })).toBe("");
+    expect(docToMd(doc({ type: "heading" }))).toBe("# ");
+    expect(docToMd(doc({ type: "bulletList" }, para({ type: "text", text: "x" })))).toBe("x");
+    expect(docToMd(doc({ type: "bulletList", content: [{ type: "listItem" }] }))).toBe("- ");
+    expect(docToMd(doc({ type: "blockquote" }))).toBe(">");
+    expect(
+      docToMd(doc({ type: "codeBlock", attrs: { language: 3 }, content: [{ type: "text" }] })),
+    ).toBe("```\n```");
+
+    expect(docToMd(doc({ type: "codeBlock" }))).toBe("```\n```");
+    expect(docToMd(doc({ type: "table" }))).toBe("| --- |");
+    expect(
+      docToMd(
+        doc({ type: "table", content: [{ type: "tableRow", content: [{ type: "tableCell" }] }] }),
+      ),
+    ).toBe("|  |\n| --- |");
+
+    expect(docToMd(doc({ type: "table", content: [{ type: "tableRow" }] }))).toBe("|  |\n| --- |");
+  });
+});
+
+describe("editor positions of nodes without text", () => {
+  it("counts a leaf node as one position and a container as two plus its content", () => {
+    const rule = mdToDoc("one\n\n---\n\ntwo");
+    expect(findRange(rule, "two")).toEqual([7, 10]);
+
+    const hard: PmNode = {
+      type: "doc",
+      content: [
+        { type: "image" },
+        { type: "mystery" },
+        { type: "paragraph", content: [{ type: "text", text: "x" }] },
+      ],
+    };
+
+    expect(findRange(hard, "x")).toEqual([4, 5]);
+  });
+
+  it("reads a hard break as a newline and a text node without text as empty", () => {
+    const doc: PmNode = {
+      type: "doc",
+      content: [
+        {
+          type: "paragraph",
+          content: [{ type: "text", text: "a" }, { type: "hardBreak" }, { type: "text" }],
+        },
+      ],
+    };
+
+    expect(plainText(doc)).toEqual(["a\n"]);
+    expect(findRange(doc, "\n")).toEqual([2, 3]);
+    expect(plainText({ type: "doc" })).toEqual([]);
   });
 });
