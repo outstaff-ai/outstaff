@@ -48,7 +48,7 @@ export interface DocEvent {
 }
 
 export interface Knowledge {
-  links: Pick<Links, "doc">;
+  links: Pick<Links, "doc" | "comment">;
   search(query: string, limit?: number): Promise<Doc[]>;
   get(idOrPath: string): Promise<Doc>;
   create(doc: { path: string; title: string; body: string }): Promise<Doc>;

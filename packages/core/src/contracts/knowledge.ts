@@ -74,6 +74,8 @@ export function knowledgeContract(
       const c = await s.subject.comment(doc.id, { body: "why?", anchorText: "anchor" });
       const r = await s.subject.reply(c.id, "because");
       expect(r.parentId).toBe(c.id);
+      expect(s.subject.links.comment?.(doc.id, r.id) ?? "https://").toMatch(/^https?:\/\//);
+
       await s.subject.resolve(c.id);
       const all = await s.subject.comments(doc.id);
       expect(all.map((x) => x.id)).toEqual(expect.arrayContaining([c.id, r.id]));

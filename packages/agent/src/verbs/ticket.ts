@@ -1,10 +1,4 @@
-import {
-  CANONICAL_STATUSES,
-  createTicketLinker,
-  PortError,
-  type Issue,
-  type Member,
-} from "@outstaff/core";
+import { CANONICAL_STATUSES, PortError, type Issue, type Member } from "@outstaff/core";
 import { z } from "zod";
 import { basename } from "node:path";
 import { MAX_ATTACHMENT_BYTES, humanSize } from "../runner/attachments.js";
@@ -17,7 +11,7 @@ import {
 } from "./attachments.js";
 import { readInputBytes } from "./files.js";
 import { mentionGuard } from "./mentions.js";
-import { filedLine, requireOffice, requireTracker } from "./support.js";
+import { filedLine, requireOffice, requireTracker, ticketLinker } from "./support.js";
 import { defineVerb, result } from "./types.js";
 
 const key = z
@@ -97,7 +91,7 @@ export const ticketComment = defineVerb({
   async run(env, input) {
     const tracker = requireTracker(env);
     const guarded = tracker.mentionsUsers ? mentionGuard(env.team).apply(input.body) : input.body;
-    const body = createTicketLinker(env.team, tracker).format(guarded, "tracker");
+    const body = ticketLinker(env).format(guarded, "tracker");
     const comment = await tracker.comment(input.key, body);
     const url = tracker.links.issue(input.key);
     return result([`Commented on ${input.key}: ${comment.url}`, url], { key: input.key, comment }, [

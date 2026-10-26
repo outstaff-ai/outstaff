@@ -427,7 +427,8 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
       it("comments on the pull request conversation with a write grant", async (t) => {
         const { s, repo, self } = await setupSelf(t, "write");
         const pr = await otherPr(t, s, repo, "Talked about");
-        await s.subject.commentOnPullRequest(repo, pr.number, "Thanks, done.");
+        const made = await s.subject.commentOnPullRequest(repo, pr.number, "Thanks, done.");
+        expect(made.url).toMatch(/^https?:\/\//);
         const comments = (await s.subject.events([repo])).events.filter(
           (e) => e.type === "pr.comment" && e.number === pr.number && e.data["kind"] === "comment",
         );

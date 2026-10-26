@@ -40,7 +40,12 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     return c;
   };
 
-  const links = { doc: (id: string) => `${base}/d/${encodeURIComponent(id)}` };
+  const links = {
+    doc: (id: string) => `${base}/d/${encodeURIComponent(id)}`,
+    comment: (docId: string, id: string) =>
+      `${base}/d/${encodeURIComponent(docId)}#comment-${encodeURIComponent(id)}`,
+  };
+
   const addComment = (
     docId: string,
     c: { body: string; anchorText?: string; parentId?: string },

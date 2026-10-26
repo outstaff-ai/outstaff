@@ -316,6 +316,20 @@ export class Itsaplan {
     return this.template(bare, vars);
   }
 
+  /** The link to one issue comment: the `issue_comment_url` template, else the issue (no anchor is known). */
+  issueCommentUrl(key: string, commentId: string): string {
+    const tpl = this.conn.issue_comment_url;
+    return tpl ? this.template(tpl, { key, commentId }) : this.issueUrl(key);
+  }
+
+  /** The link to one document comment; `commentId` may be the adapter's `<docId>:<id>` form. */
+  docCommentUrl(id: string, commentId: string): string {
+    const tpl = this.conn.doc_comment_url;
+    return tpl
+      ? this.template(tpl, { id, commentId: commentId.split(":").at(-1)! })
+      : this.docUrl(id);
+  }
+
   private template(tpl: string, vars: Record<string, string>): string {
     const all: Record<string, string> = {
       url: this.conn.url.replace(/\/+$/, ""),

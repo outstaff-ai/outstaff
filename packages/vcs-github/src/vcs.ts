@@ -823,10 +823,13 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
 
     async commentOnPullRequest(repo, number, body) {
       const { token } = await actingToken(repo, "write", PERMISSIONS.write);
-      await http.request("POST", `${repoPath(repo)}/issues/${number}/comments`, {
-        token,
-        body: { body },
-      });
+      const made = await http.request<{ html_url?: string }>(
+        "POST",
+        `${repoPath(repo)}/issues/${number}/comments`,
+        { token, body: { body } },
+      );
+
+      return { url: made.data?.html_url ?? links.pr(repo, number) };
     },
 
     async react(repo, target, reaction) {

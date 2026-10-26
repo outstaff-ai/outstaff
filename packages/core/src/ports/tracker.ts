@@ -64,7 +64,7 @@ export interface NewAttachment {
 }
 
 export interface Tracker {
-  links: Pick<Links, "issue">;
+  links: Pick<Links, "issue" | "comment">;
 
   /**
    * True when an `@name` in a comment mentions (and notifies) a user of the tracker. Agents' comments are then

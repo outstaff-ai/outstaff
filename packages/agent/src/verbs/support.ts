@@ -1,14 +1,24 @@
 import {
   PortError,
+  createTicketLinker,
   parseRepoUrl,
   type Knowledge,
   type PortName,
   type RepoRef,
+  type TicketLinker,
   type Tracker,
   type Vcs,
 } from "@outstaff/core";
 import type { Filed, OfficeClient } from "./office.js";
 import type { AgentEnv } from "./types.js";
+
+/** The one formatter outgoing text goes through: ticket keys linked, links on the tracker's or knowledge host guarded. */
+export function ticketLinker(env: AgentEnv): TicketLinker {
+  return createTicketLinker(env.team, env.tracker, {
+    knowledge: env.knowledge,
+    flag: (message) => env.log?.warn(message),
+  });
+}
 
 function need<T>(env: AgentEnv, port: PortName, impl: T | undefined, label: string): T {
   if (impl !== undefined) {

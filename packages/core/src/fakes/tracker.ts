@@ -73,7 +73,11 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
     return m;
   };
 
-  const links = { issue: (key: string) => `${base}/issue/${encodeURIComponent(key)}` };
+  const links = {
+    issue: (key: string) => `${base}/issue/${encodeURIComponent(key)}`,
+    comment: (key: string, id: string) =>
+      `${base}/issue/${encodeURIComponent(key)}#comment-${encodeURIComponent(id)}`,
+  };
 
   const tracker: FakeTracker = {
     links,
@@ -196,7 +200,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
         id,
         author: actor,
         body,
-        url: `${links.issue(key)}#comment-${id}`,
+        url: links.comment(key, id),
         at: now().toISOString(),
       });
 

@@ -183,7 +183,10 @@ function buildKnowledge(api: Itsaplan, now: () => Date): Knowledge {
   };
 
   return {
-    links: { doc: (id) => api.docUrl(id) },
+    links: {
+      doc: (id) => api.docUrl(id),
+      comment: (docId, id) => api.docCommentUrl(docId, id),
+    },
 
     async get(idOrPath) {
       return full(await idOf(idOrPath));

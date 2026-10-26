@@ -507,6 +507,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
       conversation.set(commentId, key(repo));
       noteComment(repo, number, commentId, self, body);
       emit("pr.comment", repo, number, self, { kind: "comment", body, commentId });
+      return { url: `${links.pr(repo, number)}#issuecomment-${commentId}` };
     },
     async react(repo, target, reaction) {
       grant(repo, "write");
