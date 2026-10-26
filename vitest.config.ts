@@ -42,7 +42,7 @@ const integrations = [
 // Coverage is measured on the integrations, the code that talks to outside services. Each one has its own
 // floor, raised to 100 as its tests are completed (#364). Test kits shipped for other packages are not measured.
 const floors: Record<string, number> = {
-  "vcs/github": 86,
+  "vcs/github": 100,
   "runtime/claude": 85,
   "chat/slack": 84,
   "tracker/itsaplan": 85,

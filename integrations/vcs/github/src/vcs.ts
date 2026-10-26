@@ -550,7 +550,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
         if (e instanceof PortError && e.code === "forbidden") {
           throw new PortError(
             "forbidden",
-            `GitHub refused the logs of job ${logId}: ${self ?? "this person"}'s GitHub App needs the Actions: read permission on the installation (run \`ost doctor\`). ${e.message}`,
+            `GitHub refused the logs of job ${logId}: ${self}'s GitHub App needs the Actions: read permission on the installation (run \`ost doctor\`). ${e.message}`,
             { cause: e },
           );
         }
