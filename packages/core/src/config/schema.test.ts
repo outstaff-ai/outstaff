@@ -137,6 +137,7 @@ describe("parseTeamConfig", () => {
       hand_back: { reassign: "requester", fallback: "first_human" },
       tickets: { prs_per_ticket: "one" },
       conflicts: { follow_up: true },
+      merge: { on_approval: false, approvers: ["humans"] },
       retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
       chat: { parallel_sessions: 2, profile: true },
@@ -167,13 +168,43 @@ describe("parseTeamConfig", () => {
       }),
     ]);
 
-    expect(bad((c) => (c.policies = { merge: { on_approval: true } }))).toEqual([
-      expect.objectContaining({ path: ["policies", "merge"], code: "schema.unknown_key" }),
+    expect(bad((c) => (c.policies = { review: { on_approval: true } }))).toEqual([
+      expect.objectContaining({ path: ["policies", "review"], code: "schema.unknown_key" }),
     ]);
 
     expect(bad((c) => (c.policies = { hand_back: { reassign: "everyone" } }))[0]).toMatchObject({
       path: ["policies", "hand_back", "reassign"],
     });
+  });
+
+  it("accepts policies.merge and rejects a bad approver, method or repo", () => {
+    const ok = parseTeamConfig({
+      ...valid(),
+      policies: {
+        merge: {
+          on_approval: true,
+          approvers: ["humans", "human:ada", "role:reviewer", "acme-rex"],
+          method: "squash",
+          repos: ["app"],
+        },
+      },
+    });
+
+    expect(ok.ok).toBe(true);
+    expect(bad((c) => (c.policies = { merge: { approvers: ["role:Bad Role"] } }))[0]).toMatchObject(
+      { path: ["policies", "merge", "approvers", 0] },
+    );
+
+    expect(bad((c) => (c.policies = { merge: { method: "rebase" } }))[0]).toMatchObject({
+      path: ["policies", "merge", "method"],
+    });
+
+    expect(bad((c) => (c.policies = { merge: { repos: ["nope"] } }))).toEqual([
+      expect.objectContaining({
+        path: ["policies", "merge", "repos", 0],
+        code: "policies.merge_unknown_repo",
+      }),
+    ]);
   });
 
   it("reports wrong types with the exact path", () => {

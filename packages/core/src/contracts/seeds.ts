@@ -63,6 +63,19 @@ export interface VcsSeed {
     comments?: { path: string; line: number; body: string }[],
   ): Promise<string>;
 
+  /**
+   * Ask a person for a review (they are then in `requestedReviewers` until they review). Only for subjects that
+   * support merging; the kit skips the merge cases when unset.
+   */
+  requestReview?(repo: RepoRef, number: number, login: string): Promise<void>;
+
+  /** Mark a check as required for merging (by name), or set how the repository merges. Merge cases only. */
+  requireCheck?(repo: RepoRef, number: number, name: string): Promise<void>;
+  mergeSettings?(
+    repo: RepoRef,
+    o: { queue?: boolean; methods?: ("merge" | "squash")[] },
+  ): Promise<void>;
+
   /** A comment on the pull request conversation. Resolves to the comment id. */
   comment(repo: RepoRef, number: number, actor: string, body: string): Promise<string>;
 

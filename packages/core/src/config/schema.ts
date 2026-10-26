@@ -254,6 +254,9 @@ const workflowSchema = z
   })
   .meta(d("How work moves through the team."));
 
+/** `humans`, `human:<id>`, `role:<role>` or an agent or login handle. */
+const APPROVER = /^(humans|human:\S+|role:[a-z][a-z0-9-]*|[A-Za-z0-9][A-Za-z0-9._[\]-]*)$/;
+
 const policiesSchema = z
   .strictObject({
     agent_loop_guard: z
@@ -467,6 +470,45 @@ const policiesSchema = z
           "How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.",
         ),
       ),
+    merge: z
+      .strictObject({
+        on_approval: z
+          .boolean()
+          .default(false)
+          .meta(
+            d(
+              "Let an agent merge its own pull request, with ost pr merge, when an allowed approver approves it. Off by default: without it the verb refuses and nothing is scheduled. Adds the preset rules approved-merge and approved-merge-after-feedback. Needs a vcs adapter with vcs.merge. It never bypasses branch protection or rulesets; the code host stays the final gate.",
+            ),
+          ),
+        approvers: z
+          .array(z.string().regex(APPROVER, "Use humans, human:<id>, role:<role> or a handle."))
+          .min(1)
+          .default(["humans"])
+          .meta(
+            d(
+              "Who may approve a merge: humans (the people in humans, or anyone with write access when humans is omitted), human:<id> (one human, by vcs identity), role:<role> (the agent playing a catalog role) or a handle (an agent, or a human by vcs login). Default humans.",
+            ),
+          ),
+        method: z
+          .enum(["queue", "merge", "squash"])
+          .optional()
+          .meta(
+            d(
+              "How the pull request is merged: queue (the host's merge queue), merge or squash. When omitted, outstaff uses what the repository has: its merge queue, else a method its settings allow.",
+            ),
+          ),
+        repos: z
+          .array(z.string().min(1))
+          .min(1)
+          .optional()
+          .meta(
+            d(
+              "Names of the repos (from repos) whose pull requests may be merged this way. Default: every repo an agent can write to.",
+            ),
+          ),
+      })
+      .default({ on_approval: false, approvers: ["humans"] })
+      .meta(d("Merging an agent's pull request when an allowed approver approves it (opt-in).")),
     messages: z
       .strictObject({
         max_lines: z
@@ -660,6 +702,18 @@ export const teamConfigSchema = z
         ctx.addIssue(customIssue(i.code, i.message, i.path));
       }
     }
+
+    cfg.policies?.merge.repos?.forEach((name, n) => {
+      if (!seenRepos.has(name)) {
+        ctx.addIssue(
+          customIssue(
+            CONFIG_CODES.mergeUnknownRepo,
+            `policies.merge.repos refers to unknown repo "${name}".`,
+            ["policies", "merge", "repos", n],
+          ),
+        );
+      }
+    });
 
     const handles = new Set(cfg.people.map((p) => p.handle));
     const grouped = new Set<string>();

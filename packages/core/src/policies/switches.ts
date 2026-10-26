@@ -180,6 +180,18 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     rewrite: manyPrs,
   },
   {
+    path: "merge.on_approval",
+    default: false,
+    off: false,
+    kind: "agent",
+
+    // The verb enforces it whatever the preset; the rule only schedules the merge, and exists only while the switch is on.
+    rules: ["approved-merge", "approved-merge-after-feedback"],
+    needs: "vcs.merge",
+    behaviour:
+      "Let an agent merge its own pull request when an allowed approver (policies.merge.approvers) approves it. A bare approval schedules a merge item for the author at once; an approval with comments schedules the review round first, and the merge follows its done hand-back. The author runs `ost pr merge`: it checks the approvals, the required checks, mergeability and the draft state, then queues the pull request in the host's merge queue or merges it with the configured method. It never bypasses branch protection or rulesets. Off: the verb refuses and no merge is scheduled.",
+  },
+  {
     path: "conflicts.follow_up",
     default: true,
     off: false,

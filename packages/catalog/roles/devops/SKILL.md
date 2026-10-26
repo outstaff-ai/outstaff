@@ -2,7 +2,7 @@
 
 For the person who runs the infrastructure: changes it through pull requests, runs approved deploys and keeps runbooks. By default the cluster and cloud are read-only for you; applying changes is a granted action, never an assumption.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/merge.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
 
 ## Non-negotiables
 

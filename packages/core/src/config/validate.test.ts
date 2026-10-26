@@ -28,7 +28,12 @@ const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
     ["reviewer", { needs: [] }],
   ]),
   adapters: new Map([
-    adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
+    adapter("vcs", "github", [
+      "vcs.pullRequests",
+      "vcs.reviewThreads",
+      "vcs.reactions",
+      "vcs.merge",
+    ]),
     adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
     adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
     adapter("knowledge", "notion", ["knowledge.docs"]),
@@ -214,6 +219,53 @@ describe("validateTeam", () => {
 
     const off = config((x) => (x.policies = { chat: { profile: false } }));
     expect(validateTeam(off, plain).warnings).toEqual([]);
+  });
+
+  it("warns when merging on approval is on for a repo with no checks, or an adapter that cannot merge", () => {
+    const on = (extra: Record<string, unknown> = {}) =>
+      config((x) => (x.policies = { merge: { on_approval: true, ...extra } }));
+
+    expect(validateTeam(on(), ctx()).warnings).toEqual([
+      expect.objectContaining({
+        path: ["repos", 0, "checks"],
+        code: "policies.merge_without_checks",
+      }),
+    ]);
+
+    const withChecks = config((x) => {
+      x.policies = { merge: { on_approval: true } };
+      x.repos[0].checks = ["pnpm lint"];
+    });
+
+    expect(validateTeam(withChecks, ctx()).warnings).toEqual([]);
+    expect(validateTeam(config(), ctx()).warnings).toEqual([]);
+
+    const other = config((x) => {
+      x.repos.push({ name: "docs", url: "github.com/acme/docs", kind: "other" });
+      x.policies = { merge: { on_approval: true, repos: ["docs"] } };
+      x.repos[0].checks = ["pnpm lint"];
+    });
+
+    expect(validateTeam(other, ctx()).warnings).toEqual([
+      expect.objectContaining({ path: ["repos", 1, "checks"] }),
+    ]);
+
+    const noMerge = ctx({
+      adapters: new Map([
+        adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
+        adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
+        adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+        adapter("knowledge", "notion", ["knowledge.docs"]),
+        adapter("tracker", "linear", ["tracker.issues"]),
+      ]),
+    });
+
+    expect(validateTeam(withChecks, noMerge).warnings).toEqual([
+      expect.objectContaining({
+        path: ["policies", "merge", "on_approval"],
+        code: "policies.capability_missing",
+      }),
+    ]);
   });
 
   it("warns about missing optional capabilities", () => {

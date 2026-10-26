@@ -18,6 +18,7 @@ export const CONFIG_CODES = {
   retryBackoffOrder: "policies.retry_backoff_order",
   usageSharedUnknownPerson: "policies.usage_shared_unknown_person",
   usageSharedOverlap: "policies.usage_shared_overlap",
+  mergeUnknownRepo: "policies.merge_unknown_repo",
   toolsInvalidVersion: "tools.invalid_version",
   toolsDuplicate: "tools.duplicate",
   toolsRuleProgram: "tools.rule_program",

@@ -16,6 +16,8 @@ interface Pr {
   draft: boolean;
   mergeable: PullRequest["mergeable"][];
   updatedAt: string;
+  requested?: Set<string>;
+  required?: Set<string>;
 }
 
 interface Thread {
@@ -33,6 +35,7 @@ interface StoredReview {
   state: string;
   body: string;
   at: string;
+  commitId: string;
   comments: { databaseId: number; path: string; line: number; body: string }[];
 }
 
@@ -90,6 +93,10 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
   const threads = new Map<string, Thread>();
   const reviews = new Map<number, StoredReview>();
   const perms = new Map<string, VcsPermission>();
+  let mergeSettings: { queue: boolean; methods: string[] } = {
+    queue: false,
+    methods: ["merge", "squash"],
+  };
 
   // Conversation comment ids, and the reactions on a comment (`<endpoint>:<id>` -> `<login>:<content>`).
   const issueComments = new Map<
@@ -140,6 +147,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
       merged: pr.merged,
       merged_at: pr.merged ? pr.updatedAt : null,
       draft: pr.draft,
+      requested_reviewers: [...(pr.requested ?? [])].map((login) => ({ login })),
       updated_at: pr.updatedAt,
       mergeable:
         pr.state !== "open"
@@ -203,9 +211,11 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
       state,
       body,
       at: clockIso(),
+      commitId: prs.get(prNumber)?.head.sha ?? "",
       comments: [],
     };
 
+    prs.get(prNumber)?.requested?.delete(actor);
     reviews.set(id, stored);
     for (const c of inline) {
       const threadId = `PRRT_${++thread}`;
@@ -298,8 +308,60 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     {
       method: "GET",
       path: `/repos/${repo.owner}/${repo.name}`,
-      handler: () => ({ default_branch: "main" }),
+      handler: () => ({
+        default_branch: "main",
+        allow_merge_commit: mergeSettings.methods.includes("merge"),
+        allow_squash_merge: mergeSettings.methods.includes("squash"),
+      }),
     },
+    ...(["merge", "merge-async"] as const).map((kind): Route => ({
+      method: "PUT",
+      path: `/repos/${repo.owner}/${repo.name}/pulls/:n/${kind}`,
+      handler: (r) => {
+        const pr = prs.get(Number(r.params["n"]));
+        if (!pr) {
+          return { status: 404, body: { message: "Not Found" } };
+        }
+
+        if (pr.state !== "open") {
+          return { status: 405, body: { message: "Pull Request is not mergeable" } };
+        }
+
+        if (r.json.sha !== pr.head.sha) {
+          return {
+            status: 409,
+            body: { message: "Head branch was modified. Review and try the merge again." },
+          };
+        }
+
+        const queue = kind === "merge-async";
+        const allowed = queue
+          ? r.json.merge_action === "merge_queue" && mergeSettings.queue
+          : mergeSettings.methods.includes(r.json.merge_method);
+
+        if (!allowed) {
+          return { status: 405, body: { message: "Merge method not allowed" } };
+        }
+
+        const open = (checks.get(pr.head.sha) ?? []).filter(
+          (c) =>
+            pr.required?.has(c.name) && (c.status !== "completed" || c.conclusion !== "success"),
+        );
+
+        if (pr.draft || open.length > 0 || pr.mergeable[0] === "conflicting") {
+          return { status: 405, body: { message: "Required status check is expected." } };
+        }
+
+        if (queue) {
+          return { status: 202, body: { status: "enqueued" } };
+        }
+
+        Object.assign(pr, { state: "closed", merged: true });
+        touch(pr);
+        emit("PullRequestEvent", actorOf(r), prPayload(pr, "closed"));
+        return { merged: true, sha: pr.head.sha };
+      },
+    })),
     {
       method: "POST",
       path: `/repos/${repo.owner}/${repo.name}/pulls`,
@@ -455,6 +517,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
             body: v.body,
             state: v.state,
             submitted_at: v.at,
+            commit_id: v.commitId,
             html_url: `https://github.example/${repo.owner}/${repo.name}/pull/${n}#pullrequestreview-${id}`,
           }));
       },
@@ -597,6 +660,44 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
           return { data: { pullRequest: { id: variables["id"], isDraft: pr?.draft ?? false } } };
         }
 
+        if (query.includes("statusCheckRollup")) {
+          const pr = prs.get(variables["number"]);
+          const nodes = (pr ? (checks.get(pr.head.sha) ?? []) : []).map((c) => ({
+            __typename: "CheckRun",
+            name: c.name,
+            status: c.status.toUpperCase(),
+            conclusion: c.conclusion?.toUpperCase() ?? null,
+            detailsUrl: null,
+            isRequired: pr?.required?.has(c.name) ?? false,
+          }));
+
+          return {
+            data: {
+              repository: {
+                pullRequest: {
+                  commits: {
+                    nodes: [
+                      {
+                        commit: {
+                          statusCheckRollup: {
+                            contexts: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          };
+        }
+
+        if (query.includes("mergeQueue(")) {
+          return {
+            data: { repository: { mergeQueue: mergeSettings.queue ? { id: "MQ_1" } : null } },
+          };
+        }
+
         if (query.startsWith("mutation")) {
           const t = threads.get(variables["id"]);
           if (t) {
@@ -677,6 +778,20 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     },
     async review(_repo, number, actor, state, body = "", comments = []) {
       return String(submitReview(number, actor, state.toUpperCase(), body, comments));
+    },
+    async requestReview(_repo, number, login) {
+      const pr = need(number);
+      pr.requested = (pr.requested ?? new Set()).add(login);
+    },
+    async requireCheck(_repo, number, name) {
+      const pr = need(number);
+      pr.required = (pr.required ?? new Set()).add(name);
+    },
+    async mergeSettings(_repo, o) {
+      mergeSettings = {
+        queue: o.queue ?? mergeSettings.queue,
+        methods: o.methods ?? mergeSettings.methods,
+      };
     },
     async comment(_repo, number, actor, body) {
       const id = ++commentCounter;

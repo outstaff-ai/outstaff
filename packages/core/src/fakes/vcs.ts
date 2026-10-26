@@ -3,6 +3,8 @@ import { PortError, repoKey } from "../ports/index.js";
 import type {
   Check,
   CheckLog,
+  MergeOptions,
+  PullRequestReview,
   ConversationEntry,
   PullRequest,
   ReactionTarget,
@@ -37,6 +39,9 @@ interface StoredPr {
   threads: ReviewThread[];
   reviews: Map<string, ReviewInlineComment[]>;
   conversation: ConversationEntry[];
+  reviewList: PullRequestReview[];
+  requested: Set<string>;
+  required: Set<string>;
 }
 
 export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
@@ -127,6 +132,15 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
   };
 
   const defaultBranch = "main";
+  const mergeSettings = new Map<string, MergeOptions>();
+  const settingsOf = (repo: RepoRef): MergeOptions =>
+    mergeSettings.get(key(repo)) ?? { queue: false, methods: ["merge", "squash"] };
+
+  /** Records a submitted review: it answers a request for that reviewer and is listed for `reviewState`. */
+  const record = (s: StoredPr, id: string, author: string, state: PullRequestReview["state"]) => {
+    s.requested.delete(author);
+    s.reviewList.push({ id, author, state, at: now().toISOString(), commitSha: s.pr.head.sha });
+  };
 
   const grant = (repo: RepoRef, level: "write" | "read") => {
     const have = perms.get(`${key(repo)}:${self}`) ?? "none";
@@ -168,6 +182,9 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
           threads: [],
           reviews: new Map(),
           conversation: [],
+          reviewList: [],
+          requested: new Set(),
+          required: new Set(),
         });
 
         emit("pr.opened", repo, number, pr.author.login);
@@ -228,6 +245,7 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         }
 
         s.reviews.set(reviewId, inline);
+        record(s, reviewId, actor, state);
         if (state !== "commented" || body.trim()) {
           s.conversation.push({
             id: `review-${reviewId}`,
@@ -242,6 +260,15 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
 
         emit("pr.review_submitted", repo, number, actor, { state, body, reviewId });
         return reviewId;
+      },
+      async requestReview(repo, number, login) {
+        need(repo, number).requested.add(login);
+      },
+      async requireCheck(repo, number, name) {
+        need(repo, number).required.add(name);
+      },
+      async mergeSettings(repo, o) {
+        mergeSettings.set(key(repo), { ...settingsOf(repo), ...o });
       },
       async comment(repo, number, actor, body) {
         need(repo, number);
@@ -426,6 +453,9 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         threads: [],
         reviews: new Map(),
         conversation: [],
+        reviewList: [],
+        requested: new Set(),
+        required: new Set(),
       });
 
       emit("pr.opened", repo, number, self, { title: pr.title });
@@ -460,11 +490,13 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         throw new PortError("forbidden", `${self} cannot review their own pull request.`);
       }
 
-      const state = {
-        approve: "approved",
-        request_changes: "changes_requested",
-        comment: "commented",
-      }[review.verdict];
+      const state = (
+        {
+          approve: "approved",
+          request_changes: "changes_requested",
+          comment: "commented",
+        } as const
+      )[review.verdict];
 
       for (const c of review.comments ?? []) {
         s.threads.push({
@@ -488,7 +520,60 @@ export function createFakeVcs(opts: FakeVcsOptions = {}): FakeVcs {
         });
       }
 
+      record(s, `rv${++reviewCounter}`, self, state);
       emit("pr.review_submitted", repo, number, self, { state, body: review.body });
+    },
+    async reviewState(repo, number) {
+      const s = need(repo, number);
+      return structuredClone({
+        reviews: s.reviewList,
+        requestedReviewers: [...s.requested],
+      });
+    },
+    async requiredChecks(repo, number) {
+      const s = need(repo, number);
+      const reported = checks.get(`${key(repo)}@${s.pr.head.sha}`) ?? [];
+      return structuredClone(reported.filter((c) => s.required.has(c.name)));
+    },
+    async mergeOptions(repo) {
+      return structuredClone(settingsOf(repo));
+    },
+    async mergePullRequest(repo, number, input) {
+      grant(repo, "write");
+      const s = need(repo, number);
+      if (s.pr.state !== "open") {
+        throw new PortError("invalid", `${key(repo)}#${number} is ${s.pr.state}, not open.`);
+      }
+
+      if (input.sha !== s.pr.head.sha) {
+        throw new PortError(
+          "conflict",
+          `The head of ${key(repo)}#${number} moved since it was checked.`,
+        );
+      }
+
+      const options = settingsOf(repo);
+      if (input.method === "queue" ? !options.queue : !options.methods.includes(input.method)) {
+        throw new PortError("invalid", `${key(repo)} does not allow merging by ${input.method}.`);
+      }
+
+      const failing = (checks.get(`${key(repo)}@${s.pr.head.sha}`) ?? []).filter(
+        (c) => s.required.has(c.name) && c.status !== "success" && c.status !== "neutral",
+      );
+
+      if (s.pr.draft || failing.length > 0 || s.pr.mergeable === "conflicting") {
+        throw new PortError("invalid", `The host refuses to merge ${key(repo)}#${number}.`);
+      }
+
+      if (input.method === "queue") {
+        touch(s);
+        return { outcome: "queued" };
+      }
+
+      s.pr.state = "merged";
+      touch(s);
+      emit("pr.merged", repo, number, self);
+      return { outcome: "merged" };
     },
     async replyToThread(repo, number, threadId, body) {
       grant(repo, "write");

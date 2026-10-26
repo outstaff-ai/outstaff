@@ -11,7 +11,8 @@ import { createStatusMap } from "./status-map.js";
 import { renderTemplate, TemplateError } from "./template.js";
 import type { Rule } from "./rules.js";
 
-const kanban = presetRules("kanban");
+/** The preset as a team gets it by default: approved-merge exists only while policies.merge.on_approval is on. */
+const kanban = presetRules("kanban").filter((r) => !r.id.startsWith("approved-merge"));
 
 const baseConfig = () => ({
   version: 1,
@@ -589,7 +590,7 @@ describe("scrum and minimal presets", () => {
 
   it("scrum keeps the other kanban rules", () => {
     const scrum = presetRules("scrum");
-    expect(scrum.map((r) => r.id)).toEqual(kanban.map((r) => r.id));
+    expect(scrum.map((r) => r.id)).toEqual(presetRules("kanban").map((r) => r.id));
     expect(run(ev("pr.merged"), world(), scrum)).toEqual([
       { type: "move", ticket: "ACME-1", to: "done" },
     ]);
@@ -1208,5 +1209,189 @@ describe("comments on documents and tickets", () => {
       ["ticket-comment-to-assignee", "feedback.ticket_comments", "removed"],
       ["ticket-comment-reactivates-ticket", "feedback.ticket_comments", "removed"],
     ]);
+  });
+});
+
+describe("approved-merge (policies.merge.on_approval)", () => {
+  const rulesWith = (
+    merge?: Record<string, unknown>,
+    preset?: string,
+  ): ReturnType<typeof resolveWorkflow> => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      ...(preset ? { workflow: { preset } } : {}),
+      ...(merge ? { policies: { merge } } : {}),
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    return resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+  };
+
+  const on = rulesWith({ on_approval: true });
+  const approved = (over: Partial<ReturnType<typeof ev>> = {}, body = "") =>
+    ev("pr.review_submitted", { data: { state: "approved", body }, ...over });
+
+  const mergeSchedule = {
+    type: "schedule",
+    person: "ada",
+    kind: "merge",
+    priority: "high",
+    ticket: "ACME-1",
+    pr: ref(10),
+  };
+
+  const merges = (
+    w: ReturnType<typeof resolveWorkflow>,
+    e: ReturnType<typeof ev>,
+    state = world(),
+  ) =>
+    evaluateWorkflow(e, state, w.rules, w.options).filter(
+      (x) => x.type === "schedule" && x.kind === "merge",
+    );
+
+  it("is off by default: no rule, nothing scheduled, no switched entry", () => {
+    const off = rulesWith();
+    expect(off.rules.some((r) => r.id === "approved-merge")).toBe(false);
+    expect(off.switched).toEqual([]);
+    expect(merges(off, approved())).toEqual([]);
+    expect(merges(rulesWith({ on_approval: false }), approved())).toEqual([]);
+  });
+
+  it("schedules a merge for the author when an allowed approver approves an open agent pull request", () => {
+    expect(merges(on, approved())).toEqual([mergeSchedule]);
+  });
+
+  it("an approval that carries comments schedules only the review round, not the merge", () => {
+    const withBody = approved({}, "Ship it, but rename the flag.");
+    expect(merges(on, withBody)).toEqual([]);
+    expect(run(withBody, world(), on.rules).filter((e) => e.type === "schedule")).toEqual([
+      feedbackSchedule("ACME-1"),
+    ]);
+
+    const inline = ev("pr.review_submitted", {
+      data: { state: "approved", body: "", comments: [{ path: "a.ts", line: 1, body: "nit" }] },
+    });
+
+    expect(merges(on, inline)).toEqual([]);
+  });
+
+  describe("after the round on an approval's comments", () => {
+    const verdict = (actor: string, state: "approved" | "changes_requested" | "dismissed") => ({
+      actor,
+      kind: "human" as const,
+      state,
+    });
+
+    const handBack = (kind = "review_feedback", status = "done") =>
+      ev("agent.handed_back", { actor: agent, data: { kind, status } });
+
+    const withVerdicts = (...verdicts: ReturnType<typeof verdict>[]) =>
+      world({ prs: [pr(10, { verdicts })] });
+
+    it("schedules the merge when the round is done and an allowed approver's approval stands", () => {
+      expect(merges(on, handBack(), withVerdicts(verdict("grace", "approved")))).toEqual([
+        mergeSchedule,
+      ]);
+    });
+
+    it("waits for a verdict, and stops at changes requested or a dismissed approval", () => {
+      expect(merges(on, handBack(), world())).toEqual([]);
+      expect(merges(on, handBack(), withVerdicts(verdict("grace", "changes_requested")))).toEqual(
+        [],
+      );
+
+      expect(merges(on, handBack(), withVerdicts(verdict("grace", "dismissed")))).toEqual([]);
+      expect(
+        merges(
+          on,
+          handBack(),
+          withVerdicts(verdict("grace", "approved"), verdict("ada-admin", "changes_requested")),
+        ),
+      ).toEqual([]);
+    });
+
+    it("counts only allowed approvers", () => {
+      const only = rulesWith({ on_approval: true, approvers: ["human:linus"] });
+      expect(merges(only, handBack(), withVerdicts(verdict("grace", "approved")))).toEqual([]);
+      expect(merges(only, handBack(), withVerdicts(verdict("linus", "approved")))).toHaveLength(1);
+    });
+
+    it("only for a done review round on an open agent pull request", () => {
+      const approvedState = withVerdicts(verdict("grace", "approved"));
+      expect(merges(on, handBack("review_feedback", "waiting"), approvedState)).toEqual([]);
+      expect(merges(on, handBack("review_feedback", "blocked"), approvedState)).toEqual([]);
+      expect(merges(on, handBack("assigned"), approvedState)).toEqual([]);
+      const closed = world({
+        prs: [pr(10, { state: "closed", verdicts: [verdict("grace", "approved")] })],
+      });
+
+      expect(merges(on, handBack(), closed)).toEqual([]);
+    });
+
+    it("is off with the switch", () => {
+      expect(merges(rulesWith(), handBack(), withVerdicts(verdict("grace", "approved")))).toEqual(
+        [],
+      );
+    });
+  });
+
+  it("is in every preset", () => {
+    for (const preset of ["kanban", "scrum", "minimal"]) {
+      expect(merges(rulesWith({ on_approval: true }, preset), approved())).toHaveLength(1);
+    }
+  });
+
+  it("ignores other review states, human-authored, closed and merged pull requests, and agent actors", () => {
+    const state = (over: Partial<ReturnType<typeof pr>>) => world({ prs: [pr(10, over)] });
+    expect(merges(on, ev("pr.review_submitted", { data: { state: "changes_requested" } }))).toEqual(
+      [],
+    );
+
+    expect(
+      merges(on, ev("pr.review_submitted", { data: { state: "commented", body: "hm" } })),
+    ).toEqual([]);
+
+    expect(merges(on, approved(), state({ author: { login: "grace", kind: "human" } }))).toEqual(
+      [],
+    );
+
+    expect(merges(on, approved(), state({ state: "closed" }))).toEqual([]);
+    expect(merges(on, approved(), state({ state: "merged" }))).toEqual([]);
+    expect(merges(on, approved({ actor: agent }))).toEqual([]);
+    expect(merges(on, approved({ actor: automation }))).toEqual([]);
+    expect(merges(on, ev("pr.comment"))).toEqual([]);
+  });
+
+  it("ignores a disallowed approver", () => {
+    const only = rulesWith({ on_approval: true, approvers: ["human:linus"] });
+    expect(merges(only, approved())).toEqual([]);
+    expect(merges(only, approved({ actor: { kind: "human", id: "linus" } }))).toHaveLength(1);
+  });
+
+  it("accepts an agent by handle or role", () => {
+    const byHandle = rulesWith({ on_approval: true, approvers: ["rex"] });
+    expect(merges(byHandle, approved({ actor: { kind: "agent", id: "rex" } }))).toHaveLength(1);
+    expect(merges(byHandle, approved({ actor: { kind: "agent", id: "ada" } }))).toEqual([]);
+    const byRole = rulesWith({ on_approval: true, approvers: ["role:reviewer"] });
+    expect(merges(byRole, approved({ actor: { kind: "agent", id: "rex" } }))).toHaveLength(1);
+    expect(merges(byRole, approved())).toEqual([]);
+  });
+
+  it("an explicit workflow.rules entry wins over the switch", () => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      workflow: { rules: [{ id: "approved-merge", disabled: true }] },
+      policies: { merge: { on_approval: true } },
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    const w = resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+    expect(merges(w, approved())).toEqual([]);
   });
 });

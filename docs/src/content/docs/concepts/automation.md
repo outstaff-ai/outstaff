@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-Outstaff acts without being asked in a few places: it reacts to messages, starts follow-up rounds, hands tickets back and retries stuck work. Each of these has a named switch under `policies` in `.outstaff/team.yaml`. Everything that happens today is on by default; a team that wants less turns a switch off. Anything that would merge, approve or act without a human in the loop will be off until a team opts in.
+Outstaff acts without being asked in a few places: it reacts to messages, starts follow-up rounds, hands tickets back and retries stuck work. Each of these has a named switch under `policies` in `.outstaff/team.yaml`. Everything that happens today is on by default; a team that wants less turns a switch off. Anything that merges, approves or acts without a human in the loop is off until a team opts in.
 
 ```yaml
 policies:
@@ -15,6 +15,7 @@ policies:
   feedback: { follow_up_round: true, merged_prs: true, doc_comments: true, ticket_comments: true }
   hand_back: { reassign: requester, fallback: first_human }
   tickets: { prs_per_ticket: one }
+  merge: { on_approval: false }
   conflicts: { follow_up: true }
   retry: { on_signal: true }
 ```
@@ -36,6 +37,7 @@ Run `ost policies` to see every switch with its effective value and where the va
 | `policies.hand_back.reassign`       | `requester`   | When an agent hands work back, moves the ticket to review (done) or to blocked and tells the person who asked (blocked), and assigns it to them. A waiting hand-back changes nothing. With `none` the ticket still moves and keeps its assignee.                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `policies.hand_back.fallback`       | `first_human` | When a ticket has no known requester, uses the first human in `humans`. With `none`, a rule that needs a requester is skipped when the ticket has none.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `policies.tickets.prs_per_ticket`   | `one`         | Keeps a ticket to one pull request, because the ticket moves to done when its pull request merges. `ost pr open` refuses a second pull request for a ticket that already has one (open or merged), names it and points to `ost ticket create --parent <ticket>`, which splits the work into sub-tickets, one pull request each. A second pull request a person opens is not refused: the office comments on the ticket that it now has two and that the first to merge closes it. With `many`, several pull requests are allowed and the ticket moves to done only when the agent hands its work back as `done` and every pull request linked to it is closed with at least one merged; a merge alone does not close it. |
+| `policies.merge.on_approval`        | `false`       | Lets an agent merge its own pull request when an allowed approver approves it. The approval schedules a merge item for the author, who runs `ost pr merge`; the code checks the approvals, the required checks, mergeability and the draft state first, then queues the pull request in the host's merge queue or merges it. Off by default: the verb refuses and nothing is scheduled. Needs a vcs adapter with `vcs.merge`; `ost validate` warns when it lacks it, and when a repository has no `checks`. See [Merging on approval](#merging-on-approval).                                                                                                                                                             |
 | `policies.conflicts.follow_up`      | `true`        | When a pull request starts to conflict with its base, for example after another one merged, sends it back to its agent author to rebase.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `policies.retry.on_signal`          | `true`        | Retries a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
 
@@ -43,7 +45,9 @@ Run `ost policies` to see every switch with its effective value and where the va
 
 ## Switches and workflow rules
 
-Six switches act on preset [workflow](/reference/team-yaml/#workflow) rules: `feedback.merged_prs` removes `merged-feedback-follow-up`, `feedback.doc_comments` removes `doc-feedback-to-author`, `feedback.ticket_comments` removes `ticket-comment-to-assignee` and `ticket-comment-reactivates-ticket`, `conflicts.follow_up` removes `conflict-back-to-author`, `hand_back.reassign: none` drops the assignment from `hand-back-to-requester` and `hand-back-blocked-to-requester`, and `tickets.prs_per_ticket: many` edits `pr-merged-done`, `pr-closed-ready`, `hand-back-to-requester` and `second-pr-comment` so that a ticket is done when the agent has handed it back as done and its pull requests are all closed with one merged (conditions `ticket_prs_all_closed`, `ticket_prs_open`, `ticket_handed_back` and `ticket_prs_several`). `tickets.prs_per_ticket` is also enforced by `ost pr open`, whatever the preset, so it is not shown as off for the `minimal` preset. The others are carried out by the agent or the office and have no rule behind them.
+Several switches act on preset [workflow](/reference/team-yaml/#workflow) rules: `feedback.merged_prs` removes `merged-feedback-follow-up`, `feedback.doc_comments` removes `doc-feedback-to-author`, `feedback.ticket_comments` removes `ticket-comment-to-assignee` and `ticket-comment-reactivates-ticket`, `conflicts.follow_up` removes `conflict-back-to-author`, `hand_back.reassign: none` drops the assignment from `hand-back-to-requester` and `hand-back-blocked-to-requester`, and `tickets.prs_per_ticket: many` edits `pr-merged-done`, `pr-closed-ready`, `hand-back-to-requester` and `second-pr-comment` so that a ticket is done when the agent has handed it back as done and its pull requests are all closed with one merged (conditions `ticket_prs_all_closed`, `ticket_prs_open`, `ticket_handed_back` and `ticket_prs_several`). `tickets.prs_per_ticket` is also enforced by `ost pr open`, whatever the preset, so it is not shown as off for the `minimal` preset. The others are carried out by the agent or the office and have no rule behind them.
+
+`merge.on_approval` works the other way round: the preset rule `approved-merge` exists only while the switch is on.
 
 Precedence, strongest first:
 
@@ -52,6 +56,34 @@ Precedence, strongest first:
 3. The built-in default.
 
 A switch can only do something the workflow preset has. The `minimal` preset has no `conflict-back-to-author` or `hand-back-to-requester`, so `ost policies` shows those switches as `off` with the source `preset`.
+
+## Merging on approval
+
+```yaml
+policies:
+  merge:
+    on_approval: true
+    approvers: [humans] # humans, human:<id>, role:<role> or a handle
+    method: queue # queue | merge | squash; omit to use what the repository has
+    repos: [app] # optional; default every repo an agent can write to
+```
+
+With the switch on, the preset rule `approved-merge` fires when an allowed approver approves an open pull request an agent wrote, and schedules a `merge` item for its author. An approval that carries comments (a body or inline comments) schedules only the review round, so nothing merges before the comments are handled; when the author hands that round back as done and an allowed approver's approval still stands (nobody requested changes since), the rule `approved-merge-after-feedback` schedules the merge. The agent runs `ost pr merge <n>`. The verb, not the model, checks that:
+
+- the pull request is the caller's own, open, not a draft and mergeable;
+- an allowed approver approved its current head (an approval of an earlier commit does not count), and no allowed approver's latest review requests changes;
+- no review is still pending from a requested reviewer who is an allowed approver;
+- the checks the host requires have passed.
+
+It then queues the pull request in the host's merge queue, or merges it with `method`. Without `method`, it uses what the repository has: its merge queue, else a merge method its settings allow; it never picks a method the repository forbids. If a condition fails, the verb lists each one and the agent reports it. The verb never bypasses branch protection or rulesets: the host stays the final gate, and a refusal is not retried another way. After the merge the usual rules run (the ticket moves to done, other open pull requests are re-checked for conflicts). How commits and merge messages look is the repository's own convention; outstaff sets none.
+
+Approvers are people by default. `role:<role>` and agent handles are accepted for a reviewer agent later. Turn the switch on only for repositories whose CI is configured as required checks: `ost validate` warns when it is on for a repository with no `checks`, because then an approval merges untested code.
+
+### Approvals by GitHub Apps
+
+Whether GitHub counts an approval from a GitHub App toward a branch protection rule's required approvals is not settled. The documentation says required approvals come from "people with write or admin permissions"; approvals by the Actions `GITHUB_TOKEN` count unless the organization turns off "Allow GitHub Actions to approve pull requests"; community reports about a dedicated App or a machine user conflict. Test it on a scratch repository before relying on it: require one approval, let the App approve, and read `mergeStateStatus` and `reviewDecision`.
+
+The design holds either way, because the verb checks approvals itself and branch protection stays the last gate. If an App's approval does not count, an agent reviewer can still trigger the merge but cannot satisfy a repository that requires approvals; pair it with a ruleset that requires no approvals and relies on required status checks instead.
 
 ## Checks
 

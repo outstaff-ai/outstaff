@@ -57,17 +57,24 @@ export function applySwitches(
     let rule: Rule | undefined = presetRule;
     for (const sw of POLICY_SWITCHES.filter((s) => s.rules?.includes(presetRule.id))) {
       const value = policyValue(policies, sw.path);
-      if (!rule || value === sw.default) {
+
+      // A switch that is off by default governs rules that exist only while it is on; one that is on by default
+      // governs rules that stand at the default and change or go away otherwise.
+      const standing = sw.default === sw.off ? value !== sw.off : value === sw.default;
+      if (!rule || standing) {
         continue;
       }
 
       const next: Rule | undefined = sw.rewrite ? sw.rewrite(rule, value) : undefined;
-      switched.push({
-        rule: presetRule.id,
-        on: presetRule.on,
-        switch: sw.path,
-        effect: next ? "edited" : "removed",
-      });
+      // A rule held back by a switch that is off by default is the preset as it stands, not a change to it.
+      if (value !== sw.default) {
+        switched.push({
+          rule: presetRule.id,
+          on: presetRule.on,
+          switch: sw.path,
+          effect: next ? "edited" : "removed",
+        });
+      }
 
       rule = next;
     }
@@ -104,6 +111,8 @@ export function resolveWorkflow(
     options: {
       templates: config?.templates ?? {},
       needsHumanLabel: config?.needs_human_label ?? DEFAULT_NEEDS_HUMAN_LABEL,
+      ...(humans ? { humans } : {}),
+      approvers: policies?.merge.approvers ?? ["humans"],
       ...(fallbackRequester ? { fallbackRequester } : {}),
     },
     statuses: createStatusMap(config?.statuses),

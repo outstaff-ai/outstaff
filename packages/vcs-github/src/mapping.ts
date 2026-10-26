@@ -12,6 +12,7 @@ export interface RestPull {
   merged?: boolean;
   merged_at?: string | null;
   draft?: boolean;
+  requested_reviewers?: { login: string }[] | null;
   mergeable?: boolean | null;
   mergeable_state?: string;
   updated_at: string;

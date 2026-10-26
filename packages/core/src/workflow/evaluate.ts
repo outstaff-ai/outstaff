@@ -1,5 +1,6 @@
 import type { RepoRef } from "../ports/repo.js";
 import type { Action, Condition, Rule } from "./rules.js";
+import { isApprover } from "../policies/approvers.js";
 import { BUILTIN_TEMPLATES, renderTemplate, TemplateError } from "./template.js";
 import {
   DEFAULT_NEEDS_HUMAN_LABEL,
@@ -122,6 +123,19 @@ function check(c: Condition, ctx: Ctx): Check {
     };
   }
 
+  if ("approver" in c) {
+    const actor = ctx.event.actor;
+    const ok =
+      isApprover(
+        ctx.opts.approvers ?? ["humans"],
+        { kind: actor.kind, id: actor.id, trusted: ctx.event.data["untrusted"] !== true },
+        { humans: ctx.opts.humans },
+        (role) => ctx.state.personForRole(role),
+      ) === c.approver;
+
+    return { ok, detail: `actor ${actor.id} is ${c.approver ? "" : "not "}an allowed approver` };
+  }
+
   if ("pr_draft" in c) {
     const draft = ctx.pr?.draft;
     return {
@@ -164,6 +178,32 @@ function check(c: Condition, ctx: Ctx): Check {
     return {
       ok: typeof s === "string" && (c.hand_back_status as string[]).includes(s),
       detail: `hand-back status ${String(s ?? "none")} in ${list(c.hand_back_status)}`,
+    };
+  }
+
+  if ("hand_back_kind" in c) {
+    const k = ctx.event.data["kind"];
+    return {
+      ok: typeof k === "string" && c.hand_back_kind.includes(k),
+      detail: `hand-back is for a ${String(k ?? "unknown")} item, wanted one of ${list(c.hand_back_kind)}`,
+    };
+  }
+
+  if ("pr_approved" in c) {
+    const allowed = (ctx.pr?.verdicts ?? []).filter((v) =>
+      isApprover(
+        ctx.opts.approvers ?? ["humans"],
+        { kind: v.kind, id: v.actor, trusted: true },
+        { humans: ctx.opts.humans },
+        (role) => ctx.state.personForRole(role),
+      ),
+    );
+
+    const approved = allowed.some((v) => v.state === "approved");
+    const blocked = allowed.some((v) => v.state === "changes_requested");
+    return {
+      ok: (approved && !blocked) === c.pr_approved,
+      detail: `${allowed.length} allowed approver verdict${allowed.length === 1 ? "" : "s"} on the pull request (${approved ? "approved" : "not approved"}${blocked ? ", changes requested" : ""}), wanted ${c.pr_approved ? "approved" : "not approved"}`,
     };
   }
 

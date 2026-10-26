@@ -8,7 +8,7 @@ description: The tracker-neutral ost verbs agents call, as commands and as runti
 Agents never talk to the tracker, the knowledge base or the code host directly. They call these verbs, which work the same whatever adapters the team uses. Every verb is available two ways from one library: as a command (`ost ticket show ACME-12`) and as an in-process runtime tool (`ticket_show`).
 
 - Every result carries the URLs of the things it touches, built from the adapters' link templates.
-- Inputs are validated; there are no destructive verbs (nothing deletes, force-merges or edits other people's text).
+- Inputs are validated; there are no destructive verbs: nothing deletes, force-merges or edits other people's text, and the one verb that merges, `pr merge`, is refused unless the team opted in with `policies.merge.on_approval`, merges only your own approved pull request, and never bypasses branch protection.
 - Text that `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` post (and `ticket comment` on a tracker where `@` mentions users) is guarded: `@handle` of a teammate becomes their name, a configured human's `identities.vcs` stays a mention, and any other `@login` is refused, because on the code host it would notify an unrelated user. Code spans and blocks, emails and `@scope/package` are left alone.
 - `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.
 - A verb that needs a port the team has not configured fails with `unsupported` ("no tracker configured for this team"); the office verbs (`ask`, `work`, `roster`) fail with `unavailable` when the agent is not connected to an office.
@@ -586,6 +586,29 @@ Examples:
 
 ```sh
 ost pr diff 42
+```
+
+## pr.merge
+
+Merge your own approved pull request, or put it in the merge queue.
+
+Merges your own pull request after an allowed approver approved it (policies.merge.approvers). Refused outright unless the team turned on policies.merge.on_approval. The code checks every condition and lists each one that fails: the pull request is yours, open, not a draft and mergeable; an allowed approver approved its current head and none has requested changes or still has a review pending; the required checks passed. Then it puts the pull request in the host's merge queue, or merges it with policies.merge.method (when that is unset, with what the repository has: its merge queue, else a method its settings allow). It never bypasses branch protection or rulesets: when the host refuses, report why and stop; do not merge another way.
+
+```
+ost pr merge <number> [--repo <repo>]
+```
+
+Runtime tool: `pr_merge`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `repo` | string | no | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `number` | integer | yes | Pull request number. |
+
+Examples:
+
+```sh
+ost pr merge 42
 ```
 
 ## me

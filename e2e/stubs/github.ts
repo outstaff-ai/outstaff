@@ -25,6 +25,9 @@ interface Pr {
   merged: boolean;
   draft: boolean;
   updatedAt: string;
+
+  /** Taken into the merge queue by `merge-async`; the stub then merges it as the host's queue would. */
+  queued?: boolean;
 }
 
 interface Thread {
@@ -42,6 +45,7 @@ interface Review {
   state: string;
   body: string;
   at: string;
+  commitId: string;
   comments: { databaseId: number; path: string; line: number; body: string }[];
 }
 
@@ -146,6 +150,7 @@ export function createGithub(opts: GithubOptions) {
       merged: pr.merged,
       merged_at: pr.merged ? pr.updatedAt : null,
       draft: pr.draft,
+      requested_reviewers: [],
       updated_at: pr.updatedAt,
       mergeable: open ? clean : null,
       mergeable_state: open ? (clean ? "clean" : "dirty") : "unknown",
@@ -208,6 +213,7 @@ export function createGithub(opts: GithubOptions) {
       state: REVIEW_STATE[event] ?? event,
       body,
       at: now(),
+      commitId: (await repo.sha(pr.head)) ?? pr.lastSha,
       comments: [],
     };
 
@@ -322,6 +328,33 @@ export function createGithub(opts: GithubOptions) {
       return { data: { pullRequest: { id: variables["id"], isDraft: pr?.draft ?? false } } };
     }
 
+    if (query.includes("statusCheckRollup")) {
+      // No check is required in this repository.
+      return {
+        data: {
+          repository: {
+            pullRequest: {
+              commits: {
+                nodes: [
+                  {
+                    commit: {
+                      statusCheckRollup: {
+                        contexts: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      };
+    }
+
+    if (query.includes("mergeQueue(")) {
+      return { data: { repository: { mergeQueue: { id: "MQ_1" } } } };
+    }
+
     if (query.startsWith("mutation")) {
       const t = threads.get(variables["id"]);
       if (t) {
@@ -385,7 +418,58 @@ export function createGithub(opts: GithubOptions) {
       path: `${API}/users/:login`,
       handler: (r) => ({ id: 5000 + r.params["login"]!.length }),
     },
-    { method: "GET", path: `${API}/repos/${full}`, handler: () => ({ default_branch: "main" }) },
+    {
+      method: "GET",
+      path: `${API}/repos/${full}`,
+      handler: () => ({
+        default_branch: "main",
+        allow_merge_commit: true,
+        allow_squash_merge: true,
+      }),
+    },
+    ...(["merge", "merge-async"] as const).map((kind): Route => ({
+      method: "PUT",
+      path: `${pulls}/:n/${kind}`,
+      handler: async (r) => {
+        const pr = need(r.params["n"]!);
+        if (!pr) {
+          return notFound;
+        }
+
+        if (pr.state !== "open" || pr.draft) {
+          return { status: 405, body: { message: "Pull Request is not mergeable" } };
+        }
+
+        const sha = (await repo.sha(pr.head)) ?? pr.lastSha;
+        if (r.json.sha !== sha) {
+          return { status: 409, body: { message: "Head branch was modified." } };
+        }
+
+        const actor = botOf(r) ?? "unknown";
+        if (kind === "merge-async") {
+          if (r.json.merge_action !== "merge_queue") {
+            return { status: 422, body: { message: "merge_action must be merge_queue" } };
+          }
+
+          pr.queued = true;
+          // The queue passes a moment later and the host merges the pull request.
+          setTimeout(() => {
+            void (async () => {
+              await repo.merge(pr.base, pr.head, `Merge pull request #${pr.number} (queue)`);
+              Object.assign(pr, { state: "closed", merged: true, updatedAt: now() });
+              emit("PullRequestEvent", actor, await prPayload(pr, "closed"));
+            })();
+          }, 1500);
+
+          return { status: 202, body: { status: "enqueued" } };
+        }
+
+        await repo.merge(pr.base, pr.head, `Merge pull request #${pr.number}`);
+        Object.assign(pr, { state: "closed", merged: true, updatedAt: now() });
+        emit("PullRequestEvent", actor, await prPayload(pr, "closed"));
+        return { merged: true, sha };
+      },
+    })),
     {
       method: "GET",
       path: pulls,
@@ -567,6 +651,7 @@ export function createGithub(opts: GithubOptions) {
                 body: v.body,
                 state: v.state,
                 submitted_at: v.at,
+                commit_id: v.commitId,
                 html_url: `https://github.example/${full}/pull/${pr.number}#pullrequestreview-${id}`,
               }))
           : notFound;
@@ -734,6 +819,7 @@ export function createGithub(opts: GithubOptions) {
               author: p.login,
               head: r.head,
               state: p.merged ? "merged" : p.state,
+              queued: p.queued === true,
               mergeable: r.mergeable,
               forcePushes: p.forcePushes,
               commits: await repo.ahead(p.base, p.head),
