@@ -78,7 +78,7 @@ Maintainers: signatures are stored in the separate `outstaff-ai/cla-signatures` 
 ## Code style
 
 - TypeScript in strict mode, ESM only, and no default exports.
-- Keep modules small. Put tests beside the code as `*.test.ts` and run them with vitest.
+- Keep modules small. Put tests in a `__tests__` folder inside the folder they test, as `__tests__/*.test.ts`, and run them with vitest. Test-only fixtures and helpers go in the same `__tests__` folder. `pnpm check:tests` (run in CI) fails on a test file outside a `__tests__` folder.
 - Write comments only where the why is not obvious. Match the style of the code around your change.
 
 ## Reporting bugs, asking for features, and security

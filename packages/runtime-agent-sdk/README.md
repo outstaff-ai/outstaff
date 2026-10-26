@@ -118,7 +118,7 @@ OUTSTAFF_TEST_LIVE_SDK=1 pnpm vitest run --project runtime-agent-sdk
 
 ### Runtime upgrade test
 
-`src/upgrade.test.ts` guards against SDK or Claude Code upgrades that change what loads in an unattended run. It renders the workdir of one person of the acme example (stock catalog, the adapter's layout mapping) and runs short sessions with `haiku`, checking that:
+`src/__tests__/upgrade.test.ts` guards against SDK or Claude Code upgrades that change what loads in an unattended run. It renders the workdir of one person of the acme example (stock catalog, the adapter's layout mapping) and runs short sessions with `haiku`, checking that:
 
 - the person's skill is available and other roles' skills are not; any skill in `init` outside the rendered ones and a documented list of built-ins fails the test, and built-in skills are rejected by the Skill tool;
 - a deny rule from the workdir's `.claude/settings.json` applies;
