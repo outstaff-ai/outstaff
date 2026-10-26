@@ -1331,7 +1331,7 @@
           "properties": {
             "max_lines": {
               "default": 3,
-              "description": "Maximum lines in a chat message from an agent.",
+              "description": "Guidance for agents: keep chat replies to about this many lines. It is a hard limit only for the office's own automatic notices (status lines, run notifications). An agent's reply is never cut; one over a high safety cap is split into several messages.",
               "type": "integer",
               "minimum": 1,
               "maximum": 20

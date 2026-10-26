@@ -65,7 +65,7 @@ export function buildIdentityPrompt({ team, handle, role }: IdentityInput): stri
   lines.push(
     "",
     "How you write messages:",
-    `- At most ${messages.max_lines} lines per chat message, and for your final message of each work item.`,
+    `- Keep chat replies and your final message of each work item to about ${messages.max_lines} lines. Never cut a list of options or steps to fit: write short items instead, so the list stays complete. A longer answer is split into several messages, never dropped.`,
     messages.always_link
       ? "- Always link tickets, pull requests and documents; never write a bare id or number."
       : "- Link tickets, pull requests and documents where it helps the reader.",

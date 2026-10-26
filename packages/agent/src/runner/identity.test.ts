@@ -18,7 +18,7 @@ describe("identity prompt", () => {
 
   it("states the message style from policies.messages", () => {
     const text = buildIdentityPrompt({ team, handle: "sam", role });
-    expect(text).toContain("At most 3 lines");
+    expect(text).toContain("about 3 lines");
     expect(text).toContain("Always link tickets, pull requests and documents");
     expect(text).toContain("Leave out: CI status, mergeability, commit hashes.");
   });
@@ -31,7 +31,7 @@ describe("identity prompt", () => {
     };
 
     const text = buildIdentityPrompt({ team: changed, handle: "sam", role });
-    expect(text).toContain("At most 5 lines");
+    expect(text).toContain("about 5 lines");
     expect(text).not.toContain("Always link");
     expect(text).toContain("Leave out: lists of changed files.");
   });

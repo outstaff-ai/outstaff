@@ -18,6 +18,8 @@ A chat session runs beside your work, so it cannot disturb it. You can read the 
    `ost work attach` takes only your own work (assigned to you or authored by you). If you cannot tell which work the request means, ask in the thread with the candidates linked. Do not guess.
 3. **New work** (something to build, fix, write or change that no work of yours covers): file it with a ticket, `ost ticket create --title "..." --body "..."`. It is assigned to you and starts `ready`. The office makes a work item for it in the same thread, your agent replies there with the ticket link, and you end your session. The work item moves the ticket to `active` when it starts (`process/ticket-lifecycle.md`). File one ticket per message.
 
+Keep a reply short (about 3 lines), and when it lists options keep the list complete with short items rather than cutting it. Nothing you write is cut off.
+
 If you cannot tell whether it is a question or work, ask the human in your last message. Do not file work on a guess.
 
 ## After you file or attach work
