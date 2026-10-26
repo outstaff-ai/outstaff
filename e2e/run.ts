@@ -1471,8 +1471,31 @@ async function main() {
     `ticket comment: a comment on the handed-back ${design} sent it back to its agent (active), who answered and handed it back`,
   );
 
-  // ---- 10c. the blocked ticket is assigned to the agent again and the agent is still blocked: it ends its message with
-  // "still blocked" and moves nothing. The ticket stays Blocked (the office did not move it to active when the work
+  // ---- 10b2. the checks of an open pull request fail: its author gets a round with the failing check, whatever the
+  // ticket's status, and hands the ticket back
+  await stub("POST", `/_test/pulls/${pr2.pr.number}/check`, {
+    name: "build",
+    conclusion: "failure",
+  });
+
+  const ci = await until(`${second}: the failing build was looked at`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === second);
+    return t.comments.some((c: Json) => c.author === "sam" && c.body.includes("CI failed on"))
+      ? t
+      : undefined;
+  });
+
+  assertEq(
+    ci.comments.some((c: Json) => c.body.includes("failing: build")),
+    true,
+    "the round saw the failing check by name",
+  );
+
+  step(
+    `ci: the build of #${pr2.pr.number} failed -> a round for its author, who looked at the failing check`,
+  );
+
+  // ---- 10c. the blocked ticket is assigned to the agent again and the agent is still blocked: it moves nothing. The ticket stays Blocked (the office did not move it to active when the work
   // started), goes back to the requester, and no earlier blocked item is left behind.
   const movesBefore = (await state()).tickets.find((x: Json) => x.key === stuck).moves.length;
   await stub("POST", `/_test/tickets/${stuck}/assign`, { to: "sam" });
@@ -1490,7 +1513,7 @@ async function main() {
   );
 
   step(
-    `blocked retry: ${stuck} assigned to sam again, still blocked in free text -> handed back as blocked, stays Blocked, back with the requester`,
+    `blocked retry: ${stuck} assigned to sam again, still blocked -> handed back as blocked, stays Blocked, back with the requester`,
   );
 
   // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the ticket is the agent's again

@@ -505,6 +505,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     const prev = prs.get(key) ?? known;
     const open = pr.state === "open";
     let checks = prev?.checks ?? [];
+    let links = new Map<string, { url: string; summary?: string }>();
     let unresolved = prev?.unresolvedThreads ?? 0;
     if (open) {
       const [found, threads] = await Promise.all([
@@ -513,6 +514,10 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       ]);
 
       checks = found.map((c) => ({ name: c.name, status: c.status }));
+      links = new Map(
+        found.map((c) => [c.name, { url: c.url, ...(c.summary ? { summary: c.summary } : {}) }]),
+      );
+
       unresolved = threads.filter((t) => !t.resolved).length;
     }
 
@@ -552,8 +557,14 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       }
 
       if (rec.ci === "failure" && prev?.ci !== "failure") {
-        const failing = checks.filter((c) => c.status === "failure").map((c) => c.name);
-        await synthetic(ctx, "pr.ci_failed", rec, { failing });
+        const failed = checks.filter((c) => c.status === "failure");
+        await synthetic(ctx, "pr.ci_failed", rec, {
+          failing: failed.map((c) => c.name),
+          checks: failed.map((c) => ({
+            name: c.name,
+            ...links.get(c.name),
+          })),
+        });
       }
     }
 
@@ -821,8 +832,12 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     async rescan() {
       const ctx: Ctx = { fresh: [] };
-      await locked(() => doRescan(ctx));
-      await deliver(ctx.fresh);
+      try {
+        await locked(() => doRescan(ctx));
+      } finally {
+        // What the rescan raised before it failed is already recorded and its state saved: deliver it, or it is lost.
+        await deliver(ctx.fresh);
+      }
     },
 
     refreshWorkers: () => locked(refreshWorkers),

@@ -77,7 +77,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     .slice(1)
     .map((block): Feedback => {
       const start =
-        /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat|a comment on the ticket|a comment on a document)\b[^\n]*?(?:: (\S+))?$/m.exec(
+        /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat|a comment on the ticket|a comment on a document|failing checks)\b[^\n]*?(?:: (\S+))?$/m.exec(
           block,
         )!;
 

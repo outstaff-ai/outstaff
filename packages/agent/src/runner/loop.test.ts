@@ -347,31 +347,17 @@ describe("work loop", () => {
       return { status: (sentOf("handback")[0]!.payload as { status: string }).status, logs };
     };
 
-    it.each([
-      "Still blocked: I need the staging key from ops.",
-      "I retried it and the ticket remains blocked on the staging key.",
-      "Blocked on ops, nothing to do until the key arrives.",
-    ])("ending %j in free text is handed back as blocked", async (text) => {
-      const { status, logs } = await retry(text);
+    it("that moved nothing is handed back as blocked whatever the message says", async () => {
+      const { status, logs } = await retry("Looked at it again.");
       expect(status).toBe("blocked");
-      expect(logs.join("\n")).toContain("still blocked");
+      expect(logs.join("\n")).toContain("left its blocked ticket blocked");
     });
 
-    it("is done when the agent moved the ticket on, whatever the message says", async () => {
+    it("is done when the agent moved the ticket on", async () => {
       expect((await retry("Still blocked on nothing now.", "active")).status).toBe("done");
     });
 
-    it("is done when the message says it is no longer blocked", async () => {
-      expect((await retry("Fixed. The earlier blocker is gone, no longer blocked.")).status).toBe(
-        "done",
-      );
-    });
-
-    it("is done when the message is not about being blocked", async () => {
-      expect((await retry("Finished the search page.")).status).toBe("done");
-    });
-
-    it("is done when the ticket is not blocked, even if the message says blocked", async () => {
+    it("is done when the ticket is not blocked", async () => {
       expect((await retry("Still blocked on review.", undefined, "active")).status).toBe("done");
     });
   });

@@ -76,6 +76,7 @@ export function buildWorkPrompt(
       ticket_comment: "a comment on the ticket",
       doc_comment: "a comment on a document",
       blocked: "a hand-back as blocked",
+      ci_failure: "failing checks",
     }[fb.kind];
 
     lines.push("", `Triggered by ${what} from ${fb.actor}${fb.url ? `: ${fb.url}` : "."}`);

@@ -54,6 +54,21 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
     };
   }
 
+  if (event.type === "pr.ci_failed") {
+    const failed = event.data["checks"];
+    const lines = Array.isArray(failed)
+      ? failed.flatMap((c: { name?: unknown; url?: unknown; summary?: unknown }) =>
+          typeof c.name === "string"
+            ? [
+                `${c.name}${typeof c.url === "string" ? ` (${c.url})` : ""}${typeof c.summary === "string" && c.summary !== "" ? `: ${c.summary}` : ""}`,
+              ]
+            : [],
+        )
+      : [];
+
+    return { ...base, kind: "ci_failure", body: lines.join("\n") };
+  }
+
   if (event.type === "ticket.commented") {
     return { ...base, kind: "ticket_comment", ...(commentId ? { commentId } : {}) };
   }

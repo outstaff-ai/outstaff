@@ -144,6 +144,27 @@ describe("kanban preset", () => {
       }
     });
 
+    it("failing CI on an open pull request goes to its author whatever the ticket's status", () => {
+      const failed = ev("pr.ci_failed", { subject: { pr: ref(11) }, actor: automation });
+      for (const status of ["ready", "active", "review", "blocked", "done"] as const) {
+        const effects = run(failed, world({ status, prs: [pr(11)] }));
+        expect(effects).toContainEqual({
+          type: "schedule",
+          person: "ada",
+          kind: "ci_failed",
+          priority: "high",
+          ticket: "ACME-1",
+          pr: ref(11),
+        });
+      }
+
+      expect(run(failed, world({ status: "canceled", prs: [pr(11)] }))).toEqual([]);
+      expect(run(failed, world({ status: "done", prs: [mergedPr(11)] }))).toEqual([]);
+      expect(
+        run(failed, world({ prs: [pr(11, { author: { login: "grace", kind: "human" } })] })),
+      ).toEqual([]);
+    });
+
     it("a conflict on a closed pull request or a canceled ticket schedules nothing", () => {
       const conflicted = ev("pr.conflicted", { subject: { pr: ref(11) }, actor: automation });
       expect(run(conflicted, world({ status: "done", prs: [mergedPr(11)] }))).toEqual([]);

@@ -138,7 +138,7 @@ export async function* assigned(ctx: ItemContext): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
-  // A retry of a ticket that is blocked and still has its blocker: the agent moves nothing and says so in free text.
+  // A retry of a ticket that is blocked and still has its blocker: the agent moves nothing.
   const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
   if (blocker && /^Status: .*\(blocked\)/m.test(shown)) {
     return `Still blocked: ${blocker}`;
@@ -745,6 +745,24 @@ export async function* merge(ctx: ItemContext): Script {
   return "Ran pr merge.";
 }
 
+/** The checks of the pull request fail: look at them and say so on the ticket. */
+export async function* ciFailed(ctx: ItemContext): Script {
+  const key = need(ctx.ticket, "the ticket");
+  const number = need(ctx.pr, "the pull request");
+  const repo = need(ctx.repo, "the repository");
+  const shown = yield { type: "tool", tool: "pr_status", input: { repo, number } };
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `CI failed on #${number}: ${/- failing: .*/.exec(shown)?.[0] ?? "see the checks"}`,
+    },
+  };
+
+  return `Looked at the failing checks of pull request ${number}.`;
+}
+
 export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   assigned,
   ticket: assigned,
@@ -754,5 +772,6 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   doc_feedback: docFeedback,
   ticket_comment: ticketComment,
   conflict,
+  ci_failed: ciFailed,
   chat,
 };
