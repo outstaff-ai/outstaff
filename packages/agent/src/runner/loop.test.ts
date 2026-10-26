@@ -17,7 +17,8 @@ import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Message } from "@outstaff/protocol";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ACKNOWLEDGE_TIMEOUT_MS } from "./reactions.js";
 import {
   createOfficeConnection,
   type Offer,
@@ -1303,6 +1304,38 @@ describe("work loop", () => {
       expect(runtime.requests.length).toBeGreaterThan(0);
       expect(warnings).toEqual([expect.stringContaining("Resource not accessible")]);
       expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "done" });
+    });
+
+    it("starts the run once the reactions settle, and does not wait past the timeout for one that hangs", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      try {
+        await connect();
+        const { vcs, conversation } = await prWithComments();
+        let release!: () => void;
+        const hung = new Promise<void>((resolve) => (release = resolve));
+        vcs.react = () => hung;
+        const runtime = createFakeRuntime();
+        runtime.enqueue([{ type: "finish", text: "Answered." }]);
+        start(runtime, { vcs });
+        socket.offerWith("w1", {
+          kind: "review_feedback",
+          feedback: [{ actor: "dana", kind: "comment", body: "Hm", commentId: conversation }],
+        });
+
+        // The reaction is pending, so the run has not started.
+        for (let i = 0; i < 20; i++) {
+          await tick();
+        }
+
+        expect(runtime.requests).toHaveLength(0);
+
+        await vi.advanceTimersByTimeAsync(ACKNOWLEDGE_TIMEOUT_MS);
+        await until(() => types().includes("handback"));
+        expect(runtime.requests.length).toBeGreaterThan(0);
+        release();
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 });

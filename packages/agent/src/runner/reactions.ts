@@ -44,9 +44,14 @@ export function reactionTargets(offer: Offer): ReactionTarget[] {
   return [...found.values()];
 }
 
+/** How long the run waits for the reactions, so a slow host delays a round by at most this. */
+export const ACKNOWLEDGE_TIMEOUT_MS = 2000;
+
 /**
  * Tells the people behind a round's feedback that the agent took it: an `eyes` reaction on each comment, as the
- * person the agent works as. A reaction that fails is logged; it never stops the round.
+ * person the agent works as. The returned promise settles when every reaction has, or after
+ * `ACKNOWLEDGE_TIMEOUT_MS`, whichever comes first, so the reactions land before the run's first reply without a
+ * slow host holding the round. A reaction that fails is logged; it never stops the round.
  */
 export async function acknowledgeFeedback(offer: Offer, vcs: Vcs | undefined, log: Logger) {
   if (!vcs || !FEEDBACK_KINDS.has(offer.workItem.kind)) {
@@ -71,7 +76,7 @@ export async function acknowledgeFeedback(offer: Offer, vcs: Vcs | undefined, lo
     return;
   }
 
-  await Promise.all(
+  const reacted = Promise.all(
     targets.map(async (target) => {
       try {
         await vcs.react(repo, target, "eyes");
@@ -84,4 +89,21 @@ export async function acknowledgeFeedback(offer: Offer, vcs: Vcs | undefined, lo
       }
     }),
   );
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      log.warn("the reactions to the feedback are slow; starting the run without waiting", {
+        workItemId: offer.workItem.id,
+      });
+
+      resolve();
+    }, ACKNOWLEDGE_TIMEOUT_MS);
+  });
+
+  try {
+    await Promise.race([reacted, timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
