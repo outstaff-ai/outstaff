@@ -43,7 +43,7 @@ const integrations = [
 // floor, raised to 100 as its tests are completed (#364). Test kits shipped for other packages are not measured.
 const floors: Record<string, number> = {
   "vcs/github": 100,
-  "runtime/claude": 85,
+  "runtime/claude": 100,
   "chat/slack": 84,
   "tracker/itsaplan": 85,
   "knowledge/itsaplan": 83,
