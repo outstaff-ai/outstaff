@@ -233,6 +233,11 @@ describe("tracker", () => {
     });
 
     expect(first.events[3]?.data["body"]).toBe("hello");
+    expect(first.events[3]?.data).toMatchObject({
+      commentId: expect.any(String),
+      url: expect.stringMatching(/#comment-\d+$/),
+    });
+
     expect(new Set(first.events.map((e) => e.externalId)).size).toBe(4);
     // The overlap re-reads recent activity; intake de-duplicates by external id.
     const seen = new Set(first.events.map((e) => e.externalId));
@@ -514,5 +519,86 @@ describe("knowledge", () => {
 
     const empty = await kb.create({ path: "e", title: "E", body: "" });
     await expect(kb.comment(empty.id, { body: "x" })).rejects.toMatchObject({ code: "invalid" });
+  });
+});
+
+describe("knowledge events", () => {
+  const setup = async () => {
+    const fake = createItsaplanFake();
+    const kb = await createItsaplanKnowledge(knowledgeCtx(fake));
+    const doc = await kb.create({
+      path: "design/cart",
+      title: "Cart design",
+      body: "Keep the cart\n\nin the session",
+    });
+
+    return { fake, kb, doc };
+  };
+
+  it("reads the comments of the named documents, oldest first, with the author's identity and the anchor", async () => {
+    const { kb, doc } = await setup();
+    const other = await kb.create({ path: "design/other", title: "Other", body: "Elsewhere" });
+    const base = await kb.events([doc.id, other.id]);
+    const c = await kb.comment(doc.id, { body: "why a session?", anchorText: "the cart" });
+    const r = await kb.reply(c.id, "so it survives a reload");
+    await kb.comment(other.id, { body: "not asked for", anchorText: "Elsewhere" });
+
+    const page = await kb.events([doc.id], base.cursor);
+    expect(page.events.map((e) => e.data.body)).toEqual([
+      "why a session?",
+      "so it survives a reload",
+    ]);
+
+    expect(page.events[0]).toMatchObject({
+      externalId: expect.stringContaining(c.id),
+      type: "commented",
+      doc: doc.id,
+      title: "Cart design",
+      url: doc.url,
+      actor: { id: "u-sam", kind: "agent" },
+      data: { commentId: c.id, anchorText: "the cart" },
+    });
+
+    expect(page.events[1]?.data.parentId).toBe(c.id);
+    expect(r.id).toBe(page.events[1]?.data.commentId);
+    expect(page.events.every((e) => e.doc === doc.id)).toBe(true);
+  });
+
+  it("re-reads the overlap without handing back what the baseline saw, and dedupes by external id", async () => {
+    const { kb, doc } = await setup();
+    const old = await kb.comment(doc.id, { body: "old", anchorText: "Keep" });
+    const first = await kb.events([doc.id]);
+    // The first call without a cursor lists the recent history; the office only keeps the cursor.
+    expect(first.events.map((e) => e.data.commentId)).toEqual([old.id]);
+    expect((await kb.events([doc.id], first.cursor)).events).toEqual([]);
+
+    const fresh = await kb.comment(doc.id, { body: "new", anchorText: "session" });
+    const next = await kb.events([doc.id], first.cursor);
+    expect(next.events.map((e) => e.data.commentId)).toEqual([fresh.id]);
+    const again = await kb.events([doc.id], next.cursor);
+    // The overlap returns it once more with the same external id.
+    expect(again.events.map((e) => e.externalId)).toEqual(next.events.map((e) => e.externalId));
+  });
+
+  it("orders by time, never by id", async () => {
+    const { fake, kb, doc } = await setup();
+    const base = await kb.events([doc.id]);
+    const a = await kb.comment(doc.id, { body: "first", anchorText: "Keep" });
+    const b = await kb.comment(doc.id, { body: "second", anchorText: "session" });
+    // The ids say b then a, the times say a then b.
+    const rows = fake.state.docComments;
+    rows.find((x) => `${doc.id}:${x.id}` === a.id)!.id = "z-late-id";
+    rows.find((x) => `${doc.id}:${x.id}` === b.id)!.id = "a-early-id";
+    const page = await kb.events([doc.id], base.cursor);
+    expect(page.events.map((e) => e.data.body)).toEqual(["first", "second"]);
+  });
+
+  it("skips a document that is gone, baselines an unusable cursor, and rejects garbage", async () => {
+    const { kb, doc } = await setup();
+    await kb.comment(doc.id, { body: "x", anchorText: "Keep" });
+    expect((await kb.events(["999", doc.id])).events).toHaveLength(1);
+    const old = await kb.events([doc.id], JSON.stringify({ id: 5 }));
+    expect(old.events).toEqual([]);
+    await expect(kb.events([doc.id], "not json")).rejects.toMatchObject({ code: "invalid" });
   });
 });

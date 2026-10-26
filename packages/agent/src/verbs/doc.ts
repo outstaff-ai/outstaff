@@ -1,7 +1,7 @@
-import { PortError, type DocComment } from "@outstaff/core";
+import { PortError, type Doc, type DocComment } from "@outstaff/core";
 import { z } from "zod";
 import { requireKnowledge } from "./support.js";
-import { defineVerb, result } from "./types.js";
+import { defineVerb, result, type AgentEnv, type VerbContext } from "./types.js";
 
 const id = z.string().min(1).max(500).describe("Document id or path.");
 const commentId = z.string().min(1).max(200).describe("Comment id.");
@@ -15,7 +15,28 @@ const docPath = z
   .describe("Path of the document in the knowledge base, for example specs/checkout.md.");
 
 const commentLine = (c: DocComment) =>
-  `- ${c.id} ${c.resolved ? "[resolved] " : ""}${c.parentId ? "(reply) " : ""}${c.author}: ${c.body.trim()}`;
+  `- ${c.id} ${c.resolved ? "[resolved] " : ""}${c.parentId ? `(reply to ${c.parentId}) ` : ""}${c.author}: ${c.body.trim()}`;
+
+/**
+ * Tells the office the caller wrote the document for the work it is on, so that comments people leave on it come back
+ * as work. The document is already written: a refusal or an office that does not know the message costs only that.
+ */
+async function linkToWork(env: AgentEnv, ctx: VerbContext, doc: Doc, url: string) {
+  if (!env.office || !ctx.workItemId) {
+    return;
+  }
+
+  try {
+    await env.office.docLink({
+      workItemId: ctx.workItemId,
+      doc: { id: doc.id, title: doc.title, url },
+    });
+  } catch (error) {
+    env.log?.warn(`could not tell the office about document ${doc.id}`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
 
 export const docSearch = defineVerb({
   name: "doc.search",
@@ -81,11 +102,50 @@ export const docCreate = defineVerb({
   }),
   args: ["path"],
   examples: ['ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"'],
-  async run(env, input) {
+  async run(env, input, ctx) {
     const kb = requireKnowledge(env);
     const doc = await kb.create(input);
     const url = kb.links.doc(doc.id);
+    await linkToWork(env, ctx, doc, url);
     return result([`Created ${doc.title} (${doc.path}).`, url], { doc }, [url]);
+  },
+});
+
+export const docUpdate = defineVerb({
+  name: "doc.update",
+  summary: "Change the text or title of a document.",
+  description:
+    "Replaces the text (and optionally the title) of a document. Pass the version you read as baseVersion to refuse overwriting a change someone made meanwhile; without it the current version is replaced. The document you update is linked to your work item, so comments people leave on it come back to you.",
+  input: z.strictObject({
+    id,
+    title: z.string().min(1).max(200).optional().describe("New title."),
+    body: z.string().max(200_000).optional().describe("New document text, Markdown."),
+    baseVersion: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("The version you read (`ost doc show --json`); a newer one is a conflict."),
+  }),
+  args: ["id"],
+  examples: ['ost doc update specs/checkout.md --body "# Checkout (revised)"'],
+  async run(env, input, ctx) {
+    const kb = requireKnowledge(env);
+    if (input.title === undefined && input.body === undefined) {
+      throw new PortError("invalid", "Pass a new title, a new body, or both.");
+    }
+
+    const doc = await kb.update(input.id, {
+      ...(input.title === undefined ? {} : { title: input.title }),
+      ...(input.body === undefined ? {} : { body: input.body }),
+      ...(input.baseVersion === undefined ? {} : { baseVersion: input.baseVersion }),
+    });
+
+    const url = kb.links.doc(doc.id);
+    await linkToWork(env, ctx, doc, url);
+    return result([`Updated ${doc.title} (${doc.path}), version ${doc.version}.`, url], { doc }, [
+      url,
+    ]);
   },
 });
 
@@ -142,4 +202,4 @@ export const docResolve = defineVerb({
   },
 });
 
-export const docVerbs = [docSearch, docShow, docCreate, docReply, docResolve];
+export const docVerbs = [docSearch, docShow, docCreate, docUpdate, docReply, docResolve];

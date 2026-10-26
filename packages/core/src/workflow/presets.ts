@@ -28,6 +28,43 @@ const mergedFeedbackRule: Rule = {
   do: [{ schedule: { person: "author", kind: "merged_feedback", priority: "high" } }],
 };
 
+/** A trusted human's comment or reply on a document an agent wrote goes back to that agent. */
+const docFeedbackRule: Rule = {
+  id: "doc-feedback-to-author",
+  on: "doc.commented",
+  if: { actor_kind: "human" },
+  do: [{ schedule: { person: "doc_author", kind: "doc_feedback", priority: "high" } }],
+};
+
+/** A trusted human's comment on a ticket assigned to an agent starts a round for that agent. */
+const ticketCommentRule = (status: Condition): Rule => ({
+  id: "ticket-comment-to-assignee",
+  on: "ticket.commented",
+  if: { all: [{ actor_kind: "human" }, { assignee_kind: "agent" }, status] },
+  do: [{ schedule: { person: "assignee", kind: "ticket_comment", priority: "high" } }],
+});
+
+/**
+ * A comment on a ticket the agent handed back (assigned to a person, in review or blocked) is feedback: the ticket
+ * goes back to the agent who last worked on it, as `human-feedback-reactivates-ticket` does for a pull request.
+ */
+const ticketCommentReactivatesRule: Rule = {
+  id: "ticket-comment-reactivates-ticket",
+  on: "ticket.commented",
+  if: {
+    all: [
+      { actor_kind: "human" },
+      { assignee_kind: "human" },
+      { ticket_status: ["review", "blocked"] },
+    ],
+  },
+  do: [
+    { assign: "last_worker" },
+    { move: "active" },
+    { schedule: { person: "last_worker", kind: "ticket_comment", priority: "high" } },
+  ],
+};
+
 const kanbanRules: Rule[] = [
   {
     id: "pr-opened-review",
@@ -67,6 +104,9 @@ const kanbanRules: Rule[] = [
     do: [{ schedule: { person: "author", kind: "review_feedback", priority: "high" } }],
   },
   mergedFeedbackRule,
+  docFeedbackRule,
+  ticketCommentRule({ not: { ticket_status: ["done", "canceled"] } }),
+  ticketCommentReactivatesRule,
   {
     id: "human-feedback-reactivates-ticket",
     on: ["pr.review_submitted", "pr.comment"],
@@ -149,20 +189,22 @@ const kanbanRules: Rule[] = [
 ];
 
 /** In scrum, `ready` means committed to the sprint: work on uncommitted (backlog) tickets is not started. */
-const scrumRules: Rule[] = kanbanRules.map((r) =>
-  r.id === "assigned-agent-scheduled"
-    ? {
+const COMMITTED: Condition = { ticket_status: ["ready", "active", "review", "blocked"] };
+const scrumRules: Rule[] = kanbanRules.map((r) => {
+  switch (r.id) {
+    case "assigned-agent-scheduled":
+      return {
         ...r,
         if: {
-          all: [
-            { assignee_kind: "agent" },
-            { not: { actor_kind: "automation" } },
-            { ticket_status: ["ready", "active", "review", "blocked"] },
-          ],
+          all: [{ assignee_kind: "agent" }, { not: { actor_kind: "automation" } }, COMMITTED],
         },
-      }
-    : r,
-);
+      };
+    case "ticket-comment-to-assignee":
+      return ticketCommentRule(COMMITTED);
+    default:
+      return r;
+  }
+});
 
 /** Scheduling on assignment and the review loop; never moves a ticket. */
 const minimalRules: Rule[] = [
@@ -176,6 +218,8 @@ const minimalRules: Rule[] = [
     ],
   },
   mergedFeedbackRule,
+  docFeedbackRule,
+  ticketCommentRule({ not: { ticket_status: ["done", "canceled"] } }),
   {
     id: "assigned-agent-scheduled",
     // A ticket created already assigned has one `created` item and no assignment item to go on.

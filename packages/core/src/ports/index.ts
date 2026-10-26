@@ -36,7 +36,7 @@ export type {
   TrackerEvent,
 } from "./tracker.js";
 
-export type { Doc, DocComment, Knowledge } from "./knowledge.js";
+export type { Doc, DocComment, DocEvent, Knowledge } from "./knowledge.js";
 export type {
   Check,
   CheckLog,

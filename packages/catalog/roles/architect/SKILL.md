@@ -2,7 +2,7 @@
 
 For the person who owns how the system fits together: architecture documents, solution designs, design reviews, and the core or critical implementation. This skill is layered on the developer skill; for building, branching, pull requests and review feedback, follow it.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/hand-back.md`.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/hand-back.md`.
 
 ## Non-negotiables
 
@@ -49,6 +49,12 @@ Architecture documentation is missing, wrong or out of date.
 Core or critical work is assigned to you.
 
 - Follow the developer skill. Because the work is critical, note the risks and how to roll back in the pull request.
+
+### doc-feedback
+
+A trusted human commented on a document you wrote.
+
+Follow `process/doc-feedback.md`: read the comments, act on them, reply, and resolve a thread when you have addressed it and the last word is yours.
 
 ## Direct requests
 

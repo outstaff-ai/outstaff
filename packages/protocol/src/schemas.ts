@@ -141,9 +141,9 @@ export const inlineCommentSchema = z.strictObject({
 export const feedbackSchema = z.strictObject({
   actor: z.string().min(1).describe("Login of the person who gave the feedback."),
   kind: z
-    .enum(["review", "comment", "inline_comment", "chat"])
+    .enum(["review", "comment", "inline_comment", "chat", "ticket_comment", "doc_comment"])
     .describe(
-      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, or a message from a trusted human in chat.",
+      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, a message from a trusted human in chat, a comment on a ticket, or a comment or reply on a knowledge document.",
     ),
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),
@@ -151,7 +151,14 @@ export const feedbackSchema = z.strictObject({
     .string()
     .optional()
     .describe(
-      "For a comment or inline comment: its id on the host. The kind tells which kind of comment it is.",
+      "For a comment or inline comment: its id on the host. The kind tells which kind of comment it is. For a ticket or document comment, its id in the tracker or knowledge base.",
+    ),
+  docId: z.string().optional().describe("For a document comment: the id of the document."),
+  anchorText: z
+    .string()
+    .optional()
+    .describe(
+      "For a document comment: the text of the document it is anchored to. Data from the document.",
     ),
   at: z.string().optional().describe("When the host reported the feedback (ISO-8601)."),
   body: z.string().describe("What the person wrote. Data from that person."),
@@ -515,6 +522,17 @@ export const messageSchema = z.discriminatedUnion("type", [
         .describe(
           "Every thread linked to the item now, to post the result in: the one it came from and the ones attached later. Absent when nothing should be posted.",
         ),
+    }),
+  ),
+  message(
+    "doc_link",
+    z.strictObject({
+      workItemId: itemId,
+      doc: z.strictObject({
+        id: z.string().min(1).max(500).describe("Id of the document in the knowledge base."),
+        title: z.string().max(500).describe("Title of the document."),
+        url: z.string().min(1).describe("Absolute URL of the document."),
+      }),
     }),
   ),
   message("current_work", empty),

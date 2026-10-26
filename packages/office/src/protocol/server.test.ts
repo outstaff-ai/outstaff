@@ -434,6 +434,48 @@ describe("protocol server", () => {
       a.send("ticket_prs", { headRef: "feat/x", title: "x", body: "" });
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
+
+    it("says doc_link is unsupported without a document desk", async () => {
+      const a = await login("ada", tokens.ada);
+      a.send("doc_link", { workItemId: "w1", doc: { id: "d1", title: "T", url: "https://x/d1" } });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+  });
+});
+
+describe("protocol server with a document desk", () => {
+  it("passes the document and the caller to the desk, and says what it refuses", async () => {
+    const linked: unknown[] = [];
+    const server = createProtocolServer({
+      source: createFakeSource(),
+      docs: {
+        async link(person, workItemId, doc) {
+          if (workItemId === "other") {
+            throw new ProtocolError("unknown_item", "No work item other for ada.");
+          }
+
+          linked.push({ person, workItemId, doc });
+        },
+      },
+      auth: createAgentAuth(tokens),
+      clock: manualClock(),
+      port: 0,
+      host: "127.0.0.1",
+    });
+
+    await server.start();
+    const a = await Agent.connect(server.port());
+    await a.hello("ada", tokens.ada);
+    await a.next("welcome");
+    const doc = { id: "d1", title: "Cart design", url: "https://docs.acme.example/d1" };
+    a.send("doc_link", { workItemId: "w1", doc });
+    expect(await a.next("ack")).toBeDefined();
+    expect(linked).toEqual([{ person: "ada", workItemId: "w1", doc }]);
+
+    a.send("doc_link", { workItemId: "other", doc });
+    expect((await a.next("error")).payload).toMatchObject({ code: "unknown_item" });
+    a.ws.terminate();
+    await server.stop();
   });
 });
 

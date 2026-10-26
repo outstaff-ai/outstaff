@@ -139,6 +139,59 @@ describe("doc verbs", () => {
     await rejects(run("doc.create", env, input), "conflict");
   });
 
+  it("tells the office about a document it created for the work item, and still creates it when the office refuses", async () => {
+    const { env, office } = fakeEnv();
+    const made = await run(
+      "doc.create",
+      env,
+      { path: "specs/design.md", title: "Design", body: "Options" },
+      { workItemId: "w1" },
+    );
+
+    expect(office.docsLinked).toEqual([
+      {
+        workItemId: "w1",
+        doc: { id: expect.any(String), title: "Design", url: expect.stringMatching(/^https:\/\//) },
+      },
+    ]);
+
+    expect(office.docsLinked[0]?.doc.url).toBe(made.links[0]);
+
+    // No work item (a plain command line): nothing to link to. A refusing office costs only the link.
+    await run("doc.create", env, { path: "specs/loose.md", title: "Loose", body: "x" });
+    expect(office.docsLinked).toHaveLength(1);
+    env.office!.docLink = () => Promise.reject(new Error("unsupported"));
+    expectLinks(
+      await run(
+        "doc.create",
+        env,
+        { path: "specs/again.md", title: "Again", body: "x" },
+        { workItemId: "w1" },
+      ),
+    );
+  });
+
+  it("updates the text and title, refuses a stale version and an empty change, and links the document", async () => {
+    const { env, knowledge, office } = fakeEnv();
+    const doc = await knowledge.seed.doc({ path: "specs/u.md", title: "U", body: "one" });
+    const r = await run(
+      "doc.update",
+      env,
+      { id: doc.id, body: "two", title: "U2" },
+      { workItemId: "w1" },
+    );
+
+    expectLinks(r);
+    expect(await knowledge.get(doc.id)).toMatchObject({ body: "two", title: "U2", version: "2" });
+    expect(office.docsLinked.map((l) => l.doc.id)).toEqual([doc.id]);
+    await rejects(
+      run("doc.update", env, { id: doc.id, body: "three", baseVersion: "1" }),
+      "conflict",
+    );
+
+    await rejects(run("doc.update", env, { id: doc.id }), "invalid");
+  });
+
   it("replies and resolves only comments that belong to the document", async () => {
     const { env, knowledge } = fakeEnv();
     const a = await knowledge.seed.doc({ path: "a.md", title: "A", body: "" });
@@ -1537,6 +1590,7 @@ describe("missing ports", () => {
     ["doc.search", { query: "x" }],
     ["doc.show", { id: "x" }],
     ["doc.create", { path: "a.md", title: "A", body: "" }],
+    ["doc.update", { id: "x", body: "b" }],
     ["doc.reply", { doc: "x", commentId: "c", body: "b" }],
     ["doc.resolve", { doc: "x", commentId: "c" }],
   ])("%s without a knowledge base", async (name, input) => {
@@ -1601,6 +1655,7 @@ describe("verb catalogue", () => {
       "doc.search",
       "doc.show",
       "doc.create",
+      "doc.update",
       "doc.reply",
       "doc.resolve",
       "pr.status",

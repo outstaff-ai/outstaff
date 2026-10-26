@@ -316,6 +316,14 @@ function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {
 }
 
 function person(spec: string, ctx: Ctx): Resolved<string> {
+  if (spec === "doc_author") {
+    const doc = ctx.event.subject.doc;
+    const author = doc ? ctx.state.docAuthor(doc) : undefined;
+    return author
+      ? { value: author }
+      : { skip: "no agent is recorded as the author of the document" };
+  }
+
   if (spec === "assignee") {
     const a = ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined;
     return a?.kind === "agent" ? { value: a.id } : { skip: "ticket is not assigned to an agent" };
@@ -411,6 +419,10 @@ function perform(a: Action, ctx: Ctx): Resolved<Effect> {
 
     if (ctx.event.subject.pr) {
       e.pr = ctx.event.subject.pr;
+    }
+
+    if (ctx.event.subject.doc) {
+      e.doc = ctx.event.subject.doc;
     }
 
     return { value: e };

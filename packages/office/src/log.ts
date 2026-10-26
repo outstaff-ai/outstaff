@@ -11,7 +11,9 @@ export function clip(text: string, max = CLIP): string {
 export const prLabel = (pr: Pick<PrRef, "repo" | "number">): string =>
   `${pr.repo.owner}/${pr.repo.name}#${pr.number}`;
 
-/** `owner/name#n` for a pull request, the key for a ticket. */
-export function subjectLabel(subject: { pr?: PrRef; ticket?: string }): string {
-  return subject.pr ? prLabel(subject.pr) : (subject.ticket ?? "no subject");
+/** `owner/name#n` for a pull request, the key for a ticket, `doc <id>` for a document. */
+export function subjectLabel(subject: { pr?: PrRef; ticket?: string; doc?: string }): string {
+  return subject.pr
+    ? prLabel(subject.pr)
+    : (subject.ticket ?? (subject.doc ? `doc ${subject.doc}` : "no subject"));
 }

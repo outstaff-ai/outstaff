@@ -309,8 +309,29 @@ const policiesSchema = z
               "Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.",
             ),
           ),
+        doc_comments: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Schedule the author of a knowledge document to answer a trusted person's comments on it. Switches the preset rule doc-feedback-to-author. Default on.",
+            ),
+          ),
+        ticket_comments: z
+          .boolean()
+          .default(true)
+          .meta(
+            d(
+              "Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.",
+            ),
+          ),
       })
-      .default({ follow_up_round: true, merged_prs: true })
+      .default({
+        follow_up_round: true,
+        merged_prs: true,
+        doc_comments: true,
+        ticket_comments: true,
+      })
       .meta(d("How agents act on feedback from trusted people beyond the first round.")),
     hand_back: z
       .strictObject({

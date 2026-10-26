@@ -1,5 +1,6 @@
 import type {
   ActorKind,
+  DocEvent,
   TrackerEvent,
   VcsEvent,
   WorkflowEvent,
@@ -71,4 +72,24 @@ export function normalizeTrackerEvent(
   }
 
   return build(type, { ticket: event.key }, actor, event.at, event.data);
+}
+
+/** A comment or reply on a document, with the ticket the work state linked the document to. */
+export function normalizeDocEvent(
+  event: DocEvent,
+  actor: Actor,
+  ticket: string | undefined,
+): WorkflowEvent {
+  return build(
+    "doc.commented",
+    { doc: event.doc, ...(ticket ? { ticket } : {}) },
+    actor,
+    event.at,
+    {
+      docId: event.doc,
+      title: event.title,
+      url: event.url,
+      ...event.data,
+    },
+  );
 }

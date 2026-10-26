@@ -16,6 +16,7 @@ import { ticketCandidates } from "./infer.js";
 import type {
   CiState,
   CurrentWork,
+  DocRecord,
   PrRecord,
   TicketRecord,
   WorkState,
@@ -30,6 +31,7 @@ const TERMINAL = new Set(["done", "canceled"]);
 const prNode = (key: string): Ref => ({ type: "pr", ref: key });
 const ticketNode = (key: string): Ref => ({ type: "ticket", ref: key });
 const personNode = (handle: string): Ref => ({ type: "person", ref: handle });
+const docNode = (id: string): Ref => ({ type: "doc", ref: id });
 const ACTOR = { kind: "automation", id: "workstate" } as const;
 
 interface Fresh {
@@ -77,6 +79,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
   const prs = new Map<string, PrRecord>();
   const tickets = new Map<string, TicketRecord>();
+  const docs = new Map<string, DocRecord>();
   const workers = new Map<string, string>();
 
   /** Tickets whose latest work item ended as a hand-back as done. */
@@ -275,6 +278,50 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     if (ticket.status === "review" || ticket.status === "blocked") {
       await saveTicket(withRequester(ticket, trackerIdentity(login), event));
     }
+  };
+
+  /**
+   * A trusted human's comment on a ticket an agent handed back sends it back to the agent (as
+   * `ticket-comment-reactivates-ticket` does), so that person is who the next hand-back goes to.
+   */
+  const recordCommentRequester = async (key: string, event: WorkflowEvent) => {
+    const person = trustedHuman(event);
+    const ticket = tickets.get(key);
+    if (
+      !person ||
+      ticket?.assignee?.kind !== "human" ||
+      (ticket.status !== "review" && ticket.status !== "blocked")
+    ) {
+      return;
+    }
+
+    await saveTicket(withRequester(ticket, person, event));
+  };
+
+  // Documents
+
+  const saveDoc = async (rec: DocRecord) => {
+    docs.set(rec.id, rec);
+    await store.upsertSubject("doc", rec.id, rec);
+    await store.link(ROOT, docNode(rec.id), "tracks");
+    await store.link(docNode(rec.id), personNode(rec.author), "authored_by");
+  };
+
+  const touchDoc = async (id: string, event: WorkflowEvent) => {
+    const rec = docs.get(id);
+    const at = typeof event.data["at"] === "string" ? event.data["at"] : clock.now().toISOString();
+    if (rec && Date.parse(at) > Date.parse(rec.touchedAt)) {
+      await saveDoc({ ...rec, touchedAt: at });
+    }
+  };
+
+  const docOpen = (rec: DocRecord): boolean => {
+    const ticket = rec.ticket ? tickets.get(rec.ticket) : undefined;
+    if (ticket) {
+      return !(ticket.status && TERMINAL.has(ticket.status));
+    }
+
+    return clock.now().getTime() - Date.parse(rec.touchedAt) < retentionMs;
   };
 
   const ensureTicket = async (key: string): Promise<boolean> => {
@@ -517,6 +564,15 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       case "ticket.commented":
         if (event.subject.ticket) {
           await refreshTicket(event.subject.ticket, event);
+          if (event.type === "ticket.commented") {
+            await recordCommentRequester(event.subject.ticket, event);
+          }
+        }
+
+        return;
+      case "doc.commented":
+        if (event.subject.doc) {
+          await touchDoc(event.subject.doc, event);
         }
 
         return;
@@ -540,6 +596,13 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       if (t.status && TERMINAL.has(t.status) && old(t.updatedAt)) {
         tickets.delete(key);
         await store.unlink(ROOT, ticketNode(key), "tracks");
+      }
+    }
+
+    for (const [id, d] of docs) {
+      if (!docOpen(d) && old(d.touchedAt)) {
+        docs.delete(id);
+        await store.unlink(ROOT, docNode(id), "tracks");
       }
     }
   };
@@ -595,6 +658,8 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
         prs.set(link.to.ref, subject.data as PrRecord);
       } else if (link.to.type === "ticket" && subject) {
         tickets.set(link.to.ref, subject.data as TicketRecord);
+      } else if (link.to.type === "doc" && subject) {
+        docs.set(link.to.ref, subject.data as DocRecord);
       }
     }
 
@@ -696,6 +761,28 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     ticketForDraft: (draft) => locked(() => ticketOfDraft(draft)),
     handedBack: (t) => handedBack.has(t),
     ticket: (key) => tickets.get(key),
+    doc: (id) => docs.get(id),
+    docAuthor: (id) => docs.get(id)?.author,
+
+    linkDoc: (doc) =>
+      locked(async () => {
+        const known = docs.get(doc.id);
+        await saveDoc({
+          id: doc.id,
+          title: doc.title,
+          url: doc.url,
+          author: known?.author ?? doc.author,
+          ...((doc.ticket ?? known?.ticket) ? { ticket: (doc.ticket ?? known?.ticket)! } : {}),
+          touchedAt: clock.now().toISOString(),
+        });
+      }),
+
+    openDocs: (limit) =>
+      [...docs.values()]
+        .filter(docOpen)
+        .toSorted((a, b) => Date.parse(b.touchedAt) - Date.parse(a.touchedAt))
+        .slice(0, limit),
+
     lastWorker: (t) => workers.get(t),
     requester: (t) => tickets.get(t)?.requester,
     hasLabel: (t, label) => tickets.get(t)?.labels.includes(label) ?? false,

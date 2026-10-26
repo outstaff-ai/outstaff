@@ -660,6 +660,34 @@ ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"
 ost doc create specs/checkout.md --title "Checkout" --body "# Checkout" --json
 ```
 
+## ost doc update
+
+Change the text or title of a document.
+
+Replaces the text (and optionally the title) of a document. Pass the version you read as baseVersion to refuse overwriting a change someone made meanwhile; without it the current version is replaced. The document you update is linked to your work item, so comments people leave on it come back to you.
+
+```
+ost doc update <id> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--title <title>` | New title. |
+| `--body <body>` | New document text, Markdown. |
+| `--base-version <baseVersion>` | The version you read (`ost doc show --json`); a newer one is a conflict. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost doc update specs/checkout.md --body "# Checkout (revised)"
+ost doc update specs/checkout.md --body "# Checkout (revised)" --json
+```
+
 ## ost doc reply
 
 Reply to a comment on a document.

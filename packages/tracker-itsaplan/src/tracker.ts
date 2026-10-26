@@ -11,6 +11,7 @@ import {
   type TrackerEvent,
 } from "@outstaff/core";
 import { createClient, type ApiProject, type ClientDeps, type Itsaplan } from "./client.js";
+import { OVERLAP_MS, parseCursor } from "./cursor.js";
 import type { TrackerOptions } from "./options.js";
 
 interface ApiIssue {
@@ -63,34 +64,6 @@ const KEY = /^(?:([A-Za-z0-9_]+)-)?(\d+)$/;
 const HYDRATE_CONCURRENCY = 5;
 const FEED_PAGE = 100;
 const EVENT_PAGES = 20;
-
-// Re-read this much before the newest time seen; intake de-duplicates by external id.
-const OVERLAP_MS = 5 * 60_000;
-
-interface EventCursor {
-  since: number;
-  seen: Set<string>;
-}
-
-/** Undefined means "no usable position": an old cursor shape counts as no entry and is baselined. */
-function parseCursor(cursor: string | undefined): EventCursor | undefined {
-  if (!cursor) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(cursor) as { since?: unknown; seen?: unknown };
-    if (parsed && typeof parsed === "object") {
-      const since = typeof parsed.since === "string" ? Date.parse(parsed.since) : Number.NaN;
-      const seen = Array.isArray(parsed.seen) ? parsed.seen.map(String) : [];
-      return Number.isNaN(since) ? undefined : { since, seen: new Set(seen) };
-    }
-  } catch {
-    // fall through
-  }
-
-  throw new PortError("invalid", "Unrecognised tracker cursor.");
-}
 
 export function createItsaplanTracker(
   ctx: AdapterContext<TrackerOptions>,
@@ -404,6 +377,12 @@ function buildTracker(api: Itsaplan): Tracker {
           actor: actor(setup, item),
           at: item.createdAt,
           data: {
+            ...(type === "commented"
+              ? {
+                  commentId: String(item.id),
+                  url: `${api.issueUrl(`${setup.project.key}-${item.issueSequence}`)}#comment-${item.id}`,
+                }
+              : {}),
             ...(item.issueTitle ? { title: item.issueTitle } : {}),
             ...(item.body ? { body: item.body } : {}),
             ...(item.payload?.from?.value ? { from: item.payload.from.value } : {}),

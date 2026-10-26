@@ -30,6 +30,22 @@ export interface TicketRecord {
   updatedAt: string;
 }
 
+/** A knowledge document an agent wrote for a ticket (or in a chat request), kept so comments on it reach the agent. */
+export interface DocRecord {
+  id: string;
+  title: string;
+  url: string;
+
+  /** Handle of the agent who wrote it. */
+  author: string;
+
+  /** The ticket the work item that wrote it was about, if any. */
+  ticket?: string;
+
+  /** When the document was linked or last commented on; the most recently active are read first. */
+  touchedAt: string;
+}
+
 export interface PrRecord {
   ref: PrRef;
   title: string;
@@ -138,4 +154,17 @@ export interface WorkState extends WorkflowState {
     body?: string;
   }): Promise<string | undefined>;
   ticket(key: string): TicketRecord | undefined;
+
+  /** Records that an agent wrote a document, for a ticket or not. Idempotent; the first author stays. */
+  linkDoc(doc: {
+    id: string;
+    title: string;
+    url: string;
+    author: string;
+    ticket?: string;
+  }): Promise<void>;
+  doc(id: string): DocRecord | undefined;
+
+  /** The documents whose comments are worth reading: those of tickets not finished, and recent ones without. Most recently active first. */
+  openDocs(limit: number): DocRecord[];
 }

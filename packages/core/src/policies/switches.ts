@@ -130,6 +130,25 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "Schedule the author to answer a trusted person's review or comment on an already merged pull request, and to open a follow-up pull request if a change is asked for.",
   },
   {
+    path: "feedback.doc_comments",
+    default: true,
+    off: false,
+    kind: "rule",
+    rules: ["doc-feedback-to-author"],
+    behaviour:
+      "Schedule the agent who wrote a knowledge document to answer a trusted person's comment or reply on it: it reads the open comments, updates the document, replies to each and resolves a thread only when the last word is its own. The office polls the comments of documents agents wrote for open work.",
+    needs: "knowledge.docs",
+  },
+  {
+    path: "feedback.ticket_comments",
+    default: true,
+    off: false,
+    kind: "rule",
+    rules: ["ticket-comment-to-assignee", "ticket-comment-reactivates-ticket"],
+    behaviour:
+      "Start a round for the assigned agent when a trusted person comments on its ticket. On a ticket the agent handed back (assigned to a person, in review or blocked) the comment counts as feedback: the ticket goes back to the agent who last worked on it and moves to active. Comments by agents and by the office never start anything.",
+  },
+  {
     path: "hand_back.reassign",
     default: "requester",
     off: "none",

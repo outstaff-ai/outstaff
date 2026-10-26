@@ -1,9 +1,16 @@
 import { parseRepoUrl, PortError } from "@outstaff/core";
-import type { RepoRef, TrackerEvent, UnmappedEvent, VcsEvent, WorkflowEvent } from "@outstaff/core";
+import type {
+  DocEvent,
+  RepoRef,
+  TrackerEvent,
+  UnmappedEvent,
+  VcsEvent,
+  WorkflowEvent,
+} from "@outstaff/core";
 import type { Cancel } from "../clock.js";
 import { clip, prLabel, subjectLabel } from "../log.js";
 import { backoffDelay, DEFAULT_BACKOFF, type BackoffOptions } from "./backoff.js";
-import { normalizeTrackerEvent, normalizeVcsEvent } from "./normalize.js";
+import { normalizeDocEvent, normalizeTrackerEvent, normalizeVcsEvent } from "./normalize.js";
 import { createTrust } from "./trust.js";
 import type { EventHandler, Intake, IntakeMeta, IntakeOptions } from "./types.js";
 import { createWebhookServer, type WebhookParser, type WebhookServer } from "./webhook.js";
@@ -12,6 +19,9 @@ const CURSOR_KEY = "events";
 const DEFAULT_MAX_ATTEMPTS = 5;
 const TRANSIENT = new Set(["rate_limited", "unavailable"]);
 const DEFAULT_STALE_POLL_MINUTES = 10;
+
+/** How many documents one poll of the knowledge base reads the comments of. */
+export const DOC_POLL_LIMIT = 25;
 
 /** The adapters re-read the last 5 minutes of each feed, so an id older than that no longer comes back. */
 const UNMAPPED_MEMORY_MS = 5 * 60_000;
@@ -274,6 +284,15 @@ export function createIntake(opts: IntakeOptions): Intake {
       return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
     });
 
+  const ingestDoc = (event: DocEvent, ticket: string | undefined) =>
+    ingest("knowledge", event, event.doc, async () => {
+      const actor = trust.trackerActor(event.actor);
+      return {
+        event: normalizeDocEvent(event, actor, ticket),
+        trusted: actor.kind !== "human" || actor.trusted,
+      };
+    });
+
   // With no stored cursor the source returns its recent history; that is not news, so only remember where "now" is.
   const setBaseline = async (source: IntakeMeta["source"], cursor: string) => {
     await store.setCursor(source, CURSOR_KEY, cursor);
@@ -281,8 +300,11 @@ export function createIntake(opts: IntakeOptions): Intake {
   };
 
   interface Source {
-    name: "vcs" | "tracker";
+    name: "vcs" | "tracker" | "knowledge";
     poll(): Promise<void>;
+
+    /** No webhook exists for it, so it is polled in webhook mode too. */
+    always?: true;
   }
 
   const sources: Source[] = [
@@ -324,6 +346,41 @@ export function createIntake(opts: IntakeOptions): Intake {
         }
 
         await store.setCursor("tracker", CURSOR_KEY, page.cursor);
+      },
+    });
+  }
+
+  const { knowledge } = ports;
+  if (knowledge && opts.docs) {
+    const watched = opts.docs;
+    sources.push({
+      name: "knowledge",
+      always: true,
+      async poll() {
+        const cursor = await store.getCursor("knowledge", CURSOR_KEY);
+        const docs = watched.open(DOC_POLL_LIMIT);
+        // Nothing to read yet: the first call still happens, so that what is written before the first document is
+        // not mistaken for the baseline later.
+        if (cursor !== undefined && docs.length === 0) {
+          return;
+        }
+
+        const page = await knowledge.events(
+          docs.map((d) => d.id),
+          cursor,
+        );
+
+        if (cursor === undefined) {
+          await setBaseline("knowledge", page.cursor);
+          return;
+        }
+
+        const ticketOf = new Map(docs.map((d) => [d.id, d.ticket]));
+        for (const event of page.events) {
+          await ingestDoc(event, ticketOf.get(event.doc));
+        }
+
+        await store.setCursor("knowledge", CURSOR_KEY, page.cursor);
       },
     });
   }
@@ -437,6 +494,10 @@ export function createIntake(opts: IntakeOptions): Intake {
         });
 
         address = await server.listen();
+        for (const source of sources.filter((s) => s.always)) {
+          schedule(source, 0, 0);
+        }
+
         return;
       }
 

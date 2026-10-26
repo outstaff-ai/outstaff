@@ -14,6 +14,7 @@ Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-spec
 
 ## Rules
 
+- A comment on your ticket from a trusted human reaches you as feedback. Read it, act on it and reply on the ticket. On a ticket you handed back it comes back to you as `active`.
 - Move a ticket the moment its real state changes, not later in a batch.
 - Assign the ticket to yourself before you start it. Never work on a ticket assigned to someone else.
 - Comment on every status change that is not obvious: why it is blocked, why it is canceled.

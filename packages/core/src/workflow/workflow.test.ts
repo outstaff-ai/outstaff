@@ -682,6 +682,8 @@ describe("overrides", () => {
     expect(w.rules.map((x) => x.id)).toEqual([
       "human-feedback-back-to-author",
       "merged-feedback-follow-up",
+      "doc-feedback-to-author",
+      "ticket-comment-to-assignee",
       "assigned-agent-scheduled",
       "ping-requester",
     ]);
@@ -1048,5 +1050,163 @@ describe("one pull request per ticket", () => {
     }
 
     expect(rulesFor("one")).toEqual(kanban);
+  });
+});
+
+describe("comments on documents and tickets", () => {
+  const a = { id: "ada", kind: "agent" as const };
+  const grace = { id: "grace", kind: "human" as const };
+  const docEvent = (over: Partial<ReturnType<typeof ev>> = {}) =>
+    ev("doc.commented", { subject: { doc: "doc-1", ticket: "ACME-1" }, data: {}, ...over });
+
+  const docSchedule = {
+    type: "schedule",
+    person: "ada",
+    kind: "doc_feedback",
+    priority: "high",
+    ticket: "ACME-1",
+    doc: "doc-1",
+  };
+
+  describe("doc-feedback-to-author", () => {
+    it("a human's comment on a document an agent wrote schedules doc_feedback for that agent", () => {
+      expect(run(docEvent(), world())).toEqual([docSchedule]);
+    });
+
+    it("works for a document with no ticket, and leaves the ticket alone whatever its status", () => {
+      const noTicket = run(docEvent({ subject: { doc: "doc-1" } }), world());
+      expect(noTicket).toEqual([
+        { type: "schedule", person: "ada", kind: "doc_feedback", priority: "high", doc: "doc-1" },
+      ]);
+
+      for (const status of ["backlog", "active", "review", "blocked", "done"] as const) {
+        expect(run(docEvent(), world({ status }))).toEqual([docSchedule]);
+      }
+    });
+
+    it("ignores agents, the office, and documents nobody recorded as an agent's", () => {
+      expect(run(docEvent({ actor: a }), world())).toEqual([]);
+      expect(run(docEvent({ actor: automation }), world())).toEqual([]);
+      expect(run(docEvent({ subject: { doc: "doc-9" } }), world())).toEqual([]);
+    });
+
+    it("explains why a document no agent wrote was skipped", () => {
+      const explained = explainWorkflow(
+        docEvent({ subject: { doc: "doc-9" } }),
+        world(),
+        kanban,
+      ).rules.find((r) => r.id === "doc-feedback-to-author");
+
+      expect(explained?.skipped).toEqual([
+        "schedule: no agent is recorded as the author of the document",
+      ]);
+    });
+
+    it("is in every preset", () => {
+      for (const p of ["kanban", "scrum", "minimal"] as const) {
+        expect(run(docEvent(), world(), presetRules(p))).toEqual([docSchedule]);
+      }
+    });
+  });
+
+  describe("ticket-comment-to-assignee", () => {
+    const commented = ev("ticket.commented", { ...tk });
+    const round = {
+      type: "schedule",
+      person: "ada",
+      kind: "ticket_comment",
+      priority: "high",
+      ticket: "ACME-1",
+    };
+
+    it("a human's comment on a ticket assigned to an agent schedules a round for it", () => {
+      for (const status of ["backlog", "ready", "active"] as const) {
+        expect(run(commented, world({ status, ticket: { assignee: a } }))).toEqual([round]);
+      }
+    });
+
+    it("agent and automation comments do nothing", () => {
+      const state = world({ status: "active", ticket: { assignee: a } });
+      expect(run({ ...commented, actor: a }, state)).toEqual([]);
+      expect(run({ ...commented, actor: automation }, state)).toEqual([]);
+    });
+
+    it("leaves finished tickets and tickets nobody is assigned to alone", () => {
+      expect(run(commented, world({ status: "done", ticket: { assignee: a } }))).toEqual([]);
+      expect(run(commented, world({ status: "canceled", ticket: { assignee: a } }))).toEqual([]);
+      expect(run(commented, world({ status: "active" }))).toEqual([]);
+    });
+
+    it("scrum does not start uncommitted backlog work, minimal only schedules", () => {
+      const state = (status: "backlog" | "review") => world({ status, ticket: { assignee: a } });
+      const scrum = presetRules("scrum");
+      expect(run(commented, state("backlog"), scrum)).toEqual([]);
+      expect(run(commented, state("review"), scrum)).toEqual([round]);
+      expect(run(commented, state("review"), presetRules("minimal"))).toEqual([round]);
+    });
+  });
+
+  describe("ticket-comment-reactivates-ticket", () => {
+    const commented = ev("ticket.commented", { ...tk });
+    const handedBack = (status: "review" | "blocked") =>
+      world({ status, ticket: { assignee: grace } });
+
+    it.each(["review", "blocked"] as const)(
+      "a comment on a handed-back ticket in %s goes back to the last worker and reactivates it",
+      (status) => {
+        expect(run(commented, handedBack(status))).toEqual([
+          { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
+          { type: "move", ticket: "ACME-1", to: "active" },
+          {
+            type: "schedule",
+            person: "ada",
+            kind: "ticket_comment",
+            priority: "high",
+            ticket: "ACME-1",
+          },
+        ]);
+      },
+    );
+
+    it("leaves a ticket a person is working on in another status alone", () => {
+      for (const status of ["backlog", "ready", "active", "done"] as const) {
+        expect(run(commented, world({ status, ticket: { assignee: grace } }))).toEqual([]);
+      }
+    });
+
+    it("ignores agent and automation comments", () => {
+      expect(run({ ...commented, actor: a }, handedBack("review"))).toEqual([]);
+      expect(run({ ...commented, actor: automation }, handedBack("review"))).toEqual([]);
+    });
+
+    it("only moves the ticket when no agent has worked on it", () => {
+      const nobody = createStaticWorkflowState({
+        tickets: { "ACME-1": { status: "review", assignee: grace } },
+      });
+
+      expect(run(commented, nobody)).toEqual([{ type: "move", ticket: "ACME-1", to: "active" }]);
+    });
+
+    it("minimal never moves a ticket", () => {
+      expect(run(commented, handedBack("review"), presetRules("minimal"))).toEqual([]);
+    });
+  });
+
+  it("the switches remove their rules", () => {
+    const parsed = parseTeamConfig({
+      ...baseConfig(),
+      policies: { feedback: { doc_comments: false, ticket_comments: false } },
+    });
+
+    if (!parsed.ok) {
+      throw new Error(JSON.stringify(parsed.issues));
+    }
+
+    const w = resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
+    expect(w.switched.map((s) => [s.rule, s.switch, s.effect])).toEqual([
+      ["doc-feedback-to-author", "feedback.doc_comments", "removed"],
+      ["ticket-comment-to-assignee", "feedback.ticket_comments", "removed"],
+      ["ticket-comment-reactivates-ticket", "feedback.ticket_comments", "removed"],
+    ]);
   });
 });

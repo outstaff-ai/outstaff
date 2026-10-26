@@ -1,10 +1,10 @@
-import type { Logger, Tracker, TeamConfig, Vcs, WorkflowEvent } from "@outstaff/core";
+import type { Knowledge, Logger, Tracker, TeamConfig, Vcs, WorkflowEvent } from "@outstaff/core";
 import type { Clock } from "../clock.js";
 import type { Store } from "../store/index.js";
 import type { BackoffOptions } from "./backoff.js";
 
 export interface IntakeMeta {
-  source: "vcs" | "tracker";
+  source: "vcs" | "tracker" | "knowledge";
   externalId: string;
 
   /**
@@ -22,7 +22,13 @@ export type EventHandler = (event: WorkflowEvent, meta: IntakeMeta) => void | Pr
 
 export interface IntakeOptions {
   store: Store;
-  ports: { vcs: Vcs; tracker?: Tracker };
+  ports: { vcs: Vcs; tracker?: Tracker; knowledge?: Knowledge };
+
+  /**
+   * The documents agents wrote for open work, whose comments the knowledge source reads: at most `limit`, the most
+   * recently active first. Without it nothing is read from the knowledge base.
+   */
+  docs?: { open(limit: number): { id: string; ticket?: string }[] };
   team: TeamConfig;
   clock: Clock;
   logger: Logger;

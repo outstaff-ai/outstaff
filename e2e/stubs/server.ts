@@ -89,6 +89,7 @@ const control: Route[] = [
     handler: async () => ({
       github: await github.state(),
       tickets: tracker.state(),
+      docs: tracker.docs(),
       chat: chat.state(),
       attachmentsServed: tracker.served(),
     }),
@@ -121,6 +122,22 @@ const control: Route[] = [
       tracker.assignTicket(r.params["key"]!, r.json.to);
       return ok();
     },
+  },
+  {
+    method: "POST",
+    path: "/_test/tickets/:key/comment",
+    handler: (r) => {
+      tracker.commentTicket(r.params["key"]!, r.json.body);
+      return ok();
+    },
+  },
+  {
+    // A person comments on a document of the knowledge base, anchored to `quote`, or replies to `parentId`.
+    method: "POST",
+    path: "/_test/docs/:id/comments",
+    handler: (r) => ({
+      id: tracker.commentDoc(r.params["id"]!, r.json.body, r.json.quote ?? "", r.json.parentId),
+    }),
   },
   {
     method: "POST",

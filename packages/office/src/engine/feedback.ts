@@ -14,7 +14,7 @@ export const DELIVERED_SUBJECT = "work_feedback_delivered";
 /** Set once the follow-up round for an item's late feedback is queued, so a repeated hand-back adds no second one. */
 export const FOLLOW_UP_SUBJECT = "work_feedback_followup";
 
-/** The review or comment a pull request event carries; nothing for other events. */
+/** The review or comment a pull request, ticket or document event carries; nothing for other events. */
 export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
   const text = (key: string) => {
     const v = event.data[key];
@@ -40,6 +40,22 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
         ? { comments: comments as NonNullable<Feedback["comments"]> }
         : {}),
     };
+  }
+
+  if (event.type === "doc.commented") {
+    const docId = text("docId") ?? event.subject.doc;
+    const anchor = text("anchorText");
+    return {
+      ...base,
+      kind: "doc_comment",
+      ...(docId ? { docId } : {}),
+      ...(anchor ? { anchorText: anchor } : {}),
+      ...(commentId ? { commentId } : {}),
+    };
+  }
+
+  if (event.type === "ticket.commented") {
+    return { ...base, kind: "ticket_comment", ...(commentId ? { commentId } : {}) };
   }
 
   if (event.type === "pr.comment") {

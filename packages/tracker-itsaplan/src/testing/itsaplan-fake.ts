@@ -58,6 +58,7 @@ interface DocComment {
   id: string;
   documentId: number;
   parentId: string | null;
+  authorId: string;
   authorName: string;
   body: string;
   quote: string | null;
@@ -544,6 +545,7 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
           id: `c-${++commentCounter}`,
           documentId: d.id,
           parentId: b.parentId ?? null,
+          authorId: actor.userId,
           authorName: actor.name,
           body: b.body,
           quote: b.quote ?? null,

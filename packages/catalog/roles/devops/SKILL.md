@@ -2,7 +2,7 @@
 
 For the person who runs the infrastructure: changes it through pull requests, runs approved deploys and keeps runbooks. By default the cluster and cloud are read-only for you; applying changes is a granted action, never an assumption.
 
-Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
+Read first: `references/ost.md`, `references/team.md`, `references/security.md`, `references/memory.md`, `references/git.md`, `process/work-items.md`, `process/ticket-lifecycle.md`, `process/direct-requests.md`, `process/review-loop.md`, `process/merged-feedback.md`, `process/doc-feedback.md`, `process/hand-back.md`. Use `templates/pull-request.md` for pull request descriptions.
 
 ## Non-negotiables
 
@@ -50,6 +50,12 @@ Something is broken in a running environment.
 
 - Gather evidence with read-only commands: what changed, when, what the logs say. Link or quote the minimum needed.
 - Report the likely cause, the evidence and options with risks. Do not fix by hand; propose the change as a pull request or ask a trusted human for a granted action.
+
+### doc-feedback
+
+A trusted human commented on a document you wrote.
+
+Follow `process/doc-feedback.md`: read the comments, act on them, reply, and resolve a thread when you have addressed it and the last word is yours.
 
 ## Checks before you push
 

@@ -870,6 +870,7 @@
                           "ticket.moved",
                           "ticket.commented",
                           "ticket.created",
+                          "doc.commented",
                           "agent.handed_back",
                           "agent.asked",
                           "schedule.cron"
@@ -892,6 +893,7 @@
                             "ticket.moved",
                             "ticket.commented",
                             "ticket.created",
+                            "doc.commented",
                             "agent.handed_back",
                             "agent.asked",
                             "schedule.cron"
@@ -997,7 +999,7 @@
                               "properties": {
                                 "person": {
                                   "type": "string",
-                                  "pattern": "^(author|assignee|last_worker|role:[a-z][a-z0-9-]*)$"
+                                  "pattern": "^(author|assignee|last_worker|doc_author|role:[a-z][a-z0-9-]*)$"
                                 },
                                 "kind": {
                                   "type": "string",
@@ -1196,7 +1198,9 @@
         "feedback": {
           "default": {
             "follow_up_round": true,
-            "merged_prs": true
+            "merged_prs": true,
+            "doc_comments": true,
+            "ticket_comments": true
           },
           "description": "How agents act on feedback from trusted people beyond the first round.",
           "type": "object",
@@ -1209,6 +1213,16 @@
             "merged_prs": {
               "default": true,
               "description": "Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.",
+              "type": "boolean"
+            },
+            "doc_comments": {
+              "default": true,
+              "description": "Schedule the author of a knowledge document to answer a trusted person's comments on it. Switches the preset rule doc-feedback-to-author. Default on.",
+              "type": "boolean"
+            },
+            "ticket_comments": {
+              "default": true,
+              "description": "Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.",
               "type": "boolean"
             }
           },

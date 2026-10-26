@@ -1,6 +1,6 @@
 import type { Req, Route } from "./http.ts";
 
-/** The parts of the Its a Plan REST API the tracker adapter uses: project setup, issues, comments and the activity feed. */
+/** The parts of the Its a Plan REST API the tracker adapter uses: project setup, issues, comments, the activity feed and documents. */
 
 interface Column {
   id: number;
@@ -35,6 +35,30 @@ interface Activity {
   body: string | null;
   action: string | null;
   payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface Doc {
+  id: number;
+  parentId: number | null;
+  title: string;
+  content: string;
+  contentJson: unknown;
+  metadata: Record<string, unknown>;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DocComment {
+  id: string;
+  documentId: number;
+  parentId: string | null;
+  authorId: string;
+  authorName: string;
+  body: string;
+  quote: string;
+  resolvedAt: string | null;
   createdAt: string;
 }
 
@@ -105,6 +129,10 @@ export function createTracker(opts: TrackerOptions) {
   /** Relations the agents made between tickets (`POST /issues/:id/links`). */
   const related: { from: string; to: string; kind: string }[] = [];
   const activity: Activity[] = [];
+
+  /** Documents of the knowledge base and the comment threads on them (they are not in the activity feed). */
+  const docs: Doc[] = [];
+  const docComments: DocComment[] = [];
 
   /** Files attached to tickets, and the public ids a download was served for. */
   const attachments: { issueId: number; name: string; mimetype: string; data: Buffer }[] = [];
@@ -199,8 +227,147 @@ export function createTracker(opts: TrackerOptions) {
       return who ? handler(r, who) : denied;
     };
 
+  const docById = (id: string) => docs.find((d) => d.id === Number(id));
+  const docFull = (d: Doc) => ({ ...d, ownerUserId: null, archivedAt: null });
+  const commentOn = (
+    docId: number,
+    who: string,
+    body: string,
+    quote: string,
+    parentId?: string,
+  ) => {
+    const row: DocComment = {
+      id: `c-${docComments.length + 1}`,
+      documentId: docId,
+      parentId: parentId ?? null,
+      authorId: who,
+      authorName: member(who).name,
+      body,
+      quote,
+      resolvedAt: null,
+      createdAt: clock(),
+    };
+
+    docComments.push(row);
+    return row;
+  };
+
   const base = "/tracker";
   const routes: Route[] = [
+    {
+      method: "GET",
+      path: `${base}/projects/:p/documents`,
+      handler: as(() => docs.map(docFull)),
+    },
+    {
+      method: "POST",
+      path: `${base}/projects/:p/documents`,
+      handler: as((r) => {
+        const now = clock();
+        const doc: Doc = {
+          id: docs.length + 1,
+          parentId: r.json.parentId ?? null,
+          title: r.json.title,
+          content: r.json.content ?? "",
+          contentJson: r.json.contentJson ?? null,
+          metadata: r.json.metadata ?? {},
+          version: 1,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        docs.push(doc);
+        return { status: 201, body: docFull(doc) };
+      }),
+    },
+    {
+      method: "GET",
+      path: `${base}/projects/:p/documents/:id`,
+      handler: as((r) => {
+        const d = docById(r.params["id"]!);
+        return d ? docFull(d) : err(404, "document not found");
+      }),
+    },
+    {
+      method: "PATCH",
+      path: `${base}/projects/:p/documents/:id`,
+      handler: as((r) => {
+        const d = docById(r.params["id"]!);
+        if (!d) {
+          return err(404, "document not found");
+        }
+
+        if (r.json.version !== d.version) {
+          return err(409, "The page changed; read it again.", "version_conflict");
+        }
+
+        for (const field of ["title", "content", "contentJson"] as const) {
+          if (r.json[field] !== undefined) {
+            (d as unknown as Record<string, unknown>)[field] = r.json[field];
+          }
+        }
+
+        d.version += 1;
+        d.updatedAt = clock();
+        return docFull(d);
+      }),
+    },
+    {
+      method: "GET",
+      path: `${base}/projects/:p/documents/:id/comments`,
+      handler: as((r) =>
+        docComments
+          .filter((c) => c.documentId === Number(r.params["id"]))
+          .map((c) => ({
+            ...c,
+            documentVersion: 1,
+            from: null,
+            to: null,
+            orphaned: false,
+            updatedAt: c.createdAt,
+          })),
+      ),
+    },
+    {
+      method: "POST",
+      path: `${base}/projects/:p/documents/:id/comments`,
+      handler: as((r, who) => {
+        const d = docById(r.params["id"]!);
+        if (!d) {
+          return err(404, "document not found");
+        }
+
+        const parent = docComments.find((c) => c.id === r.json.parentId);
+        const row = commentOn(
+          d.id,
+          who,
+          r.json.body,
+          parent?.quote ?? r.json.quote ?? "",
+          parent?.id,
+        );
+
+        return { status: 201, body: { id: row.id } };
+      }),
+    },
+    {
+      method: "PATCH",
+      path: `${base}/projects/:p/documents/:id/comments/:cid`,
+      handler: as((r) => {
+        const c = docComments.find(
+          (x) => x.id === r.params["cid"] && x.documentId === Number(r.params["id"]),
+        );
+
+        if (!c) {
+          return err(404, "comment not found");
+        }
+
+        if (r.json.resolved) {
+          c.resolvedAt = clock();
+        }
+
+        return c;
+      }),
+    },
     {
       method: "GET",
       path: `${base}/projects/:p`,
@@ -456,8 +623,49 @@ export function createTracker(opts: TrackerOptions) {
       touch(issue);
     },
 
+    /** A person comments on a ticket. */
+    commentTicket(keyName: string, body: string) {
+      const issue = issues.find((i) => i.identifier === keyName);
+      if (!issue) {
+        throw new Error(`No ticket ${keyName}.`);
+      }
+
+      touch(issue);
+      log(issue, human, { kind: "comment", action: null, body, payload: {} });
+    },
+
+    /** A person comments on a document (a reply when `parentId` is given). */
+    commentDoc(id: string, body: string, quote: string, parentId?: string) {
+      const d = docById(id);
+      if (!d) {
+        throw new Error(`No document ${id}.`);
+      }
+
+      return commentOn(d.id, human, body, quote, parentId).id;
+    },
+
     /** Public ids of the attachments the agents downloaded. */
     served: () => served,
+
+    docs() {
+      return docs.map((d) => ({
+        id: String(d.id),
+        title: d.title,
+        path: d.metadata["path"],
+        body: d.content,
+        version: d.version,
+        comments: docComments
+          .filter((c) => c.documentId === d.id)
+          .map((c) => ({
+            id: c.id,
+            parentId: c.parentId,
+            author: member(c.authorId).username,
+            body: c.body,
+            quote: c.quote,
+            resolved: c.resolvedAt !== null,
+          })),
+      }));
+    },
 
     state() {
       return issues.map((i) => ({
