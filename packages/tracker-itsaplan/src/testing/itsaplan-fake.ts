@@ -92,7 +92,8 @@ const err = (status: number, error: string, code?: string): StubReply => ({
 
 export function createItsaplanFake(opts: FakeOptions = {}) {
   const key = opts.projectKey ?? "SHOP";
-  const ref = `${opts.teamRef ?? "acme"}.${key}`;
+  const teamRef = opts.teamRef ?? "acme";
+  const ref = `${teamRef}.${key}`;
   let tick = 0;
   const clock = () => new Date(Date.UTC(2026, 0, 1, 0, 0, 0) + ++tick * 1000).toISOString();
   const columns: Column[] = (opts.columns ?? DEFAULT_COLUMNS).map((c, i) => ({
@@ -215,7 +216,7 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
       handler: (r) =>
         isProject(r.params["p"]!)
           ? {
-              project: { id: 1, key, ref, name: "Shop" },
+              project: { id: 1, teamId: 1, teamName: "Acme", teamRef, key, ref, name: "Shop" },
               columns,
               labels,
               assignees,

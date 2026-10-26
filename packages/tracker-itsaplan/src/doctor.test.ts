@@ -12,7 +12,7 @@ const team = {
 } as unknown as TeamConfig;
 
 const ctx = (
-  respond: () => Response,
+  respond: (url?: string) => Response,
   tracker?: string,
   scope: "person" | "office" = "person",
 ): DeriveContext => ({
@@ -28,15 +28,22 @@ const ctx = (
         } as never,
       }
     : {}),
-  fetch: (async () => respond()) as unknown as typeof fetch,
+  fetch: (async (url: string | URL) => respond(String(url))) as unknown as typeof fetch,
   now: () => new Date(),
   warn: () => {},
 });
 
+const project = {
+  project: { id: 1, key: "ACME", ref: "acme.ACME", name: "Acme", teamRef: "acme" },
+};
+
+/** Answers `/me` with `body` and the project with a workspace named `acme`. */
 const me =
-  (body: unknown, status = 200) =>
-  () =>
-    new Response(JSON.stringify(body), { status });
+  (body: unknown, status = 200, proj: unknown = project) =>
+  (url?: string) =>
+    new Response(JSON.stringify(String(url).includes("/projects/") ? proj : body), {
+      status: String(url).includes("/projects/") ? 200 : status,
+    });
 
 const secrets = (extra: Record<string, string> = {}) =>
   envSecretSource({ ITSAPLAN_API_KEY: "fake-key", ...extra }, "/nonexistent");
@@ -48,7 +55,7 @@ describe("doctorItsaplan", () => {
       ctx(me({ id: 17, username: "sam" }), "sam"),
     );
 
-    expect(checks.map((c) => c.status)).toEqual(["ok", "ok"]);
+    expect(checks.map((c) => c.status)).toEqual(["ok", "ok", "ok"]);
   });
 
   it("fails when the call is rejected", async () => {
@@ -88,7 +95,22 @@ describe("doctorItsaplan", () => {
 
   it("does not compare an identity for the office", async () => {
     const checks = await doctorItsaplan(secrets(), ctx(me({ id: 17 }), undefined, "office"));
-    expect(checks).toHaveLength(1);
+    expect(checks).toHaveLength(2);
+  });
+
+  it("prints one issue link and one doc link with the workspace", async () => {
+    const checks = await doctorItsaplan(secrets(), ctx(me({ id: 17 }), "17"));
+    expect(checks.find((c) => c.name === "Its a Plan links")).toMatchObject({
+      status: "ok",
+      detail:
+        "Workspace acme. Issue link https://tracker.example/acme/issue/ACME-1, doc link https://tracker.example/acme/ACME/docs/1. Open them to check.",
+    });
+  });
+
+  it("fails when the workspace cannot be determined", async () => {
+    const noTeam = { project: { id: 1, key: "ACME", ref: "ACME", name: "Acme" } };
+    const checks = await doctorItsaplan(secrets(), ctx(me({ id: 17 }, 200, noTeam), "17"));
+    expect(checks.find((c) => c.name === "Its a Plan links")).toMatchObject({ status: "fail" });
   });
 
   it("does nothing without a key", async () => {

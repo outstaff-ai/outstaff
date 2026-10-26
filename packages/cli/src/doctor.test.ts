@@ -348,6 +348,10 @@ describe("ost doctor with the shipped adapters", () => {
       }
 
       if (u.host === "api.tracker.acme.example") {
+        if (u.pathname.startsWith("/projects/")) {
+          return json({ project: { key: "SHOP", ref: "acme.SHOP", teamRef: "acme" } });
+        }
+
         return json({ id: 5, username: "mira.okafor" });
       }
 

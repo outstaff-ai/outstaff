@@ -1,4 +1,5 @@
 import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
+import { Itsaplan } from "./client.js";
 import { ItsaplanHttp } from "./http.js";
 import { knowledgeOptions, resolveConnection } from "./options.js";
 
@@ -18,14 +19,18 @@ export async function doctorItsaplan(
   }
 
   let me: Me;
+  let api: Itsaplan;
   try {
     const conn = resolveConnection(ctx, knowledgeOptions.parse(ctx.options ?? {}));
-    me = await new ItsaplanHttp({
+    const http = new ItsaplanHttp({
       fetch: ctx.fetch,
       apiUrl: conn.api_url,
       webUrl: conn.url,
       apiKey,
-    }).request<Me>("GET", "/me");
+    });
+
+    api = new Itsaplan(http, conn, ctx);
+    me = await http.request<Me>("GET", "/me");
   } catch (e) {
     return [
       {
@@ -48,6 +53,8 @@ export async function doctorItsaplan(
       detail: `An authenticated call works${id === undefined ? "" : ` (member ${id})`}.`,
     },
   ];
+
+  out.push(await linkCheck(api));
 
   const configured = secrets.get("ITSAPLAN_MEMBER_ID");
   if (configured && id !== undefined && configured !== String(id)) {
@@ -93,4 +100,25 @@ export async function doctorItsaplan(
   }
 
   return out;
+}
+
+/** Builds one issue link and one doc link so a human can click them; fails when the workspace is unknown. */
+async function linkCheck(api: Itsaplan): Promise<DoctorCheck> {
+  try {
+    await api.loadWorkspace();
+  } catch (e) {
+    return {
+      name: "Its a Plan links",
+      status: "fail",
+      detail: `The workspace of project ${api.conn.project} could not be determined: ${(e as Error).message}`,
+      fix: "Check the project option and that the API key can read the project.",
+    };
+  }
+
+  const key = `${api.conn.project.split(".").at(-1)}-1`;
+  return {
+    name: "Its a Plan links",
+    status: "ok",
+    detail: `Workspace ${api.workspace}. Issue link ${api.issueUrl(key)}, doc link ${api.docUrl("1")}. Open them to check.`,
+  };
 }

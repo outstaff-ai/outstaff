@@ -175,10 +175,11 @@ describe("tracker", () => {
     await expect(tracker.assign(issue.key, "nobody")).rejects.toMatchObject({ code: "not_found" });
   });
 
-  it("builds issue links from the web address, or a template", async () => {
+  it("builds issue links from the workspace the API names, or a template", async () => {
     const fake = createItsaplanFake();
     const tracker = await createItsaplanTracker(trackerCtx(fake));
-    expect(tracker.links.issue("SHOP-7")).toBe("https://tracker.acme.example/SHOP-7");
+    await tracker.members(); // reads the project, which names the workspace
+    expect(tracker.links.issue("SHOP-7")).toBe("https://tracker.acme.example/acme/issue/SHOP-7");
     const custom = await createItsaplanTracker({
       ...trackerCtx(fake),
       options: trackerOptions.parse({
@@ -189,6 +190,112 @@ describe("tracker", () => {
     });
 
     expect(custom.links.issue("SHOP-7")).toBe("https://tracker.acme.example/p/SHOP/issue/SHOP-7");
+
+    const named = await createItsaplanTracker({
+      ...trackerCtx(createItsaplanFake({ teamRef: "globex" })),
+      options: trackerOptions.parse({
+        url: "https://tracker.acme.example",
+        project: "SHOP",
+        issue_url: "{url}/w/{workspace}/{key}",
+      }),
+    });
+
+    await named.members();
+    expect(named.links.issue("SHOP-7")).toBe("https://tracker.acme.example/w/globex/SHOP-7");
+  });
+
+  it("takes the workspace from the project and lets doc_url override the default", async () => {
+    const fake = createItsaplanFake({ teamRef: "globex" });
+    const kb = await createItsaplanKnowledge(knowledgeCtx(fake));
+    await kb.search("x");
+    expect(kb.links.doc("3")).toBe("https://tracker.acme.example/globex/SHOP/docs/3");
+    const custom = await createItsaplanKnowledge({
+      ...knowledgeCtx(fake),
+      options: knowledgeOptions.parse({ doc_url: "{url}/{workspace}/d/{id}" }),
+    });
+
+    await custom.search("x");
+    expect(custom.links.doc("3")).toBe("https://tracker.acme.example/globex/d/3");
+  });
+
+  it("starts with an unreachable API and resolves the workspace once it answers", async () => {
+    const fake = createItsaplanFake({ teamRef: "globex" });
+    let up = false;
+    let t = Date.parse("2026-01-01T00:00:00Z");
+    const flaky: typeof fake.fetch = async (input, init) => {
+      if (!up) {
+        throw new TypeError("fetch failed");
+      }
+
+      return fake.fetch(input, init);
+    };
+
+    const warnings: string[] = [];
+    const ctx = {
+      ...trackerCtx(fake),
+      fetch: flaky,
+      now: () => new Date(t),
+      log: { ...silentLogger, warn: (m: string) => warnings.push(m) },
+    };
+
+    const tracker = await createItsaplanTracker(ctx);
+    expect(tracker.links.issue("SHOP-7")).toBe("https://tracker.acme.example/SHOP-7");
+    expect(tracker.links.issue("SHOP-8")).toBe("https://tracker.acme.example/SHOP-8");
+    expect(warnings).toHaveLength(1);
+    await new Promise((r) => setTimeout(r, 0)); // the background attempt fails; it backs off
+
+    up = true;
+    await new Promise((r) => setTimeout(r, 0));
+    expect(tracker.links.issue("SHOP-7")).toBe("https://tracker.acme.example/SHOP-7");
+
+    t += 6_000; // past the first backoff
+    await tracker.getIssue((await tracker.createIssue({ title: "A", body: "" })).key);
+    expect(tracker.links.issue("SHOP-7")).toBe("https://tracker.acme.example/globex/issue/SHOP-7");
+  });
+
+  it("keeps explicit templates working while the workspace is unknown", async () => {
+    const fake = createItsaplanFake();
+    const down: typeof fake.fetch = async () => {
+      throw new TypeError("fetch failed");
+    };
+
+    const tracker = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      fetch: down,
+      options: trackerOptions.parse({
+        url: "https://tracker.acme.example",
+        project: "SHOP",
+        issue_url: "{url}/p/{project}/issue/{key}",
+      }),
+    });
+
+    expect(tracker.links.issue("SHOP-7")).toBe("https://tracker.acme.example/p/SHOP/issue/SHOP-7");
+  });
+
+  it("builds document links without the workspace until a read resolves it", async () => {
+    const fake = createItsaplanFake({ teamRef: "globex" });
+    let up = false;
+    const flaky: typeof fake.fetch = async (input, init) => {
+      if (!up) {
+        throw new TypeError("fetch failed");
+      }
+
+      return fake.fetch(input, init);
+    };
+
+    let t = Date.parse("2026-01-01T00:00:00Z");
+    const kb = await createItsaplanKnowledge({
+      ...knowledgeCtx(fake),
+      fetch: flaky,
+      now: () => new Date(t),
+    });
+
+    expect(kb.links.doc("3")).toBe("https://tracker.acme.example/SHOP/docs/3");
+    await new Promise((r) => setTimeout(r, 0));
+    up = true;
+    t += 6_000;
+    await kb.search("x");
+    expect(kb.links.doc("3")).toBe("https://tracker.acme.example/globex/SHOP/docs/3");
   });
 
   it("rejects keys of another project and malformed keys", async () => {
@@ -496,7 +603,8 @@ describe("knowledge", () => {
 
     expect((await kb.get("eng/runbooks")).title).toBe("runbooks");
     expect(fake.state.docs[2]?.contentJson?.content?.[0]?.type).toBe("heading");
-    expect(kb.links.doc("3")).toBe("https://tracker.acme.example/SHOP/docs/3");
+    await kb.search("x");
+    expect(kb.links.doc("3")).toBe("https://tracker.acme.example/acme/SHOP/docs/3");
   });
 
   it("updates against the current version when no baseVersion is given and writes both bodies", async () => {
