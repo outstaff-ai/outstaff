@@ -67,7 +67,13 @@ const dump = (files: Map<string, string>): string =>
 describe("golden output per acme person", () => {
   for (const person of acme.people) {
     it(`${person.handle}`, () => {
-      const result = renderPerson({ team: acme, handle: person.handle, catalog: real });
+      const result = renderPerson({
+        team: acme,
+        handle: person.handle,
+        catalog: real,
+        workdir: "/work/dir",
+      });
+
       const file = join(GOLDEN, `${person.handle}.txt`);
       const actual = dump(result.files);
       if (process.env.UPDATE_GOLDEN === "1") {
@@ -115,6 +121,48 @@ describe("golden output per acme person", () => {
     expect(acme.repos.length).toBeGreaterThan(1);
     expect(work(acme)).toContain("## Which repository");
     expect(work({ ...acme, repos: acme.repos.slice(0, 1) })).not.toContain("## Which repository");
+  });
+
+  it("has no dangling process, reference or template path in any rendered file", () => {
+    const roles = Object.keys(real.roles);
+    expect(roles.length).toBeGreaterThan(1);
+    const teams = [
+      acme,
+      ...roles.map((r) => ({
+        ...acme,
+        people: acme.people.map((p) => ({ ...p, role: r, extends: undefined })),
+      })),
+    ];
+
+    const dangling: string[] = [];
+    for (const team of teams) {
+      const handle = team.people[0]!.handle;
+      const { files } = renderPerson({ team, handle, catalog: real, workdir: "/work/dir" });
+      for (const [file, text] of files) {
+        for (const [path] of text.matchAll(
+          /\/?[\w./-]*\b(?:process|references|templates)\/[\w.-]+\.md\b/g,
+        )) {
+          if (!path.startsWith("/work/dir/") || !files.has(path.slice("/work/dir/".length))) {
+            dangling.push(`${file} -> ${path}`);
+          }
+        }
+      }
+    }
+
+    expect([...new Set(dangling)]).toEqual([]);
+  });
+
+  it("tells every designer to view a canvas before publishing and to answer document threads", () => {
+    const team = {
+      ...acme,
+      people: acme.people.map((p) => ({ ...p, role: "designer", extends: undefined })),
+    };
+
+    const files = renderPerson({ team, handle: team.people[0]!.handle, catalog: real }).files;
+    expect(files.get("skills/designer/SKILL.md")).toContain("View before you publish");
+    expect(files.get("skills/designer/SKILL.md")).toContain("Unknown skill");
+    expect(files.get("process/doc-feedback.md")).toContain("Leave no addressed thread unanswered");
+    expect(files.get("references/ost.md")).toContain("A denial covers exactly the command");
   });
 
   it("has no stale golden files", () => {

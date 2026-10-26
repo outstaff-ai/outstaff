@@ -30,6 +30,12 @@ export type RenderPersonOptions = {
   /** Client's `.outstaff/catalog/`; same-named roles and documents replace stock ones. */
   ejected?: Catalog;
 
+  /**
+   * Absolute directory the files are written to. When set, every `process/`, `references/` and `templates/`
+   * document path in the text becomes absolute below it, since agents run in other directories.
+   */
+  workdir?: string;
+
   /** URL templates for the `links` placeholders. */
   links?: Record<string, string>;
 };
@@ -57,6 +63,11 @@ const merge = (stock: Catalog, ejected?: Catalog) => ({
 });
 
 /** LF line endings and exactly one trailing newline. */
+const DOC_PATH = /(?<![\w/.-])(?:process|references|templates)\/[\w.-]+\.md\b/g;
+
+const absolutize = (text: string, workdir: string | undefined): string =>
+  workdir ? text.replace(DOC_PATH, (p) => `${workdir.replace(/\/+$/, "")}/${p}`) : text;
+
 const normalize = (text: string): string => text.replace(/\r\n?/g, "\n").replace(/\n*$/, "\n");
 
 /**
@@ -99,7 +110,7 @@ export function renderTeam(options: RenderTeamOptions): Map<string, RenderedWork
 }
 
 function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWorkdir {
-  const { team, handle, catalog, ejected, links } = options;
+  const { team, handle, catalog, ejected, links, workdir } = options;
   const merged = merge(catalog, ejected);
   const person = team.people.find((p) => p.handle === handle);
   if (!person) {
@@ -165,7 +176,7 @@ function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWor
     let hit = cache.get(path);
     if (hit === undefined) {
       try {
-        hit = normalize(render(doc.text, context, { file: doc.file }));
+        hit = absolutize(normalize(render(doc.text, context, { file: doc.file })), workdir);
         if (skillOf) {
           hit = withSkillFrontMatter(
             hit,

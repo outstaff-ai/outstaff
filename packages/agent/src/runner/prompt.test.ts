@@ -505,3 +505,50 @@ describe("buildWorkPrompt repositories", () => {
     ).not.toContain("Your repositories");
   });
 });
+
+describe("buildWorkPrompt document paths", () => {
+  it("names every catalog document by an absolute path under the docs directory", () => {
+    const base = offer();
+    const chat = {
+      ...base,
+      workItem: {
+        ...base.workItem,
+        kind: "chat",
+        origin: { channel: "D1", thread: "t1", requester: { id: "U1" }, direct: true },
+      },
+    } as unknown as Offer;
+
+    const workspace = {
+      repo: "shop",
+      worktree: "/home/sam/worktrees/shop/w7",
+      scratch: "/home/sam/scratch/w7",
+      conventionFiles: [],
+    };
+
+    const repo = (name: string) => ({
+      name,
+      kind: "git",
+      access: "write",
+      ref: { host: "h", owner: "o", name },
+      trackerLabels: [],
+    });
+
+    const prompts = [
+      buildWorkPrompt(chat, { resumed: false, docsDir: "/work/dir" }),
+      buildWorkPrompt(base, {
+        resumed: false,
+        docsDir: "/work/dir",
+        workspace: { ...workspace, branch: "ticket/w7" } as never,
+        repos: [repo("a"), repo("b")] as never,
+      }),
+    ];
+
+    const text = prompts.join("\n");
+    expect(text).toContain("/work/dir/process/direct-requests.md");
+    expect(text).toContain("/work/dir/process/work-items.md");
+    expect(text).toContain("/work/dir/references/git.md");
+    for (const m of text.matchAll(/\S*\b(?:process|references|templates)\/[\w.-]+\.md/g)) {
+      expect(m[0]).toMatch(/^\/work\/dir\//);
+    }
+  });
+});
