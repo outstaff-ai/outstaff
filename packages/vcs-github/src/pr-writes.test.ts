@@ -112,7 +112,7 @@ function setup(person: string, over: { pull?: Record<string, unknown>; threads?:
       handler: (r) => {
         seen.bodies["comment"] = r.json;
         seen.auth["comment"] = r.headers.get("authorization")!;
-        return {};
+        return { html_url: "https://github.com/acme/app/pull/7#issuecomment-41" };
       },
     },
     ...(["issues", "pulls"] as const).map((kind): Route => ({
@@ -331,7 +331,8 @@ describe("reviews, replies and diffs", () => {
 
   it("comments on the conversation as the own App", async () => {
     const { vcs, seen } = setup("sam");
-    await vcs.commentOnPullRequest(REPO, 7, "Thanks, done.");
+    const made = await vcs.commentOnPullRequest(REPO, 7, "Thanks, done.");
+    expect(made.url).toBe("https://github.com/acme/app/pull/7#issuecomment-41");
     expect(seen.bodies["comment"]).toEqual({ body: "Thanks, done." });
     expect(seen.auth["comment"]).toBe("Bearer ghs_own");
   });

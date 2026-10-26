@@ -215,8 +215,8 @@ export interface Vcs {
   /** Needs a write grant. `not_found` unless the thread belongs to that pull request. */
   replyToThread(repo: RepoRef, number: number, threadId: string, body: string): Promise<void>;
 
-  /** A top-level comment on the pull request conversation. Needs a write grant. */
-  commentOnPullRequest(repo: RepoRef, number: number, body: string): Promise<void>;
+  /** A top-level comment on the pull request conversation; resolves with its link. Needs a write grant. */
+  commentOnPullRequest(repo: RepoRef, number: number, body: string): Promise<{ url: string }>;
 
   /**
    * Adds the reaction as the person this port instance belongs to. Adding one that is already there is not an

@@ -116,6 +116,10 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       const first = await s.subject.comment(issue.key, "one");
       await s.subject.comment(issue.key, "two");
       expectAbsoluteUrl(first.url);
+      const link = s.subject.links.comment?.(issue.key, first.id) ?? first.url;
+      expectAbsoluteUrl(link);
+      expect(first.url).toBe(link);
+
       const comments = await s.subject.listComments(issue.key);
       expect(comments.map((c) => c.body)).toEqual(["one", "two"]);
     });

@@ -178,9 +178,12 @@ export const docReply = defineVerb({
   async run(env, input) {
     const { kb, doc, url } = await ownComment(env, input.doc, input.commentId);
     const reply = await kb.reply(input.commentId, input.body);
-    return result([`Replied to ${input.commentId} on ${doc.title}.`, url], { doc: doc.id, reply }, [
-      url,
-    ]);
+    const link = kb.links.comment?.(doc.id, reply.id) ?? url;
+    return result(
+      [`Replied to ${input.commentId} on ${doc.title}: ${link}`, url],
+      { doc: doc.id, reply },
+      [link, url],
+    );
   },
 });
 

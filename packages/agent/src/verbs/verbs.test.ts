@@ -68,6 +68,12 @@ describe("ticket verbs", () => {
     const issue = await tracker.createIssue({ title: "T", body: "" });
     const r = await run("ticket.comment", env, { key: issue.key, body: "Done." });
     expectLinks(r, 2);
+    const [made] = await tracker.listComments(issue.key);
+    expect(r.links).toEqual([
+      tracker.links.comment!(issue.key, made!.id),
+      tracker.links.issue(issue.key),
+    ]);
+
     expect(await tracker.listComments(issue.key)).toHaveLength(1);
   });
 
@@ -133,9 +139,14 @@ describe("doc verbs", () => {
   });
 
   it("creates but never overwrites", async () => {
-    const { env } = fakeEnv();
+    const { env, knowledge } = fakeEnv();
     const input = { path: "specs/new.md", title: "New", body: "Text" };
-    expectLinks(await run("doc.create", env, input));
+    const created = await run("doc.create", env, input);
+    expectLinks(created);
+    expect(created.links).toEqual([
+      knowledge.links.doc((created.data as { doc: { id: string } }).doc.id),
+    ]);
+
     await rejects(run("doc.create", env, input), "conflict");
   });
 
@@ -198,7 +209,11 @@ describe("doc verbs", () => {
     const b = await knowledge.seed.doc({ path: "b.md", title: "B", body: "" });
     const c = await knowledge.comment(a.id, { body: "Question" });
 
-    expectLinks(await run("doc.reply", env, { doc: a.id, commentId: c.id, body: "Answer" }));
+    const replied = await run("doc.reply", env, { doc: a.id, commentId: c.id, body: "Answer" });
+    expectLinks(replied, 2);
+    const reply = (replied.data as { reply: { id: string } }).reply;
+    expect(replied.links[0]).toBe(knowledge.links.comment!(a.id, reply.id));
+    expect(replied.text).toContain(replied.links[0]);
     const resolved = await run("doc.resolve", env, { doc: a.id, commentId: c.id });
     expectLinks(resolved);
     expect((await knowledge.comments(a.id)).find((x) => x.id === c.id)?.resolved).toBe(true);
@@ -1033,10 +1048,13 @@ describe("pr write verbs", () => {
     const f = await setup();
     const pr = await f.theirs();
     const r = await run("pr.comment", f.env, { number: pr.number, body: "Done." }, f.ctx);
-    expect(r.links).toEqual([pr.url]);
     const sent = (await f.vcs.events([f.repo])).events.filter(
       (e) => e.type === "pr.comment" && e.data["kind"] === "comment",
     );
+
+    // The comment's own link comes first, then the pull request's.
+    expect(r.links).toEqual([`${pr.url}#issuecomment-${sent[0]!.data["commentId"]}`, pr.url]);
+    expect(r.text).toContain(r.links[0]);
 
     expect(sent.map((e) => [e.actor, e.data["body"]])).toEqual([["sam", "Done."]]);
     await rejects(run("pr.comment", f.env, { number: pr.number, body: " " }, f.ctx), "invalid");
@@ -1153,6 +1171,7 @@ describe("office verbs", () => {
 
     expect(r.text).toContain("Created SHOP-");
     expectLinks(r);
+    expect(r.links).toEqual([f.tracker.links.issue("SHOP-1")]);
     expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
     const issue = await f.tracker.getIssue("SHOP-1");
     expect(issue).toMatchObject({ title: "Add search" });

@@ -1,4 +1,5 @@
 import type { TeamConfig } from "../config/schema.js";
+import type { Knowledge } from "../ports/knowledge.js";
 import type { Tracker } from "../ports/tracker.js";
 
 /**
@@ -25,6 +26,29 @@ export function ticketProjectKeys(team: Partial<Pick<TeamConfig, "integrations">
   return [...new Set(keys.filter((k) => /^[A-Z][A-Z0-9_]*$/.test(k)))];
 }
 
+export interface TicketLinkerOptions {
+  /** The knowledge base; its host (and doc links) count as known when guarding URLs. */
+  knowledge?: Pick<Knowledge, "links"> | undefined;
+
+  /** Called with a description of a link on the tracker's or knowledge host that matches no known template and could not be replaced. */
+  flag?: ((message: string) => void) | undefined;
+}
+
+/** A URL split around the id a link template put in: `{prefix}<id>{suffix}`. */
+function template(build: (id: string) => string): { prefix: string; suffix: string } | undefined {
+  const probe = build("\u0001");
+  const at = probe.indexOf("%01");
+  return at < 0 ? undefined : { prefix: probe.slice(0, at), suffix: probe.slice(at + 3) };
+}
+
+function host(url: string): string | undefined {
+  try {
+    return new URL(url).host;
+  } catch {
+    return undefined;
+  }
+}
+
 const escapeRegExp = (s: string) => s.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
 /**
@@ -36,6 +60,7 @@ const escapeRegExp = (s: string) => s.replaceAll(/[.*+?^${}()|[\]\\]/g, String.r
 export function createTicketLinker(
   team: Partial<Pick<TeamConfig, "integrations">>,
   tracker: Pick<Tracker, "links"> | undefined,
+  options: TicketLinkerOptions = {},
 ): TicketLinker {
   const keys = ticketProjectKeys(team);
   if (!tracker || keys.length === 0) {
@@ -45,13 +70,74 @@ export function createTicketLinker(
   const key = `(?:${keys.map(escapeRegExp).join("|")})-\\d+`;
   const keyOnly = new RegExp(`^${key}$`, "i");
 
+  const hosts = new Set<string>();
+  const trackerHost = host(tracker.links.issue("ACME-1"));
+  if (trackerHost) {
+    hosts.add(trackerHost);
+  }
+
+  const knowledgeHost = options.knowledge ? host(options.knowledge.links.doc("1")) : undefined;
+  if (knowledgeHost) {
+    hosts.add(knowledgeHost);
+  }
+
+  const docTemplate = options.knowledge ? template(options.knowledge.links.doc) : undefined;
+  const issueTemplate = template(tracker.links.issue);
+
+  /** Whether the tracker's comment links carry an anchor of their own, so a fragment on an issue link can be real. */
+  const anchored = tracker.links.comment
+    ? tracker.links.comment("ACME-1", "1") !== tracker.links.issue("ACME-1")
+    : false;
+
+  const exactKey = new RegExp(`^${key}$`, "i");
+
+  /**
+   * Guards a URL on the tracker's or knowledge host: one that is not a known link is replaced with the canonical
+   * link of the ticket it names, or flagged when it names none. A fragment on an issue link is dropped when the
+   * tracker has no comment anchors.
+   */
+  const guard = (raw: string): string => {
+    const trail = /[.,;:!?]+$/.exec(raw)?.[0] ?? "";
+    const url = trail ? raw.slice(0, -trail.length) : raw;
+    const h = host(url);
+    if (!h || !hosts.has(h)) {
+      return raw;
+    }
+
+    const bare = url.replace(/[#?].*$/, "");
+    if (docTemplate && bare.startsWith(docTemplate.prefix)) {
+      return raw;
+    }
+
+    if (issueTemplate && bare.startsWith(issueTemplate.prefix)) {
+      const id = decodeURIComponent(bare.slice(issueTemplate.prefix.length).split("/")[0] ?? "");
+      if (exactKey.test(id)) {
+        const canonical = tracker.links.issue(id.toUpperCase());
+        const exact = bare === canonical;
+        return exact && (anchored || url === bare) ? raw : `${canonical}${trail}`;
+      }
+    }
+
+    const named = new URL(url).pathname
+      .split("/")
+      .map((seg) => decodeURIComponent(seg))
+      .find((seg) => exactKey.test(seg));
+
+    if (named) {
+      return `${tracker.links.issue(named.toUpperCase())}${trail}`;
+    }
+
+    options.flag?.(`Link not built by outstaff on ${h}: ${url}`);
+    return raw;
+  };
+
   // In order of precedence: inline code, Markdown link or image, autolink, URL, email address, bare key.
   const spans = (bare: boolean) =>
     new RegExp(
       [
         "(`+)[^]*?\\1(?!`)",
         String.raw`(?<image>!?)\[(?<label>[^\]\n]*)\]\((?<url>[^)\s]*)(?:\s+"[^"]*")?\)`,
-        "<(?:https?|mailto):[^\\s>]*>",
+        "<(?<auto>https?:[^\\s>]*|mailto:[^\\s>]*)>",
         String.raw`https?://[^\s<>)\]]+`,
         String.raw`[\w.+-]+@[\w-]+(?:\.[\w-]+)+`,
         ...(bare ? [`(?<![\\w/#@.-])(?<found>${key})(?![\\w-])`] : []),
@@ -62,15 +148,28 @@ export function createTicketLinker(
   const rewrite = (text: string, bare: boolean) =>
     text.replace(spans(bare), (...args: unknown[]) => {
       const whole = args[0] as string;
-      const { image, label, url, found } = args.at(-1) as Record<string, string | undefined>;
+      const { image, label, url, found, auto } = args.at(-1) as Record<string, string | undefined>;
+      if (auto !== undefined) {
+        return auto.startsWith("http") ? `<${guard(auto)}>` : whole;
+      }
+
       if (label !== undefined) {
-        if (image || !keyOnly.test(label.trim())) {
+        if (image) {
           return whole;
+        }
+
+        if (!keyOnly.test(label.trim())) {
+          const next = guard(url ?? "");
+          return next === url ? whole : whole.replace(`(${url}`, `(${next}`);
         }
 
         const ref = label.trim().toUpperCase();
         const target = tracker.links.issue(ref);
         return url === target ? whole : `[${ref}](${target})`;
+      }
+
+      if (found === undefined && whole.startsWith("http")) {
+        return guard(whole);
       }
 
       // Bare keys are matched case-insensitively by the shared flag; only upper case ones are ticket keys.

@@ -174,7 +174,10 @@ function buildTracker(api: Itsaplan): Tracker {
     api.member(setup, item.actorUserId, item.actorName);
 
   return {
-    links: { issue: (key) => api.issueUrl(key) },
+    links: {
+      issue: (key) => api.issueUrl(key),
+      comment: (key, id) => api.issueCommentUrl(key, id),
+    },
 
     async getIssue(key) {
       return toIssue(await fetchIssue(key), await api.project());
@@ -244,7 +247,7 @@ function buildTracker(api: Itsaplan): Tracker {
         body: { body },
       });
 
-      return { id: String(made.id), url: `${api.issueUrl(issue.identifier)}#comment-${made.id}` };
+      return { id: String(made.id), url: api.issueCommentUrl(issue.identifier, String(made.id)) };
     },
 
     async listComments(key): Promise<Comment[]> {
@@ -258,7 +261,7 @@ function buildTracker(api: Itsaplan): Tracker {
           id: String(i.id),
           author: actor(setup, i),
           body: i.body ?? "",
-          url: `${api.issueUrl(issue.identifier)}#comment-${i.id}`,
+          url: api.issueCommentUrl(issue.identifier, String(i.id)),
           at: i.createdAt,
         }));
     },

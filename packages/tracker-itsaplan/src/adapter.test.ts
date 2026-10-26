@@ -218,6 +218,48 @@ describe("tracker", () => {
     expect(custom.links.doc("3")).toBe("https://tracker.acme.example/globex/d/3");
   });
 
+  it("links a comment to its parent unless a comment template is set", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const issue = await tracker.createIssue({ title: "T", body: "" });
+    expect(tracker.links.comment!("SHOP-7", "41")).toBe(
+      "https://tracker.acme.example/acme/issue/SHOP-7",
+    );
+
+    const made = await tracker.comment(issue.key, "hi");
+    expect(made.url).toBe(tracker.links.issue(issue.key));
+
+    const custom = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      options: trackerOptions.parse({
+        url: "https://tracker.acme.example",
+        project: "SHOP",
+        issue_comment_url: "{url}/{workspace}/issue/{key}?comment={commentId}",
+      }),
+    });
+
+    const again = await custom.comment(issue.key, "hi again");
+    expect(again.url).toBe(
+      `https://tracker.acme.example/acme/issue/${issue.key}?comment=${again.id}`,
+    );
+
+    expect((await custom.listComments(issue.key)).map((c) => c.url)).toContain(again.url);
+
+    const kb = await createItsaplanKnowledge({
+      ...knowledgeCtx(fake),
+      options: knowledgeOptions.parse({
+        doc_comment_url: "{url}/{workspace}/{project}/docs/{id}#c-{commentId}",
+      }),
+    });
+
+    await kb.search("");
+    expect(kb.links.comment!("3", "3:9")).toBe("https://tracker.acme.example/acme/SHOP/docs/3#c-9");
+
+    const plain = await createItsaplanKnowledge(knowledgeCtx(fake));
+    await plain.search("");
+    expect(plain.links.comment!("3", "3:9")).toBe(plain.links.doc("3"));
+  });
+
   it("starts with an unreachable API and resolves the workspace once it answers", async () => {
     const fake = createItsaplanFake({ teamRef: "globex" });
     let up = false;

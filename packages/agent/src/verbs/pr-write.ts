@@ -1,12 +1,6 @@
-import {
-  createTicketLinker,
-  PortError,
-  policyValue,
-  type ReviewComment,
-  type ReviewVerdict,
-} from "@outstaff/core";
+import { PortError, policyValue, type ReviewComment, type ReviewVerdict } from "@outstaff/core";
 import { z } from "zod";
-import { repoLabel, requireVcs } from "./support.js";
+import { repoLabel, requireVcs, ticketLinker } from "./support.js";
 import { readInputFile } from "./files.js";
 import { mentionGuard } from "./mentions.js";
 import { defineVerb, result, type AgentEnv, type VerbContext } from "./types.js";
@@ -36,10 +30,7 @@ const bodyFile = z
 
 /** Mentions guarded, then ticket keys linked the way the code host wants (wrong links only; GitHub autolinks bare keys). */
 function guarded(env: AgentEnv, text: string): string {
-  return createTicketLinker(env.team, env.tracker).format(
-    mentionGuard(env.team).apply(text),
-    "host",
-  );
+  return ticketLinker(env).format(mentionGuard(env.team).apply(text), "host");
 }
 
 /** The text from `body` or `body-file`, with @-mentions guarded and ticket links fixed; `undefined` when neither is given and it is optional. */
@@ -361,9 +352,12 @@ export const prComment = defineVerb({
 
     const vcs = requireVcs(env);
     const ref = await repoOrWorktree(env, ctx, input.repo);
-    await vcs.commentOnPullRequest(ref, input.number, text);
+    const made = await vcs.commentOnPullRequest(ref, input.number, text);
     const url = vcs.links.pr(ref, input.number);
-    return result([`Commented on ${repoLabel(ref)}#${input.number}.`, url], {}, [url]);
+    return result([`Commented on ${repoLabel(ref)}#${input.number}: ${made.url}`, url], {}, [
+      made.url,
+      url,
+    ]);
   },
 });
 

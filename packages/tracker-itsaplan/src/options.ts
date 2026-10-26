@@ -26,6 +26,18 @@ const connection = {
     .describe(
       "Link template for issues; `{url}`, `{workspace}`, `{project}` and `{key}` are replaced; default `{url}/{workspace}/issue/{key}`.",
     ),
+  issue_comment_url: z
+    .string()
+    .optional()
+    .describe(
+      "Link template for one issue comment; `{url}`, `{workspace}`, `{project}`, `{key}` and `{commentId}` are replaced. Unset: comments link to the issue.",
+    ),
+  doc_comment_url: z
+    .string()
+    .optional()
+    .describe(
+      "Link template for one document comment; `{url}`, `{workspace}`, `{project}`, `{id}` and `{commentId}` are replaced. Unset: comments link to the document.",
+    ),
   doc_url: z
     .string()
     .optional()
@@ -45,6 +57,8 @@ export const knowledgeOptions = z.strictObject({
   agents: connection.agents,
   issue_url: connection.issue_url,
   doc_url: connection.doc_url,
+  issue_comment_url: connection.issue_comment_url,
+  doc_comment_url: connection.doc_comment_url,
 });
 
 export type TrackerOptions = z.output<typeof trackerOptions>;

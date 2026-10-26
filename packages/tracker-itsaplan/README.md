@@ -16,6 +16,7 @@ integrations:
     # agents: [sam, kit]                          # usernames that are agents, besides the team's people handles
     # issue_url: "{url}/{workspace}/issue/{key}"  # link templates; {url}, {workspace}, {project}, {key} / {id}
     # doc_url: "{url}/{workspace}/{project}/docs/{id}"
+    # issue_comment_url / doc_comment_url: optional comment link templates; {commentId} too. Default: the parent's link
   knowledge:
     adapter: itsaplan # url, project, api_url, ca_file and agents fall back to the tracker integration
 ```
@@ -45,7 +46,7 @@ A key carries its owner's permissions. The office uses a member key of its own.
 - Labels are created by name when missing. `link` kinds: `blocks`, `relates`, `duplicates`. There is no parent field: a sub-ticket (`ost ticket create --parent`) carries a `Part of <key>: <link>` line in its description and a `relates` link to its parent.
 - `assign` and the `assignee` filter take a member id, a username or a display name.
 - Events come from the project activity feed (`GET /projects/{project}/analytics/activity`, which needs the dashboards read permission). Mapped: `created`, status moves (`moved`), assignee changes (`assigned`) and comments (`commented`); everything else (labels, priority and so on) is skipped. `externalId` is `itsaplan:<activity id>`. The cursor is opaque (it holds the highest activity id seen); the first call without one returns the feed's history, oldest first, up to 2,000 entries.
-- Comment URLs are the issue URL plus `#comment-<id>`.
+- Comment URLs (`links.comment`) are the issue URL, because no comment anchor is documented; set `issue_comment_url` (variables `{url}`, `{workspace}`, `{project}`, `{key}`, `{commentId}`) when your instance has one. Documents work the same way with `doc_comment_url`.
 
 ## Knowledge behaviour
 

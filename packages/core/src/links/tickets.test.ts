@@ -86,3 +86,52 @@ describe("ticket links", () => {
     expect(both.format("SHOP-3", "chat")).toBe(`[SHOP-3](${url("SHOP-3")})`);
   });
 });
+
+describe("guard for links on the tracker's host", () => {
+  const plain = {
+    links: { issue: (key: string) => `https://tracker.acme.example/acme/issue/${key}` },
+  } as never;
+
+  const guarded = createTicketLinker(team("ACME"), plain);
+
+  it("replaces a made-up tracker URL with the canonical link of the ticket it names", () => {
+    expect(
+      guarded.format("See https://tracker.acme.example/ACME-111#comment-1740.", "tracker"),
+    ).toBe("See https://tracker.acme.example/acme/issue/ACME-111.");
+
+    expect(
+      guarded.format("[the comment](https://tracker.acme.example/browse/ACME-7)", "chat"),
+    ).toBe("[the comment](https://tracker.acme.example/acme/issue/ACME-7)");
+  });
+
+  it("drops a fragment from an issue link when the tracker has no comment anchors", () => {
+    expect(
+      guarded.format("https://tracker.acme.example/acme/issue/ACME-111#comment-1740", "host"),
+    ).toBe("https://tracker.acme.example/acme/issue/ACME-111");
+  });
+
+  it("keeps canonical links, comment links of a tracker with anchors, and other hosts", () => {
+    const own = "https://tracker.acme.example/acme/issue/ACME-5";
+    expect(guarded.format(`${own} and <${own}>`, "chat")).toBe(`${own} and <${own}>`);
+    const comment = tracker.links.comment!("ACME-5", "c1");
+    expect(linker.format(`See ${comment}`, "chat")).toBe(`See ${comment}`);
+    const other = "https://github.com/acme/app/issues/5#issuecomment-1";
+    expect(guarded.format(other, "chat")).toBe(other);
+  });
+
+  it("flags a URL that names no ticket, and leaves documents of the knowledge base alone", () => {
+    const flags: string[] = [];
+    const knowledge = {
+      links: {
+        doc: (id: string) =>
+          `https://tracker.acme.example/acme/SHOP/docs/${encodeURIComponent(id)}`,
+      },
+    } as never;
+
+    const g = createTicketLinker(team("ACME"), plain, { knowledge, flag: (m) => flags.push(m) });
+    const doc = "https://tracker.acme.example/acme/SHOP/docs/3";
+    const odd = "https://tracker.acme.example/some/page";
+    expect(g.format(`${doc} ${odd}`, "chat")).toBe(`${doc} ${odd}`);
+    expect(flags).toEqual([`Link not built by outstaff on tracker.acme.example: ${odd}`]);
+  });
+});
