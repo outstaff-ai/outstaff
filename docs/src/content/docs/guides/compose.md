@@ -59,6 +59,22 @@ On first start the office doesn't pick up existing tickets or pull requests; ass
 | Restart one agent            | `docker compose restart sam`. The office hands its work item back to the queue.                                                                                                   |
 | Why does an agent not start? | `docker compose logs sam`. It prints the reason: a missing secret, an invalid team file, a person who is not on the team, or (with the sandbox on) a host that does not allow it. |
 
+## Connect the office to a monitoring service (proposed)
+
+**Proposed** ([decision 0016](/decisions/0016-event-pipeline/)). An office can connect to a monitoring or management service, a dashboard for example, that shows its people, queues and event traces. The office connects out to it, so nothing needs to reach the office from outside.
+
+1. In the service, register the office. It gives you a link URL and a token.
+2. Add the URL to `team.yaml`:
+
+   ```yaml
+   link:
+     url: wss://ops.acme.example/link
+   ```
+
+3. Put the token in a file and add it to the `office` service as a Compose secret mounted at `/run/secrets/outstaff/OUTSTAFF_LINK_TOKEN`, then recreate the office: `docker compose up -d --force-recreate office`.
+
+The office then keeps one WebSocket open to that URL, reconnecting with a backoff when it drops. The service stores nothing from the office: it asks the office whenever someone looks, so while the office is down the service shows it as offline. The link never holds up the office; its state shows in the office's health output as the `link` component (`connected`, or why it is not), which never makes the office unhealthy. The messages are in the [office link reference](/reference/office-link/).
+
 ## Subprocess sandbox (optional)
 
 By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/integrations/runtime/claude#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap`, Claude Code removes the credential from each command's environment and runs the command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`; the runtime also hides the credential files under `/run/secrets/outstaff` there. The [Kubernetes guide](/guides/kubernetes/#subprocess-sandbox-optional) explains each part.

@@ -88,7 +88,7 @@ describe("configurePipeline", () => {
           policies: {
             no_such_policy: { enabled: false },
             review_to_author: { instruction: "Hi {{nobody}}" },
-            merged_closes_ticket: { instruction: "Close it." },
+            merged_closes_ticket: { instruction: "Closed for {{person}}." },
           },
         },
       }),
@@ -97,13 +97,13 @@ describe("configurePipeline", () => {
     expect(issues).toEqual([
       "pipeline.policies.no_such_policy: no policy has this id",
       "pipeline.policies.review_to_author.instruction: unknown variable nobody; the default is kept",
-      "pipeline.policies.merged_closes_ticket.instruction: only a wake has one; the default is kept",
     ]);
 
     expect(byId(policies, "review_to_author").instruction).toBe(
       DEFAULT_POLICIES.find((p) => p.id === "review_to_author")!.instruction,
     );
 
-    expect(byId(policies, "merged_closes_ticket").instruction).toBeUndefined();
+    // An act's instruction is the note the office posts with its changes.
+    expect(byId(policies, "merged_closes_ticket").instruction).toBe("Closed for {{person}}.");
   });
 });

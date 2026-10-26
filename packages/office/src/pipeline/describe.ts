@@ -33,7 +33,7 @@ export function describeDecision(d: Decision): string {
     case "wake":
       return `wake ${d.person} (${d.kind}) on ${d.subject.type} ${d.subject.ref}`;
     case "act":
-      return `act as ${d.as}: ${d.ops.map(describeOp).join(", ")}`;
+      return `act for ${d.as}: ${d.ops.map(describeOp).join(", ")}`;
     case "drop":
       return `drop: ${d.reason}`;
   }

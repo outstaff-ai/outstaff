@@ -39,6 +39,10 @@ const EVENT_PIPELINE = [
   "packages/office/src/store/migrations/0006_pipeline_traces.ts",
   "packages/core/src/config/pipeline.ts",
   "packages/cli/src/commands/explain.ts",
+  "packages/office/src/link/**/*.ts",
+  "packages/office/src/office-link.ts",
+  "packages/protocol/src/link/**/*.ts",
+  "packages/core/src/acts/**/*.ts",
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];

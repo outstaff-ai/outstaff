@@ -8,13 +8,18 @@ export function createStoreTraceStore(
   store: Pick<Store, "recordTrace" | "getTrace" | "listTraces">,
 ): TraceStore {
   return {
-    record: (trace) =>
-      store.recordTrace({
+    record: async (trace) => {
+      const results =
+        trace.results ??
+        (await store.getTrace(trace.event.id).then((t) => t && toTrace(t).results));
+
+      await store.recordTrace({
         ref: trace.event.id,
         type: trace.event.type,
         at: trace.event.at,
-        data: trace,
-      }),
+        data: results ? { ...trace, results } : trace,
+      });
+    },
     get: async (id) => {
       const found = await store.getTrace(id);
       return found && toTrace(found);

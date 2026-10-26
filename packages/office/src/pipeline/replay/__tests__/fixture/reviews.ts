@@ -102,7 +102,7 @@ export const ciFailure: ReplayScenario = {
         prs: [savedSearches],
         links: { 61: "ACME-141" },
       },
-      note: "intended fix: sam is woken with the failing checks; the office no longer reassigns or moves ACME-141 as itself",
+      note: "intended fix: sam is woken with the failing checks; reassigning and moving ACME-141 is left to sam",
     },
     {
       event: ev("s9-ci-54", "pr.ci_failed", "office", { pr: 54 }, at(171), { failing: ["lint"] }),
@@ -143,7 +143,7 @@ export const otherPrEvents: ReplayScenario = {
         prs: [checkout, second],
         links: { 51: "ACME-131", 63: "ACME-131" },
       },
-      note: "intended fix: a human's pull request leaves the ticket to that human (the office never acts as itself), and one pull request per ticket is the repository's practice, not the office's",
+      note: "intended fix: a human's pull request leaves the ticket to that human (there is no agent to act for), and one pull request per ticket is the repository's practice, not the office's",
     },
     {
       event: ev("s11-closed", "pr.closed", "ada-admin", { pr: 62, ticket: "ACME-162" }, at(182)),
@@ -167,7 +167,7 @@ export const otherPrEvents: ReplayScenario = {
         prs: [legal],
         links: { 55: "ACME-135" },
       },
-      note: "intended fix: there is no agent to act as, so the ticket is left to the human who merged; the office never closes it as itself",
+      note: "intended fix: there is no agent to act for, so closing the ticket is left to the human who merged",
     },
     {
       event: ev(

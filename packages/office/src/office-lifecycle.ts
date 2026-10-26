@@ -1,5 +1,7 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
 import type { Intake } from "./intake/index.js";
+import type { OfficeLink } from "./link/index.js";
+import { linkHealth } from "./office-link.js";
 import type { ComponentHealth, Office, OfficeHealth } from "./office.types.js";
 import type { ProtocolServer } from "./protocol/index.js";
 import type { BlockNotice, Scheduler } from "./scheduler/index.js";
@@ -14,6 +16,7 @@ type State = OfficeHealth["state"];
  */
 export function officeLifecycle(deps: {
   team: Pick<TeamConfig, "team">;
+  link: OfficeLink | undefined;
   store: Store;
   log: Logger;
   intake: Intake;
@@ -24,8 +27,8 @@ export function officeLifecycle(deps: {
   notify: (person: string) => void;
   onBlocked: (b: BlockNotice) => Promise<void>;
 }): Pick<Office, "start" | "stop" | "health"> {
-  const { team, store, log, intake, workState, scheduler, protocol, inFlight, notify, onBlocked } =
-    deps;
+  const { team, link, store, log, intake, workState, scheduler, protocol } = deps;
+  const { inFlight, notify, onBlocked } = deps;
 
   let state: State = "created";
   let stopping: Promise<void> | undefined;
@@ -51,6 +54,7 @@ export function officeLifecycle(deps: {
     }
 
     Object.assign(up, { server: false, workState: false, intake: false, scheduler: false });
+    await link?.stop();
     await store.close();
     state = "stopped";
   };
@@ -91,6 +95,7 @@ export function officeLifecycle(deps: {
         });
 
         up.scheduler = true;
+        link?.start();
         state = "running";
         log.info("office started", { team: team.team.name, agentPort: protocol.port() });
       } catch (error) {
@@ -110,6 +115,8 @@ export function officeLifecycle(deps: {
         workState: { ok: up.workState },
         intake: { ok: up.intake },
         scheduler: { ok: up.scheduler },
+        // Visible, never fatal: an office without its link still works, so the probes stay green.
+        ...(link ? { link: linkHealth(link) } : {}),
       };
 
       try {

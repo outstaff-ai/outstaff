@@ -54,7 +54,10 @@ export interface Policy {
   when?: PipelineCondition | undefined;
   decide: DecideSpec;
 
-  /** The wake instruction, a template with {{variable}} placeholders. Only wake policies have one. */
+  /**
+   * A template with {{variable}} placeholders: for a wake, the instruction the agent is given; for an act, the comment
+   * the office posts with its changes, saying whom they are for.
+   */
   instruction?: string | undefined;
 
   /** False turns the policy off; it is still listed in the trace. Default true. */

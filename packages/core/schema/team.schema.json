@@ -761,11 +761,12 @@
           "minLength": 1
         },
         "pipeline": {
-          "description": "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`. Default off.",
+          "description": "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.",
           "type": "string",
           "enum": [
             "off",
-            "shadow"
+            "shadow",
+            "live"
           ]
         }
       },
@@ -1428,6 +1429,21 @@
       },
       "additionalProperties": false,
       "description": "Proposed (decision 0016): the event pipeline's policies. Read only by the office's shadow mode (office.pipeline: shadow), which records what the pipeline would decide and changes nothing."
+    },
+    "link": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "pattern": "^wss?:\\/\\/\\S+$",
+          "description": "Where the office connects, for example wss://ops.acme.example/link."
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "additionalProperties": false,
+      "description": "Proposed (decision 0016): a monitoring or management service the office connects out to, with the secret OUTSTAFF_LINK_TOKEN, that shows its people, queues and event traces (a dashboard, for example). Without it, or without the token, the office connects to none."
     },
     "policies": {
       "type": "object",

@@ -10,10 +10,10 @@ for (const [file, data] of Object.entries(summary)) {
     continue;
   }
 
-  // Each integration gets a row, and so does the office's event pipeline (decision 0016).
+  // Each integration gets a row, and so do the event pipeline and the office link (decision 0016).
   const name =
     /\/integrations\/([^/]+\/[^/]+)\//.exec(file)?.[1] ??
-    (/\/packages\/office\/src\/pipeline\//.test(file) ? "office/pipeline" : undefined);
+    /\/packages\/(office)\/src\/(pipeline|link)\//.exec(file)?.slice(1).join("/");
 
   if (!name) {
     continue;

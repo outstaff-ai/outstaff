@@ -261,6 +261,9 @@ export interface Store {
   /** Newest event first. */
   listTraces(query?: TraceQuery): Promise<StoredTrace[]>;
 
+  /** In the order they were recorded (then by ref), from `from` on, inclusive: for shipping traces out in order. */
+  listTracesRecorded(query: { from?: string | undefined; limit: number }): Promise<StoredTrace[]>;
+
   close(): Promise<void>;
 }
 

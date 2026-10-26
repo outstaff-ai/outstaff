@@ -15,7 +15,7 @@ export function pipelineSide(trace: Trace): Side {
       for (const op of d.ops) {
         const key = describeOp(op);
         keys.push(key);
-        shown.push(`${key} (as ${d.as})`);
+        shown.push(`${key} (for ${d.as})`);
       }
     } else {
       shown.push(`(drop: ${d.reason})`);
