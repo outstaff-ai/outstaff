@@ -329,6 +329,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       buildWorkPrompt(offer, {
         resumed: sessionId !== undefined && !restarted,
         restarted,
+        ...(opts.env.layout ? { docsDir: opts.env.layout.workDir } : {}),
         ...(offer.interrupted ? { interrupted: true } : {}),
         ...(workspace ? { workspace } : {}),
         ...(opts.repos?.length ? { repos: opts.repos } : {}),

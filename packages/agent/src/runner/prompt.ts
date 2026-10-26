@@ -15,6 +15,9 @@ export function buildWorkPrompt(
     repos?: ClonedRepo[];
     chatContext?: string;
 
+    /** The directory the catalog documents (`process/`, `references/`) are written to; their paths are absolute below it. */
+    docsDir?: string;
+
     /** Files from the chat message that started the item, downloaded to scratch or listed. */
     attachments?: Attachment[];
 
@@ -23,6 +26,9 @@ export function buildWorkPrompt(
   },
 ): string {
   const { workItem: item, context } = offer;
+  const doc = (path: string) =>
+    opts.docsDir ? `${opts.docsDir.replace(/\/+$/, "")}/${path}` : path;
+
   const lines = [
     `Work item ${item.id} (${item.kind}): ${item.title}`,
     `Started by: ${item.trigger}.`,
@@ -140,8 +146,8 @@ export function buildWorkPrompt(
     lines.push(
       "",
       item.kind === "chat"
-        ? `This is a message from ${who}, a trusted human, in chat. You are a chat session: you run beside your other work, read the repositories and the office state, and change no file. Follow process/direct-requests.md. You do not post in chat yourself: answer a question or a discussion in your last message, which is posted in the requester's thread. Do not greet or address them by name or tag them: just answer. If the message is work, file it as the process says and your agent posts the reply instead of your last message.`
-        : `This is a request from ${who}, a trusted human, in chat. Follow process/direct-requests.md. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the requester's thread as the result. Do not greet or address them by name or tag them: just give the outcome. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
+        ? `This is a message from ${who}, a trusted human, in chat. You are a chat session: you run beside your other work, read the repositories and the office state, and change no file. Follow ${doc("process/direct-requests.md")}. You do not post in chat yourself: answer a question or a discussion in your last message, which is posted in the requester's thread. Do not greet or address them by name or tag them: just answer. If the message is work, file it as the process says and your agent posts the reply instead of your last message.`
+        : `This is a request from ${who}, a trusted human, in chat. Follow ${doc("process/direct-requests.md")}. The acknowledgement is already posted and you do not post in chat yourself: your last message is posted in the requester's thread as the result. Do not greet or address them by name or tag them: just give the outcome. Keep it to the outcome and links to the results (pull request, ticket, documents).`,
     );
 
     if (origin.about?.state === "finished") {
@@ -198,7 +204,7 @@ export function buildWorkPrompt(
       "",
       `Your worktree for this item is ${w.worktree} (repository ${w.repo}, ${w.branch ? `branch ${w.branch}` : "detached HEAD at the default branch"}). Scratch space: ${w.scratch}.${
         (opts.repos?.length ?? 0) > 1 && !headBranchOf(offer)
-          ? " That is the repository outstaff opened by default, not a decision about where the work belongs: settle the target repository as process/work-items.md says before you change anything."
+          ? ` That is the repository outstaff opened by default, not a decision about where the work belongs: settle the target repository as ${doc("process/work-items.md")} says before you change anything.`
           : ""
       }`,
       head
@@ -208,7 +214,7 @@ export function buildWorkPrompt(
           : "The worktree is on a detached HEAD at the default branch: no branch exists for this work yet, and outstaff does not name one. Once you know what the work is, and before your first commit, create the branch with git switch -c <name>. Name it the way the repository says (the convention files below); if it says nothing, use <type>/<ticket key>-<short slug>, for example feat/ACME-106-di-scopes, or <type>/<short slug> without a ticket. Keep the ticket key in the branch name or the pull request title. Then commit there and push that branch; never push to the default branch. If the item ends without code changes, create no branch.",
       w.conventionFiles.length
         ? `The repository says how work is done in it. Read these files in the worktree before you change anything, and follow them for commits, branches, the pull request and checks: ${w.conventionFiles.join(", ")}.`
-        : "The repository has no contribution guide, agent guide or pull request template. Follow the defaults in references/git.md and the style of its history.",
+        : `The repository has no contribution guide, agent guide or pull request template. Follow the defaults in ${doc("references/git.md")} and the style of its history.`,
     );
   }
 

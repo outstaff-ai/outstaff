@@ -219,6 +219,11 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     log,
   });
 
+  const layout = agentLayout(
+    opts.home,
+    opts.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
+  );
+
   // Working files: stock catalog plus the team's ejected one, laid out the way the runtime expects them.
   const catalogs = loadCatalogs(opts.stockCatalogDir, team, source.dir);
   let toolStatuses: ToolStatus[] = [];
@@ -227,6 +232,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     rendered = renderPerson({
       team,
       handle: person,
+      workdir: layout.workDir,
       catalog: catalogs.stock,
       ...(catalogs.ejected ? { ejected: catalogs.ejected } : {}),
     });
@@ -278,11 +284,6 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
       `The runtime adapter "${runtimeRef.adapter}" is not installed in this build.`,
     );
   }
-
-  const layout = agentLayout(
-    opts.home,
-    opts.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
-  );
 
   // The Design canvas: roles that declare the capability (their own or an extended role's), unless the team switched it off.
   const declared = [me.role, ...(rendered.extends ?? [])].flatMap((name) => {
