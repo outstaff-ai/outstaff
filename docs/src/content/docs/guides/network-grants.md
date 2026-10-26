@@ -82,12 +82,21 @@ A service with no authentication can also be reached with `curl` when `network.r
 
 ### Install adb
 
-Outstaff does not ship adb and does not name a mise source for it, because none is maintained for platform-tools that Outstaff can pin. Either put `adb` on the `PATH` of an image you build ([Container images](/guides/images/)), or declare it as a tool with a source your team trusts ([Tools](/guides/tools/)):
+Outstaff does not ship adb. Either put `adb` on the `PATH` of an image you build ([Container images](/guides/images/)), or declare it as a tool with mise's `http` backend, which downloads Google's platform-tools zip ([Tools](/guides/tools/#tool-options)):
 
 ```yaml
 tools:
-  adb: { version: 35.0.2, source: "<backend>:<name>", allow: [] }
+  adb:
+    source: "http:adb"
+    version: 37.0.1
+    options:
+      url: "https://dl.google.com/android/repository/platform-tools_r{{ version }}-linux.zip"
+      bin_path: platform-tools
+      checksum: "sha256:d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1"
+    allow: []
 ```
+
+That URL is the linux x86-64 build. Google publishes no arm64 Linux platform-tools, so a team whose agents run on arm64 needs its own image with `adb` on the `PATH`. The checksum above is the SHA-256 of `platform-tools_r37.0.1-linux.zip`, computed from the download (Google's repository manifest lists SHA-1 only). When you change the version, download the new zip, compare its SHA-1 with the manifest at `https://dl.google.com/android/repository/repository2-3.xml`, and put its SHA-256 in `checksum`.
 
 `allow: []` installs the tool and allows no commands from the shell, which is what you want: the agent reaches the device through `ost adb`. The verb runs whichever `adb` is first on the agent's `PATH`. `ost doctor <handle>` reports whether `adb` runs.
 

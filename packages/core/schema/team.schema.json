@@ -296,6 +296,45 @@
                   "type": "string",
                   "pattern": "^[a-z0-9_-]+:\\S+$"
                 },
+                "options": {
+                  "description": "Options mise passes to the tool's backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: \"...\" } }. Needs source.",
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+$"
+                        },
+                        "additionalProperties": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "object",
+                              "propertyNames": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z0-9_-]+$"
+                              },
+                              "additionalProperties": {
+                                "type": "string"
+                              }
+                            }
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
                 "allow": {
                   "anyOf": [
                     {
@@ -746,6 +785,45 @@
             "description": "Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cli or npm:their-cli. Defaults to the tool name, which mise looks up in its registry.",
             "type": "string",
             "pattern": "^[a-z0-9_-]+:\\S+$"
+          },
+          "options": {
+            "description": "Options mise passes to the tool's backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: \"...\" } }. Needs source.",
+            "type": "object",
+            "propertyNames": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$"
+            },
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9_-]+$"
+                  },
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9_-]+$"
+                        },
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
           },
           "allow": {
             "anyOf": [

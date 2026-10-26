@@ -108,6 +108,10 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
     "A tool version is a range, prefix or alias instead of an exact version.",
   "tools.duplicate": "A tool lists a verb twice, or two tools share a source.",
   "tools.rule_program": "A structured rule of a tool names a different program than the tool.",
+  "tools.options_without_source": "A tool sets options but no source to pass them to.",
+  "tools.reserved_option": "A tool option is version, which the tool's version field sets.",
+  "tools.http_checksum":
+    "A tool with an http: source has no checksum, or a platform without one, so the download is not pinned.",
   "integrations.invalid_options": "An integration's options are rejected by its adapter.",
   "people.unknown_role": "A person's role is not in the catalog.",
   "people.unknown_extends": "An extends entry names a role that is not in the catalog.",

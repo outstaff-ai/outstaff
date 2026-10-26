@@ -592,6 +592,13 @@ Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cl
 - Optional
 - Must match `^[a-z0-9_-]+:\S+$`
 
+#### people[].tools.<key>.options
+
+Options mise passes to the tool's backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: "..." } }. Needs source.
+
+- Type: `map`
+- Optional
+
 #### people[].tools.<key>.allow
 
 What the agent may run: "all" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win.
@@ -912,6 +919,13 @@ Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cl
 - Type: `string`
 - Optional
 - Must match `^[a-z0-9_-]+:\S+$`
+
+#### tools.<key>.options
+
+Options mise passes to the tool's backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: "..." } }. Needs source.
+
+- Type: `map`
+- Optional
 
 #### tools.<key>.allow
 

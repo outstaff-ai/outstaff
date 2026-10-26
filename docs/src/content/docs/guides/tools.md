@@ -43,8 +43,42 @@ Without `source`, mise looks the name up in its registry. Set `source` to a mise
 | `github:vendor/their-cli`      | A GitHub release, with asset matching.    |
 | `npm:their-cli`, `pipx:name`   | A package from a package manager.         |
 | `cargo:name`, `go:example.com` | A package built from a language registry. |
+| `http:name`                    | A file or archive downloaded from a URL.  |
 
 The `npm`, `pipx`, `cargo` and `go` backends need that package manager on the agent, which usually means declaring it as a tool first. Two tools cannot share a source (`tools.duplicate`).
+
+## Tool options
+
+A tool can carry `options`, which Outstaff passes to mise as the tool's options. They need a `source` (`tools.options_without_source`), and `version` is not an option (`tools.reserved_option`). A value is a string, or a map for options that differ per platform. The tool is written to `mise.toml` as an inline table, and a change to any option installs the tool again.
+
+The `http` backend installs a tool that is published only as a download. It needs a `url` and a `checksum`, so a download is always pinned: an `http:` source without a `checksum`, or without one in every entry of `platforms`, is rejected (`tools.http_checksum`).
+
+```yaml
+tools:
+  acme-cli:
+    source: "http:acme-cli"
+    version: 2.4.0
+    options:
+      url: "https://downloads.acme.example/acme-cli/{{ version }}/acme-cli-linux-x64.tar.gz"
+      bin_path: bin
+      checksum: "sha256:<64 hex digits>"
+    allow: [status]
+```
+
+`{{ version }}` in a value is filled in by mise. For a tool that downloads a different file per platform, put the options under `platforms`, keyed by `<os>-<arch>` (`linux-x64`, `linux-arm64`, `macos-arm64`), each with its own `url` and `checksum`:
+
+```yaml
+options:
+  platforms:
+    linux-x64:
+      url: "https://downloads.acme.example/acme-cli/{{ version }}/acme-cli-linux-x64.tar.gz"
+      checksum: "sha256:<64 hex digits>"
+    linux-arm64:
+      url: "https://downloads.acme.example/acme-cli/{{ version }}/acme-cli-linux-arm64.tar.gz"
+      checksum: "sha256:<64 hex digits>"
+```
+
+The other options (`bin_path`, `strip_components`, `format` and the rest) are mise's; see the [mise http backend](https://mise.jdx.dev/dev-tools/backends/http.html). Outstaff checks only what it needs to pin the download. The agent needs outbound HTTPS to the download host ([egress](#egress)).
 
 `ubi:vendor/their-cli` also works but mise has deprecated that backend, so prefer `github:`.
 
@@ -81,7 +115,7 @@ A repository can ask for its own pnpm: `packageManager` in `package.json`, or `d
 
 ## Egress
 
-Installing needs outbound HTTPS to the tool sources: mise's registry and release hosts, `github.com` and `api.github.com` for `github:` (and the older `ubi:`), and the package registries of the backends you use. Only the first start and a version change need them, so you can leave them blocked afterwards. See [egress](/reference/container-contract/#egress).
+Installing needs outbound HTTPS to the tool sources: mise's registry and release hosts, `github.com` and `api.github.com` for `github:` (and the older `ubi:`), the download host of each `http:` source, and the package registries of the backends you use. Only the first start and a version change need them, so you can leave them blocked afterwards. See [egress](/reference/container-contract/#egress).
 
 ## Prebuilt images instead
 
