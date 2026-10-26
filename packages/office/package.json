@@ -30,11 +30,12 @@
   },
   "dependencies": {
     "@outstaff/catalog": "workspace:*",
-    "@outstaff/chat-slack": "workspace:*",
     "@outstaff/core": "workspace:*",
+    "@outstaff/integration.chat.slack": "workspace:*",
+    "@outstaff/integration.knowledge.itsaplan": "workspace:*",
+    "@outstaff/integration.tracker.itsaplan": "workspace:*",
+    "@outstaff/integration.vcs.github": "workspace:*",
     "@outstaff/protocol": "workspace:*",
-    "@outstaff/tracker-itsaplan": "workspace:*",
-    "@outstaff/vcs-github": "workspace:*",
     "kysely": "0.29.7",
     "pg": "8.23.1",
     "ws": "8.22.0"

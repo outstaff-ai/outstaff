@@ -90,7 +90,7 @@ A StatefulSet's `selector` and `serviceName` are immutable, so `kubectl apply` c
 
 ## Subprocess sandbox (optional)
 
-By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/packages/runtime-agent-sdk#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap` in the team file, Claude Code removes the credential from the environment of every command, hook and MCP server and runs each command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`, so a command cannot read it from another process either. The runtime also hides the credential files under `/run/secrets/outstaff` inside that sandbox; the other secret files stay readable, because `ost git-credential` runs there.
+By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/integrations/runtime/claude#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap` in the team file, Claude Code removes the credential from the environment of every command, hook and MCP server and runs each command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`, so a command cannot read it from another process either. The runtime also hides the credential files under `/run/secrets/outstaff` inside that sandbox; the other secret files stay readable, because `ost git-credential` runs there.
 
 ```yaml
 integrations:

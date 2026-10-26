@@ -6,7 +6,7 @@ import {
   silentLogger,
 } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
-import { slackChat } from "@outstaff/chat-slack";
+import { slackChat } from "@outstaff/integration.chat.slack";
 import { describe, expect, it } from "vitest";
 import { manualClock } from "../clock.js";
 import { createOfficePorts } from "../ports.js";

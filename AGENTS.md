@@ -6,18 +6,19 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 
 ## Repo map
 
-| Path                    | What it is                                                                                                            |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `packages/core`         | Shared types and the team config model.                                                                               |
-| `packages/catalog`      | Generic roles and skills, baked into container images and ejectable by clients.                                       |
-| `packages/cli`          | The `outstaff` command line (alias `ost`): creates and validates the team config, hires people, sets up credentials.  |
-| `packages/office`       | The office: one container per team. Event intake, work state, workflow engine, scheduler, store (Postgres or SQLite). |
-| `packages/agent`        | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.      |
-| `packages/protocol`     | The agent connection protocol: zod schemas and types shared by the office and the agent.                              |
-| `docs/`                 | The Starlight documentation site (`@outstaff/docs`), published to GitHub Pages at docs.outstaff.work.                 |
-| `docs/scripts/llms.mjs` | Generates `llms.txt` and `llms-full.txt` into `docs/dist` after the docs build.                                       |
+| Path                           | What it is                                                                                                            |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `packages/core`                | Shared types and the team config model.                                                                               |
+| `packages/catalog`             | Generic roles and skills, baked into container images and ejectable by clients.                                       |
+| `packages/cli`                 | The `outstaff` command line (alias `ost`): creates and validates the team config, hires people, sets up credentials.  |
+| `packages/office`              | The office: one container per team. Event intake, work state, workflow engine, scheduler, store (Postgres or SQLite). |
+| `packages/agent`               | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.      |
+| `packages/protocol`            | The agent connection protocol: zod schemas and types shared by the office and the agent.                              |
+| `integrations/<port>/<vendor>` | One adapter package per integration, published as `@outstaff/integration.<port>.<vendor>`.                            |
+| `docs/`                        | The Starlight documentation site (`@outstaff/docs`), published to GitHub Pages at docs.outstaff.work.                 |
+| `docs/scripts/llms.mjs`        | Generates `llms.txt` and `llms-full.txt` into `docs/dist` after the docs build.                                       |
 
-Adapters (tracker, knowledge, vcs, chat, runtime, avatars) are separate packages, one per integration, each implementing a port and checked by a shared contract test kit. They land under `packages/` as the milestones progress.
+Adapters (tracker, knowledge, vcs, chat, runtime, avatars) are separate packages, one per integration, each implementing a port and checked by a shared contract test kit. They live in `integrations/<port>/<vendor>` (for example `integrations/vcs/github`, `@outstaff/integration.vcs.github`). The package name does not change the `adapter:` name a team file uses (`github`, `slack`, `itsaplan`, ...).
 
 ## Commands
 

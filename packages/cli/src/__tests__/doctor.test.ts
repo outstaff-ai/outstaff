@@ -10,10 +10,10 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AdapterRegistry, type DoctorCheck } from "@outstaff/core";
-import { githubVcs } from "@outstaff/vcs-github";
+import { githubVcs } from "@outstaff/integration.vcs.github";
 import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE } from "../../../core/src/testing/fixtures.js";
-import { testKey } from "../../../vcs-github/src/testing/keys.js";
+import { testKey } from "../../../../integrations/vcs/github/src/testing/keys.js";
 import { createAgentAuth } from "../../../office/src/protocol/auth.js";
 import { createProtocolServer } from "../../../office/src/protocol/server.js";
 import { createFakeSource } from "../../../office/src/protocol/testing.js";
