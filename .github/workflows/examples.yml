@@ -3,12 +3,6 @@ name: Examples
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
-    paths:
-      - examples/**
-      - images/**
-      - packages/**
-      - pnpm-lock.yaml
-      - .github/workflows/examples.yml
   # the merge queue tests each PR combined with everything ahead of it
   merge_group:
 
