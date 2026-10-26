@@ -117,7 +117,7 @@ describe("chat requests", () => {
     const session = await say(text);
     await scheduler.markActive(session.item.id);
     const filed = ticket
-      ? await desk.linkTicket("sam", session.item.id, ticket)
+      ? await desk.linkTicket("sam", session.item.id, ticket, text)
       : await desk.queueWork("sam", session.item.id, { title: text, body: "Asked in chat." });
 
     return { session: session.item, filed, item: filed.item };
@@ -465,9 +465,38 @@ describe("chat requests", () => {
         itemId: created.id,
       });
 
-      await expect(desk.linkTicket("sam", session.id, "ACME-6")).rejects.toMatchObject({
-        code: "invalid",
+      // The same request again is refused, by the check before the ticket exists and by the filing itself.
+      await expect(
+        desk.checkFiling("sam", session.id, "  add A   search page "),
+      ).rejects.toMatchObject({ code: "invalid" });
+
+      await expect(
+        desk.linkTicket("sam", session.id, "ACME-6", "Add a search page"),
+      ).rejects.toMatchObject({ code: "invalid" });
+    });
+
+    it("files each request of one message as its own work item", async () => {
+      const first = await fileWork("Add a search page", "ACME-5");
+      await desk.checkFiling("sam", first.session.id, "Fix the footer");
+      const second = await desk.linkTicket("sam", first.session.id, "ACME-6", "Fix the footer");
+
+      expect(second.item.id).not.toBe(first.item.id);
+      expect(await store.getItem(second.item.id)).toMatchObject({
+        parentId: first.session.id,
+        subject: { type: "ticket", ref: "ACME-6" },
+        status: "queued",
       });
+
+      expect(await readOrigin(store, first.session.id)).toMatchObject({
+        filed: second.item.id,
+        requests: ["add a search page", "fix the footer"],
+      });
+
+      // The first filing does not make the person busy for the second: nothing is asked.
+      expect(second.waiting).toBe(false);
+      await expect(
+        desk.linkTicket("sam", first.session.id, "ACME-7", "Fix the footer"),
+      ).rejects.toMatchObject({ code: "invalid" });
     });
 
     it("files work without a tracker as a request", async () => {
@@ -485,7 +514,7 @@ describe("chat requests", () => {
 
     it("is refused for other people's items and for items that are not chat sessions", async () => {
       const r = await say("Add a search page");
-      await expect(desk.linkTicket("pat", r.item.id, "ACME-5")).rejects.toMatchObject({
+      await expect(desk.linkTicket("pat", r.item.id, "ACME-5", "x")).rejects.toMatchObject({
         code: "unknown_item",
       });
 
@@ -496,7 +525,7 @@ describe("chat requests", () => {
         trigger: "human",
       });
 
-      await expect(desk.linkTicket("sam", plain.id, "ACME-5")).rejects.toMatchObject({
+      await expect(desk.linkTicket("sam", plain.id, "ACME-5", "x")).rejects.toMatchObject({
         code: "invalid",
       });
     });

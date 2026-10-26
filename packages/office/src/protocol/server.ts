@@ -288,8 +288,16 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       case "work_link":
         return reply(
           "work_link_result",
-          await desk().linkTicket(person, m.payload.workItemId, m.payload.ticket),
+          await desk().linkTicket(
+            person,
+            m.payload.workItemId,
+            m.payload.ticket,
+            m.payload.request,
+          ),
         );
+      case "work_check":
+        await desk().checkFiling(person, m.payload.workItemId, m.payload.request);
+        return reply("ack", {});
       case "work_queue":
         return reply(
           "work_queue_result",

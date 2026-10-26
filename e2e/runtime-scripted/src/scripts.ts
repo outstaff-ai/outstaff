@@ -226,7 +226,13 @@ export async function* assigned(ctx: ItemContext): Script {
     const created = yield {
       type: "tool",
       tool: "ticket_create",
-      input: { title: part, body: `The second pull request of ${key}.`, parent: key },
+      input: {
+        title: part,
+        body: `The second pull request of ${key}.`,
+        parent: key,
+        assignee: "me",
+        status: "active",
+      },
     };
 
     const subKey = /^Created (\S+?)\./m.exec(created)?.[1];
@@ -367,6 +373,19 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
     }
   }
 
+  // A reviewer's "follow-up: <title>" is work for later: filed from here, under this ticket, not asked of anyone.
+  const followUp = conversational.map((f) => /^follow-up: (.+)$/im.exec(f.body)?.[1]).find(Boolean);
+  let filedFollowUp: string | undefined;
+  if (followUp) {
+    const created = yield {
+      type: "tool",
+      tool: "ticket_create",
+      input: { title: followUp, body: `Found while reviewing ${key}.` },
+    };
+
+    filedFollowUp = /^Created (\S+?)\./m.exec(created)?.[1];
+  }
+
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
     type: "write",
@@ -405,7 +424,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
     };
   }
 
-  return `Addressed ${ids.length} thread${ids.length === 1 ? "" : "s"} on pull request ${number} (${sha}).`;
+  return `Addressed ${ids.length} thread${ids.length === 1 ? "" : "s"} on pull request ${number} (${sha}).${filedFollowUp ? ` Filed follow-up ${filedFollowUp}.` : ""}`;
 }
 
 /**
@@ -509,6 +528,8 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
         title: `Follow up on #${number}`,
         body: `Feedback on the merged #${number}.`,
         parent: ctx.ticket,
+        assignee: "me",
+        status: "active",
       },
     };
 
@@ -614,6 +635,26 @@ export async function* chat(ctx: ItemContext): Script {
   const talk = ctx.conversation ?? [];
   const humans = talk.filter((m) => !m.agent);
   const latest = humans.at(-1)?.text ?? "";
+
+  // A status question is answered from the pull request itself, not from the office's list of work.
+  const statusOf = /^what is the status of PR #(\d+)/i.exec(latest)?.[1];
+  if (statusOf) {
+    // `ost work` links the pull request; its address names the repository.
+    const work = yield { type: "tool", tool: "work", input: {} };
+    const repo = need(
+      new RegExp(`\\((\\S+?)/pull/${statusOf}\\)`).exec(work)?.[1],
+      "the repository",
+    );
+
+    const status = yield {
+      type: "tool",
+      tool: "pr_status",
+      input: { repo, number: Number(statusOf) },
+    };
+
+    return `Pull request ${statusOf}:\n${status}`;
+  }
+
   if (ctx.about) {
     // A reply in the thread of running or finished work: an instruction is attached to that work, a question is answered.
     const target = ctx.ticket ?? (ctx.pr === undefined ? undefined : String(ctx.pr));

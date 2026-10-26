@@ -119,6 +119,12 @@ export const MESSAGE_META = {
       "Files the ticket a chat session created as work: the office creates a work item for it, in the thread the session answers in. Refused for an item that is not a chat session.",
     replies: ["work_link_result", "error"],
   },
+  work_check: {
+    from: "agent",
+    summary:
+      "Asks whether a chat session may file a request now, before it creates the ticket. Refused for an item that is not a chat session and for a request the message already filed, so a refused filing leaves nothing in the tracker.",
+    replies: ["ack", "error"],
+  },
   work_link_result: {
     from: "office",
     summary: "The work item created for the ticket, and whether it waits for its place.",

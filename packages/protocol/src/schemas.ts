@@ -453,6 +453,14 @@ export const messageSchema = z.discriminatedUnion("type", [
     z.strictObject({
       workItemId: itemId,
       ticket: z.string().min(1).max(200).describe("Key of the ticket the agent created."),
+      request: z.string().min(1).max(300).describe("Title of the request the ticket files."),
+    }),
+  ),
+  message(
+    "work_check",
+    z.strictObject({
+      workItemId: itemId,
+      request: z.string().min(1).max(300).describe("Title of the request about to be filed."),
     }),
   ),
   message("work_link_result", filedSchema),

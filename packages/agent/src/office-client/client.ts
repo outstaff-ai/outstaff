@@ -534,8 +534,9 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     reportPosted: (workItemId, id) => ack("report_posted", { workItemId, id }),
     chatReport: (workItemId, kind): Promise<ChatReportResult> =>
       call("chat_report", { workItemId, kind }, "chat_report_result"),
-    linkTicket: (workItemId, ticket) =>
-      call("work_link", { workItemId, ticket }, "work_link_result"),
+    linkTicket: (workItemId, ticket, request) =>
+      call("work_link", { workItemId, ticket, request }, "work_link_result"),
+    checkFiling: (workItemId, request) => ack("work_check", { workItemId, request }),
     attachWork: (workItemId, request) =>
       call("work_attach", { workItemId, ...request }, "work_attach_result"),
     queueWork: (workItemId, request) =>

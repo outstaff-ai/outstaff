@@ -19,6 +19,7 @@ interface Issue {
   columnId: number;
   assigneeUserId: string | null;
   labelIds: number[];
+  parentId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -173,7 +174,13 @@ export function createTracker(opts: TrackerOptions) {
 
   const create = (
     actorId: string,
-    b: { title: string; description?: string; columnId: number; assigneeUserId?: string },
+    b: {
+      title: string;
+      description?: string;
+      columnId: number;
+      assigneeUserId?: string;
+      parentId?: number;
+    },
   ): Issue => {
     const seq = issues.length + 1;
     const issue: Issue = {
@@ -185,6 +192,7 @@ export function createTracker(opts: TrackerOptions) {
       columnId: b.columnId,
       assigneeUserId: b.assigneeUserId ?? null,
       labelIds: [],
+      parentId: b.parentId ?? null,
       createdAt: clock(),
       updatedAt: clock(),
     };
@@ -463,6 +471,10 @@ export function createTracker(opts: TrackerOptions) {
           assign(issue, who, b.assigneeUserId);
         }
 
+        if (b.parentId !== undefined) {
+          issue.parentId = b.parentId;
+        }
+
         if (b.labelIds) {
           issue.labelIds = b.labelIds;
         }
@@ -682,6 +694,7 @@ export function createTracker(opts: TrackerOptions) {
         description: i.description,
         status: column(i.columnId)?.name,
         assignee: nameOf(i.assigneeUserId),
+        parent: issues.find((p) => p.id === i.parentId)?.identifier ?? null,
         links: related.filter((l) => l.from === i.identifier),
         attachments: attachments
           .filter((a) => a.issueId === i.id)

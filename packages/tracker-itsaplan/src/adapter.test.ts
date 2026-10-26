@@ -491,6 +491,47 @@ describe("tracker", () => {
   });
 });
 
+describe("parent", () => {
+  it("sets the real parent field and refuses an API that ignores it", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const parent = await tracker.createIssue({ title: "Parent", body: "" });
+    const child = await tracker.createIssue({ title: "Child", body: "" });
+    await tracker.setParent!(child.key, parent.key);
+    expect(fake.state.issues.find((i) => i.identifier === child.key)?.parentId).toBe(
+      Number(parent.id),
+    );
+
+    const ignoring = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      fetch: (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+        if (init?.method === "PATCH" && body && "parentId" in body) {
+          delete body.parentId;
+          return fake.fetch(input, { ...init, body: JSON.stringify(body) });
+        }
+
+        return fake.fetch(input, init);
+      }) as typeof fetch,
+    });
+
+    const born = await tracker.createIssue({
+      title: "Born a subtask",
+      body: "",
+      parent: parent.key,
+    });
+
+    expect(fake.state.issues.find((i) => i.identifier === born.key)?.parentId).toBe(
+      Number(parent.id),
+    );
+
+    const other = await tracker.createIssue({ title: "Other", body: "" });
+    await expect(ignoring.setParent!(other.key, parent.key)).rejects.toMatchObject({
+      code: "unsupported",
+    });
+  });
+});
+
 describe("errors", () => {
   it("maps HTTP statuses to port error codes", () => {
     expect(
