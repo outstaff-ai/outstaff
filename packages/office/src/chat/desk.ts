@@ -214,8 +214,11 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     };
   }
 
+  /** Two filings are the same request when their wording is, ignoring case and spacing. */
+  const requestKey = (request: string) => request.trim().replace(/\s+/g, " ").toLowerCase();
+
   /** The chat session a filing verb was called from. */
-  async function sessionOf(person: string, sessionId: string) {
+  async function sessionOf(person: string, sessionId: string, request: string) {
     const session = await store.getItem(sessionId);
     if (!session || session.person !== person) {
       throw new ProtocolError("unknown_item", `No work item ${sessionId} for ${person}.`);
@@ -226,10 +229,11 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       throw new ProtocolError("invalid", "Only a chat session files work this way.");
     }
 
-    if (origin.filed) {
+    // A message may hold several requests and each is filed once: only filing the same request again is refused.
+    if (origin.requests?.includes(requestKey(request))) {
       throw new ProtocolError(
         "invalid",
-        "This chat request already filed its work; use that instead of filing a second one.",
+        `This chat message already filed "${request}"; use that instead of filing it again. Another request in the same message is filed as its own ticket.`,
       );
     }
 
@@ -243,11 +247,19 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   async function file(
     person: string,
     sessionId: string,
-    spec: { kind: string; title: string; subject: { type: string; ref: string }; note: string },
+    spec: {
+      kind: string;
+      title: string;
+      request: string;
+      subject: { type: string; ref: string };
+      note: string;
+    },
   ): Promise<Filed> {
-    const { session, origin } = await sessionOf(person, sessionId);
-    const others = await open(person, session.id);
-    const busy = others.some((i) => i.kind !== CHAT_KIND);
+    const { session, origin } = await sessionOf(person, sessionId, spec.request);
+    const all = await open(person, session.id);
+    // Work this session filed earlier is queue order, not a reason to ask the requester where this one goes.
+    const others = all.filter((i) => i.parentId !== session.id);
+    const busy = others.length > 0;
     const created = await scheduler.enqueue({
       person,
       kind: spec.kind,
@@ -255,7 +267,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       trigger: "human",
       subject: spec.subject,
       parentId: session.id,
-      placement: busy ? "last" : "next",
+      placement: all.length > 0 ? "last" : "next",
     });
 
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, {
@@ -268,7 +280,13 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       claimed: [],
     } satisfies ChatOriginRecord);
 
-    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, { ...origin, filed: created.id });
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, {
+      ...origin,
+      filed: created.id,
+      requests: [...(origin.requests ?? []), requestKey(spec.request)],
+    });
+
+    // The thread follows the latest filing; every item filed from it reports in the same thread anyway.
     await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
       itemId: created.id,
     });
@@ -370,7 +388,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     sessionId: string,
     request: { target: string; confirmed: boolean; request?: string },
   ): Promise<Attached> {
-    const { session, origin } = await sessionOf(person, sessionId);
+    const { session, origin } = await sessionOf(person, sessionId, `attach ${request.target}`);
     const target = resolve(person, request.target);
 
     // A ticket is the work of its open pull request, when it has one.
@@ -498,7 +516,12 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       );
     }
 
-    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, { ...origin, filed: item.id });
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, {
+      ...origin,
+      filed: item.id,
+      requests: [...(origin.requests ?? []), requestKey(`attach ${request.target}`)],
+    });
+
     await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
       itemId: item.id,
     });
@@ -683,7 +706,14 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   }
 
   const claim = async (item: WorkItem, origin: ChatOriginRecord, kind: string) => {
-    const key = kind === "failed" || kind === "ack" ? kind : await claimKey(item, kind);
+    // Each request a chat session files is acknowledged once, so a message with two requests gets two replies.
+    const key =
+      kind === "ack"
+        ? `ack:${origin.requests?.length ?? 0}`
+        : kind === "failed"
+          ? kind
+          : await claimKey(item, kind);
+
     if (origin.claimed.includes(key)) {
       return false;
     }
@@ -881,7 +911,11 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       return { post: true, ...where, links: await opts.linksOf(item) };
     },
 
-    async linkTicket(person, workItemId, ticket) {
+    async checkFiling(person, workItemId, request) {
+      await sessionOf(person, workItemId, request);
+    },
+
+    async linkTicket(person, workItemId, ticket, request) {
       const title = (await store.getSubject("ticket", ticket))?.data as
         | { title?: string }
         | undefined;
@@ -889,6 +923,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       const filed = await file(person, workItemId, {
         kind: "assigned",
         title: `assigned: ${ticket}${title?.title ? ` ${title.title}` : ""}`,
+        request,
         subject: { type: "ticket", ref: ticket },
         note: `Tracked in ${ticket}.`,
       });
@@ -903,6 +938,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       return file(person, workItemId, {
         kind: "request",
         title: request.title,
+        request: request.title,
         subject: { type: "chat", ref: workItemId },
         note: request.body,
       });

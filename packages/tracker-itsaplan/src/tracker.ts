@@ -24,6 +24,7 @@ interface ApiIssue {
   columnId: number;
   assigneeUserId?: string | null;
   labelIds?: number[];
+  parentId?: number | null;
   updatedAt: string;
 }
 
@@ -218,6 +219,10 @@ function buildTracker(api: Itsaplan): Tracker {
         body["assigneeUserId"] = api.resolveMemberId(setup, issue.assignee);
       }
 
+      if (issue.parent) {
+        body["parentId"] = (await fetchIssue(issue.parent)).id;
+      }
+
       if (issue.labels?.length) {
         body["labelIds"] = await labelIds(issue.labels, true);
       }
@@ -287,6 +292,20 @@ function buildTracker(api: Itsaplan): Tracker {
       await api.http.request("POST", `/issues/${from.id}/links`, {
         body: { targetIssueId: to.id, kind: relation },
       });
+    },
+
+    async setParent(key, parentKey) {
+      const [child, parent] = [await fetchIssue(key), await fetchIssue(parentKey)];
+      const updated = await api.http.request<ApiIssue>("PATCH", `/issues/${child.id}`, {
+        body: { parentId: parent.id },
+      });
+
+      // An API that ignores the field answers with the issue unchanged: say so, so the caller relates them instead.
+      if (updated.parentId !== parent.id) {
+        throw new PortError("unsupported", "The tracker did not set the parent.");
+      }
+
+      return toIssue(updated, await api.project());
     },
 
     async attach(key, file) {

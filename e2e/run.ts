@@ -462,7 +462,7 @@ async function main() {
   await stub("POST", "/_test/gates/review/close");
   await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, {
     state: "changes_requested",
-    body: "Please greet properly.",
+    body: "Please greet properly.\n\nfollow-up: Add a farewell",
     comments: [{ path: "greeting.txt", line: 1, body: "Say hello to someone." }],
   });
 
@@ -519,6 +519,25 @@ async function main() {
     "chat: a question asked while the review round is held is answered right away, with no ticket and no queue",
   );
 
+  // A chat session reads the pull request and its checks itself (ost pr status).
+  const statusAsked = await stub("POST", "/_test/chat/say", {
+    text: `What is the status of PR #${pr1.pr.number}?`,
+  });
+
+  const statusReply = await until("the pull request status answered in chat", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === statusAsked.id),
+  );
+
+  assertEq(
+    statusReply.text.includes("State: open"),
+    true,
+    "the chat answer has the pull request state",
+  );
+
+  assertEq(statusReply.text.includes("Checks:"), true, "the chat answer has the checks");
+
+  step("chat: a status question is answered with the pull request and its checks");
+
   await stub("POST", "/_test/gates/review/open");
 
   const fixed = await until(
@@ -542,6 +561,17 @@ async function main() {
     strays.length,
     0,
     "the review round pushed to the pull request's branch, no branch of its own",
+  );
+
+  // The agent filed the reviewer's follow-up itself: one ticket, in the backlog, unassigned, under the reviewed ticket.
+  const farewells = (await state()).tickets.filter((x: Json) => x.title === "Add a farewell");
+
+  assertEq(farewells.length, 1, "the review round filed the follow-up once");
+  assertEq(farewells[0].status, "Backlog", "the follow-up is in the backlog");
+  assertEq(farewells[0].assignee ?? null, null, "the follow-up is unassigned");
+  assertEq(farewells[0].parent, first, "the follow-up has the reviewed ticket as its real parent");
+  step(
+    `follow-up: the review round filed ${farewells[0].key} itself, in the backlog, unassigned, under ${first}`,
   );
 
   assertEq(fixed.thread.comments.at(-1).author, "acme-sam[bot]", "the agent replied in the thread");
@@ -1059,11 +1089,8 @@ async function main() {
   );
 
   assertEq(split.child.assignee, "sam", "the sub-ticket is assigned to the agent who made it");
-  assertEq(
-    JSON.stringify(split.child.links),
-    JSON.stringify([{ from: split.child.key, to: parent, kind: "relates" }]),
-    "the sub-ticket is linked to its parent",
-  );
+  assertEq(split.child.parent, parent, "the sub-ticket has its parent as a real parent");
+  assertEq(JSON.stringify(split.child.links), "[]", "no relates link where the parent is real");
 
   assertEq(
     split.t.comments.some((c: Json) => c.body.includes(split.child.key)),

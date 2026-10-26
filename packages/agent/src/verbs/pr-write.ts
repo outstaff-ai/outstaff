@@ -123,7 +123,7 @@ async function oneForTicket(
 
   throw new PortError(
     "conflict",
-    `${ticket} already has ${existing.length === 1 ? "a pull request" : "pull requests"}: ${named}. One ticket takes one pull request, because outstaff moves the ticket to done when its pull request merges. Split the work: create a ticket for this part with \`ost ticket create --parent ${ticket} --title "..."\`, then open the pull request for that new ticket, with \`Closes <new ticket>\` in its body. To change the pull request ${ticket} already has, use \`ost pr update\` or push to its branch.`,
+    `${ticket} already has ${existing.length === 1 ? "a pull request" : "pull requests"}: ${named}. One ticket takes one pull request, because outstaff moves the ticket to done when its pull request merges. Split the work: create a ticket for this part with \`ost ticket create --parent ${ticket} --assignee me --status active --title "..."\`, then open the pull request for that new ticket, with \`Closes <new ticket>\` in its body. To change the pull request ${ticket} already has, use \`ost pr update\` or push to its branch.`,
   );
 }
 

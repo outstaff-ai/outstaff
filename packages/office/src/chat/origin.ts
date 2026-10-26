@@ -25,7 +25,10 @@ export interface ChatOriginRecord extends ChatOrigin {
   /** The message that started the session, for the office's own use (it is not offered to the agent). */
   text?: string;
 
-  /** For a chat session: the work item it filed for the request. The thread belongs to that item from then on. */
+  /** For a chat session: the requests it has filed so far (normalized), so the same one is not filed twice. */
+  requests?: string[];
+
+  /** For a chat session: the work item it filed last for the message. The thread belongs to that item from then on. */
   filed?: string;
 
   /** What was already reported to the requester, so a retry does not post again. */

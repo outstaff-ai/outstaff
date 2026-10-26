@@ -105,7 +105,13 @@ export interface ChatDesk {
    * Files the ticket a chat session created as work: a work item for the ticket, in the session's thread. It starts
    * when the person is idle and otherwise waits last until the requester says where it goes.
    */
-  linkTicket(person: string, workItemId: string, ticket: string): Promise<Filed>;
+  linkTicket(person: string, workItemId: string, ticket: string, request: string): Promise<Filed>;
+
+  /**
+   * Refuses, before anything is created in the tracker, a filing the office would refuse afterwards: a caller that is
+   * not a chat session, or a request this message already filed. `request` is the title of the work.
+   */
+  checkFiling(person: string, workItemId: string, request: string): Promise<void>;
 
   /**
    * Makes a chat session's request part of existing work of the person: a round on its pull request or ticket, or the

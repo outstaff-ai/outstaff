@@ -473,6 +473,8 @@ describe("pr verbs", () => {
       "not_found",
     );
 
+    // The way `ost work` names the repository of a pull request works as well.
+    await run("pr.status", f.env, { repo: `${f.repo.owner}/${f.repo.name}`, number: f.pr.number });
     await rejects(run("pr.status", f.env, { repo: "nothing", number: 1 }), "not_found");
   });
 
@@ -1366,7 +1368,10 @@ describe("office verbs", () => {
     expect(r.text).toContain("Created SHOP-");
     expectLinks(r);
     expect(r.links).toEqual([f.tracker.links.issue("SHOP-1")]);
-    expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
+    expect(f.office.linked).toEqual([
+      { workItemId: "c1", ticket: "SHOP-1", request: "Add search" },
+    ]);
+
     const issue = await f.tracker.getIssue("SHOP-1");
     expect(issue).toMatchObject({ title: "Add search" });
     expect(issue.status.canonical).toBe("ready");
@@ -1429,7 +1434,7 @@ describe("office verbs", () => {
     await rejects(run("work.queue", f.env, { title: "x" }), "invalid", /chat session/);
   });
 
-  it("creates a sub-ticket from inside the work item of its parent, linked and assigned to the caller", async () => {
+  it("creates a sub-ticket from inside the work item of its parent, with a real parent and no assignee", async () => {
     const f = fakeEnv();
     const parent = await f.tracker.createIssue({ title: "Fix checkout", body: "All of it." });
     const r = await run(
@@ -1443,13 +1448,101 @@ describe("office verbs", () => {
     const issue = await f.tracker.getIssue("SHOP-2");
 
     expect(issue.body).toBe(`Part of ${parent.key}: ${url}\n\nOnly the cart.`);
-    expect(issue.status.canonical).toBe("active");
+    expect(issue.status.canonical).toBe("backlog");
+    expect(issue.assignee).toBeUndefined();
+    expect(f.tracker.parents.get("SHOP-2")).toBe(parent.key);
+    expect(f.tracker.relations).toEqual([]);
+    expect(r.text).toContain(`Parent: ${parent.key}.`);
+    expect(r.text).toContain("Name SHOP-2 in your hand-back.");
+    expectLinks(r);
+  });
+
+  it("falls back to a relates link when the tracker has no parent field", async () => {
+    const f = fakeEnv();
+    const parent = await f.tracker.createIssue({ title: "Fix checkout", body: "" });
+    delete (f.tracker as { setParent?: unknown }).setParent;
+    const r = await run("ticket.create", f.env, { title: "Half", parent: parent.key });
     expect(f.tracker.relations).toEqual([
       { key: "SHOP-2", otherKey: parent.key, relation: "relates" },
     ]);
 
-    expect(r.text).toContain(`Part of ${parent.key}: ${url}`);
-    expectLinks(r);
+    expect(r.text).toContain("Related to SHOP-1");
+  });
+
+  it("sets a parent on an existing ticket, and refuses a tracker without parents", async () => {
+    const f = fakeEnv();
+    const parent = await f.tracker.createIssue({ title: "Parent", body: "" });
+    const child = await f.tracker.createIssue({ title: "Child", body: "" });
+    await run("ticket.parent", f.env, { key: child.key, parent: parent.key });
+    expect(f.tracker.parents.get(child.key)).toBe(parent.key);
+
+    delete (f.tracker as { setParent?: unknown }).setParent;
+    await rejects(
+      run("ticket.parent", f.env, { key: child.key, parent: parent.key }),
+      "unsupported",
+    );
+  });
+
+  it("files an independent follow-up with a relates link and no parent", async () => {
+    const f = fakeEnv();
+    await f.tracker.seed.member({ name: "sam", kind: "agent" });
+    await f.tracker.createIssue({ title: "Fix checkout", body: "" });
+    await run(
+      "ticket.create",
+      f.env,
+      { title: "Elsewhere", related: "SHOP-1" },
+      { workItemId: "w1" },
+    );
+
+    expect(f.tracker.parents.size).toBe(0);
+    expect(f.tracker.relations).toEqual([
+      { key: "SHOP-2", otherKey: "SHOP-1", relation: "relates" },
+    ]);
+  });
+
+  it("files a follow-up from a work item that has a ticket: backlog, unassigned, under that ticket", async () => {
+    const f = fakeEnv();
+    await f.tracker.seed.member({ name: "sam", kind: "agent" });
+    await f.tracker.createIssue({ title: "Fix checkout", body: "" });
+    const r = await run("ticket.create", f.env, { title: "Rate-limit it" }, { workItemId: "w1" });
+    const issue = await f.tracker.getIssue("SHOP-2");
+    expect(issue.status.canonical).toBe("backlog");
+    expect(issue.assignee).toBeUndefined();
+    expect(f.tracker.parents.get("SHOP-2")).toBe("SHOP-1");
+    expect(r.text).toContain("hand-back");
+    expect(f.office.checked).toEqual([]);
+
+    // Asked for, a follow-up is assigned and started.
+    await run(
+      "ticket.create",
+      f.env,
+      { title: "Mine", assignee: "me", status: "active" },
+      { workItemId: "w1" },
+    );
+
+    const mine = await f.tracker.getIssue("SHOP-3");
+    expect(mine.status.canonical).toBe("active");
+    expect(mine.assignee).toBeDefined();
+  });
+
+  it("writes nothing to the tracker when the office refuses the filing", async () => {
+    const f = fakeEnv();
+    const record = f.office.checkFiling;
+    f.office.checkFiling = async (id, request) => {
+      await record(id, request);
+      throw new PortError("invalid", "This chat message already filed it.");
+    };
+
+    f.office.work = async () => [{ id: "c1", title: "Chat", status: "active", kind: "chat" }];
+    await rejects(
+      run("ticket.create", f.env, { title: "Add search" }, { workItemId: "c1" }),
+      "invalid",
+      /already filed/,
+    );
+
+    expect(await f.tracker.listIssues({})).toHaveLength(0);
+    expect(f.office.checked).toEqual([{ workItemId: "c1", request: "Add search" }]);
+    expect(f.office.linked).toEqual([]);
   });
 
   it("creates a sub-ticket with an empty body as just the Part of line, and refuses an unknown parent", async () => {
@@ -1473,17 +1566,6 @@ describe("office verbs", () => {
 
     const r = await run("ticket.create", f.env, { title: "Half", parent: parent.key });
     expect(r.text).toContain("Created SHOP-2.");
-  });
-
-  it("refuses a second ticket for an item that has one", async () => {
-    const f = fakeEnv();
-    await rejects(
-      run("ticket.create", f.env, { title: "Again" }, { workItemId: "w1" }),
-      "invalid",
-      /already has ticket SHOP-1/,
-    );
-
-    expect(await f.tracker.listIssues({})).toHaveLength(0);
   });
 
   it("lists the team", async () => {
@@ -1599,7 +1681,9 @@ describe("files from chat", () => {
     );
 
     expect(r.text).toContain("Attached screen.png, error.log.");
-    expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
+    expect(f.office.linked).toEqual([
+      { workItemId: "c1", ticket: "SHOP-1", request: "Fix the page" },
+    ]);
   });
 
   it("lists the files by name, saying they stayed in chat, when the tracker takes no attachments", async () => {
@@ -1646,7 +1730,10 @@ describe("files from chat", () => {
     expect(warnings).toEqual(["could not attach a file to a ticket"]);
     expect(f.tracker.attached.get("SHOP-1")?.map((a) => a.name)).toEqual(["error.log"]);
     expect(r.text).toContain("Could not attach screen.png.");
-    expect(f.office.linked).toEqual([{ workItemId: "c1", ticket: "SHOP-1" }]);
+    expect(f.office.linked).toEqual([
+      { workItemId: "c1", ticket: "SHOP-1", request: "Fix the page" },
+    ]);
+
     expect((await f.tracker.listComments("SHOP-1")).map((c) => c.body)).toEqual([
       "These files could not be attached and stayed in chat: screen.png.",
     ]);
@@ -1864,6 +1951,7 @@ describe("verb catalogue", () => {
       "ticket.move",
       "ticket.assign",
       "ticket.create",
+      "ticket.parent",
       "ticket.attach",
       "doc.search",
       "doc.show",

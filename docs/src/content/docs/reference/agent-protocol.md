@@ -412,10 +412,22 @@ Files the ticket a chat session created as work: the office creates a work item 
 
 Sent by: agent. Answered by: `work_link_result`, `error`.
 
-| Field        | Type   | Required | Description                          |
-| ------------ | ------ | -------- | ------------------------------------ |
-| `workItemId` | string | yes      | Id of the work item.                 |
-| `ticket`     | string | yes      | Key of the ticket the agent created. |
+| Field        | Type   | Required | Description                            |
+| ------------ | ------ | -------- | -------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                   |
+| `ticket`     | string | yes      | Key of the ticket the agent created.   |
+| `request`    | string | yes      | Title of the request the ticket files. |
+
+### `work_check`
+
+Asks whether a chat session may file a request now, before it creates the ticket. Refused for an item that is not a chat session and for a request the message already filed, so a refused filing leaves nothing in the tracker.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field        | Type   | Required | Description                             |
+| ------------ | ------ | -------- | --------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                    |
+| `request`    | string | yes      | Title of the request about to be filed. |
 
 ### `work_link_result`
 

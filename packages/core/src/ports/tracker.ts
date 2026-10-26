@@ -46,6 +46,9 @@ export interface NewIssue {
   status?: CanonicalStatus;
   assignee?: string;
   labels?: string[];
+
+  /** Key of the ticket this one is a subtask of. Only for a tracker with `setParent`; others ignore it. */
+  parent?: string;
 }
 
 /** A file attached to a ticket, as the tracker lists it. */
@@ -91,6 +94,13 @@ export interface Tracker {
   setLabels(key: string, add: string[], remove: string[]): Promise<Issue>;
   link(key: string, otherKey: string, relation: "blocks" | "relates" | "duplicates"): Promise<void>;
   members(): Promise<Member[]>;
+
+  /**
+   * Capability `tracker.parents`: the tracker has a real parent (subtask) field. Makes `parentKey` the parent of
+   * `key`; `createIssue` takes the same through `parent`. Absent when the tracker has none: callers then fall back to
+   * a "relates" link. Throws `unsupported` when the tracker did not take the parent.
+   */
+  setParent?(key: string, parentKey: string): Promise<Issue>;
 
   /** Capability `tracker.attachments`. Adds a file to the ticket. */
   attach?(key: string, file: NewAttachment): Promise<void>;

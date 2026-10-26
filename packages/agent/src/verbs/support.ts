@@ -54,11 +54,22 @@ export const filedLine = (f: Filed) =>
 const sameRepo = (a: RepoRef, b: RepoRef) =>
   a.owner.toLowerCase() === b.owner.toLowerCase() && a.name.toLowerCase() === b.name.toLowerCase();
 
-/** A repo of the team by its name in team.yaml, or by `host/owner/name`; anything else is refused. */
+/** A repo of the team by its name in team.yaml, by `owner/name` (how `ost work` shows a pull request) or by `host/owner/name`; anything else is refused. */
 export function resolveRepo(env: AgentEnv, ref: string): Required<RepoRef> {
   const byName = env.team.repos.find((r) => r.name === ref);
   if (byName) {
     return parseRepoUrl(byName.url);
+  }
+
+  const short = /^([^/\s]+)\/([^/\s]+)$/.exec(ref);
+  const named = short
+    ? env.team.repos
+        .map((r) => parseRepoUrl(r.url))
+        .find((r) => sameRepo(r, { owner: short[1]!, name: short[2]! }))
+    : undefined;
+
+  if (named) {
+    return named;
   }
 
   let parsed: Required<RepoRef> | undefined;

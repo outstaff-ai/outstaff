@@ -20,6 +20,9 @@ export interface FakeTracker extends Tracker {
   seed: TrackerSeed;
   relations: { key: string; otherKey: string; relation: string }[];
 
+  /** Real parents set with `setParent`: child key to parent key. */
+  parents: Map<string, string>;
+
   /** Every file attached, by ticket key. */
   attached: Map<string, { name: string; mimetype: string; data: Uint8Array }[]>;
 }
@@ -37,6 +40,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const comments = new Map<string, Comment[]>();
   const log = new EventLog<TrackerEvent>();
   const relations: FakeTracker["relations"] = [];
+  const parents: FakeTracker["parents"] = new Map();
   const attached: FakeTracker["attached"] = new Map();
   let counter = 0;
   let eventCounter = 0;
@@ -83,6 +87,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const tracker: FakeTracker = {
     links,
     relations,
+    parents,
     attached,
     as(identity) {
       return new Proxy(tracker, {
@@ -168,6 +173,11 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       }
 
       issues.set(key, issue);
+      if (input.parent) {
+        need(input.parent);
+        parents.set(key, input.parent);
+      }
+
       emit("created", key);
       if (issue.assignee) {
         emit("assigned", key, { assignee: issue.assignee.id });
@@ -222,6 +232,12 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       need(key);
       need(otherKey);
       relations.push({ key, otherKey, relation });
+    },
+    async setParent(key, parentKey) {
+      need(parentKey);
+      const issue = need(key);
+      parents.set(key, parentKey);
+      return touch(issue);
     },
     async members() {
       return structuredClone([...members.values()]);

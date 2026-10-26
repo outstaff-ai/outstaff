@@ -23,6 +23,7 @@ interface Issue {
   columnId: number;
   assigneeUserId: string | null;
   labelIds: number[];
+  parentId?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -151,6 +152,7 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
     columnId: number;
     assigneeUserId?: string;
     labelIds?: number[];
+    parentId?: number;
   }): Issue => {
     const seq = issues.length + 1;
     const issue: Issue = {
@@ -162,6 +164,7 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
       columnId: b.columnId,
       assigneeUserId: b.assigneeUserId ?? null,
       labelIds: b.labelIds ?? [],
+      parentId: b.parentId ?? null,
       createdAt: clock(),
       updatedAt: clock(),
     };
@@ -312,6 +315,10 @@ export function createItsaplanFake(opts: FakeOptions = {}) {
         if (b.assigneeUserId !== undefined) {
           issue.assigneeUserId = b.assigneeUserId;
           log(issue, { kind: "history", action: "assignee", body: null, payload: {} });
+        }
+
+        if (b.parentId !== undefined) {
+          issue.parentId = b.parentId;
         }
 
         if (b.labelIds) {

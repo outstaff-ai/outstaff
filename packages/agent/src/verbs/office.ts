@@ -75,8 +75,11 @@ export interface OfficeClient {
    */
   docLink(request: DocLinkRequest): Promise<void>;
 
-  /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for a second filing. */
-  linkTicket(workItemId: string, ticket: string): Promise<Filed>;
+  /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same request twice. */
+  linkTicket(workItemId: string, ticket: string, request: string): Promise<Filed>;
+
+  /** Asks whether a chat session may file this request, before anything is created. Refused when it may not. */
+  checkFiling(workItemId: string, request: string): Promise<void>;
 
   /** Makes a chat session's request part of the caller's existing ticket or pull request. */
   attachWork(
@@ -92,7 +95,8 @@ export interface FakeOffice extends OfficeClient {
   asked: { to: string; question: string; workItemId?: string }[];
   answered: { questionId: string; answer: string }[];
   placed: { workItemId: string; placement: Placement }[];
-  linked: { workItemId: string; ticket: string }[];
+  linked: { workItemId: string; ticket: string; request: string }[];
+  checked: { workItemId: string; request: string }[];
   queued: { workItemId: string; title: string; body: string }[];
   attached: { workItemId: string; target: string; confirmed: boolean; request?: string }[];
   chatMessages: ChatMessageRequest[];
@@ -128,6 +132,7 @@ export function createFakeOffice(
   const answered: FakeOffice["answered"] = [];
   const placed: FakeOffice["placed"] = [];
   const linked: FakeOffice["linked"] = [];
+  const checked: FakeOffice["checked"] = [];
   const queued: FakeOffice["queued"] = [];
   const attached: FakeOffice["attached"] = [];
   const chatMessages: ChatMessageRequest[] = [];
@@ -150,6 +155,7 @@ export function createFakeOffice(
     answered,
     placed,
     linked,
+    checked,
     queued,
     attached,
     async attachWork(workItemId, request) {
@@ -174,8 +180,11 @@ export function createFakeOffice(
         ...opts.attach?.(request.target, request.confirmed),
       };
     },
-    async linkTicket(workItemId, ticket) {
-      linked.push({ workItemId, ticket });
+    async checkFiling(workItemId, request) {
+      checked.push({ workItemId, request });
+    },
+    async linkTicket(workItemId, ticket, request) {
+      linked.push({ workItemId, ticket, request });
       return {
         url: `https://tracker.acme.example/issue/${ticket}`,
         item: { id: `work-${ticket}`, title: ticket, status: "queued" },

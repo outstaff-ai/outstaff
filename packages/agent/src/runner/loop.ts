@@ -249,8 +249,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
               asked ||= r.status === "pending";
               return r;
             },
-            async linkTicket(workItemId, ticket) {
-              const r = await base.linkTicket(workItemId, ticket);
+            async linkTicket(workItemId, ticket, request) {
+              const r = await base.linkTicket(workItemId, ticket, request);
               await filed(workItemId, { key: ticket, title: ticket }, r);
               return r;
             },

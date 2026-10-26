@@ -94,6 +94,10 @@ const rows: Row[] = [
   ],
   ["chat may file a request", "chat", { kind: "ost", command: "work.queue" }, "allow"],
   ["chat may attach a request", "chat", { kind: "ost", command: "work.attach" }, "allow"],
+  ["chat may read a pull request's status", "chat", { kind: "ost", command: "pr.status" }, "allow"],
+  ["chat may read its checks", "chat", { kind: "ost", command: "pr.checks" }, "allow"],
+  ["chat may read its review threads", "chat", { kind: "ost", command: "pr.threads" }, "allow"],
+  ["chat may not open a pull request", "chat", { kind: "ost", command: "pr.open" }, "deny"],
   ["chat may comment on a pull request", "chat", { kind: "ost", command: "pr.comment" }, "allow"],
   [
     "chat may not open a pull request",
