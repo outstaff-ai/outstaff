@@ -39,8 +39,34 @@ const integrations = [
   "avatars/dicebear",
 ];
 
+// Coverage is measured on the integrations, the code that talks to outside services. Each one has its own
+// floor, raised to 100 as its tests are completed (#364). Test kits shipped for other packages are not measured.
+const floors: Record<string, number> = {
+  "vcs/github": 86,
+  "runtime/claude": 85,
+  "chat/slack": 84,
+  "tracker/itsaplan": 85,
+  "knowledge/itsaplan": 83,
+  "avatars/dicebear": 75,
+};
+
 export default defineConfig({
   test: {
+    coverage: {
+      provider: "v8",
+      include: integrations.map((dir) => `integrations/${dir}/src/**/*.ts`),
+      exclude: ["**/__tests__/**", "**/src/testing/**", "**/testing.ts", "**/contract.ts"],
+      reporter: ["text-summary", "json-summary"],
+      thresholds: Object.fromEntries(
+        integrations.map((dir) => {
+          const floor = floors[dir] ?? 100;
+          return [
+            `integrations/${dir}/src/**`,
+            { lines: floor, branches: floor, functions: floor, statements: floor },
+          ];
+        }),
+      ),
+    },
     projects: [
       ...packages.map((pkg) => ({
         // Packages import each other as compiled libs; tests use the sources so they need no build first.

@@ -15,11 +15,14 @@
     "check:versions": "node scripts/versions.mjs check",
     "check:tests": "node scripts/tests-layout.mjs",
     "format": "oxfmt --write .",
-    "format:check": "oxfmt --check ."
+    "format:check": "oxfmt --check .",
+    "test:coverage": "vitest run --coverage.enabled",
+    "coverage:summary": "node scripts/coverage-summary.mjs"
   },
   "devDependencies": {
     "@stylistic/eslint-plugin": "5.10.0",
     "@types/node": "24.19.2",
+    "@vitest/coverage-v8": "5.0.5",
     "oxfmt": "0.74.0",
     "oxlint": "1.89.0",
     "typescript": "7.0.2",
