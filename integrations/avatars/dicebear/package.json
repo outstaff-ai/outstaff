@@ -1,0 +1,39 @@
+{
+  "name": "@outstaff/integration.avatars.dicebear",
+  "version": "0.0.0",
+  "description": "Avatar adapters for Outstaff: deterministic DiceBear avatars rendered locally, plus directory and URL sources.",
+  "license": "Apache-2.0",
+  "private": false,
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/outstaff-ai/outstaff.git",
+    "directory": "integrations/avatars/dicebear"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "prepack": "node ../../../scripts/copy-legal.mjs"
+  },
+  "dependencies": {
+    "@dicebear/collection": "9.4.3",
+    "@dicebear/core": "9.4.3",
+    "@outstaff/core": "workspace:*",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "vitest": "5.0.5"
+  }
+}

@@ -1,5 +1,6 @@
 packages:
   - "packages/*"
+  - "integrations/*/*"
   - "docs"
   - "e2e"
   - "e2e/runtime-scripted"

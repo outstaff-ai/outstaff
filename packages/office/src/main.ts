@@ -3,9 +3,10 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { githubVcs } from "@outstaff/vcs-github";
-import { itsaplanKnowledge, itsaplanTracker } from "@outstaff/tracker-itsaplan";
-import { slackChat } from "@outstaff/chat-slack";
+import { githubVcs } from "@outstaff/integration.vcs.github";
+import { itsaplanKnowledge } from "@outstaff/integration.knowledge.itsaplan";
+import { itsaplanTracker } from "@outstaff/integration.tracker.itsaplan";
+import { slackChat } from "@outstaff/integration.chat.slack";
 import {
   AdapterRegistry,
   envSecretSource,

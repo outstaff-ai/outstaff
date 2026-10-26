@@ -47,10 +47,20 @@ function commitsSince(tag: string | null): Commit[] {
   return commits;
 }
 
+const subdirs = (dir: string): string[] =>
+  readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(dir, entry.name));
+
+// Packages live in packages/<name> and integrations/<port>/<vendor>.
 function publishedManifests(): string[] {
-  const packages = path.join(root, "packages");
-  return readdirSync(packages)
-    .map((dir) => path.join(packages, dir, "package.json"))
+  const dirs = [
+    ...subdirs(path.join(root, "packages")),
+    ...subdirs(path.join(root, "integrations")).flatMap(subdirs),
+  ];
+
+  return dirs
+    .map((dir) => path.join(dir, "package.json"))
     .filter((file) => {
       try {
         return JSON.parse(readFileSync(file, "utf8")).private !== true;

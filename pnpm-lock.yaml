@@ -225,44 +225,7 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  packages/agent:
-    dependencies:
-      '@outstaff/catalog':
-        specifier: workspace:*
-        version: link:../catalog
-      '@outstaff/chat-slack':
-        specifier: workspace:*
-        version: link:../chat-slack
-      '@outstaff/core':
-        specifier: workspace:*
-        version: link:../core
-      '@outstaff/protocol':
-        specifier: workspace:*
-        version: link:../protocol
-      '@outstaff/runtime-agent-sdk':
-        specifier: workspace:*
-        version: link:../runtime-agent-sdk
-      '@outstaff/tracker-itsaplan':
-        specifier: workspace:*
-        version: link:../tracker-itsaplan
-      '@outstaff/vcs-github':
-        specifier: workspace:*
-        version: link:../vcs-github
-      ws:
-        specifier: 8.22.0
-        version: 8.22.0
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
-    devDependencies:
-      '@types/ws':
-        specifier: 8.18.2
-        version: 8.18.2
-      tsx:
-        specifier: 4.23.15
-        version: 4.23.15
-
-  packages/avatars-dicebear:
+  integrations/avatars/dicebear:
     dependencies:
       '@dicebear/collection':
         specifier: 9.4.3
@@ -272,7 +235,7 @@ importers:
         version: 9.4.3
       '@outstaff/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../../packages/core
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -281,13 +244,11 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
-  packages/catalog: {}
-
-  packages/chat-slack:
+  integrations/chat/slack:
     dependencies:
       '@outstaff/core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../../packages/core
       '@slack/socket-mode':
         specifier: 3.1.0
         version: 3.1.0(undici@8.12.3)
@@ -302,6 +263,106 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  integrations/knowledge/itsaplan:
+    dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      '@outstaff/integration.tracker.itsaplan':
+        specifier: workspace:*
+        version: link:../../tracker/itsaplan
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  integrations/runtime/claude:
+    dependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: 0.3.308
+        version: 0.3.308(@anthropic-ai/sdk@1.1.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(supports-color@10.2.2)(zod@4.6.7))(zod@4.6.7)
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  integrations/tracker/itsaplan:
+    dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      undici:
+        specifier: 8.12.3
+        version: 8.12.3
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  integrations/vcs/github:
+    dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../../packages/core
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  packages/agent:
+    dependencies:
+      '@outstaff/catalog':
+        specifier: workspace:*
+        version: link:../catalog
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../core
+      '@outstaff/integration.chat.slack':
+        specifier: workspace:*
+        version: link:../../integrations/chat/slack
+      '@outstaff/integration.knowledge.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/knowledge/itsaplan
+      '@outstaff/integration.runtime.claude':
+        specifier: workspace:*
+        version: link:../../integrations/runtime/claude
+      '@outstaff/integration.tracker.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/tracker/itsaplan
+      '@outstaff/integration.vcs.github':
+        specifier: workspace:*
+        version: link:../../integrations/vcs/github
+      '@outstaff/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      ws:
+        specifier: 8.22.0
+        version: 8.22.0
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
+    devDependencies:
+      '@types/ws':
+        specifier: 8.18.2
+        version: 8.18.2
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+
+  packages/catalog: {}
+
   packages/cli:
     dependencies:
       '@commander-js/extra-typings':
@@ -310,27 +371,30 @@ importers:
       '@outstaff/agent':
         specifier: workspace:*
         version: link:../agent
-      '@outstaff/avatars-dicebear':
-        specifier: workspace:*
-        version: link:../avatars-dicebear
       '@outstaff/catalog':
         specifier: workspace:*
         version: link:../catalog
-      '@outstaff/chat-slack':
-        specifier: workspace:*
-        version: link:../chat-slack
       '@outstaff/core':
         specifier: workspace:*
         version: link:../core
-      '@outstaff/runtime-agent-sdk':
+      '@outstaff/integration.avatars.dicebear':
         specifier: workspace:*
-        version: link:../runtime-agent-sdk
-      '@outstaff/tracker-itsaplan':
+        version: link:../../integrations/avatars/dicebear
+      '@outstaff/integration.chat.slack':
         specifier: workspace:*
-        version: link:../tracker-itsaplan
-      '@outstaff/vcs-github':
+        version: link:../../integrations/chat/slack
+      '@outstaff/integration.knowledge.itsaplan':
         specifier: workspace:*
-        version: link:../vcs-github
+        version: link:../../integrations/knowledge/itsaplan
+      '@outstaff/integration.runtime.claude':
+        specifier: workspace:*
+        version: link:../../integrations/runtime/claude
+      '@outstaff/integration.tracker.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/tracker/itsaplan
+      '@outstaff/integration.vcs.github':
+        specifier: workspace:*
+        version: link:../../integrations/vcs/github
       commander:
         specifier: 15.0.0
         version: 15.0.0
@@ -369,21 +433,24 @@ importers:
       '@outstaff/catalog':
         specifier: workspace:*
         version: link:../catalog
-      '@outstaff/chat-slack':
-        specifier: workspace:*
-        version: link:../chat-slack
       '@outstaff/core':
         specifier: workspace:*
         version: link:../core
+      '@outstaff/integration.chat.slack':
+        specifier: workspace:*
+        version: link:../../integrations/chat/slack
+      '@outstaff/integration.knowledge.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/knowledge/itsaplan
+      '@outstaff/integration.tracker.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/tracker/itsaplan
+      '@outstaff/integration.vcs.github':
+        specifier: workspace:*
+        version: link:../../integrations/vcs/github
       '@outstaff/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@outstaff/tracker-itsaplan':
-        specifier: workspace:*
-        version: link:../tracker-itsaplan
-      '@outstaff/vcs-github':
-        specifier: workspace:*
-        version: link:../vcs-github
       kysely:
         specifier: 0.29.7
         version: 0.29.7
@@ -416,51 +483,6 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
-
-  packages/runtime-agent-sdk:
-    dependencies:
-      '@anthropic-ai/claude-agent-sdk':
-        specifier: 0.3.308
-        version: 0.3.308(@anthropic-ai/sdk@1.1.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.1(supports-color@10.2.2)(zod@4.6.7))(zod@4.6.7)
-      '@outstaff/core':
-        specifier: workspace:*
-        version: link:../core
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
-    devDependencies:
-      vitest:
-        specifier: 5.0.5
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/tracker-itsaplan:
-    dependencies:
-      '@outstaff/core':
-        specifier: workspace:*
-        version: link:../core
-      undici:
-        specifier: 8.12.3
-        version: 8.12.3
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
-    devDependencies:
-      vitest:
-        specifier: 5.0.5
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
-
-  packages/vcs-github:
-    dependencies:
-      '@outstaff/core':
-        specifier: workspace:*
-        version: link:../core
-      zod:
-        specifier: 4.6.7
-        version: 4.6.7
-    devDependencies:
-      vitest:
-        specifier: 5.0.5
-        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
 packages:
 

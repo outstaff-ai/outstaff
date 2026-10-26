@@ -86,7 +86,7 @@ echo "ok   sam: connected with sandbox: bubblewrap"
 
 # The agent started, so the runtime's start-up probe passed; run it once more to show what it found.
 probe="$(compose exec -T sam node --input-type=module -e '
-  const m = await import("/opt/outstaff/node_modules/@outstaff/runtime-agent-sdk/dist/index.js");
+  const m = await import("/opt/outstaff/node_modules/@outstaff/integration.runtime.claude/dist/index.js");
   const p = m.probeSubprocessSandbox();
   console.log(p.detail + (p.fix ? " Fix: " + p.fix : ""));
   process.exit(p.ok ? 0 : 1);' 2>&1)" || fail "subprocess sandbox: $probe"

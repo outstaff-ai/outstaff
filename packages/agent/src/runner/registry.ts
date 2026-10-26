@@ -1,8 +1,9 @@
 import { AdapterRegistry } from "@outstaff/core";
-import { slackChat } from "@outstaff/chat-slack";
-import { claudeAgentSdk } from "@outstaff/runtime-agent-sdk";
-import { itsaplanKnowledge, itsaplanTracker } from "@outstaff/tracker-itsaplan";
-import { githubVcs } from "@outstaff/vcs-github";
+import { slackChat } from "@outstaff/integration.chat.slack";
+import { claudeAgentSdk } from "@outstaff/integration.runtime.claude";
+import { itsaplanKnowledge } from "@outstaff/integration.knowledge.itsaplan";
+import { itsaplanTracker } from "@outstaff/integration.tracker.itsaplan";
+import { githubVcs } from "@outstaff/integration.vcs.github";
 
 /** The adapters installed in the agent image. */
 export function agentRegistry(): AdapterRegistry {

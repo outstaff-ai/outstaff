@@ -3,7 +3,7 @@ title: DiceBear (avatars)
 description: Deterministic avatars per person, rendered locally, with directory and URL sources.
 ---
 
-The `dicebear` avatars adapter (`@outstaff/avatars-dicebear`) gives every person a stable, good-looking avatar. It renders locally with [DiceBear](https://www.dicebear.com) (`@dicebear/core` and `@dicebear/collection`, exact pins), so it makes no network calls. The same seed, style and options always give the same SVG. Capability: `avatars.generate`.
+The `dicebear` avatars adapter (`@outstaff/integration.avatars.dicebear`) gives every person a stable, good-looking avatar. It renders locally with [DiceBear](https://www.dicebear.com) (`@dicebear/core` and `@dicebear/collection`, exact pins), so it makes no network calls. The same seed, style and options always give the same SVG. Capability: `avatars.generate`.
 
 ```yaml
 integrations:

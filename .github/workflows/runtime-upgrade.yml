@@ -5,7 +5,7 @@ name: Runtime upgrade
 on:
   pull_request:
     paths:
-      - packages/runtime-agent-sdk/package.json
+      - integrations/runtime/claude/package.json
       - pnpm-lock.yaml
   workflow_dispatch:
   # the release workflow calls this before it publishes
@@ -51,4 +51,4 @@ jobs:
         if: steps.key.outputs.present == 'true'
         env:
           OUTSTAFF_TEST_LIVE_SDK: "1"
-        run: pnpm vitest run --project runtime-agent-sdk upgrade
+        run: pnpm vitest run --project integration.runtime.claude upgrade

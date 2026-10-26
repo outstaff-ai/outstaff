@@ -61,7 +61,7 @@ On first start the office doesn't pick up existing tickets or pull requests; ass
 
 ## Subprocess sandbox (optional)
 
-By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/packages/runtime-agent-sdk#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap`, Claude Code removes the credential from each command's environment and runs the command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`; the runtime also hides the credential files under `/run/secrets/outstaff` there. The [Kubernetes guide](/guides/kubernetes/#subprocess-sandbox-optional) explains each part.
+By default the agent's shell commands can read the Claude credential from their environment, the same as Claude Code on a developer's machine; the [runtime adapter](https://github.com/outstaff-ai/outstaff/tree/main/integrations/runtime/claude#sandbox) explains the trade-off and the mitigations. With `sandbox: bubblewrap`, Claude Code removes the credential from each command's environment and runs the command in a [bubblewrap](https://github.com/containers/bubblewrap) sandbox with its own user and PID namespaces and a fresh `/proc`; the runtime also hides the credential files under `/run/secrets/outstaff` there. The [Kubernetes guide](/guides/kubernetes/#subprocess-sandbox-optional) explains each part.
 
 Docker's defaults block bubblewrap, so `compose.sandbox.yaml` adds three `security_opt` entries to every agent; the office keeps the defaults:
 
@@ -95,4 +95,4 @@ The example has a smoke test that you can run too. It starts Postgres, the offic
 examples/compose/smoke.sh
 ```
 
-The Examples workflow runs it, and `docker compose config` on the full file, for every pull request that touches `examples/`, `images/` or `packages/`.
+The Examples workflow runs it, and `docker compose config` on the full file, for every pull request.

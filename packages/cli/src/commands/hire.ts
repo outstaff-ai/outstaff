@@ -80,7 +80,7 @@ async function avatarRegistry(ctx: Context): Promise<AdapterRegistry> {
   }
 
   const { dicebearAvatars, directoryAvatars, urlAvatars } =
-    await import("@outstaff/avatars-dicebear");
+    await import("@outstaff/integration.avatars.dicebear");
 
   return new AdapterRegistry()
     .register(dicebearAvatars)

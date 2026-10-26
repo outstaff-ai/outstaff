@@ -26,7 +26,7 @@ To preview locally, run `node scripts/release.ts --dry-run`. It prints the next 
 
 ## What happens, in order
 
-1. **Version and notes.** `scripts/release.ts` writes the version into every published `packages/*/package.json` and prepends the notes to `CHANGELOG.md`. The notes group commits into Breaking changes, Features, Fixes, Performance and Other (`docs`, `refactor`, `revert`, `build`, `ci`). `chore`, `test` and `style` commits stay out.
+1. **Version and notes.** `scripts/release.ts` writes the version into every published `packages/*/package.json` and `integrations/*/*/package.json` and prepends the notes to `CHANGELOG.md`. The notes group commits into Breaking changes, Features, Fixes, Performance and Other (`docs`, `refactor`, `revert`, `build`, `ci`). `chore`, `test` and `style` commits stay out.
 2. **Verify.** Version pinning, format, lint, typecheck, test and build must pass.
 3. **Commit and tag, locally.** The commit is `chore(release): vX.Y.Z` and the tag is `vX.Y.Z`. Nothing has left the runner yet.
 4. **Publish to npm.** `pnpm pack` turns every `workspace:*` dependency into the exact release version, and `npm publish --provenance` publishes `outstaff` and the `@outstaff/*` packages. A package whose version is already on npm is skipped, so a run that failed halfway can simply be started again with the same level.

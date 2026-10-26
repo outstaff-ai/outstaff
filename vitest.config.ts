@@ -17,18 +17,26 @@ const coreAlias = [
     replacement: fileURLToPath(new URL("packages/agent/src/index.ts", import.meta.url)),
   },
   {
-    find: /^@outstaff\/vcs-github$/,
-    replacement: fileURLToPath(new URL("packages/vcs-github/src/index.ts", import.meta.url)),
+    find: /^@outstaff\/integration\.vcs\.github$/,
+    replacement: fileURLToPath(new URL("integrations/vcs/github/src/index.ts", import.meta.url)),
+  },
+  {
+    find: /^@outstaff\/integration\.tracker\.itsaplan$/,
+    replacement: fileURLToPath(
+      new URL("integrations/tracker/itsaplan/src/index.ts", import.meta.url),
+    ),
   },
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];
-const adapters = [
-  "vcs-github",
-  "runtime-agent-sdk",
-  "chat-slack",
-  "tracker-itsaplan",
-  "avatars-dicebear",
+// Adapter packages live in integrations/<port>/<vendor>; each is a project named like its package.
+const integrations = [
+  "vcs/github",
+  "runtime/claude",
+  "chat/slack",
+  "tracker/itsaplan",
+  "knowledge/itsaplan",
+  "avatars/dicebear",
 ];
 
 export default defineConfig({
@@ -46,9 +54,13 @@ export default defineConfig({
           ...(pkg === "office" ? { fileParallelism: false } : {}),
         },
       })),
-      ...adapters.map((pkg) => ({
+      ...integrations.map((dir) => ({
         resolve: { alias: coreAlias },
-        test: { name: pkg, root: `packages/${pkg}`, include: ["src/**/__tests__/**/*.test.ts"] },
+        test: {
+          name: `integration.${dir.replace("/", ".")}`,
+          root: `integrations/${dir}`,
+          include: ["src/**/__tests__/**/*.test.ts"],
+        },
       })),
       // The scripted runtime of the end-to-end test reads the agent's prompt, so it tests against the agent's source.
       {

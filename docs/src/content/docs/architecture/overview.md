@@ -17,7 +17,7 @@ Outstaff has five kinds of component. The hosting of the containers and the stor
 
 **Agent.** One container per person. `ost-agent` connects out to the office, so agents need no inbound network access. It runs work items through an LLM runtime adapter (the Claude Code CLI first), keeps a separate session, worktree and journal per work item, and gives the agent a small set of tracker-neutral `ost` verbs.
 
-**Adapters.** Separate packages, one per integration. Each implements a port and is checked by a shared contract test kit.
+**Adapters.** Separate packages, one per integration, in `integrations/<port>/<vendor>` and named `@outstaff/integration.<port>.<vendor>`. Each implements a port and is checked by a shared contract test kit.
 
 ## Ports
 

@@ -32,7 +32,7 @@ pnpm test        # vitest, one project per package
 pnpm build       # TypeScript 7: compiled ESM, declarations and source maps in each package's dist/
 ```
 
-Packages live in `packages/*`: `core`, `catalog`, `cli` (published as `outstaff`), `agent` and `office`.
+Packages live in `packages/*`: `core`, `catalog`, `cli` (published as `outstaff`), `agent` and `office`. Adapters live in `integrations/<port>/<vendor>` and are published as `@outstaff/integration.<port>.<vendor>`, for example `integrations/tracker/itsaplan` as `@outstaff/integration.tracker.itsaplan`.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for branching, commit and PR rules.
 

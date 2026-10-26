@@ -30,12 +30,13 @@
   },
   "dependencies": {
     "@outstaff/catalog": "workspace:*",
-    "@outstaff/chat-slack": "workspace:*",
     "@outstaff/core": "workspace:*",
+    "@outstaff/integration.chat.slack": "workspace:*",
+    "@outstaff/integration.knowledge.itsaplan": "workspace:*",
+    "@outstaff/integration.runtime.claude": "workspace:*",
+    "@outstaff/integration.tracker.itsaplan": "workspace:*",
+    "@outstaff/integration.vcs.github": "workspace:*",
     "@outstaff/protocol": "workspace:*",
-    "@outstaff/runtime-agent-sdk": "workspace:*",
-    "@outstaff/tracker-itsaplan": "workspace:*",
-    "@outstaff/vcs-github": "workspace:*",
     "ws": "8.22.0",
     "zod": "4.6.7"
   },

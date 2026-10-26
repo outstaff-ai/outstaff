@@ -3,7 +3,7 @@ title: Slack (chat)
 description: Talk to each agent through its own Slack app over Socket Mode.
 ---
 
-The `slack` chat adapter (`@outstaff/chat-slack`) gives every agent its own Slack app. People send it direct messages or mention it; it replies in threads, reacts while it works, and shows its status on the app's Home tab. It connects out over Socket Mode, so no public URL is needed.
+The `slack` chat adapter (`@outstaff/integration.chat.slack`) gives every agent its own Slack app. People send it direct messages or mention it; it replies in threads, reacts while it works, and shows its status on the app's Home tab. It connects out over Socket Mode, so no public URL is needed.
 
 ```yaml
 integrations:

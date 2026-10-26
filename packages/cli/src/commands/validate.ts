@@ -15,12 +15,12 @@ import { issueJson, loadTeam } from "../load.js";
 
 /** Importing an adapter package registers its option schema; load only the packages the team uses. */
 const OPTION_SCHEMAS: Record<AdapterPort, () => Promise<unknown>> = {
-  chat: () => import("@outstaff/chat-slack"),
-  vcs: () => import("@outstaff/vcs-github"),
-  tracker: () => import("@outstaff/tracker-itsaplan"),
-  knowledge: () => import("@outstaff/tracker-itsaplan"),
-  runtime: () => import("@outstaff/runtime-agent-sdk"),
-  avatars: () => import("@outstaff/avatars-dicebear"),
+  chat: () => import("@outstaff/integration.chat.slack"),
+  vcs: () => import("@outstaff/integration.vcs.github"),
+  tracker: () => import("@outstaff/integration.tracker.itsaplan"),
+  knowledge: () => import("@outstaff/integration.knowledge.itsaplan"),
+  runtime: () => import("@outstaff/integration.runtime.claude"),
+  avatars: () => import("@outstaff/integration.avatars.dicebear"),
 };
 
 async function loadOptionSchemas(config: TeamConfig): Promise<void> {

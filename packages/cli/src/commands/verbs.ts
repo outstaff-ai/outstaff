@@ -17,7 +17,7 @@ import {
   envSecretSource,
   formatIssue,
 } from "@outstaff/core";
-import { githubVcs } from "@outstaff/vcs-github";
+import { githubVcs } from "@outstaff/integration.vcs.github";
 import { defineCommand, type CommandDef, type Context, type GlobalOptions } from "../define.js";
 import { loadTeam } from "../load.js";
 

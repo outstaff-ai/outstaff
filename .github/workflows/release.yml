@@ -84,13 +84,13 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md packages/*/package.json
+          git add CHANGELOG.md packages/*/package.json integrations/*/*/package.json
           git commit -m "chore(release): v$VERSION"
           git tag -a "v$VERSION" -m "v$VERSION"
 
       - name: Pack
         if: steps.release.outputs.skip != 'true'
-        run: pnpm -r --filter "./packages/*" pack --pack-destination "$RUNNER_TEMP/tarballs"
+        run: pnpm -r --filter "./packages/*" --filter "./integrations/*/*" pack --pack-destination "$RUNNER_TEMP/tarballs"
 
       # Re-running after a partial failure is safe: versions already on npm are skipped.
       - name: Publish to npm

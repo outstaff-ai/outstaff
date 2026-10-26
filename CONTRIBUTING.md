@@ -28,7 +28,7 @@ Before you open a pull request, run `pnpm format && pnpm lint && pnpm typecheck 
 
 ## End-to-end test
 
-`e2e/` runs the acme loop on Docker Compose, with the real office and agent images and stand-ins for everything outside them. It takes a few minutes (about 75 seconds with the images built, under four with a cold build), needs no secrets and no network beyond pulling images and packages, and runs every night, by hand, before a release, and on pull requests that touch `packages/`, `images/` or `e2e/` (`.github/workflows/e2e.yml`); it is not a required check yet.
+`e2e/` runs the acme loop on Docker Compose, with the real office and agent images and stand-ins for everything outside them. It takes a few minutes (about 75 seconds with the images built, under four with a cold build), needs no secrets and no network beyond pulling images and packages, and runs every night, by hand, before a release, on every pull request and in the merge queue (`.github/workflows/e2e.yml`); it is a required check.
 
 ```sh
 pnpm install && pnpm --filter outstaff... run build   # the test runs the built CLI
