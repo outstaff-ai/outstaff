@@ -630,7 +630,7 @@ describe("work loop", () => {
     await conn.stop();
   });
 
-  it("interrupts the runtime on stop and hands the item back as waiting", async () => {
+  it("interrupts the runtime on stop and hands the item back as interrupted", async () => {
     await connect();
     const { runtime, requests } = blockingRuntime();
     start(runtime);
@@ -641,7 +641,7 @@ describe("work loop", () => {
     expect(requests[0]?.signal?.aborted).toBe(true);
     expect(sentOf("handback")[0]?.payload).toMatchObject({
       workItemId: "w1",
-      status: "waiting",
+      status: "interrupted",
       summary: expect.stringContaining("Last message: Working on it"),
     });
 
@@ -1075,7 +1075,7 @@ describe("work loop", () => {
       socket.offerWith("c1", { origin: true });
       await until(() => sentOf("progress").length === 1);
       await loop.stop();
-      expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "waiting" });
+      expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "interrupted" });
       expect(reports).toEqual([]);
       await conn.stop();
       await running;

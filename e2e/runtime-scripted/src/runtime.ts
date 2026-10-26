@@ -144,6 +144,12 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
         const action = step.value;
         if (action.type === "gate") {
           await waitAtGate(action.name, req.signal);
+          // The agent is shutting down: the round stops here, as the real runtime does when it is interrupted.
+          if (req.signal?.aborted) {
+            yield { type: "finished", ok: false, text: last, interrupted: true };
+            return;
+          }
+
           step = await steps.next("");
           continue;
         }

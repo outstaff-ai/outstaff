@@ -206,6 +206,9 @@ export interface Store {
   /** Number of guarded runs of the item in the last `windowMs`. */
   countLoopGuard(workItemId: string, windowMs: number): Promise<number>;
 
+  /** Forgets the item's latest guarded run: a run cut short by a shutdown is no loop. */
+  forgetLatestLoopGuard(workItemId: string): Promise<void>;
+
   /** Forgets the item's guarded runs, so a human's retry starts with a clean count. */
   clearLoopGuard(workItemId: string): Promise<void>;
 

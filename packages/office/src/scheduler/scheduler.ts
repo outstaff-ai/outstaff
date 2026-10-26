@@ -137,6 +137,12 @@ export interface Scheduler {
    */
   fail(itemId: string, error: string): Promise<FailResult>;
 
+  /**
+   * Ends the run because the agent shut down. The item goes back to the front of the person's queue with its
+   * session and workspace. The run is no failure and no loop: it counts for neither the retry nor the loop guard.
+   */
+  interrupt(itemId: string, outcome: string): Promise<WorkItem>;
+
   /** Blocks the item and journals the reason. */
   block(itemId: string, reason: string): Promise<BlockNotice>;
 
@@ -171,6 +177,9 @@ const DEFAULT_CHAT_SESSIONS = 2;
 // Mirrors the team.yaml defaults for a team that sets no `policies`.
 const DEFAULT_MAX_RUNS_PER_HOUR = 12;
 const DEFAULT_USAGE = { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 };
+
+/** Outcome of a run that an agent shutdown cut short. */
+export const INTERRUPTED = "interrupted";
 
 const TEAM_SCOPE = "team";
 const personScope = (person: string) => `person:${person}`;
@@ -441,6 +450,31 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
           status,
           ...(status === "queued" ? {} : { failures: 0, notBefore: null }),
         });
+      });
+    },
+
+    interrupt(itemId, outcome) {
+      return exclusive(async () => {
+        const run = await openRun(itemId);
+        if (run) {
+          await store.finishRun(run.id, { outcome: INTERRUPTED, error: outcome });
+        }
+
+        await store.forgetLatestLoopGuard(itemId);
+        const item = await store.updateItem(itemId, { status: "queued", notBefore: null });
+        const first = orderQueue(await queuedOf(item.person)).find((i) => i.id !== itemId);
+        if (first) {
+          await applyMove(itemId, { before: first.id });
+        }
+
+        await store.appendJournal(
+          itemId,
+          "scheduler",
+          "Run interrupted by a shutdown; queued first.",
+        );
+
+        log.info("work item interrupted; queued first", { item: itemId, person: item.person });
+        return (await store.getItem(itemId)) ?? item;
       });
     },
 

@@ -49,7 +49,7 @@ For each offer the agent:
 
 Heartbeats are sent by the office connection itself, at the interval the office asks for, with the id of the item being worked on. Work items run one at a time; a second offer waits until the first is handed back. Chat sessions run beside the work item, each with its own heartbeat, up to the office's limit (`policies.chat.parallel_sessions`).
 
-**Stopping.** On `SIGTERM` or `SIGINT` the agent interrupts the runtime, hands the item back as `waiting` with the last message, and closes the connection. The office queues the item again and a later round resumes its session.
+**Stopping.** On `SIGTERM` or `SIGINT` the agent interrupts the runtime, hands the item back as `interrupted` with the last message, and closes the connection. The office queues the item first with its session; the next offer says the previous run was interrupted, and the session resumes.
 
 **Restarts.** The office lists accepted, unfinished items when the agent reconnects, but it cannot re-send their context. At startup the agent sends `decline` for each of them. That puts the item back in the queue untouched: no failure or attempt is counted, and the next offer carries the journal and the stored session.
 

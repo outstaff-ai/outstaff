@@ -123,7 +123,7 @@ export function createFakeSource(members: Member[] = []): FakeSource {
     },
     async handBack(person, id, result) {
       record("handback", person, id);
-      find(person, id).state = result.status === "done" ? "done" : result.status;
+      find(person, id).state = result.status === "interrupted" ? "queued" : result.status;
       handBacks.push({ id, ...result });
     },
     async fail(person, id) {

@@ -6,7 +6,7 @@ import { publicOrigin, readOrigin } from "./chat/origin.js";
 import { deliverFeedback, readFeedback } from "./engine/feedback.js";
 import { previousConversation } from "./conversation-context.js";
 import { placeQueued } from "./chat/placement.js";
-import type { BlockNotice, Scheduler } from "./scheduler/scheduler.js";
+import { INTERRUPTED, type BlockNotice, type Scheduler } from "./scheduler/scheduler.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { PrRecord, TicketRecord } from "./workstate/index.js";
 
@@ -125,7 +125,7 @@ const OPEN = new Set(["queued", "active", "waiting", "blocked"]);
 export interface HandBackResult {
   summary: string;
   links: Link[];
-  status: "done" | "waiting" | "blocked";
+  status: "done" | "waiting" | "blocked" | "interrupted";
 }
 
 export interface WorkSourceOptions {
@@ -187,8 +187,12 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
     const conversation = await previousConversation(store, opts.ports?.vcs, item, feedback);
 
+    // This run is the latest; the one before it is what the agent continues.
+    const interrupted = (await store.listRuns(item.id)).at(-2)?.outcome === INTERRUPTED;
+
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
+      ...(interrupted ? { interrupted } : {}),
       workItem: {
         id: item.id,
         kind: item.kind,
@@ -307,10 +311,17 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
         if (result.status === "blocked") {
           await scheduler.block(id, result.summary);
+        } else if (result.status === "interrupted") {
+          await scheduler.interrupt(id, result.summary);
         } else {
           await scheduler.finish(id, { outcome: result.summary, status: result.status });
         }
-      } else if (item.status !== "done" && item.status !== "waiting" && item.status !== "blocked") {
+      } else if (
+        result.status !== "interrupted" &&
+        item.status !== "done" &&
+        item.status !== "waiting" &&
+        item.status !== "blocked"
+      ) {
         throw new ProtocolError("invalid", `Work item ${id} is ${item.status}, not running.`);
       }
 

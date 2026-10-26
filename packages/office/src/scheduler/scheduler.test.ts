@@ -603,6 +603,44 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
     });
   });
 
+  describe("interrupted runs", () => {
+    it("queues the item first, keeps its session, and counts no failure, loop or stale run", async () => {
+      const a = await add("a", "agent");
+      const b = await add("b", "agent");
+      for (let i = 0; i < 5; i++) {
+        const started = await sched.markActive(a.id);
+        expect(started.started).toBe(true);
+        await store.updateItem(a.id, { sessionId: "s-1" });
+        await sched.interrupt(a.id, "Shut down.");
+        expect((await sched.next("ann"))?.id).toBe(a.id);
+      }
+
+      expect(await store.getItem(a.id)).toMatchObject({
+        status: "queued",
+        failures: 0,
+        notBefore: null,
+        sessionId: "s-1",
+      });
+
+      expect(await store.countLoopGuard(a.id, 3_600_000)).toBe(0);
+      expect((await store.listRuns(a.id)).every((r) => r.outcome === "interrupted")).toBe(true);
+      expect((await store.getItem(b.id))?.status).toBe("queued");
+
+      // The next run is the first one the guard counts, and stale detection starts from a clean slate.
+      await sched.markActive(a.id);
+      clock.advance(11 * 60_000);
+      expect((await sched.tick()).retried.map((i) => i.id)).toEqual([a.id]);
+    });
+
+    it("goes ahead of higher-priority work already queued", async () => {
+      const a = await add("a", "schedule");
+      await add("b", "human");
+      await sched.markActive(a.id);
+      await sched.interrupt(a.id, "Shut down.");
+      expect((await sched.next("ann"))?.id).toBe(a.id);
+    });
+  });
+
   describe("stale runs", () => {
     it("retries once, then blocks with a reason", async () => {
       const a = await add("a");
@@ -624,6 +662,17 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       expect(second.blocked).toHaveLength(1);
       expect(second.blocked[0]).toMatchObject({ code: "stale", item: { status: "blocked" } });
       expect(second.blocked[0]?.reason).toMatch(/Stale again/);
+    });
+
+    it("offers a stale item again with its session", async () => {
+      const a = await add("a");
+      await add("b");
+      await sched.markActive(a.id);
+      await store.updateItem(a.id, { sessionId: "s-1" });
+      clock.advance(11 * 60_000);
+      await sched.tick();
+      const next = await sched.next("ann");
+      expect(next).toMatchObject({ id: a.id, status: "queued", sessionId: "s-1" });
     });
 
     it("heartbeats keep a run alive", async () => {

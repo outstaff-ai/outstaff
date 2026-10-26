@@ -85,7 +85,7 @@ A StatefulSet's `selector` and `serviceName` are immutable, so `kubectl apply` c
 ## Hardening that is already in the manifests
 
 - Every container is non-root (uid and gid 10001), with `readOnlyRootFilesystem`, all capabilities dropped, no privilege escalation and the `RuntimeDefault` seccomp profile. Writable places are the volumes: `/home/outstaff` (an agent), `/var/lib/outstaff` (the office) and a size-limited `emptyDir` for `/tmp`.
-- `terminationGracePeriodSeconds` is 45 for the office and 60 for an agent. Both stop on `SIGTERM`: the office finishes its running handlers and an agent hands its work item back, so rolling either is safe.
+- `terminationGracePeriodSeconds` is 45 for the office and 60 for an agent. Both stop on `SIGTERM`: the office finishes its running handlers and an agent hands its running work item back as `interrupted`. The item goes first in the queue and the restarted agent resumes it with its session, so a rollout resumes running work.
 - The office has a startup probe on `/healthz` with a generous window (three minutes), then a liveness probe on `/healthz` and a readiness probe on `/readyz`. The agent has no port, so no probes: it exits when it cannot run and the StatefulSet restarts it.
 
 ## Subprocess sandbox (optional)
