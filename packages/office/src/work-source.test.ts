@@ -108,14 +108,19 @@ describe("work source: a chat session beside running work", () => {
       requester: { id: "U1" },
       awaitingPlacement: false,
       claimed: [],
-      about: { id: work.id, title: work.title },
+      about: { id: work.id, title: work.title, state: "running" },
     });
 
     await store.appendJournal(chat.id, "office", "Dana replied in chat.");
 
     const offer = await source.next("ann");
     expect(offer?.workItem.id).toBe(chat.id);
-    expect(offer?.workItem.origin?.about).toEqual({ id: work.id, title: work.title });
+    expect(offer?.workItem.origin?.about).toEqual({
+      id: work.id,
+      title: work.title,
+      state: "running",
+    });
+
     expect(offer?.context.subjects.map((s) => `${s.type} ${s.ref}`)).toContain("ticket ACME-1");
     expect(offer?.context.journal.map((j) => j.text)).toEqual([
       "Tried the index.",

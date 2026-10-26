@@ -32,6 +32,7 @@ import {
 import { addFeedback } from "../engine/feedback.js";
 import {
   CHAT_MESSAGE_SUBJECT,
+  ATTACH_REASSIGN_SUBJECT,
   CHAT_ORIGIN_SUBJECT,
   CHAT_THREAD_SUBJECT,
   needsMention,
@@ -54,7 +55,10 @@ export interface ChatDeskOptions {
   /** The scheduler without the notifying wrapper: the desk stores the origin first and then calls `notify`. */
   scheduler: Pick<Scheduler, "enqueue" | "move" | "retry">;
   team: Pick<TeamConfig, "people" | "policies"> & Partial<Pick<TeamConfig, "integrations">>;
-  workState: Pick<WorkState, "currentWork" | "pullRequests" | "ticket" | "prSubject">;
+  workState: Pick<
+    WorkState,
+    "currentWork" | "pullRequests" | "ticket" | "prSubject" | "lastWorker" | "catchUp"
+  >;
   tracker?: Pick<Tracker, "links">;
   messaging?: Pick<Messaging, "ask">;
 
@@ -150,6 +154,9 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   ): Promise<MessageResult> {
     const follow = link && "follow" in link ? { item: link.follow } : undefined;
     const beside = link && "beside" in link ? link.beside : undefined;
+    // The earlier work of the thread, so the session continues its ticket instead of filing a duplicate. A chat
+    // session that only answered has no work to continue.
+    const about = beside ?? (follow && follow.item.kind !== CHAT_KIND ? follow.item : undefined);
     const thread = m.thread ?? m.messageId;
     const taken = [
       ...(await store.listItems({ person, status: "active" })),
@@ -180,7 +187,9 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       claimed: [],
       text: m.text,
       ...(m.files?.length ? { files: m.files } : {}),
-      ...(beside ? { about: { id: beside.id, title: beside.title } } : {}),
+      ...(about
+        ? { about: { id: about.id, title: about.title, state: beside ? "running" : "finished" } }
+        : {}),
     };
 
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, origin);
@@ -289,8 +298,12 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   }
 
   const LIVE: WorkItem["status"][] = ["active", "queued", "waiting", "blocked"];
-  const ownTicket = (person: string, t?: TicketRecord) =>
+  const assignedTo = (person: string, t?: TicketRecord) =>
     t?.assignee?.kind === "agent" && t.assignee.id === person;
+
+  /** Work the agent can attach to: assigned to it, or it was the last to work on it (a hand-back reassigns to the requester). */
+  const ownTicket = (person: string, t?: TicketRecord) =>
+    assignedTo(person, t) || (t !== undefined && opts.workState.lastWorker(t.key) === person);
 
   interface Target {
     ticket?: TicketRecord;
@@ -311,7 +324,9 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     if (/^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(t)) {
       const ticket = opts.workState.ticket(t) ?? opts.workState.ticket(t.toUpperCase());
       if (!ticket || !ownTicket(person, ticket)) {
-        return refuse(`No ticket ${t} is assigned to you. Attach a request only to your own work.`);
+        return refuse(
+          `No ticket ${t} is your work: it is not assigned to you and you were not the last to work on it. Attach a request only to your own work.`,
+        );
       }
 
       return { ticket };
@@ -362,6 +377,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     // A ticket is the work of its open pull request, when it has one.
     let { ticket, pr } = target;
     if (!pr && ticket) {
+      // A pull request opened a moment ago may not be in the work state yet.
+      await opts.workState.catchUp();
       const open = opts.workState.currentWork(person).prs.find((p) => p.ticket === ticket!.key);
       pr =
         open &&
@@ -419,6 +436,10 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
             (key !== undefined && i.subject?.type === "ticket" && i.subject.ref === key)),
       )
       .toSorted((a, b) => LIVE.indexOf(a.status) - LIVE.indexOf(b.status));
+
+    if (key && !assignedTo(person, opts.workState.ticket(key))) {
+      await store.upsertSubject(ATTACH_REASSIGN_SUBJECT, `${person}:${key}`, { pending: true });
+    }
 
     const attachedOrigin: ChatOriginRecord = {
       channel: origin.channel,

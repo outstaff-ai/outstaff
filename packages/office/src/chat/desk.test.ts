@@ -63,6 +63,7 @@ describe("chat requests", () => {
   let makeDesk: (withChat?: boolean, over?: TeamConfig) => ChatRequests;
   let tickets: TicketRecord[];
   let pulls: PrRecord[];
+  let workers: Record<string, string>;
 
   // The office's picture of the work, as the work state keeps it.
   const knownWork = () => ({
@@ -85,6 +86,8 @@ describe("chat requests", () => {
     }),
     pullRequests: (number: number) => pulls.filter((p) => p.ref.number === number),
     ticket: (key: string) => tickets.find((t) => t.key === key),
+    lastWorker: (key: string) => workers[key],
+    catchUp: async () => {},
     prSubject: (ref: { number: number }) => `acme/app#${ref.number}`,
   });
 
@@ -134,6 +137,7 @@ describe("chat requests", () => {
   beforeEach(async () => {
     tickets = [];
     pulls = [];
+    workers = {};
     n = 0;
     notified = [];
     asked = [];
@@ -617,6 +621,35 @@ describe("chat requests", () => {
       expect(attached.attached.pr).toBeUndefined();
     });
 
+    it("accepts a ticket the person last worked on, though a hand-back reassigned it, and assigns it back", async () => {
+      ticket("ACME-30", { assignee: { id: "dana", kind: "human" }, status: "blocked" });
+      workers["ACME-30"] = "sam";
+      const { attached } = await attach("ACME-30");
+      expect(await store.getItem(attached.item.id)).toMatchObject({
+        kind: "assigned",
+        subject: { type: "ticket", ref: "ACME-30" },
+      });
+
+      expect((await store.getSubject("attach_reassign", "sam:ACME-30"))?.data).toEqual({
+        pending: true,
+      });
+    });
+
+    it("accepts a pull request the person authored whose ticket went to the requester", async () => {
+      ticket("ACME-31", { assignee: { id: "dana", kind: "human" }, status: "review" });
+      pull(31, { ticket: "ACME-31" });
+      const { attached } = await attach("#31", true);
+      expect(attached.attached.pr?.ref).toBe("#31");
+    });
+
+    it("refuses a ticket someone else worked on and holds", async () => {
+      ticket("ACME-32", { assignee: { id: "dana", kind: "human" } });
+      workers["ACME-32"] = "pat";
+      await expect(
+        desk.attachWork("sam", (await session()).id, { target: "ACME-32", confirmed: true }),
+      ).rejects.toMatchObject({ code: "invalid" });
+    });
+
     it("refuses a ticket or pull request that is not the person's own", async () => {
       ticket("ACME-20", { assignee: { id: "pat", kind: "agent" } });
       ticket("ACME-21", { assignee: { id: "dana", kind: "human" } });
@@ -901,7 +934,7 @@ describe("chat requests", () => {
       expect(journal).toContain("In the chat thread: anything else on the design side?");
       expect(await readOrigin(store, r.item.id)).toMatchObject({
         thread: "m1",
-        about: { id: item.id, title: item.title },
+        about: { id: item.id, title: item.title, state: "running" },
       });
 
       // The thread stays linked to the running item, so its result is posted there.
@@ -957,9 +990,11 @@ describe("chat requests", () => {
     });
 
     expect(await readOrigin(store, next.id)).toMatchObject({ thread: "m1" });
+    // An answer has no work to continue.
+    expect((await readOrigin(store, next.id))?.about).toBeUndefined();
   });
 
-  it("answers a reply in the thread of finished filed work with a new chat session", async () => {
+  it("answers a reply in the thread of finished filed work with a new chat session that knows the work", async () => {
     const { item } = await fileWork("Add a search page", "ACME-1");
     await scheduler.markActive(item.id);
     await scheduler.finish(item.id, { outcome: "done", status: "done" });
@@ -968,6 +1003,11 @@ describe("chat requests", () => {
     expect(r.disposition).toBe("started");
     expect(await store.getItem(r.item.id)).toMatchObject({ kind: "chat", parentId: item.id });
     expect((await store.getItem(r.item.id))!.sessionId).toBeNull();
+    expect((await readOrigin(store, r.item.id))?.about).toEqual({
+      id: item.id,
+      title: item.title,
+      state: "finished",
+    });
   });
 
   it("treats a reply in an unknown thread as a new request in that thread", async () => {

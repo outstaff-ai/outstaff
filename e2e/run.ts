@@ -1138,6 +1138,97 @@ async function main() {
     `chat files: a direct message with a picture was answered; ${withPicture.key} has the picture attached and the working agent downloaded it`,
   );
 
+  // ---- 10. a done hand-back on a ticket the agent left blocked stays blocked and goes to the requester
+  const { key: stuck } = await stub("POST", "/_test/tickets", {
+    title: "Rotate the staging key",
+    description: "blocked: the staging credentials are missing",
+    assignee: "sam",
+  });
+
+  const blockedAt = await until(`${stuck} handed back blocked`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === stuck);
+    return t.status === "Blocked" && t.assignee !== "sam"
+      ? { t, pulls: s.github.pulls.length }
+      : undefined;
+  });
+
+  assertEq(blockedAt.t.assignee, "ada.admin", "the blocked ticket went to the requester");
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+      ? true
+      : undefined,
+  );
+
+  const stays = await state();
+  assertEq(
+    stays.tickets.find((x: Json) => x.key === stuck).status,
+    "Blocked",
+    "the ticket is still blocked, not moved to review",
+  );
+
+  assertEq(stays.github.pulls.length, blockedAt.pulls, "no pull request was opened for it");
+  step(
+    `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, assigned to the requester`,
+  );
+
+  // ---- 11. a reply in the thread of a done item continues its ticket instead of filing a duplicate
+  const ticketsBefore10 = (await state()).tickets.length;
+  const pullsBefore10 = (await state()).github.pulls.length;
+  const request = await stub("POST", "/_test/chat/say", {
+    text: "New work: add a sign-off line",
+  });
+
+  const made = await until("the sign-off ticket in review with its pull request", (s) => {
+    const t = s.tickets.find((x: Json) => x.title === "add a sign-off line");
+    const pr = t ? s.github.pulls.find((p: Json) => p.body.includes(`Closes ${t.key}`)) : undefined;
+    return t && pr && t.status === "In Review" && t.assignee !== "sam" ? { t, pr } : undefined;
+  });
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+      ? true
+      : undefined,
+  );
+
+  // The done hand-back sent the ticket to the requester; the reply must still attach to it, and the attached work
+  // gives it back to the agent when it starts (held at the review gate to see that).
+  await stub("POST", "/_test/gates/review/close");
+  await stub("POST", "/_test/chat/say", {
+    text: "Also make the sign-off lowercase.",
+    thread: request.id,
+  });
+
+  await until(
+    "the attached round started and held at the gate",
+    (s) => s.chat.gates.review?.arrived,
+  );
+
+  const taken = await state();
+  assertEq(
+    taken.tickets.find((x: Json) => x.key === made.t.key).assignee,
+    "sam",
+    "the ticket is assigned to the agent again when the attached work starts",
+  );
+
+  await stub("POST", "/_test/gates/review/open");
+  await until(
+    "the attached round pushed to the same pull request, the ticket back in review",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === made.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === made.t.key);
+      return pr.head.sha !== made.pr.head.sha && t.status === "In Review" && t.assignee !== "sam"
+        ? true
+        : undefined;
+    },
+  );
+
+  const after10 = await state();
+  assertEq(after10.tickets.length, ticketsBefore10 + 1, "no second ticket was filed for the reply");
+  assertEq(after10.github.pulls.length, pullsBefore10 + 1, "no second pull request was opened");
+  step(
+    `thread: a reply after the done hand-back of ${made.t.key} continued it, no duplicate ticket`,
+  );
+
   const final = await state();
   const t2 = final.tickets.find((x: Json) => x.key === second);
   assertEq(t2.status, "In Review", "the second ticket waits in review");

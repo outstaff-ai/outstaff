@@ -136,6 +136,14 @@ export async function* assigned(ctx: ItemContext): Script {
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
+  // A ticket that says `blocked: <what>` cannot go on: the agent blocks it and still hands the item back as done.
+  const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
+  if (blocker) {
+    yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
+    yield { type: "tool", tool: "ticket_comment", input: { key, body: `Blocked: ${blocker}` } };
+    return `Stopped: ${blocker}`;
+  }
+
   // The toolset's tools work in the worktree: the mise shim has a version set, not just an install behind it.
   const pnpm = (yield { type: "shell", command: "pnpm --version", cwd }).trim();
   if (!/^\d+\.\d+\.\d+/.test(pnpm)) {
@@ -450,7 +458,7 @@ export async function* chat(ctx: ItemContext): Script {
   const humans = talk.filter((m) => !m.agent);
   const latest = humans.at(-1)?.text ?? "";
   if (ctx.about) {
-    // A reply in the thread of running work: an instruction is attached to that work, a question is answered.
+    // A reply in the thread of running or finished work: an instruction is attached to that work, a question is answered.
     const target = ctx.ticket ?? (ctx.pr === undefined ? undefined : String(ctx.pr));
     // A session that goes on with the thread's conversation has no history in its prompt: the reply is in the journal.
     const said =
@@ -468,6 +476,13 @@ export async function* chat(ctx: ItemContext): Script {
 
     const work = yield { type: "tool", tool: "work", input: {} };
     return `Greetings live in greeting.txt on the main branch. Right now I am on: ${work.split("\n")[0] ?? ""}`;
+  }
+
+  // New work is filed as a ticket, which the office turns into the work.
+  const filed = /^new work: (.+)$/i.exec(latest)?.[1];
+  if (filed) {
+    yield { type: "tool", tool: "ticket_create", input: { title: filed, body: filed } };
+    return "Filed.";
   }
 
   // A message with pictures is a request to file: the ticket gets the files, which the agent attaches itself.

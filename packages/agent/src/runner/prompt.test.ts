@@ -275,7 +275,7 @@ describe("buildWorkPrompt reply in the thread of running work", () => {
             requester: { id: "U1", name: "Dana" },
             direct: true,
             participant: true,
-            about: { id: "w3", title: "assigned: ACME-1" },
+            about: { id: "w3", title: "assigned: ACME-1", state: "running" },
           },
         },
       },
@@ -381,5 +381,34 @@ describe("buildWorkPrompt files", () => {
     );
 
     expect(prompt).toContain("- /scratch/w1/tickets/ACME-4/1-bug.png (image/png, 10 bytes)");
+  });
+});
+
+describe("buildWorkPrompt reply in the thread of finished work", () => {
+  it("names the earlier work and tells the session to continue its ticket", () => {
+    const base = offer();
+    const prompt = buildWorkPrompt(
+      {
+        ...base,
+        workItem: {
+          ...base.workItem,
+          kind: "chat",
+          origin: {
+            channel: "D1",
+            thread: "t1",
+            requester: { id: "U1", name: "Dana" },
+            direct: true,
+            participant: true,
+            about: { id: "w3", title: "assigned: ACME-1", state: "finished" },
+          },
+        },
+      },
+      { resumed: false },
+    );
+
+    expect(prompt).toContain("your earlier work item w3 (assigned: ACME-1)");
+    expect(prompt).toContain("Continue that ticket instead of filing a new one");
+    expect(prompt).toContain("ost work attach");
+    expect(prompt).not.toContain("running work item");
   });
 });

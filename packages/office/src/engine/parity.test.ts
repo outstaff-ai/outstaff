@@ -456,6 +456,19 @@ describe("kanban parity", () => {
     expect(await assignee(key)).toBe("Dana");
   });
 
+  it("treats a done hand-back on a ticket the agent left blocked as blocked", async () => {
+    const key = await ticket({ status: "blocked" });
+    await h.deliver({
+      type: "agent.handed_back",
+      subject: { ticket: key },
+      actor: sam,
+      data: { status: "done" },
+    });
+
+    expect(await status(key)).toBe("blocked");
+    expect(await assignee(key)).toBe("Dana");
+  });
+
   it("leaves the ticket alone when the agent hands back as waiting", async () => {
     const key = await ticket();
     const before = { status: await status(key), assignee: await assignee(key) };

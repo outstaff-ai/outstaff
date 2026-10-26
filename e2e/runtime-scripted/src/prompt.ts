@@ -24,7 +24,7 @@ export interface ItemContext {
   feedback: Feedback[];
 
   /** For a chat session answering in the thread of running work: that work item. */
-  about?: { itemId: string; title: string };
+  about?: { itemId: string; title: string; state: "running" | "finished" };
 
   /** For a chat session: the files the requester shared, as downloaded into scratch. */
   files?: { path: string; mimetype: string; name: string }[];
@@ -101,7 +101,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     .filter((m) => m !== null)
     .map((m) => ({ from: m[1]!, agent: m[2] !== undefined, text: m[3]! }));
 
-  const about = /reply in the thread of your running work item (\S+) \((.*?)\)\. Its ticket/.exec(
+  const about = /reply in the thread of your (running|earlier) work item (\S+) \((.*?)\)[,.] /.exec(
     prompt,
   );
 
@@ -133,6 +133,14 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     feedback,
     ...(shared.length ? { files: shared } : {}),
     ...(conversation?.length ? { conversation } : {}),
-    ...(about ? { about: { itemId: about[1]!, title: about[2]! } } : {}),
+    ...(about
+      ? {
+          about: {
+            itemId: about[2]!,
+            title: about[3]!,
+            state: about[1] === "running" ? ("running" as const) : ("finished" as const),
+          },
+        }
+      : {}),
   };
 }

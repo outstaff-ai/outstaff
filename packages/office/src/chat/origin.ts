@@ -6,6 +6,12 @@ export const CHAT_ORIGIN_SUBJECT = "chat_origin";
 export const CHAT_THREAD_SUBJECT = "chat_thread";
 export const CHAT_MESSAGE_SUBJECT = "chat_message";
 
+/**
+ * A ticket a chat session attached to the agent's earlier work, which may no longer be assigned to it. Keyed by
+ * `<person>:<ticket>`; the ticket is assigned back to the agent when its work starts.
+ */
+export const ATTACH_REASSIGN_SUBJECT = "attach_reassign";
+
 export interface ChatOriginRecord extends ChatOrigin {
   /**
    * Other threads linked to the item, because a request from them was attached to it. Each gets the item's result,

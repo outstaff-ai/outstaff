@@ -10,7 +10,7 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
-import { CHAT_ORIGIN_SUBJECT, readOrigin } from "../chat/origin.js";
+import { ATTACH_REASSIGN_SUBJECT, CHAT_ORIGIN_SUBJECT, readOrigin } from "../chat/origin.js";
 import {
   addFeedback,
   awaitsReview,
@@ -599,7 +599,44 @@ export function createEngine(opts: EngineOptions): Engine {
     );
   };
 
+  const started = async (itemId: string): Promise<void> => {
+    const item = await store.getItem(itemId);
+    const key = item ? await ticketOfItem(item) : undefined;
+    if (!item || !key || !tracker) {
+      return;
+    }
+
+    const ref = `${item.person}:${key}`;
+    const mark = (await store.getSubject(ATTACH_REASSIGN_SUBJECT, ref))?.data as
+      | { pending?: boolean }
+      | undefined;
+
+    if (!mark?.pending) {
+      return;
+    }
+
+    try {
+      const assignee = workState.ticket(key)?.assignee;
+      if (assignee?.kind !== "agent" || assignee.id !== item.person) {
+        await tracker.assign(key, await trackerId({ kind: "agent", id: item.person }));
+        await sync(key, "ticket.assigned", {});
+        logger.info("assigned the attached ticket back to the agent", {
+          ticket: key,
+          person: item.person,
+        });
+      }
+
+      await store.upsertSubject(ATTACH_REASSIGN_SUBJECT, ref, { pending: false });
+    } catch (error) {
+      logger.warn("could not assign the attached ticket to the agent", {
+        ticket: key,
+        error: String(error),
+      });
+    }
+  };
+
   return {
+    started: (itemId) => locked(() => started(itemId)),
     handle: (event, meta) => locked(() => run(event, meta)),
     followUp: (itemId) => locked(() => followUp(itemId)),
   };

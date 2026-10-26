@@ -157,12 +157,13 @@ describe("parsePrompt", () => {
 
     asked.workItem.origin = {
       ...asked.workItem.origin,
-      about: { id: "w9", title: "review feedback: PR #3" },
+      about: { id: "w9", title: "review feedback: PR #3", state: "running" },
     };
 
     expect(parsePrompt(buildWorkPrompt(asked, { resumed: false }))?.about).toEqual({
       itemId: "w9",
       title: "review feedback: PR #3",
+      state: "running",
     });
 
     const round = buildWorkPrompt(

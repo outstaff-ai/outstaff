@@ -56,4 +56,10 @@ export interface Engine {
    * offer, so the agent never saw it. Idempotent.
    */
   followUp(itemId: string): Promise<void>;
+
+  /**
+   * After an item started: a ticket a chat session attached to the agent's earlier work, which may have been
+   * reassigned to the requester since, is assigned to the agent again. Idempotent; failures are logged.
+   */
+  started(itemId: string): Promise<void>;
 }

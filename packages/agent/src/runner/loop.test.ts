@@ -170,6 +170,7 @@ describe("work loop", () => {
   let conn: OfficeConnection;
   let loop: WorkLoop;
   let running: Promise<void>;
+  let fake: ReturnType<typeof fakeEnv>;
 
   const sentOf = (type: string) => socket.sentOf(type) as Message[];
   const types = () => socket.sent.map((m) => m.type).filter((t) => t !== "hello");
@@ -206,7 +207,8 @@ describe("work loop", () => {
       tracker?: Tracker;
     } = {},
   ) {
-    const { env, vcs } = fakeEnv();
+    fake = fakeEnv();
+    const { env, vcs } = fake;
     const { vcs: ownVcs, layout: ownLayout, tracker: ownTracker, ...rest } = extra;
     const policy = buildPolicy({
       profile: "readonly",
@@ -250,6 +252,46 @@ describe("work loop", () => {
   beforeEach(() => {
     clock = createManualClock();
     socket = new OfficeSocket();
+  });
+
+  describe("a ticket the agent moved to blocked", () => {
+    const hand = async (moves: ("blocked" | "review")[], text = "Could not continue.") => {
+      await connect();
+      const runtime: Runtime = {
+        async *run(req) {
+          const move = req.tools.find((t) => t.name === "ticket_move")!;
+          for (const to of moves) {
+            await move.handler({ key: "SHOP-1", to }, { workItemId: "w1" });
+          }
+
+          yield { type: "finished", ok: true, text };
+        },
+      };
+
+      const logs: string[] = [];
+      start(runtime, {
+        log: { debug() {}, info() {}, error() {}, warn: (m: string) => void logs.push(m) },
+      });
+
+      await fake.tracker.createIssue({ title: "Checkout", body: "", status: "active", labels: [] });
+      socket.offerWith("w1");
+      await until(() => sentOf("handback").length === 1);
+      return { status: (sentOf("handback")[0]!.payload as { status: string }).status, logs };
+    };
+
+    it("is handed back as blocked, and the correction is logged", async () => {
+      const { status, logs } = await hand(["blocked"]);
+      expect(status).toBe("blocked");
+      expect(logs.join("\n")).toContain("handing back as blocked");
+    });
+
+    it("is handed back as done when the agent moved it on afterwards", async () => {
+      expect((await hand(["blocked", "review"])).status).toBe("done");
+    });
+
+    it("is done when the agent moved no ticket", async () => {
+      expect((await hand([])).status).toBe("done");
+    });
   });
 
   it("accepts an offer, runs it and hands back with the summary and links", async () => {

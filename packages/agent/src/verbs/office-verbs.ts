@@ -159,7 +159,7 @@ export const workAttach = defineVerb({
   name: "work.attach",
   summary: "Add a chat request to work you already have.",
   description:
-    "Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work (assigned to you or authored by you). Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket. The files the requester shared in their message are attached to the ticket, when the tracker takes attachments.",
+    "Makes the request of a chat session part of your existing ticket or pull request instead of new work: it becomes a round on that work, carrying the human's message as feedback, and the thread follows it. Only your own work: assigned to you, work you were the last to work on, or a pull request you authored; the ticket is assigned to you again when the work starts. Nothing is asked about its place. A pull request in review is refused unless the requester said in the thread that it belongs there: ask them first, then pass confirmed. Merged or done work is never reopened; file a follow-up with a ticket. The files the requester shared in their message are attached to the ticket, when the tracker takes attachments.",
   input: z.strictObject({
     target: z
       .string()
