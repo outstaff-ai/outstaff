@@ -1,7 +1,7 @@
 import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
 import type { RunRequest, RuntimeEvent, ToolKind } from "@outstaff/core";
 import { sampleRunRequest } from "@outstaff/core/contracts";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -596,5 +596,78 @@ describe("Design canvas", () => {
 
     expect(calls[0]!.options.env).not.toHaveProperty("CLAUDE_CODE_ARTIFACT");
     expect(calls[0]!.options.settings).toMatchObject({ enableArtifact: false });
+  });
+});
+
+describe("run edge cases", () => {
+  it("fails with a generic message when the thrown value is not an Error", async () => {
+    const { query } = fakeQuery(() =>
+      (async function* () {
+        yield init("s1");
+        throw "overloaded";
+      })(),
+    );
+
+    const events = await collect(createAgentSdkRuntime({ options, query }).run(req()));
+    expect(events.at(-1)).toEqual({ type: "finished", ok: false, text: "", error: "overloaded" });
+  });
+
+  it("reports a failure after the result only as the result", async () => {
+    const { query } = fakeQuery(() =>
+      (async function* () {
+        yield init("s1");
+        yield result();
+        throw new Error("late");
+      })(),
+    );
+
+    const events = await collect(createAgentSdkRuntime({ options, query }).run(req()));
+    expect(events.filter((e) => e.type === "finished")).toEqual([
+      { type: "finished", ok: true, text: "done", costUsd: 0.01 },
+    ]);
+  });
+
+  it("finishes with an error when the session ends without a result", async () => {
+    const { query } = fakeQuery(() => [init("s1"), assistant("partial")]);
+    const events = await collect(createAgentSdkRuntime({ options, query }).run(req()));
+    expect(events.at(-1)).toEqual({
+      type: "finished",
+      ok: false,
+      text: "partial",
+      error: "The session ended without a result.",
+    });
+  });
+
+  it("reads the secret folder from OUTSTAFF_SECRETS_DIR in the environment, else the default", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "claude-secrets-"));
+    writeFileSync(join(dir, "ANTHROPIC_API_KEY"), "fake-key");
+    try {
+      const bubblewrap = agentSdkOptions.parse({ sandbox: "bubblewrap" });
+      const settingsOf = async (env: Record<string, string>) => {
+        const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+        await collect(createAgentSdkRuntime({ options: bubblewrap, query, env }).run(req()));
+        return calls[0]!.options.settings;
+      };
+
+      expect(await settingsOf({ OUTSTAFF_SECRETS_DIR: dir })).toMatchObject({
+        sandbox: {
+          credentials: { files: [{ path: join(dir, "ANTHROPIC_API_KEY"), mode: "deny" }] },
+        },
+      });
+
+      expect(await settingsOf({ OUTSTAFF_SECRETS_DIR: join(dir, "missing") })).not.toHaveProperty(
+        "sandbox",
+      );
+
+      // Without a configured environment the process environment decides, then /run/secrets/outstaff.
+      const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+      vi.stubEnv("OUTSTAFF_SECRETS_DIR", dir);
+      await collect(createAgentSdkRuntime({ options: bubblewrap, query }).run(req()));
+      expect(calls[0]!.options.settings).toHaveProperty("sandbox");
+      vi.unstubAllEnvs();
+      expect(await settingsOf({})).not.toHaveProperty("sandbox");
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
   });
 });
