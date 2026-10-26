@@ -1,5 +1,5 @@
 import type { HookCallback } from "@anthropic-ai/claude-agent-sdk";
-import type { RunRequest, RuntimeEvent } from "@outstaff/core";
+import type { RunRequest, RuntimeEvent, ToolKind } from "@outstaff/core";
 import { sampleRunRequest } from "@outstaff/core/contracts";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -477,6 +477,7 @@ describe("child process environment", () => {
       PATH: "/bin",
       HOME: "/home/agent",
       ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+      CLAUDE_CODE_DISABLE_ARTIFACT: "1",
     });
   });
 
@@ -485,7 +486,11 @@ describe("child process environment", () => {
       env: { ANTHROPIC_API_KEY: "key", CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" },
     });
 
-    expect(env).toEqual({ ANTHROPIC_API_KEY: "key", ENABLE_CLAUDEAI_MCP_SERVERS: "false" });
+    expect(env).toEqual({
+      ANTHROPIC_API_KEY: "key",
+      ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+      CLAUDE_CODE_DISABLE_ARTIFACT: "1",
+    });
   });
 
   it("turns the scrub on with sandbox: bubblewrap", async () => {
@@ -497,6 +502,7 @@ describe("child process environment", () => {
     expect(env).toEqual({
       ANTHROPIC_API_KEY: "key",
       ENABLE_CLAUDEAI_MCP_SERVERS: "false",
+      CLAUDE_CODE_DISABLE_ARTIFACT: "1",
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1",
     });
   });
@@ -547,5 +553,41 @@ describe("child process environment", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("Design canvas", () => {
+  const run = async (builtinTools: ToolKind[], env: Record<string, string> = {}) => {
+    const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+    await collect(createAgentSdkRuntime({ options, query, env }).run(req({ builtinTools })));
+    return calls[0]!.options;
+  };
+
+  it("turns the Artifact tool on only for a session with the artifact tool kind", async () => {
+    const on = await run(["read", "artifact"]);
+    expect(on.env).toMatchObject({ CLAUDE_CODE_ARTIFACT: "1" });
+    expect(on.env).not.toHaveProperty("CLAUDE_CODE_DISABLE_ARTIFACT");
+    expect(on.settings).toMatchObject({ enableArtifact: true });
+    expect(on.tools).toEqual(expect.arrayContaining(["Artifact", "ArtifactComments"]));
+    expect(on.disallowedTools).not.toContain("Artifact");
+    expect(on.disallowedTools).toContain("ArtifactData");
+  });
+
+  it("keeps it off for every other session, whatever the environment says", async () => {
+    const off = await run(["read"], { CLAUDE_CODE_ARTIFACT: "1" });
+    expect(off.env).not.toHaveProperty("CLAUDE_CODE_ARTIFACT");
+    expect(off.env).toMatchObject({ CLAUDE_CODE_DISABLE_ARTIFACT: "1" });
+    expect(off.settings).toMatchObject({ enableArtifact: false });
+    expect(off.tools).not.toContain("Artifact");
+    expect(off.disallowedTools).toEqual(expect.arrayContaining(["Artifact", "ArtifactComments"]));
+  });
+
+  it("keeps it off for the usage probe", async () => {
+    const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+    await createAgentSdkRuntime({ options, query, env: { CLAUDE_CODE_ARTIFACT: "1" } })
+      .probeUsage!().catch(() => undefined);
+
+    expect(calls[0]!.options.env).not.toHaveProperty("CLAUDE_CODE_ARTIFACT");
+    expect(calls[0]!.options.settings).toMatchObject({ enableArtifact: false });
   });
 });

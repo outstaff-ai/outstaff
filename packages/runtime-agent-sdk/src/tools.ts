@@ -18,6 +18,8 @@ export const BUILTIN_NAMES: Record<ToolKind, string[]> = {
   shell: ["Bash"],
   web_fetch: ["WebFetch"],
   subagent: ["Task", "Agent"],
+  // ToolSearch is how Claude Code loads ArtifactComments, which it defers.
+  artifact: ["Artifact", "ArtifactComments", "ToolSearch"],
   ost: [],
 };
 
@@ -31,6 +33,8 @@ const EVERY_BUILTIN = [
   ...Object.values(BUILTIN_NAMES).flat(),
   "NotebookEdit",
   "MultiEdit",
+  "ArtifactData",
+  "ClaudeDesign",
   "WebSearch",
   "KillShell",
   "BashOutput",

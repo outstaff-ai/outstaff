@@ -69,6 +69,7 @@ const LACKING: Record<Capability, string> = {
   "runtime.sessions": "keep sessions between runs",
   "runtime.usage": "track LLM usage against limits",
   "avatars.generate": "get a generated avatar",
+  "design.canvas": "work on a Design canvas",
 };
 
 export const documentedCodes: Record<ConfigCode | WarningCode, string> = {

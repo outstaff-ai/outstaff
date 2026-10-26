@@ -416,3 +416,45 @@ describe("documentedCodes", () => {
     ]);
   });
 });
+
+describe("validateTeam: design.canvas", () => {
+  const designer = (runtime: Capability[]) =>
+    ctx({
+      roles: new Map<string, RoleNeeds>([
+        ["designer", { needs: ["knowledge.docs"], optionalNeeds: ["design.canvas"] }],
+      ]),
+      adapters: new Map([
+        adapter("runtime", "claude-agent-sdk", runtime),
+        adapter("knowledge", "notion", ["knowledge.docs"]),
+        adapter("vcs", "github", ["vcs.pullRequests"]),
+        adapter("chat", "slack", ["chat.messages"]),
+      ]),
+    });
+
+  const team = () =>
+    config((c) => {
+      c.people = [{ handle: "dina", name: "Dina", role: "designer", repos: {} }];
+      delete c.integrations.tracker;
+    });
+
+  it("is quiet when the runtime provides the capability", () => {
+    const { warnings } = validateTeam(team(), designer(["runtime.sessions", "design.canvas"]));
+    expect(warnings.filter((w) => w.code.startsWith("capability."))).toEqual([]);
+  });
+
+  it("warns when a role declares the capability and the runtime does not provide it", () => {
+    const warnings = validateTeam(team(), designer(["runtime.sessions"])).warnings.filter((w) =>
+      w.code.startsWith("capability."),
+    );
+
+    expect(warnings).toEqual([
+      {
+        path: ["people", 0, "role"],
+        code: "capability.optional_missing",
+        message: 'Role "designer" can use design.canvas, which no configured integration provides.',
+        consequence:
+          "designer dina cannot work on a Design canvas: no runtime integration provides design.canvas.",
+      },
+    ]);
+  });
+});

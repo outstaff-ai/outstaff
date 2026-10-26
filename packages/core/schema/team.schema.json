@@ -1362,6 +1362,21 @@
           },
           "additionalProperties": false
         },
+        "design": {
+          "default": {
+            "canvas": true
+          },
+          "description": "What design roles may use.",
+          "type": "object",
+          "properties": {
+            "canvas": {
+              "default": true,
+              "description": "Let roles that declare the design.canvas capability use Claude's Artifact tools (the Design canvas). Needs the claude-agent-sdk runtime signed in with a Claude account. Default on; it does nothing for a role without the capability.",
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "chat": {
           "default": {
             "parallel_sessions": 2,

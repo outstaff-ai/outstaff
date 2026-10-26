@@ -1,6 +1,7 @@
 import {
   PortError,
   defineAdapter,
+  policyOn,
   type DeriveContext,
   type DoctorCheck,
   type SecretSource,
@@ -76,6 +77,43 @@ function credentialCheck(secrets: SecretSource): DoctorCheck {
   };
 }
 
+// Claude Code serves the Artifact tool to a Claude account login only: not to an API key or a cloud provider. The check
+// reads which credential is set; it cannot tell whether the account's plan or organisation allows artifacts.
+function canvasCheck(secrets: SecretSource, ctx: DeriveContext): DoctorCheck[] {
+  if (
+    !ctx.roleCapabilities?.includes("design.canvas") ||
+    !policyOn(ctx.team.policies, "design.canvas")
+  ) {
+    return [];
+  }
+
+  const name = "Design canvas";
+  if (secrets.get("CLAUDE_CODE_OAUTH_TOKEN")) {
+    return [
+      {
+        key: "CLAUDE_CODE_OAUTH_TOKEN",
+        name,
+        status: "ok",
+        detail:
+          "CLAUDE_CODE_OAUTH_TOKEN is set, a Claude account login. Canvases belong to that account.",
+      },
+    ];
+  }
+
+  const other = [...SIGN_IN, ...PROVIDER_SWITCHES].filter(
+    (k) => k !== "CLAUDE_CODE_OAUTH_TOKEN" && secrets.get(k),
+  );
+
+  return [
+    {
+      name,
+      status: "warn",
+      detail: `The role uses the Design canvas, which needs a Claude account login, but ${other.length > 0 ? `only ${other.join(", ")} ${other.length === 1 ? "is" : "are"} set` : "no Claude credential is set"}. Without it the agent has no Artifact tools.`,
+      fix: "Give this agent CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token` on a machine signed in to a Claude Pro, Max, Team or Enterprise account), or set policies.design.canvas to false.",
+    },
+  ];
+}
+
 // With sandbox: bubblewrap only, and only on Linux, where the agent runs: run `ost doctor <handle>` in its container.
 function sandboxCheck(options: unknown): DoctorCheck[] {
   const parsed = agentSdkOptions.safeParse(options ?? {});
@@ -99,7 +137,7 @@ async function doctor(secrets: SecretSource, ctx: DeriveContext): Promise<Doctor
     return [];
   }
 
-  return [credentialCheck(secrets), ...sandboxCheck(ctx.options)];
+  return [credentialCheck(secrets), ...canvasCheck(secrets, ctx), ...sandboxCheck(ctx.options)];
 }
 
 /** With sandbox: bubblewrap, stops the agent at start, once, when the sandbox cannot run; Claude Code would fail every command instead. */
@@ -116,7 +154,7 @@ function requireSandbox(): void {
 export const claudeAgentSdk = defineAdapter({
   port: "runtime",
   name: "claude-agent-sdk",
-  capabilities: ["runtime.sessions", "runtime.usage"],
+  capabilities: ["runtime.sessions", "runtime.usage", "design.canvas"],
   options: agentSdkOptions,
   secrets: () => secrets,
   setupGuide,

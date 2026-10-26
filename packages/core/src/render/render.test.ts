@@ -402,3 +402,23 @@ describe("renderToDir", () => {
     ).not.toThrow();
   });
 });
+
+describe("designer skill: Design canvas", () => {
+  const skill = (team: TeamConfig) =>
+    renderPerson({ team, handle: "leo", catalog: real }).files.get("skills/designer/SKILL.md")!;
+
+  it("has the canvas guidance, and the no-code rule", () => {
+    const text = skill(acme);
+    expect(text).toContain("#### The Design canvas");
+    expect(text).toContain("`ArtifactComments`");
+    expect(text).toContain("link");
+    expect(text).toContain("Attach the exports");
+    expect(text).toContain("You do not read code.");
+    expect(text).toContain("Do not ask for the code.");
+  });
+
+  it("drops the canvas guidance when the team switches the canvas off", () => {
+    const off = { ...acme, policies: { ...acme.policies!, design: { canvas: false } } };
+    expect(skill(off)).not.toContain("Design canvas");
+  });
+});

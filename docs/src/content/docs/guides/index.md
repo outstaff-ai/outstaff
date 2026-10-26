@@ -12,4 +12,5 @@ Every deployment guide builds on the [container contract](/reference/container-c
 - [Kubernetes](/guides/kubernetes/): the same team as plain manifests, with secrets, a network policy and resource sizing.
 - [Secrets](/guides/secrets/): keep the secret files in 1Password, SOPS, Kubernetes Secrets or Compose secrets.
 - [Tell your agents how your repo works](/guides/repo-conventions/): put your commit, branch and pull request rules in the repository, and what to do when its files cannot change.
+- [Design canvas](/guides/design-canvas/): let the designer work on a private Claude Design canvas, and what it needs.
 - [Hire and remove people](/guides/hiring/): add a person with `ost hire`, which generates what you leave out, and remove one with `ost fire`.

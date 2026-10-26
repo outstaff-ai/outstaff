@@ -732,3 +732,44 @@ describe("globToRegExp", () => {
     expect(globToRegExp(glob).test(path)).toBe(ok);
   });
 });
+
+describe("design.canvas", () => {
+  const designer = buildPolicy({
+    profile: "docs",
+    person: { repos: {} },
+    team,
+    layout,
+    capabilities: ["design.canvas"],
+  });
+
+  const developer = policy("code");
+
+  it("adds the artifact tool and the artifacts folder for a role with the capability", () => {
+    expect(designer.tools.allow).toContain("artifact");
+    expect(evaluate(designer, { kind: "artifact" }).effect).toBe("allow");
+    expect(designer.paths.write.allow).toContain("/home/agent/artifacts/**");
+    expect(designer.paths.read.allow).toContain("/home/agent/artifacts/**");
+    expect(
+      evaluate(designer, { kind: "write", path: "/home/agent/artifacts/home.html" }).effect,
+    ).toBe("allow");
+  });
+
+  it("keeps them away from the other roles", () => {
+    expect(developer.tools.allow).not.toContain("artifact");
+    expect(evaluate(developer, { kind: "artifact" })).toMatchObject({
+      effect: "deny",
+      rule: "tools.allow",
+    });
+
+    expect(
+      evaluate(developer, { kind: "write", path: "/home/agent/artifacts/home.html" }).effect,
+    ).toBe("deny");
+  });
+
+  it("limits what an artifact call may publish to files the role can read", () => {
+    expect(evaluate(designer, { kind: "artifact", path: "/work/secrets/key" }).effect).toBe("deny");
+    expect(
+      evaluate(designer, { kind: "artifact", paths: ["/home/agent/artifacts/a.css"] }).effect,
+    ).toBe("allow");
+  });
+});

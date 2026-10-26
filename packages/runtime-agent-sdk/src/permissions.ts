@@ -4,6 +4,39 @@ import { HARMLESS_NAMES, OST_SERVER } from "./tools.js";
 
 const str = (v: unknown): string | undefined => (typeof v === "string" && v !== "" ? v : undefined);
 
+/** The local files an Artifact call publishes: the page, supporting files, an upload and the folder they resolve against. */
+function artifactSources(input: Record<string, unknown>): { path?: string; paths?: string[] } {
+  const paths: string[] = [];
+  const add = (v: unknown) => {
+    const p = str(v);
+    if (p !== undefined) {
+      paths.push(p);
+    }
+  };
+
+  const root = str(input["root"]);
+  add(root);
+  // Sources in `files` are relative to `root` (or the working directory without one).
+  const addIn = (v: unknown) =>
+    add(root !== undefined && str(v) && !String(v).startsWith("/") ? `${root}/${String(v)}` : v);
+
+  if (Array.isArray(input["file_paths"])) {
+    input["file_paths"].forEach(add);
+  }
+
+  const files = input["files"];
+  if (Array.isArray(files)) {
+    files.forEach((f) => addIn((f as { path?: unknown } | null)?.path));
+  } else if (files && typeof files === "object") {
+    for (const f of Object.values(files)) {
+      addIn(typeof f === "object" && f !== null ? (f as { from?: unknown }).from : f);
+    }
+  }
+
+  const path = str(input["file_path"]);
+  return { ...(path === undefined ? {} : { path }), ...(paths.length ? { paths } : {}) };
+}
+
 /** Maps an SDK tool call to the neutral call, or undefined for a tool the policy has no kind for. */
 export function toToolCall(name: string, input: unknown, cwd: string): ToolCall | undefined {
   const i = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
@@ -35,6 +68,11 @@ export function toToolCall(name: string, input: unknown, cwd: string): ToolCall 
     case "Task":
     case "Agent":
       return { kind: "subagent", cwd };
+    case "Artifact":
+      return { kind: "artifact", cwd, ...artifactSources(i) };
+    case "ArtifactComments":
+    case "ToolSearch":
+      return { kind: "artifact", cwd };
     default: {
       const prefix = `mcp__${OST_SERVER}__`;
       // A verb's tool name is its name with the dots as underscores (`ticket_create` for `ticket.create`).

@@ -1,4 +1,5 @@
 export {
+  artifactsDir,
   buildPolicy,
   CHAT_VERBS,
   commandRules,

@@ -1,3 +1,4 @@
+import type { Capability } from "../capabilities.js";
 import type { TeamConfig } from "../config/schema.js";
 import type { CommandRule, GitMode, Layout, Policy, Profile, RulePack, ToolKind } from "./types.js";
 
@@ -12,7 +13,16 @@ export interface BuildPolicyInput {
 
   /** Rules from adapters, toolsets and the team, merged after the built-in ones. */
   packs?: RulePack[];
+
+  /**
+   * Capabilities the person's role declares and the team has switched on. `design.canvas` adds the artifact tool and
+   * the artifacts folder; no profile has them by itself.
+   */
+  capabilities?: readonly Capability[];
 }
+
+/** Where a person's Design canvas files live; the folder stays across items. */
+export const artifactsDir = (layout: Pick<Layout, "home">): string => `${layout.home}/artifacts`;
 
 interface ProfileSpec {
   tools: ToolKind[];
@@ -305,6 +315,7 @@ export function buildPolicy({
   team,
   layout,
   packs = [],
+  capabilities = [],
 }: BuildPolicyInput): Policy {
   for (const [name, dir] of [
     ["reposDir", layout.reposDir],
@@ -356,12 +367,20 @@ export function buildPolicy({
     }
   }
 
+  // The profile's `writable: none` is about repositories; a canvas role keeps its own folder even when it is read-only.
+  const tools: ToolKind[] = [...spec.tools];
+  if (capabilities.includes("design.canvas")) {
+    tools.push("artifact");
+    readAllow.push(`${artifactsDir(layout)}/**`);
+    writeAllow.push(`${artifactsDir(layout)}/**`);
+  }
+
   const readDeny = [`${layout.secretsDir}/**`, ...SECRET_GLOBS];
   return {
     profile,
     home: layout.home,
     defaultCwd: layout.workDir,
-    tools: { allow: [...spec.tools], deny: [] },
+    tools: { allow: tools, deny: [] },
     paths: {
       read: { allow: readAllow, deny: readDeny },
       write: { allow: writeAllow, deny: [...readDeny, "**/.git", "**/.git/**"] },

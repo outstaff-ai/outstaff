@@ -320,6 +320,16 @@ export function evaluate(policy: Policy, call: ToolCall): Decision {
       }
 
       return allow("ost is allowed.", "tools.allow");
+    case "artifact": {
+      // The tool publishes files from disk, so every source must be readable by the person.
+      const sources = [...(call.path === undefined ? [] : [call.path]), ...(call.paths ?? [])];
+      const refused = sources
+        .map((p) => checkPath(policy, "read", p, cwd))
+        .find((d) => d.effect !== "allow");
+
+      return refused ?? allow("artifact is allowed.", "tools.allow");
+    }
+
     case "web_fetch":
     case "subagent":
       return allow(`${call.kind} is allowed.`, "tools.allow");

@@ -5,6 +5,8 @@ toolset: base
 permissions: docs
 needs:
   - knowledge.docs
+optional_needs:
+  - design.canvas
 modes:
   - name: design
     when: A requirement needs a design or a spec.
