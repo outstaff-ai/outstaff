@@ -60,6 +60,49 @@ describe("office connection", () => {
     expect(conn.resume()).toEqual(["w7"]);
   });
 
+  it("hands the reports queued for the agent to the handler, also when they came before it was set", async () => {
+    const report = {
+      id: "w1:blocked:1",
+      workItemId: "w1",
+      kind: "blocked" as const,
+      text: "Need the staging key.",
+      direct: "U1",
+      links: [],
+    };
+
+    await connectUp({ reports: [report] });
+    const seen: unknown[] = [];
+    conn.onReports?.((r) => seen.push(r));
+    expect(seen).toEqual([[report]]);
+
+    // The next connection brings what was queued since; nothing is repeated by the client.
+    current().terminate();
+    clock.advance(30_000);
+    current().open();
+    current().welcome({ reports: [{ ...report, id: "w2:blocked:1", workItemId: "w2" }] });
+    expect(seen).toEqual([[report], [{ ...report, id: "w2:blocked:1", workItemId: "w2" }]]);
+
+    // The office also pushes them while the connection is up.
+    current().receive({
+      id: "o9",
+      type: "reports",
+      payload: { reports: [{ ...report, id: "w3:blocked:1", workItemId: "w3" }] },
+    });
+
+    expect(seen).toHaveLength(3);
+
+    // And the client confirms one it posted.
+    const done = conn.reportPosted("w1", "w1:blocked:1");
+    const sent = current().sent.at(-1)!;
+    expect(sent).toMatchObject({
+      type: "report_posted",
+      payload: { workItemId: "w1", id: "w1:blocked:1" },
+    });
+
+    current().reply(sent, "ack");
+    await done;
+  });
+
   it("reconnects with exponential backoff, capped, and resets after a welcome", async () => {
     conn.start();
     const delays: number[] = [];

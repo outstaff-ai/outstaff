@@ -12,7 +12,7 @@ export interface PolicySwitch {
   default: PolicyValue;
 
   /** The value that turns the behaviour off (or, for a limit, lifts it). */
-  off: false | "none" | "many";
+  off: false | "none" | "many" | "agent";
 
   /** What outstaff does while the switch is on, for `ost policies` and the docs. */
   behaviour: string;
@@ -164,9 +164,20 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     kind: "rule",
     rules: ["hand-back-to-requester", "hand-back-blocked-to-requester"],
     behaviour:
-      "When an agent hands work back, move the ticket to review (done), or to blocked and tell the requester (blocked), and assign it to the person who asked for it. A waiting hand-back changes nothing. With none the ticket still moves but keeps its assignee.",
+      "When an agent hands work back, move the ticket to review (done), or to blocked (blocked), and assign it to the person who asked for it. A waiting hand-back changes nothing. With none the ticket still moves but keeps its assignee.",
     rewrite: (rule, value) =>
       value === "none" ? { ...rule, do: rule.do.filter((a) => !("assign" in a)) } : rule,
+  },
+  {
+    path: "hand_back.blocked_notify",
+    default: "pm",
+    off: "agent",
+    kind: "rule",
+    rules: ["hand-back-blocked-to-requester"],
+    behaviour:
+      "Who deals with a blocked hand-back before a human is pulled in. With pm (the default when the team has a PM role) the office schedules an unblock round for the PM, who tries to unblock it and messages the requester only if a human is needed. With agent, or when the team has no PM, the blocked agent tells the requester itself, in its own direct message with the ticket linked. The thread of a chat item always gets its agent's reply. Items the scheduler blocks are routed the same way. The office never posts to people.",
+    rewrite: (rule, value) =>
+      value === "agent" ? { ...rule, do: rule.do.filter((a) => !("schedule" in a)) } : rule,
   },
   {
     path: "hand_back.fallback",
@@ -261,4 +272,16 @@ export const policyOn = (policies: PolicyConfig, path: string): boolean =>
 /** The switch that governs a preset rule, if any. */
 export function switchOfRule(ruleId: string): PolicySwitch | undefined {
   return POLICY_SWITCHES.find((s) => s.rules?.includes(ruleId));
+}
+
+/**
+ * Who deals with a blocked hand-back: the PM when the team has one and the switch says so, else the blocked agent
+ * itself. A team without a PM role cannot route to one, whatever the switch says.
+ */
+export function blockedNotify(team: {
+  people: readonly { role: string }[];
+  policies?: PolicyConfig;
+}): "pm" | "agent" {
+  const hasPm = team.people.some((p) => p.role === "pm");
+  return hasPm && policyValue(team.policies, "hand_back.blocked_notify") === "pm" ? "pm" : "agent";
 }

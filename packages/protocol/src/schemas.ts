@@ -139,11 +139,22 @@ export const inlineCommentSchema = z.strictObject({
 });
 
 export const feedbackSchema = z.strictObject({
-  actor: z.string().min(1).describe("Login of the person who gave the feedback."),
+  actor: z
+    .string()
+    .min(1)
+    .describe("Login of the person who gave the feedback; for a blocked hand-back, the agent."),
   kind: z
-    .enum(["review", "comment", "inline_comment", "chat", "ticket_comment", "doc_comment"])
+    .enum([
+      "review",
+      "comment",
+      "inline_comment",
+      "chat",
+      "ticket_comment",
+      "doc_comment",
+      "blocked",
+    ])
     .describe(
-      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, a message from a trusted human in chat, a comment on a ticket, or a comment or reply on a knowledge document.",
+      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, a message from a trusted human in chat, a comment on a ticket, a comment or reply on a knowledge document, or an agent's hand-back as blocked (its last comment on the ticket).",
     ),
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),
@@ -266,6 +277,39 @@ export const answerStateSchema = z.strictObject({
 
 const empty = z.strictObject({});
 
+/** Where and how the agent posts a report to the requester; shared by `chat_report_result` and queued reports. */
+const reportWhere = {
+  requester: z.string().optional().describe("Id of the requester to mention."),
+  links: z.array(linkSchema).describe("The ticket and pull requests of the item."),
+  threads: z
+    .array(chatOriginSchema.omit({ about: true, files: true }))
+    .optional()
+    .describe(
+      "Every thread linked to the item now, to post the report in: the one it came from and the ones attached later. Absent when the report goes to a direct message instead.",
+    ),
+  direct: z
+    .string()
+    .optional()
+    .describe(
+      "For a blocked report on an item without a chat thread: the requester's chat user id. Open a direct message with them and post the report there.",
+    ),
+};
+
+/** A report the agent was not online to post, handed to it when it connects. */
+export const queuedReportSchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(300)
+    .describe(
+      "Id of this report. The office sends it again until the agent confirms with `report_posted`, so the agent skips an id it posted already.",
+    ),
+  workItemId: itemId,
+  kind: z.enum(["result", "blocked"]).describe("How the item ended."),
+  text: z.string().describe("What the agent handed back: the summary to report."),
+  ...reportWhere,
+});
+
 function message<T extends string, P extends z.ZodType>(type: T, payload: P) {
   return z.strictObject({
     id: z.string().min(1).max(200).describe("Unique id of this message."),
@@ -293,6 +337,12 @@ export const messageSchema = z.discriminatedUnion("type", [
       resume: z
         .array(z.string())
         .describe("Ids of accepted, unfinished items the agent should carry on with."),
+      reports: z
+        .array(queuedReportSchema)
+        .optional()
+        .describe(
+          "Reports to a requester that the agent did not post when its item ended, because it was offline. The agent posts each one now, as itself; the office does not send them again.",
+        ),
     }),
   ),
   message(
@@ -513,15 +563,25 @@ export const messageSchema = z.discriminatedUnion("type", [
     z.strictObject({
       post: z
         .boolean()
-        .describe("False when nothing should be posted: no chat origin, or already reported."),
-      requester: z.string().optional().describe("Id of the requester to mention."),
-      links: z.array(linkSchema).describe("The ticket and pull requests of the item."),
-      threads: z
-        .array(chatOriginSchema.omit({ about: true, files: true }))
-        .optional()
         .describe(
-          "Every thread linked to the item now, to post the result in: the one it came from and the ones attached later. Absent when nothing should be posted.",
+          "False when nothing should be posted: no chat origin and no blocked report to the requester, or already reported.",
         ),
+      ...reportWhere,
+    }),
+  ),
+  message(
+    "reports",
+    z.strictObject({
+      reports: z
+        .array(queuedReportSchema)
+        .describe("Reports to requesters the agent has not confirmed posting yet."),
+    }),
+  ),
+  message(
+    "report_posted",
+    z.strictObject({
+      workItemId: itemId,
+      id: z.string().min(1).max(300).describe("The `id` of the report the agent posted."),
     }),
   ),
   message(
@@ -599,6 +659,7 @@ export type Filed = z.infer<typeof filedSchema>;
 export type Attached = PayloadOf<"work_attach_result">;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
 export type MemberUsage = z.infer<typeof memberUsageSchema>;
+export type QueuedReport = z.infer<typeof queuedReportSchema>;
 export type ChatOrigin = z.infer<typeof chatOriginSchema>;
 export type ChatFile = z.infer<typeof chatFileSchema>;
 export type Human = z.infer<typeof humanSchema>;

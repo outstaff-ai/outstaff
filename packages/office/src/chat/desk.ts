@@ -1,23 +1,17 @@
-import {
-  createTicketLinker,
-  policyOn,
-  silentLogger,
-  type Chat,
-  type Logger,
-  type TeamConfig,
-  type Tracker,
-} from "@outstaff/core";
+import { blockedNotify, policyOn, type TeamConfig, type Tracker } from "@outstaff/core";
 import {
   formatWorkGroups,
   groupWork,
   type Attached,
+  type ChatOrigin,
   type Feedback,
   type Filed,
   type Link,
   type PayloadOf,
+  type QueuedReport,
   type WorkSummary,
 } from "@outstaff/protocol";
-import type { Cancel, Clock } from "../clock.js";
+import type { Clock } from "../clock.js";
 import { ProtocolError, type ChatDesk, type Messaging } from "../protocol/source.js";
 import { CHAT_KIND, orderQueue } from "../scheduler/policy.js";
 import type { Scheduler } from "../scheduler/scheduler.js";
@@ -35,19 +29,24 @@ import {
   ATTACH_REASSIGN_SUBJECT,
   CHAT_ORIGIN_SUBJECT,
   CHAT_THREAD_SUBJECT,
-  needsMention,
   readOrigin,
   threadKey,
   threadsOf,
   withThread,
   type ChatOriginRecord,
 } from "./origin.js";
+import { createReportQueue } from "./pending.js";
 import { parsePlacement, placeQueued, type ParsedPlacement } from "./placement.js";
 
 type MessageResult = PayloadOf<"chat_message_result">;
 type Message = PayloadOf<"chat_message">;
 
 export const PM_ROLE = "pm";
+
+const reportId = (r: { itemId: string; key: string }) => `${r.itemId}:${r.key}`;
+
+/** Work that answers something and changes no ticket: a blocked end of it tells no requester. */
+const SILENT_KINDS = new Set(["asked", "doc_feedback"]);
 
 export interface ChatDeskOptions {
   store: Store;
@@ -62,22 +61,21 @@ export interface ChatDeskOptions {
   tracker?: Pick<Tracker, "links">;
   messaging?: Pick<Messaging, "ask">;
 
-  /** Used for notes the agent cannot post itself, for example an item the scheduler blocked. */
-  chat?: Chat;
+  /**
+   * The chat user id of the human who asked for the item's work, for the blocked report of an item that did not
+   * come from chat. Undefined when there is no known requester or no chat identity for them.
+   */
+  requesterChat?: (item: WorkItem) => Promise<string | undefined>;
 
   /** Pull requests and tickets of an item, as links. */
   linksOf: (item: WorkItem) => Promise<Link[]>;
   notify: (person: string) => void;
-  logger?: Logger;
 
-  /** Times the grace period before the office posts a result the agent did not. */
+  /** Tells the server to send the person's queued reports now; the agent also gets them when it connects. */
+  push?: (person: string) => void;
+
   clock?: Clock;
-
-  /** How long the agent has to claim the report after its hand-back. Default 60. */
-  graceSeconds?: number;
 }
-
-export const DEFAULT_CHAT_REPORT_GRACE_SECONDS = 60;
 
 const firstLine = (text: string, max = 80) => {
   const line = text.split("\n", 1)[0]!.trim();
@@ -90,36 +88,37 @@ const withFiles = (m: Pick<Message, "text" | "files">) =>
     ? `${m.text}\n(Shared ${m.files.map((f) => `${f.name} (${f.mimetype})`).join(", ")}.)`.trimStart()
     : m.text;
 
-/** The mention with its trailing space, or nothing when the requester is notified anyway. */
-const mention = (origin: Pick<ChatOriginRecord, "requester" | "direct" | "participant">) =>
-  needsMention(origin) ? `<@${origin.requester.id}> ` : "";
-
 export interface ChatRequests extends ChatDesk {
-  /** Tells the requester of a chat item that the scheduler blocked it. Needs the office's chat port. */
-  notifyBlocked(item: WorkItem, reason: string): Promise<void>;
+  /**
+   * An item the scheduler blocked (the agent did not hand it back): queues the report its agent owes the requester,
+   * so the agent posts it as itself (the thread of a chat item, else a direct message), live if connected and
+   * otherwise on its next connection. With `routedToPm` a ticket's block is the PM's, and only a chat thread is told.
+   */
+  blocked(item: WorkItem, reason: string, routedToPm: boolean): Promise<void>;
 
   /**
-   * Records the hand-back of a chat item and, if the agent has not claimed the report when the grace period
-   * ends, posts the result through the office's chat port.
+   * Records the hand-back of an item whose requester is to hear how it ended: the chat result of a chat item, and
+   * the blocked report when the blocked agent reports itself. The agent claims it with `chat_report`; if it did not
+   * (it was offline), `queued` hands it over when the agent connects. The office posts nothing.
    */
   handedBack(item: WorkItem, result: { summary: string; links: Link[] }): Promise<void>;
-
-  /** Resumes the grace periods of hand-backs that no report claimed, after a restart. */
-  resume(): Promise<void>;
-
-  /** Cancels the pending timers. */
-  stop(): void;
 }
 
 export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const { store, scheduler } = opts;
-  const log = opts.logger ?? silentLogger;
 
   const clock = opts.clock;
-  const graceMs = (opts.graceSeconds ?? DEFAULT_CHAT_REPORT_GRACE_SECONDS) * 1000;
-  const timers = new Map<string, Cancel>();
-  const maxLines = opts.team.policies?.messages.max_lines ?? 3;
-  const linker = createTicketLinker(opts.team, opts.tracker);
+  const reports = createReportQueue(store);
+
+  /**
+   * Whether the blocked agent reports a blocked hand-back to the requester itself. Always in the thread a human asked
+   * in (the agent replying there is not a notification); for work without a chat origin only when the team routes
+   * blocked work to the agent, or the blocked agent is the PM, who has nobody to route it to.
+   */
+  const reportsBlocked = (item: WorkItem, origin: ChatOriginRecord | undefined) =>
+    origin !== undefined ||
+    blockedNotify(opts.team) === "agent" ||
+    opts.team.people.some((p) => p.handle === item.person && p.role === PM_ROLE);
 
   const open = async (person: string, except: string) => {
     const active = await store.listItems({ person, status: "active" });
@@ -606,24 +605,6 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     return { disposition: "placed", placement, ...(await base()) };
   }
 
-  async function retryNote(item: WorkItem, m: Message) {
-    if (!opts.chat) {
-      return;
-    }
-
-    try {
-      await opts.chat.post(
-        m.channel,
-        linker.format(`Retrying ${item.subject?.ref ?? item.title} on request`, "chat"),
-        {
-          thread: m.thread ?? m.messageId,
-        },
-      );
-    } catch (error) {
-      log.warn("could not post the retry note", { item: item.id, error: String(error) });
-    }
-  }
-
   async function replyInThread(
     person: string,
     item: WorkItem,
@@ -670,7 +651,6 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       const by = m.author.name ?? m.author.id;
       current = (await scheduler.retry(item.id, { by, signal: "chat reply" })) ?? item;
       opts.notify(person);
-      await retryNote(item, m);
     } else if (item.status === "waiting") {
       current = await store.updateItem(item.id, { status: "queued" });
       opts.notify(person);
@@ -716,78 +696,19 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const claimKey = async (item: WorkItem, kind: string) =>
     `${kind}:${(await store.listRuns(item.id)).at(-1)?.id ?? "0"}`;
 
-  /** Posts the result the agent did not, unless a report claimed it in the meantime. */
-  async function recover(itemId: string) {
-    timers.delete(itemId);
-    const item = await store.getItem(itemId);
-    const origin = item && (await readOrigin(store, itemId));
-    const hb = origin && origin.handBack;
-    if (
-      !item ||
-      !origin ||
-      !hb ||
-      origin.claimed.includes(hb.key) ||
-      item.status !== (hb.kind === "result" ? "done" : "blocked")
-    ) {
-      return;
+  /** Where the agent posts a report: the chat threads of the item, else the requester's direct message. */
+  async function placeOf(
+    item: WorkItem,
+    origin: ChatOriginRecord | undefined,
+    kind: "result" | "blocked" | "ack" | "failed",
+  ): Promise<{ requester: string; threads?: ChatOrigin[]; direct?: string } | undefined> {
+    if (origin) {
+      return { requester: origin.requester.id, threads: threadsOf(origin) };
     }
 
-    if (!opts.chat) {
-      return;
-    }
-
-    const got = await claim(item, origin, hb.kind);
-    if (!got) {
-      return;
-    }
-
-    const lines = hb.summary.trim().split("\n");
-    const body = lines.slice(0, Math.max(1, maxLines - 1)).join("\n");
-    const links = [...hb.links, ...(await opts.linksOf(item))].filter(
-      (l, i, all) => all.findIndex((x) => x.url === l.url) === i && !body.includes(l.url),
-    );
-
-    for (const t of threadsOf(origin)) {
-      const text = [
-        linker.format(
-          `${mention(t)}${hb.kind === "blocked" ? "I am blocked. " : ""}${body}`,
-          "chat",
-        ),
-        "(My agent went offline before it could post this, so the office is posting it.)",
-        ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
-      ].join("\n");
-
-      try {
-        await opts.chat.post(t.channel, text, { thread: t.thread });
-      } catch (error) {
-        log.warn("could not post the result of a chat item for its agent", {
-          item: item.id,
-          error: String(error),
-        });
-      }
-    }
+    const direct = kind === "blocked" ? await opts.requesterChat?.(item) : undefined;
+    return direct ? { requester: direct, direct } : undefined;
   }
-
-  const arm = (itemId: string, at: string) => {
-    if (!opts.chat || !clock) {
-      log.warn("no chat port: a chat result the agent does not post will not be posted", {
-        item: itemId,
-      });
-
-      return;
-    }
-
-    timers.get(itemId)?.();
-    const wait = Math.max(0, Date.parse(at) + graceMs - clock.now().getTime());
-    timers.set(
-      itemId,
-      clock.setTimeout(() => {
-        void recover(itemId).catch((error: unknown) => {
-          log.warn("chat result recovery failed", { item: itemId, error: String(error) });
-        });
-      }, wait),
-    );
-  };
 
   return {
     async handedBack(item, result) {
@@ -796,48 +717,110 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         item.status === "done" ? "result" : item.status === "blocked" ? "blocked" : undefined;
 
       // A session that filed its request as work has nothing to report; the work reports its own result.
-      if (!origin || !kind || !clock || origin.filed) {
+      if (!kind || !clock || origin?.filed) {
+        return;
+      }
+
+      // The result is for the chat thread that asked; a blocked item is reported when the agent is the one to do it.
+      // Answering someone else's question or a document comment is not the work the requester waits for.
+      if (
+        kind === "result"
+          ? !origin
+          : !reportsBlocked(item, origin) || (!origin && SILENT_KINDS.has(item.kind))
+      ) {
         return;
       }
 
       const key = await claimKey(item, kind);
-      // A retried hand-back finds it recorded, or the agent already reported it.
-      if (origin.claimed.includes(key) || origin.handBack?.key === key) {
+      // A retried hand-back finds it queued, or the agent already reported it.
+      if (origin?.claimed.includes(key)) {
         return;
       }
 
-      const at = clock.now().toISOString();
-      await store.upsertSubject(CHAT_ORIGIN_SUBJECT, item.id, {
-        ...origin,
-        handBack: { key, kind, summary: result.summary, links: result.links, at },
+      await reports.add(item.person, {
+        itemId: item.id,
+        key,
+        kind,
+        summary: result.summary,
+        links: result.links,
+        at: clock.now().toISOString(),
+      });
+    },
+
+    async queued(person) {
+      const out: QueuedReport[] = [];
+      for (const entry of await reports.list(person)) {
+        const item = await store.getItem(entry.itemId);
+        const origin = item && (await readOrigin(store, item.id));
+        const ended = item?.status === (entry.kind === "result" ? "done" : "blocked");
+        // The ending is gone (the item was retried) or the agent posted it itself already.
+        if (!item || !ended || origin?.claimed.includes(entry.key)) {
+          await reports.settle(person, entry.itemId, entry.key);
+          continue;
+        }
+
+        const where = await placeOf(item, origin, entry.kind);
+        if (!where) {
+          await reports.settle(person, entry.itemId, entry.key);
+          continue;
+        }
+
+        out.push({
+          id: reportId(entry),
+          workItemId: item.id,
+          kind: entry.kind,
+          text: entry.summary,
+          ...where,
+          links: [...entry.links, ...(await opts.linksOf(item))],
+        });
+      }
+
+      return out;
+    },
+
+    async posted(person, workItemId, id) {
+      const entry = (await reports.list(person)).find(
+        (r) => r.itemId === workItemId && reportId(r) === id,
+      );
+
+      // Confirmed twice, or the report was settled another way: nothing left to do.
+      if (!entry) {
+        return;
+      }
+
+      const origin = await readOrigin(store, workItemId);
+      if (origin && !origin.claimed.includes(entry.key)) {
+        await store.upsertSubject(CHAT_ORIGIN_SUBJECT, workItemId, {
+          ...origin,
+          claimed: [...origin.claimed, entry.key],
+        });
+      }
+
+      await reports.settle(person, workItemId, entry.key);
+    },
+
+    async blocked(item, reason, routedToPm) {
+      const origin = await readOrigin(store, item.id);
+      // The PM deals with a ticket's block; the thread a human asked in still gets its agent's reply.
+      if (!clock || origin?.filed || (routedToPm && !origin)) {
+        return;
+      }
+
+      if (!origin && SILENT_KINDS.has(item.kind)) {
+        return;
+      }
+
+      const key = `${await claimKey(item, "blocked")}:${clock.now().toISOString()}`;
+      await reports.add(item.person, {
+        itemId: item.id,
+        key,
+        kind: "blocked",
+        summary: firstLine(reason, 200),
+        links: [],
+        at: clock.now().toISOString(),
       });
 
-      arm(item.id, at);
-    },
-
-    async resume() {
-      for (const status of ["done", "blocked"] as const) {
-        for (const item of await store.listItems({ status })) {
-          const hb =
-            item.kind === CHAT_KIND ? (await readOrigin(store, item.id))?.handBack : undefined;
-
-          if (
-            hb &&
-            hb.key === (await claimKey(item, hb.kind)) &&
-            !(await readOrigin(store, item.id))?.claimed.includes(hb.key)
-          ) {
-            arm(item.id, hb.at);
-          }
-        }
-      }
-    },
-
-    stop() {
-      for (const cancel of timers.values()) {
-        cancel();
-      }
-
-      timers.clear();
+      opts.push?.(item.person);
     },
 
     async message(person, m) {
@@ -866,19 +849,33 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         kind === "result"
           ? item.status === "done"
           : kind === "blocked"
-            ? item.status === "blocked"
+            ? item.status === "blocked" && reportsBlocked(item, origin)
             : true;
 
-      if (!origin || !ended || !(await claim(item, origin, kind))) {
+      if (!ended) {
         return { post: false, links: [] };
       }
 
-      return {
-        post: true,
-        requester: origin.requester.id,
-        links: await opts.linksOf(item),
-        threads: threadsOf(origin),
-      };
+      const key = kind === "result" || kind === "blocked" ? await claimKey(item, kind) : undefined;
+      if (origin) {
+        if (!(await claim(item, origin, kind))) {
+          return { post: false, links: [] };
+        }
+      } else if (kind !== "blocked" || (await reports.done(person, item.id, key!))) {
+        // Only a blocked item without a chat thread has someone to tell: the requester, in a direct message.
+        return { post: false, links: [] };
+      }
+
+      const where = await placeOf(item, origin, kind);
+      if (!where) {
+        return { post: false, links: [] };
+      }
+
+      if (key) {
+        await reports.settle(person, item.id, key);
+      }
+
+      return { post: true, ...where, links: await opts.linksOf(item) };
     },
 
     async linkTicket(person, workItemId, ticket) {
@@ -910,33 +907,6 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
 
     async currentWork(person) {
       return formatCurrentWork(opts.workState.currentWork(person));
-    },
-
-    async notifyBlocked(item, reason) {
-      const origin = await readOrigin(store, item.id);
-      if (!origin || !opts.chat || !(await claim(item, origin, "blocked"))) {
-        return;
-      }
-
-      const links = await opts.linksOf(item);
-      for (const t of threadsOf(origin)) {
-        const text = [
-          linker.format(
-            `${mention(t)}I could not carry on with this: ${firstLine(reason, 200)}`,
-            "chat",
-          ),
-          ...links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`),
-        ].join("\n");
-
-        try {
-          await opts.chat.post(t.channel, text, { thread: t.thread });
-        } catch (error) {
-          log.warn("could not tell the requester about a blocked item", {
-            item: item.id,
-            error: String(error),
-          });
-        }
-      }
     },
   };
 }

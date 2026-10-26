@@ -1,7 +1,13 @@
 import type { TeamConfig } from "../config/schema.js";
 import { presetRules } from "../workflow/presets.js";
 import type { ResolvedWorkflow } from "../workflow/resolve.js";
-import { POLICY_SWITCHES, policyValue, type PolicySwitch, type PolicyValue } from "./switches.js";
+import {
+  POLICY_SWITCHES,
+  blockedNotify,
+  policyValue,
+  type PolicySwitch,
+  type PolicyValue,
+} from "./switches.js";
 
 /**
  * Where an effective value comes from: the built-in default, the team file, the workflow preset (which has no
@@ -38,7 +44,7 @@ const has = (raw: unknown, path: string): boolean => {
  * (undefined when absent), which tells a default from a value the team set to the same thing.
  */
 export function describePolicies(
-  config: Pick<TeamConfig, "policies" | "workflow">,
+  config: Pick<TeamConfig, "policies" | "workflow"> & Partial<Pick<TeamConfig, "people">>,
   workflow: Pick<ResolvedWorkflow, "rules">,
   raw: unknown,
 ): PolicyReport[] {
@@ -69,6 +75,14 @@ export function describePolicies(
         source: "preset",
         note: `the ${config.workflow?.preset ?? "kanban"} preset has no rule ${missing.join(", ")}`,
       };
+    }
+
+    // A team without a PM role cannot route blocked work to one, whatever the switch says.
+    if (sw.path === "hand_back.blocked_notify" && config.people) {
+      const effective = blockedNotify({ people: config.people, policies: config.policies });
+      if (effective !== configured) {
+        return { switch: sw, value: effective, source: own, note: "no pm role on the team" };
+      }
     }
 
     return { switch: sw, value: configured, source: own };

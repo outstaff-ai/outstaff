@@ -1,5 +1,6 @@
 export {
   POLICY_SWITCHES,
+  blockedNotify,
   POLICY_SWITCH_PATHS,
   policyOn,
   policySwitch,

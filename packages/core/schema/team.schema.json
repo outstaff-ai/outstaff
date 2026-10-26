@@ -1237,34 +1237,6 @@
                           ],
                           "additionalProperties": false,
                           "description": "Schedule a work item for an agent."
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "notify": {
-                              "type": "object",
-                              "properties": {
-                                "to": {
-                                  "type": "string",
-                                  "pattern": "^(requester|assignee|channel(:\\S+)?)$"
-                                },
-                                "template": {
-                                  "type": "string",
-                                  "pattern": "^[a-z][a-z0-9_-]*$"
-                                }
-                              },
-                              "required": [
-                                "to",
-                                "template"
-                              ],
-                              "additionalProperties": false
-                            }
-                          },
-                          "required": [
-                            "notify"
-                          ],
-                          "additionalProperties": false,
-                          "description": "Send a rendered template to a person or channel."
                         }
                       ]
                     },
@@ -1447,6 +1419,7 @@
         "hand_back": {
           "default": {
             "reassign": "requester",
+            "blocked_notify": "pm",
             "fallback": "first_human"
           },
           "description": "What happens to a ticket when an agent hands its work back.",
@@ -1459,6 +1432,15 @@
               "enum": [
                 "requester",
                 "none"
+              ]
+            },
+            "blocked_notify": {
+              "default": "pm",
+              "description": "Who deals with a blocked hand-back: pm schedules an unblock round for the team's PM, who messages the requester only if a human is needed; agent has the blocked agent tell the requester itself, in its own direct message. Without a PM role the agent always does. The office never posts to people. Default pm.",
+              "type": "string",
+              "enum": [
+                "pm",
+                "agent"
               ]
             },
             "fallback": {
@@ -1544,7 +1526,7 @@
             },
             "max_failures": {
               "default": 3,
-              "description": "Consecutive failed runs after which the work item is blocked and its requester told.",
+              "description": "Consecutive failed runs after which the work item is blocked.",
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991

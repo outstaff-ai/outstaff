@@ -117,14 +117,6 @@ export type Effect =
       ticket?: string;
       pr?: PrRef;
       doc?: string;
-    }
-  | {
-      type: "notify";
-      to: { kind: "human" | "agent" | "channel"; id?: string };
-      template: string;
-      body: string;
-      ticket?: string;
-      pr?: PrRef;
     };
 
 export interface WorkflowOptions {

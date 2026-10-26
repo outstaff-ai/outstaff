@@ -284,9 +284,9 @@ OUTSTAFF_AGENT_TOKEN_KOFI=
 
 # --- slack (chat) ---
 
-# Bot User OAuth Token of the team's office Slack app (xoxb-...); it posts and reads channel history only.
+# Bot User OAuth Token of the team's office Slack app (xoxb-...), used only to mirror agent questions to office.channel; it posts and reads channel history only. Not needed without office.channel.
 # Where: api.slack.com/apps > the office app > OAuth & Permissions.
-# Required.
+# Optional.
 SLACK_OFFICE_BOT_TOKEN=
 
 # --- github (vcs) ---

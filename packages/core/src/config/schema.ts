@@ -413,6 +413,14 @@ const policiesSchema = z
               "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.",
             ),
           ),
+        blocked_notify: z
+          .enum(["pm", "agent"])
+          .default("pm")
+          .meta(
+            d(
+              "Who deals with a blocked hand-back: pm schedules an unblock round for the team's PM, who messages the requester only if a human is needed; agent has the blocked agent tell the requester itself, in its own direct message. Without a PM role the agent always does. The office never posts to people. Default pm.",
+            ),
+          ),
         fallback: z
           .enum(["first_human", "none"])
           .default("first_human")
@@ -422,7 +430,7 @@ const policiesSchema = z
             ),
           ),
       })
-      .default({ reassign: "requester", fallback: "first_human" })
+      .default({ reassign: "requester", blocked_notify: "pm", fallback: "first_human" })
       .meta(d("What happens to a ticket when an agent hands its work back.")),
     tickets: z
       .strictObject({
@@ -482,11 +490,7 @@ const policiesSchema = z
           .int()
           .min(1)
           .default(3)
-          .meta(
-            d(
-              "Consecutive failed runs after which the work item is blocked and its requester told.",
-            ),
-          ),
+          .meta(d("Consecutive failed runs after which the work item is blocked.")),
       })
       .superRefine((v, ctx) => {
         if (v.base_minutes > v.cap_minutes) {

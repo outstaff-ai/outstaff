@@ -162,6 +162,7 @@ describe("shared catalog files", () => {
         "review-loop",
         "merged-feedback",
         "doc-feedback",
+        "unblock",
         "merge",
         "hand-back",
         "direct-requests",

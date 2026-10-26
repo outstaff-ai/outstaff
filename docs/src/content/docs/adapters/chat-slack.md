@@ -55,18 +55,18 @@ settings:
   token_rotation_enabled: false
 ```
 
-## Set up the office app
+## Set up the office app (optional)
 
-The office posts notifications and mirrors agent-to-agent questions, so it needs its own app, `<team>-outstaff-office`. It posts and reads history only: the manifest has no app-level token, Socket Mode or event subscriptions, because the office never listens to chat.
+The office posts to no person. Everything a human reads in chat comes from an agent, as itself: a result, a blocked report, or a message from the PM. The office app, `<team>-outstaff-office`, is only for the one thing the office writes to chat: the mirror of agent-to-agent questions and answers in the team channel (`office.channel` in `team.yaml`). If the team sets no `office.channel`, skip this section: the office has no chat port and needs no chat credentials. The app posts and reads history only: the manifest has no app-level token, Socket Mode or event subscriptions, because the office never listens to chat.
 
 1. Create an app from the manifest below.
 2. Install it to your workspace and keep the Bot User OAuth Token as `SLACK_OFFICE_BOT_TOKEN` in the office container.
-3. Invite the app to the channels it should post in, or send only direct messages.
+3. Invite the app to the team channel.
 
 ```yaml
 display_information:
   name: acme-outstaff-office
-  description: Notifications from the acme team's office
+  description: Mirrors the acme team's agent questions to a channel
 features:
   bot_user:
     display_name: acme-outstaff-office
@@ -86,7 +86,7 @@ settings:
   token_rotation_enabled: false
 ```
 
-If `integrations.chat` is set and `SLACK_OFFICE_BOT_TOKEN` is missing, the office stops at startup with an error naming the key; it does not run without posting. An agent's `SLACK_BOT_TOKEN` is never used in its place.
+If `office.channel` is set and `SLACK_OFFICE_BOT_TOKEN` is missing, the office stops at startup with an error naming the key; it does not run without mirroring. An agent's `SLACK_BOT_TOKEN` is never used in its place.
 
 ## Secrets
 
@@ -97,7 +97,7 @@ If `integrations.chat` is set and `SLACK_OFFICE_BOT_TOKEN` is missing, the offic
 | `SLACK_BOT_USER_ID`      | The bot's member id. Optional: derived with `auth.test`.         |
 | `SLACK_OFFICE_BOT_TOKEN` | Office container only: bot token of the office app (`xoxb-...`). |
 
-The first three are in each agent's container; the last is only in the office's.
+The first three are in each agent's container; the last is only in the office's, and only needed with `office.channel`.
 
 ## Pictures and files
 

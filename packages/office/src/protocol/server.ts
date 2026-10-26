@@ -69,6 +69,9 @@ export interface ProtocolServer {
 
   /** Tells the server that work may be waiting for a person; the scheduler calls this after enqueueing. */
   notify(person: string): void;
+
+  /** Sends the person's queued reports to its agent now, if it is connected; otherwise the next `welcome` carries them. */
+  reports(person: string): void;
 }
 
 interface Connection {
@@ -156,6 +159,24 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     });
 
     deliveries.set(person, next);
+  }
+
+  function pushReports(person: string) {
+    const c = conns.get(person);
+    if (!c || !opts.chat) {
+      return;
+    }
+
+    void opts.chat
+      .queued(person)
+      .then((reports) => {
+        if (reports.length > 0) {
+          send(c, "reports", { reports });
+        }
+      })
+      .catch((err: unknown) => {
+        log.warn("could not send the queued reports of an agent", { person, error: String(err) });
+      });
   }
 
   function desk(): ChatDesk {
@@ -286,6 +307,9 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
             ...(m.payload.request ? { request: m.payload.request } : {}),
           }),
         );
+      case "report_posted":
+        await desk().posted(person, m.payload.workItemId, m.payload.id);
+        return reply("ack", {});
       case "doc_link": {
         if (!opts.docs) {
           throw new ProtocolError("unsupported", "This office does not track documents.");
@@ -348,6 +372,12 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
 
     armIdle(c, heartbeatMs * 3);
     const outstanding = await source.outstanding(person);
+    // Reports the agent was offline for are handed to it here, once; it posts them as itself.
+    const reports = await opts.chat?.queued(person).catch((err: unknown) => {
+      log.warn("could not collect the queued reports of an agent", { person, error: String(err) });
+      return [];
+    });
+
     send(
       c,
       "welcome",
@@ -355,6 +385,7 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         protocolVersion: PROTOCOL_VERSION,
         heartbeatMs,
         resume: outstanding.filter((o) => o.accepted).map((o) => o.offer.workItem.id),
+        ...(reports?.length ? { reports } : {}),
       },
       m.id,
     );
@@ -488,5 +519,6 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
 
     connected: () => [...conns.keys()],
     notify: (person) => deliver(person),
+    reports: (person) => pushReports(person),
   };
 }

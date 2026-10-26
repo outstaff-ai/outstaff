@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock, type ManualClock } from "../clock.js";
 import { createAgentAuth, agentAuthFromSecrets, agentTokenKey } from "./auth.js";
 import { createProtocolServer, type ProtocolServer } from "./server.js";
-import { ProtocolError, type Messaging } from "./source.js";
+import { ProtocolError, type ChatDesk, type Messaging } from "./source.js";
 import { createFakeSource, type FakeSource } from "./testing.js";
 
 class Agent {
@@ -128,6 +128,70 @@ describe("protocol server", () => {
     }
 
     await server.stop();
+  });
+
+  describe("queued reports", () => {
+    const report = {
+      id: "w1:blocked:1",
+      workItemId: "w1",
+      kind: "blocked" as const,
+      text: "Need the staging key.",
+      requester: "U1",
+      direct: "U1",
+      links: [],
+    };
+
+    const withDesk = async (queued: ChatDesk["queued"], posted?: ChatDesk["posted"]) => {
+      await server.stop();
+      server = createProtocolServer({
+        source,
+        auth: createAgentAuth(tokens),
+        clock,
+        port: 0,
+        host: "127.0.0.1",
+        heartbeatMs: 1000,
+        chat: { queued, posted: posted ?? (async () => {}) } as ChatDesk,
+      });
+
+      await server.start();
+    };
+
+    it("hands them to the agent in the welcome", async () => {
+      await withDesk(async (person) => (person === "ada" ? [report] : []));
+      const a = await connect();
+      await a.hello("ada", tokens.ada);
+      expect((await a.next("welcome")).payload).toMatchObject({ reports: [report] });
+    });
+
+    it("pushes them to a connected agent, and takes its confirmation", async () => {
+      const confirmed: string[] = [];
+      await withDesk(
+        async () => [report],
+        async (person, item, id) => void confirmed.push(`${person}:${item}:${id}`),
+      );
+
+      const a = await login();
+      server.reports("ada");
+      expect((await a.next("reports")).payload).toEqual({ reports: [report] });
+      a.send("report_posted", { workItemId: "w1", id: "w1:blocked:1" });
+      await a.next("ack");
+      expect(confirmed).toEqual(["ada:w1:w1:blocked:1"]);
+    });
+
+    it("sends none when nothing is queued, and still welcomes the agent when the desk fails", async () => {
+      await withDesk(async () => []);
+      const a = await connect();
+      await a.hello("ada", tokens.ada);
+      expect((await a.next("welcome")).payload).not.toHaveProperty("reports");
+
+      await withDesk(async () => {
+        throw new Error("store down");
+      });
+
+      const b = await connect();
+      await b.hello("ada", tokens.ada);
+      expect((await b.next("welcome")).payload).not.toHaveProperty("reports");
+    });
   });
 
   describe("authentication", () => {

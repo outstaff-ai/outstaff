@@ -488,7 +488,7 @@ function perform(a: Action, ctx: Ctx, forced?: string): Resolved<Effect> {
       : { value: { type: "comment", on: target, template, body: body.value } };
   }
 
-  if ("schedule" in a) {
+  {
     const p = forced === undefined ? person(a.schedule.person, ctx) : { value: forced };
     if ("skip" in p) {
       return p;
@@ -515,42 +515,6 @@ function perform(a: Action, ctx: Ctx, forced?: string): Resolved<Effect> {
 
     return { value: e };
   }
-
-  const body = render(a.notify.template, ctx);
-  if ("skip" in body) {
-    return body;
-  }
-
-  let to: Extract<Effect, { type: "notify" }>["to"];
-  if (a.notify.to === "requester") {
-    const r = requesterOf(ctx);
-    if (!r) {
-      return { skip: noRequester(ctx) };
-    }
-
-    to = { kind: "human", id: r };
-  } else if (a.notify.to === "assignee") {
-    const as = ticket ? ctx.state.assignee(ticket) : undefined;
-    if (!as) {
-      return { skip: "ticket has no assignee" };
-    }
-
-    to = { kind: as.kind, id: as.id };
-  } else {
-    const name = a.notify.to.slice("channel:".length);
-    to = a.notify.to === "channel" ? { kind: "channel" } : { kind: "channel", id: name };
-  }
-
-  const e: Effect = { type: "notify", to, template: a.notify.template, body: body.value };
-  if (ticket) {
-    e.ticket = ticket;
-  }
-
-  if (ctx.event.subject.pr) {
-    e.pr = ctx.event.subject.pr;
-  }
-
-  return { value: e };
 }
 
 function stable(v: unknown): string {

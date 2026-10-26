@@ -70,8 +70,6 @@ export const BUILTIN_TEMPLATES: Readonly<Record<string, string>> = {
     "",
     "This team allows several pull requests per ticket. outstaff moves {{ticket}} to done only when the agent has handed its work back as done and every one of them is closed with at least one merged; a merge alone does not close it.",
   ].join("\n"),
-  hand_back_blocked:
-    "{{ticket}} is blocked: the agent could not continue. Its last comment on the ticket says what is needed; the work so far is kept on its branch.",
   rebase_conflict: [
     "Pull request #{{pr.number}} ({{pr.title}}) now conflicts with `{{pr.base}}`.",
     "",
