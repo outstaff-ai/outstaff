@@ -1,15 +1,4 @@
-import type { TeamConfig } from "@outstaff/core";
-
-export interface IdentityRole {
-  title: string;
-  summary?: string;
-}
-
-export interface IdentityInput {
-  team: TeamConfig;
-  handle: string;
-  role?: IdentityRole;
-}
+import type { IdentityInput } from "./types.js";
 
 const MESSAGE_OMIT: Record<string, string> = {
   ci: "CI status",

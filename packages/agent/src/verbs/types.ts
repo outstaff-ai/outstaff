@@ -1,19 +1,22 @@
 import type {
+  AdapterRegistry,
+  Logger,
+  SecretSource,
+  TeamConfig,
+  Vcs,
   AdbGrant,
   Chat,
   Knowledge,
   Layout,
-  Logger,
   Policy,
   PortName,
-  TeamConfig,
   Tracker,
-  Vcs,
 } from "@outstaff/core";
+import type { OfficeClient } from "./office.types.js";
+
 import type { z } from "zod";
-import type { Attachment } from "../runner/attachments.js";
+import type { Attachment } from "../runner/types.js";
 import type { ToolStatus } from "../tools/types.js";
-import type { OfficeClient } from "./office.js";
 
 /** What every verb returns; `text` already contains every URL in `links`. */
 export interface VerbResult {
@@ -99,24 +102,42 @@ export interface Verb {
   run(env: AgentEnv, input: never, ctx: VerbContext): Promise<VerbResult>;
 }
 
-export function defineVerb<S extends z.ZodObject>(
-  verb: Omit<Verb, "input" | "run" | "cli"> & {
-    cli?: string[];
-    input: S;
-    run(env: AgentEnv, input: z.output<S>, ctx: VerbContext): Promise<VerbResult>;
-  },
-): Verb {
-  return verb as unknown as Verb;
+export interface VerbField {
+  name: string;
+  type: "string" | "integer" | "number" | "boolean" | "array";
+  required: boolean;
+  description: string;
+  default?: unknown;
+  enum?: string[];
+
+  /** Position among the positional arguments, or undefined for an option. */
+  arg?: number;
 }
 
-/** Text from lines and the links they must contain. */
-export function result(lines: string[], data: unknown, links: string[]): VerbResult {
-  const unique = [...new Set(links)];
-  const text = lines.join("\n");
-  const missing = unique.filter((l) => !text.includes(l));
-  return {
-    text: missing.length ? `${text}\n${missing.join("\n")}` : text,
-    data,
-    links: unique,
-  };
+export interface Uploaded {
+  attached: string[];
+  failed: { name: string; reason: string }[];
+}
+
+export interface MentionGuard {
+  /** `text` with each teammate's `@handle` replaced by their name. Throws `invalid` for any other login. */
+  apply(text: string): string;
+}
+
+/** A code host that can merge: it declares `vcs.merge`, so it has all four operations. */
+export type MergeVcs = Vcs &
+  Required<Pick<Vcs, "reviewState" | "requiredChecks" | "mergeOptions" | "mergePullRequest">>;
+
+export interface CreateAgentEnvOptions {
+  team: TeamConfig;
+
+  /** Handle of the person this process runs as. */
+  person: string;
+  registry: AdapterRegistry;
+  secrets: SecretSource;
+  office?: OfficeClient;
+
+  log?: Logger;
+  fetch?: typeof fetch;
+  now?: () => Date;
 }

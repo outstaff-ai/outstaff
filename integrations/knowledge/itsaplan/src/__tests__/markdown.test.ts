@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { docToMd, findRange, mdToDoc, plainText, type PmNode } from "../markdown.js";
+import { docToMd } from "../doc-to-md.js";
+import { mdToDoc } from "../markdown.js";
+import { findRange, plainText } from "../text-range.js";
+import type { PmNode } from "../types.js";
 
 describe("mdToDoc", () => {
   it("builds headings, paragraphs and inline marks", () => {

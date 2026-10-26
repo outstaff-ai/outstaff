@@ -1,14 +1,6 @@
-import { silentLogger, type Chat, type Logger, type Tracker } from "@outstaff/core";
+import { silentLogger } from "@outstaff/core";
 import type { WorkItem } from "../store/types.js";
-
-export interface MirrorOptions {
-  chat?: Chat | undefined;
-  channel?: string | undefined;
-  tracker?: Tracker | undefined;
-  logger?: Logger | undefined;
-}
-
-export type MirrorWhere = "channel" | "ticket" | "journal";
+import type { MirrorOptions, MirrorWhere } from "./types.js";
 
 /**
  * Makes a question or an answer visible to humans: the team channel when one is configured, else the ticket of the

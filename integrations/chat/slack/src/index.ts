@@ -5,9 +5,10 @@ import { validateSlackIdentities } from "./identities.js";
 import { deriveSlack, slackSetupGuide } from "./setup.js";
 import { slackOptions } from "./options.js";
 
-export { createSlackChat, type SlackDeps } from "./chat.js";
+export { createSlackChat } from "./chat.js";
+export type { SlackDeps, SlackOptions } from "./types.js";
 export { validateSlackIdentities } from "./identities.js";
-export { slackOptions, type SlackOptions } from "./options.js";
+export { slackOptions } from "./options.js";
 export { toMrkdwn, splitMrkdwn, SLACK_MAX_LENGTH } from "./mrkdwn.js";
 export type { SlackWeb, SlackSocket, SlackEvent } from "./api.js";
 

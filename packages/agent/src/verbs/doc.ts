@@ -1,7 +1,8 @@
 import { PortError, type Doc, type DocComment } from "@outstaff/core";
 import { z } from "zod";
 import { requireKnowledge } from "./support.js";
-import { defineVerb, result, type AgentEnv, type VerbContext } from "./types.js";
+import { defineVerb, result } from "./define.js";
+import type { AgentEnv, VerbContext } from "./types.js";
 
 const id = z.string().min(1).max(500).describe("Document id or path.");
 const commentId = z.string().min(1).max(200).describe("Comment id.");

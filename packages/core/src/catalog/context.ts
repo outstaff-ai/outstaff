@@ -1,92 +1,15 @@
-import type { TeamConfig } from "../config/schema.js";
+import type { TeamConfig } from "../config/types.js";
 import { policyOn, policyValue } from "../policies/switches.js";
-
-/**
- * The values a template can use. Every key below always exists, so a template
- * may test it with {{#if}}; an absent value is "" (or null for objects).
- *
- * One context for every catalog file; it never contains a person, because a role
- * reads the same for everyone who holds it. Who the agent is comes from data
- * at runtime.
- *
- *   team.name, team.product
- *   repos.many (true when the team has more than one repo),
- *   repos.list[] {name,url,kind,default_branch,checks[],conventions,instructions[]}, repos.primary (null when none),
- *                  repos.has_checks (true when any repo lists checks),
- *                  repos.has_conventions (true when any repo has conventions text)
- *   people.list[] {handle,name,pronouns,role,role_title,role_summary,model},
- *   people.byRole.<role>[] (a key, possibly empty, for every catalog role)
- *   roles[] {name,title,summary,people[]} for every catalog role; people is the
- *                  same list as people.byRole.<name>, so a template can nest it
- *   humans.list[] {name}, humans.has, humans.default_trust (true when the team
- *                  gives no `humans:` list); no identities or ids
- *   integrations.has.<port> (boolean), integrations.adapter.<port> (name or "")
- *   links.<name>   url templates with {key} slots, for example "{base}/{key}";
- *                  adapters fill them later. issue, pr and doc always exist.
- *   policies.messages.{max_lines,always_link,omit[]}
- *   policies.tickets.many_prs (true when policies.tickets.prs_per_ticket is many)
- *   policies.design.canvas (true unless policies.design.canvas is switched off)
- */
-export type RepoContext = {
-  name: string;
-  url: string;
-  kind: string;
-  default_branch: string;
-
-  /** The repo's configured affected-check commands; empty when none. */
-  checks: string[];
-
-  /** The repo's free-text conventions from team.yaml; "" when none. */
-  conventions: string;
-  instructions: string[];
-};
-
-export type PersonContext = {
-  handle: string;
-  name: string;
-  pronouns: string;
-  role: string;
-
-  /** Title and one-line summary from the role's role.yaml; "" if not in the catalog. */
-  role_title: string;
-  role_summary: string;
-  model: string;
-};
-
-export type RoleInfo = { name: string; title: string; summary: string };
-export type HumanContext = { name: string };
+import type {
+  CatalogContext,
+  ContextExtras,
+  PersonContext,
+  RepoContext,
+  RoleInfo,
+} from "./types.js";
 
 export const PORTS = ["tracker", "knowledge", "vcs", "chat", "runtime", "avatars"] as const;
 type Port = (typeof PORTS)[number];
-
-export type CatalogContext = {
-  team: { name: string; product: string };
-  repos: {
-    list: RepoContext[];
-    primary: RepoContext | null;
-    many: boolean;
-    has_checks: boolean;
-    has_conventions: boolean;
-  };
-  people: { list: PersonContext[]; byRole: Record<string, PersonContext[]> };
-  roles: (RoleInfo & { people: PersonContext[] })[];
-  humans: { list: HumanContext[]; has: boolean; default_trust: boolean };
-  integrations: { has: Record<Port, boolean>; adapter: Record<Port, string> };
-  links: Record<string, string>;
-  policies: {
-    messages: { max_lines: number; always_link: boolean; omit: string[] };
-    tickets: { many_prs: boolean };
-    design: { canvas: boolean };
-  };
-};
-
-export type ContextExtras = {
-  /** URL templates by name; merged over empty `issue`, `pr` and `doc`. */
-  links?: Record<string, string>;
-
-  /** Catalog roles; each gets a (possibly empty) `people.byRole` list and a `roles` entry. */
-  roles?: RoleInfo[];
-};
 
 const DEFAULT_OMIT = ["ci", "mergeability", "hashes"];
 

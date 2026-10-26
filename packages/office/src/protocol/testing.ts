@@ -1,27 +1,9 @@
-import type { Link, Member, WorkSummary } from "@outstaff/protocol";
-import { ProtocolError, type Offer, type WorkSource } from "./source.js";
+import type { Member, WorkSummary } from "@outstaff/protocol";
+import { ProtocolError } from "./errors.js";
+import type { Offer } from "./source.types.js";
+import type { FakeSource } from "./types.js";
 
-type State =
-  | "queued"
-  | "offered"
-  | "accepted"
-  | "done"
-  | "failed"
-  | "waiting"
-  | "blocked"
-  | "canceled";
-
-export interface FakeSource extends WorkSource {
-  enqueue(person: string, id: string, title?: string): Offer;
-  stateOf(id: string): State | undefined;
-
-  /** Every call the server made, as `method:person:id`. */
-  calls: string[];
-  sessions: Map<string, string>;
-  journalLines: { id: string; text: string }[];
-  handBacks: { id: string; summary: string; links: Link[]; status: string }[];
-  failNext(error: Error): void;
-}
+type State = NonNullable<ReturnType<FakeSource["stateOf"]>>;
 
 export function createFakeSource(members: Member[] = []): FakeSource {
   const items = new Map<string, { person: string; offer: Offer; state: State; title: string }>();

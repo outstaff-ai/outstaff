@@ -1,8 +1,6 @@
 import { PortError, repoKey, vcsAgentLogins } from "@outstaff/core";
-import type { Member, RepoRef, TeamConfig, Vcs } from "@outstaff/core";
-import type { Clock } from "../clock.js";
-import type { Store } from "../store/index.js";
-import type { Actor } from "./normalize.js";
+import type { RepoRef } from "@outstaff/core";
+import type { Trust, TrustOptions } from "./types.js";
 
 export const DEFAULT_TRUST_TTL_MS = 10 * 60_000;
 const BOT_SUFFIX = "[bot]";
@@ -10,20 +8,6 @@ const BOT_SUFFIX = "[bot]";
 interface CachedPermission {
   permission: string;
   checkedAt: string;
-}
-
-export interface Trust {
-  vcsActor(repo: RepoRef, login: string): Promise<Actor>;
-  trackerActor(member: Member): Actor;
-}
-
-export interface TrustOptions {
-  store: Store;
-  vcs: Vcs;
-  team: TeamConfig;
-  clock: Clock;
-  ttlMs?: number;
-  resolveAgent?: (login: string) => string | undefined;
 }
 
 export function createTrust(opts: TrustOptions): Trust {

@@ -1,99 +1,25 @@
 import {
-  mentionData,
   PortError,
   type AdapterContext,
   type Doc,
   type DocComment,
-  type DocEvent,
   type Knowledge,
 } from "@outstaff/core";
 import {
   createClient,
-  OVERLAP_MS,
-  parseCursor,
   type ClientDeps,
   type Itsaplan,
   type KnowledgeOptions,
 } from "@outstaff/integration.tracker.itsaplan";
-import { findRange, mdToDoc, plainText, type PmNode } from "./markdown.js";
-
-interface ApiDocSummary {
-  id: number;
-  parentId?: number | null;
-  title: string;
-  metadata?: { path?: string } | null;
-  version: number;
-  updatedAt: string;
-}
-
-interface ApiDoc extends ApiDocSummary {
-  content?: string | null;
-  contentJson?: PmNode | null;
-}
-
-interface ApiDocComment {
-  id: string;
-  parentId?: string | null;
-  authorId?: string | null;
-  authorName?: string | null;
-  body: string;
-  quote?: string | null;
-  resolvedAt?: string | null;
-  createdAt: string;
-}
-
-interface Tree {
-  items: ApiDocSummary[];
-  byId: Map<number, ApiDocSummary>;
-}
+import { commentId, parseCommentId } from "./comment-ids.js";
+import { find, pathOf, segments } from "./doc-tree.js";
+import { readDocEvents } from "./events.js";
+import { mdToDoc } from "./markdown.js";
+import { findRange, plainText } from "./text-range.js";
+import type { ApiDoc, ApiDocComment, ApiDocSummary, PmNode, Tree } from "./types.js";
 
 const NUMERIC = /^\d+$/;
 const QUOTE_FALLBACK = 80;
-
-const segments = (path: string) =>
-  path
-    .split("/")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-
-/** A document's tree path from the titles of its ancestors. */
-function titlePath(d: ApiDocSummary, byId: Map<number, ApiDocSummary>): string {
-  const parts: string[] = [];
-  for (let cur: ApiDocSummary | undefined = d; cur; cur = byId.get(cur.parentId ?? -1)) {
-    parts.unshift(cur.title);
-    if (parts.length > 50) {
-      break;
-    }
-  }
-
-  return parts.join("/");
-}
-
-// The stored path (kept in metadata) wins; pages made in the web app fall back to their ancestors' titles.
-const pathOf = (d: ApiDocSummary, byId: Map<number, ApiDocSummary>) =>
-  d.metadata?.path ?? titlePath(d, byId);
-
-function find(tree: Tree, path: string): ApiDocSummary | undefined {
-  const wanted = segments(path).join("/");
-  return (
-    tree.items.find((d) => d.metadata?.path !== undefined && same(d.metadata.path, wanted)) ??
-    tree.items.find((d) => same(titlePath(d, tree.byId), wanted))
-  );
-}
-
-// `<docId>:<commentId>`: replies and resolves arrive with a comment id only, and the API needs the document too.
-const commentId = (docId: number | string, id: string) => `${docId}:${id}`;
-
-function parseCommentId(id: string): { docId: number; id: string } {
-  const m = /^(\d+):(.+)$/.exec(id);
-  if (!m) {
-    throw new PortError("not_found", `Comment ${id} not found.`);
-  }
-
-  return { docId: Number(m[1]), id: m[2]! };
-}
 
 export function createItsaplanKnowledge(
   ctx: AdapterContext<KnowledgeOptions>,
@@ -340,71 +266,7 @@ function buildKnowledge(api: Itsaplan, now: () => Date): Knowledge {
     },
 
     async events(ids, cursor) {
-      // Document comments are not in the project's activity feed, so the comments of each document are read.
-      const after = parseCursor(cursor);
-      const setup = await api.project();
-      const all: { docId: number; comment: ApiDocComment; at: number }[] = [];
-      for (const id of new Set(ids)) {
-        const docId = await idOf(id);
-        try {
-          const found = await api.http.request<ApiDocComment[]>("GET", `${docs}/${docId}/comments`);
-
-          for (const comment of found) {
-            all.push({ docId, comment, at: Date.parse(comment.createdAt) });
-          }
-        } catch (error) {
-          // A document that was deleted or closed to this account is no longer news; anything else is retried.
-          if (!(error instanceof PortError) || !["not_found", "forbidden"].includes(error.code)) {
-            throw error;
-          }
-        }
-      }
-
-      const key = (r: (typeof all)[number]) => commentId(r.docId, r.comment.id);
-      const times = all.map((r) => r.at).filter((t) => !Number.isNaN(t));
-      // Without a position, the window is what lies within the overlap of the newest comment.
-      const floor = (after?.since ?? Math.max(...times)) - OVERLAP_MS;
-      // No cursor at all is the first poll (the office decides if it is a baseline); a cursor we cannot use baselines here.
-      const baseline = cursor !== undefined && !after;
-      const fresh = baseline
-        ? []
-        : all.filter((r) => r.at >= floor && !(after?.seen.has(key(r)) ?? false));
-
-      const titles = new Map<number, string>();
-      const events: DocEvent[] = [];
-      for (const r of fresh.toSorted((a, b) => a.at - b.at || key(a).localeCompare(key(b)))) {
-        if (!titles.has(r.docId)) {
-          titles.set(r.docId, (await read(r.docId)).title);
-        }
-
-        const c = r.comment;
-        events.push({
-          externalId: `itsaplan-doc:${key(r)}`,
-          type: "commented",
-          doc: String(r.docId),
-          title: titles.get(r.docId)!,
-          url: api.docUrl(String(r.docId)),
-          actor: api.member(setup, c.authorId, c.authorName),
-          at: c.createdAt,
-          data: {
-            commentId: key(r),
-            ...(c.parentId ? { parentId: commentId(r.docId, c.parentId) } : {}),
-            ...(c.quote ? { anchorText: c.quote } : {}),
-            body: c.body,
-            ...mentionData(c.body),
-          },
-        });
-      }
-
-      const newest = Math.max(after?.since ?? Number.NEGATIVE_INFINITY, ...times);
-      const since = new Date(Number.isFinite(newest) ? newest : now().getTime()).toISOString();
-      // Ids read at baseline time, kept while they are inside the overlap so that history is not handed back as news.
-      const keep = after?.seen;
-      const seen = all
-        .filter((r) => (keep ? keep.has(key(r)) : true) && r.at >= Date.parse(since) - OVERLAP_MS)
-        .map(key);
-
-      return { events, cursor: JSON.stringify({ since, ...(seen.length > 0 ? { seen } : {}) }) };
+      return readDocEvents({ api, docs, idOf, read, now }, ids, cursor);
     },
   };
 }

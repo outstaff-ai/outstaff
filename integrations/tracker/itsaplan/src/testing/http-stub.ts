@@ -1,38 +1,8 @@
 import { expect } from "vitest";
+import type { Route, StubReply, StubRequest } from "./types.js";
 
 export const API_ORIGIN = "https://api.tracker.acme.example";
 export const API_KEY = "key-sam";
-
-export interface StubRequest {
-  method: string;
-  path: string;
-  query: URLSearchParams;
-  headers: Headers;
-  params: Record<string, string>;
-  json: any; // oxlint-disable-line no-explicit-any
-
-  /** The multipart body of an upload. */
-  form?: FormData;
-}
-
-export interface StubReply {
-  status?: number;
-  headers?: Record<string, string>;
-  body?: unknown;
-
-  /** Raw bytes, sent as they are instead of `body`. */
-  buffer?: Uint8Array;
-}
-
-export type Handler = (req: StubRequest) => StubReply | unknown;
-
-export interface Route {
-  method: string;
-
-  /** `:name` segments capture a decoded path segment; `*` matches the rest. */
-  path: string;
-  handler: Handler;
-}
 
 const compile = (pattern: string): ((path: string) => Record<string, string> | undefined) => {
   const parts = pattern.split("/");

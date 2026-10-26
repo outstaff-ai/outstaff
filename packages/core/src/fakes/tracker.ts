@@ -1,31 +1,8 @@
-import type { TrackerSeed } from "../contracts/seeds.js";
-import { PortError, type CanonicalStatus, type StatusMap } from "../ports/index.js";
-import type { Comment, Issue, Member, NewIssue, Tracker, TrackerEvent } from "../ports/index.js";
+import { PortError, type CanonicalStatus } from "../ports/index.js";
+import type { Comment, Issue, Member, NewIssue, TrackerEvent } from "../ports/index.js";
 import { mentionData } from "../mentions.js";
+import type { FakeTracker, FakeTrackerOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
-
-export interface FakeTrackerOptions {
-  statusMap?: StatusMap;
-  baseUrl?: string;
-  keyPrefix?: string;
-
-  /** Who the events and comments are attributed to. */
-  actor?: Member;
-  now?: () => Date;
-}
-
-export interface FakeTracker extends Tracker {
-  /** The same tracker seen by another identity: its calls are attributed to `identity`, as an adapter with its own credentials. */
-  as(identity: Member): FakeTracker;
-  seed: TrackerSeed;
-  relations: { key: string; otherKey: string; relation: string }[];
-
-  /** Real parents set with `setParent`: child key to parent key. */
-  parents: Map<string, string>;
-
-  /** Every file attached, by ticket key. */
-  attached: Map<string, { name: string; mimetype: string; data: Uint8Array }[]>;
-}
 
 export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const base = (opts.baseUrl ?? "https://tracker.acme.example").replace(/\/+$/, "");

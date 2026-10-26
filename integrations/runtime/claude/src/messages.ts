@@ -1,5 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { RuntimeEvent, UsageEvent } from "@outstaff/core";
+import type { MapState } from "./types.js";
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -55,10 +56,6 @@ export function parseUsage(message: unknown): UsageEvent | undefined {
   }
 
   return windows.length > 0 ? { type: "usage", windows } : undefined;
-}
-
-export interface MapState {
-  lastText: string;
 }
 
 /** Maps one SDK message to zero or more events. `tool_call` events come from the permission hook instead. */

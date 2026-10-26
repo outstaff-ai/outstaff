@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parse } from "yaml";
-import { toolsetSchema, type TeamCommands, type Toolset } from "./schema.js";
-import type { ArgPredicate, CommandRule, RulePack } from "./types.js";
+import { toolsetSchema } from "./schema.js";
+import type { ArgPredicate, CommandRule, RulePack, TeamCommands, Toolset } from "./types.js";
 
 export function parseToolset(text: string, source = "toolset"): Toolset {
   const parsed = toolsetSchema.safeParse(parse(text));

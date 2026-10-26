@@ -9,8 +9,7 @@ import { evaluateWorkflow, explainWorkflow } from "../evaluate.js";
 import { ruleInputSchema } from "../rules.js";
 import { createStatusMap } from "../status-map.js";
 import { renderTemplate, TemplateError } from "../template.js";
-import type { Rule } from "../rules.js";
-import type { WorkflowPr } from "../types.js";
+import type { Rule, WorkflowPr } from "../types.js";
 
 /** The preset as a team gets it by default: approved-merge exists only while policies.merge.on_approval is on. */
 const kanban = presetRules("kanban").filter((r) => !r.id.startsWith("approved-merge"));

@@ -1,4 +1,4 @@
-import type { WorkSummary } from "./schemas.js";
+import type { WorkGroup, WorkSummary } from "./types.js";
 
 /** How a follow-up kind reads next to its status. Other kinds are only their status. */
 const WHAT: Record<string, string> = {
@@ -11,23 +11,6 @@ const WHAT: Record<string, string> = {
   conflict: "resolving conflicts",
   ci_failed: "CI failed",
 };
-
-/** One piece of work: a ticket, or a pull request without one, with the follow-ups on it. */
-export interface WorkGroup {
-  key: string;
-  ticketKey?: string;
-  ticketTitle?: string;
-  pr?: string;
-  prNumber?: number;
-  prTitle?: string;
-  prUrl?: string;
-
-  /** Title of the first item, for work that has neither a ticket nor a pull request. */
-  title: string;
-
-  /** The items of the group, in the order they were given. */
-  items: WorkSummary[];
-}
 
 const keyOf = (i: WorkSummary) =>
   i.ticketKey ? `ticket:${i.ticketKey}` : i.pr ? `pr:${i.pr}` : `item:${i.id}`;

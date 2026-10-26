@@ -2,7 +2,8 @@ import { expect, it } from "vitest";
 import { buildPolicy } from "../permissions/index.js";
 import type { RunRequest, Runtime, RuntimeEvent } from "../ports/index.js";
 import type { RuntimeSeed } from "./seeds.js";
-import { contractSuite, requireCapability, requireSeed, type ContractSetupFn } from "./harness.js";
+import { contractSuite, requireCapability, requireSeed } from "./harness.js";
+import type { ContractSetupFn } from "./types.js";
 
 const layout = {
   home: "/home/agent",

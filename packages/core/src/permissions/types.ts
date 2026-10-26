@@ -1,18 +1,19 @@
-export const TOOL_KINDS = [
-  "read",
-  "write",
-  "edit",
-  "search",
-  "shell",
-  "web_fetch",
-  "subagent",
-  "artifact",
-  "ost",
-] as const;
+import type { z } from "zod";
+import type { Capability } from "../types.js";
+import type { TeamConfig } from "../config/types.js";
+import type { PROFILES, TOOL_KINDS } from "./constants.js";
+import type {
+  optionValueSchema,
+  teamCommandSchema,
+  teamCommandsSchema,
+  toolDeclarationSchema,
+  toolRuleSchema,
+  toolsetSchema,
+  toolsSchema,
+} from "./schema.js";
 
 export type ToolKind = (typeof TOOL_KINDS)[number];
 
-export const PROFILES = ["readonly", "docs", "code", "infra", "chat"] as const;
 export type Profile = (typeof PROFILES)[number];
 
 export type GitMode = "read" | "write";
@@ -138,4 +139,68 @@ export interface Layout {
   scratchDir: string;
   memoryDir: string;
   secretsDir: string;
+}
+
+export type PathVerdict = "allow" | "denied" | "outside";
+
+export type ToolOptionValue = z.output<typeof optionValueSchema>;
+export type ToolRuleInput = z.input<typeof toolRuleSchema>;
+export type ToolDeclaration = z.output<typeof toolDeclarationSchema>;
+export type Tools = z.output<typeof toolsSchema>;
+export type Toolset = z.output<typeof toolsetSchema>;
+export type TeamCommands = z.output<typeof teamCommandsSchema>;
+export type CommandRuleInput = z.input<typeof teamCommandSchema>;
+
+export type ToolOrigin = "toolset" | "team" | "person";
+
+/** A tool after precedence is applied: the declaration that wins for its name, and where it came from. */
+export interface EffectiveTool extends ToolDeclaration {
+  name: string;
+  origin: ToolOrigin;
+
+  /** The toolset that declared it, when `origin` is "toolset". */
+  toolset?: string;
+  profiles?: Profile[];
+}
+
+export interface EffectiveToolsInput {
+  /** In order of precedence from lowest: a later toolset replaces an earlier one. */
+  toolsets?: Toolset[];
+  team?: Tools | undefined;
+  person?: Tools | undefined;
+}
+
+export type PermissionPerson = Pick<TeamConfig["people"][number], "repos">;
+export type PermissionTeam = Pick<TeamConfig, "repos">;
+
+export interface BuildPolicyInput {
+  profile: Profile;
+  person: PermissionPerson;
+  team: PermissionTeam;
+  layout: Layout;
+
+  /** Rules from adapters, toolsets and the team, merged after the built-in ones. */
+  packs?: RulePack[];
+
+  /** The profile whose rule packs apply; defaults to `profile`. A chat session takes those of its role's profile. */
+  packsOf?: Profile;
+
+  /**
+   * Capabilities the person's role declares and the team has switched on. `design.canvas` adds the artifact tool and
+   * the artifacts folder; no profile has them by itself.
+   */
+  capabilities?: readonly Capability[];
+}
+
+export interface ProfileSpec {
+  tools: ToolKind[];
+
+  /** Whether write grants are honoured (git write verbs, edits in worktrees). */
+  honoursWrite: boolean;
+
+  /** Which files of a write repository's worktree the edit tools may change; "all" is every file. */
+  writable: "none" | "docs" | "all";
+
+  /** The `ost` verbs the profile may call. Every verb when omitted. */
+  verbs?: string[];
 }

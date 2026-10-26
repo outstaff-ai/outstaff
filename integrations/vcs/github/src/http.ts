@@ -1,28 +1,5 @@
 import { PortError } from "@outstaff/core";
-
-export interface HttpConfig {
-  fetch: typeof fetch;
-  apiUrl: string;
-  graphqlUrl: string;
-  now: () => Date;
-}
-
-export interface RequestOptions {
-  /** Bearer credential: an App JWT or an installation token. */
-  token: string;
-  query?: Record<string, string | number | undefined>;
-  body?: unknown;
-  headers?: Record<string, string>;
-}
-
-export interface HttpResult<T> {
-  status: number;
-  data: T;
-
-  /** The raw body, for media types that are not JSON (a diff). */
-  text: string;
-  headers: Headers;
-}
+import type { HttpConfig, HttpResult, RequestOptions } from "./types.js";
 
 const DEFAULT_SECONDARY_LIMIT_MS = 60_000;
 

@@ -1,24 +1,9 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { silentLogger, type EffectiveTool, type Logger } from "@outstaff/core";
+import { silentLogger, type EffectiveTool } from "@outstaff/core";
 import { runMise } from "./mise.js";
-import type { MiseRunner, ToolStatus } from "./types.js";
-
-export interface InstallToolsOptions {
-  tools: EffectiveTool[];
-  home: string;
-  env?: NodeJS.ProcessEnv;
-  mise?: MiseRunner;
-  log?: Logger;
-}
-
-export interface InstallToolsResult {
-  statuses: ToolStatus[];
-
-  /** Where mise puts its shims; put it on PATH for the runtime's child processes. */
-  shimsDir: string;
-}
+import type { MiseRunner, ToolStatus, InstallToolsOptions, InstallToolsResult } from "./types.js";
 
 interface State {
   /** Hash of mise.toml. */

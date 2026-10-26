@@ -14,6 +14,7 @@
     "docs:dev": "pnpm --filter @outstaff/docs dev",
     "check:versions": "node scripts/versions.mjs check",
     "check:tests": "node scripts/tests-layout.mjs",
+    "check:files": "node scripts/file-layout.mjs",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "test:coverage": "vitest run --coverage.enabled",

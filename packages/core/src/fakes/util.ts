@@ -1,9 +1,5 @@
 import { PortError, type EventPage } from "../ports/index.js";
 
-export interface FakeClock {
-  now: () => Date;
-}
-
 /** A deterministic clock that moves forward one second per call. */
 export function steppingClock(start = "2030-01-01T00:00:00.000Z"): () => Date {
   let t = Date.parse(start);

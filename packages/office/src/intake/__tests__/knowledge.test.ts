@@ -1,6 +1,6 @@
 import { createFakeKnowledge, createFakeVcs } from "@outstaff/core/fakes";
 import { describe, expect, it, vi } from "vitest";
-import { DOC_POLL_LIMIT } from "../intake.js";
+import { DOC_POLL_LIMIT } from "../sources.js";
 import { setup } from "../test-support.js";
 
 async function world(author = "dana") {

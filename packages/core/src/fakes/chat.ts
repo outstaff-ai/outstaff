@@ -1,33 +1,8 @@
-import type { ChatSeed, InboundMessage } from "../contracts/seeds.js";
+import type { InboundMessage } from "../contracts/seeds.js";
 import { PortError, splitAtLines } from "../ports/index.js";
-import type { Chat, ChatFile, ChatMessage, AgentProfile } from "../ports/index.js";
+import type { ChatFile, ChatMessage, AgentProfile } from "../ports/index.js";
+import type { FakeChat, FakeChatOptions } from "./types.js";
 import { steppingClock } from "./util.js";
-
-export interface FakeChatOptions {
-  /** Posts longer than this are split at line breaks, as a real adapter does. Default 4000. */
-  maxMessageLength?: number;
-  now?: () => Date;
-}
-
-export interface FakeChat extends Chat {
-  seed: ChatSeed;
-
-  /** Every message the adapter posted, one entry per platform message. */
-  posts: ChatMessage[];
-  reactions: { channel: string; messageId: string; name: string }[];
-  profiles: Map<string, AgentProfile>;
-
-  /** Every profile published, in order, with the user it was published for. */
-  profileLog: { userId: string; profile: AgentProfile }[];
-  setAgentProfile(userId: string, profile: AgentProfile): Promise<void>;
-  onProfileRequest(source: (userId: string) => Promise<AgentProfile | undefined>): void;
-
-  /** The bytes of every file seeded with an inbound message, by file id. */
-  files: Map<string, Uint8Array>;
-
-  /** What the adapter does when a user opens the profile page: asks the source registered with `onProfileRequest`. */
-  openProfile(userId: string): Promise<AgentProfile | undefined>;
-}
 
 export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
   const max = opts.maxMessageLength ?? 4000;

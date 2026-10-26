@@ -1,13 +1,8 @@
 import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "node:crypto";
 import type { SecretSource } from "@outstaff/core";
+import type { AgentAuth } from "./types.js";
 
 const KEY_LENGTH = 32;
-
-export interface AgentAuth {
-  /** True only when the person has a token and `token` matches it. Takes the same time either way. */
-  verify(person: string, token: string): Promise<boolean>;
-  has(person: string): boolean;
-}
 
 export const agentTokenKey = (handle: string) =>
   `OUTSTAFF_AGENT_TOKEN_${handle.toUpperCase().replaceAll("-", "_")}`;

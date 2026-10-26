@@ -1,12 +1,8 @@
 import { PortError } from "@outstaff/core";
+import type { EventCursor } from "./types.js";
 
 // Re-read this much before the newest time seen; intake de-duplicates by external id.
 export const OVERLAP_MS = 5 * 60_000;
-
-export interface EventCursor {
-  since: number;
-  seen: Set<string>;
-}
 
 /** Undefined means "no usable position": an old cursor shape counts as no entry and is baselined. */
 export function parseCursor(cursor: string | undefined): EventCursor | undefined {

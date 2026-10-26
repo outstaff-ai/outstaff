@@ -12,16 +12,7 @@ import {
   type Tracker,
   type Vcs,
 } from "@outstaff/core";
-import type { Clock } from "./clock.js";
-
-export interface OfficePorts {
-  vcs: Vcs;
-  tracker?: Tracker;
-  chat?: Chat;
-
-  /** Only to read the comments people leave on documents; the agents write documents through their own port. */
-  knowledge?: Knowledge;
-}
+import type { Clock, OfficePorts } from "./types.js";
 
 interface Input {
   team: TeamConfig;

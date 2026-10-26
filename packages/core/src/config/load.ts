@@ -1,46 +1,17 @@
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { CONFIG_CODES } from "./codes.js";
-import {
-  cacheKey,
-  defaultCacheDir,
-  nodeFs,
-  nodeGit,
-  parseGitUrl,
-  type ConfigFs,
-  type GitClient,
-} from "./io.js";
-import type { ConfigIssue } from "./issues.js";
-import { parseYaml, type LocatedIssue } from "./locate.js";
+import { cacheKey, defaultCacheDir, nodeFs, nodeGit, parseGitUrl } from "./io.js";
+import { parseYaml } from "./locate.js";
 import { parseTeamConfig } from "./parse.js";
-import type { TeamConfig } from "./schema.js";
-
-export type { LocatedIssue } from "./locate.js";
-
-export type ConfigSource = {
-  kind: "file" | "git";
-
-  /** Absolute path of the team file. */
-  file: string;
-
-  /** Directory containing the team file; `catalog.path` is relative to it. */
-  dir: string;
-  repo?: string;
-  ref?: string;
-};
-
-export type LoadOptions = {
-  /** Path to a file or directory, or a git URL with an optional `#ref`. */
-  team?: string;
-  cwd?: string;
-  env?: NodeJS.ProcessEnv;
-  cacheDir?: string;
-  fs?: ConfigFs;
-  git?: GitClient;
-};
-
-export type LoadResult =
-  | { ok: true; config: TeamConfig; source: ConfigSource }
-  | { ok: false; issues: LocatedIssue[]; source?: ConfigSource };
+import type {
+  ConfigFs,
+  ConfigIssue,
+  ConfigSource,
+  GitClient,
+  LoadOptions,
+  LoadResult,
+  LocatedIssue,
+} from "./types.js";
 
 const CANDIDATES = [join(".outstaff", "team.yaml"), "team.yaml"];
 

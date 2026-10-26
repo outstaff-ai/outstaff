@@ -2,7 +2,8 @@ import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { createFakeChat } from "@outstaff/core/fakes";
 import type { WorkSummary } from "@outstaff/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PROFILE_HINT, createProfilePublisher, type ProfilePublisher } from "../profile.js";
+import { PROFILE_HINT, createProfilePublisher } from "../profile.js";
+import type { ProfilePublisher } from "../types.js";
 
 function team(humans: boolean): TeamConfig {
   const result = parseTeamConfig({

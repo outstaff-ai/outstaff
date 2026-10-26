@@ -1,12 +1,7 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { Office } from "./office.js";
-
-export interface HealthServer {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  port(): number;
-}
+import type { Office } from "./office.types.js";
+import type { HealthServer } from "./types.js";
 
 /**
  * The container contract's probes. `/healthz` says whether the office is up and its parts are fine (503 otherwise,

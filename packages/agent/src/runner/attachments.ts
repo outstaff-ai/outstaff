@@ -1,22 +1,10 @@
 import { mkdirSync, statSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { silentLogger, type Logger, type Tracker } from "@outstaff/core";
+import type { Attachment, RemoteFile, SaveOptions } from "./types.js";
 
 /** Most bytes of one file the agent downloads. Bigger files are listed by name and type. */
 export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-
-/** A file a person shared in chat: where it is on disk, or why it is not. All of it is data from that person. */
-export interface Attachment {
-  name: string;
-  mimetype: string;
-  size: number;
-
-  /** The downloaded copy, in the item's scratch directory. Absent when the file was not downloaded. */
-  path?: string;
-
-  /** Why there is no copy. */
-  skipped?: string;
-}
 
 const TEXT_TYPES = new Set([
   "application/json",
@@ -52,20 +40,6 @@ export const humanSize = (bytes: number) =>
     : bytes < 1024 * 1024
       ? `${(bytes / 1024).toFixed(0)} KB`
       : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-
-/** What is known of a file before it is downloaded. */
-export interface RemoteFile {
-  name: string;
-  mimetype: string;
-  size: number;
-}
-
-export interface SaveOptions<F extends RemoteFile> {
-  /** Fetches the bytes; absent when the source cannot serve files. */
-  download: ((file: F) => Promise<Uint8Array>) | undefined;
-  dir: string;
-  log?: Logger;
-}
 
 /**
  * Downloads the readable files of a message into `dir`, within the size cap, and lists the rest. A download that

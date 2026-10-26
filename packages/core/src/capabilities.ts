@@ -1,4 +1,5 @@
-import type { AdapterPort } from "./config/adapters.js";
+import type { AdapterPort } from "./config/types.js";
+import type { Capability } from "./types.js";
 
 export const CAPABILITIES = [
   "tracker.issues",
@@ -21,8 +22,6 @@ export const CAPABILITIES = [
   "avatars.generate",
   "design.canvas",
 ] as const;
-
-export type Capability = (typeof CAPABILITIES)[number];
 
 /** The port that provides each capability; the part before the dot. */
 export const CAPABILITY_PORT: Record<Capability, AdapterPort> = {

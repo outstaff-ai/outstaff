@@ -1,0 +1,15 @@
+export const WARNING_CODES = {
+  capabilityMissing: "capability.missing",
+  capabilityOptionalMissing: "capability.optional_missing",
+  trustDefault: "trust.default",
+  peopleMissingVcsIdentity: "people.missing_vcs_identity",
+  peopleMissingChatIdentity: "people.missing_chat_identity",
+  peopleMissingTrackerIdentity: "people.missing_tracker_identity",
+  peopleReviewerWithoutGithub: "people.reviewer_without_github",
+  identityChatNotMemberId: "identities.chat_not_member_id",
+  identityVcsNotLogin: "identities.vcs_not_login",
+  identityVcsNotBotLogin: "identities.vcs_not_bot_login",
+  identityTrackerEmpty: "identities.tracker_empty",
+  policyCapabilityMissing: "policies.capability_missing",
+  policyMergeWithoutChecks: "policies.merge_without_checks",
+} as const;

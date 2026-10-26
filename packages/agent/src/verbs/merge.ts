@@ -12,7 +12,7 @@ import {
   type RepoRef,
   type Vcs,
 } from "@outstaff/core";
-import type { AgentEnv } from "./types.js";
+import type { AgentEnv, MergeVcs } from "./types.js";
 
 const stripBot = (login: string) => login.replace(/\[bot\]$/i, "").toLowerCase();
 
@@ -64,10 +64,6 @@ function latestVerdicts(reviews: PullRequestReview[]): Map<string, PullRequestRe
 
   return latest;
 }
-
-/** A code host that can merge: it declares `vcs.merge`, so it has all four operations. */
-export type MergeVcs = Vcs &
-  Required<Pick<Vcs, "reviewState" | "requiredChecks" | "mergeOptions" | "mergePullRequest">>;
 
 export function requireMergeVcs(vcs: Vcs): MergeVcs {
   if (!vcs.reviewState || !vcs.requiredChecks || !vcs.mergeOptions || !vcs.mergePullRequest) {

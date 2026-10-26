@@ -1,6 +1,6 @@
 import type { EventPage } from "./events.js";
 import type { Links } from "./links.js";
-import type { CanonicalStatus } from "./status.js";
+import type { CanonicalStatus } from "./types.js";
 
 export interface Member {
   id: string;

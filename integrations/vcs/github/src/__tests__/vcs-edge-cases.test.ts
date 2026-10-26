@@ -12,7 +12,7 @@ import {
   ownSecrets,
   team,
 } from "../testing/harness.js";
-import type { Route } from "../testing/http-stub.js";
+import type { Route } from "../testing/types.js";
 import { testKey } from "../testing/keys.js";
 
 afterEach(() => {

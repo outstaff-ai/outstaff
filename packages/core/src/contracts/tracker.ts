@@ -8,8 +8,8 @@ import {
   expectPortError,
   requireCapability,
   requireSeed,
-  type ContractSetupFn,
 } from "./harness.js";
+import type { ContractSetupFn } from "./types.js";
 
 export function trackerContract(name: string, setup: ContractSetupFn<Tracker, TrackerSeed>): void {
   contractSuite(`tracker contract: ${name}`, setup, (get) => {

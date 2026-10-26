@@ -1,17 +1,6 @@
 // Pure functions behind scripts/release.ts: conventional commits in, version, notes and changelog out.
 
-export type Level = "auto" | "patch" | "minor" | "major";
-export type Bump = "patch" | "minor" | "major";
-
-export type Commit = {
-  hash: string;
-  type: string;
-  scope: string | null;
-  breaking: boolean;
-  summary: string;
-  // Text of the `BREAKING CHANGE:` footer, when there is one.
-  breakingNote: string | null;
-};
+import type { Bump, Commit, Level } from "./release.types.ts";
 
 const HEADER = /^([a-z]+)(?:\(([^)\n]+)\))?(!)?: (.+)$/;
 const BREAKING_FOOTER = /^BREAKING[ -]CHANGE: ?(.*(?:\n(?!\s*\n).*)*)/m;

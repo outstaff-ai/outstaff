@@ -1,6 +1,7 @@
 import type { Offer } from "../office-client/index.js";
 import { headBranchOf, type ClonedRepo, type Workspace } from "../repos/index.js";
-import { attachmentLines, type Attachment } from "./attachments.js";
+import { attachmentLines } from "./attachments.js";
+import type { Attachment } from "./types.js";
 
 /** The user prompt of a run, from what the office sent with the offer. */
 export function buildWorkPrompt(

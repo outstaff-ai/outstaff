@@ -1,12 +1,6 @@
-import { CANONICAL_STATUSES, type CanonicalStatus, type StatusMap } from "../ports/status.js";
-
-export interface WorkflowStatusMap {
-  /** The tracker's name for a canonical status. */
-  toTracker(status: CanonicalStatus): string;
-
-  /** Canonical status for a tracker name (case-insensitive), or undefined if unmapped. */
-  toCanonical(name: string): CanonicalStatus | undefined;
-}
+import { CANONICAL_STATUSES } from "../ports/status.js";
+import type { CanonicalStatus, StatusMap } from "../ports/types.js";
+import type { WorkflowStatusMap } from "./types.js";
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 

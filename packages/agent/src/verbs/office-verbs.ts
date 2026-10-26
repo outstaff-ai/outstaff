@@ -1,9 +1,10 @@
 import { PortError } from "@outstaff/core";
 import { formatWorkGroups, groupWork } from "@outstaff/protocol";
 import { z } from "zod";
-import { uploadAttachments, uploadedLines, type Uploaded } from "./attachments.js";
+import { uploadAttachments, uploadedLines } from "./attachments.js";
+import type { Uploaded } from "./types.js";
 import { filedLine, requireOffice } from "./support.js";
-import { defineVerb, result } from "./types.js";
+import { defineVerb, result } from "./define.js";
 
 export const ask = defineVerb({
   name: "ask",

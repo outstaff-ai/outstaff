@@ -1,5 +1,5 @@
 import { posix } from "node:path";
-import type { PathRules } from "./types.js";
+import type { PathRules, PathVerdict } from "./types.js";
 
 const cache = new Map<string, RegExp>();
 
@@ -57,8 +57,6 @@ export function resolvePath(p: string, cwd: string, home: string): string {
   const n = posix.normalize(q);
   return n.length > 1 && n.endsWith("/") ? n.slice(0, -1) : n;
 }
-
-export type PathVerdict = "allow" | "denied" | "outside";
 
 export function judgePath(rules: PathRules, abs: string): PathVerdict {
   if (matchesAny(rules.deny, abs)) {

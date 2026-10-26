@@ -1,33 +1,26 @@
-import { PortError, silentLogger, type Logger, type PortErrorCode } from "@outstaff/core";
+import { PortError, silentLogger } from "@outstaff/core";
 import {
   PROTOCOL_VERSION,
   decode,
   encode,
   type ErrorCode,
-  type Link,
   type Message,
   type MessageType,
   type PayloadOf,
   type QueuedReport,
 } from "@outstaff/protocol";
 import { WebSocket } from "ws";
+import { FATAL, unavailable } from "./errors.js";
+import { officeMethods } from "./methods.js";
+import { createOfferQueue } from "./offers.js";
+import { createRequests } from "./requests.js";
 import type {
-  ChatMessageResult,
-  ChatReportResult,
-  OfficeAnswer,
-  OfficeClient,
-  OfficeTeam,
-  OfficeTeamMember,
-  OfficeWorkItem,
-} from "../verbs/office.js";
-
-export type Offer = PayloadOf<"offer">;
-
-/** The same shape as the office's clock, so one fake serves both. */
-export interface ClientClock {
-  now(): Date;
-  setTimeout(fn: () => void, ms: number): () => void;
-}
+  ClientClock,
+  ClientSocket,
+  ConnectionState,
+  OfficeConnection,
+  OfficeConnectionOptions,
+} from "./types.js";
 
 export const systemClientClock: ClientClock = {
   now: () => new Date(),
@@ -36,115 +29,6 @@ export const systemClientClock: ClientClock = {
     return () => clearTimeout(t);
   },
 };
-
-/** The part of a WebSocket the client uses; `ws` satisfies it. */
-export interface ClientSocket {
-  send(data: string): void;
-  close(code?: number): void;
-  terminate(): void;
-  on(event: "open", listener: () => void): unknown;
-  on(event: "message", listener: (data: { toString(): string }) => void): unknown;
-  on(event: "close", listener: (code: number) => void): unknown;
-  on(event: "error", listener: (err: Error) => void): unknown;
-}
-
-export interface OfficeConnectionOptions {
-  /** For example ws://office:8787/agent. */
-  url: string;
-  person: string;
-  token: string;
-  agentVersion: string;
-  clock?: ClientClock;
-  logger?: Logger;
-  socket?: (url: string) => ClientSocket;
-  backoff?: { baseMs?: number; maxMs?: number };
-
-  /** 0..1, for jitter. Default Math.random. */
-  random?: () => number;
-
-  /** How long a request waits for a connection and for its answer. Default 30000. */
-  requestTimeoutMs?: number;
-}
-
-export type ConnectionState =
-  | "idle"
-  | "connecting"
-  | "connected"
-  | "backoff"
-  | "stopped"
-  | "rejected";
-
-export interface OfficeConnection extends OfficeClient {
-  start(): void;
-  stop(): Promise<void>;
-  state(): ConnectionState;
-
-  /** Why the office refused the connection, when `state()` is `rejected`. */
-  rejection(): { code: ErrorCode; message: string } | undefined;
-
-  /** Resolves once connected; rejects if the office refuses the connection or the client stops. */
-  whenConnected(): Promise<void>;
-
-  /**
-   * Work items offered by the office. Delivery is at least once, so the same item can come again after a
-   * reconnect until it is accepted; handle an id twice.
-   */
-  offers(): AsyncIterable<Offer>;
-
-  /** Ids of accepted, unfinished items the office listed when the connection was last established. */
-  resume(): string[];
-
-  /**
-   * Reports to requesters for the agent to post: the office hands them over each time the connection is established
-   * and pushes new ones while it is up, and repeats each until `reportPosted`. The handler posts them; reports that
-   * arrive before it is set wait for it.
-   */
-  onReports?(handler: (reports: QueuedReport[]) => void): void;
-
-  accept(workItemId: string): Promise<void>;
-  decline(workItemId: string, reason: string): Promise<void>;
-  progress(workItemId: string, text: string): Promise<void>;
-
-  /** Stores the runtime session of the item; the next offer of the item carries it. */
-  session(workItemId: string, sessionId: string): Promise<void>;
-  journal(workItemId: string, text: string): Promise<void>;
-  handBack(
-    workItemId: string,
-    result: {
-      summary: string;
-      links?: Link[];
-      status: "done" | "waiting" | "blocked" | "interrupted";
-    },
-  ): Promise<void>;
-  fail(workItemId: string, reason: string): Promise<void>;
-
-  /** Reports the runtime's usage windows; the office keeps the latest. */
-  usage(windows: PayloadOf<"usage">["windows"]): Promise<void>;
-  answer(questionId: string, answer: string): Promise<void>;
-}
-
-const FATAL: ErrorCode[] = ["auth_failed", "version_mismatch", "replaced"];
-
-const PORT_CODE: Partial<Record<ErrorCode, PortErrorCode>> = {
-  unknown_item: "not_found",
-  not_found: "not_found",
-  invalid: "invalid",
-  invalid_message: "invalid",
-  unsupported: "unsupported",
-  auth_failed: "forbidden",
-};
-
-interface Pending {
-  resolve(m: Message): void;
-  reject(err: Error): void;
-  cancel(): void;
-}
-
-/** Drops keys that are undefined, which the verbs' types do not allow for optional fields. */
-const compact = <T extends object>(o: T): T =>
-  Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
-
-const unavailable = (message: string) => new PortError("unavailable", message);
 
 export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeConnection {
   const clock = opts.clock ?? systemClientClock;
@@ -167,50 +51,20 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   const activeItems = new Set<string>();
   let cancelBackoff: (() => void) | undefined;
   let cancelBeat: (() => void) | undefined;
-  const pending = new Map<string, Pending>();
-  const connectWaiters: { resolve(): void; reject(err: Error): void }[] = [];
-
-  const offerBuffer: Offer[] = [];
-  const offerWaiters: ((r: IteratorResult<Offer>) => void)[] = [];
-
-  function pushOffer(offer: Offer) {
-    // A redelivery of an offer nobody has taken yet is already in the buffer.
-    if (offerBuffer.some((o) => o.workItem.id === offer.workItem.id)) {
-      return;
-    }
-
-    const waiter = offerWaiters.shift();
-    if (waiter) {
-      waiter({ value: offer, done: false });
-    } else {
-      offerBuffer.push(offer);
-    }
-  }
+  const offers = createOfferQueue();
+  const { request, call, ack, settle, failPending, settleWaiters, whenConnected } = createRequests({
+    clock,
+    requestTimeoutMs,
+    state: () => state,
+    hasSocket: () => socket !== undefined,
+    send: (type, payload) => rawSend(type, payload),
+  });
 
   function deliverReports(list: QueuedReport[]) {
     if (reportHandler) {
       reportHandler(list);
     } else {
       heldReports.push(...list);
-    }
-  }
-
-  function failPending(err: Error) {
-    for (const p of pending.values()) {
-      p.cancel();
-      p.reject(err);
-    }
-
-    pending.clear();
-  }
-
-  function settleWaiters(err?: Error) {
-    for (const w of connectWaiters.splice(0)) {
-      if (err) {
-        w.reject(err);
-      } else {
-        w.resolve();
-      }
     }
   }
 
@@ -285,7 +139,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
 
       if (m.type === "offer") {
-        pushOffer(m.payload);
+        offers.push(m.payload);
         return;
       }
 
@@ -299,14 +153,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
         return;
       }
 
-      if (m.replyTo !== undefined) {
-        const p = pending.get(m.replyTo);
-        if (p) {
-          pending.delete(m.replyTo);
-          p.cancel();
-          p.resolve(m);
-          return;
-        }
+      if (settle(m)) {
+        return;
       }
 
       if (m.type === "error") {
@@ -335,7 +183,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       if (rejected) {
         state = "rejected";
         settleWaiters(new PortError("forbidden", rejected.message));
-        endOffers();
+        offers.end();
         return;
       }
 
@@ -353,86 +201,6 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     });
   }
 
-  function endOffers() {
-    for (const w of offerWaiters.splice(0)) {
-      w({ value: undefined, done: true });
-    }
-  }
-
-  function request<T extends MessageType>(
-    type: T,
-    payload: PayloadOf<T>,
-    timeoutMs = requestTimeoutMs,
-  ): Promise<Message> {
-    return new Promise<Message>((resolve, reject) => {
-      const go = () => {
-        const sock = socket;
-        if (!sock || state !== "connected") {
-          reject(unavailable("Not connected to the office."));
-          return;
-        }
-
-        const id = rawSend(type, payload);
-        const cancel = clock.setTimeout(() => {
-          pending.delete(id);
-          reject(unavailable(`The office did not answer ${type} in time.`));
-        }, timeoutMs);
-
-        pending.set(id, { resolve, reject, cancel });
-      };
-
-      if (state === "connected") {
-        go();
-        return;
-      }
-
-      if (state === "stopped" || state === "rejected" || state === "idle") {
-        reject(unavailable("Not connected to the office."));
-        return;
-      }
-
-      let waiting = true;
-      const cancel = clock.setTimeout(() => {
-        waiting = false;
-        reject(unavailable("Could not reach the office in time."));
-      }, timeoutMs);
-
-      connectWaiters.push({
-        resolve() {
-          cancel();
-          if (waiting) {
-            go();
-          }
-        },
-        reject(err) {
-          cancel();
-          reject(err);
-        },
-      });
-    });
-  }
-
-  async function call<T extends MessageType, R extends MessageType>(
-    type: T,
-    payload: PayloadOf<T>,
-    expect: R,
-  ): Promise<PayloadOf<R>> {
-    const m = await request(type, payload);
-    if (m.type === "error") {
-      throw new PortError(PORT_CODE[m.payload.code] ?? "unavailable", m.payload.message);
-    }
-
-    if (m.type !== expect) {
-      throw unavailable(`The office answered ${type} with ${m.type}.`);
-    }
-
-    return m.payload as PayloadOf<R>;
-  }
-
-  const ack = async <T extends MessageType>(type: T, payload: PayloadOf<T>) => {
-    await call(type, payload, "ack");
-  };
-
   return {
     start() {
       if (state === "idle") {
@@ -446,7 +214,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       cancelBeat?.();
       failPending(unavailable("The client stopped."));
       settleWaiters(unavailable("The client stopped."));
-      endOffers();
+      offers.end();
       socket?.close(1000);
       socket = undefined;
     },
@@ -463,112 +231,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
     },
 
-    whenConnected() {
-      if (state === "connected") {
-        return Promise.resolve();
-      }
-
-      if (state === "stopped" || state === "rejected") {
-        return Promise.reject(unavailable("Not connected to the office."));
-      }
-
-      return new Promise<void>((resolve, reject) => connectWaiters.push({ resolve, reject }));
-    },
-
-    offers() {
-      return {
-        [Symbol.asyncIterator]: () => ({
-          next(): Promise<IteratorResult<Offer>> {
-            const offer = offerBuffer.shift();
-            if (offer) {
-              return Promise.resolve({ value: offer, done: false });
-            }
-
-            if (state === "stopped" || state === "rejected") {
-              return Promise.resolve({ value: undefined, done: true });
-            }
-
-            return new Promise((resolve) => offerWaiters.push(resolve));
-          },
-        }),
-      };
-    },
-
-    async accept(workItemId) {
-      await ack("accept", { workItemId });
-      activeItems.add(workItemId);
-    },
-
-    decline: (workItemId, reason) => ack("decline", { workItemId, reason }),
-    progress: (workItemId, text) => ack("progress", { workItemId, text }),
-    session: (workItemId, sessionId) => ack("session", { workItemId, sessionId }),
-    journal: (workItemId, text) => ack("journal", { workItemId, text }),
-    async handBack(workItemId, result) {
-      await ack("handback", { workItemId, ...result, links: result.links ?? [] });
-      activeItems.delete(workItemId);
-    },
-
-    async fail(workItemId, reason) {
-      await ack("fail", { workItemId, reason });
-      activeItems.delete(workItemId);
-    },
-
-    usage: (windows) => ack("usage", { windows }),
-    answer: (questionId, answer) => ack("answer", { questionId, answer }),
-
-    async place(workItemId, placement) {
-      const r = await call(
-        "work_place",
-        {
-          workItemId,
-          position: placement.position,
-          ...(placement.relativeTo ? { relativeTo: placement.relativeTo } : {}),
-        },
-        "work_move_result",
-      );
-
-      return compact(r.item) as OfficeWorkItem;
-    },
-
-    chatMessage: (m): Promise<ChatMessageResult> => call("chat_message", m, "chat_message_result"),
-    reportPosted: (workItemId, id) => ack("report_posted", { workItemId, id }),
-    chatReport: (workItemId, kind): Promise<ChatReportResult> =>
-      call("chat_report", { workItemId, kind }, "chat_report_result"),
-    linkTicket: (workItemId, ticket, request) =>
-      call("work_link", { workItemId, ticket, request }, "work_link_result"),
-    checkFiling: (workItemId, request) => ack("work_check", { workItemId, request }),
-    attachWork: (workItemId, request) =>
-      call("work_attach", { workItemId, ...request }, "work_attach_result"),
-    queueWork: (workItemId, request) =>
-      call("work_queue", { workItemId, ...request }, "work_queue_result"),
-    async currentWork() {
-      return (await call("current_work", {}, "current_work_result")).text;
-    },
-
-    ticketPrs: (draft) => call("ticket_prs", draft, "ticket_prs_result"),
-    docLink: (request) => ack("doc_link", request),
-
-    async ask(q): Promise<OfficeAnswer> {
-      const r = await call("ask", q, "ask_result");
-      return {
-        id: r.id,
-        to: r.to,
-        status: r.status,
-        ...(r.answer === undefined ? {} : { answer: r.answer }),
-      };
-    },
-
-    async work(q): Promise<OfficeWorkItem[]> {
-      const r = await call("work_list", q, "work_list_result");
-      return r.items.map((i) => compact(i) as OfficeWorkItem);
-    },
-
-    async team(): Promise<OfficeTeam> {
-      const r = await call("roster", {}, "roster_result");
-      return {
-        members: r.members.map((m) => compact(m) as OfficeTeamMember),
-        humans: r.humans ?? [],
-      };
-    },
+    whenConnected,
+    offers: () => offers.iterable(() => state === "stopped" || state === "rejected"),
+    ...officeMethods(call, ack, activeItems),
   };
 }

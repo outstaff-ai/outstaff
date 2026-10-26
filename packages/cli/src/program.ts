@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { Command, CommanderError } from "@commander-js/extra-typings";
 import { commands, groupSummaries } from "./commands/index.js";
-import type { Context, GlobalOptions } from "./define.js";
+import type { Context, GlobalOptions } from "./types.js";
 
 const pkgUrl = new URL("../package.json", import.meta.url);
 export const version = (JSON.parse(readFileSync(pkgUrl, "utf8")) as { version: string }).version;

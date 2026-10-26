@@ -1,10 +1,5 @@
 import { PortError } from "./errors.js";
-
-export interface RepoRef {
-  owner: string;
-  name: string;
-  host?: string;
-}
+import type { RepoRef } from "./types.js";
 
 /**
  * Parse the `url` of a team repo: `host/owner/name`, `https://host/owner/name(.git)`,

@@ -8,8 +8,10 @@ import { prVerbs } from "./pr.js";
 import { ticketVerbs } from "./ticket.js";
 import type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 
-export { createAgentEnv, type CreateAgentEnvOptions } from "./env.js";
-export { createFakeOffice, type FakeOffice } from "./office.js";
+export { createAgentEnv } from "./env.js";
+export type { CreateAgentEnvOptions } from "./types.js";
+export { createFakeOffice } from "./office.js";
+export type { FakeOffice } from "./office.types.js";
 export type {
   ChatMessageRequest,
   ChatMessageResult,
@@ -21,9 +23,10 @@ export type {
   OfficeTeamMember,
   OfficeWorkItem,
   Placement,
-} from "./office.js";
+} from "./office.types.js";
 
-export { cliPath, describeVerb, kebab, type VerbField } from "./describe.js";
+export { cliPath, describeVerb, kebab } from "./describe.js";
+export type { VerbField } from "./types.js";
 export { renderVerbsReference } from "./reference.js";
 export type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 

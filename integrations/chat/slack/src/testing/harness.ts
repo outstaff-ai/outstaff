@@ -5,8 +5,9 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { createSlackChat } from "../chat.js";
-import type { SlackOptions } from "../options.js";
-import { BOT_TOKEN, createFakeSlack, type FakeSlack } from "./slack-fake.js";
+import type { SlackOptions } from "../types.js";
+import { BOT_TOKEN, createFakeSlack } from "./slack-fake.js";
+import type { FakeSlack } from "./types.js";
 
 export const secretMap = (values: Record<string, string>): SecretSource => ({
   get: (k) => values[k],

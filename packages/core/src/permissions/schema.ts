@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { CONFIG_CODES } from "../config/codes.js";
 import { customIssue } from "../config/issues.js";
-import { PROFILES } from "./types.js";
+import { PROFILES } from "./constants.js";
+import { checkOptions } from "./tool-options.js";
 
 const d = (description: string) => ({ description });
 
@@ -98,23 +99,19 @@ const OPTION_KEY = /^[A-Za-z0-9_-]+$/;
 const optionKey = z.string().regex(OPTION_KEY, "Use letters, digits, dashes and underscores.");
 
 /** A string, or a map for platform-keyed options such as platforms.linux-x64.url. */
-const optionValueSchema = z.union([
+export const optionValueSchema = z.union([
   z.string(),
   z.record(optionKey, z.union([z.string(), z.record(optionKey, z.string())])),
 ]);
 
-export type ToolOptionValue = z.output<typeof optionValueSchema>;
-
-const toolRuleSchema = z
+export const toolRuleSchema = z
   .strictObject({
     program: programName("Optional; when given it must be the tool's own name.").optional(),
     ...commandMatchFields,
   })
   .meta(d("A command rule for the tool."));
 
-export type ToolRuleInput = z.input<typeof toolRuleSchema>;
-
-const toolDeclarationSchema = z
+export const toolDeclarationSchema = z
   .strictObject({
     version: z
       .string()
@@ -156,76 +153,6 @@ const toolDeclarationSchema = z
   .meta(
     d("A tool installed at agent start, and optionally a narrower set of commands it may run."),
   );
-
-export type ToolDeclaration = z.output<typeof toolDeclarationSchema>;
-
-const isMap = (v: unknown): v is Record<string, unknown> =>
-  typeof v === "object" && v !== null && !Array.isArray(v);
-
-const hasChecksum = (v: unknown) => typeof v === "string" && v.trim() !== "";
-
-function checkOptions(name: string, t: ToolDeclaration, ctx: z.RefinementCtx) {
-  const { options, source } = t;
-  if (options === undefined) {
-    if (source?.startsWith("http:")) {
-      ctx.addIssue(
-        customIssue(
-          CONFIG_CODES.toolsHttpChecksum,
-          `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
-          [name, "options"],
-        ),
-      );
-    }
-
-    return;
-  }
-
-  if (source === undefined) {
-    ctx.addIssue(
-      customIssue(
-        CONFIG_CODES.toolsOptionsWithoutSource,
-        `Tool "${name}" sets options but no source; options go to the backend the source names.`,
-        [name, "options"],
-      ),
-    );
-  }
-
-  if ("version" in options) {
-    ctx.addIssue(
-      customIssue(
-        CONFIG_CODES.toolsReservedOption,
-        `Tool "${name}" sets options.version; use the version field.`,
-        [name, "options", "version"],
-      ),
-    );
-  }
-
-  if (!source?.startsWith("http:") || hasChecksum(options["checksum"])) {
-    return;
-  }
-
-  const platforms = isMap(options["platforms"]) ? Object.entries(options["platforms"]) : [];
-  const missing = platforms.filter(([, p]) => !isMap(p) || !hasChecksum(p["checksum"]));
-  if (platforms.length === 0) {
-    ctx.addIssue(
-      customIssue(
-        CONFIG_CODES.toolsHttpChecksum,
-        `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
-        [name, "options", "checksum"],
-      ),
-    );
-  }
-
-  for (const [platform] of missing) {
-    ctx.addIssue(
-      customIssue(
-        CONFIG_CODES.toolsHttpChecksum,
-        `Platform "${platform}" of tool "${name}" has no checksum.`,
-        [name, "options", "platforms", platform, "checksum"],
-      ),
-    );
-  }
-}
 
 export const toolsSchema = z
   .record(
@@ -290,8 +217,6 @@ export const toolsSchema = z
     ),
   );
 
-export type Tools = z.output<typeof toolsSchema>;
-
 export const toolsetSchema = z
   .strictObject({
     name: z
@@ -312,9 +237,7 @@ export const toolsetSchema = z
   })
   .meta(d("A toolset: command rules for a family of tools, shipped as catalog data."));
 
-export type Toolset = z.output<typeof toolsetSchema>;
-
-const teamCommandSchema = z
+export const teamCommandSchema = z
   .strictObject({
     program: programName("Program name, for example make. Git is governed by repository grants."),
     ...commandMatchFields,
@@ -341,6 +264,3 @@ export const teamCommandsSchema = z
       .meta(d("Commands agents may never run. Deny always wins over allow.")),
   })
   .meta(d("Command rules for this team's own tools, on top of the built-in and toolset rules."));
-
-export type TeamCommands = z.output<typeof teamCommandsSchema>;
-export type CommandRuleInput = z.input<typeof teamCommandSchema>;

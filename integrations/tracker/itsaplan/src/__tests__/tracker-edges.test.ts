@@ -2,8 +2,10 @@ import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { trackerOptions } from "../options.js";
 import { secretMap, team } from "../testing/harness.js";
-import { API_KEY, createStubFetch, type Route, type StubRequest } from "../testing/http-stub.js";
-import { createItsaplanTracker, eventType } from "../tracker.js";
+import { eventType } from "../events.js";
+import { API_KEY, createStubFetch } from "../testing/http-stub.js";
+import type { Route, StubRequest } from "../testing/types.js";
+import { createItsaplanTracker } from "../tracker.js";
 
 const setup = () => ({
   project: { id: 1, key: "SHOP", ref: "acme.SHOP", name: "Shop", teamRef: "acme" },

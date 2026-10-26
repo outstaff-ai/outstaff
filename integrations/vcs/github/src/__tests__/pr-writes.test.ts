@@ -7,7 +7,7 @@ import {
   officeSecrets,
   ownSecrets,
 } from "../testing/harness.js";
-import type { Route } from "../testing/http-stub.js";
+import type { Route } from "../testing/types.js";
 
 const own = (person: string) => ({
   ...officeSecrets,

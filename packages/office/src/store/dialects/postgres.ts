@@ -1,10 +1,6 @@
 import { PostgresDialect } from "kysely";
 import { Client, Pool } from "pg";
-
-export interface PostgresOptions {
-  /** Schema to keep the tables in (created if missing). Default: the connection's search_path. */
-  schema?: string;
-}
+import type { PostgresOptions } from "./types.js";
 
 export async function ensureSchema(url: string, schema: string): Promise<void> {
   const client = new Client({ connectionString: url });

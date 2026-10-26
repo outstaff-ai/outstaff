@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { silentLogger, type Tracker } from "@outstaff/core";
-import { humanSize, type Attachment } from "../runner/attachments.js";
-import type { AgentEnv } from "./types.js";
+import { humanSize } from "../runner/attachments.js";
+import type { Attachment } from "../runner/types.js";
+import type { AgentEnv, Uploaded } from "./types.js";
 
 /** The tracker, when it can take attachments. */
 export const canAttach = (tracker: Tracker | undefined): tracker is Tracker =>
@@ -23,11 +24,6 @@ export function attachmentsSection(files: readonly Attachment[], attaching: bool
         ]
       : []),
   ].join("\n");
-}
-
-export interface Uploaded {
-  attached: string[];
-  failed: { name: string; reason: string }[];
 }
 
 /**

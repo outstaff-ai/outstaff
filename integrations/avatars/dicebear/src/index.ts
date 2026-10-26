@@ -5,16 +5,10 @@ import { createDirectoryAvatars, createUrlAvatars } from "./sources.js";
 
 export { createDicebearAvatars } from "./dicebear.js";
 export { createDirectoryAvatars, createUrlAvatars } from "./sources.js";
-export {
-  dicebearOptions,
-  directoryOptions,
-  urlOptions,
-  type DicebearOptions,
-  type DirectoryOptions,
-  type UrlOptions,
-} from "./options.js";
+export { dicebearOptions, directoryOptions, urlOptions } from "./options.js";
+export type { DicebearOptions, DirectoryOptions, StyleInfo, UrlOptions } from "./types.js";
 
-export { DEFAULT_STYLE, STYLES, STYLE_IDS, type StyleInfo } from "./styles.js";
+export { DEFAULT_STYLE, STYLES, STYLE_IDS } from "./styles.js";
 
 const noSecrets = () => [];
 

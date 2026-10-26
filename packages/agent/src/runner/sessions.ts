@@ -1,28 +1,6 @@
-import type { Logger } from "@outstaff/core";
-import { silentLogger } from "@outstaff/core";
+import { silentLogger, type Logger } from "@outstaff/core";
 import type { Offer } from "../office-client/index.js";
-
-/** Where the office keeps the session of an item. */
-export interface SessionStore {
-  session(workItemId: string, sessionId: string): Promise<void>;
-}
-
-/**
- * One runtime session per work item (decision 0010): a later round resumes the session stored with the item, and a
- * session is never used for another item. The office persists the id, so it survives restarts of the agent.
- *
- * Chat sessions have a second kind of key, the thread. The chat sessions of one thread (the first, and a follow-up
- * after it was done) share one session, and a thread session is never used for an item that did not come
- * from that thread, nor an item session for a thread. The office stores both with the item and carries the id over
- * to the next item of the thread.
- */
-export interface SessionManager {
-  /** The session to resume for the offered item, if an earlier round started one. */
-  resumeFor(offer: Offer): string | undefined;
-
-  /** Stores the session the runtime started (or kept) for the item, once. */
-  started(workItemId: string, sessionId: string): Promise<void>;
-}
+import type { SessionStore, SessionManager } from "./types.js";
 
 /**
  * The key a session is kept under: the chat thread of a chat session, else the work item. Work that a chat session

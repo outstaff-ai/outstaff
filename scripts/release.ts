@@ -17,9 +17,8 @@ import {
   prependChangelog,
   releaseNotes,
   setPackageVersion,
-  type Commit,
-  type Level,
 } from "./release-lib.ts";
+import type { Commit, Level } from "./release.types.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 

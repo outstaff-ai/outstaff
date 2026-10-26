@@ -4,9 +4,11 @@ import { join } from "node:path";
 import { rootCertificates } from "node:tls";
 import type { Logger, TeamConfig } from "@outstaff/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { buildFetch, Itsaplan, type ApiProject } from "../client.js";
+import { Itsaplan } from "../client.js";
+import { buildFetch } from "../fetch.js";
 import type { ItsaplanHttp } from "../http.js";
 import { resolveConnection, trackerOptions } from "../options.js";
+import type { ApiProject } from "../types.js";
 
 // The default TLS fetch loads undici on demand; the double records what it is asked to do instead of connecting.
 const undici = vi.hoisted(() => ({

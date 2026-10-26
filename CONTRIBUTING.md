@@ -79,9 +79,11 @@ Maintainers: signatures are stored in the separate `outstaff-ai/cla-signatures` 
 
 - TypeScript in strict mode, ESM only, and no default exports.
 - Keep modules small. Put tests in a `__tests__` folder inside the folder they test, as `__tests__/*.test.ts`, and run them with vitest. Test-only fixtures and helpers go in the same `__tests__` folder. `pnpm check:tests` (run in CI) fails on a test file outside a `__tests__` folder.
+- Keep types apart from implementations. A folder's shared types go in `types.ts`, a larger contract in `<name>.types.ts`, and a file that exports functions, classes or values does not also export types (`index.ts` files re-export both). Keep each source file to one unit and under 300 lines, split along its seams. `pnpm check:files` (run in CI) enforces both; the files it skips are listed with a reason in `scripts/file-layout.mjs`.
 - Write comments only where the why is not obvious. Match the style of the code around your change.
 
 - **Coverage.** Integrations (`integrations/*/*`) must have 100% line, branch, function and statement coverage in every file; CI fails below it (`pnpm test:coverage`). Cover a branch with a test, or delete it if it can't run; no coverage-ignore comments.
+- **Fakes reuse the integration's types.** A fake or stand-in (`src/testing/**`, `testing.ts`, `packages/core/src/fakes`, `e2e/stubs`) derives its shapes from the adapter's API types or the core port types, for example `type StoredIssue = ApiIssue & Required<Pick<ApiIssue, "labelIds">>`, and names them `Stored*` or `Fake*` so they don't shadow domain names. When a fake needs a field the adapter doesn't read, add it to the adapter's API type as optional instead of redefining the shape.
 
 ## Reporting bugs, asking for features, and security
 

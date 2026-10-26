@@ -14,7 +14,7 @@ import { parse } from "yaml";
 import { afterAll, describe, expect, it } from "vitest";
 import { loadCatalog } from "../../catalog/load.js";
 import { parseTeamConfig } from "../../config/parse.js";
-import type { TeamConfig } from "../../config/schema.js";
+import type { TeamConfig } from "../../config/types.js";
 import { EXAMPLE_CATALOG_DIR, readAcmeTeam } from "../../testing/fixtures.js";
 import { renderPerson, renderTeam, RenderError } from "../render.js";
 import { renderToDir } from "../write.js";

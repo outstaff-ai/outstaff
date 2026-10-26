@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { rootCertificates } from "node:tls";
 import {
   PortError,
   type AdapterContext,
@@ -8,108 +6,25 @@ import {
   type Member,
   type StatusMap,
 } from "@outstaff/core";
+import { buildFetch } from "./fetch.js";
 import { ItsaplanHttp } from "./http.js";
-import {
-  resolveConnection,
-  type Connection,
-  type KnowledgeOptions,
-  type TrackerOptions,
-} from "./options.js";
-
-export interface ApiColumn {
-  id: number;
-  name: string;
-  stateType: string;
-  position?: number;
-}
-
-export interface ApiLabel {
-  id: number;
-  name: string;
-}
-
-export interface ApiAssignee {
-  userId: string;
-  name: string;
-  username?: string | null;
-  kind?: "member" | "agent";
-}
-
-export interface ApiProject {
-  project: { id: number; key: string; ref: string; name: string; teamRef?: string };
-  columns: ApiColumn[];
-  labels: ApiLabel[];
-  assignees: ApiAssignee[];
-}
-
-export interface ClientDeps {
-  readFile?: (path: string) => string;
-
-  /** Builds a fetch that trusts the given PEM text; the default uses an undici Agent. */
-  tlsFetch?: (ca: string) => Promise<typeof fetch>;
-}
+import { resolveConnection } from "./options.js";
+import { columnFor, DEFAULT_NAMES, statusOf } from "./statuses.js";
+import type {
+  ApiAssignee,
+  ApiColumn,
+  ApiProject,
+  ClientDeps,
+  Connection,
+  KnowledgeOptions,
+  TrackerOptions,
+} from "./types.js";
 
 const SETUP_TTL_MS = 30_000;
 
 /** First wait before asking for the workspace again after a failure; doubles up to the maximum. */
 const WORKSPACE_RETRY_MS = 5_000;
 const WORKSPACE_RETRY_MAX_MS = 300_000;
-
-/** Default status names, Title Case; `team.workflow.statuses` overrides them. */
-const DEFAULT_NAMES: Record<CanonicalStatus, string> = {
-  backlog: "Backlog",
-  ready: "Ready",
-  active: "Active",
-  review: "Review",
-  blocked: "Blocked",
-  done: "Done",
-  canceled: "Canceled",
-};
-
-/** Used when the project has no column with the mapped name: the first column of this kind. */
-const STATE_FOR: Record<CanonicalStatus, string[]> = {
-  backlog: ["backlog", "unstarted"],
-  ready: ["unstarted", "backlog"],
-  active: ["started"],
-  review: ["started"],
-  blocked: ["started"],
-  done: ["completed"],
-  canceled: ["canceled"],
-};
-
-const CANONICAL_FOR_STATE: Record<string, CanonicalStatus> = {
-  backlog: "backlog",
-  unstarted: "ready",
-  started: "active",
-  completed: "done",
-  canceled: "canceled",
-};
-
-async function undiciFetch(ca: string): Promise<typeof fetch> {
-  const { Agent, fetch: f } = await import("undici");
-  const agent = new Agent({ connect: { ca: [...rootCertificates, ca] } });
-  return ((input: string | URL, init?: RequestInit) =>
-    f(input, { ...init, dispatcher: agent } as never)) as unknown as typeof fetch;
-}
-
-export async function buildFetch(
-  base: typeof fetch,
-  conn: Connection,
-  deps: ClientDeps = {},
-): Promise<typeof fetch> {
-  if (!conn.ca_file) {
-    return base;
-  }
-
-  let pem: string;
-  try {
-    pem = (deps.readFile ?? ((p) => readFileSync(p, "utf8")))(conn.ca_file);
-  } catch (cause) {
-    throw new PortError("invalid", `Cannot read ca_file ${conn.ca_file}.`, { cause });
-  }
-
-  return (deps.tlsFetch ?? undiciFetch)(pem);
-}
 
 /** The typed client both adapters share: HTTP, the project's setup (columns, labels, members) and links. */
 export class Itsaplan {
@@ -153,41 +68,11 @@ export class Itsaplan {
 
   /** The column for a canonical status: the mapped name, else the first column of the matching kind. */
   column(setup: ApiProject, status: CanonicalStatus): ApiColumn {
-    const name = (this.statusMap[status] ?? DEFAULT_NAMES[status]).toLowerCase();
-    const byName = setup.columns.find((c) => c.name.toLowerCase() === name);
-    if (byName) {
-      return byName;
-    }
-
-    for (const kind of STATE_FOR[status]) {
-      const byKind = setup.columns
-        .filter((c) => c.stateType === kind)
-        .toSorted((a, b) => (a.position ?? 0) - (b.position ?? 0))[0];
-
-      if (byKind) {
-        return byKind;
-      }
-    }
-
-    throw new PortError(
-      "invalid",
-      `The project has no column for "${status}" (looked for "${this.statusMap[status]}").`,
-    );
+    return columnFor(this.statusMap, setup, status);
   }
 
   status(setup: ApiProject, columnId: number): { name: string; canonical?: CanonicalStatus } {
-    const col = setup.columns.find((c) => c.id === columnId);
-    if (!col) {
-      return { name: String(columnId) };
-    }
-
-    const lower = col.name.toLowerCase();
-    const named = (Object.keys(this.statusMap) as CanonicalStatus[]).find(
-      (s) => this.statusMap[s]?.toLowerCase() === lower,
-    );
-
-    const canonical = named ?? CANONICAL_FOR_STATE[col.stateType];
-    return canonical ? { name: col.name, canonical } : { name: col.name };
+    return statusOf(this.statusMap, setup, columnId);
   }
 
   member(

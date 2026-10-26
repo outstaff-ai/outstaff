@@ -1,15 +1,9 @@
-export { CANONICAL_STATUSES, type CanonicalStatus, type StatusMap } from "./status.js";
+export { CANONICAL_STATUSES } from "./status.js";
 export type { Links } from "./links.js";
-export { PORT_ERROR_CODES, PortError, type PortErrorCode } from "./errors.js";
-export {
-  envSecretSource,
-  maskSecrets,
-  scrubEnv,
-  type SecretSource,
-  type SecretSpec,
-} from "./secrets.js";
+export { PORT_ERROR_CODES, PortError } from "./errors.js";
+export { envSecretSource, maskSecrets, scrubEnv } from "./secrets.js";
 
-export { silentLogger, type Logger } from "./logger.js";
+export { silentLogger } from "./logger.js";
 export type {
   AdapterContext,
   AdapterDefinition,
@@ -23,8 +17,19 @@ export type {
 
 export type { EventPage, UnmappedEvent } from "./events.js";
 
-export { AdapterRegistry, defineAdapter, type PortImpls } from "./define.js";
-export { parseRepoUrl, repoKey, type RepoRef } from "./repo.js";
+export { AdapterRegistry, defineAdapter } from "./define.js";
+export { parseRepoUrl, repoKey } from "./repo.js";
+export type {
+  CanonicalStatus,
+  Logger,
+  PortErrorCode,
+  PortImpls,
+  RepoRef,
+  SecretSource,
+  SecretSpec,
+  StatusMap,
+} from "./types.js";
+
 export type {
   Comment,
   Issue,
@@ -62,13 +67,8 @@ export type {
   VcsPermission,
 } from "./vcs.js";
 
-export {
-  splitAtLines,
-  type Chat,
-  type ChatFile,
-  type ChatMessage,
-  type AgentProfile,
-} from "./chat.js";
+export { splitAtLines } from "./split-lines.js";
+export type { Chat, ChatFile, ChatMessage, AgentProfile } from "./chat.js";
 
 export type { RunRequest, Runtime, RuntimeEvent, RuntimeTool, UsageEvent } from "./runtime.js";
 export type { Avatars } from "./avatars.js";

@@ -1,19 +1,7 @@
-import type { Placement, Scheduler } from "../scheduler/scheduler.js";
+import type { Placement, Scheduler } from "../scheduler/types.js";
 import { orderQueue } from "../scheduler/policy.js";
 import type { Store } from "../store/types.js";
-
-export type ParsedPlacement =
-  | { type: "next" }
-  | { type: "last" }
-  | { type: "pm" }
-  | { type: "after"; itemIds: string[] };
-
-/** One line of the list the requester saw: a piece of work and the ids of all its items. */
-export interface Candidate {
-  ids: string[];
-  title: string;
-  ticketKey?: string | undefined;
-}
+import type { Candidate, ParsedPlacement } from "./types.js";
 
 const words = (s: string) => s.toLowerCase().replaceAll(/[^a-z0-9#._ -]+/g, " ");
 

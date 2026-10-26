@@ -2,8 +2,10 @@ import type { AdapterContext, SecretSource, TeamConfig } from "@outstaff/core";
 import { silentLogger, PortError, type PortErrorCode } from "@outstaff/core";
 import { expect } from "vitest";
 import { githubOptions } from "../options.js";
-import { createGithubVcs, type GithubDeps } from "../vcs.js";
-import { createStubFetch, type Route } from "./http-stub.js";
+import type { GithubDeps } from "../types.js";
+import { createGithubVcs } from "../vcs.js";
+import { createStubFetch } from "./http-stub.js";
+import type { Clock, Route } from "./types.js";
 import { testKey } from "./keys.js";
 
 export const REPO = { owner: "acme", name: "app" };
@@ -31,12 +33,6 @@ export const team = {
     { handle: "lee", repos: {} },
   ],
 } as unknown as TeamConfig;
-
-export interface Clock {
-  date: Date;
-  now: () => Date;
-  advance(ms: number): void;
-}
 
 export function clock(start = "2026-01-01T00:00:00Z"): Clock {
   const c: Clock = {

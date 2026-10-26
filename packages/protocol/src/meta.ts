@@ -1,13 +1,4 @@
-import type { MessageType } from "./schemas.js";
-
-export interface MessageMeta {
-  /** Who sends it. */
-  from: "agent" | "office" | "both";
-  summary: string;
-
-  /** Message types that may answer it; empty for messages that are not requests. */
-  replies: MessageType[];
-}
+import type { MessageMeta, MessageType } from "./types.js";
 
 export const MESSAGE_META = {
   hello: {

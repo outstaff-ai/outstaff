@@ -2,23 +2,16 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { toConfigIssues } from "../config/issues.js";
 import { parseYaml } from "../config/locate.js";
-import { CATALOG_CODES, CatalogError, type CatalogIssue } from "./codes.js";
-import { roleSchema, type Role } from "./role.js";
-import { parseTemplate } from "./template.js";
-
-export type CatalogDoc = { name: string; file: string; text: string };
-export type CatalogRole = Role & { dir: string; skill: CatalogDoc };
-export type Catalog = {
-  /** From `<dir>/package.json`, or the `version` option. */
-  version: string;
-  dir: string;
-  roles: Record<string, CatalogRole>;
-  process: Record<string, CatalogDoc>;
-  references: Record<string, CatalogDoc>;
-  templates: Record<string, CatalogDoc>;
-};
-
-export type LoadCatalogOptions = { version?: string };
+import { CATALOG_CODES, CatalogError } from "./codes.js";
+import { roleSchema } from "./role.js";
+import { parseTemplate } from "./template-parse.js";
+import type {
+  Catalog,
+  CatalogDoc,
+  CatalogIssue,
+  CatalogRole,
+  LoadCatalogOptions,
+} from "./types.js";
 
 const subdirs = (dir: string): string[] =>
   existsSync(dir)

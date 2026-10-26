@@ -11,13 +11,9 @@ export const dicebearOptions = z.strictObject({
   size: z.number().int().min(16).max(2048).optional(),
 });
 
-export type DicebearOptions = z.output<typeof dicebearOptions>;
-
 export const directoryOptions = z.strictObject({
   path: z.string().min(1),
 });
-
-export type DirectoryOptions = z.output<typeof directoryOptions>;
 
 export const urlOptions = z.strictObject({
   template: z
@@ -25,5 +21,3 @@ export const urlOptions = z.strictObject({
     .refine((t) => t.includes("{seed}"), "Include {seed} where the person's seed goes.")
     .refine((t) => URL.canParse(t.replace("{seed}", "x")), "Must be a valid URL."),
 });
-
-export type UrlOptions = z.output<typeof urlOptions>;

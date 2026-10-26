@@ -1,164 +1,18 @@
-import type { Tracker, TeamConfig, Vcs } from "@outstaff/core";
-import type { Link, Member, Ref, WorkSummary } from "@outstaff/protocol";
-import { ProtocolError, type Offer, type WorkSource } from "./protocol/source.js";
-import { readRoster, type RosterOptions } from "./messaging/roster.js";
-import { publicOrigin, readOrigin } from "./chat/origin.js";
-import { deliverFeedback, readFeedback } from "./engine/feedback.js";
-import { previousConversation } from "./conversation-context.js";
+import type { Member } from "@outstaff/protocol";
 import { placeQueued } from "./chat/placement.js";
-import { INTERRUPTED, type BlockNotice, type Scheduler } from "./scheduler/scheduler.js";
-import type { Store, WorkItem } from "./store/types.js";
-import type { DocRecord, PrRecord, TicketRecord } from "./workstate/index.js";
-
-/** The tickets and pull requests an item concerns, as links the agent and the requester can open. */
-export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs }) {
-  const ticketRef = async (key: string): Promise<Ref> => {
-    const rec = (await store.getSubject("ticket", key))?.data as TicketRecord | undefined;
-    const url = rec?.url ?? ports?.tracker?.links.issue(key);
-    return {
-      type: "ticket",
-      ref: key,
-      ...(rec ? { title: rec.title } : {}),
-      ...(url ? { url } : {}),
-    };
-  };
-
-  const prRef = async (key: string, person?: string): Promise<Ref> => {
-    const rec = (await store.getSubject("pr", key))?.data as PrRecord | undefined;
-    const url = rec?.url ?? (rec ? ports?.vcs?.links.pr(rec.ref.repo, rec.ref.number) : undefined);
-
-    return {
-      type: "pr",
-      ref: key,
-      ...(rec ? { title: rec.title } : {}),
-      ...(url ? { url } : {}),
-      ...(rec
-        ? {
-            headRef: rec.headRef,
-            baseRef: rec.baseRef,
-            state: rec.state,
-            ...(person !== undefined ? { own: rec.author.person === person } : {}),
-          }
-        : {}),
-    };
-  };
-
-  /** The item's own subject, plus the ticket and pull requests it is connected to. */
-  const subjectsOf = async (item: WorkItem): Promise<Ref[]> => {
-    const subject = item.subject;
-    if (!subject) {
-      return [];
-    }
-
-    if (subject.type === "ticket") {
-      const prs = await store.queryLinks({
-        to: { type: "ticket", ref: subject.ref },
-        relation: "implements",
-      });
-
-      return [
-        await ticketRef(subject.ref),
-        ...(await Promise.all(
-          prs.filter((l) => l.from.type === "pr").map((l) => prRef(l.from.ref, item.person)),
-        )),
-      ];
-    }
-
-    if (subject.type === "pr") {
-      const rec = (await store.getSubject("pr", subject.ref))?.data as PrRecord | undefined;
-      const stacked = await store.queryLinks({
-        from: { type: "pr", ref: subject.ref },
-        relation: "stacked_on",
-      });
-
-      return [
-        await prRef(subject.ref, item.person),
-        ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
-        ...(await Promise.all(stacked.map((l) => prRef(l.to.ref, item.person)))),
-      ];
-    }
-
-    if (subject.type === "doc") {
-      const rec = (await store.getSubject("doc", subject.ref))?.data as DocRecord | undefined;
-      return [
-        {
-          type: "doc",
-          ref: subject.ref,
-          ...(rec ? { title: rec.title, url: rec.url } : {}),
-        },
-        ...(rec?.ticket ? [await ticketRef(rec.ticket)] : []),
-      ];
-    }
-
-    return [{ type: subject.type, ref: subject.ref }];
-  };
-
-  return { subjectsOf, ticketRef, prRef };
-}
-
-/** An item as the protocol lists it. */
-export async function summarizeItem(
-  store: Store,
-  item: WorkItem,
-  current?: string,
-): Promise<WorkSummary> {
-  let ticketKey: string | undefined;
-  let pr: PrRecord | undefined;
-  if (item.subject?.type === "ticket") {
-    ticketKey = item.subject.ref;
-  } else if (item.subject?.type === "pr") {
-    pr = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
-    ticketKey = pr?.ticket;
-  }
-
-  const ticketTitle = ticketKey
-    ? ((await store.getSubject("ticket", ticketKey))?.data as TicketRecord | undefined)?.title
-    : undefined;
-
-  return {
-    id: item.id,
-    title: item.title,
-    status: item.status,
-    kind: item.kind,
-    ...(ticketKey ? { ticketKey } : {}),
-    ...(ticketTitle ? { ticketTitle } : {}),
-    ...(item.subject?.type === "pr" ? { pr: item.subject.ref } : {}),
-    ...(pr ? { prNumber: pr.ref.number, prTitle: pr.title } : {}),
-    ...(pr?.url ? { prUrl: pr.url } : {}),
-    ...(current === item.id ? { current: true } : {}),
-  };
-}
+import { readOrigin } from "./chat/origin.js";
+import { summarizeItem } from "./item-summary.js";
+import { readRoster } from "./messaging/roster.js";
+import { ProtocolError } from "./protocol/errors.js";
+import type { WorkSource } from "./protocol/source.types.js";
+import type { WorkItem } from "./store/types.js";
+import { offerBuilder } from "./work-offer.js";
+import type { WorkSourceOptions } from "./work-source.types.js";
 
 /** Subject type that keeps whether the agent accepted an offered item; it must survive a restart. */
 export const OFFER_SUBJECT = "offer";
 
 const OPEN = new Set(["queued", "active", "waiting", "blocked"]);
-
-export interface HandBackResult {
-  summary: string;
-  links: Link[];
-  status: "done" | "waiting" | "blocked" | "interrupted";
-}
-
-export interface WorkSourceOptions {
-  scheduler: Scheduler;
-  store: Store;
-  team: Pick<TeamConfig, "people" | "humans">;
-  ports?: { tracker?: Tracker; vcs?: Vcs };
-  roles?: RosterOptions["roles"];
-
-  /** Called after the item left `active` because of a hand-back, so the workflow can react (move the ticket, notify). */
-  onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;
-
-  /** Called after an item started, before it is offered. */
-  onStarted?: (item: WorkItem) => Promise<void>;
-
-  /** Called after the scheduler blocked an item on its own (repeated failures, loop guard), so the requester hears of it. */
-  onBlocked?: (notice: BlockNotice) => void | Promise<void>;
-
-  /** Called after an item went back to the queue because the agent asked for it. */
-  notify?: (person: string) => void;
-}
 
 interface OfferState {
   accepted: boolean;
@@ -182,59 +36,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       accepted: false,
     };
 
-  const { subjectsOf } = itemRefs(store, opts.ports);
-
-  // A new offer counts as delivering the feedback it carries; a resumed one the agent already has.
-  const offerOf = async (item: WorkItem, fresh = true): Promise<Offer> => {
-    const origin = await readOrigin(store, item.id);
-    // A chat session answering in the thread of running work sees that work: its ticket, pull request and journal.
-    const about = origin?.about ? await store.getItem(origin.about.id) : undefined;
-    const mine = await subjectsOf(item);
-    const subjects = about
-      ? [...(await subjectsOf(about)), ...mine].filter(
-          (s, i, all) => all.findIndex((x) => x.type === s.type && x.ref === s.ref) === i,
-        )
-      : mine;
-
-    const feedback = fresh
-      ? await deliverFeedback(store, item.id)
-      : await readFeedback(store, item.id);
-
-    const conversation = await previousConversation(store, opts.ports?.vcs, item, feedback);
-
-    // This run is the latest; the one before it is what the agent continues.
-    const interrupted = (await store.listRuns(item.id)).at(-2)?.outcome === INTERRUPTED;
-
-    return {
-      ...(item.sessionId ? { sessionId: item.sessionId } : {}),
-      ...(interrupted ? { interrupted } : {}),
-      workItem: {
-        id: item.id,
-        kind: item.kind,
-        title: item.title,
-        priority: item.priority,
-        trigger: item.trigger,
-        ...(item.parentId ? { parentId: item.parentId } : {}),
-        ...(item.subject ? { subject: item.subject } : {}),
-        ...(origin ? { origin: publicOrigin(origin) } : {}),
-      },
-      context: {
-        journal: [
-          ...(about ? await store.readJournal(about.id) : []),
-          ...(await store.readJournal(item.id)),
-        ].map((j) => ({
-          at: j.at,
-          author: j.author,
-          text: j.text,
-        })),
-        subjects,
-        links: subjects.flatMap((s) => (s.url ? [{ url: s.url, title: s.title ?? s.ref }] : [])),
-        ...(feedback.length > 0 ? { feedback } : {}),
-        ...(conversation.length > 0 ? { conversation } : {}),
-      },
-    };
-  };
-
+  const offerOf = offerBuilder(store, opts.ports);
   const summaryOf = (item: WorkItem, current?: string) => summarizeItem(store, item, current);
 
   return {

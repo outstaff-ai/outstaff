@@ -1,62 +1,18 @@
-import { parseRepoUrl, PortError, repoKey, vcsAgentLogins } from "@outstaff/core";
-import type {
-  CanonicalStatus,
-  Issue,
-  Member,
-  PrRef,
-  PrVerdict,
-  PullRequest,
-  RepoRef,
-  WorkflowEvent,
-  WorkflowPr,
-} from "@outstaff/core";
-import type { Cancel } from "../clock.js";
-import { awaitsReview } from "../engine/feedback.js";
-import type { Ref } from "../store/index.js";
-import { ticketCandidates } from "./infer.js";
-import type {
-  CiState,
-  CurrentWork,
-  DocRecord,
-  PrRecord,
-  TicketRecord,
-  WorkState,
-  WorkstateHandler,
-  WorkstateOptions,
-} from "./types.js";
+import { parseRepoUrl, repoKey, vcsAgentLogins } from "@outstaff/core";
+import type { PrRef, RepoRef } from "@outstaff/core";
+import type { Cancel } from "../types.js";
+import type { RefreshCtx, WorkstateCore } from "./core.types.js";
+import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
+import { createDocs } from "./docs.js";
+import { createEvents } from "./events.js";
+import { createPrs } from "./prs.js";
+import { createRequesters } from "./requesters.js";
+import { createRescan } from "./rescan.js";
+import { createTickets } from "./tickets.js";
+import type { WorkState, WorkstateOptions } from "./types.js";
 
-const ROOT: Ref = { type: "workstate", ref: "index" };
 const DEFAULT_REFRESH_MS = 60_000;
 const DEFAULT_RETENTION_MS = 14 * 24 * 3_600_000;
-const TERMINAL = new Set(["done", "canceled"]);
-const prNode = (key: string): Ref => ({ type: "pr", ref: key });
-const ticketNode = (key: string): Ref => ({ type: "ticket", ref: key });
-const personNode = (handle: string): Ref => ({ type: "person", ref: handle });
-const docNode = (id: string): Ref => ({ type: "doc", ref: id });
-const ACTOR = { kind: "automation", id: "workstate" } as const;
-
-interface Fresh {
-  event: WorkflowEvent;
-  externalId: string;
-}
-
-interface Ctx {
-  fresh: Fresh[];
-}
-
-const ciOf = (checks: PrRecord["checks"]): CiState => {
-  if (checks.length === 0) {
-    return "none";
-  }
-
-  if (checks.some((c) => c.status === "failure")) {
-    return "failure";
-  }
-
-  return checks.some((c) => c.status === "pending") ? "pending" : "success";
-};
-
-const notFound = (error: unknown) => error instanceof PortError && error.code === "not_found";
 
 /** Opens the work state and loads what the store already knows. */
 export async function createWorkState(opts: WorkstateOptions): Promise<WorkState> {
@@ -75,7 +31,6 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     );
 
   const defaultHost = repos[0]?.host ?? "git.acme.example";
-  const vcsPeople = vcsAgentLogins(team);
   const trackerPeople = new Map<string, string>();
   for (const p of team.people) {
     if (p.identities?.tracker) {
@@ -83,18 +38,32 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     }
   }
 
-  const prs = new Map<string, PrRecord>();
-  const tickets = new Map<string, TicketRecord>();
-  const docs = new Map<string, DocRecord>();
-  const workers = new Map<string, string>();
-
-  /** Tickets whose latest work item ended as a hand-back as done. */
-  const handedBack = new Set<string>();
-  const notTickets = new Set<string>();
-  const handlers: WorkstateHandler[] = [];
-
   const sameRepo = (a: RepoRef, b: RepoRef) => repoKey(a, defaultHost) === repoKey(b, defaultHost);
   const prSubject = (pr: PrRef) => `${repoKey(pr.repo, defaultHost)}#${pr.number}`;
+  const core: WorkstateCore = {
+    store,
+    vcs,
+    tracker,
+    team,
+    clock,
+    logger,
+    retentionMs,
+    repos,
+    vcsPeople: vcsAgentLogins(team),
+    trackerPeople,
+    prs: new Map(),
+    tickets: new Map(),
+    docs: new Map(),
+    workers: new Map(),
+    handedBack: new Set(),
+    notTickets: new Set(),
+    handlers: [],
+    sameRepo,
+    prSubject,
+    ticketLinks,
+  };
+
+  const { prs, tickets, docs, workers, handedBack, handlers } = core;
 
   let chain: Promise<unknown> = Promise.resolve();
   const locked = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -103,701 +72,20 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     return run;
   };
 
-  const relink = async (from: Ref, relation: string, prev?: Ref, next?: Ref) => {
-    if (prev?.type === next?.type && prev?.ref === next?.ref) {
-      return;
-    }
-
-    if (prev) {
-      await store.unlink(from, prev, relation);
-    }
-
-    if (next) {
-      await store.link(from, next, relation);
-    }
-  };
-
-  const synthetic = async (
-    ctx: Ctx,
-    type: "pr.conflicted" | "pr.ci_failed",
-    rec: PrRecord,
-    data: Record<string, unknown>,
-  ) => {
-    const externalId = `${type}:${prSubject(rec.ref)}:${rec.headSha}`;
-    const event: WorkflowEvent = {
-      type,
-      subject: { pr: rec.ref, ...(rec.ticket ? { ticket: rec.ticket } : {}) },
-      actor: { ...ACTOR },
-      data: { ...data, sha: rec.headSha, at: clock.now().toISOString() },
-    };
-
-    // The stored shape is the one intake delivers, so a crash before delivery is repaired by intake.
-    const fresh = await store.recordEvent({
-      source: "workstate",
-      externalId,
-      type,
-      payload: { raw: { externalId, type }, event, trusted: true },
-    });
-
-    if (fresh) {
-      ctx.fresh.push({ event, externalId });
-    }
-  };
-
-  const deliver = async (list: Fresh[]) => {
-    if (handlers.length === 0) {
-      return;
-    }
-
-    for (const { event, externalId } of list) {
-      let ok = true;
-      for (const handler of handlers) {
-        try {
-          await handler(event, { source: "workstate", externalId, trusted: true });
-        } catch (error) {
-          ok = false;
-          logger.warn("workstate handler failed", { type: event.type, error: String(error) });
-        }
-      }
-
-      if (ok) {
-        await store.markProcessed("workstate", externalId);
-      }
-    }
-  };
-
-  // Tickets
-
-  const assigneeOf = (member?: Member): TicketRecord["assignee"] => {
-    if (!member) {
-      return undefined;
-    }
-
-    if (member.kind === "agent") {
-      const handle =
-        trackerPeople.get(member.id) ?? (member.username && trackerPeople.get(member.username));
-
-      return { id: handle || member.id, kind: "agent" };
-    }
-
-    return { id: member.username ?? member.id, kind: "human" };
-  };
-
-  const saveTicket = async (rec: TicketRecord) => {
-    const prev = tickets.get(rec.key);
-    tickets.set(rec.key, rec);
-    await store.upsertSubject("ticket", rec.key, rec);
-    await store.link(ROOT, ticketNode(rec.key), "tracks");
-    const person = (a?: TicketRecord["assignee"]) =>
-      a?.kind === "agent" && team.people.some((p) => p.handle === a.id)
-        ? personNode(a.id)
-        : undefined;
-
-    await relink(ticketNode(rec.key), "assigned_to", person(prev?.assignee), person(rec.assignee));
-  };
-
-  const toTicket = (issue: Issue, prev?: TicketRecord): TicketRecord => {
-    const status = issue.status.canonical ?? prev?.status;
-    const assignee = assigneeOf(issue.assignee);
-    return {
-      key: issue.key,
-      title: issue.title,
-      url: issue.url,
-      ...(status ? { status } : {}),
-      ...(assignee ? { assignee } : {}),
-      labels: [...issue.labels],
-      ...(prev?.requester ? { requester: prev.requester } : {}),
-      ...(prev?.requesterAt ? { requesterAt: prev.requesterAt } : {}),
-      updatedAt: clock.now().toISOString(),
-    };
-  };
-
-  /**
-   * The tracker no longer has the ticket: remember that, close what hung on it, and stop asking.
-   * A ticket the work state never held only gets the warning.
-   */
-  const forgetTicket = async (key: string, prev?: TicketRecord) => {
-    if (!prev) {
-      logger.warn("ticket not found", { key });
-      return;
-    }
-
-    if (prev.goneAt) {
-      return;
-    }
-
-    logger.warn("ticket not found, forgetting it", { key });
-    const note = `Ticket ${key} no longer exists in the tracker.`;
-    const at = clock.now().toISOString();
-    const gone: TicketRecord = {
-      key,
-      title: prev.title,
-      ...(prev.url ? { url: prev.url } : {}),
-      labels: [],
-      goneAt: at,
-      updatedAt: at,
-    };
-
-    tickets.set(key, gone);
-    await store.upsertSubject("ticket", key, gone);
-    const assignee = prev.assignee;
-    if (assignee?.kind === "agent" && team.people.some((p) => p.handle === assignee.id)) {
-      await store.unlink(ticketNode(key), personNode(assignee.id), "assigned_to");
-    }
-
-    const linked = [...prs.values()].filter((p) => p.ticket === key);
-    const prKeys = new Set<string>();
-    for (const rec of linked) {
-      const { ticket: _ticket, ...unlinked } = rec;
-      const prKey = prSubject(rec.ref);
-      prKeys.add(prKey);
-      prs.set(prKey, unlinked);
-      await store.upsertSubject("pr", prKey, unlinked);
-      await store.unlink(prNode(prKey), ticketNode(key), "implements");
-    }
-
-    for (const item of await store.listItems()) {
-      const on = item.subject;
-      if (
-        (item.status === "queued" || item.status === "waiting") &&
-        on &&
-        ((on.type === "ticket" && on.ref === key) || (on.type === "pr" && prKeys.has(on.ref)))
-      ) {
-        await store.updateItem(item.id, { status: "canceled" });
-        await store.appendJournal(item.id, "office", note);
-      }
-    }
-  };
-
-  const refreshTicket = async (key: string, event?: WorkflowEvent) => {
-    const prev = tickets.get(key);
-    if (prev?.goneAt && !event) {
-      return;
-    }
-
-    let rec: TicketRecord;
-    if (tracker) {
-      try {
-        rec = toTicket(await tracker.getIssue(key), prev);
-      } catch (error) {
-        if (notFound(error)) {
-          await forgetTicket(key, prev);
-          return;
-        }
-
-        throw error;
-      }
-    } else {
-      // Without a tracker the events are all there is to go on.
-      rec = prev ?? { key, title: key, labels: [], updatedAt: clock.now().toISOString() };
-      const to = event?.data["to"];
-      if (event?.type === "ticket.moved" && typeof to === "string") {
-        rec = { ...rec, status: to as CanonicalStatus };
-      }
-    }
-
-    const requestedBy =
-      event && ["ticket.created", "ticket.assigned"].includes(event.type)
-        ? trustedHuman(event)
-        : undefined;
-
-    await saveTicket(requestedBy && event ? withRequester(rec, requestedBy, event) : rec);
-  };
-
-  const trustedHuman = (event: WorkflowEvent): string | undefined =>
-    event.actor.kind === "human" && event.data["untrusted"] !== true ? event.actor.id : undefined;
-
-  /** The latest trusted human wins; events are ordered by when they happened, never by id. */
-  const withRequester = (rec: TicketRecord, requester: string, event: WorkflowEvent) => {
-    const at = typeof event.data["at"] === "string" ? event.data["at"] : clock.now().toISOString();
-    return rec.requesterAt && Date.parse(at) < Date.parse(rec.requesterAt)
-      ? rec
-      : { ...rec, requester, requesterAt: at };
-  };
-
-  /** What the tracker knows the human as: pull request actors are code host logins, so map them through `humans:`. */
-  const trackerIdentity = (login: string): string => {
-    const lower = login.toLowerCase();
-    const human = team.humans?.find((h) => h.identities.vcs?.toLowerCase() === lower);
-    return human?.identities.tracker ?? login;
-  };
-
-  /** A trusted human's feedback that sends a ticket back to its agent (as `human-feedback-reactivates-ticket` does). */
-  const recordFeedbackRequester = async (event: WorkflowEvent, ref: PrRef) => {
-    const login = trustedHuman(event);
-    const rec = prs.get(prSubject(ref));
-    const body = event.data["body"];
-    const comments = event.data["comments"];
-    const signOff =
-      event.data["state"] === "approved" &&
-      !(typeof body === "string" && body.trim() !== "") &&
-      !(Array.isArray(comments) && comments.length > 0);
-
-    if (!login || !rec?.ticket || rec.state !== "open" || rec.author.kind !== "agent" || signOff) {
-      return;
-    }
-
-    if (!(await ensureTicket(rec.ticket))) {
-      return;
-    }
-
-    const ticket = tickets.get(rec.ticket)!;
-    if (ticket.status === "review" || ticket.status === "blocked") {
-      await saveTicket(withRequester(ticket, trackerIdentity(login), event));
-    }
-  };
-
-  /**
-   * A trusted human's comment on a ticket an agent handed back sends it back to the agent (as
-   * `ticket-comment-reactivates-ticket` does), so that person is who the next hand-back goes to.
-   */
-  const recordCommentRequester = async (key: string, event: WorkflowEvent) => {
-    const person = trustedHuman(event);
-    const ticket = tickets.get(key);
-    // A comment that mentions an agent hands the ticket to it, so the next hand-back goes to who wrote the comment.
-    const mentions = event.data["mentions"];
-    const handsOver =
-      Array.isArray(mentions) &&
-      mentions.length > 0 &&
-      ticket?.status !== undefined &&
-      !TERMINAL.has(ticket.status);
-
-    if (
-      !person ||
-      !ticket ||
-      (!handsOver &&
-        (ticket.assignee?.kind !== "human" ||
-          (ticket.status !== "review" && ticket.status !== "blocked")))
-    ) {
-      return;
-    }
-
-    await saveTicket(withRequester(ticket, person, event));
-  };
-
-  // Documents
-
-  const saveDoc = async (rec: DocRecord) => {
-    docs.set(rec.id, rec);
-    await store.upsertSubject("doc", rec.id, rec);
-    await store.link(ROOT, docNode(rec.id), "tracks");
-    await store.link(docNode(rec.id), personNode(rec.author), "authored_by");
-  };
-
-  const touchDoc = async (id: string, event: WorkflowEvent) => {
-    const rec = docs.get(id);
-    const at = typeof event.data["at"] === "string" ? event.data["at"] : clock.now().toISOString();
-    if (rec && Date.parse(at) > Date.parse(rec.touchedAt)) {
-      await saveDoc({ ...rec, touchedAt: at });
-    }
-  };
-
-  const docOpen = (rec: DocRecord): boolean => {
-    const ticket = rec.ticket ? tickets.get(rec.ticket) : undefined;
-    if (ticket) {
-      return !(ticket.status && TERMINAL.has(ticket.status));
-    }
-
-    return clock.now().getTime() - Date.parse(rec.touchedAt) < retentionMs;
-  };
-
-  const ensureTicket = async (key: string): Promise<boolean> => {
-    if (tickets.has(key)) {
-      return !tickets.get(key)!.goneAt;
-    }
-
-    if (notTickets.has(key)) {
-      return false;
-    }
-
-    await refreshTicket(key);
-    if (tickets.has(key)) {
-      return !tickets.get(key)!.goneAt;
-    }
-
-    notTickets.add(key);
-    return false;
-  };
-
-  /** The ticket a pull request links to: the first candidate by `ticketCandidates` (branch, title, closing keyword) that the tracker knows. */
-  const ticketOfDraft = async (
-    draft: { headRef: string; title: string; body?: string },
-    prev?: PrRecord,
-    repo?: RepoRef,
-  ): Promise<string | undefined> => {
-    // A draft names no repository, so every repository's patterns apply to it.
-    const candidates = ticketCandidates(draft, ticketLinks(repo));
-    const kept = candidates.find((c) => c.key === prev?.ticket);
-    if (kept) {
-      return kept.key;
-    }
-
-    for (const { key, source } of candidates) {
-      if (!tracker || (await ensureTicket(key))) {
-        logger.info("pull request linked to ticket", {
-          headRef: draft.headRef,
-          ticket: key,
-          source,
-        });
-
-        return key;
-      }
-    }
-
-    return undefined;
-  };
-
-  const inferTicket = (pr: PullRequest, prev?: PrRecord) =>
-    ticketOfDraft({ headRef: pr.head.ref, title: pr.title, body: pr.body }, prev, pr.repo);
-
-  // Pull requests
-
-  const openPrs = (repo?: RepoRef) =>
-    [...prs.values()].filter((p) => p.state === "open" && (!repo || sameRepo(p.ref.repo, repo)));
-
-  const restack = async (repo: RepoRef) => {
-    const open = openPrs(repo);
-    for (const rec of open) {
-      const base = open.find((o) => o !== rec && o.headRef === rec.baseRef);
-      const next = base && prSubject(base.ref);
-      if (next === rec.stackedOn) {
-        continue;
-      }
-
-      const key = prSubject(rec.ref);
-      const updated: PrRecord = { ...rec };
-      if (next) {
-        updated.stackedOn = next;
-      } else {
-        delete updated.stackedOn;
-      }
-
-      prs.set(key, updated);
-      await store.upsertSubject("pr", key, updated);
-      await relink(
-        prNode(key),
-        "stacked_on",
-        rec.stackedOn ? prNode(rec.stackedOn) : undefined,
-        next ? prNode(next) : undefined,
-      );
-    }
-  };
-
-  const refreshPr = async (
-    ctx: Ctx,
-    ref: PrRef,
-    o: { baseline?: boolean; wait?: boolean; review?: string; verdict?: PrVerdict } = {},
-  ): Promise<void> => {
-    const known = prs.get(prSubject(ref));
-    let pr: PullRequest;
-    try {
-      pr = await vcs.getPullRequest(ref.repo, ref.number, { waitForMergeable: o.wait ?? false });
-    } catch (error) {
-      if (notFound(error)) {
-        logger.warn("pull request not found", { pr: prSubject(ref) });
-        return;
-      }
-
-      throw error;
-    }
-
-    const key = prSubject({ repo: pr.repo, number: pr.number });
-    const prev = prs.get(key) ?? known;
-    const open = pr.state === "open";
-    let checks = prev?.checks ?? [];
-    let links = new Map<string, { url: string; summary?: string }>();
-    let unresolved = prev?.unresolvedThreads ?? 0;
-    if (open) {
-      const [found, threads] = await Promise.all([
-        vcs.checks(pr.repo, pr.head.sha),
-        vcs.reviewThreads(pr.repo, pr.number),
-      ]);
-
-      checks = found.map((c) => ({ name: c.name, status: c.status }));
-      links = new Map(
-        found.map((c) => [c.name, { url: c.url, ...(c.summary ? { summary: c.summary } : {}) }]),
-      );
-
-      unresolved = threads.filter((t) => !t.resolved).length;
-    }
-
-    const person = vcsPeople.get(pr.author.login.toLowerCase());
-    const review = o.review ?? prev?.review;
-    const verdicts = o.verdict
-      ? [...(prev?.verdicts ?? []).filter((v) => v.actor !== o.verdict!.actor), o.verdict]
-      : prev?.verdicts;
-
-    const ticket = await inferTicket(pr, prev);
-    const rec: PrRecord = {
-      ref: { repo: pr.repo, number: pr.number },
-      title: pr.title,
-      url: pr.url,
-      headRef: pr.head.ref,
-      headSha: pr.head.sha,
-      baseRef: pr.base.ref,
-      draft: pr.draft,
-      state: pr.state,
-      // A finished pull request has no mergeability worth reporting.
-      mergeable: open ? pr.mergeable : (prev?.mergeable ?? pr.mergeable),
-      author: { login: pr.author.login, kind: pr.author.kind, ...(person ? { person } : {}) },
-      checks,
-      ci: ciOf(checks),
-      unresolvedThreads: unresolved,
-      ...(review ? { review } : {}),
-      ...(verdicts?.length ? { verdicts } : {}),
-      ...(ticket ? { ticket } : {}),
-      ...(prev?.stackedOn ? { stackedOn: prev.stackedOn } : {}),
-      updatedAt: clock.now().toISOString(),
-    };
-
-    // A pull request seen for the first time during a rescan sets the baseline instead of raising events.
-    if (open && (prev || !o.baseline)) {
-      if (rec.mergeable === "conflicting" && prev?.mergeable !== "conflicting") {
-        await synthetic(ctx, "pr.conflicted", rec, { base: rec.baseRef });
-      }
-
-      if (rec.ci === "failure" && prev?.ci !== "failure") {
-        const failed = checks.filter((c) => c.status === "failure");
-        await synthetic(ctx, "pr.ci_failed", rec, {
-          failing: failed.map((c) => c.name),
-          checks: failed.map((c) => ({
-            name: c.name,
-            ...links.get(c.name),
-          })),
-        });
-      }
-    }
-
-    prs.set(key, rec);
-    await store.upsertSubject("pr", key, rec);
-    await store.link(ROOT, prNode(key), "tracks");
-    await relink(
-      prNode(key),
-      "implements",
-      prev?.ticket ? ticketNode(prev.ticket) : undefined,
-      rec.ticket ? ticketNode(rec.ticket) : undefined,
-    );
-
-    await relink(
-      prNode(key),
-      "authored_by",
-      prev?.author.person ? personNode(prev.author.person) : undefined,
-      person ? personNode(person) : undefined,
-    );
-
-    await restack(rec.ref.repo);
-  };
-
-  // Who last worked on what
-
-  const refreshWorkers = async () => {
-    const latest = new Map<string, { at: string; person: string; done: boolean }>();
-    for (const item of await store.listItems()) {
-      // Answering a question on a ticket, or trying to unblock it, does not make the agent the one who worked on it.
-      if (
-        !item.subject ||
-        item.status === "queued" ||
-        item.kind === "asked" ||
-        item.kind === "unblock"
-      ) {
-        continue;
-      }
-
-      const key =
-        item.subject.type === "ticket"
-          ? item.subject.ref
-          : item.subject.type === "pr"
-            ? prs.get(item.subject.ref)?.ticket
-            : undefined;
-
-      const seen = key && latest.get(key);
-      if (key && (!seen || seen.at < item.updatedAt)) {
-        latest.set(key, { at: item.updatedAt, person: item.person, done: item.status === "done" });
-      }
-    }
-
-    workers.clear();
-    handedBack.clear();
-    for (const [key, v] of latest) {
-      workers.set(key, v.person);
-      if (v.done) {
-        handedBack.add(key);
-      }
-    }
-  };
-
-  // Events
-
-  const handle = async (ctx: Ctx, event: WorkflowEvent) => {
-    if (awaitsReview(event)) {
-      return;
-    }
-
-    const pr = event.subject.pr;
-    switch (event.type) {
-      case "pr.opened":
-      case "pr.comment":
-      case "pr.closed":
-      case "pr.merged":
-      case "pr.review_submitted": {
-        if (!pr) {
-          return;
-        }
-
-        const state = event.data["state"];
-        const review =
-          event.type === "pr.review_submitted" && typeof state === "string" && state !== "commented"
-            ? state
-            : undefined;
-
-        // A trusted reviewer's approval or request for changes replaces their earlier verdict.
-        const verdict: PrVerdict | undefined =
-          review &&
-          (review === "approved" || review === "changes_requested" || review === "dismissed") &&
-          event.data["untrusted"] !== true &&
-          event.actor.kind !== "automation"
-            ? { actor: event.actor.id, kind: event.actor.kind, state: review }
-            : undefined;
-
-        await refreshPr(ctx, pr, {
-          ...(review ? { review } : {}),
-          ...(verdict ? { verdict } : {}),
-        });
-
-        if (event.type === "pr.review_submitted" || event.type === "pr.comment") {
-          await recordFeedbackRequester(event, pr);
-        }
-
-        if (event.type === "pr.merged") {
-          for (const other of openPrs(pr.repo)) {
-            if (prSubject(other.ref) !== prSubject(pr)) {
-              await refreshPr(ctx, other.ref, { wait: true });
-            }
-          }
-        }
-
-        return;
-      }
-
-      case "ticket.created":
-      case "ticket.assigned":
-      case "ticket.moved":
-      case "ticket.commented":
-        if (event.subject.ticket) {
-          await refreshTicket(event.subject.ticket, event);
-          if (event.type === "ticket.commented") {
-            await recordCommentRequester(event.subject.ticket, event);
-          }
-        }
-
-        return;
-      case "doc.commented":
-        if (event.subject.doc) {
-          await touchDoc(event.subject.doc, event);
-        }
-
-        return;
-      default:
-        // Our own synthetic events and the ones for the engine only.
-        return;
-    }
-  };
-
-  const prune = async () => {
-    const cutoff = clock.now().getTime() - retentionMs;
-    const old = (at: string) => Date.parse(at) < cutoff;
-    for (const [key, p] of prs) {
-      if (p.state !== "open" && old(p.updatedAt)) {
-        prs.delete(key);
-        await store.unlink(ROOT, prNode(key), "tracks");
-      }
-    }
-
-    for (const [key, t] of tickets) {
-      if (((t.status && TERMINAL.has(t.status)) || t.goneAt) && old(t.updatedAt)) {
-        tickets.delete(key);
-        await store.unlink(ROOT, ticketNode(key), "tracks");
-      }
-    }
-
-    for (const [id, d] of docs) {
-      if (!docOpen(d) && old(d.touchedAt)) {
-        docs.delete(id);
-        await store.unlink(ROOT, docNode(id), "tracks");
-      }
-    }
-  };
-
-  const doRescan = async (ctx: Ctx) => {
-    const seen = new Set<string>();
-    for (const repo of repos) {
-      for (const listed of await vcs.listPullRequests(repo, { state: "open" })) {
-        const ref = { repo: listed.repo, number: listed.number };
-        seen.add(prSubject(ref));
-        await refreshPr(ctx, ref, { baseline: !prs.has(prSubject(ref)) });
-      }
-    }
-
-    // Stored as open, no longer listed: merged or closed while nobody was watching.
-    for (const rec of openPrs()) {
-      if (!seen.has(prSubject(rec.ref))) {
-        await refreshPr(ctx, rec.ref);
-      }
-    }
-
-    if (tracker) {
-      for (const rec of tickets.values()) {
-        if (!rec.goneAt && (!rec.status || !TERMINAL.has(rec.status))) {
-          await refreshTicket(rec.key);
-        }
-      }
-
-      for (const person of team.people) {
-        const id = person.identities?.tracker;
-        if (!id) {
-          continue;
-        }
-
-        for (const issue of await tracker.listIssues({ assignee: id, limit: 100 })) {
-          if (issue.status.canonical && TERMINAL.has(issue.status.canonical)) {
-            continue;
-          }
-
-          await saveTicket(toTicket(issue, tickets.get(issue.key)));
-        }
-      }
-    }
-
-    await prune();
-    await refreshWorkers();
-  };
-
-  const load = async () => {
-    for (const link of await store.queryLinks({ from: ROOT, relation: "tracks" })) {
-      const subject = await store.getSubject(link.to.type, link.to.ref);
-      if (link.to.type === "pr" && subject) {
-        prs.set(link.to.ref, subject.data as PrRecord);
-      } else if (link.to.type === "ticket" && subject) {
-        tickets.set(link.to.ref, subject.data as TicketRecord);
-      } else if (link.to.type === "doc" && subject) {
-        docs.set(link.to.ref, subject.data as DocRecord);
-      }
-    }
-
-    await refreshWorkers();
-  };
-
-  const toWorkflowPr = (p: PrRecord): WorkflowPr => ({
-    ref: p.ref,
-    title: p.title,
-    ...(p.url ? { url: p.url } : {}),
-    headRef: p.headRef,
-    baseRef: p.baseRef,
-    draft: p.draft,
-    state: p.state,
-    author: { ...p.author },
-    ...(p.verdicts?.length ? { verdicts: p.verdicts } : {}),
+  const ticketOps = createTickets(core);
+  const prOps = createPrs(core, ticketOps);
+  const requesters = createRequesters(core, ticketOps);
+  const { saveDoc, touchDoc } = createDocs(core);
+  const { refreshPr, ticketOfDraft } = prOps;
+  const { deliver, handle } = createEvents(core, {
+    ...ticketOps,
+    ...prOps,
+    ...requesters,
+    saveDoc,
+    touchDoc,
   });
+
+  const { refreshWorkers, doRescan, load } = createRescan(core, { ...ticketOps, ...prOps });
 
   let timer: Cancel | undefined;
   let running = false;
@@ -821,7 +109,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     onEvent: (h) => void handlers.push(h),
 
     async apply(event) {
-      const ctx: Ctx = { fresh: [] };
+      const ctx: RefreshCtx = { fresh: [] };
       await locked(async () => {
         await handle(ctx, event);
         await refreshWorkers();
@@ -831,7 +119,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     },
 
     async rescan() {
-      const ctx: Ctx = { fresh: [] };
+      const ctx: RefreshCtx = { fresh: [] };
       try {
         await locked(() => doRescan(ctx));
       } finally {
@@ -843,7 +131,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     refreshWorkers: () => locked(refreshWorkers),
 
     async catchUp() {
-      const ctx: Ctx = { fresh: [] };
+      const ctx: RefreshCtx = { fresh: [] };
       await locked(async () => {
         for (const repo of repos) {
           for (const listed of await vcs.listPullRequests(repo, { state: "open" })) {
@@ -905,7 +193,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     openDocs: (limit) =>
       [...docs.values()]
-        .filter(docOpen)
+        .filter((d) => docOpen(core, d))
         .toSorted((a, b) => Date.parse(b.touchedAt) - Date.parse(a.touchedAt))
         .slice(0, limit),
 
@@ -918,98 +206,16 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       return (i >= 0 ? team.repos[i]?.default_branch : undefined) ?? "main";
     },
 
-    stackedOn(repo, branch) {
-      // Everything above the branch, bottom first.
-      const out: PrRecord[] = [];
-      const queue = [branch];
-      while (queue.length > 0) {
-        const base = queue.shift()!;
-        for (const p of openPrs(repo)) {
-          if (p.baseRef === base && !out.includes(p)) {
-            out.push(p);
-            queue.push(p.headRef);
-          }
-        }
-      }
-
-      return out.map(toWorkflowPr);
-    },
+    stackedOn: (repo, branch) => stackedOn(core, repo, branch),
 
     personForRole(role) {
       const matches = team.people.filter((p) => p.role === role || p.extends?.includes(role));
       return matches.length === 1 ? matches[0]!.handle : undefined;
     },
 
-    currentWork(person): CurrentWork {
-      const mine = [...tickets.values()].filter(
-        (t) =>
-          t.assignee?.kind === "agent" &&
-          t.assignee.id === person &&
-          !(t.status && TERMINAL.has(t.status)),
-      );
-
-      const keys = new Set(mine.map((t) => t.key));
-      const prList = openPrs().filter(
-        (p) => p.author.person === person || (p.ticket !== undefined && keys.has(p.ticket)),
-      );
-
-      const refs = (key: string) =>
-        prList.filter((p) => p.ticket === key).map((p) => prSubject(p.ref));
-
-      return {
-        person,
-        tickets: mine.map((t) => ({
-          key: t.key,
-          title: t.title,
-          ...(t.status ? { status: t.status } : {}),
-          prs: refs(t.key),
-        })),
-        prs: prList.map((p) => ({
-          ref: prSubject(p.ref),
-          number: p.ref.number,
-          title: p.title,
-          ...(p.url ? { url: p.url } : {}),
-          state: p.state,
-          draft: p.draft,
-          ci: p.ci,
-          mergeable: p.mergeable,
-          unresolvedThreads: p.unresolvedThreads,
-          ...(p.review ? { review: p.review } : {}),
-          ...(p.ticket ? { ticket: p.ticket } : {}),
-          ...(p.stackedOn ? { stackedOn: p.stackedOn } : {}),
-        })),
-      };
-    },
+    currentWork: (person) => currentWork(core, person),
   };
 
   await load();
   return state;
-}
-
-/** A few lines for the agent's session context. */
-export function formatCurrentWork(work: CurrentWork): string {
-  if (work.tickets.length === 0 && work.prs.length === 0) {
-    return `${work.person} has no open tickets or pull requests.`;
-  }
-
-  const lines: string[] = [];
-  for (const t of work.tickets) {
-    lines.push(`Ticket ${t.key} (${t.status ?? "unknown"}): ${t.title}`);
-  }
-
-  for (const p of work.prs) {
-    const notes = [
-      p.draft ? "draft" : "",
-      `CI ${p.ci}`,
-      p.mergeable === "conflicting" ? "conflicts" : "",
-      p.unresolvedThreads > 0 ? `${p.unresolvedThreads} unresolved threads` : "",
-      p.review ? `review ${p.review}` : "",
-      p.ticket ? `for ${p.ticket}` : "",
-      p.stackedOn ? `stacked on ${p.stackedOn}` : "",
-    ].filter(Boolean);
-
-    lines.push(`PR ${p.ref}: ${p.title} (${notes.join(", ")})`);
-  }
-
-  return lines.join("\n");
 }

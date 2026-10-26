@@ -1,9 +1,6 @@
 import { isCollection, isMap, isScalar, isSeq, LineCounter, parseDocument, type Node } from "yaml";
 import { CONFIG_CODES } from "./codes.js";
-import type { ConfigIssue } from "./issues.js";
-
-export type Position = { line: number; column: number };
-export type LocatedIssue = ConfigIssue & { file: string; line: number; column: number };
+import type { ConfigIssue, ParsedYaml, Position } from "./types.js";
 
 /** These issues are about a key itself, so they point at the key rather than its value. */
 const KEY_CODES: string[] = [
@@ -11,12 +8,6 @@ const KEY_CODES: string[] = [
   CONFIG_CODES.peopleUnknownRepo,
   CONFIG_CODES.peopleInvalidGrantKey,
 ];
-
-export type ParsedYaml = {
-  value: unknown;
-  syntaxErrors: { message: string; position: Position }[];
-  locate: (issue: ConfigIssue) => Position;
-};
 
 export function parseYaml(text: string): ParsedYaml {
   const lineCounter = new LineCounter();

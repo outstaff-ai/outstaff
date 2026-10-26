@@ -7,40 +7,17 @@ import {
   scrubEnv,
   silentLogger,
   type Decision,
-  type Logger,
   type RunRequest,
   type Runtime,
-  type SecretSource,
   type RuntimeEvent,
   type UsageEvent,
 } from "@outstaff/core";
 import { renderedSkillNames } from "./layout.js";
-import { mapMessage, type MapState } from "./messages.js";
-import type { AgentSdkOptions } from "./options.js";
+import { mapMessage } from "./messages.js";
 import { permissionHook } from "./permissions.js";
 import { ALWAYS_DROPPED, CREDENTIAL_KEYS } from "./credentials.js";
 import { builtinToolNames, disallowedToolNames, OST_SERVER, ostServer } from "./tools.js";
-import type { QueryFn } from "./types.js";
-
-export interface AgentSdkRuntimeConfig {
-  options: AgentSdkOptions;
-  log?: Logger;
-
-  /** Replaces the SDK's `query`; for tests. */
-  query?: QueryFn;
-
-  /** Starting point for the Claude Code process environment. Defaults to the process environment. */
-  env?: Record<string, string | undefined>;
-
-  /** Where the runtime credential is read from (files first, then `env`). Defaults to `envSecretSource(env)`. */
-  secrets?: SecretSource;
-
-  /** Every secret key any adapter declares; removed from the child's environment. */
-  scrubKeys?: Iterable<string>;
-
-  /** The folder of secret files. Defaults to `OUTSTAFF_SECRETS_DIR` in `env`, then `/run/secrets/outstaff`. */
-  secretsDir?: string;
-}
+import type { AgentSdkRuntimeConfig, MapState, QueryFn } from "./types.js";
 
 const PROBE_MODEL = "haiku";
 

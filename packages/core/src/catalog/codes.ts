@@ -1,3 +1,5 @@
+import type { CatalogIssue } from "./types.js";
+
 /** Stable machine-readable codes for catalog problems. Never rename; add new ones. */
 export const CATALOG_CODES = {
   notFound: "catalog.not_found",
@@ -18,16 +20,6 @@ export const CATALOG_CODES = {
   notIterable: "catalog.not_iterable",
   frontMatterInvalid: "catalog.front_matter_invalid",
 } as const;
-
-export type CatalogCode = (typeof CATALOG_CODES)[keyof typeof CATALOG_CODES];
-
-export type CatalogIssue = {
-  code: string;
-  message: string;
-  file: string;
-  line: number;
-  column: number;
-};
 
 export function formatCatalogIssue(issue: CatalogIssue): string {
   return `${issue.file}:${issue.line}:${issue.column} ${issue.code}: ${issue.message}`;

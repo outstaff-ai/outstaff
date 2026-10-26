@@ -1,11 +1,9 @@
 import type { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
-import { toConfigIssues, type ConfigIssue } from "./issues.js";
-import type { TeamConfig } from "./schema.js";
+import { toConfigIssues } from "./issues.js";
+import type { AdapterPort, ConfigIssue, TeamConfig } from "./types.js";
 
 export const ADAPTER_PORTS = ["chat", "vcs", "runtime", "tracker", "knowledge", "avatars"] as const;
-
-export type AdapterPort = (typeof ADAPTER_PORTS)[number];
 
 const registry = new Map<string, z.ZodType>();
 const key = (port: AdapterPort, adapter: string) => `${port}:${adapter}`;

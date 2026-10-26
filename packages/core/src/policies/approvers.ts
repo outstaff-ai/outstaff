@@ -1,15 +1,5 @@
-import type { TeamConfig } from "../config/schema.js";
-
-/** Someone who submitted a review, as the host and the team know them. */
-export interface ApproverCandidate {
-  kind: "human" | "agent" | "automation";
-
-  /** A human's login on the code host, or an agent's handle. */
-  id: string;
-
-  /** A human the team trusts (listed in `humans`, or with write access when it lists none). Ignored for agents. */
-  trusted: boolean;
-}
+import type { TeamConfig } from "../config/types.js";
+import type { ApproverCandidate } from "./types.js";
 
 const same = (a: string | undefined, b: string) =>
   a !== undefined && a.toLowerCase() === b.toLowerCase();

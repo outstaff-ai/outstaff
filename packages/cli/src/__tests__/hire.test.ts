@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE } from "../../../core/src/testing/fixtures.js";
-import type { Context } from "../define.js";
+import type { Context } from "../types.js";
 import { run } from "../program.js";
 import { addPerson, removePerson } from "../teamfile.js";
 

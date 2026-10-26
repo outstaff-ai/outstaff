@@ -1,35 +1,22 @@
-export { buildIdentityPrompt, type IdentityInput, type IdentityRole } from "./identity.js";
+export { buildIdentityPrompt } from "./identity.js";
+export type { IdentityInput, IdentityRole } from "./types.js";
 export { agentLayout } from "./layout.js";
-export {
-  createWorkLoop,
-  linksIn,
-  type WorkConnection,
-  type WorkLoop,
-  type WorkLoopOptions,
-} from "./loop.js";
+export { createWorkLoop } from "./loop.js";
+export { linksIn } from "./links.js";
+export type { WorkConnection, WorkLoop, WorkLoopOptions } from "./loop.types.js";
 
 export { buildWorkPrompt } from "./prompt.js";
-export {
-  createSessionManager,
-  sessionKey,
-  type SessionManager,
-  type SessionStore,
-} from "./sessions.js";
+export { createSessionManager, sessionKey } from "./sessions.js";
+export type { SessionManager, SessionStore } from "./types.js";
 
-export {
-  createUsageReporter,
-  type UsageReporter,
-  type UsageReporterOptions,
-  type UsageThresholds,
-} from "./usage.js";
+export { createUsageReporter } from "./usage.js";
+export type { UsageReporter, UsageReporterOptions, UsageThresholds } from "./types.js";
 
-export {
-  StartupError,
-  loadToolsets,
-  prepareAgent,
-  type PreparedAgent,
-  type StartupOptions,
-} from "./startup.js";
+export { loadToolsets } from "./catalogs.js";
+export { StartupError } from "./startup-error.js";
+export { prepareAgent } from "./startup.js";
+export type { PreparedAgent, StartupOptions } from "./startup.types.js";
 
 export { agentRegistry } from "./registry.js";
-export { createChatRelay, type ChatOffice, type ChatRelay, type ChatRelayOptions } from "./chat.js";
+export { createChatRelay } from "./chat.js";
+export type { ChatOffice, ChatRelay, ChatRelayOptions } from "./chat.types.js";

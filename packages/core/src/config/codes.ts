@@ -46,5 +46,3 @@ export const CONFIG_CODES = {
   networkReservedToken: "network.reserved_token",
   rolesUnknownRole: "roles.unknown_role",
 } as const;
-
-export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];

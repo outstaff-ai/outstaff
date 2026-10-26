@@ -1,4 +1,5 @@
 import { PortError, type TeamConfig } from "@outstaff/core";
+import type { MentionGuard } from "./types.js";
 
 // A mention starts at an "@" that no word character, dot, slash, dash or "@" precedes (so not an email address, a URL
 // or a path), names a login, and is not continued by a word character or "@" (so not "@scope/pkg" or "a@b@c").
@@ -50,11 +51,6 @@ function codeRanges(text: string): [number, number][] {
   }
 
   return ranges;
-}
-
-export interface MentionGuard {
-  /** `text` with each teammate's `@handle` replaced by their name. Throws `invalid` for any other login. */
-  apply(text: string): string;
 }
 
 const norm = (s: string) => s.toLowerCase();

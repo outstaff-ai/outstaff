@@ -10,15 +10,8 @@ import { agentSdkOptions } from "../options.js";
 import { createAgentSdkRuntime } from "../runtime.js";
 import { toSdkTools } from "../tools.js";
 import { parseUsage } from "../messages.js";
-import {
-  assistant,
-  codePolicy,
-  fakeQuery,
-  init,
-  rateLimit,
-  result,
-  type Call,
-} from "../testing.js";
+import { assistant, codePolicy, fakeQuery, init, rateLimit, result } from "../testing.js";
+import type { Call } from "../types.js";
 
 const options = agentSdkOptions.parse({});
 const req = (o: Partial<RunRequest> = {}): RunRequest =>

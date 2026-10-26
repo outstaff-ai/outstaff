@@ -1,14 +1,7 @@
 import type { ChatSeed, InboundMessage } from "@outstaff/core/contracts";
 import type { ChatMessage } from "@outstaff/core";
-import type {
-  SlackEvent,
-  SlackFile,
-  SlackHomeView,
-  SlackMessage,
-  SlackSocket,
-  SlackUser,
-  SlackWeb,
-} from "../api.js";
+import type { SlackEvent, SlackFile, SlackMessage, SlackUser, SlackWeb } from "../api.js";
+import type { FakeSlack } from "./types.js";
 
 export const BOT_USER = "U-bot";
 export const BOT_TOKEN = "xoxb-test";
@@ -20,31 +13,6 @@ export function slackError(error: string): Error {
     code: "slack_webapi_platform_error",
     data: { ok: false, error },
   });
-}
-
-export interface FakeSlack {
-  web: SlackWeb;
-  socket: SlackSocket & { started: boolean };
-  seed: ChatSeed;
-
-  /** What a download from Slack's file host sees: the bytes of every file seeded, by file id. */
-  files: Map<string, { name: string; mimetype: string; data: Uint8Array }>;
-
-  /** The file host: serves the seeded files to the bot token only, like `url_private_download`. */
-  fetch: typeof fetch;
-
-  /** Every chat.postMessage, in order. */
-  posts: { channel: string; text: string; thread_ts?: string }[];
-  reactions: { channel: string; timestamp: string; name: string }[];
-  views: { user_id: string; view: SlackHomeView }[];
-  usersInfoCalls: string[];
-  users: Map<string, SlackUser>;
-
-  /** Deliver a raw Events API event to the adapter and wait for it to finish. */
-  emit(event: SlackEvent): Promise<void>;
-
-  /** A message from `user` in a direct channel, as Slack delivers it. */
-  directMessage(user: string, text: string, extra?: Partial<SlackEvent>): Promise<void>;
 }
 
 /** A stateful stand-in for Slack's Web API and Socket Mode, enough for the chat contract kit. */

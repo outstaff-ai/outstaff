@@ -1,53 +1,53 @@
 import { createPublicKey, verify } from "node:crypto";
 import { BareRepo } from "./git.ts";
 import type { Req, Route } from "./http.ts";
+import type {
+  RequiredChecksData,
+  RestCheckRun,
+  RestEvent,
+  RestIssueComment,
+  RestPull,
+  RestReview,
+  RestReviewComment,
+  ThreadNode,
+  ThreadsData,
+} from "../../integrations/vcs/github/src/api.types.ts";
+import type {
+  StoredIssueComment,
+  StoredReview,
+  StoredThread as FakeStoredThread,
+  StoredThreadComment,
+} from "../../integrations/vcs/github/src/testing/types.ts";
 
 /**
  * The parts of GitHub the vcs adapter and git use: the App and installation endpoints, pull requests, reviews,
  * review threads (GraphQL), the events feed, and a smart-HTTP git remote. State is in memory; the repository is real.
  */
 
-interface Pr {
-  number: number;
-  title: string;
-  body: string;
-  login: string;
-  head: string;
-  base: string;
-  lastSha: string;
+/** A pull request: `head` and `base` are branch names, the head commit is read from the repository. */
+type StoredPull = Pick<RestPull, "number" | "title" | "state"> &
+  Required<Pick<RestPull, "merged" | "draft">> & {
+    body: NonNullable<RestPull["body"]>;
+    login: NonNullable<RestPull["user"]>["login"];
+    head: RestPull["head"]["ref"];
+    base: RestPull["base"]["ref"];
+    lastSha: RestPull["head"]["sha"];
 
-  /** Pushes that did not build on the previous head. */
-  forcePushes: number;
+    /** Pushes that did not build on the previous head. */
+    forcePushes: number;
 
-  /** Top-level comments on the conversation. */
-  conversation: { id: number; seq: number; author: string; body: string; at: string }[];
-  state: "open" | "closed";
-  merged: boolean;
-  draft: boolean;
-  updatedAt: string;
+    /** Top-level comments on the conversation. */
+    conversation: (Pick<RestIssueComment, "id"> &
+      Omit<StoredIssueComment, "prNumber"> & { seq: number })[];
+    updatedAt: RestPull["updated_at"];
 
-  /** Taken into the merge queue by `merge-async`; the stub then merges it as the host's queue would. */
-  queued?: boolean;
-}
+    /** Taken into the merge queue by `merge-async`; the stub then merges it as the host's queue would. */
+    queued?: boolean;
+  };
 
-interface Thread {
-  id: string;
-  prNumber: number;
-  resolved: boolean;
-  path: string | undefined;
-  line: number | undefined;
-  comments: { id: string; databaseId: number; seq: number; author: string; body: string }[];
-}
-
-interface Review {
-  prNumber: number;
-  author: string;
-  state: string;
-  body: string;
-  at: string;
-  commitId: string;
-  comments: { databaseId: number; path: string; line: number; body: string }[];
-}
+type StoredThread = Omit<FakeStoredThread, "comments"> & {
+  comments: (StoredThreadComment & { seq: number })[];
+};
 
 type Json = Record<string, any>; // oxlint-disable-line no-explicit-any
 
@@ -78,10 +78,10 @@ export function createGithub(opts: GithubOptions) {
   const { repo } = opts;
   const full = `${repo.owner}/${repo.name}`;
   const key = createPublicKey(opts.publicKey);
-  const prs = new Map<number, Pr>();
-  const threads = new Map<string, Thread>();
-  const reviews = new Map<number, Review>();
-  const events: Json[] = [];
+  const prs = new Map<number, StoredPull>();
+  const threads = new Map<string, StoredThread>();
+  const reviews = new Map<number, StoredReview>();
+  const events: RestEvent[] = [];
   const tokens = new Map<string, { slug: string; write: boolean }>();
   let eventId = 1000;
   let threadId = 0;
@@ -137,7 +137,7 @@ export function createGithub(opts: GithubOptions) {
     return t ? `${t.slug}[bot]` : undefined;
   };
 
-  const rest = async (pr: Pr) => {
+  const rest = async (pr: StoredPull) => {
     const sha = (await repo.sha(pr.head)) ?? pr.lastSha;
     const open = pr.state === "open";
     const clean = open ? await repo.mergeable(pr.base, pr.head) : undefined;
@@ -160,7 +160,7 @@ export function createGithub(opts: GithubOptions) {
     };
   };
 
-  const prPayload = async (pr: Pr, action: string) => {
+  const prPayload = async (pr: StoredPull, action: string) => {
     const r = await rest(pr);
     return {
       action,
@@ -175,7 +175,7 @@ export function createGithub(opts: GithubOptions) {
     };
   };
 
-  const toNode = (t: Thread) => ({
+  const toNode = (t: StoredThread): ThreadNode => ({
     id: t.id,
     isResolved: t.resolved,
     path: t.path ?? null,
@@ -203,14 +203,14 @@ export function createGithub(opts: GithubOptions) {
    * still pending, and the review itself only when it is submitted.
    */
   async function submitReview(
-    pr: Pr,
+    pr: StoredPull,
     actor: string,
     event: string,
     body: string,
     comments?: Json[],
   ): Promise<number> {
     const id = ++reviewId;
-    const review: Review = {
+    const review: StoredReview = {
       prNumber: pr.number,
       author: actor,
       state: REVIEW_STATE[event] ?? event,
@@ -280,7 +280,7 @@ export function createGithub(opts: GithubOptions) {
     }
   }
 
-  const need = (n: string | number): Pr | undefined => prs.get(Number(n));
+  const need = (n: string | number): StoredPull | undefined => prs.get(Number(n));
   const notFound = { status: 404, body: { message: "Not Found" } };
 
   const graphql = (req: Req) => {
@@ -291,15 +291,15 @@ export function createGithub(opts: GithubOptions) {
         .filter((t) => t.prNumber === variables["number"])
         .map(toNode);
 
-      return {
-        data: {
-          repository: {
-            pullRequest: {
-              reviewThreads: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
-            },
+      const data: ThreadsData = {
+        repository: {
+          pullRequest: {
+            reviewThreads: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
           },
         },
       };
+
+      return { data };
     }
 
     if (query.includes("addPullRequestReviewThreadReply")) {
@@ -333,25 +333,25 @@ export function createGithub(opts: GithubOptions) {
 
     if (query.includes("statusCheckRollup")) {
       // No check is required in this repository.
-      return {
-        data: {
-          repository: {
-            pullRequest: {
-              commits: {
-                nodes: [
-                  {
-                    commit: {
-                      statusCheckRollup: {
-                        contexts: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
-                      },
+      const data: RequiredChecksData = {
+        repository: {
+          pullRequest: {
+            commits: {
+              nodes: [
+                {
+                  commit: {
+                    statusCheckRollup: {
+                      contexts: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
                     },
                   },
-                ],
-              },
+                },
+              ],
             },
           },
         },
       };
+
+      return { data };
     }
 
     if (query.includes("mergeQueue(")) {
@@ -378,7 +378,7 @@ export function createGithub(opts: GithubOptions) {
   };
 
   const pulls = `${API}/repos/${full}/pulls`;
-  const checkRuns = new Map<string, { name: string }[]>();
+  const checkRuns = new Map<string, RestCheckRun[]>();
   const routes: Route[] = [
     {
       method: "GET",
@@ -503,7 +503,7 @@ export function createGithub(opts: GithubOptions) {
           return { status: 422, body: { message: `Head ref ${b.head} does not exist.` } };
         }
 
-        const pr: Pr = {
+        const pr: StoredPull = {
           number: prs.size + 1,
           title: b.title,
           body: b.body ?? "",
@@ -593,7 +593,7 @@ export function createGithub(opts: GithubOptions) {
           return notFound;
         }
 
-        return review.comments.map((c) => ({
+        return review.comments.map((c): RestReviewComment => ({
           id: c.databaseId,
           path: c.path,
           line: c.line,
@@ -630,7 +630,7 @@ export function createGithub(opts: GithubOptions) {
       handler: (r) => {
         const pr = need(r.params["n"]!);
         return pr
-          ? pr.conversation.map((c) => ({
+          ? pr.conversation.map((c): RestIssueComment => ({
               id: c.id,
               user: { login: c.author },
               body: c.body,
@@ -649,7 +649,7 @@ export function createGithub(opts: GithubOptions) {
         return pr
           ? [...reviews]
               .filter(([, v]) => v.prNumber === pr.number)
-              .map(([id, v]) => ({
+              .map(([id, v]): RestReview => ({
                 id,
                 user: { login: v.author },
                 body: v.body,

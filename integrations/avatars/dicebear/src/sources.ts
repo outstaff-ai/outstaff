@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { PortError, type AdapterContext, type Avatars } from "@outstaff/core";
-import type { DirectoryOptions, UrlOptions } from "./options.js";
+import type { DirectoryOptions, UrlOptions } from "./types.js";
 
 const EXTENSIONS = [
   ["png", "image/png"],

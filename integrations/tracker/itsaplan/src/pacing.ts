@@ -1,7 +1,4 @@
-export interface Clock {
-  now: () => number;
-  sleep: (ms: number) => Promise<void>;
-}
+import type { Clock } from "./types.js";
 
 export const realClock: Clock = {
   now: () => Date.now(),

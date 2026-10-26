@@ -1,20 +1,5 @@
-import {
-  networkGrants,
-  type AdapterDefinition,
-  type SecretSpec,
-  type TeamConfig,
-} from "@outstaff/core";
-
-export type Scope = "person" | "office";
-
-// Definitions with different option types live in one list.
-// oxlint-disable-next-line no-explicit-any
-export type AnyDef = AdapterDefinition<any, any, any>;
-
-export interface Section {
-  title: string;
-  specs: SecretSpec[];
-}
+import { networkGrants, type SecretSpec, type TeamConfig } from "@outstaff/core";
+import type { AnyDef, Scope, Section } from "./types.js";
 
 export const tokenKey = (handle: string) =>
   `OUTSTAFF_AGENT_TOKEN_${handle.toUpperCase().replaceAll("-", "_")}`;

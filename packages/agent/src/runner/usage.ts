@@ -1,44 +1,6 @@
-import { silentLogger, type Logger, type Runtime, type UsageEvent } from "@outstaff/core";
+import { silentLogger, type UsageEvent } from "@outstaff/core";
 import { systemClientClock, type ClientClock } from "../office-client/index.js";
-
-export interface UsageThresholds {
-  defer_scheduled_at: number;
-  pause_automatic_at: number;
-}
-
-export interface UsageReporterOptions {
-  /** Sends the windows to the office. */
-  send(windows: UsageEvent["windows"]): Promise<void>;
-
-  /** The runtime to probe while idle; without `probeUsage` only runtime events are forwarded. */
-  runtime?: Pick<Runtime, "probeUsage">;
-
-  /** The team's usage thresholds: crossing one is reported at once. */
-  thresholds?: UsageThresholds;
-
-  /** Least time between two reports that do not cross a threshold. Default 60000. */
-  minIntervalMs?: number;
-
-  /** Time between idle probes. Default 600000. */
-  probeEveryMs?: number;
-  clock?: ClientClock;
-  log?: Logger;
-}
-
-export interface UsageReporter {
-  /** A usage event from a running item: sent now, or held until the next send or `flush`. */
-  observe(event: UsageEvent): void;
-
-  /** Sends the newest held report, if any. */
-  flush(): void;
-
-  /** The loop tells whether an item is running; probes only happen while idle. */
-  setBusy(busy: boolean): void;
-
-  /** Probes now and then every `probeEveryMs` while idle. */
-  start(): void;
-  stop(): void;
-}
+import type { UsageThresholds, UsageReporterOptions, UsageReporter } from "./types.js";
 
 const DEFAULT_THRESHOLDS: UsageThresholds = { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 };
 

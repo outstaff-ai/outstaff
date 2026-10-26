@@ -4,7 +4,6 @@ import { defineCommand } from "../define.js";
 import {
   allStockFiles,
   baseFile,
-  openTeam,
   tryIndex,
   resolveTarget,
   sha256,
@@ -12,6 +11,7 @@ import {
   writeFileDeep,
   writeIndex,
 } from "../ejected.js";
+import { openTeam } from "../open-team.js";
 
 export const eject = defineCommand({
   name: "eject",

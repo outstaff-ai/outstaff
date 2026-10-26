@@ -5,18 +5,7 @@ import { nodeSqliteDialect } from "./dialects/sqlite.js";
 import { migrationProvider } from "./migrations/index.js";
 import type { Database } from "./schema.js";
 import { createSqlStore } from "./sql-store.js";
-import type { Store } from "./types.js";
-
-export interface OpenStoreOptions {
-  /** Run pending migrations on open. Default true. */
-  migrate?: boolean;
-
-  /** Postgres only: keep tables in this schema (created if missing). */
-  schema?: string;
-
-  /** Clock override, for tests. */
-  now?: () => Date;
-}
+import type { OpenStoreOptions, Store } from "./types.js";
 
 /**
  * `postgres://…` / `postgresql://…`, `sqlite:///abs/path.db` (or `sqlite://relative.db`),

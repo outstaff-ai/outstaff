@@ -1,13 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { renderPerson, type RenderPersonOptions, type RenderedWorkdir } from "./render.js";
-
-export type RenderToDirOptions = RenderPersonOptions & {
-  out: string;
-
-  /** Write into a non-empty directory. Existing files with the same path are overwritten. */
-  force?: boolean;
-};
+import { renderPerson } from "./render.js";
+import type { RenderedWorkdir, RenderToDirOptions } from "./types.js";
 
 /** Renders a person and writes the files below `out`. */
 export function renderToDir(options: RenderToDirOptions): RenderedWorkdir {

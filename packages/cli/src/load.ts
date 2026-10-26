@@ -1,26 +1,7 @@
 import { relative } from "node:path";
-import {
-  loadTeamConfig,
-  parseYaml,
-  type ConfigIssue,
-  type ConfigSource,
-  type LocatedIssue,
-  type TeamConfig,
-} from "@outstaff/core";
+import { loadTeamConfig, parseYaml, type ConfigIssue, type LocatedIssue } from "@outstaff/core";
 import { readFileSync } from "node:fs";
-import type { Context, GlobalOptions } from "./define.js";
-
-export type Loaded =
-  | {
-      ok: true;
-      config: TeamConfig;
-      source: ConfigSource;
-
-      /** The team file as written, parsed; tells a value the team set from a default. */
-      raw: unknown;
-      locate: (issue: ConfigIssue) => LocatedIssue;
-    }
-  | { ok: false; issues: LocatedIssue[] };
+import type { Context, GlobalOptions, Loaded } from "./types.js";
 
 export async function loadTeam(ctx: Context, options: GlobalOptions): Promise<Loaded> {
   const result = await loadTeamConfig({

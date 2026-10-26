@@ -18,8 +18,8 @@ import { createAgentAuth } from "../../../office/src/protocol/auth.js";
 import { createProtocolServer } from "../../../office/src/protocol/server.js";
 import { createFakeSource } from "../../../office/src/protocol/testing.js";
 import { systemClock } from "../../../office/src/clock.js";
-import type { AnyDef } from "../commands/setup-template.js";
-import type { Context } from "../define.js";
+import type { AnyDef } from "../commands/types.js";
+import type { Context } from "../types.js";
 import { run } from "../program.js";
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-doctor-")));

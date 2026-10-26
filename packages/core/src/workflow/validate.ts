@@ -1,20 +1,13 @@
 import { CONFIG_CODES } from "../config/codes.js";
-import type { ConfigIssue } from "../config/issues.js";
-import { presetRules, type WorkflowPreset } from "./presets.js";
-import type { Action, RuleInput } from "./rules.js";
+import type { ConfigIssue } from "../config/types.js";
+import { presetRules } from "./presets.js";
 import {
   BUILTIN_TEMPLATES,
   TEMPLATE_VARIABLES,
   TemplateError,
   templatePlaceholders,
 } from "./template.js";
-
-export interface WorkflowConfigShape {
-  preset: WorkflowPreset;
-  statuses?: Partial<Record<string, string>> | undefined;
-  rules?: unknown[] | undefined;
-  templates?: Record<string, string> | undefined;
-}
+import type { Action, RuleInput, WorkflowConfigShape } from "./types.js";
 
 function templateOf(a: Action): string | undefined {
   if ("comment" in a) {

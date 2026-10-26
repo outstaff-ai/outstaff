@@ -28,7 +28,8 @@ import {
 } from "@outstaff/core/fakes";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "../../clock.js";
-import { createOffice, type Office } from "../../office.js";
+import { createOffice } from "../../office.js";
+import type { Office } from "../../office.types.js";
 import { PENDING_REPORT_SUBJECT } from "../pending.js";
 import { openStore, type Store } from "../../store/index.js";
 

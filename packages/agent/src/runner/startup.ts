@@ -1,178 +1,32 @@
-import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
-import { delimiter, dirname, join, resolve } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import {
   PROFILE_SPECS,
   artifactsDir,
   policyOn,
-  buildPolicy,
   effectiveTools,
   envSecretSource,
   grantTokenKeys,
   networkGrants,
-  formatCatalogIssue,
   formatIssue,
-  loadCatalog,
   loadTeamConfig,
-  loadToolset,
-  renderPerson,
   silentLogger,
-  teamCommandsToPack,
-  toolsetToPack,
-  toolsToPacks,
-  CatalogError,
-  RenderError,
-  type AdapterRegistry,
   type Capability,
-  type Catalog,
-  type Logger,
-  type Policy,
-  type RenderedWorkdir,
-  type RulePack,
   type Runtime,
-  type SecretSource,
-  type TeamConfig,
-  type Toolset,
 } from "@outstaff/core";
-import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
-import {
-  syncRepositories,
-  createWorkspaces,
-  type ClonedRepo,
-  type SyncRepositoriesOptions,
-} from "../repos/index.js";
-import { installTools, type MiseRunner, type ToolStatus } from "../tools/index.js";
+import { createOfficeConnection } from "../office-client/index.js";
+import type { StartupOptions, PreparedAgent } from "./startup.types.js";
+import { syncRepositories, createWorkspaces, type ClonedRepo } from "../repos/index.js";
+import type { ToolStatus } from "../tools/index.js";
 import { createAgentEnv } from "../verbs/env.js";
-import type { AgentEnv } from "../verbs/types.js";
 import { buildIdentityPrompt } from "./identity.js";
-import { createChatRelay, type ChatRelay } from "./chat.js";
-import { createProfilePublisher, type ProfilePublisher } from "./profile.js";
 import { agentLayout } from "./layout.js";
-import { createWorkLoop, type WorkLoop } from "./loop.js";
-import { createUsageReporter, type UsageReporter } from "./usage.js";
-
-export interface StartupOptions {
-  /** The container environment: OUTSTAFF_PERSON, OUTSTAFF_OFFICE_URL and the team location variables. */
-  env: NodeJS.ProcessEnv;
-
-  /** The agent's home directory; the working files render into `<home>/work`. */
-  home: string;
-  registry: AdapterRegistry;
-
-  /** Root of the installed stock catalog package. */
-  stockCatalogDir: string;
-  agentVersion: string;
-  cwd?: string;
-
-  /** Defaults to `envSecretSource(env)`. */
-  secrets?: SecretSource;
-  log?: Logger;
-
-  /** Milliseconds between usage probes while idle. Default 600000 (10 minutes). */
-  usageProbeEveryMs?: number;
-
-  /** Replaces the WebSocket connection (tests only). */
-  connection?: OfficeConnection;
-
-  /** Overrides for cloning: the remote of each repo, the credential helper command, the git runner (tests only). */
-  repositories?: Pick<SyncRepositoriesOptions, "remoteUrl" | "helper" | "git">;
-
-  /** Overrides for tool installation: the mise runner and what to do with the shims directory (tests only). */
-  tools?: { mise?: MiseRunner; addToPath?: (shimsDir: string) => void };
-}
-
-export interface PreparedAgent {
-  person: string;
-  team: TeamConfig;
-  connection: OfficeConnection;
-  loop: WorkLoop;
-
-  /** Forwards usage to the office. Not started by `prepareAgent`: call `start()` once connected. */
-  usage: UsageReporter;
-  env: AgentEnv;
-  runtime: Runtime;
-  rendered: RenderedWorkdir;
-  policy: Policy;
-  systemPrompt: string;
-  workdir: string;
-
-  /** The repos cloned for the person, one per grant. */
-  repos: ClonedRepo[];
-
-  /** The declared tools and whether each is available. */
-  tools: ToolStatus[];
-
-  /** Listens on the agent's own chat identity; absent when the team has no chat or it cannot start. */
-  chat?: ChatRelay;
-}
-
-/** Why the agent cannot start, in words an operator can act on. */
-export class StartupError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "StartupError";
-  }
-}
-
-const present = (env: NodeJS.ProcessEnv, key: string): string => {
-  const v = env[key];
-  if (!v) {
-    throw new StartupError(`${key} is not set.`);
-  }
-
-  return v;
-};
-
-function loadCatalogs(
-  stockDir: string,
-  team: TeamConfig,
-  teamDir: string,
-): { stock: Catalog; ejected?: Catalog } {
-  try {
-    const stock = loadCatalog(stockDir);
-    const dir = resolve(teamDir, team.catalog.path);
-    const ejected =
-      existsSync(dir) && statSync(dir).isDirectory()
-        ? loadCatalog(dir, { version: team.catalog.version })
-        : undefined;
-
-    return { stock, ...(ejected ? { ejected } : {}) };
-  } catch (e) {
-    if (e instanceof CatalogError) {
-      throw new StartupError(
-        `The catalog cannot be loaded:\n${e.issues.map(formatCatalogIssue).join("\n")}`,
-      );
-    }
-
-    throw e;
-  }
-}
-
-/** The toolsets of a role and the roles it extends, in the order they apply, from the stock catalog's `toolsets/`. */
-export function loadToolsets(
-  stockCatalogDir: string,
-  roles: Record<string, { toolset?: string | undefined } | undefined>,
-  role: string,
-  extended: string[],
-): Toolset[] {
-  const names = [...new Set([role, ...extended].map((r) => roles[r]?.toolset).filter((t) => t))];
-  const toolsets: Toolset[] = [];
-  for (const name of names as string[]) {
-    const file = join(stockCatalogDir, "toolsets", `${name}.yaml`);
-    if (existsSync(file)) {
-      toolsets.push(loadToolset(file));
-    }
-  }
-
-  return toolsets;
-}
-
-/** The runtime starts its children with the process environment, so the shims go on this process's PATH. */
-function addToPath(shimsDir: string): void {
-  const parts = (process.env["PATH"] ?? "").split(delimiter);
-  if (!parts.includes(shimsDir)) {
-    process.env["PATH"] = [shimsDir, ...parts].filter(Boolean).join(delimiter);
-  }
-}
+import { createWorkLoop } from "./loop.js";
+import { createUsageReporter } from "./usage.js";
+import { loadCatalogs, loadToolsets } from "./catalogs.js";
+import { startChat } from "./startup-chat.js";
+import { StartupError, present } from "./startup-error.js";
+import { buildPolicies, installDeclaredTools, renderWorkdir } from "./startup-steps.js";
 
 /**
  * Everything the agent needs before it takes work: the team, the person's rendered working files, the permission
@@ -227,28 +81,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   // Working files: stock catalog plus the team's ejected one, laid out the way the runtime expects them.
   const catalogs = loadCatalogs(opts.stockCatalogDir, team, source.dir);
   let toolStatuses: ToolStatus[] = [];
-  let rendered: RenderedWorkdir;
-  try {
-    rendered = renderPerson({
-      team,
-      handle: person,
-      workdir: layout.workDir,
-      catalog: catalogs.stock,
-      ...(catalogs.ejected ? { ejected: catalogs.ejected } : {}),
-    });
-  } catch (e) {
-    if (e instanceof RenderError) {
-      throw new StartupError(
-        `The working files cannot be rendered:\n${e.issues.map(formatCatalogIssue).join("\n")}`,
-      );
-    }
-
-    throw e;
-  }
-
-  for (const w of rendered.warnings) {
-    log.warn(w.message);
-  }
+  const rendered = renderWorkdir(team, person, layout.workDir, catalogs, log);
 
   const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
   const role = roles[me.role];
@@ -257,24 +90,8 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   // Person beats team beats toolset. Installing a tool allows nothing; its `allow` becomes policy rules below.
   const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });
   if (tools.length > 0) {
-    const installed = await installTools({
-      tools,
-      home: opts.home,
-      env: opts.env,
-      log,
-      ...(opts.tools?.mise ? { mise: opts.tools.mise } : {}),
-    });
-
-    toolStatuses = installed.statuses;
-    const unavailable = toolStatuses.filter((x) => x.state === "unavailable");
-    if (unavailable.length > 0) {
-      throw new StartupError(
-        `Tools declared for ${person} are not usable:\n${unavailable.map((t) => t.error ?? `${t.name}@${t.version} could not be installed`).join("\n")}\nFix the declaration or the egress to the tool sources and restart.`,
-      );
-    }
-
+    toolStatuses = await installDeclaredTools(opts, tools, person, log);
     env.tools = toolStatuses;
-    (opts.tools?.addToPath ?? addToPath)(installed.shimsDir);
   }
 
   const runtimeRef = team.integrations.runtime;
@@ -350,35 +167,14 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     now: () => new Date(),
   })) as Runtime;
 
-  const packs: RulePack[] = [...opts.registry.rulePacks("person", team)];
-  for (const ts of toolsets) {
-    packs.push(toolsetToPack(ts));
-  }
-
-  packs.push(...toolsToPacks(tools));
-
-  const teamPack = teamCommandsToPack(team.policies?.commands);
-  if (teamPack) {
-    packs.push(teamPack);
-  }
-
-  const policy = buildPolicy({
-    profile: rendered.profile,
-    person: me,
+  const { policy, chatPolicy } = buildPolicies(opts, {
+    rendered,
+    me,
     team,
     layout,
-    packs,
+    toolsets,
+    tools,
     capabilities,
-  });
-
-  // Chat sessions run beside the active item, so they get a profile that cannot change its repositories.
-  const chatPolicy = buildPolicy({
-    profile: "chat",
-    packsOf: rendered.profile,
-    person: me,
-    team,
-    layout,
-    packs,
   });
 
   const systemPrompt = buildIdentityPrompt({
@@ -404,42 +200,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     log,
   });
 
-  let chat: ChatRelay | undefined;
-  let profile: ProfilePublisher | undefined;
-  const chatPort = env.chat;
-  if (chatPort?.setAgentProfile && policyOn(team.policies, "chat.profile")) {
-    profile = createProfilePublisher({
-      chat: { ...chatPort, setAgentProfile: chatPort.setAgentProfile.bind(chatPort) },
-      office: connection,
-      team,
-      who: {
-        name: me.name,
-        role: role?.title ?? me.role,
-        ...(role?.summary ? { description: role.summary } : {}),
-        ...(model ? { model } : {}),
-      },
-      log,
-      ...(env.tracker ? { tracker: env.tracker } : {}),
-    });
-  }
-
-  if (env.chat) {
-    chat = createChatRelay({
-      ...(profile ? { profile } : {}),
-      chat: env.chat,
-      office: connection,
-      team,
-      person,
-      log,
-      ...(env.tracker ? { tracker: env.tracker } : {}),
-    });
-
-    // Reports the office queued while this agent was offline are posted by the agent when it connects.
-    const relay = chat;
-    connection.onReports?.((reports) => void relay.postQueued(reports));
-  } else if (env.unavailable?.chat) {
-    log.warn("chat requests are off", { reason: env.unavailable.chat });
-  }
+  const { chat, profile } = startChat(connection, { env, team, me, role, model, person, log });
 
   const loop = createWorkLoop({
     ...(profile ? { profile } : {}),

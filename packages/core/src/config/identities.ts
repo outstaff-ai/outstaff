@@ -1,9 +1,6 @@
-import type { TeamConfig } from "./schema.js";
-import type { ConfigWarning } from "./validate.js";
+import type { ConfigWarning, IdentityRef, TeamConfig } from "./types.js";
 
 type Kind = "vcs" | "tracker" | "chat" | "email";
-
-export type IdentityRef = { path: (string | number)[]; subject: string; value: string };
 
 /** Every `identities.<kind>` value in the team, humans first, with the path where it is written. */
 export function identitiesOf(

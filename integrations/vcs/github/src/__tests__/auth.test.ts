@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { AppAuth, REFRESH_MARGIN_MS, type AppCredentials } from "../auth.js";
+import { AppAuth, REFRESH_MARGIN_MS } from "../auth.js";
 import { GithubHttp } from "../http.js";
 import { clock, expectPortError, ORIGIN, REPO } from "../testing/harness.js";
-import { createStubFetch, type Route } from "../testing/http-stub.js";
+import { createStubFetch } from "../testing/http-stub.js";
 import { testKey } from "../testing/keys.js";
+import type { Route } from "../testing/types.js";
+import type { AppCredentials } from "../types.js";
 
 function setup(routes: Route[], creds: Partial<AppCredentials> = {}) {
   const c = clock();

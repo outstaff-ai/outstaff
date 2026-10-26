@@ -9,7 +9,8 @@ import {
 import { join } from "node:path";
 import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
-import { hasConflictMarkers, tryIndex } from "../ejected.js";
+import { tryIndex } from "../ejected.js";
+import { hasConflictMarkers } from "../merge.js";
 import { loadTeam } from "../load.js";
 
 export const build = defineCommand({

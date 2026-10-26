@@ -1,188 +1,16 @@
-import { silentLogger, type Logger, type TeamConfig } from "@outstaff/core";
-import type { Clock } from "../clock.js";
-import type { NewWorkItem, Run, Store, WorkItem } from "../store/types.js";
-import {
-  CHAT_KIND,
-  DEFAULT_RETRY,
-  HOUR_MS,
-  backoffMs,
-  isLoopGuarded,
-  loopGuardVerdict,
-  orderQueue,
-  planMove,
-  priorityFor,
-  staleVerdict,
-  trailingStale,
-  usageVerdict,
-  type MoveTarget,
-  type RunBlock,
-  type UsageWindow,
-} from "./policy.js";
-
-export interface UsageSource {
-  /** Current 5h / 7d utilization for the runtime account the person uses. */
-  windows(person: string): Promise<UsageWindow[]>;
-}
-
-export interface SchedulerOptions {
-  store: Store;
-  team: Pick<TeamConfig, "policies">;
-  clock: Clock;
-  logger?: Logger;
-  usage?: UsageSource;
-
-  /** Minutes without a heartbeat before an active item is stale. Default 10. */
-  staleAfterMinutes?: number;
-
-  /** Interval of the background tick started by `start()`. Default 60 seconds. */
-  tickIntervalMs?: number;
-}
-
-export type Placement = "next" | "last" | { before: string } | { after: string };
-
-export interface EnqueueInput extends Omit<NewWorkItem, "position"> {
-  /**
-   * Where the item goes among the person's queued items. Default: the priority
-   * class decides.
-   */
-  placement?: Placement;
-
-  /**
-   * Runs once the item exists and before anything can start it, so an offer never goes out without what this
-   * stores for the item (its chat origin, its feedback).
-   */
-  init?: (item: WorkItem) => Promise<void>;
-}
-
-export type StartResult =
-  | { started: true; item: WorkItem; run: Run }
-  | {
-      started: false;
-      reason: "not_queued" | "busy" | "backoff" | RunBlock["code"] | "loop_guard";
-      detail: string;
-
-      /** Set when the attempt blocked the item (loop guard). */
-      blocked?: BlockNotice;
-    };
-
-export interface BlockNotice {
-  item: WorkItem;
-  reason: string;
-  code: "loop_guard" | "stale" | "failures" | "manual";
-}
-
-export interface TickResult {
-  /** Stale items sent back to the queue for their one retry. */
-  retried: WorkItem[];
-
-  /** Failed items whose backoff ran out; they can be offered again. */
-  released: WorkItem[];
-
-  /** Items the tick blocked: stale twice, or tripped by the loop guard. */
-  blocked: BlockNotice[];
-}
-
-export interface FinishInput {
-  outcome: string;
-
-  /** What the item becomes. Default "done". */
-  status?: "done" | "waiting" | "queued" | "canceled";
-  error?: string;
-  usage?: unknown;
-}
-
-export interface FailResult {
-  item: WorkItem;
-
-  /** Set when this failure was the last one allowed and blocked the item. */
-  blocked?: BlockNotice;
-
-  /** When a queued item may run again. */
-  notBefore?: string;
-}
-
-export interface RetryRequest {
-  /** The human who asked. */
-  by: string;
-
-  /** What they did, for the journal and the log: "ticket moved", "PR comment", "chat reply". */
-  signal: string;
-}
-
-export interface PauseState {
-  team: { reason: string | null; since: string } | null;
-  people: Record<string, { reason: string | null; since: string }>;
-}
-
-export interface Scheduler {
-  enqueue(input: EnqueueInput): Promise<WorkItem>;
-
-  /**
-   * The item the person should run next, or null: while paused, and when every queued item is held back by a
-   * policy, a failure backoff, or a lane that is full (one work item at a time; chat sessions up to
-   * `policies.chat.parallel_sessions`, beside it). Does not change state.
-   */
-  next(person: string): Promise<WorkItem | null>;
-
-  /** Starts a run of a queued item (re-checks every policy). */
-  markActive(itemId: string): Promise<StartResult>;
-
-  /** Records activity so the item is not considered stale. */
-  heartbeat(itemId: string): Promise<void>;
-  finish(itemId: string, input: FinishInput): Promise<WorkItem>;
-
-  /**
-   * Ends the run as failed. The item goes back to the queue but is held back with exponential backoff; after
-   * `policies.retry.max_failures` failures in a row it is blocked instead.
-   */
-  fail(itemId: string, error: string): Promise<FailResult>;
-
-  /**
-   * Ends the run because the agent shut down. The item goes back to the front of the person's queue with its
-   * session and workspace. The run is no failure and no loop: it counts for neither the retry nor the loop guard.
-   */
-  interrupt(itemId: string, outcome: string): Promise<WorkItem>;
-
-  /** Blocks the item and journals the reason. */
-  block(itemId: string, reason: string): Promise<BlockNotice>;
-
-  /**
-   * A trusted human asked for a blocked item to run again: it is queued with no failures, no backoff and no
-   * loop-guard count; its session and journal stay. Returns null when the item is not blocked (nothing to retry).
-   */
-  retry(itemId: string, request: RetryRequest): Promise<WorkItem | null>;
-
-  /** Explicit reorder of a queued item. Active items are never interrupted. */
-  move(itemId: string, target: MoveTarget): Promise<void>;
-
-  /** Pauses starting new work for one person, or the whole team. Running items are not interrupted. */
-  pause(person?: string, reason?: string): Promise<void>;
-  resume(person?: string): Promise<void>;
-  pauseState(): Promise<PauseState>;
-
-  /** Why the item cannot run now, or null. Humans always get null from usage limits. */
-  isPausedFor(person: string, item: Pick<WorkItem, "trigger">): Promise<RunBlock | null>;
-
-  /** Housekeeping: stale runs and loop-guard sweep. Call periodically. */
-  tick(): Promise<TickResult>;
-
-  /** Runs `tick` on the clock until `stop()`. Results go to `onTick`. */
-  start(onTick?: (result: TickResult) => void): void;
-  stop(): void;
-}
+import { silentLogger } from "@outstaff/core";
+import type { SchedulerDeps } from "./checks.types.js";
+import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
+import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";
+import { CHAT_KIND, DEFAULT_RETRY, isLoopGuarded, orderQueue, priorityFor } from "./policy.js";
+import { runTick } from "./tick.js";
+import type { PauseState, Scheduler, SchedulerOptions, StartResult } from "./types.js";
 
 /** Chat sessions run beside the active work item, up to `policies.chat.parallel_sessions`. */
 const DEFAULT_CHAT_SESSIONS = 2;
 
 // Mirrors the team.yaml defaults for a team that sets no `policies`.
 const DEFAULT_MAX_RUNS_PER_HOUR = 12;
-const DEFAULT_USAGE = { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 };
-
-/** Outcome of a run that an agent shutdown cut short. */
-export const INTERRUPTED = "interrupted";
-
-const TEAM_SCOPE = "team";
-const personScope = (person: string) => `person:${person}`;
 
 export function createScheduler(opts: SchedulerOptions): Scheduler {
   const { store, team, clock } = opts;
@@ -203,112 +31,29 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
   const retry = { ...DEFAULT_RETRY, ...team.policies?.retry };
   const chatSessions = team.policies?.chat?.parallel_sessions ?? DEFAULT_CHAT_SESSIONS;
+  const checks = createChecks({
+    store,
+    team,
+    clock,
+    log,
+    usage: opts.usage,
+    maxRuns,
+    chatSessions,
+  });
 
-  /** Whether the person has room to start the item: a chat session needs a free session, other work an idle lane. */
-  const hasRoom = async (item: Pick<WorkItem, "person" | "kind">) => {
-    const active = await store.listItems({ person: item.person, status: "active" });
-    return item.kind === CHAT_KIND
-      ? active.filter((i) => i.kind === CHAT_KIND).length < chatSessions
-      : !active.some((i) => i.kind !== CHAT_KIND);
-  };
+  const {
+    hasRoom,
+    backingOff,
+    getWindows,
+    pauseBlock,
+    usageBlock,
+    guardTripped,
+    blockItem,
+    queuedOf,
+    applyMove,
+  } = checks;
 
-  const backingOff = (item: Pick<WorkItem, "notBefore">) =>
-    item.notBefore !== null && Date.parse(item.notBefore) > clock.now().getTime();
-
-  const getWindows = async (person: string): Promise<UsageWindow[]> => {
-    if (!opts.usage) {
-      return [];
-    }
-
-    try {
-      return await opts.usage.windows(person);
-    } catch (err) {
-      // Fail open: a broken usage feed must not stop humans from being answered.
-      log.warn("usage source failed; ignoring usage policy", { person, error: String(err) });
-      return [];
-    }
-  };
-
-  const pauseBlock = async (person: string): Promise<RunBlock | null> => {
-    const pauses = await store.listPauses();
-    const t = pauses.find((p) => p.scope === TEAM_SCOPE);
-    if (t) {
-      return { code: "paused_team", reason: `Team paused${t.reason ? `: ${t.reason}` : ""}.` };
-    }
-
-    const p = pauses.find((x) => x.scope === personScope(person));
-    if (p) {
-      return {
-        code: "paused_person",
-        reason: `${person} paused${p.reason ? `: ${p.reason}` : ""}.`,
-      };
-    }
-
-    return null;
-  };
-
-  const usageBlock = async (
-    person: string,
-    item: Pick<WorkItem, "trigger">,
-    windows?: UsageWindow[],
-  ): Promise<RunBlock | null> => {
-    if (item.trigger === "human") {
-      return null;
-    }
-
-    return usageVerdict(
-      item.trigger,
-      windows ?? (await getWindows(person)),
-      team.policies?.usage ?? DEFAULT_USAGE,
-    );
-  };
-
-  const guardTripped = async (item: WorkItem): Promise<string | null> => {
-    if (!isLoopGuarded(item.trigger)) {
-      return null;
-    }
-
-    const count = await store.countLoopGuard(item.id, HOUR_MS);
-    const v = loopGuardVerdict(item.trigger, count, maxRuns);
-    return v.tripped ? (v.reason ?? "Loop guard tripped.") : null;
-  };
-
-  const openRun = async (itemId: string): Promise<Run | undefined> => {
-    const runs = await store.listRuns(itemId);
-    return runs.findLast((r) => r.finishedAt === null);
-  };
-
-  const blockItem = async (
-    item: WorkItem,
-    reason: string,
-    code: BlockNotice["code"],
-  ): Promise<BlockNotice> => {
-    const run = await openRun(item.id);
-    if (run) {
-      await store.finishRun(run.id, { outcome: "blocked", error: reason });
-    }
-
-    const updated = await store.updateItem(item.id, { status: "blocked" });
-    await store.appendJournal(item.id, "scheduler", `Blocked: ${reason}`);
-    log.warn("work item blocked", { item: item.id, person: item.person, code, reason });
-    return { item: updated, reason, code };
-  };
-
-  const queuedOf = (person: string) => store.listItems({ person, status: "queued" });
-
-  const applyMove = async (itemId: string, target: MoveTarget): Promise<void> => {
-    const item = await store.getItem(itemId);
-    if (!item) {
-      throw new Error(`unknown work item: ${itemId}`);
-    }
-
-    if (item.status !== "queued") {
-      throw new Error(`work item ${itemId} is ${item.status}; only queued items can be moved`);
-    }
-
-    const queue = await queuedOf(item.person);
-    await store.reorderQueue(planMove(queue, itemId, target));
-  };
+  const deps: SchedulerDeps = { store, clock, log, checks, retry, staleMs };
 
   const scheduler: Scheduler = {
     enqueue(input) {
@@ -434,130 +179,23 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     },
 
     finish(itemId, input) {
-      return exclusive(async () => {
-        const run = await openRun(itemId);
-        if (run) {
-          await store.finishRun(run.id, {
-            outcome: input.outcome,
-            ...(input.error === undefined ? {} : { error: input.error }),
-            ...(input.usage === undefined ? {} : { usage: input.usage }),
-          });
-        }
-
-        const status = input.status ?? "done";
-        // Finishing the work is a success; a plain requeue is not.
-        return store.updateItem(itemId, {
-          status,
-          ...(status === "queued" ? {} : { failures: 0, notBefore: null }),
-        });
-      });
+      return exclusive(() => finishItem(deps, itemId, input));
     },
 
     interrupt(itemId, outcome) {
-      return exclusive(async () => {
-        const run = await openRun(itemId);
-        if (run) {
-          await store.finishRun(run.id, { outcome: INTERRUPTED, error: outcome });
-        }
-
-        await store.forgetLatestLoopGuard(itemId);
-        const item = await store.updateItem(itemId, { status: "queued", notBefore: null });
-        const first = orderQueue(await queuedOf(item.person)).find((i) => i.id !== itemId);
-        if (first) {
-          await applyMove(itemId, { before: first.id });
-        }
-
-        await store.appendJournal(
-          itemId,
-          "scheduler",
-          "Run interrupted by a shutdown; queued first.",
-        );
-
-        log.info("work item interrupted; queued first", { item: itemId, person: item.person });
-        return (await store.getItem(itemId)) ?? item;
-      });
+      return exclusive(() => interruptItem(deps, itemId, outcome));
     },
 
     fail(itemId, error) {
-      return exclusive(async () => {
-        const item = await store.getItem(itemId);
-        if (!item) {
-          throw new Error(`unknown work item: ${itemId}`);
-        }
-
-        const run = await openRun(itemId);
-        if (run) {
-          await store.finishRun(run.id, { outcome: "failed", error });
-        }
-
-        const failures = item.failures + 1;
-        if (failures >= retry.max_failures) {
-          const firstLine = error.split("\n", 1)[0]?.trim() || "unknown error";
-          const blocked = await blockItem(
-            item,
-            `failed ${failures} times: ${firstLine}`,
-            "failures",
-          );
-
-          // A human who unblocks the item starts it with a clean count.
-          const reset = await store.updateItem(itemId, { failures: 0, notBefore: null });
-          return { item: reset, blocked: { ...blocked, item: reset } };
-        }
-
-        const notBefore = new Date(
-          clock.now().getTime() + backoffMs(failures, retry),
-        ).toISOString();
-
-        const updated = await store.updateItem(itemId, { status: "queued", failures, notBefore });
-        await store.appendJournal(
-          itemId,
-          "scheduler",
-          `Failed ${failures} of ${retry.max_failures} times; retrying after ${notBefore}.`,
-        );
-
-        log.warn("work item failed; backing off", { item: itemId, failures, notBefore });
-        return { item: updated, notBefore };
-      });
+      return exclusive(() => failItem(deps, itemId, error));
     },
 
     block(itemId, reason) {
-      return exclusive(async () => {
-        const item = await store.getItem(itemId);
-        if (!item) {
-          throw new Error(`unknown work item: ${itemId}`);
-        }
-
-        return blockItem(item, reason, "manual");
-      });
+      return exclusive(() => blockById(deps, itemId, reason));
     },
 
     retry(itemId, request) {
-      return exclusive(async () => {
-        const item = await store.getItem(itemId);
-        if (item?.status !== "blocked") {
-          return null;
-        }
-
-        await store.clearLoopGuard(itemId);
-        const queued = await store.updateItem(itemId, {
-          status: "queued",
-          failures: 0,
-          notBefore: null,
-        });
-
-        await store.appendJournal(
-          itemId,
-          "scheduler",
-          `Retried on request by ${request.by} (${request.signal}).`,
-        );
-
-        log.info(
-          `retried ${itemId} for ${request.by} on ${item.subject?.ref ?? item.title} (signal: ${request.signal})`,
-          { item: itemId, person: item.person, by: request.by, signal: request.signal },
-        );
-
-        return queued;
-      });
+      return exclusive(() => retryItem(deps, itemId, request));
     },
 
     move(itemId, target) {
@@ -589,68 +227,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     },
 
     tick() {
-      return exclusive(async () => {
-        const result: TickResult = { retried: [], released: [], blocked: [] };
-        const now = clock.now();
-
-        for (const item of await store.listItems({ status: "active" })) {
-          const runs = await store.listRuns(item.id);
-          const verdict = staleVerdict({
-            lastActivity: new Date(item.updatedAt),
-            now,
-            staleMs,
-            trailingStaleRuns: trailingStale(runs.map((r) => r.outcome)),
-          });
-
-          if (verdict === "ok") {
-            continue;
-          }
-
-          const minutes = Math.round(staleMs / 60_000);
-          const run = runs.findLast((r) => r.finishedAt === null);
-          if (verdict === "retry") {
-            if (run) {
-              await store.finishRun(run.id, {
-                outcome: "stale",
-                error: `No heartbeat for ${minutes} minutes.`,
-              });
-            }
-
-            const requeued = await store.updateItem(item.id, { status: "queued" });
-            await store.appendJournal(item.id, "scheduler", "Run went stale; retrying once.");
-            log.warn("stale run requeued", { item: item.id });
-            result.retried.push(requeued);
-          } else {
-            result.blocked.push(
-              await blockItem(
-                item,
-                `Stale again: no heartbeat for ${minutes} minutes on the retry.`,
-                "stale",
-              ),
-            );
-          }
-        }
-
-        // Backoff that ran out: clear it so the person is told there is work again.
-        for (const item of await store.listItems({ status: "queued" })) {
-          if (item.notBefore !== null && !backingOff(item)) {
-            result.released.push(await store.updateItem(item.id, { notBefore: null }));
-          }
-        }
-
-        // Surface loop-guard trips even when nobody asks for the item.
-        const people = new Set((await store.listItems({ status: "queued" })).map((i) => i.person));
-        for (const person of people) {
-          for (const item of await queuedOf(person)) {
-            const tripped = await guardTripped(item);
-            if (tripped) {
-              result.blocked.push(await blockItem(item, tripped, "loop_guard"));
-            }
-          }
-        }
-
-        return result;
-      });
+      return exclusive(() => runTick(deps));
     },
 
     start(onTick) {

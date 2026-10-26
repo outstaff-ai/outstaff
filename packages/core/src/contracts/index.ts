@@ -5,5 +5,5 @@ export { vcsContract } from "./vcs.js";
 export { chatContract } from "./chat.js";
 export { runtimeContract, sampleRunRequest } from "./runtime.js";
 export { avatarsContract } from "./avatars.js";
-export type { ContractSetup, ContractSetupFn } from "./harness.js";
+export type { ContractSetup, ContractSetupFn } from "./types.js";
 export type * from "./seeds.js";

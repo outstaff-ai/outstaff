@@ -1,24 +1,10 @@
-import type { Toolset, ToolDeclaration, Tools } from "./schema.js";
-import type { ArgPredicate, CommandRule, Profile, RulePack } from "./types.js";
-
-export type ToolOrigin = "toolset" | "team" | "person";
-
-/** A tool after precedence is applied: the declaration that wins for its name, and where it came from. */
-export interface EffectiveTool extends ToolDeclaration {
-  name: string;
-  origin: ToolOrigin;
-
-  /** The toolset that declared it, when `origin` is "toolset". */
-  toolset?: string;
-  profiles?: Profile[];
-}
-
-export interface EffectiveToolsInput {
-  /** In order of precedence from lowest: a later toolset replaces an earlier one. */
-  toolsets?: Toolset[];
-  team?: Tools | undefined;
-  person?: Tools | undefined;
-}
+import type {
+  ArgPredicate,
+  CommandRule,
+  EffectiveTool,
+  EffectiveToolsInput,
+  RulePack,
+} from "./types.js";
 
 /** Person beats team beats toolset; the winning declaration replaces the others whole, so its `allow` is the only one. */
 export function effectiveTools(input: EffectiveToolsInput): EffectiveTool[] {
