@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { PortError, maskSecrets, type AdbGrant } from "@outstaff/core";
+import { PortError, adbDestructive, maskSecrets, type AdbGrant } from "@outstaff/core";
 import { z } from "zod";
 import { DATA_NOTE } from "./http.js";
 import { defineVerb, result, type AgentEnv } from "./types.js";
@@ -257,9 +257,6 @@ async function connect(env: AgentEnv, device: AdbGrant, use: number): Promise<st
   return serial;
 }
 
-/** Package names of the platform itself, whose removal or reset can break the device. */
-const SYSTEM_PACKAGE = /^(android|com\.android\.|com\.google\.)/i;
-const PM_REMOVALS = new Set(["uninstall", "disable", "disable-user", "hide", "suspend", "clear"]);
 const ADB_ONLY = new Set([
   "connect",
   "disconnect",
@@ -276,12 +273,13 @@ const ADB_ONLY = new Set([
   "keygen",
 ]);
 
-/** Why an adb call is refused, or undefined. A deliberate short list, not a sandbox: the device is the human's to lose. */
+/**
+ * Why an adb call is refused, or undefined: the device is chosen by the verb, connection management goes through
+ * `ost adb connect` and `ost adb pair`, and the destructive commands the permission policy denies for raw adb too.
+ */
 export function adbRefusal(args: string[]): string | undefined {
-  const tokens = args.flatMap((a) => a.split(/[\s;&|()`$<>]+/)).filter(Boolean);
-  const lower = tokens.map((t) => t.toLowerCase());
-  const first = lower[0];
-  if (first === undefined) {
+  const first = args[0]?.trim().split(/\s+/)[0]?.toLowerCase();
+  if (first === undefined || first === "") {
     return "Give the adb command to run, for example `shell getprop ro.build.version.release`.";
   }
 
@@ -293,51 +291,7 @@ export function adbRefusal(args: string[]): string | undefined {
     return `adb ${first} is not available here; \`ost adb connect\` and \`ost adb pair\` manage the connection.`;
   }
 
-  if (
-    first === "reboot" &&
-    lower[1] &&
-    ["bootloader", "recovery", "sideload", "fastboot"].some((m) => lower[1]!.startsWith(m))
-  ) {
-    return `adb reboot ${lower[1]} can leave the device in a mode only a human can undo.`;
-  }
-
-  if (
-    lower.some(
-      (t) =>
-        t.includes("master_clear") ||
-        t.includes("factory_reset") ||
-        t === "--wipe_data" ||
-        t === "wipe",
-    )
-  ) {
-    return "Factory reset and data wipes are refused.";
-  }
-
-  if (lower.includes("recovery") && first === "shell") {
-    return "Factory reset and recovery commands are refused.";
-  }
-
-  const at =
-    first === "uninstall"
-      ? 0
-      : lower.findIndex(
-          (t, i) => i > 0 && (t === "pm" || t === "package") && PM_REMOVALS.has(lower[i + 1] ?? ""),
-        );
-
-  if (at >= 0) {
-    const rest = first === "uninstall" ? lower.slice(1) : lower.slice(at + 2);
-    const verb = first === "uninstall" ? "uninstall" : lower[at + 1]!;
-    const pkg = rest.filter((t) => !t.startsWith("-")).at(-1);
-    if (
-      rest.some((t) => t === "--user" || t.startsWith("--user=")) ||
-      (pkg !== undefined && SYSTEM_PACKAGE.test(pkg)) ||
-      pkg === undefined
-    ) {
-      return `pm ${verb} of a system package (or with --user) is refused; removing an app you installed needs its own package name and no --user.`;
-    }
-  }
-
-  return undefined;
+  return adbDestructive(args);
 }
 
 export const adbRun = defineVerb({

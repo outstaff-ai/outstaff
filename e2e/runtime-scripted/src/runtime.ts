@@ -163,9 +163,12 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
         };
 
         if (decision.effect !== "allow") {
-          throw new Error(
-            `${nameOf(action)} was ${decision.effect === "deny" ? "denied" : "not covered"} by the policy: ${decision.reason}`,
+          // Thrown into the script, which may expect it (a step that must be denied); otherwise the script fails.
+          step = await steps.throw(
+            new Error(`${nameOf(action)} was denied by the policy: ${decision.reason}`),
           );
+
+          continue;
         }
 
         let out = "";

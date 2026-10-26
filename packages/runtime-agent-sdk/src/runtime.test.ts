@@ -361,20 +361,20 @@ describe("permission hook", () => {
     return { rt: createAgentSdkRuntime({ options, query }), hook: () => hook, release };
   }
 
-  it("denies rm, denies push to main, allows ls, and reports each decision", async () => {
+  it("denies env, denies push to main, allows rm, and reports each decision", async () => {
     const { rt, hook, release } = setup();
     const stream = rt.run(req({ builtinTools: ["shell", "read"] }))[Symbol.asyncIterator]();
     const first = await stream.next();
     expect(first.value).toMatchObject({ type: "started" });
     const h = hook();
 
-    const rm = await decisionOf(h, "Bash", { command: "rm -rf build" });
-    expect(rm.permissionDecision).toBe("deny");
-    expect(rm.permissionDecisionReason).toContain("Denied by the permission policy");
+    const env = await decisionOf(h, "Bash", { command: "env" });
+    expect(env.permissionDecision).toBe("deny");
+    expect(env.permissionDecisionReason).toContain("Denied by the permission policy");
     const push = await decisionOf(h, "Bash", { command: "git push origin main" });
     expect(push.permissionDecision).toBe("deny");
-    const ls = await decisionOf(h, "Bash", { command: "ls" });
-    expect(ls.permissionDecision).toBe("allow");
+    const rm = await decisionOf(h, "Bash", { command: "rm -rf build" });
+    expect(rm.permissionDecision).toBe("allow");
     const unknown = await decisionOf(h, "SomethingNew", {});
     expect(unknown.permissionDecision).toBe("deny");
 
@@ -403,17 +403,16 @@ describe("permission hook", () => {
       ["SomethingNew", "deny"],
     ]);
 
-    expect(calls[0]!.input).toEqual({ command: "rm -rf build" });
+    expect(calls[0]!.input).toEqual({ command: "env" });
   });
 
-  it("treats ask as a denial and maps file and ost tools", async () => {
+  it("allows ordinary shell lines and maps file and ost tools", async () => {
     const { rt, hook, release } = setup();
     const stream = rt.run(req())[Symbol.asyncIterator]();
     await stream.next();
     const h = hook();
-    const ask = await decisionOf(h, "Bash", { command: "FOO=1 ls" });
-    expect(ask.permissionDecision).toBe("deny");
-    expect(ask.permissionDecisionReason).toContain("nobody is available to approve");
+    const prefixed = await decisionOf(h, "Bash", { command: "FOO=1 ls" });
+    expect(prefixed.permissionDecision).toBe("allow");
     expect((await decisionOf(h, "mcp__ost__ticket_show", { key: "X-1" })).permissionDecision).toBe(
       "allow",
     );

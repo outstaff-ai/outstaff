@@ -1,0 +1,5 @@
+name: base
+description: Tools for roles that do not build software (design, product, planning, review), installed at agent start. Node and git come with the agent image.
+tools:
+  python:
+    version: 3.13.9

@@ -301,7 +301,7 @@ describe("installTools", () => {
       options: Record<string, string | Record<string, string | Record<string, string>>>,
     ) =>
       effectiveTools({
-        team: { adb: { version: "36.0.0", source: "http:adb", options, allow: [] } },
+        team: { adb: { version: "36.0.0", source: "http:adb", options } },
       });
 
     it("renders options as an inline table after the version", () => {

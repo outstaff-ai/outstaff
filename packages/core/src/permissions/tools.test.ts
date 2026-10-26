@@ -94,9 +94,7 @@ people: []`),
   describe("options", () => {
     const sum = "sha256:" + "ab".repeat(32);
     const tool = (opts: string, source = '"http:adb"') =>
-      codes(
-        `tools:\n  adb: { version: 36.0.0, source: ${source}, options: ${opts}, allow: [] }\npeople: []`,
-      );
+      codes(`tools:\n  adb: { version: 36.0.0, source: ${source}, options: ${opts} }\npeople: []`);
 
     it("accepts an http source with a checksum, or one per platform", () => {
       expect(
@@ -112,15 +110,15 @@ people: []`),
 
     it("rejects options without a source", () => {
       expect(
-        codes(`tools:\n  adb: { version: 36.0.0, options: { url: "x" }, allow: [] }\npeople: []`),
+        codes(`tools:\n  adb: { version: 36.0.0, options: { url: "x" } }\npeople: []`),
       ).toContain("tools.options_without_source");
     });
 
     it("rejects an http source without a checksum", () => {
       expect(tool('{ url: "https://dl.acme.example/a.zip" }')).toContain("tools.http_checksum");
-      expect(
-        codes(`tools:\n  adb: { version: 36.0.0, source: "http:adb", allow: [] }\npeople: []`),
-      ).toContain("tools.http_checksum");
+      expect(codes(`tools:\n  adb: { version: 36.0.0, source: "http:adb" }\npeople: []`)).toContain(
+        "tools.http_checksum",
+      );
     });
 
     it("rejects a platform without a checksum", () => {
@@ -142,7 +140,7 @@ people: []`),
 
     it("keeps the options on the effective tool", () => {
       const r = parseTeam(
-        `tools:\n  adb: { version: 36.0.0, source: "http:adb", options: { checksum: "${sum}" }, allow: [] }\npeople: []`,
+        `tools:\n  adb: { version: 36.0.0, source: "http:adb", options: { checksum: "${sum}" } }\npeople: []`,
       );
 
       expect(r.ok && effectiveTools({ team: r.config.tools })[0]?.options).toEqual({
@@ -178,7 +176,7 @@ tools:
       toolsets: [stock],
       team: { kubectl: { version: "1.31.0", allow: ["get", "logs"] } },
       person: {
-        kubectl: { version: "1.32.0", allow: [] },
+        kubectl: { version: "1.32.0", allow: ["get"] },
         go: { version: "1.23.4", allow: "all" },
       },
     });
@@ -209,10 +207,18 @@ describe("policy from tools", () => {
     return evaluate(buildPolicy({ profile, person, team, layout, packs }), call);
   };
 
-  it("allows nothing by default", () => {
-    expect(run({}, "go build ./...").effect).toBe("ask");
-    expect(run({ person: { go: { version: "1.23.4", allow: [] } } }, "go build").effect).toBe(
-      "ask",
+  it("runs anything without a declaration, and anything of a tool declared without allow", () => {
+    expect(run({}, "go build ./...").effect).toBe("allow");
+    expect(run({ person: { go: { version: "1.23.4" } } }, "go build")).toMatchObject({
+      effect: "allow",
+      rule: "tools.go.all",
+    });
+  });
+
+  it("lifts the infrastructure defaults for a tool declared without allow", () => {
+    expect(run({}, "kubectl apply -f x").effect).toBe("deny");
+    expect(run({ team: { kubectl: { version: "1.31.3" } } }, "kubectl apply -f x").effect).toBe(
+      "allow",
     );
   });
 
@@ -226,8 +232,9 @@ describe("policy from tools", () => {
   it("a verb list allows those first subcommands only", () => {
     const t = { team: { kubectl: { version: "1.31.3", allow: ["get", "describe"] } } };
     expect(run(t, "kubectl get pods -n web").effect).toBe("allow");
-    expect(run(t, "kubectl delete pod x").effect).toBe("ask");
-    expect(run(t, "kubectl").effect).toBe("ask");
+    expect(run(t, "kubectl delete pod x").rule).toBe("commands.narrowed");
+    expect(run(t, "kubectl logs x").rule).toBe("commands.narrowed");
+    expect(run(t, "kubectl").rule).toBe("commands.narrowed");
   });
 
   it("structured rules apply as given", () => {
@@ -247,19 +254,19 @@ describe("policy from tools", () => {
     };
 
     expect(run(t, "their-cli deploy --dry-run").effect).toBe("allow");
-    expect(run(t, "their-cli deploy").effect).toBe("ask");
+    expect(run(t, "their-cli deploy").effect).toBe("deny");
   });
 
   it("built-in denies still win", () => {
     const t = {
       team: {
-        curl: { version: "8.0.0", allow: "all" as const },
         sudo: { version: "1.9.0", allow: "all" as const },
+        adb: { version: "35.0.0", allow: "all" as const },
       },
     };
 
-    expect(run(t, "curl https://example.com").effect).toBe("deny");
     expect(run(t, "sudo ls").effect).toBe("deny");
+    expect(run(t, "adb shell rm -rf /data").effect).toBe("deny");
   });
 
   it("an overridden toolset declaration no longer allows its verbs", () => {
@@ -269,7 +276,7 @@ describe("policy from tools", () => {
 
     const t = { toolsets: [stock], person: { kubectl: { version: "1.31.0", allow: ["get"] } } };
     expect(run(t, "kubectl get pods").effect).toBe("allow");
-    expect(run(t, "kubectl logs x").effect).toBe("ask");
+    expect(run(t, "kubectl logs x").effect).toBe("deny");
   });
 
   it("toolset tools respect the toolset's profiles", () => {
@@ -278,7 +285,8 @@ describe("policy from tools", () => {
     );
 
     expect(run({ toolsets: [stock] }, "kubectl get pods", "infra").effect).toBe("allow");
-    expect(run({ toolsets: [stock] }, "kubectl get pods", "code").effect).toBe("ask");
+    expect(run({ toolsets: [stock] }, "kubectl apply -f x", "infra").effect).toBe("deny");
+    expect(run({ toolsets: [stock] }, "kubectl logs x", "code").rule).toBe("commands.default");
   });
 
   it("marks packs with their source", () => {

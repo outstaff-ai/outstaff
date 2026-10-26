@@ -49,14 +49,14 @@ export function effectiveTools(input: EffectiveToolsInput): EffectiveTool[] {
 
 function toolRules(tool: EffectiveTool): CommandRule[] {
   const id = (...parts: string[]) => ["tools", tool.name, ...parts].join(".");
-  const { allow, name } = tool;
+  const { allow = "all", name } = tool;
   if (allow === "all") {
     return [
       {
         id: id("all"),
         program: name,
         effect: "allow",
-        reason: `${name} is declared in tools with allow: all.`,
+        reason: `${name} is declared in tools.`,
       },
     ];
   }
@@ -84,7 +84,10 @@ function toolRules(tool: EffectiveTool): CommandRule[] {
   });
 }
 
-/** The allow rules of the effective tools. A tool allows nothing beyond its `allow`; installing it adds no rule. */
+/**
+ * The allow rules of the effective tools. A tool without `allow` (or with `all`) runs with any arguments and lifts the
+ * built-in default denies for its program; a list or rules narrow it to what they match.
+ */
 export function toolsToPacks(tools: EffectiveTool[]): RulePack[] {
   const packs = new Map<string, RulePack>();
   for (const t of tools) {

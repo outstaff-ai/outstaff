@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import type { ItemContext } from "./prompt.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
@@ -125,6 +126,21 @@ async function* commitToPush(
   }
 }
 
+/** Runs a command the policy must deny; it fails the script when the command runs or fails for another reason. */
+async function* mustBeDenied(command: string, cwd: string): AsyncGenerator<Action, void, string> {
+  try {
+    yield { type: "shell", command, cwd };
+  } catch (e) {
+    if (/denied by the policy/.test(String(e))) {
+      return;
+    }
+
+    throw e;
+  }
+
+  throw new Error(`${command} ran; the policy should deny it.`);
+}
+
 /** The first link in a tool's answer: the ticket or pull request it is about. */
 const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
 
@@ -153,9 +169,21 @@ export async function* assigned(ctx: ItemContext): Script {
   }
 
   // The toolset's tools work in the worktree: the mise shim has a version set, not just an install behind it.
-  const pnpm = (yield { type: "shell", command: "pnpm --version", cwd }).trim();
+  const pnpm = (yield { type: "shell", command: "CI=1 pnpm --version", cwd }).trim();
   if (!/^\d+\.\d+\.\d+/.test(pnpm)) {
     throw new Error(`pnpm --version printed "${pnpm}", not a version.`);
+  }
+
+  // Ordinary shell work runs inside the sandbox: variables, a subshell, a pipe into a here-document reader.
+  yield {
+    type: "shell",
+    command: `(cd .. && pwd) && echo "$HOME" > /dev/null && cat <<'EOF' | wc -l\nchecked\nEOF`,
+    cwd,
+  };
+
+  // The hard denies still hold: printing the environment, a push to the default branch, privilege tools.
+  for (const command of ["env", "cat /proc/self/environ", "git push origin main", "sudo true"]) {
+    yield* mustBeDenied(command, cwd);
   }
 
   // A ticket that says `network: <what>` asks for the services the team granted: the hub needs no token, the home
@@ -260,7 +288,13 @@ export async function* assigned(ctx: ItemContext): Script {
   }
 
   yield { type: "shell", command: "git add -A", cwd };
-  yield { type: "shell", command: `git commit -m ${q(`${key}: ${subject(ctx.title)}`)}`, cwd };
+  // The commit message goes in through a here-document, as agents write longer messages.
+  yield {
+    type: "shell",
+    command: `git commit -F - <<'EOF'\n${key}: ${subject(ctx.title)}\nEOF`,
+    cwd,
+  };
+
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
   const opened = yield {
     type: "tool",
@@ -672,6 +706,8 @@ export async function* chat(ctx: ItemContext): Script {
       return `Noted for ${target}.`;
     }
 
+    // A chat session has the tools of a work session.
+    yield { type: "shell", command: "CI=1 pnpm --version", cwd: homedir() };
     const work = yield { type: "tool", tool: "work", input: {} };
     return `Greetings live in greeting.txt on the main branch. Right now I am on: ${work.split("\n")[0] ?? ""}`;
   }
@@ -700,6 +736,7 @@ export async function* chat(ctx: ItemContext): Script {
   const asked = talk.find((m) => m.agent && QUESTION.test(m.text));
   const pr = /PR #(\d+)/i.exec(asked ? asked.text : latest)?.[1];
   if (!pr) {
+    yield { type: "shell", command: "CI=1 pnpm --version", cwd: homedir() };
     const work = yield { type: "tool", tool: "work", input: {} };
     const first = work.split("\n")[0] ?? "";
     return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;

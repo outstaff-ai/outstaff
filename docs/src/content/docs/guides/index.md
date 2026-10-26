@@ -12,6 +12,7 @@ Every deployment guide builds on the [container contract](/reference/container-c
 - [Kubernetes](/guides/kubernetes/): the same team as plain manifests, with secrets, a network policy and resource sizing.
 - [Secrets](/guides/secrets/): keep the secret files in 1Password, SOPS, Kubernetes Secrets or Compose secrets.
 - [Tell your agents how your repo works](/guides/repo-conventions/): put your commit, branch and pull request rules in the repository, and what to do when its files cannot change.
-- [Network grants](/guides/network-grants/): let an agent reach named HTTP services and Android devices with `ost http` and `ost adb`, and open the network path for them.
+- [Permissions](/guides/permissions/): what agents may run, the short list of hard denies, and the boundary an operator provides around them.
+- [Network grants](/guides/network-grants/): name HTTP services and Android devices for `ost http` and `ost adb`, and open the network path for them.
 - [Design canvas](/guides/design-canvas/): let the designer work on a private Claude Design canvas, and what it needs.
 - [Hire and remove people](/guides/hiring/): add a person with `ost hire`, which generates what you leave out, and remove one with `ost fire`.

@@ -143,16 +143,19 @@ const toolDeclarationSchema = z
     allow: z
       .union([
         z.literal("all"),
-        z.array(z.string().min(1)).meta(d("Subcommand verbs the agent may run.")),
+        z.array(z.string().min(1)).min(1).meta(d("Subcommand verbs the agent may run.")),
         z.array(toolRuleSchema).min(1).meta(d("Structured command rules.")),
       ])
+      .optional()
       .meta(
         d(
-          'What the agent may run: "all" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win.',
+          'Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.',
         ),
       ),
   })
-  .meta(d("A tool installed at agent start, with the commands it may run."));
+  .meta(
+    d("A tool installed at agent start, and optionally a narrower set of commands it may run."),
+  );
 
 export type ToolDeclaration = z.output<typeof toolDeclarationSchema>;
 
@@ -324,13 +327,20 @@ const teamCommandSchema = z
 
 export const teamCommandsSchema = z
   .strictObject({
-    allow: z.array(teamCommandSchema).optional().meta(d("Commands agents may run.")),
+    allow: z
+      .array(teamCommandSchema)
+      .optional()
+      .meta(
+        d(
+          "Commands agents may run of a program. Everything runs by default; once a rule here names a program, the program runs only what such rules allow, and built-in default denies for it (such as kubectl apply) are lifted.",
+        ),
+      ),
     deny: z
       .array(teamCommandSchema)
       .optional()
       .meta(d("Commands agents may never run. Deny always wins over allow.")),
   })
-  .meta(d("Extra commands for this team's own tools, on top of the built-in and toolset rules."));
+  .meta(d("Command rules for this team's own tools, on top of the built-in and toolset rules."));
 
 export type TeamCommands = z.output<typeof teamCommandsSchema>;
 export type CommandRuleInput = z.input<typeof teamCommandSchema>;

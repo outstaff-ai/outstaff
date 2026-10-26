@@ -5,7 +5,7 @@ sidebar:
   order: 6
 ---
 
-**Status:** accepted
+**Status:** accepted; the command and network parts are replaced by [0015](/decisions/0015-allow-by-default-in-the-sandbox/)
 
 ## Context
 

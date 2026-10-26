@@ -103,14 +103,6 @@ export const networkSchema = z
   .strictObject({
     http: z.array(httpGrantSchema).optional().meta(d("Services reachable with `ost http`.")),
     adb: z.array(adbGrantSchema).optional().meta(d("Devices reachable with `ost adb`.")),
-    raw_http: z
-      .boolean()
-      .optional()
-      .meta(
-        d(
-          "Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.",
-        ),
-      ),
   })
   .superRefine((n, ctx) => {
     for (const key of ["http", "adb"] as const) {
@@ -132,7 +124,7 @@ export const networkSchema = z
   })
   .meta(
     d(
-      "Network grants: the services and devices an agent may reach. Everything else stays denied. The deployment must also allow the network path.",
+      "Network grants: the services and devices the `ost http` and `ost adb` verbs reach, with tokens and device pairing handled for the agent. They do not limit the network; the deployment's network policy does.",
     ),
   );
 
@@ -150,14 +142,13 @@ export const roleOverridesSchema = z
 
 /** What a person may reach after role and person grants are merged. */
 export interface NetworkGrants {
-  rawHttp: boolean;
   http: HttpGrant[];
   adb: AdbGrant[];
 }
 
 /**
  * The grants of a person: those of their role, then of the roles they extend, then their own. A later grant with
- * the same name replaces an earlier one; `raw_http` is the last value given.
+ * the same name replaces an earlier one.
  */
 export function networkGrants(
   team: { roles?: Record<string, { network?: Network | undefined } | undefined> | undefined },
@@ -167,7 +158,6 @@ export function networkGrants(
   layers.push(person.network);
   const http = new Map<string, HttpGrant>();
   const adb = new Map<string, AdbGrant>();
-  let rawHttp = false;
   for (const layer of layers) {
     for (const g of layer?.http ?? []) {
       http.set(g.name, g);
@@ -176,13 +166,9 @@ export function networkGrants(
     for (const g of layer?.adb ?? []) {
       adb.set(g.name, g);
     }
-
-    if (layer?.raw_http !== undefined) {
-      rawHttp = layer.raw_http;
-    }
   }
 
-  return { rawHttp, http: [...http.values()], adb: [...adb.values()] };
+  return { http: [...http.values()], adb: [...adb.values()] };
 }
 
 /** The secret keys the bearer tokens of these grants name. */

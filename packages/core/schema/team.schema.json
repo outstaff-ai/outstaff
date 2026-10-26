@@ -336,12 +336,14 @@
                   }
                 },
                 "allow": {
+                  "description": "Narrows what the agent may run of the tool: \"all\" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.",
                   "anyOf": [
                     {
                       "type": "string",
                       "const": "all"
                     },
                     {
+                      "minItems": 1,
                       "type": "array",
                       "items": {
                         "type": "string",
@@ -496,16 +498,14 @@
                       },
                       "description": "Structured command rules."
                     }
-                  ],
-                  "description": "What the agent may run: \"all\" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win."
+                  ]
                 }
               },
               "required": [
-                "version",
-                "allow"
+                "version"
               ],
               "additionalProperties": false,
-              "description": "A tool installed at agent start, with the commands it may run."
+              "description": "A tool installed at agent start, and optionally a narrower set of commands it may run."
             }
           },
           "network": {
@@ -582,10 +582,6 @@
                   "additionalProperties": false,
                   "description": "An Android device the agent may reach with `ost adb`."
                 }
-              },
-              "raw_http": {
-                "description": "Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.",
-                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -826,12 +822,14 @@
             }
           },
           "allow": {
+            "description": "Narrows what the agent may run of the tool: \"all\" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.",
             "anyOf": [
               {
                 "type": "string",
                 "const": "all"
               },
               {
+                "minItems": 1,
                 "type": "array",
                 "items": {
                   "type": "string",
@@ -986,16 +984,14 @@
                 },
                 "description": "Structured command rules."
               }
-            ],
-            "description": "What the agent may run: \"all\" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win."
+            ]
           }
         },
         "required": [
-          "version",
-          "allow"
+          "version"
         ],
         "additionalProperties": false,
-        "description": "A tool installed at agent start, with the commands it may run."
+        "description": "A tool installed at agent start, and optionally a narrower set of commands it may run."
       }
     },
     "roles": {
@@ -1082,10 +1078,6 @@
                   "additionalProperties": false,
                   "description": "An Android device the agent may reach with `ost adb`."
                 }
-              },
-              "raw_http": {
-                "description": "Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.",
-                "type": "boolean"
               }
             },
             "additionalProperties": false
@@ -1748,7 +1740,7 @@
           "type": "object",
           "properties": {
             "allow": {
-              "description": "Commands agents may run.",
+              "description": "Commands agents may run of a program. Everything runs by default; once a rule here names a program, the program runs only what such rules allow, and built-in default denies for it (such as kubectl apply) are lifted.",
               "type": "array",
               "items": {
                 "type": "object",
@@ -2043,7 +2035,7 @@
             }
           },
           "additionalProperties": false,
-          "description": "Extra commands for this team's own tools, on top of the built-in and toolset rules."
+          "description": "Command rules for this team's own tools, on top of the built-in and toolset rules."
         }
       },
       "additionalProperties": false,

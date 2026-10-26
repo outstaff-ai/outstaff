@@ -3,7 +3,6 @@ import type { Decision, GitMode, Policy, ToolCall } from "./types.js";
 
 const allow = (reason: string, rule: string): Decision => ({ effect: "allow", reason, rule });
 const deny = (reason: string, rule: string): Decision => ({ effect: "deny", reason, rule });
-const ask = (reason: string, rule: string): Decision => ({ effect: "ask", reason, rule });
 
 const READ_VERBS = new Set([
   "status",
@@ -43,16 +42,17 @@ const WRITE_VERBS = new Set([
   "rm",
 ]);
 
-const SAFE_GLOBAL = new Set(["--no-pager", "-P", "--no-optional-locks"]);
-const DANGEROUS_ANYWHERE = [
-  "--upload-pack",
-  "--receive-pack",
-  "--exec",
-  "--output",
-  "--no-index",
-  "--ext-diff",
-  "--open-files-in-pager",
-];
+const SAFE_GLOBAL = new Set(["--no-pager", "-P", "--no-optional-locks", "--paginate", "-p"]);
+
+/** Global options that take their value as the next word. */
+const VALUED_GLOBAL = new Set(["--git-dir", "--work-tree", "--namespace", "--super-prefix"]);
+
+/**
+ * Config keys that can change where or how a push goes, or skip the hooks that guard it: remotes and URL rewrites,
+ * aliases, credential helpers, hooks, the transport and includes of other config files.
+ */
+const PUSH_KEYS =
+  /^(remote\.|url\.|alias\.|credential|core\.(hookspath|sshcommand|gitproxy|askpass|fsmonitor)|push\.|branch\.[^.]+\.(remote|pushremote|merge)$|include|http\.|protocol\.)/i;
 
 export function repoFor(
   policy: Policy,
@@ -154,7 +154,10 @@ function pushDecision(
     ) {
       continue;
     } else if (a.startsWith("--")) {
-      return ask(`Unknown push flag ${a}.`, "git.push.unknown-flag");
+      return deny(
+        `Unknown push flag ${a}; the push rules cannot judge it.`,
+        "git.push.unknown-flag",
+      );
     } else if (a.startsWith("-") && a.length > 1) {
       if (a === "-o") {
         i++;
@@ -172,7 +175,10 @@ function pushDecision(
         if (ch === "d") {
           del = true;
         } else if (!"unvq".includes(ch)) {
-          return ask(`Unknown push flag ${a}.`, "git.push.unknown-flag");
+          return deny(
+            `Unknown push flag ${a}; the push rules cannot judge it.`,
+            "git.push.unknown-flag",
+          );
         }
       }
     } else {
@@ -283,6 +289,7 @@ export function evaluateGit(
   call: ToolCall,
 ): Decision {
   let cwd = startCwd;
+  let redirected = false;
   let i = 0;
   for (; i < args.length; i++) {
     const a = args[i]!;
@@ -296,9 +303,19 @@ export function evaluateGit(
     } else if (SAFE_GLOBAL.has(a)) {
       continue;
     } else if (a === "-c" || a.startsWith("--config-env")) {
-      return deny("git config overrides on the command line are denied.", "git.config-override");
+      const value = a === "-c" ? (args[++i] ?? "") : a.slice(a.indexOf("=") + 1);
+      if (PUSH_KEYS.test(value)) {
+        return deny(
+          `git ${a.split("=")[0]} ${value.split("=")[0]} could redirect a push or skip its hooks.`,
+          "git.config-override",
+        );
+      }
     } else if (a.startsWith("-")) {
-      return deny(`git global option ${a.split("=")[0]} is denied.`, "git.global-option");
+      // --git-dir, --work-tree and the like make the repository something other than the directory.
+      redirected = true;
+      if (VALUED_GLOBAL.has(a)) {
+        i++;
+      }
     } else {
       break;
     }
@@ -306,21 +323,23 @@ export function evaluateGit(
 
   const sub = args[i];
   if (sub === undefined) {
-    return ask("No git subcommand.", "git.syntax");
+    return allow("git with no subcommand prints its help.", "git.read");
   }
 
   const rest = args.slice(i + 1);
 
   const repo = repoFor(policy, cwd);
-  if (!repo) {
-    return ask(`git in ${cwd} is outside the repositories granted to this person.`, "git.no-repo");
+  if (sub === "push" && (!repo || redirected)) {
+    return deny(
+      redirected
+        ? "git push with --git-dir, --work-tree or another global option cannot be matched to a granted repository."
+        : `git push in ${cwd} is outside the repositories granted to this person.`,
+      "git.no-repo",
+    );
   }
 
-  for (const a of rest) {
-    const flag = a.split("=")[0]!;
-    if (DANGEROUS_ANYWHERE.includes(flag) || (sub !== "push" && a.startsWith("-O"))) {
-      return deny(`git flag ${flag} is denied.`, "git.flag");
-    }
+  if (!repo) {
+    return allow(`git ${sub} outside the granted repositories.`, "git.default");
   }
 
   // Paths and rev:path forms must not reach secrets, even via the object store.
@@ -346,13 +365,6 @@ export function evaluateGit(
       : deny(`${what} needs a write grant; this repository is read-only.`, "git.read-only-repo");
 
   if (READ_VERBS.has(sub)) {
-    if (sub === "fetch" || sub === "ls-remote") {
-      const remote = rest.find((a) => !a.startsWith("-"));
-      if (remote !== undefined && looksLikeUrl(remote)) {
-        return deny("Fetch only from a configured remote name.", "git.remote");
-      }
-    }
-
     return allow(`git ${sub} is read-only.`, "git.read");
   }
 
@@ -364,17 +376,6 @@ export function evaluateGit(
     const blocked = needWrite("Changing branches");
     if (blocked) {
       return blocked;
-    }
-
-    const names = rest.filter((a) => !a.startsWith("-"));
-    if (
-      rest.some((a) => /^(-d|-D|-m|-M|--delete|--move)/.test(a)) &&
-      names.includes(repo.defaultBranch)
-    ) {
-      return deny(
-        `Deleting or renaming the default branch "${repo.defaultBranch}" is denied.`,
-        "git.default-branch",
-      );
     }
 
     return allow("Branch management in a write repository.", "git.write");
@@ -392,15 +393,23 @@ export function evaluateGit(
       (sub === "tag" && (rest.length === 0 || rest.some((a) => a === "-l" || a === "--list"))) ||
       (sub === "stash" && (first === "list" || first === "show")) ||
       (sub === "worktree" && first === "list") ||
-      (sub === "remote" && (first === undefined || first === "show" || first === "get-url")) ||
+      (sub === "remote" &&
+        (first === undefined || ["show", "get-url", "prune", "update"].includes(first))) ||
       (sub === "config" && rest.some((a) => ["--get", "--get-all", "--list", "-l"].includes(a)));
 
     if (readOnly) {
       return allow(`git ${sub} (read-only form).`, "git.read");
     }
 
-    if (sub === "remote" || sub === "config") {
-      return ask(`git ${sub} can redirect pushes; it is not covered.`, "git.unsupported");
+    if (sub === "remote") {
+      return deny(`git remote ${first} could redirect a push.`, "git.remote");
+    }
+
+    if (sub === "config") {
+      const key = rest.find((a) => !a.startsWith("-")) ?? "";
+      return PUSH_KEYS.test(key)
+        ? deny(`git config ${key} could redirect a push or skip its hooks.`, "git.config")
+        : allow(`git config ${key}.`, "git.write");
     }
 
     const blocked = needWrite(`git ${sub}`);
@@ -424,15 +433,8 @@ export function evaluateGit(
       return blocked;
     }
 
-    if (
-      sub === "commit" &&
-      rest.some((a) => a === "--no-verify" || /^-[a-zA-Z]*n[a-zA-Z]*$/.test(a))
-    ) {
-      return deny("Skipping commit hooks is denied.", "git.no-verify");
-    }
-
     return allow(`git ${sub} in a write repository.`, "git.write");
   }
 
-  return ask(`git ${sub} is not covered by the policy.`, "git.unsupported");
+  return allow(`git ${sub}.`, "git.default");
 }

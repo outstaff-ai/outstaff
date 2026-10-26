@@ -26,6 +26,7 @@ export {
   type Toolset,
 } from "./schema.js";
 
+export { adbCommand, adbDestructive } from "./adb.js";
 export { evaluate } from "./evaluate.js";
 export { globToRegExp, matchesAny, resolvePath } from "./paths.js";
 export {

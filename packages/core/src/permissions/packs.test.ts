@@ -73,29 +73,48 @@ const infraToolset = loadToolset(catalogFile("infra"));
 const infra = toolsToPacks(effectiveTools({ toolsets: [infraToolset] }))[0]!;
 
 describe("catalog toolsets", () => {
-  it("code allows pnpm test in a code-profile write repo", () => {
-    expect(run("code", [code], "pnpm test").effect).toBe("allow");
-    expect(run("code", [code], "pnpm run build && node dist/a.js").effect).toBe("allow");
-    expect(run("code", [code], "npx vitest run").effect).toBe("allow");
+  it("code runs any pnpm, npm and npx command", () => {
+    for (const command of [
+      "pnpm test",
+      "pnpm format",
+      "pnpm --filter x build",
+      "pnpm -C packages/x exec tsc",
+      "pnpm add -D x",
+      "pnpm --version",
+      "pnpm run build && node dist/a.js",
+      "npx vitest run",
+      "npx x",
+      "npm exec x",
+      "UPDATE_SNAPSHOT=1 pnpm test",
+    ]) {
+      expect(`${command}: ${run("code", [code], command).effect}`).toBe(`${command}: allow`);
+    }
   });
 
-  it("code does not cover publishing, and docs and readonly get no toolchains", () => {
-    expect(run("code", [code], "pnpm publish").effect).toBe("ask");
-    expect(run("docs", [code], "pnpm test").effect).toBe("ask");
-    expect(run("readonly", [code], "pnpm test").effect).toBe("ask");
-    expect(run("code", [], "pnpm test").effect).toBe("ask");
+  it("every profile runs the toolchains", () => {
+    expect(run("docs", [code], "pnpm test").effect).toBe("allow");
+    expect(run("readonly", [code], "python3 x.py").effect).toBe("allow");
+    expect(run("code", [], "pnpm test").effect).toBe("allow");
   });
 
-  it("infra allows read-only verbs for the infra profile only", () => {
+  it("infra narrows its tools to read-only verbs for the infra profile", () => {
     expect(run("infra", [infra], "terraform plan").effect).toBe("allow");
     expect(run("infra", [infra], "kubectl get pods").effect).toBe("allow");
     expect(run("infra", [infra], "helm template .").effect).toBe("allow");
-    expect(run("infra", [infra], "terraform apply").effect).toBe("ask");
-    expect(run("code", [infra], "terraform plan").effect).toBe("ask");
+    expect(run("infra", [infra], "terraform apply")).toMatchObject({
+      effect: "deny",
+      rule: "commands.narrowed",
+    });
+
+    expect(run("infra", [infra], "kubectl delete pod x").effect).toBe("deny");
+    // Without the narrowing the built-in default still denies infrastructure writes.
+    expect(run("code", [infra], "terraform plan").effect).toBe("allow");
+    expect(run("code", [infra], "terraform apply").rule).toBe("infra.terraform.apply");
   });
 
-  it("names the toolset in the rule id", () => {
-    expect(run("code", [code], "pnpm test").rule).toBe("tools.pnpm.test");
+  it("names the toolset tool in the rule id", () => {
+    expect(run("infra", [infra], "kubectl get pods").rule).toBe("tools.kubectl.get");
+    expect(run("code", [code], "pnpm test").rule).toBe("tools.pnpm.all");
   });
 });
 
@@ -134,7 +153,7 @@ describe("rule packs", () => {
   it("merges rules after the built-in ones", () => {
     const p = buildPolicy({ profile: "code", person, team, layout, packs: [forge("adapter")] });
     expect(p.commands.at(-1)?.id).toBe("forge.api");
-    expect(p.commands.some((r) => r.id === "network.curl")).toBe(true);
+    expect(p.commands.some((r) => r.id === "privilege.sudo")).toBe(true);
   });
 
   it("honours requiresRepo for pack rules", () => {
@@ -163,7 +182,8 @@ describe("rule packs", () => {
   it("applies pack profiles", () => {
     const pack: RulePack = { ...forge("adapter"), profiles: ["infra"] };
     expect(run("infra", [pack], "forge pr view 1").effect).toBe("allow");
-    expect(run("code", [pack], "forge pr view 1").effect).toBe("ask");
+    expect(run("infra", [pack], "forge pr merge 1").rule).toBe("commands.narrowed");
+    expect(run("code", [pack], "forge pr merge 1").effect).toBe("allow");
   });
 
   it.each(["adapter", "toolset", "team"] as const)("deny wins in a %s pack", (source) => {
@@ -197,13 +217,13 @@ describe("rule packs", () => {
       id: "p",
       source: "team",
       rules: [
-        { id: "p.curl", program: "curl", effect: "allow", reason: "x" },
+        { id: "p.sudo", program: "sudo", effect: "allow", reason: "x" },
         { id: "p.bash", program: "bash", effect: "allow", reason: "x" },
       ],
     };
 
-    expect(run("code", [pack], "curl x").rule).toBe("network.curl");
-    expect(run("code", [pack], "bash -c ls").rule).toBe("wrapper.bash");
+    expect(run("code", [pack], "sudo ls").rule).toBe("privilege.sudo");
+    expect(run("code", [pack], "bash -c 'git push --force origin x'").rule).toBe("git.push.force");
   });
 });
 
@@ -222,7 +242,7 @@ describe("team commands", () => {
       rule: "team.allow.make.deploy-preview",
     });
 
-    expect(run("code", [pack!], "make deploy").effect).toBe("ask");
+    expect(run("code", [pack!], "make deploy").rule).toBe("commands.narrowed");
   });
 
   it("deny entries beat allow entries", () => {

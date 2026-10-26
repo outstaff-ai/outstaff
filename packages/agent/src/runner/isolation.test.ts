@@ -278,7 +278,16 @@ describe("isolation between work items", () => {
 
 describe("memory", () => {
   it("is in the runtime's directories and the only place besides scratch and repositories that can be written", () => {
-    const { layout, policy } = setup();
+    // A home outside the temp folder: /tmp is writable on purpose, and CI's tmpdir is /tmp.
+    const { env } = fakeEnv();
+    const layout = layoutOf("/home/outstaff");
+    const policy = buildPolicy({
+      profile: "code",
+      person: env.team.people[0]!,
+      team: env.team,
+      layout,
+    });
+
     const write = (path: string) => evaluate(policy, { kind: "write", path }).effect;
     expect(write(join(layout.memoryDir, "lessons.md"))).toBe("allow");
     expect(write(join(layout.home, "notes.md"))).toBe("deny");

@@ -100,7 +100,7 @@ export function decide(policy: Policy, name: string, input: unknown, cwd: string
   return evaluate(policy, call);
 }
 
-/** A PreToolUse hook that judges every call. Unattended: `ask` blocks like `deny`. */
+/** A PreToolUse hook that judges every call. */
 export function permissionHook(
   policy: Policy,
   defaultCwd: string,
@@ -124,16 +124,11 @@ export function permissionHook(
       };
     }
 
-    const prefix =
-      decision.effect === "ask"
-        ? "Not covered by the permission policy (nobody is available to approve it): "
-        : "Denied by the permission policy: ";
-
     return {
       hookSpecificOutput: {
         hookEventName: "PreToolUse",
         permissionDecision: "deny",
-        permissionDecisionReason: prefix + decision.reason,
+        permissionDecisionReason: `Denied by the permission policy: ${decision.reason}`,
       },
     };
   };

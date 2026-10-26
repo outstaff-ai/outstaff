@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -131,10 +131,13 @@ describe("prepareAgent", () => {
 
     expect(run("pnpm test").effect).toBe("allow");
     expect(run("acme-lint src").effect).toBe("allow");
-    expect(run("curl https://example.com").effect).toBe("deny");
+    expect(run("curl https://example.com").effect).toBe("allow");
+    expect(
+      run(`cat ${options.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff"}/X`).effect,
+    ).toBe("deny");
   });
 
-  it("grants a person the network of their role and their own, scrubs the token from the shell and allows curl only with raw_http", async () => {
+  it("grants a person the network of their role and their own, and scrubs the token from the shell", async () => {
     const granted = TEAM.replace(
       "people:",
       `roles:
@@ -144,7 +147,7 @@ describe("prepareAgent", () => {
 people:`,
     ).replace(
       "role: developer, repos: { shop: write } }",
-      `role: developer, repos: { shop: write }, network: { raw_http: true, http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }], adb: [{ name: wall-panel, host: 10.0.0.18, port: 5555 }] } }`,
+      `role: developer, repos: { shop: write }, network: { http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }], adb: [{ name: wall-panel, host: 10.0.0.18, port: 5555 }] } }`,
     );
 
     const { home, options } = setup({ HOME_TOKEN: "home-token-value-123" }, granted);
@@ -177,20 +180,10 @@ people:`,
 
     const cwd = join(home, "worktrees/shop");
     const run = (command: string) => evaluate(agent.policy, { kind: "shell", command, cwd });
+    // The grants feed the verbs; the shell reaches the network directly, as the deployment's network policy allows.
     expect(run("curl -s https://hub.acme.example/status").effect).toBe("allow");
-    expect(run("curl https://other.acme.example/").effect).toBe("deny");
-    expect(run("adb -s 10.0.0.18:5555 shell ls").effect).toBe("deny");
-
-    // Without raw_http the same grants leave curl denied.
-    const off = setup({}, granted.replace("raw_http: true, ", ""));
-    const quiet = await prepareAgent(off.options);
-    expect(
-      evaluate(quiet.policy, {
-        kind: "shell",
-        command: "curl https://hub.acme.example/status",
-        cwd: join(off.home, "worktrees/shop"),
-      }).effect,
-    ).toBe("deny");
+    expect(run("adb -s 10.0.0.18:5555 shell ls").effect).toBe("allow");
+    expect(run("adb -s 10.0.0.18:5555 shell rm -rf /data").effect).toBe("deny");
   });
 
   it("starts a person without repository grants with no vcs port", async () => {
@@ -285,7 +278,7 @@ people:`,
     );
   });
 
-  it("installs the declared tools and allows exactly their declared verbs", async () => {
+  it("installs the declared tools and narrows a tool to its declared verbs", async () => {
     const { home, options } = setup({}, TOOLS_TEAM);
     const calls: string[][] = [];
     const paths: string[] = [];
@@ -331,7 +324,7 @@ people:`,
 
     expect(run("go test ./...").effect).toBe("allow");
     expect(run("their-cli status").effect).toBe("allow");
-    expect(run("their-cli deploy").effect).toBe("ask");
+    expect(run("their-cli deploy").rule).toBe("commands.narrowed");
   });
 
   it("fails to start, naming the tool, when one cannot be installed", async () => {
@@ -375,10 +368,32 @@ people:`,
     expect((error as Error).message).not.toContain("go@");
   });
 
+  it("installs python for a role on the base toolset, such as the designer", async () => {
+    const { options } = setup({}, TEAM.replace("role: developer", "role: designer"));
+    const agent = await prepareAgent({
+      ...options,
+      tools: {
+        mise: withGlobalConfig(async () => ({ code: 0, stdout: "", stderr: "" })),
+        addToPath: () => {},
+      },
+    });
+
+    expect(agent.tools.map((t) => [t.name, t.version])).toEqual([["python", "3.13.9"]]);
+  });
+
   it("does not run mise when no tool is declared", async () => {
+    // A catalog whose base toolset is gone leaves the reviewer with no tool at all.
+    const catalog = mkdtempSync(join(tmpdir(), "catalog-"));
+    cpSync(stockCatalogDir, catalog, {
+      recursive: true,
+      filter: (src) =>
+        !src.endsWith(join("toolsets", "base.yaml")) && !src.includes("node_modules"),
+    });
+
     const { options } = setup({}, TEAM.replace("role: developer", "role: reviewer"));
     const agent = await prepareAgent({
       ...options,
+      stockCatalogDir: catalog,
       tools: {
         mise: async () => {
           throw new Error("mise must not run");

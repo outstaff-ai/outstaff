@@ -572,7 +572,7 @@ Tools for this agent only; they replace team-level tools of the same name.
 
 #### people[].tools.<key>
 
-A tool installed at agent start, with the commands it may run.
+A tool installed at agent start, and optionally a narrower set of commands it may run.
 
 - Type: `object`
 - Optional
@@ -601,10 +601,10 @@ Options mise passes to the tool's backend, such as url, bin_path and checksum fo
 
 #### people[].tools.<key>.allow
 
-What the agent may run: "all" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win.
+Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.
 
 - Type: `string or list of string or list of object`
-- Required
+- Optional
 
 #### people[].tools.<key>.allow[]
 
@@ -708,13 +708,6 @@ Android 11+ wireless debugging: the connect port is random and changes, so a hum
 - Type: `string`
 - Optional
 - Must be `wireless`
-
-#### people[].network.raw_http
-
-Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.
-
-- Type: `boolean`
-- Optional
 
 ### people[].avatar
 
@@ -900,7 +893,7 @@ Tools every agent of the team installs at start, with the commands they may run.
 
 ### tools.<key>
 
-A tool installed at agent start, with the commands it may run.
+A tool installed at agent start, and optionally a narrower set of commands it may run.
 
 - Type: `object`
 - Optional
@@ -929,10 +922,10 @@ Options mise passes to the tool's backend, such as url, bin_path and checksum fo
 
 #### tools.<key>.allow
 
-What the agent may run: "all" (any arguments), a list of first subcommands, or structured rules. Installing a tool allows nothing by itself. The built-in denies still win.
+Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.
 
 - Type: `string or list of string or list of object`
-- Required
+- Optional
 
 #### tools.<key>.allow[]
 
@@ -1050,13 +1043,6 @@ Android 11+ wireless debugging: the connect port is random and changes, so a hum
 - Type: `string`
 - Optional
 - Must be `wireless`
-
-#### roles.<key>.network.raw_http
-
-Also let the agent run `curl` against the origins in `http`. Off by default. `curl` sends no token.
-
-- Type: `boolean`
-- Optional
 
 ## workflow
 
@@ -1788,14 +1774,14 @@ Publish the agent's profile in chat: role, status, and current work grouped by t
 
 ### policies.commands
 
-Extra commands for this team's own tools, on top of the built-in and toolset rules.
+Command rules for this team's own tools, on top of the built-in and toolset rules.
 
 - Type: `object`
 - Optional
 
 #### policies.commands.allow
 
-Commands agents may run.
+Commands agents may run of a program. Everything runs by default; once a rule here names a program, the program runs only what such rules allow, and built-in default denies for it (such as kubectl apply) are lifted.
 
 - Type: `list of object`
 - Optional

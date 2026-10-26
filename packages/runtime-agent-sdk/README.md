@@ -51,6 +51,7 @@ Steps 1 to 3 keep every other adapter's secrets away from the agent's commands. 
 
 - **`sandbox: off` (default).** Commands the agent runs can read the Claude credential, from their environment or from `/proc/<pid>/environ` of Claude Code, the same as Claude Code on a developer's machine. A prompt injection that gets the agent to run a command can print it. Mitigations:
   - only trusted humans direct work (decision 0004), so instructions come from people you trust;
+  - the permission policy denies the plain ways to print it (`env`, `printenv`, `/proc/*/environ`, expanding a variable such as `$ANTHROPIC_API_KEY`), though not a program written to get around that;
   - deny network tools (`curl`, `wget`, ...) in the team's command policies if you want to make sending it out harder;
   - use a dedicated API key with a spend limit for each team, never a personal one;
   - rotate the key if you think it leaked.
@@ -93,7 +94,7 @@ The request's `Policy` is enforced by a `PreToolUse` hook, which sees every call
 | `Task`, `Agent`                     | `subagent`                                                 |
 | `mcp__ost__*`                       | `ost`                                                      |
 
-Any other tool, including tools of other MCP servers, is denied. Runs are unattended, so `deny` and `ask` both block the call and the decision's reason goes back to the model. `permissionMode` is `dontAsk`, so nothing waits for a human and anything the hook does not allow is denied. Every decision is also emitted as a `tool_call` event.
+Any other tool, including tools of other MCP servers, is denied. The policy allows anything its hard denies do not cover ([permissions](https://docs.outstaff.work/guides/permissions/)); a denial blocks the call and its reason goes back to the model. `permissionMode` is `dontAsk`, so nothing waits for a human and anything the hook does not allow is denied. Every decision is also emitted as a `tool_call` event.
 
 ## Events
 

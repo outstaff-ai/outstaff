@@ -21,7 +21,7 @@ describe("fake runtime", () => {
       {
         type: "tool_call",
         tool: "Write",
-        call: { kind: "write", path: "/home/agent/scratch/notes.md" },
+        call: { kind: "write", path: "/etc/hosts" },
       },
       { type: "finish", text: "done" },
     ]);
