@@ -60,6 +60,12 @@ export interface Engine {
   started(itemId: string): Promise<void>;
 
   /**
+   * After an item was handed back: when it finished the work on a ticket that is not blocked, the earlier blocked
+   * items on that ticket are closed (canceled), so none is left orphaned. Idempotent.
+   */
+  settled(item: WorkItem): Promise<void>;
+
+  /**
    * An item the scheduler blocked (loop guard, stale twice, too many failures): when the team routes blocked work to
    * its PM, queues an `unblock` round for the PM with the reason as data. Returns whether a round was queued or
    * joined; false when the team has no PM, the PM is the blocked person, the item has no ticket, or the switch says

@@ -67,7 +67,7 @@ async function startItem(key: string, kind: string) {
 }
 
 describe("a work item that starts", () => {
-  it.each(["backlog", "ready", "review", "blocked"] as const)(
+  it.each(["backlog", "ready", "review"] as const)(
     "moves an assigned ticket from %s to active",
     async (from) => {
       h = await harness({ team: team() });
@@ -77,6 +77,13 @@ describe("a work item that starts", () => {
       expect(h.ws.ticket(key)?.status).toBe("active");
     },
   );
+
+  it("leaves a blocked ticket blocked: a retry that is still blocked ends with the ticket blocked", async () => {
+    h = await harness({ team: team() });
+    const key = await ticket("blocked");
+    await startItem(key, "assigned");
+    expect(await status(key)).toBe("blocked");
+  });
 
   it("leaves an active ticket alone", async () => {
     h = await harness({ team: team() });

@@ -44,7 +44,7 @@ function manyPrs(rule: Rule): Rule {
         on: ["pr.merged", "pr.closed", "agent.handed_back"],
         if: {
           all: [
-            ...(rule.if ? [rule.if] : []),
+            { ticket_status: ["backlog", "ready", "active", "review", "blocked"] },
             settled,
             { any: [{ hand_back_status: ["done"] }, { ticket_handed_back: true }] },
           ],
@@ -196,7 +196,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     kind: "agent",
     rules: ["pr-merged-done", "pr-closed-ready", "hand-back-to-requester", "second-pr-comment"],
     behaviour:
-      "One pull request per ticket, because the ticket moves to done when its pull request merges: `ost pr open` refuses a second pull request for a ticket (open or merged) and points to `ost ticket create --parent`, and a second pull request a person opens gets a comment on the ticket that says which merge closes it. With many, several pull requests are allowed and the ticket moves to done only when the agent hands its work back as done and every pull request linked to it is closed with at least one merged; a merge alone does not close it.",
+      "One pull request per ticket, because the ticket moves to done when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is): `ost pr open` refuses a second pull request for a ticket (open or merged) and points to `ost ticket create --parent`, and a second pull request a person opens gets a comment on the ticket that says which merge closes it. With many, several pull requests are allowed and the ticket moves to done only when the agent hands its work back as done and every pull request linked to it is closed with at least one merged; a merge alone does not close it.",
     rewrite: manyPrs,
   },
   {
@@ -205,7 +205,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     off: false,
     kind: "office",
     behaviour:
-      "When a work item about a ticket starts, the office moves the ticket to active if it is in backlog, ready, review or blocked, so the board shows the work without the agent having to say so. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and neither does the minimal preset, which never moves tickets. The agent still keeps the ticket accurate as it goes.",
+      "When a work item about a ticket starts, the office moves the ticket to active if it is in backlog, ready or review, so the board shows the work without the agent having to say so. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and neither does the minimal preset, which never moves tickets. A blocked ticket stays blocked until the agent moves it: a retry that is still blocked leaves it blocked. Work that starts on an open pull request moves a ticket closed early (done) back to active. The agent still keeps the ticket accurate as it goes.",
   },
   {
     path: "merge.on_approval",
@@ -226,7 +226,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     kind: "rule",
     rules: ["conflict-back-to-author"],
     behaviour:
-      "When a pull request starts to conflict with its base, for example after another one merged, send it back to its agent author to rebase.",
+      "When an open pull request starts to conflict with its base, for example after another one merged, send it back to its agent author to rebase, whatever the status of its ticket (a done ticket goes back to active; a canceled one is left alone).",
   },
   {
     path: "retry.on_signal",

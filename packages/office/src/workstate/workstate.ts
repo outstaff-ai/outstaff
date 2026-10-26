@@ -898,6 +898,11 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     requester: (t) => tickets.get(t)?.requester,
     hasLabel: (t, label) => tickets.get(t)?.labels.includes(label) ?? false,
 
+    defaultBranch(repo) {
+      const i = repos.findIndex((r) => sameRepo(r, repo));
+      return (i >= 0 ? team.repos[i]?.default_branch : undefined) ?? "main";
+    },
+
     stackedOn(repo, branch) {
       // Everything above the branch, bottom first.
       const out: PrRecord[] = [];

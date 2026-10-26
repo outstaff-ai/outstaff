@@ -1,5 +1,7 @@
+import type { CanonicalStatus } from "../ports/status.js";
 import type { Condition, Rule } from "./rules.js";
 
+const UNFINISHED: CanonicalStatus[] = ["backlog", "ready", "active", "review", "blocked"];
 const OPEN: Rule["if"] = { ticket_status: ["backlog", "ready", "active", "blocked"] };
 
 /**
@@ -86,7 +88,13 @@ const mentionRule = (moves: boolean): Rule => ({
     all: [
       { actor_kind: "human" },
       { agent_mentioned: true },
-      { not: { ticket_status: ["done", "canceled"] } },
+      {
+        any: [
+          { not: { ticket_status: ["done", "canceled"] } },
+          // Closed early, with a pull request still open: that work is not finished.
+          { all: [{ ticket_status: ["done"] }, { ticket_prs_open: true }] },
+        ],
+      },
     ],
   },
   do: [
@@ -172,7 +180,15 @@ const kanbanRules: Rule[] = [
   {
     id: "pr-merged-done",
     on: "pr.merged",
-    if: { ticket_status: ["backlog", "ready", "active", "review", "blocked"] },
+    // A merge into another pull request's branch (a stack) is not the work landing, and neither is a merge while
+    // another pull request of the ticket is open: the last one into the default branch closes the ticket.
+    if: {
+      all: [
+        { ticket_status: UNFINISHED },
+        { pr_base_default: true },
+        { not: { ticket_prs_open: true } },
+      ],
+    },
     do: [{ move: "done" }],
   },
   {
@@ -212,13 +228,22 @@ const kanbanRules: Rule[] = [
   {
     id: "human-feedback-reactivates-ticket",
     on: ["pr.review_submitted", "pr.comment"],
-    if: { all: [humanFeedback, { ticket_status: ["review", "blocked"] }] },
+    // A ticket closed early by a merge into a stack's feature branch is reopened by feedback on its open pull request.
+    if: { all: [humanFeedback, { ticket_status: ["review", "blocked", "done"] }] },
     do: [{ assign: "author" }, { move: "active" }],
   },
   {
     id: "conflict-back-to-author",
     on: "pr.conflicted",
-    if: { all: [{ pr_author_kind: "agent" }, { ticket_status: ["review", "active", "blocked"] }] },
+    // Whatever the ticket's status: a ticket closed early by a merge into a stack's feature branch still has this
+    // pull request open. Only a canceled ticket is left alone.
+    if: {
+      all: [
+        { pr_author_kind: "agent" },
+        { pr_open: true },
+        { not: { ticket_status: ["canceled"] } },
+      ],
+    },
     do: [
       { assign: "author" },
       { move: "active" },

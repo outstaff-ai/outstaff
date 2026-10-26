@@ -88,7 +88,7 @@ describe("a second pull request a person opens", () => {
     expect(comment).toContain(`${key} now has 2 pull requests`);
     expect(comment).toContain(`#${first} `);
     expect(comment).toContain(`#${second} `);
-    expect(comment).toContain("merges first closes");
+    expect(comment).toContain("last of these to merge closes");
   });
 
   it("says what closes the ticket when the team allows several", async () => {
@@ -111,12 +111,14 @@ describe("a second pull request a person opens", () => {
 });
 
 describe("when a ticket with two pull requests is done", () => {
-  it("with one (default), the first merge closes it", async () => {
+  it("with one (default), a merge leaves it while another pull request is open, the last closes it", async () => {
     const key = await start();
     const first = await open(key, "index");
-    await open(key, "ui");
+    const second = await open(key, "ui");
     expect(await status(key)).toBe("review");
     await merge(first);
+    expect(await status(key)).toBe("review");
+    await merge(second);
     expect(await status(key)).toBe("done");
   });
 

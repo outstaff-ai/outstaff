@@ -22,6 +22,7 @@ export type Condition =
   | { pr_draft: boolean }
   | { pr_open: boolean }
   | { pr_merged: boolean }
+  | { pr_base_default: boolean }
   | { has_body: boolean }
   | { agent_mentioned: boolean }
   | { review_state: string[] }
@@ -72,6 +73,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z.strictObject({ pr_draft: z.boolean() }).meta(d("The pull request is (or is not) a draft.")),
     z.strictObject({ pr_open: z.boolean() }).meta(d("The pull request is (or is not) open.")),
     z.strictObject({ pr_merged: z.boolean() }).meta(d("The pull request is (or is not) merged.")),
+    z
+      .strictObject({ pr_base_default: z.boolean() })
+      .meta(
+        d(
+          "The pull request targets (or, with false, does not target) its repository's default branch (repos[].default_branch). A pull request stacked on another one's branch does not.",
+        ),
+      ),
     z
       .strictObject({ has_body: z.boolean() })
       .meta(

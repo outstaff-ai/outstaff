@@ -394,7 +394,10 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       );
     }
 
-    if (ticket && TERMINAL.has(ticket.status ?? "")) {
+    // An open pull request is unfinished work whatever its ticket says: a merge into a stack's feature branch can
+    // close the ticket early. The request attaches to it, and the ticket goes back to active when the work starts.
+    const closedEarly = pr !== undefined && ticket?.status === "done";
+    if (ticket && TERMINAL.has(ticket.status ?? "") && !closedEarly) {
       throw new ProtocolError(
         "invalid",
         `${ticket.key} is ${ticket.status}, and finished work is never reopened. File a follow-up instead: ost ticket create, linking ${ticket.key} and saying it depends on it.`,

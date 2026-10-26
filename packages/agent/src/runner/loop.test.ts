@@ -318,6 +318,64 @@ describe("work loop", () => {
     });
   });
 
+  describe("a retry of a ticket that was blocked", () => {
+    const retry = async (
+      text: string,
+      move?: "active" | "review",
+      from: "blocked" | "active" = "blocked",
+    ) => {
+      await connect();
+      const runtime: Runtime = {
+        async *run(req) {
+          if (move) {
+            const tool = req.tools.find((t) => t.name === "ticket_move")!;
+            await tool.handler({ key: "SHOP-1", to: move }, { workItemId: "w1" });
+          }
+
+          yield { type: "finished", ok: true, text };
+        },
+      };
+
+      const logs: string[] = [];
+      start(runtime, {
+        log: { debug() {}, info() {}, error() {}, warn: (m: string) => void logs.push(m) },
+      });
+
+      await fake.tracker.createIssue({ title: "Checkout", body: "", status: from, labels: [] });
+      socket.offerWith("w1");
+      await until(() => sentOf("handback").length === 1);
+      return { status: (sentOf("handback")[0]!.payload as { status: string }).status, logs };
+    };
+
+    it.each([
+      "Still blocked: I need the staging key from ops.",
+      "I retried it and the ticket remains blocked on the staging key.",
+      "Blocked on ops, nothing to do until the key arrives.",
+    ])("ending %j in free text is handed back as blocked", async (text) => {
+      const { status, logs } = await retry(text);
+      expect(status).toBe("blocked");
+      expect(logs.join("\n")).toContain("still blocked");
+    });
+
+    it("is done when the agent moved the ticket on, whatever the message says", async () => {
+      expect((await retry("Still blocked on nothing now.", "active")).status).toBe("done");
+    });
+
+    it("is done when the message says it is no longer blocked", async () => {
+      expect((await retry("Fixed. The earlier blocker is gone, no longer blocked.")).status).toBe(
+        "done",
+      );
+    });
+
+    it("is done when the message is not about being blocked", async () => {
+      expect((await retry("Finished the search page.")).status).toBe("done");
+    });
+
+    it("is done when the ticket is not blocked, even if the message says blocked", async () => {
+      expect((await retry("Still blocked on review.", undefined, "active")).status).toBe("done");
+    });
+  });
+
   it("accepts an offer, runs it and hands back with the summary and links", async () => {
     await connect();
     const runtime = createFakeRuntime();

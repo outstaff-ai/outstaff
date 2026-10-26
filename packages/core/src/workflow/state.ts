@@ -21,6 +21,9 @@ export interface StaticWorkflowData {
   links?: Record<number, string>;
   roles?: Record<string, string>;
 
+  /** The repositories' default branch; `main` when unset. */
+  defaultBranch?: string;
+
   /** Document id -> handle of the agent who wrote it. */
   docs?: Record<string, string>;
 }
@@ -40,6 +43,7 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
     lastWorker: (t) => data.tickets?.[t]?.lastWorker,
     requester: (t) => data.tickets?.[t]?.requester,
     hasLabel: (t, label) => data.tickets?.[t]?.labels?.includes(label) ?? false,
+    defaultBranch: () => data.defaultBranch ?? "main",
     stackedOn: (repo: RepoRef, branch) =>
       prs.filter(
         (p) =>

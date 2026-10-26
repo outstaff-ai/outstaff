@@ -806,6 +806,15 @@ describe("chat requests", () => {
       ).resolves.toBeDefined();
     });
 
+    it("still refuses a canceled ticket with an open pull request", async () => {
+      ticket("ACME-16", { status: "canceled" });
+      pull(16, { ticket: "ACME-16", draft: false });
+      const s = await session();
+      await expect(
+        desk.attachWork("sam", s.id, { target: "16", confirmed: true }),
+      ).rejects.toMatchObject({ code: "invalid" });
+    });
+
     it("never reopens merged or done work: it is a follow-up", async () => {
       ticket("ACME-14", { status: "done" });
       ticket("ACME-15");
@@ -821,6 +830,25 @@ describe("chat requests", () => {
       }
 
       expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([]);
+    });
+
+    it("attaches a request about an open pull request to its ticket even when the ticket was closed early", async () => {
+      ticket("ACME-14", { status: "done" });
+      pull(49, { ticket: "ACME-14", draft: false });
+      for (const target of ["49", "ACME-14"]) {
+        const { s, attached } = await attach(target, true, "fix the conflicts on PR #49");
+        expect(attached).toMatchObject({
+          attached: { ticket: { ref: "ACME-14" }, pr: { ref: "#49" } },
+        });
+
+        expect(await store.getItem(attached.item.id)).toMatchObject({
+          kind: "review_feedback",
+          subject: { type: "pr", ref: "acme/app#49" },
+        });
+
+        expect(await readOrigin(store, s.id)).toMatchObject({ filed: attached.item.id });
+        await store.updateItem(attached.item.id, { status: "done" });
+      }
     });
 
     it("attaches once per session and only from a chat session", async () => {

@@ -58,6 +58,26 @@ describe("the greeting edits", () => {
   });
 });
 
+describe("assigned, retrying a blocked ticket", () => {
+  it("moves nothing and says it is still blocked", async () => {
+    const shown = (status: string) =>
+      `SHOP-1 Stage\nStatus: ${status}\nblocked: the staging credentials are missing`;
+
+    const play1 = (status: string) =>
+      play(assigned(ctx), (a) =>
+        a.type === "tool" && a.tool === "ticket_show" ? shown(status) : "12.9.1\n",
+      );
+
+    const retry = await play1("Blocked (blocked)");
+    expect(retry.seen.map((a) => (a.type === "tool" ? a.tool : a.type))).toEqual(["ticket_show"]);
+    expect(retry.text).toBe("Still blocked: the staging credentials are missing");
+
+    // The first time the ticket is not blocked yet: the agent blocks it itself.
+    const first = await play1("Todo (ready)");
+    expect(first.seen.filter((a) => a.type === "tool" && a.tool === "ticket_move")).toHaveLength(2);
+  });
+});
+
 describe("assigned", () => {
   const answer = (a: Action) =>
     a.type === "read"

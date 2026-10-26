@@ -35,8 +35,11 @@ const TICKET_WORK = new Set(["assigned", "ticket_comment", "doc_feedback"]);
 /** Kinds that only answer something on a ticket; starting one leaves the ticket where it is. */
 const ANSWERS = new Set(["asked", "doc_feedback", "unblock"]);
 
-/** Where a ticket starts being worked on from. */
-const STARTS_FROM = new Set(["backlog", "ready", "review", "blocked"]);
+/**
+ * Where a ticket starts being worked on from. Not blocked: a retry that is still blocked at its end leaves the ticket
+ * blocked, and the agent that gets past it says so by moving the ticket.
+ */
+const STARTS_FROM = new Set(["backlog", "ready", "review"]);
 const TRANSIENT = new Set(["rate_limited", "unavailable"]);
 
 interface Plan {
@@ -643,21 +646,38 @@ export function createEngine(opts: EngineOptions): Engine {
     );
   };
 
-  /** A work item about a ticket moves it to active when it starts: the office's mechanics, not the agent's duty. */
+  /**
+   * A work item about a ticket moves it to active when it starts: the office's mechanics, not the agent's duty. Work on
+   * an open pull request reopens its ticket when that was closed early (a merge into a stack's feature branch).
+   */
   const moveOnStart = async (item: WorkItem): Promise<void> => {
-    const key = item.subject?.type === "ticket" ? item.subject.ref : undefined;
     if (
-      !key ||
       !tracker ||
       ANSWERS.has(item.kind) ||
+      item.kind === "merge" ||
       !policyOn(team.policies, "tickets.start_moves_active") ||
       !PRESET_MOVES_TICKETS[team.workflow?.preset ?? "kanban"]
     ) {
       return;
     }
 
-    const status = workState.ticket(key)?.status;
-    if (!status || !STARTS_FROM.has(status)) {
+    let key: string | undefined;
+    let from = STARTS_FROM;
+    if (item.subject?.type === "ticket") {
+      key = item.subject.ref;
+    } else if (item.subject?.type === "pr") {
+      const pr = (await store.getSubject("pr", item.subject.ref))?.data as
+        | { ticket?: string; state?: string }
+        | undefined;
+
+      if (pr?.state === "open") {
+        key = pr.ticket;
+        from = new Set(["done"]);
+      }
+    }
+
+    const status = key ? workState.ticket(key)?.status : undefined;
+    if (!key || !status || !from.has(status)) {
       return;
     }
 
@@ -759,7 +779,48 @@ export function createEngine(opts: EngineOptions): Engine {
     return true;
   };
 
+  /**
+   * An item finished the work on a ticket that is not blocked any more: the same person's earlier blocked items on
+   * that ticket are closed, because nothing is left to retry.
+   */
+  const settled = async (item: WorkItem): Promise<void> => {
+    const ticket = await ticketOfItem(item);
+    if (
+      !ticket ||
+      item.status !== "done" ||
+      ANSWERS.has(item.kind) ||
+      workState.ticket(ticket)?.status === "blocked"
+    ) {
+      return;
+    }
+
+    for (const old of await store.listItems({ status: "blocked" })) {
+      if (
+        old.id === item.id ||
+        old.person !== item.person ||
+        old.kind === "unblock" ||
+        (await ticketOfItem(old)) !== ticket
+      ) {
+        continue;
+      }
+
+      await store.updateItem(old.id, { status: "canceled" });
+      await store.appendJournal(
+        old.id,
+        "office",
+        `Closed: work item ${item.id} finished the work on ${ticket}.`,
+      );
+
+      logger.info(`engine: closed blocked work item ${old.id}, ${item.id} finished ${ticket}`, {
+        item: old.id,
+        by: item.id,
+        ticket,
+      });
+    }
+  };
+
   return {
+    settled: (item) => locked(() => settled(item)),
     unblock: (item, reason) => locked(() => unblock(item, reason)),
     started: (itemId) => locked(() => started(itemId)),
     handle: (event, meta) => locked(() => run(event, meta)),
