@@ -138,9 +138,14 @@ export async function* assigned(ctx: ItemContext): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+  // A retry of a ticket that is blocked and still has its blocker: the agent moves nothing and says so in free text.
+  const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
+  if (blocker && /^Status: .*\(blocked\)/m.test(shown)) {
+    return `Still blocked: ${blocker}`;
+  }
+
   yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
   // A ticket that says `blocked: <what>` cannot go on: the agent blocks it and still hands the item back as done.
-  const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
   if (blocker) {
     yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
     yield { type: "tool", tool: "ticket_comment", input: { key, body: `Blocked: ${blocker}` } };

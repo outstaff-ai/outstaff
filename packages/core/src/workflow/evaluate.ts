@@ -168,6 +168,15 @@ function check(c: Condition, ctx: Ctx): Check {
     };
   }
 
+  if ("pr_base_default" in c) {
+    const base = ctx.pr?.baseRef;
+    const def = ctx.pr ? ctx.state.defaultBranch(ctx.pr.ref.repo) : undefined;
+    return {
+      ok: base !== undefined && (base === def) === c.pr_base_default,
+      detail: `pull request targets ${base ?? "unknown"}, the default branch is ${def ?? "unknown"}, wanted ${c.pr_base_default ? "the default branch" : "another branch"}`,
+    };
+  }
+
   if ("has_body" in c) {
     const body = ctx.event.data["body"];
     const comments = ctx.event.data["comments"];

@@ -325,6 +325,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
       await chatDesk.handedBack(item, result);
       await handedBack(item);
+      await track(engine.settled(item));
       await track(engine.followUp(item.id));
     },
   });

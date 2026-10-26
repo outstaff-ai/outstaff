@@ -61,7 +61,7 @@ export const BUILTIN_TEMPLATES: Readonly<Record<string, string>> = {
     "",
     "{{ticket.prs}}",
     "",
-    "outstaff moves a ticket to done when its pull request merges, so whichever of these merges first closes {{ticket}}. If the work needs several pull requests, split it into sub-tickets, one pull request each.",
+    "outstaff moves a ticket to done when its last open pull request merges into the default branch, so the last of these to merge closes {{ticket}}. If the work needs several pull requests, split it into sub-tickets, one pull request each.",
   ].join("\n"),
   second_pr_many: [
     "{{ticket}} now has {{ticket.prs.count}} pull requests:",

@@ -92,6 +92,9 @@ export interface WorkflowState {
   requester(ticket: string): string | undefined;
   hasLabel(ticket: string, label: string): boolean;
 
+  /** The branch pull requests of the repository target by default (`repos[].default_branch`). */
+  defaultBranch(repo: RepoRef): string;
+
   /** Open pull requests whose base is `branch`. */
   stackedOn(repo: RepoRef, branch: string): WorkflowPr[];
 

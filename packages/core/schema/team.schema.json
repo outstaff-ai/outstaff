@@ -2285,6 +2285,19 @@
         {
           "type": "object",
           "properties": {
+            "pr_base_default": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "pr_base_default"
+          ],
+          "additionalProperties": false,
+          "description": "The pull request targets (or, with false, does not target) its repository's default branch (repos[].default_branch). A pull request stacked on another one's branch does not."
+        },
+        {
+          "type": "object",
+          "properties": {
             "has_body": {
               "type": "boolean"
             }

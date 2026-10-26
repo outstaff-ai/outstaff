@@ -1444,6 +1444,28 @@ async function main() {
     `ticket comment: a comment on the handed-back ${design} sent it back to its agent (active), who answered and handed it back`,
   );
 
+  // ---- 10c. the blocked ticket is assigned to the agent again and the agent is still blocked: it ends its message with
+  // "still blocked" and moves nothing. The ticket stays Blocked (the office did not move it to active when the work
+  // started), goes back to the requester, and no earlier blocked item is left behind.
+  const movesBefore = (await state()).tickets.find((x: Json) => x.key === stuck).moves.length;
+  await stub("POST", `/_test/tickets/${stuck}/assign`, { to: "sam" });
+  const retried = await until(`${stuck}: the retry handed back as blocked`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === stuck);
+    return t.assignee !== "sam" ? t : undefined;
+  });
+
+  assertEq(retried.status, "Blocked", "the ticket is still blocked after the retry");
+  assertEq(retried.assignee, "ada.admin", "the blocked ticket went back to the requester");
+  assertEq(
+    retried.moves.slice(movesBefore).filter((m: Json) => m.to === "In Progress").length,
+    0,
+    "neither the office nor the agent moved the blocked ticket to active",
+  );
+
+  step(
+    `blocked retry: ${stuck} assigned to sam again, still blocked in free text -> handed back as blocked, stays Blocked, back with the requester`,
+  );
+
   // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the ticket is the agent's again
   const mentionText = "@sam the staging key is rotated, please carry on.";
   await stub("POST", `/_test/tickets/${stuck}/comment`, { body: mentionText });

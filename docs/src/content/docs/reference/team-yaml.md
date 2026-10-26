@@ -1221,6 +1221,11 @@ Condition that must hold.
 - Type: `boolean`
 - Required
 
+#### workflow.rules[].if.pr_base_default
+
+- Type: `boolean`
+- Required
+
 #### workflow.rules[].if.has_body
 
 - Type: `boolean`
