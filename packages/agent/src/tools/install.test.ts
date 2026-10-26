@@ -295,6 +295,87 @@ describe("installTools", () => {
     expect(m.calls).toEqual([]);
   });
 
+  describe("tool options", () => {
+    const sum = `sha256:${"ab".repeat(32)}`;
+    const adb = (
+      options: Record<string, string | Record<string, string | Record<string, string>>>,
+    ) =>
+      effectiveTools({
+        team: { adb: { version: "36.0.0", source: "http:adb", options, allow: [] } },
+      });
+
+    it("renders options as an inline table after the version", () => {
+      const toml = renderMiseToml(
+        adb({
+          url: "https://dl.acme.example/platform-tools_r{{ version }}-linux.zip",
+          bin_path: "platform-tools",
+          checksum: sum,
+        }),
+      );
+
+      expect(toml).toContain(
+        `"http:adb" = { version = "36.0.0", url = "https://dl.acme.example/platform-tools_r{{ version }}-linux.zip", bin_path = "platform-tools", checksum = "${sum}" }`,
+      );
+
+      expect(renderGlobalMiseToml(adb({ checksum: sum }))).toContain(
+        `"http:adb" = { version = "36.0.0", checksum = "${sum}" }`,
+      );
+    });
+
+    it("renders platform-keyed options as nested inline tables", () => {
+      expect(
+        renderMiseToml(
+          adb({
+            platforms: {
+              "linux-x64": { url: "https://dl.acme.example/a.zip", checksum: sum },
+              "linux-arm64": { url: "https://dl.acme.example/b.zip", checksum: sum },
+            },
+          }),
+        ),
+      ).toContain(
+        `"http:adb" = { version = "36.0.0", platforms = { linux-x64 = { url = "https://dl.acme.example/a.zip", checksum = "${sum}" }, linux-arm64 = { url = "https://dl.acme.example/b.zip", checksum = "${sum}" } } }`,
+      );
+    });
+
+    it("escapes values so they cannot break out of the string", () => {
+      const toml = renderMiseToml(adb({ url: 'a"b\\c\nd\u007f }, evil = "1' }));
+      expect(toml).toContain('url = "a\\"b\\\\c\\nd\\u007f }, evil = \\"1"');
+      expect(toml.split("\n").filter((l) => l.startsWith('"http:adb"'))).toHaveLength(1);
+    });
+
+    it("renders a plain version string without options", () => {
+      expect(renderMiseToml(tools())).toContain(
+        'kubectl = "1.31.3"'.replace("kubectl", '"kubectl"'),
+      );
+    });
+
+    it("installs again when an option changes", async () => {
+      const home = homeDir();
+      const m = fakeMise();
+      await installTools({ tools: adb({ checksum: sum }), home, env: {}, mise: m.runner });
+      const first = m.calls.length;
+      const same = await installTools({
+        tools: adb({ checksum: sum }),
+        home,
+        env: {},
+        mise: m.runner,
+      });
+
+      expect(same.statuses[0]?.state).toBe("cached");
+      expect(m.calls.slice(first).some((c) => c[0] === "install" || c[0] === "lock")).toBe(false);
+
+      const other = await installTools({
+        tools: adb({ checksum: `sha256:${"cd".repeat(32)}` }),
+        home,
+        env: {},
+        mise: m.runner,
+      });
+
+      expect(other.statuses[0]?.state).toBe("installed");
+      expect(m.calls.slice(first).some((c) => c[0] === "install")).toBe(true);
+    });
+  });
+
   it("renders deterministic toml", () => {
     expect(renderMiseToml(tools())).toBe(renderMiseToml(tools()));
   });

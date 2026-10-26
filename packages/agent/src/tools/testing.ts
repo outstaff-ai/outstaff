@@ -16,7 +16,7 @@ export const withGlobalConfig =
     const file = globalConfigFile(opts.cwd, opts.env);
     const text = existsSync(file) ? readFileSync(file, "utf8") : "";
     const key = args[1]!.replaceAll(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const version = new RegExp(`^"${key}" = "([^"]+)"`, "m").exec(text)?.[1];
+    const version = new RegExp(`^"${key}" = (?:\\{ version = )?"([^"]+)"`, "m").exec(text)?.[1];
     return {
       code: 0,
       stdout: version ? `${version}\n` : "",

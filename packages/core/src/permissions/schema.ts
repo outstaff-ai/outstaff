@@ -94,6 +94,17 @@ const TOOL_NAME = /^[a-z0-9][a-z0-9._-]*$/;
 /** Dotted numbers with an optional suffix; ranges, prefixes and aliases such as "latest" do not match. */
 const EXACT_VERSION = /^v?\d+(\.\d+)+([-+.][0-9A-Za-z.+-]+)?$/;
 
+const OPTION_KEY = /^[A-Za-z0-9_-]+$/;
+const optionKey = z.string().regex(OPTION_KEY, "Use letters, digits, dashes and underscores.");
+
+/** A string, or a map for platform-keyed options such as platforms.linux-x64.url. */
+const optionValueSchema = z.union([
+  z.string(),
+  z.record(optionKey, z.union([z.string(), z.record(optionKey, z.string())])),
+]);
+
+export type ToolOptionValue = z.output<typeof optionValueSchema>;
+
 const toolRuleSchema = z
   .strictObject({
     program: programName("Optional; when given it must be the tool's own name.").optional(),
@@ -121,6 +132,14 @@ const toolDeclarationSchema = z
           "Where mise gets the tool, as a mise backend and name such as ubi:vendor/their-cli or npm:their-cli. Defaults to the tool name, which mise looks up in its registry.",
         ),
       ),
+    options: z
+      .record(optionKey, optionValueSchema)
+      .optional()
+      .meta(
+        d(
+          'Options mise passes to the tool\'s backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: "..." } }. Needs source.',
+        ),
+      ),
     allow: z
       .union([
         z.literal("all"),
@@ -136,6 +155,74 @@ const toolDeclarationSchema = z
   .meta(d("A tool installed at agent start, with the commands it may run."));
 
 export type ToolDeclaration = z.output<typeof toolDeclarationSchema>;
+
+const isMap = (v: unknown): v is Record<string, unknown> =>
+  typeof v === "object" && v !== null && !Array.isArray(v);
+
+const hasChecksum = (v: unknown) => typeof v === "string" && v.trim() !== "";
+
+function checkOptions(name: string, t: ToolDeclaration, ctx: z.RefinementCtx) {
+  const { options, source } = t;
+  if (options === undefined) {
+    if (source?.startsWith("http:")) {
+      ctx.addIssue(
+        customIssue(
+          CONFIG_CODES.toolsHttpChecksum,
+          `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
+          [name, "options"],
+        ),
+      );
+    }
+
+    return;
+  }
+
+  if (source === undefined) {
+    ctx.addIssue(
+      customIssue(
+        CONFIG_CODES.toolsOptionsWithoutSource,
+        `Tool "${name}" sets options but no source; options go to the backend the source names.`,
+        [name, "options"],
+      ),
+    );
+  }
+
+  if ("version" in options) {
+    ctx.addIssue(
+      customIssue(
+        CONFIG_CODES.toolsReservedOption,
+        `Tool "${name}" sets options.version; use the version field.`,
+        [name, "options", "version"],
+      ),
+    );
+  }
+
+  if (!source?.startsWith("http:") || hasChecksum(options["checksum"])) {
+    return;
+  }
+
+  const platforms = isMap(options["platforms"]) ? Object.entries(options["platforms"]) : [];
+  const missing = platforms.filter(([, p]) => !isMap(p) || !hasChecksum(p["checksum"]));
+  if (platforms.length === 0) {
+    ctx.addIssue(
+      customIssue(
+        CONFIG_CODES.toolsHttpChecksum,
+        `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
+        [name, "options", "checksum"],
+      ),
+    );
+  }
+
+  for (const [platform] of missing) {
+    ctx.addIssue(
+      customIssue(
+        CONFIG_CODES.toolsHttpChecksum,
+        `Platform "${platform}" of tool "${name}" has no checksum.`,
+        [name, "options", "platforms", platform, "checksum"],
+      ),
+    );
+  }
+}
 
 export const toolsSchema = z
   .record(
@@ -161,6 +248,8 @@ export const toolsSchema = z
           sources.set(t.source, name);
         }
       }
+
+      checkOptions(name, t, ctx);
 
       if (!Array.isArray(t.allow)) {
         continue;

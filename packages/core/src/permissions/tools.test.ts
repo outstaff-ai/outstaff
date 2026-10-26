@@ -91,6 +91,66 @@ people: []`),
     ).toContain("tools.duplicate");
   });
 
+  describe("options", () => {
+    const sum = "sha256:" + "ab".repeat(32);
+    const tool = (opts: string, source = '"http:adb"') =>
+      codes(
+        `tools:\n  adb: { version: 36.0.0, source: ${source}, options: ${opts}, allow: [] }\npeople: []`,
+      );
+
+    it("accepts an http source with a checksum, or one per platform", () => {
+      expect(
+        tool(`{ url: "https://dl.acme.example/a-{{ version }}.zip", checksum: "${sum}" }`),
+      ).toEqual([]);
+
+      expect(
+        tool(
+          `{ platforms: { linux-x64: { url: "https://dl.acme.example/a.zip", checksum: "${sum}" } } }`,
+        ),
+      ).toEqual([]);
+    });
+
+    it("rejects options without a source", () => {
+      expect(
+        codes(`tools:\n  adb: { version: 36.0.0, options: { url: "x" }, allow: [] }\npeople: []`),
+      ).toContain("tools.options_without_source");
+    });
+
+    it("rejects an http source without a checksum", () => {
+      expect(tool('{ url: "https://dl.acme.example/a.zip" }')).toContain("tools.http_checksum");
+      expect(
+        codes(`tools:\n  adb: { version: 36.0.0, source: "http:adb", allow: [] }\npeople: []`),
+      ).toContain("tools.http_checksum");
+    });
+
+    it("rejects a platform without a checksum", () => {
+      expect(
+        tool(
+          `{ platforms: { linux-x64: { url: "u", checksum: "${sum}" }, linux-arm64: { url: "v" } } }`,
+        ),
+      ).toContain("tools.http_checksum");
+    });
+
+    it("rejects a version option and does not require a checksum for other backends", () => {
+      expect(tool(`{ version: "1.0.0", checksum: "${sum}" }`)).toContain("tools.reserved_option");
+      expect(tool('{ bin_path: "bin" }', '"github:acme/adb"')).toEqual([]);
+    });
+
+    it("rejects values that are not strings", () => {
+      expect(tool("{ url: 5 }")).toContain("schema.invalid");
+    });
+
+    it("keeps the options on the effective tool", () => {
+      const r = parseTeam(
+        `tools:\n  adb: { version: 36.0.0, source: "http:adb", options: { checksum: "${sum}" }, allow: [] }\npeople: []`,
+      );
+
+      expect(r.ok && effectiveTools({ team: r.config.tools })[0]?.options).toEqual({
+        checksum: sum,
+      });
+    });
+  });
+
   it("rejects a structured rule for another program and unknown keys", () => {
     expect(
       codes(`tools:
