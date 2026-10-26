@@ -1,9 +1,9 @@
 ---
 title: Tools
-description: Declare the tools your agents need in team.yaml or a toolset, pin their versions, and say exactly which commands they may run.
+description: Declare the tools your agents need in team.yaml or a toolset, pin their versions, and narrow a tool to some of its commands when you need to.
 ---
 
-One image cannot carry every tool a team needs, and Outstaff keeps no list of tools. Instead you declare the tools by name and exact version, and each agent installs them with [mise](https://mise.jdx.dev/) when it starts. The declaration also says which commands the agent may run. The two are one thing on purpose: a tool you install but do not allow does nothing.
+One image cannot carry every tool a team needs, and Outstaff keeps no list of tools. Instead you declare the tools by name and exact version, and each agent installs them with [mise](https://mise.jdx.dev/) when it starts. Agents run any program inside the sandbox (see [permissions](/guides/permissions/)), so a declared tool runs with any arguments unless its declaration narrows it.
 
 ## Declare a tool
 
@@ -11,7 +11,7 @@ Add `tools:` to `team.yaml` for every agent, or under a person for one agent:
 
 ```yaml
 tools:
-  go: { version: 1.23.4, allow: all }
+  go: { version: 1.23.4 }
   kubectl: { version: 1.31.3, allow: [get, describe, logs] }
   their-cli:
     source: "github:vendor/their-cli"
@@ -28,7 +28,7 @@ people:
       terraform: { version: 1.9.8, allow: [init, validate, plan] }
 ```
 
-The key is the program name the agent runs. The stock catalog toolsets declare tools the same way: the `infra` toolset installs terraform, kubectl and helm with read-only verbs. A role's toolset is the base, `tools:` in `team.yaml` replaces a tool of the same name from it, and a person's `tools:` replaces the team's. The winning declaration replaces the others completely, `allow` included, so overriding a version also decides the verbs.
+The key is the program name the agent runs. The stock catalog toolsets declare tools the same way: the `infra` toolset installs terraform, kubectl and helm with read-only verbs. A role's toolset is the base, `tools:` in `team.yaml` replaces a tool of the same name from it, and a person's `tools:` replaces the team's. The winning declaration replaces the others completely, `allow` included, so overriding a version also decides the narrowing.
 
 ## Versions
 
@@ -62,7 +62,6 @@ tools:
       url: "https://downloads.acme.example/acme-cli/{{ version }}/acme-cli-linux-x64.tar.gz"
       bin_path: bin
       checksum: "sha256:<64 hex digits>"
-    allow: [status]
 ```
 
 `{{ version }}` in a value is filled in by mise. For a tool that downloads a different file per platform, put the options under `platforms`, keyed by `<os>-<arch>` (`linux-x64`, `linux-arm64`, `macos-arm64`), each with its own `url` and `checksum`:
@@ -84,18 +83,18 @@ The other options (`bin_path`, `strip_components`, `format` and the rest) are mi
 
 ## The stock toolsets
 
-The agent image carries only Node, git and mise. The `code` toolset installs pnpm, yarn, python and go at pinned versions and allows the verbs it always did (pnpm and yarn: `install`, `ci`, `test`, `run`, `lint`, `build`, `typecheck`; python and go: any arguments). The `infra` toolset installs terraform, kubectl and helm with read-only verbs. Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; the `code` toolset still allows `make` if it is on the `PATH`.
+The agent image carries only Node, git and mise. The `base` toolset, which the designer, PM, product and reviewer roles use, installs python. The `code` toolset installs pnpm, yarn, python and go at pinned versions, with no narrowing. The `infra` toolset installs terraform, kubectl and helm narrowed to read-only verbs. Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; anything on the `PATH` runs.
 
-## Permissions
+## Narrowing a tool
 
-The default is nothing. `allow` is the only thing that lets the agent run a tool:
+Without `allow`, or with `allow: all`, the tool runs with any arguments. `allow` narrows it:
 
-- `all` allows the program with any arguments.
-- A list of words, such as `[get, describe, logs]`, allows those first subcommands: `kubectl get pods` runs, `kubectl delete pod x` still asks.
-- Structured rules take the same fields as `policies.commands` (`subcommand`, `args`, `reason`, `requires_repo`). `program` may be left out; when given it must be the tool's own name.
-- `[]` installs the tool and allows nothing.
+- A list of words, such as `[get, describe, logs]`, allows those first subcommands only: `kubectl get pods` runs, `kubectl delete pod x` is denied.
+- Structured rules take the same fields as `policies.commands` (`subcommand`, `args`, `reason`, `requires_repo`). `program` may be left out; when given it must be the tool's own name. Only the commands they match run.
 
-Outstaff's built-in denies still win over everything here: raw network tools (`curl` only for the origins a [network grant](/guides/network-grants/) names, and only with `network.raw_http`), `adb` (reached with `ost adb`), shell wrappers such as `sudo` and `env`, and git, which repository grants govern. Declaring `curl` with `allow: all` does not make it runnable.
+Declaring a tool also lifts the built-in default denies for infrastructure writes (`kubectl apply`, `terraform apply`, `helm upgrade` and the like): they run when the declaration allows them, with `all` or a list that names them.
+
+Outstaff's hard denies still win over everything here: reading secrets and credential files, printing the environment, privilege tools such as `sudo`, destructive `adb` commands, and git pushes outside the push rules. Declaring `sudo` with `allow: all` does not make it runnable. See [permissions](/guides/permissions/).
 
 ## What happens at start
 
@@ -119,7 +118,7 @@ Installing needs outbound HTTPS to the tool sources: mise's registry and release
 
 ## Prebuilt images instead
 
-If you would rather install nothing at start, or cannot allow the egress, build your own image from the agent image and install the tools into its mise data directory (`mise install` at build time with the same versions). Keep declaring them in `team.yaml` so the permissions apply; the start then finds everything installed and needs no egress. Keep the versions in the declaration and in the image the same, or the start installs the declared ones.
+If you would rather install nothing at start, or cannot allow the egress, build your own image from the agent image and install the tools into its mise data directory (`mise install` at build time with the same versions). Keep declaring them in `team.yaml` so any narrowing applies; the start then finds everything installed and needs no egress. Keep the versions in the declaration and in the image the same, or the start installs the declared ones.
 
 ## Verified with
 

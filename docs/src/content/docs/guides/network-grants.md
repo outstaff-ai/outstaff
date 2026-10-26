@@ -1,14 +1,14 @@
 ---
 title: Network grants
-description: Let an agent reach named HTTP services and Android devices with ost http and ost adb, and open the network path they need.
+description: Give an agent named HTTP services and Android devices for ost http and ost adb, and open the network path they need.
 ---
 
-An agent has no network of its own. Raw tools such as `curl`, `wget`, `nc` and `ssh` are denied, and the `ost` verbs reach only the tracker, the knowledge base and the code host. A network grant adds named services and devices to that list, per person or per role. Everything not granted stays unreachable.
-
-Two verbs use the grants:
+What an agent can reach is decided by the deployment's network policy, not by Outstaff: inside its sandbox the agent runs `curl`, WebSocket clients in its own scripts, `nc` and `adb` like any other program (see [permissions](/guides/permissions/)). A network grant names a service or a device, per person or per role, for two conveniences:
 
 - `ost http` sends a request to a granted HTTP service, with an optional bearer token the agent never sees.
-- `ost adb` pairs with, connects to and runs commands on a granted Android device.
+- `ost adb` pairs with, connects to and runs commands on a granted Android device, remembering its ports.
+
+Use `ost http` for a service that needs a token: the token stays out of the agent's environment and output. Reach a service without one however suits the work, for example a node script that opens a WebSocket and measures round trips.
 
 This page covers the mechanics. How your team uses its services and devices (what an agent may change on them, who approves it) is your own convention, written in your repository like the rest ([Tell your agents how your repo works](/guides/repo-conventions/)).
 
@@ -37,17 +37,16 @@ people:
 
 A person gets the grants of their role, then of each role in `extends`, then their own. A later grant with the same `name` replaces an earlier one, so a person can swap the token of a role's service. `roles` takes catalog role names.
 
-| Field              | Meaning                                                                                                                          |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
-| `http[].name`      | What the agent types: `ost http hub ...`.                                                                                        |
-| `http[].url`       | The origin only: scheme, host and optional port. A path, query or credentials are rejected (`network.invalid_url`).              |
-| `http[].token`     | The name of a secret in the person's secrets. Sent as `Authorization: Bearer <value>`. Optional.                                 |
-| `adb[].host`       | Host name or IP address of the device.                                                                                           |
-| `adb[].port`       | A fixed adb port, for classic adb over TCP (usually 5555).                                                                       |
-| `adb[].pairing`    | `wireless` for Android 11+ wireless debugging, which uses random ports. Give `port` or `pairing`, not both (`network.adb_mode`). |
-| `network.raw_http` | `true` also lets the agent run `curl` against the origins in `http`. Off by default. See [curl](#curl).                          |
+| Field           | Meaning                                                                                                                          |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `http[].name`   | What the agent types: `ost http hub ...`.                                                                                        |
+| `http[].url`    | The origin only: scheme, host and optional port. A path, query or credentials are rejected (`network.invalid_url`).              |
+| `http[].token`  | The name of a secret in the person's secrets. Sent as `Authorization: Bearer <value>`. Optional.                                 |
+| `adb[].host`    | Host name or IP address of the device.                                                                                           |
+| `adb[].port`    | A fixed adb port, for classic adb over TCP (usually 5555).                                                                       |
+| `adb[].pairing` | `wireless` for Android 11+ wireless debugging, which uses random ports. Give `port` or `pairing`, not both (`network.adb_mode`). |
 
-Grants are allow-lists by origin for HTTP and by host for adb. `ost validate` checks the names, URLs and ports, and that a token does not reuse the name of a secret an integration reads (`network.reserved_token`), which would hand that credential to a service.
+The verbs reach only the granted origins and devices. `ost validate` checks the names, URLs and ports, and that a token does not reuse the name of a secret an integration reads (`network.reserved_token`), which would hand that credential to a service.
 
 ## HTTP services
 
@@ -72,13 +71,9 @@ Create the token secret like any other, in the person's secrets directory (`ost 
 .outstaff/secrets/sam/HOME_TOKEN
 ```
 
-### curl
-
-A service with no authentication can also be reached with `curl` when `network.raw_http: true` is set. The permission rules then parse the command and allow it only if every part is understood: one URL, whose origin is one of the person's `http` origins; the flags `-s -S -i -I`, `-X`, `-H`, `-d`/`--data`/`--data-raw`/`--json` with an inline value, and `-m`. Anything else is denied, including redirects (`-L`), proxies, config files, uploads, `@file` bodies, output files, `--resolve` and an `Authorization`, `Host` or `Cookie` header. `curl` sends no token, so use `ost http` for a service that needs one. A chat session never gets `curl`.
-
 ## Android devices
 
-`ost adb` uses `adb` from Android platform-tools. Raw `adb` is always denied, whatever the tool declaration allows, because the verb is what keeps the agent on the devices it was granted.
+`ost adb` uses `adb` from Android platform-tools. The agent can also run `adb` itself; the permission policy denies the destructive commands either way (factory reset and wipes, recovery and bootloader reboots, `rm -r` of the device's data roots, removing system packages). The verb adds what raw `adb` lacks: it picks the granted device, connects first and remembers wireless debugging ports.
 
 ### Install adb
 
@@ -93,12 +88,11 @@ tools:
       url: "https://dl.google.com/android/repository/platform-tools_r{{ version }}-linux.zip"
       bin_path: platform-tools
       checksum: "sha256:d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1"
-    allow: []
 ```
 
 That URL is the linux x86-64 build. Google publishes no arm64 Linux platform-tools, so a team whose agents run on arm64 needs its own image with `adb` on the `PATH`. The checksum above is the SHA-256 of `platform-tools_r37.0.1-linux.zip`, computed from the download (Google's repository manifest lists SHA-1 only). When you change the version, download the new zip, compare its SHA-1 with the manifest at `https://dl.google.com/android/repository/repository2-3.xml`, and put its SHA-256 in `checksum`.
 
-`allow: []` installs the tool and allows no commands from the shell, which is what you want: the agent reaches the device through `ost adb`. The verb runs whichever `adb` is first on the agent's `PATH`. `ost doctor <handle>` reports whether `adb` runs.
+The verb runs whichever `adb` is first on the agent's `PATH`. `ost doctor <handle>` reports whether `adb` runs.
 
 ### Classic adb over TCP
 
@@ -141,7 +135,7 @@ The verb refuses a short list of commands: connection management (`connect`, `di
 
 ## Open the network path
 
-Granting a service in `team.yaml` does not open the network. The deployment must allow the agent to reach the host, or `ost http` and `ost adb` fail with a message that points at the network path. On Kubernetes that is a NetworkPolicy; the [example policy](/guides/kubernetes/#network-policy) allows HTTPS to public addresses only and none of the private ranges. Add an egress rule for the agent pods and each host you granted:
+Granting a service in `team.yaml` does not open the network, and leaving it out does not close it. The deployment's network policy decides what the agent reaches, with the verbs or without them; `ost http` and `ost adb` fail with a message that points at the network path when it is closed. On Kubernetes that is a NetworkPolicy; the [example policy](/guides/kubernetes/#network-policy) allows HTTPS to public addresses only and none of the private ranges. Add an egress rule for the agent pods and each host you granted:
 
 ```yaml
 apiVersion: networking.k8s.io/v1

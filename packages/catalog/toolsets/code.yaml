@@ -4,22 +4,9 @@ profiles: [code, infra]
 tools:
   pnpm:
     version: 12.9.1
-    allow: [install, ci, test, run, lint, build, typecheck]
   yarn:
     version: 1.22.22
-    allow: [install, ci, test, run, lint, build, typecheck]
   python:
     version: 3.13.9
-    allow: all
   go:
     version: 1.23.4
-    allow: all
-rules:
-  - program: npm
-    verbs: [install, ci, test, run, lint, build, typecheck]
-    reason: Package manager script or install.
-  - program: npx
-    verbs: [tsc, vitest, oxlint, eslint, prettier]
-    reason: Runs a local build, test or lint tool.
-  - program: [node, tsc, vitest, oxlint, eslint, prettier, python3, make]
-    reason: Build, test or lint tool. python3 comes with the python tool; make is not installed by Outstaff.

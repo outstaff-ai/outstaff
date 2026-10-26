@@ -1,5 +1,4 @@
 import type { Capability } from "../capabilities.js";
-import { originOf, type NetworkGrants } from "../config/network.js";
 import type { TeamConfig } from "../config/schema.js";
 import type { CommandRule, GitMode, Layout, Policy, Profile, RulePack, ToolKind } from "./types.js";
 
@@ -15,14 +14,14 @@ export interface BuildPolicyInput {
   /** Rules from adapters, toolsets and the team, merged after the built-in ones. */
   packs?: RulePack[];
 
+  /** The profile whose rule packs apply; defaults to `profile`. A chat session takes those of its role's profile. */
+  packsOf?: Profile;
+
   /**
    * Capabilities the person's role declares and the team has switched on. `design.canvas` adds the artifact tool and
    * the artifacts folder; no profile has them by itself.
    */
   capabilities?: readonly Capability[];
-
-  /** The person's merged network grants (`networkGrants`). `curl` is allowed to their origins only when `rawHttp` is on. */
-  network?: NetworkGrants;
 }
 
 /** Where a person's Design canvas files live; the folder stays across items. */
@@ -34,15 +33,11 @@ interface ProfileSpec {
   /** Whether write grants are honoured (git write verbs, edits in worktrees). */
   honoursWrite: boolean;
 
-  /** Writable file globs relative to a worktree; "all" is every file. */
+  /** Which files of a write repository's worktree the edit tools may change; "all" is every file. */
   writable: "none" | "docs" | "all";
-  mutators: boolean;
 
   /** The `ost` verbs the profile may call. Every verb when omitted. */
   verbs?: string[];
-
-  /** Whether rule packs apply when they name no profile. Default true. */
-  anyPack?: boolean;
 }
 
 /**
@@ -69,221 +64,171 @@ export const CHAT_VERBS = [
   "pr.comment",
 ];
 
+const WORK_TOOLS: ToolKind[] = [
+  "read",
+  "write",
+  "edit",
+  "search",
+  "shell",
+  "web_fetch",
+  "subagent",
+  "ost",
+];
+
 /**
- * readonly: look but do not touch. Read and search, read-only git even where a write grant exists, no edits.
- * docs:     documentation work. Edits only documentation files (md, mdx, txt, rst and anything under docs/) in
- *           worktrees, scratch and memory; git write verbs and PR verbs for write repos.
- * code:     software work. Edits any file in worktrees of write repos.
- * infra:    like code, for infrastructure repos.
- * chat:     a chat session beside a running work item. Reads the repositories and the office state; writes no file,
- *           pushes nothing, and calls only the `ost` verbs in CHAT_VERBS. Only rule packs that name this profile apply.
+ * Every profile runs any program inside the sandbox; the profiles differ in what they may change in repositories.
  *
- * Which tools each profile may run (build tools, infra CLIs, an integration's CLI) comes from rule packs.
+ * readonly: read-only git even where a write grant exists; the edit tools change no repository file.
+ * docs:     the edit tools change only documentation files (md, mdx, txt, rst and anything under docs/) in worktrees
+ *           of write repos; git write verbs and pushes for write repos.
+ * code:     the edit tools change any file in worktrees of write repos.
+ * infra:    like code, for infrastructure repos.
+ * chat:     a chat session beside a running work item. The same tools as a work session, but read-only git, no
+ *           repository edits, and only the `ost` verbs in CHAT_VERBS.
+ *
+ * Every profile may write its scratch, memory, harness (`~/.claude`) and tmp folders.
  */
 export const PROFILE_SPECS: Record<Profile, ProfileSpec> = {
-  readonly: {
-    tools: ["read", "search", "shell", "ost"],
-    honoursWrite: false,
-    writable: "none",
-    mutators: false,
-  },
-  docs: {
-    tools: ["read", "write", "edit", "search", "shell", "web_fetch", "subagent", "ost"],
-    honoursWrite: true,
-    writable: "docs",
-    mutators: true,
-  },
-  code: {
-    tools: ["read", "write", "edit", "search", "shell", "web_fetch", "subagent", "ost"],
-    honoursWrite: true,
-    writable: "all",
-    mutators: true,
-  },
-  infra: {
-    tools: ["read", "write", "edit", "search", "shell", "web_fetch", "subagent", "ost"],
-    honoursWrite: true,
-    writable: "all",
-    mutators: true,
-  },
-  chat: {
-    tools: ["read", "search", "shell", "ost"],
-    honoursWrite: false,
-    writable: "none",
-    mutators: false,
-    verbs: CHAT_VERBS,
-    anyPack: false,
-  },
+  readonly: { tools: WORK_TOOLS, honoursWrite: false, writable: "none" },
+  docs: { tools: WORK_TOOLS, honoursWrite: true, writable: "docs" },
+  code: { tools: WORK_TOOLS, honoursWrite: true, writable: "all" },
+  infra: { tools: WORK_TOOLS, honoursWrite: true, writable: "all" },
+  chat: { tools: WORK_TOOLS, honoursWrite: false, writable: "none", verbs: CHAT_VERBS },
 };
 
 const DOC_GLOBS = ["**/*.md", "**/*.mdx", "**/*.txt", "**/*.rst", "**/docs/**"];
 
-const SECRET_GLOBS = ["**/.env", "**/.env.local", "**/.env.*.local", "**/*.pem"];
-
-const READ_UTILS = [
-  "ls",
-  "cat",
-  "head",
-  "tail",
-  "wc",
-  "grep",
-  "rg",
-  "sort",
-  "uniq",
-  "diff",
-  "cut",
-  "tr",
-  "jq",
-  "tree",
-  "stat",
-  "file",
-  "realpath",
-  "basename",
-  "dirname",
-  "du",
+/** Files that hold credentials wherever they are. The secrets folder and the process environment are added per layout. */
+const SECRET_GLOBS = [
+  "**/.env",
+  "**/.env.local",
+  "**/.env.*.local",
+  "**/*.pem",
+  "**/.git-credentials",
+  "**/.netrc",
+  "**/.ssh/id_*",
+  "**/.claude/.credentials.json",
+  "/proc/**/environ",
+  "/proc/**/mem",
 ];
 
-const NO_PATH_UTILS = ["pwd", "echo", "date", "true", "false", "which"];
-const MUTATORS = ["mkdir", "touch", "rm", "cp", "mv", "tee"];
-const NETWORK_TOOLS = [
-  "curl",
-  "wget",
-  "nc",
-  "ncat",
-  "netcat",
-  "telnet",
-  "ssh",
-  "scp",
-  "sftp",
-  "ftp",
-  "rsync",
-  "socat",
-];
-
-/** Reached only through a verb that checks the device against the person's grants. */
-const VERB_ONLY_TOOLS: Record<string, string> = { adb: "ost adb" };
-
-const WRAPPERS = [
-  "sh",
-  "bash",
-  "zsh",
-  "dash",
-  "eval",
+/** Programs that change the user the command runs as, or leave the sandbox's view of the system. */
+const PRIVILEGE_TOOLS = [
   "sudo",
   "doas",
   "su",
-  "env",
-  "xargs",
-  "exec",
-  "nohup",
-  "command",
-  "builtin",
-  "source",
-  ".",
-  "time",
-  "watch",
+  "pkexec",
+  "runuser",
+  "nsenter",
+  "chroot",
+  "setpriv",
+  "capsh",
 ];
+
+/** Infrastructure writes, denied unless a tool declaration or team rule allows the program. */
+const INFRA_WRITES: { program: string; verbs: string[]; sub?: Record<string, string> }[] = [
+  {
+    program: "kubectl",
+    verbs: [
+      "apply",
+      "create",
+      "delete",
+      "edit",
+      "patch",
+      "replace",
+      "scale",
+      "autoscale",
+      "set",
+      "label",
+      "annotate",
+      "taint",
+      "cordon",
+      "uncordon",
+      "drain",
+      "expose",
+      "run",
+      "exec",
+      "cp",
+      "debug",
+      "attach",
+      "certificate",
+    ],
+    sub: { rollout: "^(restart|undo|pause|resume)$" },
+  },
+  { program: "helm", verbs: ["install", "upgrade", "uninstall", "delete", "rollback"] },
+  ...["terraform", "tofu"].map((program) => ({
+    program,
+    verbs: ["apply", "destroy", "import", "taint", "untaint", "force-unlock"],
+    sub: { state: "^(rm|mv|push|replace-provider)$" },
+  })),
+  {
+    program: "pulumi",
+    verbs: ["up", "update", "destroy", "refresh", "import", "cancel"],
+    sub: { stack: "^(rm|remove)$" },
+  },
+];
+
+/**
+ * What Claude Code loads as configuration, and the rendered working directory (skills, references, the project
+ * settings source). Never writable, even where a broader allow covers them, so no file there becomes a way to persist
+ * instructions or hooks across sessions.
+ */
+function harnessConfig(layout: Layout): string[] {
+  const claude = `${layout.home}/.claude`;
+  return [
+    `${claude}/settings*.json`,
+    `${claude}/CLAUDE.md`,
+    `${claude}/*.md`,
+    ...["hooks", "skills", "agents", "commands", "plugins", "output-styles", "rules"].map(
+      (d) => `${claude}/${d}/**`,
+    ),
+    `${claude}/projects/*/settings*.json`,
+    `${layout.home}/.claude.json`,
+    `${layout.home}/.mcp.json`,
+    `${layout.workDir}/**`,
+  ];
+}
 
 const rule = (r: CommandRule): CommandRule => r;
 
-export function commandRules(spec: ProfileSpec): CommandRule[] {
-  const rules: CommandRule[] = [];
-  for (const program of NETWORK_TOOLS) {
-    rules.push(
-      rule({
-        id: `network.${program}`,
-        program,
-        effect: "deny",
-        reason: `Raw network tool ${program} is denied; use ost verbs.`,
-      }),
-    );
-  }
-
-  for (const [program, verb] of Object.entries(VERB_ONLY_TOOLS)) {
-    rules.push(
-      rule({
-        id: `network.${program}`,
-        program,
-        effect: "deny",
-        reason: `Raw ${program} is denied; use ${verb}, which reaches only the devices granted to you.`,
-      }),
-    );
-  }
-
-  for (const program of WRAPPERS) {
-    rules.push(
-      rule({
-        id: `wrapper.${program}`,
-        program,
-        effect: "deny",
-        reason: `${program} can run commands the policy cannot see.`,
-      }),
-    );
-  }
-
-  for (const program of READ_UTILS) {
-    rules.push(
-      rule({
-        id: `read.${program}`,
-        program,
-        effect: "allow",
-        pathArgs: "read",
-        reason: `${program} reads files.`,
-      }),
-    );
-  }
-
-  rules.push(
+/** The built-in command rules: privilege tools are denied, infrastructure writes are denied by default. */
+export function commandRules(): CommandRule[] {
+  const rules: CommandRule[] = PRIVILEGE_TOOLS.map((program) =>
     rule({
-      id: "find.exec",
-      program: "find",
-      args: [
-        {
-          kind: "flag",
-          names: ["-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint"],
-          present: true,
-        },
-      ],
+      id: `privilege.${program}`,
+      program,
       effect: "deny",
-      reason: "find that runs commands or deletes is denied.",
-    }),
-    rule({
-      id: "read.find",
-      program: "find",
-      effect: "allow",
-      pathArgs: "read",
-      reason: "find reads the file tree.",
-    }),
-    rule({
-      id: "sed.inplace",
-      program: "sed",
-      args: [{ kind: "flag", names: ["-i", "--in-place"], present: true }],
-      effect: "deny",
-      reason: "In-place sed is denied; use the edit tool.",
-    }),
-    rule({
-      id: "read.sed",
-      program: "sed",
-      effect: "allow",
-      pathArgs: "read",
-      reason: "sed to stdout reads files.",
+      reason: `${program} runs commands with other privileges.`,
     }),
   );
 
-  for (const program of NO_PATH_UTILS) {
-    rules.push(
-      rule({ id: `util.${program}`, program, effect: "allow", reason: `${program} is harmless.` }),
-    );
-  }
+  for (const { program, verbs, sub } of INFRA_WRITES) {
+    const reason = (what: string) =>
+      `${program} ${what} changes infrastructure; it runs only when a tools declaration or team rule allows ${program}.`;
 
-  if (spec.mutators) {
-    for (const program of MUTATORS) {
+    for (const verb of verbs) {
       rules.push(
         rule({
-          id: `write.${program}`,
+          id: `infra.${program}.${verb}`,
           program,
-          effect: "allow",
-          pathArgs: "write",
-          reason: `${program} within writable paths.`,
+          subcommand: [verb],
+          effect: "deny",
+          fallback: true,
+          reason: reason(verb),
+        }),
+      );
+    }
+
+    for (const [word, pattern] of Object.entries(sub ?? {})) {
+      rules.push(
+        rule({
+          id: `infra.${program}.${word}`,
+          program,
+          subcommand: [word],
+          args: [{ kind: "positional", index: 0, pattern }],
+          effect: "deny",
+          fallback: true,
+          reason: reason(word),
         }),
       );
     }
@@ -327,20 +272,14 @@ export function repoAccess(
   return access;
 }
 
-function curlOrigins(network: NetworkGrants | undefined): Policy["network"] {
-  const origins = [...new Set((network?.http ?? []).flatMap((g) => originOf(g.url) ?? []))];
-
-  return network?.rawHttp && origins.length > 0 ? { raw: "http", origins } : { raw: "deny" };
-}
-
 export function buildPolicy({
   profile,
   person,
   team,
   layout,
   packs = [],
+  packsOf = profile,
   capabilities = [],
-  network,
 }: BuildPolicyInput): Policy {
   for (const [name, dir] of [
     ["reposDir", layout.reposDir],
@@ -355,19 +294,13 @@ export function buildPolicy({
   const spec = PROFILE_SPECS[profile];
   const repos: Policy["git"]["repos"] = {};
   const defaultBranches: Policy["git"]["defaultBranches"] = {};
-  const readAllow = [
-    `${layout.workDir}/**`,
-    layout.reposDir,
-    layout.worktreesDir,
+  const writeAllow: string[] = [
     `${layout.scratchDir}/**`,
     `${layout.memoryDir}/**`,
+    // Claude Code's session memory and tool-result spill files; the rest of ~/.claude is configuration.
+    `${layout.home}/.claude/projects/**`,
+    "/tmp/**",
   ];
-
-  const writeAllow: string[] = [`${layout.scratchDir}/**`, `${layout.memoryDir}/**`];
-  const writeAllowDocsOnly = spec.writable === "docs";
-  if (spec.writable === "none") {
-    writeAllow.length = 0;
-  }
 
   for (const repo of team.repos) {
     const granted = repoGrant(person, repo);
@@ -379,24 +312,19 @@ export function buildPolicy({
     for (const dir of [`${layout.reposDir}/${repo.name}`, `${layout.worktreesDir}/${repo.name}`]) {
       repos[dir] = mode;
       defaultBranches[dir] = repo.default_branch;
-      readAllow.push(`${dir}/**`);
     }
 
     if (mode === "write" && spec.writable !== "none") {
       const wt = `${layout.worktreesDir}/${repo.name}`;
-      if (writeAllowDocsOnly) {
-        writeAllow.push(...DOC_GLOBS.map((g) => `${wt}/${g}`));
-      } else {
-        writeAllow.push(`${wt}/**`);
-      }
+      writeAllow.push(
+        ...(spec.writable === "docs" ? DOC_GLOBS.map((g) => `${wt}/${g}`) : [`${wt}/**`]),
+      );
     }
   }
 
-  // The profile's `writable: none` is about repositories; a canvas role keeps its own folder even when it is read-only.
   const tools: ToolKind[] = [...spec.tools];
   if (capabilities.includes("design.canvas")) {
     tools.push("artifact");
-    readAllow.push(`${artifactsDir(layout)}/**`);
     writeAllow.push(`${artifactsDir(layout)}/**`);
   }
 
@@ -405,19 +333,27 @@ export function buildPolicy({
     profile,
     home: layout.home,
     defaultCwd: layout.workDir,
+    secretsDir: layout.secretsDir,
     tools: { allow: tools, deny: [] },
     paths: {
-      read: { allow: readAllow, deny: readDeny },
-      write: { allow: writeAllow, deny: [...readDeny, "**/.git", "**/.git/**"] },
+      read: { allow: ["/**"], deny: readDeny },
+      write: {
+        allow: writeAllow,
+        deny: [
+          ...readDeny,
+          "**/.git",
+          "**/.git/**",
+          `${layout.home}/.gitconfig`,
+          `${layout.home}/.config/git/**`,
+          ...harnessConfig(layout),
+        ],
+      },
     },
     commands: [
-      ...commandRules(spec),
-      ...packs
-        .filter((p) => (p.profiles ? p.profiles.includes(profile) : spec.anyPack !== false))
-        .flatMap((p) => p.rules),
+      ...commandRules(),
+      ...packs.filter((p) => !p.profiles || p.profiles.includes(packsOf)).flatMap((p) => p.rules),
     ],
     git: { repos, defaultBranches },
-    network: curlOrigins(network),
     ...(spec.verbs ? { ost: { allow: [...spec.verbs] } } : {}),
   };
 }

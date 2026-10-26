@@ -41,7 +41,6 @@ describe("network grants in team.yaml", () => {
         };
 
         c.people[0].network = {
-          raw_http: true,
           http: [{ name: "home", url: "https://home.acme.example:8123/", token: "HOME_TOKEN" }],
           adb: [
             { name: "test-tablet", host: "10.0.0.16", pairing: "wireless" },
@@ -119,7 +118,6 @@ describe("networkGrants", () => {
     roles: {
       developer: {
         network: {
-          raw_http: true,
           http: [
             { name: "hub", url: "https://hub.acme.example" },
             { name: "home", url: "https://home.acme.example", token: "ROLE_TOKEN" },
@@ -136,13 +134,11 @@ describe("networkGrants", () => {
       role: "developer",
       extends: ["qa"],
       network: {
-        raw_http: false,
         http: [{ name: "home", url: "https://home.acme.example", token: "HOME_TOKEN" }],
         adb: [{ name: "tablet", host: "10.0.0.16", pairing: "wireless" }],
       },
     });
 
-    expect(g.rawHttp).toBe(false);
     expect(g.http.map((h) => h.name).toSorted()).toEqual(["home", "hub", "qa"]);
     expect(g.http.find((h) => h.name === "home")?.token).toBe("HOME_TOKEN");
     expect(g.adb.map((a) => a.name)).toEqual(["panel", "tablet"]);
@@ -151,14 +147,13 @@ describe("networkGrants", () => {
 
   it("gives a person with no grants nothing", () => {
     expect(networkGrants(team, { role: "architect" })).toEqual({
-      rawHttp: false,
       http: [],
       adb: [],
     });
   });
 
   it("inherits from the role when the person has none", () => {
-    expect(networkGrants(team, { role: "developer" }).rawHttp).toBe(true);
+    expect(networkGrants(team, { role: "developer" }).adb.map((a) => a.name)).toEqual(["panel"]);
   });
 });
 

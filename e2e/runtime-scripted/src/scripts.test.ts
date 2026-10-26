@@ -26,6 +26,11 @@ const ctx = {
   conventionFiles: ["CONTRIBUTING.md"],
 };
 
+/** The commands the work script checks the policy denies; the runtime throws their denial into the script. */
+const MUST_DENY = ["env", "cat /proc/self/environ", "git push origin main", "sudo true"];
+
+const SHELL_WORK = `(cd .. && pwd) && echo "$HOME" > /dev/null && cat <<'EOF' | wc -l\nchecked\nEOF`;
+
 /** Plays a script, answering each action with `answer`, and returns the actions and the final message. */
 async function play(
   script: AsyncGenerator<Action, string, string>,
@@ -37,7 +42,12 @@ async function play(
   while (!step.done) {
     const action = step.value;
     seen.push(action);
-    const failure = fails(action);
+    const failure =
+      (action.type === "shell" &&
+        MUST_DENY.includes(action.command) &&
+        "was denied by the policy") ||
+      fails(action);
+
     step = failure
       ? await script.throw(new Error(typeof failure === "string" ? failure : "failed"))
       : await script.next(answer(action));
@@ -86,7 +96,7 @@ describe("assigned", () => {
         ? "Opened acme/shop#1\nhttps://github.acme.example/acme/shop/pull/1"
         : a.type === "tool" && a.tool === "ticket_show"
           ? "SHOP-1 Add a greeting"
-          : a.type === "shell" && a.command === "pnpm --version"
+          : a.type === "shell" && a.command === "CI=1 pnpm --version"
             ? "12.9.1\n"
             : "";
 
@@ -97,13 +107,15 @@ describe("assigned", () => {
     ).toEqual([
       "ticket_show",
       "ticket_move",
-      "pnpm --version",
+      "CI=1 pnpm --version",
+      SHELL_WORK,
+      ...MUST_DENY,
       "read",
       "git switch -c 'feat/SHOP-1-add-a-greeting'",
       "read",
       "write",
       "git add -A",
-      "git commit -m 'SHOP-1: Add a greeting'",
+      "git commit -F - <<'EOF'\nSHOP-1: Add a greeting\nEOF",
       "git push origin 'feat/SHOP-1-add-a-greeting'",
       "pr_open",
     ]);
@@ -126,10 +138,23 @@ describe("assigned", () => {
     });
   });
 
+  it("fails when the policy lets a hard-denied command run", async () => {
+    // A runtime that denies nothing: every command answers like any other.
+    const run = async () => {
+      const script = assigned(ctx);
+      let step = await script.next();
+      while (!step.done) {
+        step = await script.next(answer(step.value));
+      }
+    };
+
+    await expect(run()).rejects.toThrow("env ran; the policy should deny it.");
+  });
+
   it("fails when pnpm does not print a version", async () => {
     await expect(
       play(assigned(ctx), (a) =>
-        a.type === "shell" && a.command === "pnpm --version"
+        a.type === "shell" && a.command === "CI=1 pnpm --version"
           ? "mise use -g pnpm@12.9.1"
           : answer(a),
       ),
@@ -221,7 +246,7 @@ describe("assigned, for a ticket that needs two pull requests", () => {
           ? "Created SHOP-2.\nSHOP-2: Add a farewell\nhttps://tracker.example/issue/SHOP-2\nPart of SHOP-1: https://tracker.example/issue/SHOP-1"
           : a.type === "tool" && a.tool === "ticket_show"
             ? "SHOP-1 Add a greeting\n\nsplit: Add a farewell"
-            : a.type === "shell" && a.command === "pnpm --version"
+            : a.type === "shell" && a.command === "CI=1 pnpm --version"
               ? "12.9.1\n"
               : "";
 
@@ -393,7 +418,12 @@ describe("chat", () => {
       () => "1. [SHOP-1 Add a greeting](x) (running)\n",
     );
 
-    expect(seen).toEqual([{ type: "tool", tool: "work", input: {} }]);
+    // A chat session has the tools of a work session: it can run the toolchain.
+    expect(seen).toEqual([
+      expect.objectContaining({ type: "shell", command: "CI=1 pnpm --version" }),
+      { type: "tool", tool: "work", input: {} },
+    ]);
+
     expect(text).toContain("greeting.txt");
     expect(text).toContain("SHOP-1 Add a greeting");
   });
@@ -464,7 +494,11 @@ describe("chat", () => {
       () => "1. [SHOP-1 Add a greeting](x) (running)\n",
     );
 
-    expect(seen).toEqual([{ type: "tool", tool: "work", input: {} }]);
+    expect(seen).toEqual([
+      expect.objectContaining({ type: "shell", command: "CI=1 pnpm --version" }),
+      { type: "tool", tool: "work", input: {} },
+    ]);
+
     expect(text).toContain("greeting.txt");
   });
 

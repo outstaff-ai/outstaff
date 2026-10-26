@@ -369,11 +369,18 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     layout,
     packs,
     capabilities,
-    network,
   });
 
-  // Chat sessions run beside the active item, so they get a profile that cannot disturb it.
-  const chatPolicy = buildPolicy({ profile: "chat", person: me, team, layout, packs });
+  // Chat sessions run beside the active item, so they get a profile that cannot change its repositories.
+  const chatPolicy = buildPolicy({
+    profile: "chat",
+    packsOf: rendered.profile,
+    person: me,
+    team,
+    layout,
+    packs,
+  });
+
   const systemPrompt = buildIdentityPrompt({
     team,
     handle: person,

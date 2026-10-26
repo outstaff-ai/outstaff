@@ -269,12 +269,6 @@ office: { events: poll, poll_interval_seconds: 10 }
 policies:
   # Only this approver's approval merges: the other steps approve nothing, and a human here changes none of them.
   merge: { on_approval: true, approvers: [human:merge-approver] }
-  commands:
-    # The code toolset allows pnpm's verbs, not \`pnpm --version\`; the scripted agent checks the tool with it.
-    allow:
-      - program: pnpm
-        args: [{ kind: flag, names: [--version], present: true }]
-        reason: Prints the version of the tool the toolset installed.
 `;
 
 /**

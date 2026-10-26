@@ -112,7 +112,7 @@ describe("AdapterRegistry.rulePacks", () => {
       packs: registry.rulePacks(),
     });
 
-    expect(evaluate(policy, { kind: "shell", command: "alpha x", cwd: "/w" }).rule).toBe(
+    expect(evaluate(policy, { kind: "shell", command: "alpha x", cwd: "/w/d" }).rule).toBe(
       "alpha.view",
     );
   });

@@ -53,12 +53,18 @@ export interface CommandRule {
 
   /** The working repository must have at least this grant (write implies read). */
   requiresRepo?: GitMode;
+
+  /**
+   * A built-in default deny, such as mutating kubectl verbs. It applies only while no allow rule names the program, so a
+   * tool declaration or a team rule that allows the program lifts it.
+   */
+  fallback?: boolean;
 }
 
 /**
- * Command rules from one source. Core knows only git and raw network tools; everything else comes from packs:
- * adapters (the integration's own CLI), toolsets (catalog data per image variant) and the team (team.yaml).
- * Deny wins over allow whatever the source.
+ * Command rules from one source: adapters (the integration's own CLI), toolsets (catalog data per image variant), tool
+ * declarations and the team (team.yaml). A program no allow rule names runs with any arguments; once an allow rule
+ * names a program, the program runs only what such rules allow. Deny wins over allow whatever the source.
  */
 export interface RulePack {
   id: string;
@@ -78,7 +84,16 @@ export interface Policy {
   tools: { allow: ToolKind[]; deny: ToolKind[] };
   paths: { read: PathRules; write: PathRules };
 
-  /** Non-git programs. Git is judged by the push and verb rules driven by `git`. */
+  /**
+   * The folder of secret files. Any shell command that names it is denied, whatever the program, on top of the
+   * `paths.read.deny` globs.
+   */
+  secretsDir: string;
+
+  /**
+   * Rules for non-git programs. Anything no rule denies is allowed: the sandbox, the deployment's network policy and
+   * per-person identities are the boundary, not this list. Git is judged by the push rules driven by `git`.
+   */
   commands: CommandRule[];
   git: {
     /** Absolute repository or worktree root -> grant. The longest matching prefix of the working directory wins. */
@@ -87,12 +102,6 @@ export interface Policy {
     /** Same keys as `repos`. */
     defaultBranches: Record<string, string>;
   };
-
-  /**
-   * Raw network tools are denied. With `raw: "http"`, `curl` is allowed for simple requests to the granted origins
-   * (`ost http` is the way to services that need a token).
-   */
-  network: { raw: "deny" } | { raw: "http"; origins: string[] };
 
   /** The `ost` verbs the profile may call, by verb name (`ticket.create`). Every verb when omitted. */
   ost?: { allow: string[] };
@@ -112,8 +121,7 @@ export interface ToolCall {
 }
 
 export interface Decision {
-  /** `ask` means the policy does not cover the call; unattended runtimes treat it as deny. */
-  effect: "allow" | "deny" | "ask";
+  effect: "allow" | "deny";
   reason: string;
   rule?: string;
 }

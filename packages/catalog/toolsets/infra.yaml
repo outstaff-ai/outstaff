@@ -1,5 +1,5 @@
 name: infra
-description: Read-only infrastructure CLIs, installed at agent start. Applying changes goes through a pull request.
+description: Infrastructure CLIs, installed at agent start and narrowed to read-only verbs. Applying changes goes through a pull request.
 profiles: [infra]
 tools:
   terraform:
