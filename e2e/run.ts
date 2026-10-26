@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, and a mention of the agent on a blocked ticket held by a human makes the ticket the agent's. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -1369,6 +1369,31 @@ async function main() {
 
   step(
     `ticket comment: a comment on the handed-back ${design} sent it back to its agent (active), who answered and handed it back`,
+  );
+
+  // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the ticket is the agent's again
+  const mentionText = "@sam the staging key is rotated, please carry on.";
+  await stub("POST", `/_test/tickets/${stuck}/comment`, { body: mentionText });
+  const mentioned = await until(
+    `${stuck}: the mention answered and the ticket handed back again`,
+    (s) => {
+      const t = s.tickets.find((x: Json) => x.key === stuck);
+      const answer = t.comments.find(
+        (c: Json) => c.author === "sam" && c.body === `Noted: ${mentionText}`,
+      );
+
+      return answer && t.status === "In Review" && t.assignee === "ada.admin" ? t : undefined;
+    },
+  );
+
+  assertEq(
+    mentioned.moves.filter((m: Json) => m.from === "Blocked" && m.to === "In Progress").length,
+    1,
+    "the mention moved the blocked ticket to active once",
+  );
+
+  step(
+    `mention: @sam on the blocked ${stuck} (held by the human) assigned it to sam and made it active; sam answered and handed it back`,
   );
 
   // Before the last step: merging another pull request makes the second one conflict with main again.

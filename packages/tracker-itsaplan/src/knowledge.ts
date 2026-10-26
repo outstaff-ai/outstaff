@@ -1,4 +1,5 @@
 import {
+  mentionData,
   PortError,
   type AdapterContext,
   type Doc,
@@ -385,6 +386,7 @@ function buildKnowledge(api: Itsaplan, now: () => Date): Knowledge {
             ...(c.parentId ? { parentId: commentId(r.docId, c.parentId) } : {}),
             ...(c.quote ? { anchorText: c.quote } : {}),
             body: c.body,
+            ...mentionData(c.body),
           },
         });
       }

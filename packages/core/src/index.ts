@@ -62,3 +62,4 @@ export * from "./ports/index.js";
 export * from "./workflow/index.js";
 export * from "./policies/index.js";
 export * from "./links/index.js";
+export { mentionData, parseMentions } from "./mentions.js";

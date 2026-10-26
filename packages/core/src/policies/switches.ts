@@ -149,6 +149,15 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "Start a round for the assigned agent when a trusted person comments on its ticket. On a ticket the agent handed back (assigned to a person, in review or blocked) the comment counts as feedback: the ticket goes back to the agent who last worked on it and moves to active. Comments by agents and by the office never start anything.",
   },
   {
+    path: "feedback.mentions",
+    default: true,
+    off: false,
+    kind: "rule",
+    rules: ["mention-assigns-agent", "doc-mention-feedback", "doc-mention-assigns-ticket"],
+    behaviour:
+      "A trusted person who mentions a team agent (`@username`) in a ticket comment hands that agent the ticket: it is assigned to the agent, moved to active when it is in backlog, ready, review or blocked, and the agent gets a round with the comment. When several agents are mentioned, the first takes the ticket and the others get a round to answer on it. A mention in a document comment gives the agent a round on the document, and its ticket goes to the agent when nobody or only a person has it. Comments by agents and by the office never mention anyone, and a done or canceled ticket is left alone. A mention goes to the agent mentioned, not to the assignee or the agent who last worked on the ticket.",
+  },
+  {
     path: "hand_back.reassign",
     default: "requester",
     off: "none",

@@ -260,8 +260,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       return;
     }
 
-    // Answering comments on a document changes nothing on its ticket: the ticket is where the document's work left it.
-    if (item.kind === "doc_feedback") {
+    // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
+    if (item.kind === "doc_feedback" || item.kind === "asked") {
       return;
     }
 

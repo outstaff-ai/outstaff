@@ -1,6 +1,7 @@
 import type { KnowledgeSeed } from "../contracts/seeds.js";
 import { PortError } from "../ports/index.js";
 import type { Doc, DocComment, DocEvent, Knowledge } from "../ports/index.js";
+import { mentionData } from "../mentions.js";
 import { steppingClock } from "./util.js";
 
 export interface FakeKnowledgeOptions {
@@ -168,6 +169,7 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
             ...(c.parentId ? { parentId: c.parentId } : {}),
             ...(c.anchorText ? { anchorText: c.anchorText } : {}),
             body: c.body,
+            ...mentionData(c.body),
           },
         };
       });

@@ -1,4 +1,5 @@
 import {
+  mentionData,
   PortError,
   type AdapterContext,
   type CanonicalStatus,
@@ -389,6 +390,7 @@ function buildTracker(api: Itsaplan): Tracker {
               : {}),
             ...(item.issueTitle ? { title: item.issueTitle } : {}),
             ...(item.body ? { body: item.body } : {}),
+            ...(type === "commented" ? mentionData(item.body) : {}),
             ...(item.payload?.from?.value ? { from: item.payload.from.value } : {}),
             ...(item.payload?.to?.value ? { to: item.payload.to.value } : {}),
           },

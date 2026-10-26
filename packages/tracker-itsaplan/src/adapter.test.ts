@@ -364,6 +364,23 @@ describe("tracker", () => {
     });
   });
 
+  it("parses the @mentions of a comment into the event's data, in order, once each", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const issue = await tracker.createIssue({ title: "Flow", body: "" });
+    await tracker.comment(
+      issue.key,
+      "@lena please look, then @sam. cc @Lena, mail dana@acme.example",
+    );
+
+    await tracker.comment(issue.key, "no mention, only `@scope/pkg` and @scope/pkg");
+
+    const { events } = await tracker.events();
+    const comments = events.filter((e) => e.type === "commented");
+    expect(comments[0]?.data["mentions"]).toEqual(["lena", "sam"]);
+    expect(comments[1]?.data).not.toHaveProperty("mentions");
+  });
+
   it("turns activity into events, skips what the office does not act on, and never replays", async () => {
     const fake = createItsaplanFake();
     const tracker = await createItsaplanTracker(trackerCtx(fake));
@@ -685,6 +702,20 @@ describe("knowledge events", () => {
     return { fake, kb, doc };
   };
 
+  it("parses the @mentions of a document comment and of a reply", async () => {
+    const { kb, doc } = await setup();
+    const base = await kb.events([doc.id]);
+    const c = await kb.comment(doc.id, {
+      body: "@lena can you check this?",
+      anchorText: "the cart",
+    });
+
+    await kb.reply(c.id, "thanks @sam and @lena");
+
+    const page = await kb.events([doc.id], base.cursor);
+    expect(page.events.map((e) => e.data.mentions)).toEqual([["lena"], ["sam", "lena"]]);
+  });
+
   it("reads the comments of the named documents, oldest first, with the author's identity and the anchor", async () => {
     const { kb, doc } = await setup();
     const other = await kb.create({ path: "design/other", title: "Other", body: "Elsewhere" });
@@ -709,6 +740,7 @@ describe("knowledge events", () => {
       data: { commentId: c.id, anchorText: "the cart" },
     });
 
+    expect(page.events[0]?.data.mentions).toBeUndefined();
     expect(page.events[1]?.data.parentId).toBe(c.id);
     expect(r.id).toBe(page.events[1]?.data.commentId);
     expect(page.events.every((e) => e.doc === doc.id)).toBe(true);

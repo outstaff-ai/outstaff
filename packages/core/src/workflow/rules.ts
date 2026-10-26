@@ -23,6 +23,7 @@ export type Condition =
   | { pr_open: boolean }
   | { pr_merged: boolean }
   | { has_body: boolean }
+  | { agent_mentioned: boolean }
   | { review_state: string[] }
   | { hand_back_status: HandBackStatus[] }
   | { hand_back_kind: string[] }
@@ -76,6 +77,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .meta(
         d(
           "The review or comment in the event has (or lacks) text: a non-blank body, or for a review, inline comments.",
+        ),
+      ),
+    z
+      .strictObject({ agent_mentioned: z.boolean() })
+      .meta(
+        d(
+          "The comment in the event mentions (or, with false, does not mention) a team agent: event.data.mentions, which the office fills with the handles of the agents a trusted person's comment names.",
         ),
       ),
     z
@@ -147,8 +155,8 @@ export const actionSchema: z.ZodType<Action> = z.union([
       assign: z
         .string()
         .regex(
-          new RegExp(`^(author|last_worker|requester|none|human:\\S+|${ROLE})$`),
-          "Use author, last_worker, requester, none, human:<id> or role:<role>.",
+          new RegExp(`^(author|last_worker|requester|mentioned|none|human:\\S+|${ROLE})$`),
+          "Use author, last_worker, requester, mentioned, none, human:<id> or role:<role>.",
         )
         .meta(d("Assign the ticket.")),
     })
@@ -167,8 +175,10 @@ export const actionSchema: z.ZodType<Action> = z.union([
         person: z
           .string()
           .regex(
-            new RegExp(`^(author|assignee|last_worker|doc_author|${ROLE})$`),
-            "Use author, assignee, last_worker, doc_author or role:<role>.",
+            new RegExp(
+              `^(author|assignee|last_worker|doc_author|mentioned|other_mentioned|${ROLE})$`,
+            ),
+            "Use author, assignee, last_worker, doc_author, mentioned, other_mentioned or role:<role>.",
           ),
         kind: z.string().regex(SLUG, "Use lowercase letters, digits, dashes and underscores."),
         priority: z.enum(["low", "normal", "high"]).default("normal"),

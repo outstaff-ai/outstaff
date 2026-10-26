@@ -40,7 +40,14 @@ const docFeedbackRule: Rule = {
 const ticketCommentRule = (status: Condition): Rule => ({
   id: "ticket-comment-to-assignee",
   on: "ticket.commented",
-  if: { all: [{ actor_kind: "human" }, { assignee_kind: "agent" }, status] },
+  if: {
+    all: [
+      { actor_kind: "human" },
+      { not: { agent_mentioned: true } },
+      { assignee_kind: "agent" },
+      status,
+    ],
+  },
   do: [{ schedule: { person: "assignee", kind: "ticket_comment", priority: "high" } }],
 });
 
@@ -54,6 +61,7 @@ const ticketCommentReactivatesRule: Rule = {
   if: {
     all: [
       { actor_kind: "human" },
+      { not: { agent_mentioned: true } },
       { assignee_kind: "human" },
       { ticket_status: ["review", "blocked"] },
     ],
@@ -63,6 +71,56 @@ const ticketCommentReactivatesRule: Rule = {
     { move: "active" },
     { schedule: { person: "last_worker", kind: "ticket_comment", priority: "high" } },
   ],
+};
+
+/**
+ * A trusted human's comment on an open ticket that mentions team agents hands the ticket to the first one: it is
+ * assigned to them and (except in `minimal`, which never moves a ticket) moved to active, and they get a round with
+ * the comment. Every other agent mentioned gets an `asked` round, to answer on the ticket without taking it. It goes
+ * to the mentioned agent, not to the assignee or the last worker, so the two rules above leave such a comment alone.
+ */
+const mentionRule = (moves: boolean): Rule => ({
+  id: "mention-assigns-agent",
+  on: "ticket.commented",
+  if: {
+    all: [
+      { actor_kind: "human" },
+      { agent_mentioned: true },
+      { not: { ticket_status: ["done", "canceled"] } },
+    ],
+  },
+  do: [
+    { assign: "mentioned" },
+    ...(moves ? [{ move: "active" } as const] : []),
+    { schedule: { person: "mentioned", kind: "ticket_comment", priority: "high" } },
+    { schedule: { person: "other_mentioned", kind: "asked", priority: "high" } },
+  ],
+});
+
+/** A mention on a document gives the first agent mentioned a round on the document's comments. */
+const docMentionRule: Rule = {
+  id: "doc-mention-feedback",
+  on: "doc.commented",
+  if: { all: [{ actor_kind: "human" }, { agent_mentioned: true }] },
+  do: [
+    { schedule: { person: "mentioned", kind: "doc_feedback", priority: "high" } },
+    { schedule: { person: "other_mentioned", kind: "doc_feedback", priority: "high" } },
+  ],
+};
+
+/** The ticket a document was written for goes to the agent mentioned on it, unless an agent already has it. */
+const docMentionAssignsRule: Rule = {
+  id: "doc-mention-assigns-ticket",
+  on: "doc.commented",
+  if: {
+    all: [
+      { actor_kind: "human" },
+      { agent_mentioned: true },
+      { ticket_status: ["backlog", "ready", "active", "review", "blocked"] },
+      { any: [{ assignee_kind: "human" }, { assignee_kind: "none" }] },
+    ],
+  },
+  do: [{ assign: "mentioned" }],
 };
 
 /**
@@ -144,8 +202,11 @@ const kanbanRules: Rule[] = [
   },
   mergedFeedbackRule,
   docFeedbackRule,
+  docMentionRule,
+  docMentionAssignsRule,
   ticketCommentRule({ not: { ticket_status: ["done", "canceled"] } }),
   ticketCommentReactivatesRule,
+  mentionRule(true),
   approvedMergeRule,
   approvedMergeAfterFeedbackRule,
   {
@@ -260,7 +321,10 @@ const minimalRules: Rule[] = [
   },
   mergedFeedbackRule,
   docFeedbackRule,
+  docMentionRule,
+  docMentionAssignsRule,
   ticketCommentRule({ not: { ticket_status: ["done", "canceled"] } }),
+  mentionRule(false),
   approvedMergeRule,
   approvedMergeAfterFeedbackRule,
   {

@@ -1,5 +1,6 @@
 import type {
   ActorKind,
+  TeamConfig,
   DocEvent,
   TrackerEvent,
   VcsEvent,
@@ -92,4 +93,40 @@ export function normalizeDocEvent(
       ...event.data,
     },
   );
+}
+
+/**
+ * Maps the `@name`s an adapter parsed out of a comment to the handles of the team's agents, by their tracker username,
+ * handle or display name, in the order they were written. Names that are nobody on the team are dropped.
+ */
+export function agentMentionResolver(team: TeamConfig): (names: unknown) => string[] {
+  const byName = new Map<string, string>();
+  for (const p of team.people) {
+    for (const name of [p.identities?.tracker, p.handle, p.name]) {
+      if (name) {
+        byName.set(name.toLowerCase(), p.handle);
+      }
+    }
+  }
+
+  return (names) => {
+    const handles = Array.isArray(names)
+      ? names.flatMap((n) => (typeof n === "string" ? [byName.get(n.toLowerCase())] : []))
+      : [];
+
+    return [...new Set(handles.filter((h): h is string => h !== undefined))];
+  };
+}
+
+/** Replaces the names in `data.mentions` with agent handles, or removes them when nobody on the team is named. */
+export function resolveMentions(
+  event: WorkflowEvent,
+  resolve: ((names: unknown) => string[]) | undefined,
+): void {
+  const handles = resolve && event.actor.kind === "human" ? resolve(event.data["mentions"]) : [];
+  if (handles.length > 0) {
+    event.data["mentions"] = handles;
+  } else {
+    delete event.data["mentions"];
+  }
 }

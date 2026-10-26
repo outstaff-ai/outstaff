@@ -684,7 +684,10 @@ describe("overrides", () => {
       "human-feedback-back-to-author",
       "merged-feedback-follow-up",
       "doc-feedback-to-author",
+      "doc-mention-feedback",
+      "doc-mention-assigns-ticket",
       "ticket-comment-to-assignee",
+      "mention-assigns-agent",
       "assigned-agent-scheduled",
       "ping-requester",
     ]);
@@ -1193,10 +1196,148 @@ describe("comments on documents and tickets", () => {
     });
   });
 
+  describe("mention-assigns-agent", () => {
+    const mention = (handles: string[], over: Partial<ReturnType<typeof ev>> = {}) =>
+      ev("ticket.commented", { ...tk, data: { mentions: handles }, ...over });
+
+    const to = (id: string) => ({ type: "assign", ticket: "ACME-1", to: { kind: "agent", id } });
+    const round = (person: string, kind: string) => ({
+      type: "schedule",
+      person,
+      kind,
+      priority: "high",
+      ticket: "ACME-1",
+    });
+
+    const move = { type: "move", ticket: "ACME-1", to: "active" };
+
+    it("a mention on a ticket a person has in review assigns it, activates it and schedules a round", () => {
+      expect(
+        run(mention(["rex"]), world({ status: "review", ticket: { assignee: grace } })),
+      ).toEqual([to("rex"), move, round("rex", "ticket_comment")]);
+    });
+
+    it.each(["backlog", "ready", "blocked"] as const)("activates a ticket in %s", (status) => {
+      expect(run(mention(["rex"]), world({ status, ticket: { assignee: grace } }))).toEqual([
+        to("rex"),
+        move,
+        round("rex", "ticket_comment"),
+      ]);
+    });
+
+    it("an active ticket stays active, and one nobody has is assigned", () => {
+      expect(run(mention(["rex"]), world({ status: "active" }))).toEqual([
+        to("rex"),
+        round("rex", "ticket_comment"),
+      ]);
+    });
+
+    it("goes to the mentioned agent, not to the assignee or the last worker", () => {
+      // The ticket is with ada, who worked on it; the comment is for rex.
+      expect(run(mention(["rex"]), world({ status: "active", ticket: { assignee: a } }))).toEqual([
+        to("rex"),
+        round("rex", "ticket_comment"),
+      ]);
+
+      // A handed-back ticket would go back to its last worker (ada) without the mention.
+      expect(
+        run(mention(["rex"]), world({ status: "review", ticket: { assignee: grace } })).filter(
+          (x) => x.type === "schedule",
+        ),
+      ).toEqual([round("rex", "ticket_comment")]);
+    });
+
+    it("the first agent mentioned takes the ticket and the others are asked without reassignment", () => {
+      expect(
+        run(mention(["rex", "ada"]), world({ status: "review", ticket: { assignee: grace } })),
+      ).toEqual([to("rex"), move, round("rex", "ticket_comment"), round("ada", "asked")]);
+
+      expect(run(mention(["rex", "ada", "sam"]), world({ status: "active" })).slice(-3)).toEqual([
+        round("rex", "ticket_comment"),
+        round("ada", "asked"),
+        round("sam", "asked"),
+      ]);
+    });
+
+    it("never triggers on agents, the office or a comment that mentions nobody", () => {
+      const state = world({ status: "review", ticket: { assignee: grace } });
+      expect(run(mention(["rex"], { actor: a }), state)).toEqual([]);
+      expect(run(mention(["rex"], { actor: automation }), state)).toEqual([]);
+      // Without a mention the comment is plain feedback: the last worker gets it back.
+      expect(run(mention([]), state)).toEqual(run(ev("ticket.commented", { ...tk }), state));
+    });
+
+    it("leaves done and canceled tickets alone", () => {
+      expect(run(mention(["rex"]), world({ status: "done", ticket: { assignee: a } }))).toEqual([]);
+      expect(run(mention(["rex"]), world({ status: "canceled" }))).toEqual([]);
+    });
+
+    it("minimal assigns and schedules but never moves; the others move", () => {
+      const state = world({ status: "review", ticket: { assignee: grace } });
+      expect(run(mention(["rex"]), state, presetRules("minimal"))).toEqual([
+        to("rex"),
+        round("rex", "ticket_comment"),
+      ]);
+
+      expect(run(mention(["rex"]), state, presetRules("scrum"))).toEqual([
+        to("rex"),
+        move,
+        round("rex", "ticket_comment"),
+      ]);
+    });
+  });
+
+  describe("a mention on a document", () => {
+    const mention = (handles: string[], over: Partial<ReturnType<typeof ev>> = {}) =>
+      docEvent({ data: { mentions: handles }, ...over });
+
+    const round = (person: string) => ({ ...docSchedule, person });
+    const to = { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "rex" } };
+
+    it("schedules doc_feedback for the mentioned agent and gives it the document's ticket held by a person", () => {
+      expect(run(mention(["rex"]), world({ ticket: { assignee: grace } }))).toEqual([
+        round("ada"),
+        round("rex"),
+        to,
+      ]);
+    });
+
+    it("assigns an unassigned ticket, but never takes one from an agent or finished", () => {
+      expect(
+        run(mention(["rex"]), world({ status: "active" })).filter((x) => x.type === "assign"),
+      ).toEqual([to]);
+
+      expect(
+        run(mention(["rex"]), world({ status: "active", ticket: { assignee: a } })).filter(
+          (x) => x.type === "assign",
+        ),
+      ).toEqual([]);
+
+      expect(
+        run(mention(["rex"]), world({ status: "done", ticket: { assignee: grace } })).filter(
+          (x) => x.type === "assign",
+        ),
+      ).toEqual([]);
+    });
+
+    it("schedules every agent mentioned and works for a document with no ticket", () => {
+      expect(
+        run(mention(["rex", "sam"], { subject: { doc: "doc-1" } }), world()).map((x) =>
+          x.type === "schedule" ? x.person : x.type,
+        ),
+      ).toEqual(["ada", "rex", "sam"]);
+    });
+
+    it("never triggers on agents or the office", () => {
+      expect(run(mention(["rex"], { actor: a }), world())).toEqual([]);
+      expect(run(mention(["rex"], { actor: automation }), world())).toEqual([]);
+    });
+  });
+
   it("the switches remove their rules", () => {
     const parsed = parseTeamConfig({
       ...baseConfig(),
-      policies: { feedback: { doc_comments: false, ticket_comments: false } },
+      policies: { feedback: { doc_comments: false, ticket_comments: false, mentions: false } },
     });
 
     if (!parsed.ok) {
@@ -1206,8 +1347,11 @@ describe("comments on documents and tickets", () => {
     const w = resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
     expect(w.switched.map((s) => [s.rule, s.switch, s.effect])).toEqual([
       ["doc-feedback-to-author", "feedback.doc_comments", "removed"],
+      ["doc-mention-feedback", "feedback.mentions", "removed"],
+      ["doc-mention-assigns-ticket", "feedback.mentions", "removed"],
       ["ticket-comment-to-assignee", "feedback.ticket_comments", "removed"],
       ["ticket-comment-reactivates-ticket", "feedback.ticket_comments", "removed"],
+      ["mention-assigns-agent", "feedback.mentions", "removed"],
     ]);
   });
 });

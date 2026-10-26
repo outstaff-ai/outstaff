@@ -43,6 +43,14 @@ interface Ctx {
 
 type Check = { ok: boolean; detail: string };
 
+/** The agents a comment names, first mention first: the handles the office put in `data.mentions`. */
+const mentionedBy = (event: WorkflowEvent): string[] => {
+  const found = event.data["mentions"];
+  return Array.isArray(found)
+    ? [...new Set(found.filter((m): m is string => typeof m === "string" && m !== ""))]
+    : [];
+};
+
 /** The pull requests that count toward a ticket's share: a closed one that never merged does not. */
 const livePrs = (prs: WorkflowPr[]) => prs.filter((p) => p.state !== "closed");
 const list = (xs: readonly string[]) => `[${xs.join(", ")}]`;
@@ -170,6 +178,14 @@ function check(c: Condition, ctx: Ctx): Check {
     return {
       ok: has === c.has_body,
       detail: `event ${has ? "has" : "has no"} body, wanted ${c.has_body ? "one" : "none"}`,
+    };
+  }
+
+  if ("agent_mentioned" in c) {
+    const found = mentionedBy(ctx.event);
+    return {
+      ok: found.length > 0 === c.agent_mentioned,
+      detail: `comment mentions ${found.length === 0 ? "no agent" : list(found)}, wanted ${c.agent_mentioned ? "an agent mentioned" : "none"}`,
     };
   }
 
@@ -342,6 +358,13 @@ function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {
       : { skip: "no agent has worked on the ticket yet" };
   }
 
+  if (spec === "mentioned") {
+    const first = mentionedBy(ctx.event)[0];
+    return first
+      ? { value: { kind: "agent", id: first } }
+      : { skip: "the comment mentions no agent" };
+  }
+
   if (spec === "requester") {
     const r = requesterOf(ctx);
     return r ? { value: { kind: "human", id: r } } : { skip: noRequester(ctx) };
@@ -394,7 +417,32 @@ function render(template: string, ctx: Ctx): Resolved<string> {
   }
 }
 
-function perform(a: Action, ctx: Ctx): Resolved<Effect> {
+/** A schedule for `other_mentioned` is one effect per agent mentioned after the first; every other action is one. */
+function performAll(a: Action, ctx: Ctx): Resolved<Effect[]> {
+  if ("schedule" in a && a.schedule.person === "other_mentioned") {
+    const others = mentionedBy(ctx.event).slice(1);
+    if (others.length === 0) {
+      return { skip: "the comment mentions no second agent" };
+    }
+
+    const effects: Effect[] = [];
+    for (const handle of others) {
+      const r = perform({ schedule: { ...a.schedule, person: handle } }, ctx, handle);
+      if ("skip" in r) {
+        return r;
+      }
+
+      effects.push(r.value);
+    }
+
+    return { value: effects };
+  }
+
+  const r = perform(a, ctx);
+  return "skip" in r ? r : { value: [r.value] };
+}
+
+function perform(a: Action, ctx: Ctx, forced?: string): Resolved<Effect> {
   const { ticket } = ctx;
   const needTicket = { skip: "event has no linked ticket" } as const;
   if ("move" in a) {
@@ -441,7 +489,7 @@ function perform(a: Action, ctx: Ctx): Resolved<Effect> {
   }
 
   if ("schedule" in a) {
-    const p = person(a.schedule.person, ctx);
+    const p = forced === undefined ? person(a.schedule.person, ctx) : { value: forced };
     if ("skip" in p) {
       return p;
     }
@@ -559,11 +607,11 @@ export function explainWorkflow(
     const mine: Effect[] = [];
     const skipped: string[] = [];
     for (const action of rule.do) {
-      const r = perform(action, ctx);
+      const r = performAll(action, ctx);
       if ("skip" in r) {
         skipped.push(`${Object.keys(action)[0]}: ${r.skip}`);
       } else {
-        mine.push(r.value);
+        mine.push(...r.value);
       }
     }
 

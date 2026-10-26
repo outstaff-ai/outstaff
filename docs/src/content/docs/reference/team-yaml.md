@@ -193,6 +193,7 @@ policies:
     merged_prs: true
     doc_comments: true
     ticket_comments: true
+    mentions: true
   hand_back:
     reassign: requester
     fallback: first_human
@@ -988,6 +989,11 @@ Condition that must hold.
 - Type: `boolean`
 - Required
 
+#### workflow.rules[].if.agent_mentioned
+
+- Type: `boolean`
+- Required
+
 #### workflow.rules[].if.review_state
 
 - Type: `list of string`
@@ -1075,7 +1081,7 @@ Assign the ticket.
 
 - Type: `string`
 - Required
-- Must match `^(author|last_worker|requester|none|human:\S+|role:[a-z][a-z0-9-]*)$`
+- Must match `^(author|last_worker|requester|mentioned|none|human:\S+|role:[a-z][a-z0-9-]*)$`
 
 #### workflow.rules[].do[].comment
 
@@ -1103,7 +1109,7 @@ Assign the ticket.
 
 - Type: `string`
 - Required
-- Must match `^(author|assignee|last_worker|doc_author|role:[a-z][a-z0-9-]*)$`
+- Must match `^(author|assignee|last_worker|doc_author|mentioned|other_mentioned|role:[a-z][a-z0-9-]*)$`
 
 #### workflow.rules[].do[].schedule.kind
 
@@ -1258,7 +1264,7 @@ How agents act on feedback from trusted people beyond the first round.
 
 - Type: `object`
 - Optional
-- Default: `{"follow_up_round":true,"merged_prs":true,"doc_comments":true,"ticket_comments":true}`
+- Default: `{"follow_up_round":true,"merged_prs":true,"doc_comments":true,"ticket_comments":true,"mentions":true}`
 
 #### policies.feedback.follow_up_round
 
@@ -1287,6 +1293,14 @@ Schedule the author of a knowledge document to answer a trusted person's comment
 #### policies.feedback.ticket_comments
 
 Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
+#### policies.feedback.mentions
+
+Hand a ticket to the agent a trusted person mentions in a comment on it (assign, move to active, start a round), and start a round for an agent mentioned in a document comment. Switches the preset rules mention-assigns-agent, doc-mention-feedback and doc-mention-assigns-ticket. Default on.
 
 - Type: `boolean`
 - Optional
