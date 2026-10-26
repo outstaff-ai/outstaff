@@ -89,6 +89,32 @@ export interface WorkflowState {
   personForRole(role: string): string | undefined;
 }
 
+/**
+ * What a condition reads of an event: its subject, actor and data. The type is not read, so the office's event
+ * pipeline can check conditions on event types the workflow rules do not know.
+ */
+export interface ConditionEvent {
+  type: string;
+  subject: WorkflowEvent["subject"];
+  actor: WorkflowEvent["actor"];
+  data: Record<string, unknown>;
+}
+
+/** An event with the ticket and pull request it is about, as conditions and people are resolved against. */
+export interface EvaluationContext {
+  event: ConditionEvent;
+  state: WorkflowState;
+  opts: WorkflowOptions;
+  ticket: string | undefined;
+  pr: WorkflowPr | undefined;
+}
+
+/** Whether a condition holds, and why. */
+export interface ConditionCheck {
+  ok: boolean;
+  detail: string;
+}
+
 export type EffectTarget = { kind: "agent" | "human"; id: string };
 export type Priority = "low" | "normal" | "high";
 

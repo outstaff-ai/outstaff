@@ -884,6 +884,14 @@ Team chat channel where the office mirrors agent-to-agent questions and answers,
 - Optional
 - Minimum length 1
 
+### office.pipeline
+
+Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`. Default off.
+
+- Type: `string`
+- Optional
+- Allowed values: `off`, `shadow`
+
 ## tools
 
 Tools every agent of the team installs at start, with the commands they may run.
@@ -1373,6 +1381,239 @@ Ticket label that keeps work with a human. Default "needs-human".
 - Type: `string`
 - Optional
 - Minimum length 1
+
+## pipeline
+
+Proposed (decision 0016): the event pipeline's policies. Read only by the office's shadow mode (office.pipeline: shadow), which records what the pipeline would decide and changes nothing.
+
+- Type: `object`
+- Optional
+
+### pipeline.policies
+
+Changes to the default policies, by policy id.
+
+- Type: `map`
+- Optional
+
+#### pipeline.policies.<key>
+
+Changes to one policy of the event pipeline.
+
+- Type: `object`
+- Optional
+
+#### pipeline.policies.<key>.enabled
+
+Set to false to turn the policy off. Default: the policy's own default.
+
+- Type: `boolean`
+- Optional
+
+#### pipeline.policies.<key>.instruction
+
+The instruction a woken agent is given, with {{variable}} placeholders. Replaces the policy's default text.
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### pipeline.policies.<key>.when
+
+An extra condition that must hold as well: narrows the policy, never widens it.
+
+- Type: `object`
+- Optional
+
+#### pipeline.policies.<key>.when.all
+
+- Type: `list of condition`
+- Required
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.all[]
+
+- Type: `condition`
+- Optional
+
+#### pipeline.policies.<key>.when.any
+
+- Type: `list of condition`
+- Required
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.any[]
+
+- Type: `condition`
+- Optional
+
+#### pipeline.policies.<key>.when.not
+
+- Type: `condition`
+- Required
+
+#### pipeline.policies.<key>.when.ticket_status
+
+- Type: `list of string`
+- Required
+- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.ticket_status[]
+
+- Type: `string`
+- Optional
+- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
+
+#### pipeline.policies.<key>.when.moved_to
+
+- Type: `list of string`
+- Required
+- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.moved_to[]
+
+- Type: `string`
+- Optional
+- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
+
+#### pipeline.policies.<key>.when.actor_kind
+
+- Type: `string`
+- Required
+- Allowed values: `human`, `agent`, `automation`
+
+#### pipeline.policies.<key>.when.assignee_kind
+
+- Type: `string`
+- Required
+- Allowed values: `human`, `agent`, `none`
+
+#### pipeline.policies.<key>.when.has_label
+
+- Type: `string`
+- Required
+- Minimum length 1
+
+#### pipeline.policies.<key>.when.pr_author_kind
+
+- Type: `string`
+- Required
+- Allowed values: `human`, `agent`, `bot`
+
+#### pipeline.policies.<key>.when.approver
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.pr_draft
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.pr_open
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.pr_merged
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.pr_base_default
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.has_body
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.agent_mentioned
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.review_state
+
+- Type: `list of string`
+- Required
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.review_state[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### pipeline.policies.<key>.when.hand_back_status
+
+- Type: `list of string`
+- Required
+- Allowed values: `done`, `waiting`, `blocked`
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.hand_back_status[]
+
+- Type: `string`
+- Optional
+- Allowed values: `done`, `waiting`, `blocked`
+
+#### pipeline.policies.<key>.when.hand_back_kind
+
+- Type: `list of string`
+- Required
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.hand_back_kind[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### pipeline.policies.<key>.when.pr_approved
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.ticket_prs_all_closed
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.ticket_prs_open
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.ticket_prs_several
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.ticket_handed_back
+
+- Type: `boolean`
+- Required
+
+### pipeline.wake
+
+How wakes are batched.
+
+- Type: `object`
+- Optional
+
+#### pipeline.wake.coalesce_seconds
+
+Wakes for the same person and subject within this many seconds become one run. Default 60; 0 turns it off.
+
+- Type: `integer`
+- Optional
+- Minimum 0
+- Maximum 3600
 
 ## policies
 

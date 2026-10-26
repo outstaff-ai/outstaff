@@ -1,5 +1,5 @@
 import type { Logger, WorkflowEvent } from "@outstaff/core";
-import type { Engine } from "./engine/index.js";
+import type { EngineMeta } from "./engine/index.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { PrRecord, WorkState } from "./workstate/index.js";
 
@@ -9,11 +9,12 @@ const handedBackText = (item: WorkItem) => `handed back ${item.id}`;
 export function createHandedBack(deps: {
   store: Store;
   workState: WorkState;
-  engine: Engine;
+
+  /** Has the event judged: by the engine, and in shadow mode by the pipeline too. */
+  judge: (event: WorkflowEvent, meta: EngineMeta) => Promise<unknown>;
   log: Logger;
-  track: <T>(p: Promise<T>) => Promise<T>;
 }) {
-  const { store, workState, engine, log, track } = deps;
+  const { store, workState, judge, log } = deps;
   return async (item: WorkItem): Promise<void> => {
     if (
       (item.status !== "done" && item.status !== "waiting" && item.status !== "blocked") ||
@@ -53,13 +54,11 @@ export function createHandedBack(deps: {
       log.warn("refreshing who worked on what failed", { error: String(error) });
     });
 
-    await track(
-      engine.handle(event, {
-        source: "workstate",
-        externalId: `handed_back:${item.id}:${runs.at(-1)?.id ?? "0"}`,
-        trusted: true,
-      }),
-    );
+    await judge(event, {
+      source: "workstate",
+      externalId: `handed_back:${item.id}:${runs.at(-1)?.id ?? "0"}`,
+      trusted: true,
+    });
 
     log.info(handedBackText(item), { person: item.person });
   };

@@ -11,6 +11,7 @@ export * from "./usage/index.js";
 export * from "./chat/index.js";
 
 export * from "./engine/index.js";
+export * from "./pipeline/index.js";
 
 export * from "./office.js";
 export * from "./work-source.js";

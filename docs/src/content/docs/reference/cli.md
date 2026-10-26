@@ -422,6 +422,33 @@ ost workflow explain '{"type":"pr.comment","subject":{"pr":{"repo":{"owner":"acm
 ost workflow explain '{"type":"ticket.assigned","subject":{"ticket":"ACME-1"},"actor":{"kind":"human","id":"dana"}}' --state '{"tickets":{"ACME-1":{"status":"ready","assignee":{"id":"sam","kind":"agent"}}}}'
 ```
 
+## ost explain
+
+Show what the event pipeline decided for an event, and why.
+
+Proposed (decision 0016). Reads the trace the office recorded for one event while running the event pipeline in shadow mode (office.pipeline: shadow) and prints every policy that listens to the event: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.
+
+```
+ost explain [event-id] [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--store <url>` | The office store: postgres://..., sqlite:///path/office.db. Defaults to OUTSTAFF_STORE_URL. |
+| `--recent <n>` | List the n latest traced events instead. |
+
+Exit codes:
+
+- 0: the trace or the list was printed
+- 1: no store is given or it cannot be read, no event id is given, or the event has no trace
+
+Examples:
+
+```sh
+ost explain vcs:pr.merged:acme-example/shop#41 --store sqlite:///var/lib/outstaff/office.db
+ost explain --recent 20
+```
+
 ## ost git-credential
 
 Git credential helper: gives git a short-lived token for one repository.

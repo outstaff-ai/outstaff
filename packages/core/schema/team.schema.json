@@ -759,6 +759,14 @@
           "description": "Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.",
           "type": "string",
           "minLength": 1
+        },
+        "pipeline": {
+          "description": "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`. Default off.",
+          "type": "string",
+          "enum": [
+            "off",
+            "shadow"
+          ]
         }
       },
       "additionalProperties": false
@@ -1368,6 +1376,58 @@
       },
       "additionalProperties": false,
       "description": "How work moves through the team."
+    },
+    "pipeline": {
+      "type": "object",
+      "properties": {
+        "policies": {
+          "description": "Changes to the default policies, by policy id.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "description": "Set to false to turn the policy off. Default: the policy's own default.",
+                "type": "boolean"
+              },
+              "instruction": {
+                "description": "The instruction a woken agent is given, with {{variable}} placeholders. Replaces the policy's default text.",
+                "type": "string",
+                "minLength": 1
+              },
+              "when": {
+                "description": "An extra condition that must hold as well: narrows the policy, never widens it.",
+                "allOf": [
+                  {
+                    "$ref": "#/definitions/__schema0"
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false,
+            "description": "Changes to one policy of the event pipeline."
+          }
+        },
+        "wake": {
+          "description": "How wakes are batched.",
+          "type": "object",
+          "properties": {
+            "coalesce_seconds": {
+              "description": "Wakes for the same person and subject within this many seconds become one run. Default 60; 0 turns it off.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3600
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "description": "Proposed (decision 0016): the event pipeline's policies. Read only by the office's shadow mode (office.pipeline: shadow), which records what the pipeline would decide and changes nothing."
     },
     "policies": {
       "type": "object",

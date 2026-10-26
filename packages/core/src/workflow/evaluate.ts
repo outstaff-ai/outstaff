@@ -1,7 +1,8 @@
 import { check } from "./evaluate-check.js";
-import { performAll } from "./evaluate-actions.js";
+import { performAll, person, variables } from "./evaluate-actions.js";
 import type { Ctx } from "./evaluate.types.js";
 import type {
+  ConditionEvent,
   Effect,
   Rule,
   RuleExplanation,
@@ -26,6 +27,28 @@ function stable(v: unknown): string {
   return JSON.stringify(v);
 }
 
+/** The ticket and pull request an event is about, looked up once, for checking conditions and resolving people. */
+export function createEvaluationContext(
+  event: ConditionEvent,
+  state: WorkflowState,
+  opts: WorkflowOptions = {},
+): Ctx {
+  const pr = event.subject.pr ? state.pullRequest(event.subject.pr) : undefined;
+  const ticket =
+    event.subject.ticket ?? (event.subject.pr ? state.ticketForPr(event.subject.pr) : undefined);
+
+  return { event, state, opts, ticket, pr };
+}
+
+/** Whether a condition holds, and the detail of the first part that decided it. */
+export const checkCondition = check;
+
+/** The agent a schedule's `person` names (`author`, `assignee`, `mentioned`, `role:<role>` ...), or why there is none. */
+export const resolvePerson = person;
+
+/** The template variables of an event (TEMPLATE_VARIABLES), every one present. */
+export const templateVariables = variables;
+
 /** Which rules matched or did not, and why. Pure: the same inputs always give the same output. */
 export function explainWorkflow(
   event: WorkflowEvent,
@@ -33,11 +56,7 @@ export function explainWorkflow(
   rules: readonly Rule[],
   opts: WorkflowOptions = {},
 ): WorkflowExplanation {
-  const pr = event.subject.pr ? state.pullRequest(event.subject.pr) : undefined;
-  const ticket =
-    event.subject.ticket ?? (event.subject.pr ? state.ticketForPr(event.subject.pr) : undefined);
-
-  const ctx: Ctx = { event, state, opts, ticket, pr };
+  const ctx = createEvaluationContext(event, state, opts);
 
   const out: RuleExplanation[] = [];
   const seen = new Set<string>();

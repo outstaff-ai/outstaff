@@ -1,4 +1,5 @@
 import type { AgentEnv, MiseRunner, OfficeClient } from "@outstaff/agent";
+import type * as OfficeModule from "@outstaff/office";
 import type {
   AdapterRegistry,
   Catalog,
@@ -62,6 +63,9 @@ export type Context = {
 
   /** Asks for a line of text and returns `fallback` when the answer is empty; absent when there is no terminal to ask on. */
   ask?: (question: string, fallback: string) => Promise<string>;
+
+  /** Loads `@outstaff/office` for `ost explain`; defaults to importing it (tests only). */
+  loadOffice?: () => Promise<typeof OfficeModule>;
 
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;

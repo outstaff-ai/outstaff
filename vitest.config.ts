@@ -13,6 +13,10 @@ const coreAlias = [
     replacement: fileURLToPath(new URL("packages/protocol/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@outstaff\/office$/,
+    replacement: fileURLToPath(new URL("packages/office/src/index.ts", import.meta.url)),
+  },
+  {
     find: /^@outstaff\/agent$/,
     replacement: fileURLToPath(new URL("packages/agent/src/index.ts", import.meta.url)),
   },
@@ -26,6 +30,15 @@ const coreAlias = [
       new URL("integrations/tracker/itsaplan/src/index.ts", import.meta.url),
     ),
   },
+];
+
+// The event pipeline proof of concept (decision 0016) is held to the same rule as the integrations.
+const EVENT_PIPELINE = [
+  "packages/office/src/pipeline/**/*.ts",
+  "packages/office/src/store/sql/traces.ts",
+  "packages/office/src/store/migrations/0006_pipeline_traces.ts",
+  "packages/core/src/config/pipeline.ts",
+  "packages/cli/src/commands/explain.ts",
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];
@@ -42,10 +55,10 @@ const integrations = [
 export default defineConfig({
   test: {
     coverage: {
-      // Every integration, including new ones, is held to 100% of lines, branches, functions and statements, file
-      // by file. Test kits shipped for other packages are not measured.
+      // Every integration, including new ones, and the event pipeline are held to 100% of lines, branches, functions
+      // and statements, file by file. Test kits shipped for other packages are not measured.
       provider: "v8",
-      include: ["integrations/*/*/src/**/*.ts"],
+      include: ["integrations/*/*/src/**/*.ts", ...EVENT_PIPELINE],
       exclude: ["**/__tests__/**", "**/src/testing/**", "**/testing.ts", "**/contract.ts"],
       reporter: ["text-summary", "json-summary"],
       thresholds: { perFile: true, lines: 100, branches: 100, functions: 100, statements: 100 },
