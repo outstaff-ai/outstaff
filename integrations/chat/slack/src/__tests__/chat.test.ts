@@ -40,6 +40,23 @@ describe("adapter definition", () => {
     expect(slackChat.secrets("office").map((s) => s.key)).toEqual(["SLACK_OFFICE_BOT_TOKEN"]);
     expect(slackChat.options.parse({})).toEqual({});
   });
+
+  it("creates a chat from the person's bot token, and names a missing one", async () => {
+    const ctx = {
+      options: {},
+      secrets: secretMap({ SLACK_BOT_TOKEN: "xoxb-1" }),
+      team: teamWith(),
+      log: silentLogger,
+      fetch,
+      now: () => new Date(),
+    };
+
+    const chat = await slackChat.create(ctx);
+    expect(chat.post).toBeTypeOf("function");
+    await expect(async () => slackChat.create({ ...ctx, secrets: secretMap({}) })).rejects.toThrow(
+      "Missing secret SLACK_BOT_TOKEN.",
+    );
+  });
 });
 
 describe("trust filter", () => {

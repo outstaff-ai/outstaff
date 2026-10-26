@@ -70,6 +70,20 @@ describe("toMrkdwn goldens", () => {
     );
   });
 
+  it("falls back to the address for a link with an empty label", () => {
+    expect(toMrkdwn("[](https://acme.example/a)")).toBe(
+      "<https://acme.example/a|https://acme.example/a>",
+    );
+  });
+
+  it("drops a heading with no text", () => {
+    expect(toMrkdwn("# \ntext")).toBe("\ntext");
+  });
+
+  it("leaves a table header with no body or separator as plain text", () => {
+    expect(toMrkdwn("| a | b |")).toBe("| a | b |");
+  });
+
   it("is idempotent enough to leave plain text alone", () => {
     expect(toMrkdwn("plain text, nothing special.")).toBe("plain text, nothing special.");
   });

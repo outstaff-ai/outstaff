@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -132,6 +132,41 @@ describe("dicebear", () => {
   });
 });
 
+describe("dicebear without a known style", () => {
+  it("refuses to be created", () => {
+    expect(() => createDicebearAvatars({ style: "nope" })).toThrow(
+      'Unknown DiceBear style "nope".',
+    );
+  });
+});
+
+describe("adapter definitions", () => {
+  const ctxFor = <T>(options: T) =>
+    ({ options, fetch: fakeFetch, secrets: { get: () => undefined } }) as never;
+
+  it("create avatars from their options, with no secrets", async () => {
+    for (const adapter of [dicebearAvatars, directoryAvatars, urlAvatars]) {
+      expect(adapter.secrets("person")).toEqual([]);
+      expect(adapter.port).toBe("avatars");
+    }
+
+    const svg = await (
+      await dicebearAvatars.create(ctxFor(dicebearOptions.parse({})))
+    ).render("sam");
+
+    expect(svg.mime).toBe("image/svg+xml");
+    const dir = await mkdtemp(join(tmpdir(), "ost-avatars-"));
+    await writeFile(join(dir, "sam.svg"), "<svg>dir</svg>");
+    const fromDir = await (await directoryAvatars.create(ctxFor({ path: dir }))).render("sam");
+    expect(text(fromDir.data)).toBe("<svg>dir</svg>");
+    const fromUrl = await (
+      await urlAvatars.create(ctxFor({ template: "https://img.example.test/{seed}.svg" }))
+    ).render("sam");
+
+    expect(text(fromUrl.data)).toBe("<svg>https://img.example.test/sam.svg</svg>");
+  });
+});
+
 describe("directory", () => {
   it("prefers png over svg, and rejects unsafe or missing names", async () => {
     const dir = await mkdtemp(join(tmpdir(), "ost-avatars-"));
@@ -145,6 +180,13 @@ describe("directory", () => {
     await expect(avatars.render("ghost")).rejects.toMatchObject({ code: "not_found" });
   });
 
+  it("fails loudly when a file cannot be read for a reason other than being absent", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ost-avatars-"));
+    await mkdir(join(dir, "sam.png"));
+    const avatars = createDirectoryAvatars({ path: dir });
+    await expect(avatars.render("sam")).rejects.toMatchObject({ code: "EISDIR" });
+  });
+
   it("requires a path", () => {
     expect(directoryOptions.safeParse({}).success).toBe(false);
   });
@@ -155,6 +197,69 @@ describe("url", () => {
     const avatars = createUrlAvatars(urlCtx(fakeFetch));
     await expect(avatars.render("missing")).rejects.toMatchObject({ code: "not_found" });
     await expect(avatars.render("html")).rejects.toMatchObject({ code: "invalid" });
+  });
+
+  it("maps other failing statuses to unavailable, naming the status", async () => {
+    const avatars = createUrlAvatars(
+      urlCtx((async () => new Response("down", { status: 503 })) as typeof fetch),
+    );
+
+    await expect(avatars.render("sam")).rejects.toMatchObject({
+      code: "unavailable",
+      message: "Fetching https://img.example.test/sam.svg failed: 503.",
+    });
+  });
+
+  it("encodes the seed into the address", async () => {
+    const seen: string[] = [];
+    const avatars = createUrlAvatars(
+      urlCtx((async (input: string | URL) => {
+        seen.push(String(input));
+        return new Response("<svg/>", { headers: { "content-type": "image/svg+xml" } });
+      }) as typeof fetch),
+    );
+
+    await avatars.render("sam o/brien");
+    expect(seen).toEqual(["https://img.example.test/sam%20o%2Fbrien.svg"]);
+  });
+
+  it("accepts a PNG, ignoring the charset suffix and case of its type", async () => {
+    const avatars = createUrlAvatars(
+      urlCtx(
+        (async () =>
+          new Response(new Uint8Array([137, 80]), {
+            headers: { "content-type": "Image/PNG; charset=binary" },
+          })) as typeof fetch,
+      ),
+    );
+
+    const img = await avatars.render("sam");
+    expect(img.mime).toBe("image/png");
+    expect([...img.data]).toEqual([137, 80]);
+  });
+
+  it("refuses a response with no content type, or one that is not an image it serves", async () => {
+    const untyped = createUrlAvatars(
+      urlCtx((async () => new Response(new Uint8Array([1]))) as typeof fetch),
+    );
+
+    await expect(untyped.render("sam")).rejects.toMatchObject({
+      code: "invalid",
+      message: expect.stringContaining("is untyped, not a PNG or SVG"),
+    });
+
+    const jpeg = createUrlAvatars(
+      urlCtx(
+        (async () =>
+          new Response(new Uint8Array([1]), {
+            headers: { "content-type": "image/jpeg" },
+          })) as typeof fetch,
+      ),
+    );
+
+    await expect(jpeg.render("sam")).rejects.toMatchObject({
+      message: expect.stringContaining("is image/jpeg, not a PNG or SVG"),
+    });
   });
 
   it("needs a {seed} template that is a URL", () => {

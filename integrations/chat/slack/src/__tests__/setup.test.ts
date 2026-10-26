@@ -37,6 +37,12 @@ describe("slackSetupGuide", () => {
   });
 });
 
+describe("slackSetupGuide without a person", () => {
+  it("has nothing to say for an agent that is not named", () => {
+    expect(slackSetupGuide({ team, scope: "person", options: {} })).toEqual([]);
+  });
+});
+
 describe("deriveSlack", () => {
   const warnings: string[] = [];
   const ctx = (reply: unknown): DeriveContext => ({
@@ -73,5 +79,14 @@ describe("deriveSlack", () => {
     ).toEqual({});
 
     expect(warnings).toEqual(["Slack auth.test failed: invalid_auth"]);
+  });
+
+  it("reports the HTTP status when Slack gives no error string", async () => {
+    warnings.length = 0;
+    expect(await deriveSlack(secrets({ SLACK_BOT_TOKEN: "xoxb-1" }), ctx({ ok: false }))).toEqual(
+      {},
+    );
+
+    expect(warnings).toEqual(["Slack auth.test failed: 200"]);
   });
 });
