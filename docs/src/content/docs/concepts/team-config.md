@@ -41,7 +41,7 @@ repos:
 
 ## Integrations
 
-[`integrations`](/reference/team-yaml/#integrations) chooses an adapter for each port: chat, vcs, runtime, tracker, knowledge and avatars. Each entry names the `adapter` and passes the options that adapter defines, which the adapter validates. Which agent capabilities work depends on what the chosen adapters support; missing ones are reported as warnings such as `capability.missing`.
+[`integrations`](/reference/team-yaml/#integrations) chooses an adapter for each port: chat, vcs, runtime, tracker, knowledge and avatars. Each entry names the `adapter` and passes the options that adapter defines, which the adapter validates. Which agent capabilities work depends on what the chosen adapters support; missing ones are reported as warnings such as `capability.missing`. `integrations.runtime` is the default runtime: a person can run on a runtime of their own with [`people[].runtime`](/reference/team-yaml/#people), and the runtime capabilities are checked per person against the runtime they run on (see [Runtimes](/guides/runtimes/)).
 
 ## Email
 

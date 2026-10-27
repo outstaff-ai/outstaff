@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Logger } from "@outstaff/core";
 import { reportAgentChecks } from "./doctor/index.js";
-import { StartupError, agentRegistry, prepareAgent } from "./runner/index.js";
+import { StartupError, agentRegistry, installedRuntimes, prepareAgent } from "./runner/index.js";
 
 const write = (level: string) => (message: string, data?: Record<string, unknown>) =>
   process.stderr.write(
@@ -27,6 +27,12 @@ const version = (
 
 if (process.argv.slice(2).some((a) => a === "--version" || a === "-v")) {
   process.stdout.write(`${version}\n`);
+  process.exit(0);
+}
+
+// The runtime adapters this image carries, one per line; a person's runtime must be one of them.
+if (process.argv.slice(2).includes("--runtimes")) {
+  process.stdout.write(`${installedRuntimes(agentRegistry()).join("\n")}\n`);
   process.exit(0);
 }
 

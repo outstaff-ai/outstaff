@@ -128,6 +128,28 @@ describe("ost validate", () => {
     ]);
   });
 
+  it("checks a person's own runtime: its options at the person's line, and the person in the team table", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
+      "    extends: [developer]\n",
+      "    extends: [developer]\n    runtime:\n      adapter: claude-agent-sdk\n      sandbox: sometimes\n",
+    );
+
+    const r = await ost(project("runtime-1", team), ["validate", "--json"]);
+    expect(r.code).toBe(1);
+    const line = team.split("\n").findIndex((l) => l.includes("sandbox: sometimes")) + 1;
+    expect(JSON.parse(r.out).errors).toEqual([
+      expect.objectContaining({
+        code: "integrations.invalid_options",
+        path: ["people", 2, "runtime", "sandbox"],
+        line,
+      }),
+    ]);
+
+    const fixed = team.replace("sandbox: sometimes", "sandbox: bubblewrap");
+    const ok = await ost(project("runtime-2", fixed), ["validate"]);
+    expect(ok.code).toBe(0);
+  });
+
   describe("network grants", () => {
     const withNetwork = (block: string) =>
       project(

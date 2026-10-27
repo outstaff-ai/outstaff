@@ -13,7 +13,11 @@ export const integrationsSchema = z
   .strictObject({
     chat: adapterRefSchema.meta(d("Chat adapter where humans and agents talk.")),
     vcs: adapterRefSchema.meta(d("Version control adapter (repositories and pull requests).")),
-    runtime: adapterRefSchema.meta(d("LLM runtime adapter that runs the agents.")),
+    runtime: adapterRefSchema.meta(
+      d(
+        "LLM runtime adapter that runs the agents; the default for everyone without a runtime of their own (people[].runtime).",
+      ),
+    ),
     tracker: adapterRefSchema.optional().meta(d("Issue tracker adapter.")),
     knowledge: adapterRefSchema.optional().meta(d("Knowledge base adapter.")),
     avatars: adapterRefSchema.optional().meta(d("Avatar generation adapter.")),

@@ -1,8 +1,10 @@
 import { mkdirSync } from "node:fs";
 import {
+  CAPABILITIES,
+  CAPABILITY_PORT,
   PROFILE_SPECS,
   artifactsDir,
-  policyOn,
+  capabilityOn,
   type Capability,
   type EffectiveTool,
   type Layout,
@@ -16,11 +18,14 @@ import type { AgentEnv } from "#/verbs/types.js";
 import { createWorkLoop } from "./loop.js";
 import type { WorkLoop } from "./loop.types.js";
 import { installDeclaredTools } from "./startup-steps.js";
-import type { LoopParts, StartupContext } from "./startup.types.js";
+import type { LoopParts, RuntimeAdapter, StartupContext } from "./startup.types.js";
 import type { UsageReporter } from "./types.js";
 import { createUsageReporter } from "./usage.js";
 
 type Roles = Record<string, { needs: string[]; optional_needs: string[] } | undefined>;
+
+const isCapability = (name: string): name is Capability =>
+  (CAPABILITIES as readonly string[]).includes(name);
 
 /** Installs the declared tools and notes their status in the verbs' environment. Installing a tool allows nothing. */
 export async function installTools(
@@ -39,22 +44,28 @@ export async function installTools(
 }
 
 /**
- * The capabilities the person's roles declare (their own or an extended role's) and the team has on. Only the
- * Design canvas is one so far.
+ * The runtime capabilities the person's roles declare (their own or an extended role's, needed or optional), that
+ * their runtime provides and the team has not switched off.
  */
 export function roleCapabilities(
   { team, me }: StartupContext,
   roles: Roles,
   extended: string[] | undefined,
+  runtime: RuntimeAdapter,
 ): Capability[] {
   const declared = [me.role, ...(extended ?? [])].flatMap((name) => {
     const r = roles[name];
     return r ? [...r.needs, ...r.optional_needs] : [];
   });
 
-  const canvas = declared.includes("design.canvas") && policyOn(team.policies, "design.canvas");
-
-  return canvas ? ["design.canvas"] : [];
+  return [...new Set(declared)]
+    .filter(isCapability)
+    .filter(
+      (cap) =>
+        CAPABILITY_PORT[cap] === "runtime" &&
+        runtime.capabilities.includes(cap) &&
+        capabilityOn(team.policies, cap),
+    );
 }
 
 /** The directories the runtime may use besides the working directory, created with it. */

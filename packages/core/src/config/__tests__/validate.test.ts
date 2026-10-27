@@ -35,7 +35,11 @@ const ctx = (over: Partial<ValidationContext> = {}): ValidationContext => ({
       "vcs.merge",
     ]),
     adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
-    adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+    adapter("runtime", "claude-agent-sdk", [
+      "runtime.sessions",
+      "runtime.usage",
+      "runtime.permissions",
+    ]),
     adapter("knowledge", "notion", ["knowledge.docs"]),
     adapter("tracker", "linear", ["tracker.issues"]),
   ]),
@@ -123,7 +127,7 @@ describe("validateTeam", () => {
       adapters: new Map([
         adapter("vcs", "github", []),
         adapter("chat", "slack", []),
-        adapter("runtime", "claude-agent-sdk", []),
+        adapter("runtime", "claude-agent-sdk", ["runtime.permissions"]),
         adapter("knowledge", "notion", ["knowledge.docs"]),
         adapter("tracker", "linear", []),
       ]),
@@ -177,7 +181,11 @@ describe("validateTeam", () => {
       adapters: new Map([
         adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads"]),
         adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
-        adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+        adapter("runtime", "claude-agent-sdk", [
+          "runtime.sessions",
+          "runtime.usage",
+          "runtime.permissions",
+        ]),
         adapter("knowledge", "notion", ["knowledge.docs"]),
         adapter("tracker", "linear", ["tracker.issues"]),
       ]),
@@ -204,7 +212,11 @@ describe("validateTeam", () => {
       adapters: new Map([
         adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
         adapter("chat", "slack", ["chat.messages"]),
-        adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+        adapter("runtime", "claude-agent-sdk", [
+          "runtime.sessions",
+          "runtime.usage",
+          "runtime.permissions",
+        ]),
         adapter("knowledge", "notion", ["knowledge.docs"]),
         adapter("tracker", "linear", ["tracker.issues"]),
       ]),
@@ -254,7 +266,11 @@ describe("validateTeam", () => {
       adapters: new Map([
         adapter("vcs", "github", ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"]),
         adapter("chat", "slack", ["chat.messages", "chat.agentProfile"]),
-        adapter("runtime", "claude-agent-sdk", ["runtime.sessions"]),
+        adapter("runtime", "claude-agent-sdk", [
+          "runtime.sessions",
+          "runtime.usage",
+          "runtime.permissions",
+        ]),
         adapter("knowledge", "notion", ["knowledge.docs"]),
         adapter("tracker", "linear", ["tracker.issues"]),
       ]),
@@ -503,9 +519,10 @@ describe("validateTeam: design.canvas", () => {
       {
         path: ["people", 0, "role"],
         code: "capability.optional_missing",
-        message: 'Role "designer" can use design.canvas, which no configured integration provides.',
+        message:
+          'Role "designer" can use design.canvas, which runtime "claude-agent-sdk" of dina does not provide.',
         consequence:
-          "designer dina cannot work on a Design canvas: no runtime integration provides design.canvas.",
+          "designer dina cannot work on a Design canvas: give dina a runtime that provides design.canvas.",
       },
     ]);
   });

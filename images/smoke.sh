@@ -41,6 +41,7 @@ smoke_agent() {
   local image="$1"
   expect "$image" '^[0-9]+\.[0-9]+\.[0-9]+' ost-agent --version
   expect "$image" '^[0-9]+\.[0-9]+\.[0-9]+' ost --version
+  smoke_runtimes "$image"
   expect "$image" '^[1-9][0-9]*$' id -u
   expect "$image" 'git version' git --version
   expect "$image" '^20[0-9]{2}\.' mise --version
@@ -51,6 +52,16 @@ smoke_agent() {
   expect "$image" '^not setuid$' sh -c 'test -u "$(command -v bwrap)" && echo setuid || echo not setuid'
   expect "$image" 'socat version' socat -V
   smoke_toolset "$image"
+}
+
+# The runtimes the image's label says it carries are exactly the ones the agent has installed.
+smoke_runtimes() {
+  local image="$1" label carried
+  label="$(docker image inspect -f '{{ index .Config.Labels "work.outstaff.runtimes" }}' "$(ref "$image")")"
+  carried="$(run "$image" ost-agent --runtimes 2>&1 | tr '\n' ' ' | sed 's/ *$//')" || fail "$image: ost-agent --runtimes failed"
+  [ -n "$label" ] || fail "$image: no work.outstaff.runtimes label"
+  [ "$label" = "$carried" ] || fail "$image: label work.outstaff.runtimes is '$label', ost-agent --runtimes prints '$carried'"
+  echo "ok   $image: carries the runtimes its label lists ($label)"
 }
 
 # Installs a sample of the code toolset (pnpm and yarn) the way agent start does, then runs each tool in an unrelated

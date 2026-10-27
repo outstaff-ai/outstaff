@@ -1,31 +1,9 @@
 import { CAPABILITY_PORT } from "#/capabilities.js";
 import type { Capability } from "#/types.js";
 import type { ConfigWarning, TeamConfig } from "./types.js";
+import { LACKING } from "./lacking.js";
 import type { TeamCheck } from "./validate.types.js";
 import { WARNING_CODES } from "./warning-codes.js";
-
-/** What an agent cannot do without a capability, completing "<role> <handle> cannot ...". */
-export const LACKING: Record<Capability, string> = {
-  "tracker.issues": "read or update tickets",
-  "tracker.assign": "be assigned tickets",
-  "tracker.webhooks": "react to ticket changes instantly",
-  "tracker.attachments": "attach files to tickets",
-  "knowledge.docs": "write design docs",
-  "vcs.pullRequests": "open or update pull requests",
-  "vcs.reviewThreads": "reply to review threads",
-  "vcs.workflows": "push changes to CI workflow files",
-  "vcs.webhooks": "react to repository changes instantly",
-  "vcs.reactions": "react to pull request comments",
-  "vcs.merge": "merge pull requests",
-  "chat.messages": "send chat messages",
-  "chat.history": "read earlier chat messages",
-  "chat.agentProfile": "show the agent's profile and status in chat",
-  "chat.files": "read files shared in chat",
-  "runtime.sessions": "keep sessions between runs",
-  "runtime.usage": "track LLM usage against limits",
-  "avatars.generate": "get a generated avatar",
-  "design.canvas": "work on a Design canvas",
-};
 
 export const adapterKey = (port: string, adapter: string) => `${port}/${adapter}`;
 
@@ -81,5 +59,6 @@ function unprovided(c: TeamCheck, roleName: string, optional: boolean): Capabili
   const needs = c.ctx.roles.get(roleName);
   const caps = (optional ? needs?.optionalNeeds : needs?.needs) ?? [];
 
-  return caps.filter((cap) => !c.provided.has(cap));
+  // Runtime capabilities are each person's own, checked against their runtime in validate-runtime.
+  return caps.filter((cap) => CAPABILITY_PORT[cap] !== "runtime" && !c.provided.has(cap));
 }

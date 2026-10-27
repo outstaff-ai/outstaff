@@ -10,7 +10,7 @@ export { SCRIPTS, type Action, type Script } from "./scripts.js";
 export const scriptedRuntime = defineAdapter({
   port: "runtime",
   name: "scripted",
-  capabilities: ["runtime.usage"],
+  capabilities: ["runtime.usage", "runtime.permissions"],
   options: z.strictObject({}),
   secrets: () => [],
   create: (ctx) => createScriptedRuntime({ log: ctx.log }),

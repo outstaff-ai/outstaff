@@ -1,4 +1,10 @@
-import { envSecretSource, formatIssue, loadTeamConfig, silentLogger } from "@outstaff/core";
+import {
+  envSecretSource,
+  formatIssue,
+  loadTeamConfig,
+  silentLogger,
+  teamFor,
+} from "@outstaff/core";
 import { createOfficeConnection, type OfficeConnection } from "#/office-client/index.js";
 import { StartupError, present } from "./startup-error.js";
 import type { StartupContext, StartupOptions } from "./startup.types.js";
@@ -24,11 +30,14 @@ export async function loadStartupContext(opts: StartupOptions): Promise<StartupC
   const log = opts.log ?? silentLogger;
   const person = present(opts.env, "OUTSTAFF_PERSON");
   const secrets = opts.secrets ?? envSecretSource(opts.env);
-  const { config: team, source } = await loadTeam(opts);
-  const me = team.people.find((p) => p.handle === person);
+  const { config: teamFile, source } = await loadTeam(opts);
+  const me = teamFile.people.find((p) => p.handle === person);
   if (!me) {
-    throw new StartupError(`${person} is not a person of team ${team.team.name}.`);
+    throw new StartupError(`${person} is not a person of team ${teamFile.team.name}.`);
   }
+
+  // From here on the team is as this person sees it: `integrations.runtime` is the runtime they run on.
+  const team = teamFor(teamFile, me);
 
   return { opts, person, secrets, team, teamDir: source.dir, me, log };
 }

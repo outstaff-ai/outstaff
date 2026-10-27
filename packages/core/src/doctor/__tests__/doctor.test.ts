@@ -40,6 +40,36 @@ describe("the shared doctor checks", () => {
     expect(unknown).toEqual(["chat/missing"]);
   });
 
+  describe("a person's own runtime", () => {
+    const registry = new AdapterRegistry();
+    for (const def of fake.list()) {
+      registry.register(def);
+    }
+
+    registry.register(defineAdapter({ ...fake.get("runtime", "fake")!, name: "alt" }));
+    const own = { handle: "noor", runtime: { adapter: "alt", tier: "fast" } };
+    const withOwn = { ...team, people: [...team.people, own] } as unknown as TeamConfig;
+    const runtimeOf = (
+      person?: TeamConfig["people"][number],
+      scope: "office" | "person" = "person",
+    ) =>
+      configuredAdapters(withOwn, registry, scope, person)
+        .found.filter((f) => f.def.port === "runtime")
+        .map((f) => [f.def.name, f.options]);
+
+    it("checks the runtime a person picked instead of the team's", () => {
+      expect(runtimeOf(withOwn.people[1])).toEqual([["alt", { tier: "fast" }]]);
+    });
+
+    it("checks the team's runtime for a person without one of their own", () => {
+      expect(runtimeOf(withOwn.people[0])).toEqual([["fake", {}]]);
+    });
+
+    it("still skips the runtime for the office, even given a person", () => {
+      expect(runtimeOf(withOwn.people[1], "office")).toEqual([]);
+    });
+  });
+
   it("reports a shared answer once, a check that could not run, the notes, and scrubs secrets", async () => {
     const same = async (): Promise<DoctorCheck[]> => [
       { name: "Key works", status: "ok", detail: "key s3cret-value accepted" },

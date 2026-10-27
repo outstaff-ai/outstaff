@@ -1,4 +1,10 @@
-import { formatIssue, validateTeam, type LocatedIssue, type TeamConfig } from "@outstaff/core";
+import {
+  formatIssue,
+  runtimeOf,
+  validateTeam,
+  type LocatedIssue,
+  type TeamConfig,
+} from "@outstaff/core";
 import { catalogIssue, loadCatalogs, roleRegistry } from "#/catalogs.js";
 import { defineCommand } from "#/define.js";
 import { issueJson, loadTeam } from "#/load.js";
@@ -42,17 +48,19 @@ const reposLines = ({ repos }: TeamConfig): string[] =>
     repos.map((r) => [r.name, r.kind, r.url, r.default_branch]),
   );
 
-function peopleLines({ people }: TeamConfig): string[] {
+function peopleLines(config: TeamConfig): string[] {
+  const { people } = config;
   if (people.length === 0) {
     return ["  None yet. Add one with `ost hire`."];
   }
 
   return indented(
-    ["HANDLE", "NAME", "ROLE", "MODEL", "GRANTS"],
+    ["HANDLE", "NAME", "ROLE", "RUNTIME", "MODEL", "GRANTS"],
     people.map((p) => [
       p.handle,
       p.name,
       [p.role, ...(p.extends ?? [])].join("+"),
+      runtimeOf(config, p).adapter,
       p.model ?? "default",
       pairs(p.repos) || "none",
     ]),
@@ -106,7 +114,7 @@ export const team = defineCommand({
   name: "team",
   summary: "Show the resolved team: humans, repos, people and integrations.",
   description:
-    "Prints the team as Outstaff sees it after defaults are applied, including each person's repo grants. Roles are checked against the stock catalog plus the team's ejected catalog; exits 1 if the config cannot be loaded or a role is unknown.",
+    "Prints the team as Outstaff sees it after defaults are applied, including each person's runtime (their own or the team's) and repo grants. Roles are checked against the stock catalog plus the team's ejected catalog; exits 1 if the config cannot be loaded or a role is unknown.",
   options: [],
   examples: ["ost team", "ost team --json"],
   exitCodes: [

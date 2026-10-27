@@ -164,7 +164,8 @@ Only an agent's runtime sees its usage limits, so agents report them with the `u
 
 - A report older than 30 minutes (`usageStaleAfterMinutes`) is unknown, like a person who never reported. Unknown usage fails open: the policy is skipped and the office logs one warning per person until fresh data arrives.
 - A window whose reset time has passed counts as reset and is ignored.
-- Limits apply per credential. When several people share one subscription, list them in `policies.usage.shared` (for example `[[sam, kim]]`); a report from any member is stored for all of them. A person can be in one group only.
+- Limits apply per credential, and a credential belongs to one runtime. When several people share one subscription, list them in `policies.usage.shared` (for example `[[sam, kim]]`); a report from any member is stored for every member on the same runtime as the reporter. A person can be in one group only, and `ost validate` rejects a group whose members run on different runtimes (`policies.usage_shared_mixed_runtime`). Everyone else counts alone, against the credential of their own container.
+- A person whose runtime does not provide `runtime.usage` never reports, so the policy is not applied to them; `ost validate` warns about it (`people.runtime_without_usage`).
 - `ost roster` shows each person's busiest window and when it resets, as long as the report is fresh.
 
 ### Stale runs

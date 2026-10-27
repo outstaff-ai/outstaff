@@ -109,6 +109,19 @@ describe("usage tracker", () => {
     expect(usageGroupOf(team([["sam", "kim"]]), "mira")).toEqual(["mira"]);
   });
 
+  it("keeps a shared group to the members on the reporter's runtime: a credential belongs to one", async () => {
+    // Validation rejects such a group; a report still never crosses runtimes when one slips through.
+    const mixed = team([["sam", "kim", "mira"]]);
+    mixed.people[2]!.runtime = { adapter: "acme-alt" };
+    expect(usageGroupOf(mixed, "sam")).toEqual(["sam", "kim"]);
+    expect(usageGroupOf(mixed, "mira")).toEqual(["mira"]);
+
+    const usage = createUsageTracker({ store, team: mixed, clock, logger: log });
+    await usage.report("kim", [{ name: "five_hour", utilization: 0.96 }]);
+    expect(await usage.windows("sam")).toHaveLength(1);
+    expect(await usage.windows("mira")).toEqual([]);
+  });
+
   it("feeds the scheduler: automatic work is held above the threshold, humans are not", async () => {
     const usage = make([["sam", "kim"]]);
     const scheduler = createScheduler({ store, team: team(), clock, usage });

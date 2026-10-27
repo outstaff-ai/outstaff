@@ -27,6 +27,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `network.reserved_token` | A network token names a secret the framework or an adapter reads, so it cannot be a service token. |
 | `people.duplicate_handle` | Two people share the same handle. |
 | `people.invalid_grant_key` | A repo grant key is not a repo name, kind:<kind> or *. |
+| `people.runtime_missing_capability` | A person's runtime lacks a capability every agent needs (runtime.permissions) or one the person's role needs. |
 | `people.unknown_extends` | An extends entry names a role that is not in the catalog. |
 | `people.unknown_repo` | A repo grant names a repo that is not listed in repos. |
 | `people.unknown_role` | A person's role is not in the catalog. |
@@ -34,6 +35,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `policies.command_program` | A policies.commands entry names git, which repository grants govern. |
 | `policies.merge_unknown_repo` | policies.merge.repos names a repo that is not listed in repos. |
 | `policies.retry_backoff_order` | base_minutes is higher than cap_minutes. |
+| `policies.usage_shared_mixed_runtime` | A policies.usage.shared group has people on different runtimes; a group shares one credential, so one runtime. |
 | `policies.usage_shared_overlap` | A person appears in more than one policies.usage.shared group. |
 | `policies.usage_shared_unknown_person` | A policies.usage.shared group names someone who is not in people. |
 | `policies.usage_threshold_order` | defer_scheduled_at is higher than pause_automatic_at. |
@@ -75,6 +77,7 @@ A warning describes something that will not work as written or a default that ap
 | `people.missing_tracker_identity` | A person has no identities.tracker while a tracker integration is configured. |
 | `people.missing_vcs_identity` | A person has a write grant but no identities.vcs, while a vcs integration is configured. |
 | `people.reviewer_without_github` | A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves. |
+| `people.runtime_without_usage` | A person's runtime reports no usage windows, so the usage policy is not applied to that person. |
 | `policies.capability_missing` | A policies switch is on, but the configured adapter lacks the capability it needs. |
 | `policies.merge_without_checks` | policies.merge.on_approval is on for a repo with no checks configured, so an approval merges untested code. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

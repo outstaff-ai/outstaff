@@ -524,6 +524,21 @@ LLM model for this agent; the runtime adapter's default when omitted.
 - Optional
 - Minimum length 1
 
+### people[].runtime
+
+Runtime adapter for this agent, in the same shape as integrations.runtime: `adapter` and that adapter's options. It replaces the team's runtime for this agent as a whole (options are not merged); integrations.runtime when omitted.
+
+- Type: `object`
+- Optional
+
+#### people[].runtime.adapter
+
+Name of the adapter package to use, for example "github".
+
+- Type: `string`
+- Required
+- Minimum length 1
+
 ### people[].identities
 
 How this agent is known on each connected system. The office recognizes the agent's own activity only by an exact match with these.
@@ -769,7 +784,7 @@ Name of the adapter package to use, for example "github".
 
 ### integrations.runtime
 
-LLM runtime adapter that runs the agents.
+LLM runtime adapter that runs the agents; the default for everyone without a runtime of their own (people[].runtime).
 
 - Type: `object`
 - Required

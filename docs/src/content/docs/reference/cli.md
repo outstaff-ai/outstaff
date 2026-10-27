@@ -47,7 +47,7 @@ ost validate --json
 
 Show the resolved team: humans, repos, people and integrations.
 
-Prints the team as Outstaff sees it after defaults are applied, including each person's repo grants. Roles are checked against the stock catalog plus the team's ejected catalog; exits 1 if the config cannot be loaded or a role is unknown.
+Prints the team as Outstaff sees it after defaults are applied, including each person's runtime (their own or the team's) and repo grants. Roles are checked against the stock catalog plus the team's ejected catalog; exits 1 if the config cannot be loaded or a role is unknown.
 
 ```
 ost team

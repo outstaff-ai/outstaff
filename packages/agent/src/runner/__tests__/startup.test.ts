@@ -49,7 +49,7 @@ function registry() {
     defineAdapter({
       port: "runtime",
       name: "fake",
-      capabilities: ["runtime.sessions", "runtime.usage"],
+      capabilities: ["runtime.sessions", "runtime.usage", "runtime.permissions", "design.canvas"],
       options: z.looseObject({}),
       secrets: () => [],
       workdirLayout: (files) =>
@@ -160,7 +160,7 @@ people:`,
           ? defineAdapter({
               port: "runtime",
               name: "fake",
-              capabilities: ["runtime.sessions", "runtime.usage"],
+              capabilities: ["runtime.sessions", "runtime.usage", "runtime.permissions"],
               options: z.looseObject({}),
               secrets: () => [],
               create: (ctx) => {
@@ -275,7 +275,7 @@ people:`,
   it("fails clearly when the runtime adapter is not installed", async () => {
     const { options } = setup();
     await expect(prepareAgent({ ...options, registry: new AdapterRegistry() })).rejects.toThrow(
-      'runtime adapter "fake" is not installed',
+      'sam runs on the runtime adapter "fake", which is not installed in this build (it carries: none).',
     );
   });
 

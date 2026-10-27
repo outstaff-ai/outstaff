@@ -49,7 +49,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });
   const toolStatuses = await installTools(ctx, env, tools);
   const runtimeDef = runtimeAdapter(ctx);
-  const capabilities = roleCapabilities(ctx, roles, rendered.extends);
+  const capabilities = roleCapabilities(ctx, roles, rendered.extends, runtimeDef);
   const addDirs = prepareDirs(layout, capabilities);
   const repos = await cloneRepositories(ctx, env, rendered, layout);
   writeWorkdirFiles(runtimeDef, rendered, layout.workDir);
@@ -71,6 +71,12 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   });
 
   const model = me.model ?? role?.default_model;
+  log.info("runtime selected", {
+    person,
+    runtime: team.integrations.runtime.adapter,
+    model: model ?? "the runtime's default",
+  });
+
   const usage = usageReporter(ctx, connection, runtime);
   const started = startChat(connection, { env, team, me, role, model, person, log });
   const loop = workLoop(ctx, {

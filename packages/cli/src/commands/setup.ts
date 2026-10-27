@@ -75,7 +75,7 @@ async function planSetup(
     return undefined;
   }
 
-  const { found, unknown } = configuredAdapters(config, await registryOf(ctx), scope);
+  const { found, unknown } = configuredAdapters(config, await registryOf(ctx), scope, person);
   const teamDir = loaded.source.dir;
   return {
     config,

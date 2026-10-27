@@ -24,6 +24,12 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "policies.usage_shared_unknown_person":
     "A policies.usage.shared group names someone who is not in people.",
   "policies.usage_shared_overlap": "A person appears in more than one policies.usage.shared group.",
+  "policies.usage_shared_mixed_runtime":
+    "A policies.usage.shared group has people on different runtimes; a group shares one credential, so one runtime.",
+  "people.runtime_missing_capability":
+    "A person's runtime lacks a capability every agent needs (runtime.permissions) or one the person's role needs.",
+  "people.runtime_without_usage":
+    "A person's runtime reports no usage windows, so the usage policy is not applied to that person.",
   "policies.command_program":
     "A policies.commands entry names git, which repository grants govern.",
   "tools.invalid_version":

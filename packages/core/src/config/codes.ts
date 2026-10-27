@@ -45,4 +45,6 @@ export const CONFIG_CODES = {
   networkAdbMode: "network.adb_mode",
   networkReservedToken: "network.reserved_token",
   rolesUnknownRole: "roles.unknown_role",
+  peopleRuntimeMissingCapability: "people.runtime_missing_capability",
+  usageSharedMixedRuntime: "policies.usage_shared_mixed_runtime",
 } as const;

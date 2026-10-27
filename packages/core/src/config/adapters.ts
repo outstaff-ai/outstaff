@@ -21,32 +21,38 @@ export function clearAdapterOptions(): void {
   registry.clear();
 }
 
-/** Validate each integration's extra keys against its registered schema. Unknown adapters pass. */
-export function validateAdapterOptions(config: TeamConfig): ConfigIssue[] {
-  const issues: ConfigIssue[] = [];
-  for (const port of ADAPTER_PORTS) {
-    const ref = config.integrations[port];
-    if (!ref) {
-      continue;
-    }
+type Ref = { adapter: string } & Record<string, unknown>;
 
-    const schema = registry.get(key(port, ref.adapter));
-    if (!schema) {
-      continue;
-    }
-
-    const { adapter: _adapter, ...options } = ref;
-    const result = schema.safeParse(options);
-    if (!result.success) {
-      for (const issue of toConfigIssues(result.error, ["integrations", port])) {
-        issues.push(
-          issue.code.startsWith("schema.") || issue.code === CONFIG_CODES.invalid
-            ? { ...issue, code: CONFIG_CODES.adapterInvalidOptions }
-            : issue,
-        );
-      }
-    }
+/** One adapter choice's options checked against the schema its adapter registered; an unknown adapter passes. */
+function optionIssues(port: AdapterPort, ref: Ref, base: (string | number)[]): ConfigIssue[] {
+  const schema = registry.get(key(port, ref.adapter));
+  if (!schema) {
+    return [];
   }
 
-  return issues;
+  const { adapter: _adapter, ...options } = ref;
+  const result = schema.safeParse(options);
+  if (result.success) {
+    return [];
+  }
+
+  return toConfigIssues(result.error, base).map((issue) =>
+    issue.code.startsWith("schema.") || issue.code === CONFIG_CODES.invalid
+      ? { ...issue, code: CONFIG_CODES.adapterInvalidOptions }
+      : issue,
+  );
+}
+
+/** Validate each integration's extra keys, and each person's own runtime, against the registered schemas. */
+export function validateAdapterOptions(config: TeamConfig): ConfigIssue[] {
+  const team = ADAPTER_PORTS.flatMap((port) => {
+    const ref = config.integrations[port];
+    return ref ? optionIssues(port, ref, ["integrations", port]) : [];
+  });
+
+  const people = config.people.flatMap((p, i) =>
+    p.runtime ? optionIssues("runtime", p.runtime, ["people", i, "runtime"]) : [],
+  );
+
+  return [...team, ...people];
 }
