@@ -85,6 +85,8 @@ Maintainers: signatures are stored in the separate `outstaff-ai/cla-signatures` 
 - **Coverage.** Integrations (`integrations/*/*`) must have 100% line, branch, function and statement coverage in every file; CI fails below it (`pnpm test:coverage`). Cover a branch with a test, or delete it if it can't run; no coverage-ignore comments.
 - **Fakes reuse the integration's types.** A fake or stand-in (`src/testing/**`, `testing.ts`, `packages/core/src/fakes`, `e2e/stubs`) derives its shapes from the adapter's API types or the core port types, for example `type StoredIssue = ApiIssue & Required<Pick<ApiIssue, "labelIds">>`, and names them `Stored*` or `Fake*` so they don't shadow domain names. When a fake needs a field the adapter doesn't read, add it to the adapter's API type as optional instead of redefining the shape.
 
+- **Complexity.** Functions stay at a cyclomatic complexity of 8 or less, and blocks nest at most 3 deep (`eslint/complexity`, `eslint/max-depth`). Split a function along its decisions, with guard clauses, a lookup table or small named helpers, instead of adding branches. The second `overrides` entry in `.oxlintrc.json` lists files that are still over the limit; it only ever shrinks, and nothing new is added to it. The first lists modules the event-pipeline redesign deletes.
+
 ## Reporting bugs, asking for features, and security
 
 - Bugs and feature requests: open an issue with the matching form. Pick the adapter or role form when you want a new integration or a new role.
