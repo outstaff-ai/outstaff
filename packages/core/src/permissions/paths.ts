@@ -14,17 +14,9 @@ export function globToRegExp(glob: string): RegExp {
   for (let i = 0; i < glob.length; i++) {
     const c = glob[i]!;
     if (c === "*") {
-      if (glob[i + 1] === "*") {
-        if (glob[i + 2] === "/") {
-          re += "(?:.*/)?";
-          i += 2;
-        } else {
-          re += ".*";
-          i += 1;
-        }
-      } else {
-        re += "[^/]*";
-      }
+      const star = starPattern(glob, i);
+      re += star.re;
+      i += star.skip;
     } else if (c === "?") {
       re += "[^/]";
     } else {
@@ -36,6 +28,15 @@ export function globToRegExp(glob: string): RegExp {
   const out = new RegExp(`^${re}$`);
   cache.set(glob, out);
   return out;
+}
+
+/** The pattern of the `**\/`, `**` or `*` at `i`, and how many characters past `i` it spans. */
+function starPattern(glob: string, i: number): { re: string; skip: number } {
+  if (glob[i + 1] !== "*") {
+    return { re: "[^/]*", skip: 0 };
+  }
+
+  return glob[i + 2] === "/" ? { re: "(?:.*/)?", skip: 2 } : { re: ".*", skip: 1 };
 }
 
 export function matchesAny(globs: readonly string[], path: string): boolean {

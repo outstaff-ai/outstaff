@@ -8,17 +8,19 @@ const isMap = (v: unknown): v is Record<string, unknown> =>
 
 const hasChecksum = (v: unknown) => typeof v === "string" && v.trim() !== "";
 
+const httpChecksumIssue = (name: string, path: (string | number)[]) =>
+  customIssue(
+    CONFIG_CODES.toolsHttpChecksum,
+    `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
+    [name, ...path],
+  );
+
 export function checkOptions(name: string, t: ToolDeclaration, ctx: z.RefinementCtx) {
   const { options, source } = t;
+  const isHttp = source?.startsWith("http:") === true;
   if (options === undefined) {
-    if (source?.startsWith("http:")) {
-      ctx.addIssue(
-        customIssue(
-          CONFIG_CODES.toolsHttpChecksum,
-          `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
-          [name, "options"],
-        ),
-      );
+    if (isHttp) {
+      ctx.addIssue(httpChecksumIssue(name, ["options"]));
     }
 
     return;
@@ -44,20 +46,21 @@ export function checkOptions(name: string, t: ToolDeclaration, ctx: z.Refinement
     );
   }
 
-  if (!source?.startsWith("http:") || hasChecksum(options["checksum"])) {
+  if (isHttp) {
+    checkChecksums(name, options, ctx);
+  }
+}
+
+/** An http: download needs a checksum: one for every platform, or one for them all. */
+function checkChecksums(name: string, options: Record<string, unknown>, ctx: z.RefinementCtx) {
+  if (hasChecksum(options["checksum"])) {
     return;
   }
 
   const platforms = isMap(options["platforms"]) ? Object.entries(options["platforms"]) : [];
   const missing = platforms.filter(([, p]) => !isMap(p) || !hasChecksum(p["checksum"]));
   if (platforms.length === 0) {
-    ctx.addIssue(
-      customIssue(
-        CONFIG_CODES.toolsHttpChecksum,
-        `Tool "${name}" has an http: source and needs options.checksum, or one per platform.`,
-        [name, "options", "checksum"],
-      ),
-    );
+    ctx.addIssue(httpChecksumIssue(name, ["options", "checksum"]));
   }
 
   for (const [platform] of missing) {

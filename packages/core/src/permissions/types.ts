@@ -204,3 +204,53 @@ export interface ProfileSpec {
   /** The `ost` verbs the profile may call. Every verb when omitted. */
   verbs?: string[];
 }
+
+/** What the options of a `git push` say, and its remaining words. */
+export interface PushArgs {
+  /** The push deletes the remote branch (`--delete`, `-d`). */
+  del: boolean;
+
+  /** The push is a lease push (`--force-with-lease`, `--force-if-includes`). */
+  forceLease: boolean;
+  positionals: string[];
+}
+
+/** A repository granted to the person, as found from a working directory. */
+export interface GitRepo {
+  dir: string;
+  mode: GitMode;
+  defaultBranch: string;
+}
+
+/** What the global options of a git command (before the subcommand) say. */
+export interface GitGlobals {
+  /** The directory git runs in, after any `-C`. */
+  cwd: string;
+
+  /** An option such as `--git-dir` points git at a repository other than the directory's. */
+  redirected: boolean;
+
+  /** Index of the subcommand in the arguments. */
+  next: number;
+}
+
+/** A git subcommand to judge, inside a granted repository. */
+export interface GitSubcommand {
+  sub: string;
+  rest: string[];
+  repo: GitRepo;
+  currentBranch: string | undefined;
+}
+
+/** A command being judged: where it runs, and how to judge the commands it runs in turn. */
+export interface CommandScope {
+  policy: Policy;
+  call: ToolCall;
+  cwd: string;
+
+  /** Judges a command it runs, given as words. */
+  inner: (words: string[]) => Decision;
+
+  /** Judges a command line it runs, given as text. */
+  script: (text: string) => Decision;
+}

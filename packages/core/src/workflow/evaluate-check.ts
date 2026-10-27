@@ -1,6 +1,7 @@
 import { isApprover } from "../policies/approvers.js";
+import type { ApproverCandidate } from "../policies/types.js";
 import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
-import type { Check, Ctx } from "./evaluate.types.js";
+import type { Check, ConditionChecks, ConditionKey, Ctx } from "./evaluate.types.js";
 import type { Condition, ConditionEvent, WorkflowPr } from "./types.js";
 
 /** The agents a comment names, first mention first: the handles the office put in `data.mentions`. */
@@ -14,10 +15,32 @@ export const mentionedBy = (event: ConditionEvent): string[] => {
 /** The pull requests that count toward a ticket's share: a closed one that never merged does not. */
 export const livePrs = (prs: WorkflowPr[]) => prs.filter((p) => p.state !== "closed");
 const list = (xs: readonly string[]) => `[${xs.join(", ")}]`;
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
+
+/** Whether a value from the event's data is one of the wanted strings. */
+const oneOf = (value: unknown, wanted: readonly string[]) =>
+  typeof value === "string" && wanted.includes(value);
+
+const ticketPrs = (ctx: Ctx): WorkflowPr[] =>
+  ctx.ticket ? ctx.state.pullRequestsOf(ctx.ticket) : [];
+
+/** Whether someone may approve under the workflow's `approvers` option (any trusted human by default). */
+function approves(ctx: Ctx, who: ApproverCandidate): boolean {
+  return isApprover(ctx.opts.approvers ?? ["humans"], who, { humans: ctx.opts.humans }, (role) =>
+    ctx.state.personForRole(role),
+  );
+}
 
 export function check(c: Condition, ctx: Ctx): Check {
-  if ("all" in c) {
-    for (const child of c.all) {
+  const key = CONDITION_KEYS.find((k) => k in c) ?? "review_state";
+  const judge = CHECKS[key] as (wanted: unknown, ctx: Ctx) => Check;
+
+  return judge((c as Record<ConditionKey, unknown>)[key], ctx);
+}
+
+const CHECKS: ConditionChecks = {
+  all: (conditions, ctx) => {
+    for (const child of conditions) {
       const r = check(child, ctx);
       if (!r.ok) {
         return r;
@@ -25,213 +48,181 @@ export function check(c: Condition, ctx: Ctx): Check {
     }
 
     return { ok: true, detail: "all conditions hold" };
-  }
-
-  if ("any" in c) {
-    const rs = c.any.map((child) => check(child, ctx));
+  },
+  any: (conditions, ctx) => {
+    const rs = conditions.map((child) => check(child, ctx));
     const hit = rs.find((r) => r.ok);
     return hit ?? { ok: false, detail: `none of: ${rs.map((r) => r.detail).join("; ")}` };
-  }
-
-  if ("not" in c) {
-    const r = check(c.not, ctx);
+  },
+  not: (condition, ctx) => {
+    const r = check(condition, ctx);
     return {
       ok: !r.ok,
       detail: r.ok ? `not (${r.detail})` : `${r.detail}, so not-condition holds`,
     };
-  }
-
-  if ("ticket_status" in c) {
+  },
+  ticket_status: (wanted, ctx) => {
     const s = ctx.ticket ? ctx.state.ticketStatus(ctx.ticket) : undefined;
-    const detail = `ticket status ${s ?? (ctx.ticket ? "unknown" : "none (no linked ticket)")} in ${list(c.ticket_status)}`;
-    return { ok: s !== undefined && c.ticket_status.includes(s), detail };
-  }
-
-  if ("moved_to" in c) {
+    const shown = s ?? (ctx.ticket ? "unknown" : "none (no linked ticket)");
+    return {
+      ok: s !== undefined && wanted.includes(s),
+      detail: `ticket status ${shown} in ${list(wanted)}`,
+    };
+  },
+  moved_to: (wanted, ctx) => {
     const to = ctx.event.data["to"];
-    return {
-      ok: typeof to === "string" && (c.moved_to as string[]).includes(to),
-      detail: `moved to ${String(to ?? "none")} in ${list(c.moved_to)}`,
-    };
-  }
-
-  if ("actor_kind" in c) {
-    return {
-      ok: ctx.event.actor.kind === c.actor_kind,
-      detail: `actor is ${ctx.event.actor.kind}, wanted ${c.actor_kind}`,
-    };
-  }
-
-  if ("assignee_kind" in c) {
-    const a = ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined;
-    const kind = a?.kind ?? "none";
-    return {
-      ok: kind === c.assignee_kind,
-      detail: `assignee is ${kind}, wanted ${c.assignee_kind}`,
-    };
-  }
-
-  if ("has_label" in c) {
+    return { ok: oneOf(to, wanted), detail: `moved to ${String(to ?? "none")} in ${list(wanted)}` };
+  },
+  actor_kind: (wanted, ctx) => ({
+    ok: ctx.event.actor.kind === wanted,
+    detail: `actor is ${ctx.event.actor.kind}, wanted ${wanted}`,
+  }),
+  assignee_kind: (wanted, ctx) => {
+    const kind = (ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined)?.kind ?? "none";
+    return { ok: kind === wanted, detail: `assignee is ${kind}, wanted ${wanted}` };
+  },
+  has_label: (wanted, ctx) => {
     const label =
-      c.has_label === "$needs_human"
-        ? (ctx.opts.needsHumanLabel ?? DEFAULT_NEEDS_HUMAN_LABEL)
-        : c.has_label;
+      wanted === "$needs_human" ? (ctx.opts.needsHumanLabel ?? DEFAULT_NEEDS_HUMAN_LABEL) : wanted;
 
     return {
       ok: ctx.ticket !== undefined && ctx.state.hasLabel(ctx.ticket, label),
       detail: `ticket has label "${label}"`,
     };
-  }
-
-  if ("pr_author_kind" in c) {
+  },
+  pr_author_kind: (wanted, ctx) => {
     const kind = ctx.pr?.author.kind;
     return {
-      ok: kind === c.pr_author_kind,
-      detail: `pull request author is ${kind ?? "unknown"}, wanted ${c.pr_author_kind}`,
+      ok: kind === wanted,
+      detail: `pull request author is ${kind ?? "unknown"}, wanted ${wanted}`,
     };
-  }
-
-  if ("approver" in c) {
-    const actor = ctx.event.actor;
+  },
+  approver: (wanted, ctx) => {
+    const { kind, id } = ctx.event.actor;
     const ok =
-      isApprover(
-        ctx.opts.approvers ?? ["humans"],
-        { kind: actor.kind, id: actor.id, trusted: ctx.event.data["untrusted"] !== true },
-        { humans: ctx.opts.humans },
-        (role) => ctx.state.personForRole(role),
-      ) === c.approver;
+      approves(ctx, { kind, id, trusted: ctx.event.data["untrusted"] !== true }) === wanted;
 
-    return { ok, detail: `actor ${actor.id} is ${c.approver ? "" : "not "}an allowed approver` };
-  }
-
-  if ("pr_draft" in c) {
+    return { ok, detail: `actor ${id} is ${wanted ? "" : "not "}an allowed approver` };
+  },
+  pr_draft: (wanted, ctx) => {
     const draft = ctx.pr?.draft;
     return {
-      ok: draft !== undefined && draft === c.pr_draft,
-      detail: `pull request draft is ${draft ?? "unknown"}, wanted ${c.pr_draft}`,
+      ok: draft !== undefined && draft === wanted,
+      detail: `pull request draft is ${draft ?? "unknown"}, wanted ${wanted}`,
     };
-  }
-
-  if ("pr_open" in c) {
+  },
+  pr_open: (wanted, ctx) => {
     const state = ctx.pr?.state;
     return {
-      ok: state !== undefined && (state === "open") === c.pr_open,
-      detail: `pull request is ${state ?? "unknown"}, wanted ${c.pr_open ? "open" : "not open"}`,
+      ok: state !== undefined && (state === "open") === wanted,
+      detail: `pull request is ${state ?? "unknown"}, wanted ${wanted ? "open" : "not open"}`,
     };
-  }
-
-  if ("pr_merged" in c) {
+  },
+  pr_merged: (wanted, ctx) => {
     const state = ctx.pr?.state;
     return {
-      ok: state !== undefined && (state === "merged") === c.pr_merged,
-      detail: `pull request is ${state ?? "unknown"}, wanted ${c.pr_merged ? "merged" : "not merged"}`,
+      ok: state !== undefined && (state === "merged") === wanted,
+      detail: `pull request is ${state ?? "unknown"}, wanted ${wanted ? "merged" : "not merged"}`,
     };
-  }
-
-  if ("pr_base_default" in c) {
+  },
+  pr_base_default: (wanted, ctx) => {
     const base = ctx.pr?.baseRef;
     const def = ctx.pr ? ctx.state.defaultBranch(ctx.pr.ref.repo) : undefined;
     return {
-      ok: base !== undefined && (base === def) === c.pr_base_default,
-      detail: `pull request targets ${base ?? "unknown"}, the default branch is ${def ?? "unknown"}, wanted ${c.pr_base_default ? "the default branch" : "another branch"}`,
+      ok: base !== undefined && (base === def) === wanted,
+      detail: `pull request targets ${base ?? "unknown"}, the default branch is ${def ?? "unknown"}, wanted ${wanted ? "the default branch" : "another branch"}`,
     };
-  }
-
-  if ("has_body" in c) {
-    const body = ctx.event.data["body"];
-    const comments = ctx.event.data["comments"];
-    const has =
-      (typeof body === "string" && body.trim() !== "") ||
-      (Array.isArray(comments) && comments.length > 0);
-
+  },
+  has_body: (wanted, ctx) => {
+    const has = hasBody(ctx.event);
     return {
-      ok: has === c.has_body,
-      detail: `event ${has ? "has" : "has no"} body, wanted ${c.has_body ? "one" : "none"}`,
+      ok: has === wanted,
+      detail: `event ${has ? "has" : "has no"} body, wanted ${wanted ? "one" : "none"}`,
     };
-  }
-
-  if ("agent_mentioned" in c) {
+  },
+  agent_mentioned: (wanted, ctx) => {
     const found = mentionedBy(ctx.event);
     return {
-      ok: found.length > 0 === c.agent_mentioned,
-      detail: `comment mentions ${found.length === 0 ? "no agent" : list(found)}, wanted ${c.agent_mentioned ? "an agent mentioned" : "none"}`,
+      ok: found.length > 0 === wanted,
+      detail: `comment mentions ${found.length === 0 ? "no agent" : list(found)}, wanted ${wanted ? "an agent mentioned" : "none"}`,
     };
-  }
-
-  if ("hand_back_status" in c) {
+  },
+  hand_back_status: (wanted, ctx) => {
     const s = ctx.event.data["status"];
     return {
-      ok: typeof s === "string" && (c.hand_back_status as string[]).includes(s),
-      detail: `hand-back status ${String(s ?? "none")} in ${list(c.hand_back_status)}`,
+      ok: oneOf(s, wanted),
+      detail: `hand-back status ${String(s ?? "none")} in ${list(wanted)}`,
     };
-  }
-
-  if ("hand_back_kind" in c) {
+  },
+  hand_back_kind: (wanted, ctx) => {
     const k = ctx.event.data["kind"];
     return {
-      ok: typeof k === "string" && c.hand_back_kind.includes(k),
-      detail: `hand-back is for a ${String(k ?? "unknown")} item, wanted one of ${list(c.hand_back_kind)}`,
+      ok: oneOf(k, wanted),
+      detail: `hand-back is for a ${String(k ?? "unknown")} item, wanted one of ${list(wanted)}`,
     };
-  }
-
-  if ("pr_approved" in c) {
+  },
+  pr_approved: (wanted, ctx) => {
     const allowed = (ctx.pr?.verdicts ?? []).filter((v) =>
-      isApprover(
-        ctx.opts.approvers ?? ["humans"],
-        { kind: v.kind, id: v.actor, trusted: true },
-        { humans: ctx.opts.humans },
-        (role) => ctx.state.personForRole(role),
-      ),
+      approves(ctx, { kind: v.kind, id: v.actor, trusted: true }),
     );
 
     const approved = allowed.some((v) => v.state === "approved");
     const blocked = allowed.some((v) => v.state === "changes_requested");
     return {
-      ok: (approved && !blocked) === c.pr_approved,
-      detail: `${allowed.length} allowed approver verdict${allowed.length === 1 ? "" : "s"} on the pull request (${approved ? "approved" : "not approved"}${blocked ? ", changes requested" : ""}), wanted ${c.pr_approved ? "approved" : "not approved"}`,
+      ok: (approved && !blocked) === wanted,
+      detail: `${plural(allowed.length, "allowed approver verdict")} on the pull request (${approved ? "approved" : "not approved"}${blocked ? ", changes requested" : ""}), wanted ${wanted ? "approved" : "not approved"}`,
     };
-  }
-
-  if ("ticket_prs_all_closed" in c) {
-    const all = ctx.ticket ? ctx.state.pullRequestsOf(ctx.ticket) : [];
+  },
+  ticket_prs_all_closed: (wanted, ctx) => {
+    const all = ticketPrs(ctx);
     const closed = all.length > 0 && all.every((p) => p.state !== "open");
     const merged = all.filter((p) => p.state === "merged").length;
+    const open = all.filter((p) => p.state === "open").length;
     return {
-      ok: (closed && merged > 0) === c.ticket_prs_all_closed,
-      detail: `ticket has ${all.length} pull request${all.length === 1 ? "" : "s"}, ${merged} merged, ${all.filter((p) => p.state === "open").length} open; wanted ${c.ticket_prs_all_closed ? "all closed with one merged" : "not all closed with one merged"}`,
+      ok: (closed && merged > 0) === wanted,
+      detail: `ticket has ${plural(all.length, "pull request")}, ${merged} merged, ${open} open; wanted ${wanted ? "all closed with one merged" : "not all closed with one merged"}`,
     };
-  }
-
-  if ("ticket_prs_open" in c) {
-    const open = (ctx.ticket ? ctx.state.pullRequestsOf(ctx.ticket) : []).filter(
-      (p) => p.state === "open",
-    ).length;
-
+  },
+  ticket_prs_open: (wanted, ctx) => {
+    const open = ticketPrs(ctx).filter((p) => p.state === "open").length;
     return {
-      ok: open > 0 === c.ticket_prs_open,
-      detail: `ticket has ${open} open pull request${open === 1 ? "" : "s"}, wanted ${c.ticket_prs_open ? "some" : "none"}`,
+      ok: open > 0 === wanted,
+      detail: `ticket has ${plural(open, "open pull request")}, wanted ${wanted ? "some" : "none"}`,
     };
-  }
-
-  if ("ticket_prs_several" in c) {
-    const live = ctx.ticket ? livePrs(ctx.state.pullRequestsOf(ctx.ticket)) : [];
+  },
+  ticket_prs_several: (wanted, ctx) => {
+    const live = livePrs(ticketPrs(ctx));
     return {
-      ok: live.length > 1 === c.ticket_prs_several,
-      detail: `ticket has ${live.length} open or merged pull request${live.length === 1 ? "" : "s"}, wanted ${c.ticket_prs_several ? "several" : "at most one"}`,
+      ok: live.length > 1 === wanted,
+      detail: `ticket has ${plural(live.length, "open or merged pull request")}, wanted ${wanted ? "several" : "at most one"}`,
     };
-  }
-
-  if ("ticket_handed_back" in c) {
+  },
+  ticket_handed_back: (wanted, ctx) => {
     const back = ctx.ticket ? ctx.state.handedBack(ctx.ticket) : false;
     return {
-      ok: back === c.ticket_handed_back,
-      detail: `ticket ${back ? "was" : "was not"} handed back as done, wanted ${c.ticket_handed_back ? "handed back" : "not handed back"}`,
+      ok: back === wanted,
+      detail: `ticket ${back ? "was" : "was not"} handed back as done, wanted ${wanted ? "handed back" : "not handed back"}`,
     };
-  }
+  },
+  review_state: (wanted, ctx) => {
+    const st = ctx.event.data["state"];
+    return {
+      ok: oneOf(st, wanted),
+      detail: `review state ${String(st ?? "none")} in ${list(wanted)}`,
+    };
+  },
+};
 
-  const st = ctx.event.data["state"];
-  return {
-    ok: typeof st === "string" && c.review_state.includes(st),
-    detail: `review state ${String(st ?? "none")} in ${list(c.review_state)}`,
-  };
+/** Condition names in the order they are tried. */
+const CONDITION_KEYS = Object.keys(CHECKS) as ConditionKey[];
+
+/** Whether the event carries text: a non-blank body, or comments. */
+function hasBody(event: ConditionEvent): boolean {
+  const body = event.data["body"];
+  const comments = event.data["comments"];
+
+  return (
+    (typeof body === "string" && body.trim() !== "") ||
+    (Array.isArray(comments) && comments.length > 0)
+  );
 }

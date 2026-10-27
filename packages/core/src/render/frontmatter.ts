@@ -14,30 +14,8 @@ export function withSkillFrontMatter(
   meta: { name: string; description: string },
   file: string,
 ): string {
-  const match = FRONT_MATTER.exec(text);
-  let rest = text;
-  let extra: Record<string, unknown> = {};
-  if (match) {
-    const doc = parseDocument(match[1] ?? "", { prettyErrors: false });
-    const value: unknown = doc.toJS();
-    const isMap = value !== null && typeof value === "object" && !Array.isArray(value);
-    if (doc.errors.length || (value !== null && value !== undefined && !isMap)) {
-      throw new CatalogError([
-        {
-          code: CATALOG_CODES.frontMatterInvalid,
-          message: doc.errors[0]?.message ?? "Front matter must be a YAML mapping.",
-          file,
-          line: 1,
-          column: 1,
-        },
-      ]);
-    }
-
-    extra = (value as Record<string, unknown> | null) ?? {};
-    rest = text.slice(match[0].length);
-  }
-
-  const { name: _name, description: own, ...others } = extra;
+  const { front, rest } = splitFrontMatter(text, file);
+  const { name: _name, description: own, ...others } = front;
   const description =
     typeof own === "string" && own.trim()
       ? own.trim()
@@ -46,4 +24,38 @@ export function withSkillFrontMatter(
   const block = stringify({ name: meta.name, description, ...others }, { lineWidth: 0 });
 
   return `---\n${block}---\n\n${rest.replace(/^\n+/, "")}`;
+}
+
+/** The keys of the source's front matter block (none without one) and the text after it. */
+function splitFrontMatter(
+  text: string,
+  file: string,
+): { front: Record<string, unknown>; rest: string } {
+  const match = FRONT_MATTER.exec(text);
+  if (!match) {
+    return { front: {}, rest: text };
+  }
+
+  return { front: parseFrontMatter(match[1] ?? "", file), rest: text.slice(match[0].length) };
+}
+
+const isMapping = (v: unknown): boolean => typeof v === "object" && v !== null && !Array.isArray(v);
+
+/** A front matter block must be a YAML mapping, or empty. */
+function parseFrontMatter(yaml: string, file: string): Record<string, unknown> {
+  const doc = parseDocument(yaml, { prettyErrors: false });
+  const value: unknown = doc.toJS();
+  if (doc.errors.length === 0 && (value === null || value === undefined || isMapping(value))) {
+    return (value ?? {}) as Record<string, unknown>;
+  }
+
+  throw new CatalogError([
+    {
+      code: CATALOG_CODES.frontMatterInvalid,
+      message: doc.errors[0]?.message ?? "Front matter must be a YAML mapping.",
+      file,
+      line: 1,
+      column: 1,
+    },
+  ]);
 }

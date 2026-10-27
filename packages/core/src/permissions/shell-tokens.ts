@@ -1,276 +1,296 @@
-import { closeBacktick, closeParen, expansion, expansionsIn } from "./shell-expansion.js";
-import type { Heredoc, Token, TokenResult } from "./shell.types.js";
+import { Scanner } from "./shell-scanner.js";
+import { closeBacktick, closeParen, expansion } from "./shell-expansion.js";
+import type { Heredoc, Separator, TokenResult } from "./shell.types.js";
 
-const fail = (reason: string): TokenResult => ({ ok: false, reason });
+/** Reads what starts at the current character; returns why the line cannot be read, or nothing to go on. */
+type Step = (s: Scanner) => string | undefined;
+
+const HEREDOC_DELIMITER = /^(?:'([^']*)'|"([^"]*)"|([^\s;&|<>()]+))/;
 
 /** The tokens of a command line: words, redirections, separators, substitutions and expanded variables. */
 export function tokenize(src: string): TokenResult {
-  const tokens: Token[] = [];
-  let buf = "";
-  let inWord = false;
-  let digitsOnly = true;
-  const heredocs: Heredoc[] = [];
-  let i = 0;
-
-  const endWord = () => {
-    if (inWord) {
-      tokens.push({ k: "word", v: buf });
-    }
-
-    buf = "";
-    inWord = false;
-    digitsOnly = true;
-  };
-
-  const add = (s: string, digit = false) => {
-    buf += s;
-    inWord = true;
-    if (!digit) {
-      digitsOnly = false;
-    }
-  };
-
-  /** Reads the bodies of the pending here-documents from `at`, the start of the next line; returns where they end. */
-  const readBodies = (at: number): number => {
-    let pos = at;
-    for (const h of heredocs.splice(0)) {
-      const body: string[] = [];
-      while (pos < src.length) {
-        const nl = src.indexOf("\n", pos);
-        const line = src.slice(pos, nl < 0 ? src.length : nl);
-        pos = nl < 0 ? src.length : nl + 1;
-        if ((h.stripTabs ? line.replace(/^\t+/, "") : line) === h.delimiter) {
-          break;
-        }
-
-        body.push(line);
-      }
-
-      if (h.expands) {
-        tokens.push(...expansionsIn(body.join("\n")));
-      }
-    }
-
-    return pos;
-  };
-
-  while (i < src.length) {
-    const c = src[i]!;
-    const n = src[i + 1];
-    if (c === " " || c === "\t") {
-      endWord();
-      i++;
-    } else if (c === "\n") {
-      endWord();
-      tokens.push({ k: "sep", v: ";" });
-      i = heredocs.length > 0 ? readBodies(i + 1) : i + 1;
-    } else if (c === "#" && !inWord) {
-      while (i < src.length && src[i] !== "\n") {
-        i++;
-      }
-    } else if (c === "'") {
-      const end = src.indexOf("'", i + 1);
-      if (end < 0) {
-        return fail("unterminated single quote");
-      }
-
-      add(src.slice(i + 1, end));
-      i = end + 1;
-    } else if (c === '"') {
-      i++;
-      inWord = true;
-      digitsOnly = false;
-      for (;;) {
-        if (i >= src.length) {
-          return fail("unterminated double quote");
-        }
-
-        const d = src[i]!;
-        if (d === '"') {
-          i++;
-          break;
-        }
-
-        if (d === "\\" && i + 1 < src.length) {
-          const e = src[i + 1]!;
-          buf += '"\\$`'.includes(e) ? e : `\\${e}`;
-          i += 2;
-        } else if (d === "`") {
-          const end = closeBacktick(src, i);
-          if (end < 0) {
-            return fail("unterminated backtick");
-          }
-
-          tokens.push({ k: "sub", v: src.slice(i + 1, end - 1) });
-          buf += src.slice(i, end);
-          i = end;
-        } else if (d === "$") {
-          const e = expansion(src, i);
-          if (e === "unclosed") {
-            return fail("unterminated expansion");
-          }
-
-          if (e) {
-            tokens.push(...e.tokens);
-            buf += e.text;
-            i = e.end;
-          } else {
-            buf += d;
-            i++;
-          }
-        } else {
-          buf += d;
-          i++;
-        }
-      }
-    } else if (c === "\\") {
-      if (n === "\n") {
-        i += 2;
-      } else if (n === undefined) {
-        return fail("trailing backslash");
-      } else {
-        add(n);
-        i += 2;
-      }
-    } else if (c === "`") {
-      const end = closeBacktick(src, i);
-      if (end < 0) {
-        return fail("unterminated backtick");
-      }
-
-      tokens.push({ k: "sub", v: src.slice(i + 1, end - 1) });
-      add(src.slice(i, end));
-      i = end;
-    } else if (c === "$" && n === "'") {
-      // ANSI-C quoting: the text is data.
-      const end = src.indexOf("'", i + 2);
-      if (end < 0) {
-        return fail("unterminated single quote");
-      }
-
-      add(src.slice(i + 2, end));
-      i = end + 1;
-    } else if (c === "$") {
-      const e = expansion(src, i);
-      if (e === "unclosed") {
-        return fail("unterminated expansion");
-      }
-
-      if (e) {
-        tokens.push(...e.tokens);
-        add(e.text);
-        i = e.end;
-      } else {
-        add(c);
-        i++;
-      }
-    } else if ((c === "<" || c === ">") && n === "(") {
-      const end = closeParen(src, i + 1);
-      if (end < 0) {
-        return fail("unterminated process substitution");
-      }
-
-      tokens.push({ k: "sub", v: src.slice(i + 2, end - 1) });
-      add(src.slice(i, end));
-      i = end;
-    } else if (c === "(" || c === ")") {
-      // A subshell or group runs its commands like any others; for judging them it is a separator.
-      endWord();
-      tokens.push({ k: "sep", v: ";" });
-      i++;
-    } else if (c === "<" && n === "<" && src[i + 2] === "<") {
-      endWord();
-      tokens.push({ k: "redir", op: "<<<" });
-      i += 3;
-    } else if (c === "<" && n === "<") {
-      endWord();
-      i += 2;
-      const stripTabs = src[i] === "-";
-      if (stripTabs) {
-        i++;
-      }
-
-      while (src[i] === " " || src[i] === "\t") {
-        i++;
-      }
-
-      const m = /^(?:'([^']*)'|"([^"]*)"|([^\s;&|<>()]+))/.exec(src.slice(i));
-      if (!m) {
-        return fail("here-document without a delimiter");
-      }
-
-      const quoted = m[3] === undefined || /["'\\]/.test(m[3]);
-      const delimiter = m[1] ?? m[2] ?? m[3]!.replaceAll(/["'\\]/g, "");
-      heredocs.push({ delimiter, stripTabs, expands: !quoted });
-      i += m[0].length;
-    } else if (c === "<" || c === ">") {
-      // "2>" style file-descriptor prefix belongs to the operator, not to a word.
-      if (inWord && digitsOnly && buf !== "") {
-        buf = "";
-        inWord = false;
-      } else {
-        endWord();
-      }
-
-      let op = c;
-      i++;
-      if (c === ">" && src[i] === ">") {
-        op = ">>";
-        i++;
-      }
-
-      if (src[i] === "&" && /[\d-]/.test(src[i + 1] ?? "")) {
-        // fd duplication such as 2>&1: no file involved.
-        i += 2;
-        while (/\d/.test(src[i] ?? "")) {
-          i++;
-        }
-
-        continue;
-      }
-
-      if (c === ">" && (src[i] === "&" || src[i] === "|")) {
-        i++;
-      }
-
-      tokens.push({ k: "redir", op });
-    } else if (c === "&") {
-      endWord();
-      if (n === "&") {
-        tokens.push({ k: "sep", v: "&&" });
-        i += 2;
-      } else if (n === ">") {
-        i += 2;
-        let op = ">";
-        if (src[i] === ">") {
-          op = ">>";
-          i++;
-        }
-
-        tokens.push({ k: "redir", op });
-      } else {
-        tokens.push({ k: "sep", v: "&" });
-        i++;
-      }
-    } else if (c === "|") {
-      endWord();
-      if (n === "|") {
-        tokens.push({ k: "sep", v: "||" });
-        i += 2;
-      } else {
-        tokens.push({ k: "sep", v: "|" });
-        i += n === "&" ? 2 : 1;
-      }
-    } else if (c === ";") {
-      endWord();
-      tokens.push({ k: "sep", v: ";" });
-      i += n === ";" || n === "&" ? 2 : 1;
-    } else {
-      add(c, /\d/.test(c));
-      i++;
+  const s = new Scanner(src);
+  while (!s.done) {
+    const reason = (STEPS.get(s.at()!) ?? plain)(s);
+    if (reason !== undefined) {
+      return { ok: false, reason };
     }
   }
 
-  endWord();
-  return { ok: true, tokens };
+  s.endWord();
+
+  return { ok: true, tokens: s.tokens };
 }
+
+function plain(s: Scanner): undefined {
+  const c = s.at()!;
+  s.add(c, /\d/.test(c));
+  s.i++;
+}
+
+function separator(s: Scanner, v: Separator, width: number): void {
+  s.push({ k: "sep", v });
+  s.i += width;
+}
+
+function blank(s: Scanner): undefined {
+  s.endWord();
+  s.i++;
+}
+
+function newline(s: Scanner): undefined {
+  s.endWord();
+  separator(s, ";", 1);
+  s.readHeredocBodies();
+}
+
+function comment(s: Scanner): undefined {
+  if (s.wordStarted) {
+    return plain(s);
+  }
+
+  const nl = s.src.indexOf("\n", s.i);
+  s.i = nl < 0 ? s.src.length : nl;
+}
+
+/** Literal text from `from` up to the next single quote: a '...' string, or the body of an ANSI-C $'...'. */
+function literalQuote(s: Scanner, from: number): string | undefined {
+  const end = s.src.indexOf("'", from);
+  if (end < 0) {
+    return "unterminated single quote";
+  }
+
+  s.add(s.src.slice(from, end));
+  s.i = end + 1;
+}
+
+function singleQuote(s: Scanner): string | undefined {
+  return literalQuote(s, s.i + 1);
+}
+
+function doubleQuote(s: Scanner): string | undefined {
+  s.i++;
+  s.add("");
+  while (s.at() !== '"') {
+    if (s.done) {
+      return "unterminated double quote";
+    }
+
+    const reason = (QUOTED_STEPS.get(s.at()!) ?? quotedPlain)(s);
+    if (reason !== undefined) {
+      return reason;
+    }
+  }
+
+  s.i++;
+}
+
+function quotedPlain(s: Scanner): undefined {
+  s.add(s.at()!);
+  s.i++;
+}
+
+/** Inside double quotes a backslash escapes only `"`, `\`, `$` and a backtick; before anything else it stays. */
+function quotedEscape(s: Scanner): undefined {
+  const e = s.at(1);
+  if (e === undefined) {
+    return quotedPlain(s);
+  }
+
+  s.add('"\\$`'.includes(e) ? e : `\\${e}`);
+  s.i += 2;
+}
+
+function backslash(s: Scanner): string | undefined {
+  const n = s.at(1);
+  if (n === undefined) {
+    return "trailing backslash";
+  }
+
+  // A backslash before a newline joins the lines.
+  if (n !== "\n") {
+    s.add(n);
+  }
+
+  s.i += 2;
+}
+
+function backtick(s: Scanner): string | undefined {
+  const end = closeBacktick(s.src, s.i);
+  if (end < 0) {
+    return "unterminated backtick";
+  }
+
+  s.push({ k: "sub", v: s.src.slice(s.i + 1, end - 1) });
+  s.add(s.src.slice(s.i, end));
+  s.i = end;
+}
+
+function dollar(s: Scanner): string | undefined {
+  // ANSI-C quoting: the text is data.
+  return s.at(1) === "'" ? literalQuote(s, s.i + 2) : expand(s);
+}
+
+function expand(s: Scanner): string | undefined {
+  const e = expansion(s.src, s.i);
+  if (e === "unclosed") {
+    return "unterminated expansion";
+  }
+
+  if (!e) {
+    return quotedPlain(s);
+  }
+
+  s.push(...e.tokens);
+  s.add(e.text);
+  s.i = e.end;
+}
+
+/** A subshell or group runs its commands like any others; for judging them it is a separator. */
+function paren(s: Scanner): undefined {
+  s.endWord();
+  separator(s, ";", 1);
+}
+
+function angle(s: Scanner): string | undefined {
+  if (s.at(1) === "(") {
+    return processSubstitution(s);
+  }
+
+  if (s.at() === "<" && s.at(1) === "<") {
+    return hereOperator(s);
+  }
+
+  redirect(s);
+}
+
+function processSubstitution(s: Scanner): string | undefined {
+  const end = closeParen(s.src, s.i + 1);
+  if (end < 0) {
+    return "unterminated process substitution";
+  }
+
+  s.push({ k: "sub", v: s.src.slice(s.i + 2, end - 1) });
+  s.add(s.src.slice(s.i, end));
+  s.i = end;
+}
+
+/** `<<<` (a here-string) or `<<` (a here-document). */
+function hereOperator(s: Scanner): string | undefined {
+  s.endWord();
+  if (s.at(2) !== "<") {
+    return heredoc(s);
+  }
+
+  s.push({ k: "redir", op: "<<<" });
+  s.i += 3;
+}
+
+function heredoc(s: Scanner): string | undefined {
+  s.i += 2;
+  const stripTabs = s.skip("-");
+  s.skipBlanks();
+  const m = HEREDOC_DELIMITER.exec(s.src.slice(s.i));
+  if (!m) {
+    return "here-document without a delimiter";
+  }
+
+  s.addHeredoc(heredocOf(m, stripTabs));
+  s.i += m[0].length;
+}
+
+/** A here-document from its delimiter word; a quoted delimiter keeps the body from being expanded. */
+function heredocOf(m: RegExpExecArray, stripTabs: boolean): Heredoc {
+  const bare = m[3];
+  const quoted = bare === undefined || /["'\\]/.test(bare);
+  const delimiter = m[1] ?? m[2] ?? bare!.replaceAll(/["'\\]/g, "");
+
+  return { delimiter, stripTabs, expands: !quoted };
+}
+
+function redirect(s: Scanner): void {
+  const c = s.at()!;
+  s.endWordBeforeRedirect();
+  s.i++;
+  const op = c === ">" && s.skip(">") ? ">>" : c;
+  if (isFdDuplication(s)) {
+    skipFdDuplication(s);
+
+    return;
+  }
+
+  // ">|" overrides noclobber and ">&file" sends both streams to the file: either way the target is a file.
+  if (c === ">" && /[&|]/.test(s.at() ?? "")) {
+    s.i++;
+  }
+
+  s.push({ k: "redir", op });
+}
+
+/** fd duplication such as 2>&1: no file involved. */
+function isFdDuplication(s: Scanner): boolean {
+  return s.at() === "&" && /[\d-]/.test(s.at(1) ?? "");
+}
+
+function skipFdDuplication(s: Scanner): void {
+  s.i += 2;
+  while (/\d/.test(s.at() ?? "")) {
+    s.i++;
+  }
+}
+
+function ampersand(s: Scanner): undefined {
+  s.endWord();
+  if (s.at(1) === "&") {
+    separator(s, "&&", 2);
+  } else if (s.at(1) === ">") {
+    redirectBoth(s);
+  } else {
+    separator(s, "&", 1);
+  }
+}
+
+/** `&>` and `&>>`: both streams to a file. */
+function redirectBoth(s: Scanner): void {
+  s.i += 2;
+  s.push({ k: "redir", op: s.skip(">") ? ">>" : ">" });
+}
+
+function pipe(s: Scanner): undefined {
+  s.endWord();
+  if (s.at(1) === "|") {
+    separator(s, "||", 2);
+  } else {
+    separator(s, "|", s.at(1) === "&" ? 2 : 1);
+  }
+}
+
+function semicolon(s: Scanner): undefined {
+  s.endWord();
+  separator(s, ";", s.at(1) === ";" || s.at(1) === "&" ? 2 : 1);
+}
+
+const STEPS = new Map<string, Step>([
+  [" ", blank],
+  ["\t", blank],
+  ["\n", newline],
+  ["#", comment],
+  ["'", singleQuote],
+  ['"', doubleQuote],
+  ["\\", backslash],
+  ["`", backtick],
+  ["$", dollar],
+  ["(", paren],
+  [")", paren],
+  ["<", angle],
+  [">", angle],
+  ["&", ampersand],
+  ["|", pipe],
+  [";", semicolon],
+]);
+
+const QUOTED_STEPS = new Map<string, Step>([
+  ["\\", quotedEscape],
+  ["`", backtick],
+  ["$", expand],
+]);

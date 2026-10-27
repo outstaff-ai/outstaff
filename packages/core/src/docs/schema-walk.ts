@@ -50,10 +50,10 @@ function typeOf(node: Schema, root: Schema, stack: string[]): string {
     return [...new Set(parts)].join(" or ");
   }
 
-  if ("const" in resolved) {
-    return typeof resolved["const"];
-  }
+  return "const" in resolved ? typeof resolved["const"] : declaredType(resolved, root, stack);
+}
 
+function declaredType(resolved: Schema, root: Schema, stack: string[]): string {
   const type = resolved["type"];
   if (type === "array") {
     const items = asSchema(resolved["items"]);
@@ -104,80 +104,70 @@ function enumValues(node: Schema): unknown[] | undefined {
 
 type Child = { segment: string; node: Schema; required: boolean };
 
+/** The children of a node and of each of its variants: properties, a keyed map's entries and list items. */
 function children(node: Schema, root: Schema, stack: string[]): Child[] {
-  const out: Child[] = [];
-  const collect = (candidate: Schema) => {
-    const resolved = resolve(candidate, root, [...stack]);
-    if (!resolved) {
-      return;
-    }
+  const resolved = resolve(node, root, [...stack]);
+  if (!resolved) {
+    return [];
+  }
 
-    const required = new Set(
-      Array.isArray(resolved["required"]) ? (resolved["required"] as string[]) : [],
-    );
+  return [
+    ...ownChildren(resolved),
+    ...asList(resolved["anyOf"]).flatMap((variant) => children(variant, root, stack)),
+  ];
+}
 
-    const props = asSchema(resolved["properties"]);
-    for (const [key, value] of Object.entries(props ?? {})) {
-      const child = asSchema(value);
-      if (child) {
-        out.push({ segment: `.${key}`, node: child, required: required.has(key) });
-      }
-    }
+function ownChildren(resolved: Schema): Child[] {
+  const required = new Set(
+    Array.isArray(resolved["required"]) ? (resolved["required"] as string[]) : [],
+  );
 
-    const extra = asSchema(resolved["additionalProperties"]);
-    if (extra && asSchema(extra["properties"])) {
-      out.push({ segment: ".<key>", node: extra, required: false });
-    }
+  const props = Object.entries(asSchema(resolved["properties"]) ?? {}).flatMap(([key, value]) => {
+    const child = asSchema(value);
+    return child ? [{ segment: `.${key}`, node: child, required: required.has(key) }] : [];
+  });
 
-    const items = asSchema(resolved["items"]);
-    if (items) {
-      out.push({ segment: "[]", node: items, required: false });
-    }
+  const extra = asSchema(resolved["additionalProperties"]);
+  const items = asSchema(resolved["items"]);
 
-    for (const variant of asList(resolved["anyOf"])) {
-      collect(variant);
-    }
-  };
-
-  collect(node);
-  return out;
+  return [
+    ...props,
+    ...(extra && asSchema(extra["properties"])
+      ? [{ segment: ".<key>", node: extra, required: false }]
+      : []),
+    ...(items ? [{ segment: "[]", node: items, required: false }] : []),
+  ];
 }
 
 /** Rule ids and event names repeat across a variant; keep the first section per path. */
 function section(path: string, node: Schema, required: boolean, root: Schema, stack: string[]) {
   const resolved = resolve(node, root, [...stack]) ?? node;
   const depth = path.split(/[.[]/).filter((p) => p !== "]").length;
-  const lines = [`${"#".repeat(Math.min(depth + 1, 4))} ${path}`, ""];
   const description = typeof resolved["description"] === "string" ? resolved["description"] : "";
-  if (description) {
-    lines.push(description, "");
-  }
 
-  lines.push(`- Type: ${code(typeOf(resolved, root, stack))}`);
-  lines.push(`- ${required ? "Required" : "Optional"}`);
-  if ("default" in resolved) {
-    lines.push(`- Default: ${code(resolved["default"])}`);
-  }
+  return [
+    `${"#".repeat(Math.min(depth + 1, 4))} ${path}`,
+    "",
+    ...(description ? [description, ""] : []),
+    `- Type: ${code(typeOf(resolved, root, stack))}`,
+    `- ${required ? "Required" : "Optional"}`,
+    ...facts(resolved).map((fact) => `- ${fact}`),
+  ].join("\n");
+}
 
-  if ("const" in resolved) {
-    lines.push(`- Must be ${code(resolved["const"])}`);
-  }
-
+/** What else a section says: default, fixed value, allowed values and keys, and constraints. */
+function facts(resolved: Schema): string[] {
   const values = enumValues(resolved);
-  if (values) {
-    lines.push(`- Allowed values: ${values.map((v) => code(v)).join(", ")}`);
-  }
-
   const names = asSchema(resolved["propertyNames"]);
-  if (names && Array.isArray(names["enum"])) {
-    lines.push(`- Allowed keys: ${names["enum"].map((v) => code(v)).join(", ")}`);
-  }
+  const keys = names && Array.isArray(names["enum"]) ? (names["enum"] as unknown[]) : undefined;
 
-  for (const rule of constraints(resolved)) {
-    lines.push(`- ${rule}`);
-  }
-
-  return lines.join("\n");
+  return [
+    ...("default" in resolved ? [`Default: ${code(resolved["default"])}`] : []),
+    ...("const" in resolved ? [`Must be ${code(resolved["const"])}`] : []),
+    ...(values ? [`Allowed values: ${values.map((v) => code(v)).join(", ")}`] : []),
+    ...(keys ? [`Allowed keys: ${keys.map((v) => code(v)).join(", ")}`] : []),
+    ...constraints(resolved),
+  ];
 }
 
 export function walk(path: string, node: Schema, required: boolean, root: Schema, out: string[]) {

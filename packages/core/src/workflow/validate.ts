@@ -17,12 +17,21 @@ function templateOf(a: Action): string | undefined {
   return undefined;
 }
 
+const issue = (code: string, message: string, path: (string | number)[]): ConfigIssue => ({
+  code,
+  message,
+  path,
+});
+
+const KNOWN_VARIABLES = new Set<string>(TEMPLATE_VARIABLES);
+
 /** Cross-field checks the schema cannot express. */
 export function checkWorkflowConfig(wf: WorkflowConfigShape): ConfigIssue[] {
-  const issues: ConfigIssue[] = [];
-  const add = (code: string, message: string, path: (string | number)[]) =>
-    issues.push({ code, message, path });
+  return [...duplicateStatusNames(wf), ...placeholderIssues(wf), ...ruleIssues(wf)];
+}
 
+function duplicateStatusNames(wf: WorkflowConfigShape): ConfigIssue[] {
+  const issues: ConfigIssue[] = [];
   const byName = new Map<string, string>();
   for (const [status, name] of Object.entries(wf.statuses ?? {})) {
     if (name === undefined) {
@@ -32,74 +41,100 @@ export function checkWorkflowConfig(wf: WorkflowConfigShape): ConfigIssue[] {
     const key = name.trim().toLowerCase();
     const other = byName.get(key);
     if (other) {
-      add(
-        CONFIG_CODES.workflowDuplicateStatusName,
-        `Status name "${name}" is used for both "${other}" and "${status}".`,
-        ["workflow", "statuses", status],
+      issues.push(
+        issue(
+          CONFIG_CODES.workflowDuplicateStatusName,
+          `Status name "${name}" is used for both "${other}" and "${status}".`,
+          ["workflow", "statuses", status],
+        ),
       );
     } else {
       byName.set(key, status);
     }
   }
 
-  const templates = { ...BUILTIN_TEMPLATES, ...wf.templates };
-  const known = new Set<string>(TEMPLATE_VARIABLES);
-  for (const [id, text] of Object.entries(wf.templates ?? {})) {
+  return issues;
+}
+
+/** Templates that are malformed or use a variable no template can. */
+function placeholderIssues(wf: WorkflowConfigShape): ConfigIssue[] {
+  return Object.entries(wf.templates ?? {}).flatMap(([id, text]) => {
     try {
-      for (const n of templatePlaceholders(text)) {
-        if (!known.has(n)) {
-          add(
+      return templatePlaceholders(text)
+        .filter((n) => !KNOWN_VARIABLES.has(n))
+        .map((n) =>
+          issue(
             CONFIG_CODES.workflowUnknownPlaceholder,
             `Template "${id}" uses unknown variable "${n}".`,
             ["workflow", "templates", id],
-          );
-        }
-      }
+          ),
+        );
     } catch (e) {
-      add(CONFIG_CODES.workflowUnknownPlaceholder, (e as TemplateError).message, [
-        "workflow",
-        "templates",
-        id,
-      ]);
+      return [
+        issue(CONFIG_CODES.workflowUnknownPlaceholder, (e as TemplateError).message, [
+          "workflow",
+          "templates",
+          id,
+        ]),
+      ];
     }
-  }
+  });
+}
 
+/** Duplicate rule ids, disabled rules the preset lacks and unknown templates. */
+function ruleIssues(wf: WorkflowConfigShape): ConfigIssue[] {
+  const templates = { ...BUILTIN_TEMPLATES, ...wf.templates };
   const presetIds = new Set(presetRules(wf.preset).map((r) => r.id));
   const seen = new Set<string>();
-  (wf.rules as RuleInput[] | undefined)?.forEach((r, i) => {
+  const issues: ConfigIssue[] = [];
+  ((wf.rules as RuleInput[] | undefined) ?? []).forEach((r, i) => {
     if (seen.has(r.id)) {
-      add(CONFIG_CODES.workflowDuplicateRuleId, `Rule id "${r.id}" is used more than once.`, [
-        "workflow",
-        "rules",
-        i,
-        "id",
-      ]);
+      issues.push(
+        issue(CONFIG_CODES.workflowDuplicateRuleId, `Rule id "${r.id}" is used more than once.`, [
+          "workflow",
+          "rules",
+          i,
+          "id",
+        ]),
+      );
     }
 
     seen.add(r.id);
     if ("disabled" in r && r.disabled === true && !presetIds.has(r.id)) {
-      add(
-        CONFIG_CODES.workflowUnknownRule,
-        `Preset "${wf.preset}" has no rule "${r.id}" to disable.`,
-        ["workflow", "rules", i, "id"],
+      issues.push(
+        issue(
+          CONFIG_CODES.workflowUnknownRule,
+          `Preset "${wf.preset}" has no rule "${r.id}" to disable.`,
+          ["workflow", "rules", i, "id"],
+        ),
       );
     }
 
     if ("do" in r) {
-      r.do.forEach((a, j) => {
-        const t = templateOf(a);
-        if (t !== undefined && !(t in templates)) {
-          add(CONFIG_CODES.workflowUnknownTemplate, `Unknown template "${t}".`, [
-            "workflow",
-            "rules",
-            i,
-            "do",
-            j,
-          ]);
-        }
-      });
+      issues.push(...unknownTemplates(r.do, templates, i));
     }
   });
 
   return issues;
+}
+
+function unknownTemplates(
+  actions: Action[],
+  templates: Record<string, string>,
+  rule: number,
+): ConfigIssue[] {
+  return actions.flatMap((a, j) => {
+    const t = templateOf(a);
+    return t !== undefined && !(t in templates)
+      ? [
+          issue(CONFIG_CODES.workflowUnknownTemplate, `Unknown template "${t}".`, [
+            "workflow",
+            "rules",
+            rule,
+            "do",
+            j,
+          ]),
+        ]
+      : [];
+  });
 }

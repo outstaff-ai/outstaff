@@ -2,18 +2,16 @@ import type { Capability } from "../types.js";
 import { CAPABILITY_PORT } from "../capabilities.js";
 import { CATALOG_CODES, CatalogError } from "../catalog/codes.js";
 import { buildContext } from "../catalog/context.js";
-import { render } from "../catalog/template.js";
 import type { Catalog, CatalogDoc, CatalogIssue, CatalogRole } from "../catalog/types.js";
-import { withSkillFrontMatter } from "./frontmatter.js";
+import { renderCached } from "./render-docs.js";
 import type {
+  DocRendering,
   RenderedWorkdir,
   RenderPersonOptions,
   RenderTeamOptions,
   RenderWarning,
+  RoleCache,
 } from "./types.js";
-
-/** Rendered output by path: rendered text, or the issues that rendering it raised. */
-type RoleCache = Map<string, string | CatalogIssue[]>;
 
 export const RENDER_WARNING_CODES = { missingCapability: "render.missing_capability" } as const;
 
@@ -31,14 +29,6 @@ const merge = (stock: Catalog, ejected?: Catalog) => ({
   references: { ...stock.references, ...ejected?.references },
   templates: { ...stock.templates, ...ejected?.templates },
 });
-
-/** LF line endings and exactly one trailing newline. */
-const DOC_PATH = /(?<![\w/.-])(?:process|references|templates)\/[\w.-]+\.md\b/g;
-
-const absolutize = (text: string, workdir: string | undefined): string =>
-  workdir ? text.replace(DOC_PATH, (p) => `${workdir.replace(/\/+$/, "")}/${p}`) : text;
-
-const normalize = (text: string): string => text.replace(/\r\n?/g, "\n").replace(/\n*$/, "\n");
 
 /**
  * Renders the working files of one person: skills, references, templates and
@@ -79,61 +69,14 @@ export function renderTeam(options: RenderTeamOptions): Map<string, RenderedWork
   return result;
 }
 
+type Merged = ReturnType<typeof merge>;
+type Person = RenderPersonOptions["team"]["people"][number];
+
 function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWorkdir {
-  const { team, handle, catalog, ejected, links, workdir } = options;
-  const merged = merge(catalog, ejected);
-  const person = team.people.find((p) => p.handle === handle);
-  if (!person) {
-    throw new Error(
-      `Unknown person "${handle}"; the team has: ${team.people.map((p) => p.handle).join(", ") || "nobody"}.`,
-    );
-  }
-
-  const issues: CatalogIssue[] = [];
-  const fail = (message: string) =>
-    issues.push({
-      code: CATALOG_CODES.unknownRole,
-      message,
-      file: "team.yaml",
-      line: 1,
-      column: 1,
-    });
-
-  const role = merged.roles[person.role];
-  if (!role) {
-    throw new RenderError([
-      {
-        code: CATALOG_CODES.unknownRole,
-        message: `Person "${handle}" has unknown role "${person.role}"; the catalog has: ${Object.keys(merged.roles).toSorted().join(", ") || "none"}.`,
-        file: "team.yaml",
-        line: 1,
-        column: 1,
-      },
-    ]);
-  }
-
-  // Role first, then person-level extends, then role.yaml extends; transitive, deduped.
-  const order: string[] = [person.role];
-  const queue = [...(person.extends ?? []), ...(role.extends ?? [])];
-  while (queue.length) {
-    const name = queue.shift()!;
-    if (order.includes(name)) {
-      continue;
-    }
-
-    const found = merged.roles[name];
-    if (!found) {
-      fail(
-        `Person "${handle}" extends unknown role "${name}"; the catalog has: ${Object.keys(merged.roles).toSorted().join(", ")}.`,
-      );
-
-      continue;
-    }
-
-    order.push(name);
-    queue.push(...(found.extends ?? []));
-  }
-
+  const { team, handle, links, workdir } = options;
+  const merged = merge(options.catalog, options.ejected);
+  const { person, role } = personAndRole(team.people, handle, merged.roles);
+  const { order, issues } = roleOrder(person, role, merged.roles);
   const context = buildContext(team, {
     ...(links ? { links } : {}),
     roles: Object.values(merged.roles)
@@ -141,47 +84,14 @@ function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWor
       .toSorted((a, b) => a.name.localeCompare(b.name)),
   });
 
+  const rendering: DocRendering = { cache, context, workdir };
   const out = new Map<string, string>();
-  const put = (path: string, doc: CatalogDoc, skillOf?: CatalogRole) => {
-    let hit = cache.get(path);
-    if (hit === undefined) {
-      try {
-        hit = absolutize(normalize(render(doc.text, context, { file: doc.file })), workdir);
-        if (skillOf) {
-          hit = withSkillFrontMatter(
-            hit,
-            { name: skillOf.name, description: skillOf.summary },
-            doc.file,
-          );
-        }
-      } catch (e) {
-        if (!(e instanceof CatalogError)) {
-          throw e;
-        }
-
-        hit = e.issues;
-      }
-
-      cache.set(path, hit);
-    }
-
+  for (const [path, doc, skillOf] of docsOf(order, merged)) {
+    const hit = renderCached(rendering, path, doc, skillOf);
     if (typeof hit === "string") {
       out.set(path, hit);
     } else {
       issues.push(...hit);
-    }
-  };
-
-  for (const name of order) {
-    const r = merged.roles[name];
-    if (r) {
-      put(`skills/${name}/SKILL.md`, r.skill, r);
-    }
-  }
-
-  for (const kind of ["references", "templates", "process"] as const) {
-    for (const [name, doc] of Object.entries(merged[kind])) {
-      put(`${kind}/${name}.md`, doc);
     }
   }
 
@@ -189,18 +99,105 @@ function renderWith(options: RenderPersonOptions, cache: RoleCache): RenderedWor
     throw new RenderError(issues);
   }
 
-  const warnings: RenderWarning[] = [];
-  const has = context.integrations.has;
-  for (const need of role.needs) {
-    const port = CAPABILITY_PORT[need as Capability];
-    if (!has[port]) {
-      warnings.push({
-        code: RENDER_WARNING_CODES.missingCapability,
-        message: `Role "${person.role}" needs ${need} but the team has no ${port} integration.`,
-      });
+  return {
+    files: new Map([...out].toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
+    role: person.role,
+    extends: order.slice(1),
+    profile: role.permissions,
+    warnings: missingCapabilities(role, person.role, context.integrations.has),
+  };
+}
+
+function personAndRole(
+  people: Person[],
+  handle: string,
+  roles: Merged["roles"],
+): { person: Person; role: CatalogRole } {
+  const person = people.find((p) => p.handle === handle);
+  if (!person) {
+    throw new Error(
+      `Unknown person "${handle}"; the team has: ${people.map((p) => p.handle).join(", ") || "nobody"}.`,
+    );
+  }
+
+  const role = roles[person.role];
+  if (!role) {
+    throw new RenderError([
+      unknownRole(
+        `Person "${handle}" has unknown role "${person.role}"; the catalog has: ${Object.keys(roles).toSorted().join(", ") || "none"}.`,
+      ),
+    ]);
+  }
+
+  return { person, role };
+}
+
+const unknownRole = (message: string): CatalogIssue => ({
+  code: CATALOG_CODES.unknownRole,
+  message,
+  file: "team.yaml",
+  line: 1,
+  column: 1,
+});
+
+/** Role first, then person-level extends, then role.yaml extends; transitive, deduped. Unknown roles are issues. */
+function roleOrder(
+  person: Person,
+  role: CatalogRole,
+  roles: Merged["roles"],
+): { order: string[]; issues: CatalogIssue[] } {
+  const order: string[] = [person.role];
+  const issues: CatalogIssue[] = [];
+  const queue = [...(person.extends ?? []), ...(role.extends ?? [])];
+  while (queue.length) {
+    const name = queue.shift()!;
+    if (order.includes(name)) {
+      continue;
+    }
+
+    const found = roles[name];
+    if (found) {
+      order.push(name);
+      queue.push(...(found.extends ?? []));
+    } else {
+      issues.push(
+        unknownRole(
+          `Person "${person.handle}" extends unknown role "${name}"; the catalog has: ${Object.keys(roles).toSorted().join(", ")}.`,
+        ),
+      );
     }
   }
 
-  const files = new Map([...out].toSorted(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
-  return { files, role: person.role, extends: order.slice(1), profile: role.permissions, warnings };
+  return { order, issues };
+}
+
+/** The files a person gets: a skill per role in order, then the references, templates and process documents. */
+function docsOf(order: string[], merged: Merged): [string, CatalogDoc, CatalogRole?][] {
+  const skills = order.flatMap((name): [string, CatalogDoc, CatalogRole][] => {
+    const r = merged.roles[name];
+    return r ? [[`skills/${name}/SKILL.md`, r.skill, r]] : [];
+  });
+
+  const docs = (["references", "templates", "process"] as const).flatMap((kind) =>
+    Object.entries(merged[kind]).map(([name, doc]): [string, CatalogDoc] => [
+      `${kind}/${name}.md`,
+      doc,
+    ]),
+  );
+
+  return [...skills, ...docs];
+}
+
+function missingCapabilities(
+  role: CatalogRole,
+  roleName: string,
+  has: Record<string, boolean>,
+): RenderWarning[] {
+  return role.needs
+    .map((need) => [need, CAPABILITY_PORT[need as Capability]] as const)
+    .filter(([, port]) => !has[port])
+    .map(([need, port]) => ({
+      code: RENDER_WARNING_CODES.missingCapability,
+      message: `Role "${roleName}" needs ${need} but the team has no ${port} integration.`,
+    }));
 }

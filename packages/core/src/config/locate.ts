@@ -1,4 +1,14 @@
-import { isCollection, isMap, isScalar, isSeq, LineCounter, parseDocument, type Node } from "yaml";
+import {
+  isCollection,
+  isMap,
+  isScalar,
+  isSeq,
+  LineCounter,
+  parseDocument,
+  type Node,
+  type YAMLMap,
+  type YAMLSeq,
+} from "yaml";
 import { CONFIG_CODES } from "./codes.js";
 import type { ConfigIssue, ParsedYaml, Position } from "./types.js";
 
@@ -25,41 +35,74 @@ export function parseYaml(text: string): ParsedYaml {
     position: e.linePos?.[0] ? { line: e.linePos[0].line, column: e.linePos[0].col } : at(e.pos[0]),
   }));
 
-  const locate = (issue: ConfigIssue): Position => {
-    let node: unknown = doc.contents;
-    let best: Position = start(doc.contents as Node | null) ?? { line: 1, column: 1 };
-    let keyPos: Position | undefined;
-    for (const seg of issue.path) {
-      if (isMap(node)) {
-        const pair = node.items.find((p) => isScalar(p.key) && String(p.key.value) === String(seg));
-        if (!pair) {
-          return best;
-        }
-
-        keyPos = start(pair.key as Node) ?? best;
-        const next = pair.value as Node | null;
-        best = (isCollection(next) || !next ? keyPos : start(next)) ?? keyPos;
-        node = next;
-      } else if (isSeq(node) && typeof seg === "number") {
-        const next = node.items[seg] as Node | undefined;
-        if (!next) {
-          return best;
-        }
-
-        keyPos = undefined;
-        best = start(next) ?? best;
-        node = next;
-      } else {
-        return best;
-      }
-    }
-
-    if (keyPos && typeof issue.path.at(-1) === "string" && KEY_CODES.includes(issue.code)) {
-      return keyPos;
-    }
-
-    return best;
-  };
+  const locate = (issue: ConfigIssue): Position => locateIn(doc.contents, issue, start);
 
   return { value: doc.errors.length ? undefined : doc.toJS(), syntaxErrors, locate };
+}
+
+type Start = (node: Node | null | undefined) => Position | undefined;
+
+/** A node reached along an issue's path, the position to report for it, and its key's when it is a map entry. */
+type Step = { node: unknown; best: Position; keyPos: Position | undefined };
+
+/** The position of the deepest node the issue's path reaches; its key, when the issue is about a key. */
+function locateIn(root: unknown, issue: ConfigIssue, start: Start): Position {
+  let at: Step = {
+    node: root,
+    best: start(root as Node | null) ?? { line: 1, column: 1 },
+    keyPos: undefined,
+  };
+
+  for (const seg of issue.path) {
+    const next = stepInto(at, seg, start);
+    if (!next) {
+      return at.best;
+    }
+
+    at = next;
+  }
+
+  const aboutKey = typeof issue.path.at(-1) === "string" && KEY_CODES.includes(issue.code);
+
+  return at.keyPos && aboutKey ? at.keyPos : at.best;
+}
+
+function stepInto(at: Step, seg: string | number, start: Start): Step | undefined {
+  if (isMap(at.node)) {
+    return mapEntry(at.node, seg, at.best, start);
+  }
+
+  if (isSeq(at.node) && typeof seg === "number") {
+    return seqItem(at.node, seg, at.best, start);
+  }
+
+  return undefined;
+}
+
+/** A collection or an empty value is reported at its key; a scalar at itself. */
+function mapEntry(
+  map: YAMLMap,
+  seg: string | number,
+  best: Position,
+  start: Start,
+): Step | undefined {
+  const pair = map.items.find((p) => isScalar(p.key) && String(p.key.value) === String(seg));
+  if (!pair) {
+    return undefined;
+  }
+
+  const keyPos = start(pair.key as Node) ?? best;
+  const next = pair.value as Node | null;
+
+  return {
+    node: next,
+    keyPos,
+    best: (isCollection(next) || !next ? keyPos : start(next)) ?? keyPos,
+  };
+}
+
+function seqItem(seq: YAMLSeq, index: number, best: Position, start: Start): Step | undefined {
+  const next = seq.items[index] as Node | undefined;
+
+  return next ? { node: next, keyPos: undefined, best: start(next) ?? best } : undefined;
 }

@@ -1,22 +1,14 @@
-import { adbCommand, adbDestructive, fastbootDestructive } from "./adb.js";
 import { checkPath } from "./check-path.js";
-import {
-  WRAPPERS,
-  base,
-  envCommand,
-  findCommands,
-  isDynamic,
-  wrapped,
-  writeTargets,
-} from "./command-words.js";
+import { programChecks } from "./command-programs.js";
+import { base, envCommand, isDynamic, writeTargets } from "./command-words.js";
 import { allow, deny, worst } from "./decision.js";
 import { evaluateGit } from "./git.js";
 import { resolvePath } from "./paths.js";
 import { evaluateCommandRules } from "./rule-match.js";
-import { envPrinting, holdsSecrets, namesSecretsDir, secretWord } from "./secrets.js";
+import { envPrinting, namesSecretsDir, secretWord } from "./secrets.js";
 import { lex } from "./shell.js";
-import type { Segment } from "./shell.types.js";
-import type { Decision, Policy, ToolCall } from "./types.js";
+import type { Redirect, Segment } from "./shell.types.js";
+import type { CommandScope, Decision, Policy, ToolCall } from "./types.js";
 
 const MAX_CWDS = 8;
 const MAX_DEPTH = 6;
@@ -27,25 +19,13 @@ const UNKNOWN_CWD = "/(unknown directory)";
 /** Variables whose value is a credential by name. Expanding one could print it. */
 const SECRET_VAR = /TOKEN|SECRET|PASSWORD|PASSWD|API_?KEY|PRIVATE_?KEY|CREDENTIAL/i;
 
-/** Programs that read whole directory trees; pointing one at a parent of the secrets folder reads the secrets. */
-const TREE_READERS = new Set([
-  "grep",
-  "egrep",
-  "fgrep",
-  "rg",
-  "ag",
-  "ack",
-  "tar",
-  "zip",
-  "cp",
-  "rsync",
-  "scp",
-]);
-
-const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh", "mksh", "fish"]);
-
 /** Words that start a shell construct and come before the command they guard. */
 const KEYWORDS = new Set(["!", "if", "then", "else", "elif", "do", "while", "until", "{", "}"]);
+
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*\+?=/;
+
+/** Commands that change the shell's directory. */
+const MOVES = new Set(["cd", "pushd", "popd"]);
 
 interface Ctx {
   policy: Policy;
@@ -55,14 +35,7 @@ interface Ctx {
 
 /** Judges one command: its words after redirections are taken off. */
 function judgeCommand(ctx: Ctx, input: string[], cwd: string): Decision {
-  let words = input;
-  while (
-    words.length > 0 &&
-    (KEYWORDS.has(words[0]!) || /^[A-Za-z_][A-Za-z0-9_]*\+?=/.test(words[0]!))
-  ) {
-    words = words.slice(1);
-  }
-
+  const words = commandWords(input);
   if (words.length === 0) {
     return allow("No command.");
   }
@@ -71,9 +44,6 @@ function judgeCommand(ctx: Ctx, input: string[], cwd: string): Decision {
     return deny("Commands nested this deeply cannot be judged.", "shell.depth");
   }
 
-  const { policy } = ctx;
-  const program = base(words[0]!);
-  const args = words.slice(1);
   if (isDynamic(words[0]!)) {
     return allow(
       "The program is chosen at run time; it runs inside the sandbox.",
@@ -81,137 +51,137 @@ function judgeCommand(ctx: Ctx, input: string[], cwd: string): Decision {
     );
   }
 
-  const inner = (w: string[]) => judgeCommand({ ...ctx, depth: ctx.depth + 1 }, w, cwd);
-  const script = (text: string) => judgeLine({ ...ctx, depth: ctx.depth + 1 }, text, [cwd]);
-  const checks: Decision[] = [evaluateCommandRules(policy, program, args, cwd)];
-
-  const printing = envPrinting(program, args);
-  if (printing) {
-    return printing;
+  const program = base(words[0]!);
+  const args = words.slice(1);
+  const refused = envPrinting(program, args) ?? bareEnv(program, args);
+  if (refused) {
+    return refused;
   }
 
-  if (program === "env") {
-    const run = envCommand(args);
-    if (run === null) {
-      return deny(
-        "env without a command prints the environment, which holds credentials.",
-        "secrets.environment",
-      );
-    }
+  const scope = commandScope(ctx, cwd);
 
-    checks.push("script" in run ? script(run.script) : inner(run.words));
-  } else if (SHELLS.has(program)) {
-    const at = args.findIndex((a) => /^-[a-zA-Z]*c[a-zA-Z]*$/.test(a));
-    if (at >= 0 && args[at + 1] !== undefined) {
-      checks.push(script(args[at + 1]!));
-    }
-  } else if (program === "eval") {
-    checks.push(script(args.join(" ")));
-  } else if (WRAPPERS[program]) {
-    checks.push(inner(wrapped(WRAPPERS[program], args)));
-  } else if (program === "find") {
-    checks.push(...findCommands(args).map(inner));
-  } else if (program === "git") {
-    checks.push(evaluateGit(policy, args, cwd, ctx.call));
-  } else if (program === "adb") {
-    const problem = adbDestructive(adbCommand(args));
-    if (problem) {
-      checks.push(deny(problem, "adb.destructive"));
-    }
-  } else if (program === "fastboot") {
-    const problem = fastbootDestructive(args);
-    if (problem) {
-      checks.push(deny(problem, "adb.destructive"));
-    }
+  return worst([
+    evaluateCommandRules(ctx.policy, program, args, cwd),
+    ...programChecks(program, args, scope),
+    ...laterPushes(program, words, scope),
+  ]);
+}
+
+/** The words from the command on: keywords (`if`, `!`, ...) and variable assignments before it are dropped. */
+function commandWords(words: string[]): string[] {
+  const at = words.findIndex((w) => !KEYWORDS.has(w) && !ASSIGNMENT.test(w));
+
+  return at < 0 ? [] : words.slice(at);
+}
+
+/** `env` without a command prints the environment. */
+function bareEnv(program: string, args: string[]): Decision | undefined {
+  if (program === "env" && envCommand(args) === null) {
+    return deny(
+      "env without a command prints the environment, which holds credentials.",
+      "secrets.environment",
+    );
+  }
+}
+
+function commandScope(ctx: Ctx, cwd: string): CommandScope {
+  const nested = { ...ctx, depth: ctx.depth + 1 };
+
+  return {
+    policy: ctx.policy,
+    call: ctx.call,
+    cwd,
+    inner: (words) => judgeCommand(nested, words, cwd),
+    script: (text) => judgeLine(nested, text, [cwd]),
+  };
+}
+
+/** A git push further along the line (`npx something git push ...`) is judged as a push. */
+function laterPushes(program: string, words: string[], scope: CommandScope): Decision[] {
+  if (program === "git") {
+    return [];
   }
 
-  if (TREE_READERS.has(program)) {
-    for (const a of args) {
-      if (!a.startsWith("-") && holdsSecrets(policy, resolvePath(a, cwd, policy.home))) {
-        checks.push(deny(`${program} ${a} would read the secrets folder.`, "paths.read.deny"));
-      }
-    }
-  }
-
-  // A git push further along the line (`npx something git push ...`) is judged as a push.
-  for (let k = 1; k < words.length; k++) {
-    if (base(words[k]!) === "git" && words.slice(k + 1).includes("push") && program !== "git") {
-      const d = evaluateGit(policy, words.slice(k + 1), cwd, ctx.call);
-      if (d.effect === "deny") {
-        checks.push(d);
-      }
-    }
-  }
-
-  return worst(checks);
+  return words
+    .map((w, k) => (k > 0 && base(w) === "git" ? words.slice(k + 1) : []))
+    .filter((gitArgs) => gitArgs.includes("push"))
+    .map((gitArgs) => evaluateGit(scope.policy, gitArgs, scope.cwd, scope.call))
+    .filter((d) => d.effect === "deny");
 }
 
 function evaluateSegment(ctx: Ctx, seg: Segment, cwd: string): Decision {
   const { policy } = ctx;
-  const checks: Decision[] = [];
-  for (const rd of seg.redirects) {
-    if (rd.op === "<<<") {
-      continue;
-    }
+  const nested = { ...ctx, depth: ctx.depth + 1 };
 
-    if (rd.op === "<") {
-      const d = secretWord(policy, rd.target, cwd);
-      if (d) {
-        checks.push(d);
-      }
-    } else {
-      const d = checkPath(policy, "write", rd.target, cwd);
-      if (d.rule === "paths.write.deny") {
-        checks.push(d);
-      }
-    }
+  return worst([
+    ...seg.redirects.flatMap((rd) => redirectChecks(policy, rd, cwd)),
+    ...seg.words.flatMap((w) => secretWord(policy, w, cwd) ?? []),
+    ...writeTargets(seg.words).flatMap((target) => deniedWrite(policy, target, cwd)),
+    ...secretVariable(seg.vars),
+    ...seg.subs.map((sub) => judgeLine(nested, sub, [cwd])),
+    judgeCommand(ctx, seg.words, cwd),
+  ]);
+}
+
+function redirectChecks(policy: Policy, rd: Redirect, cwd: string): Decision[] {
+  // A here-string's target is data, not a file.
+  if (rd.op === "<<<") {
+    return [];
   }
 
-  for (const w of seg.words) {
-    const d = secretWord(policy, w, cwd);
-    if (d) {
-      checks.push(d);
-    }
+  if (rd.op === "<") {
+    const d = secretWord(policy, rd.target, cwd);
+
+    return d ? [d] : [];
   }
 
-  const written = writeTargets(seg.words);
-  for (const target of written) {
-    const d = checkPath(policy, "write", target, cwd);
-    if (d.rule === "paths.write.deny") {
-      checks.push(d);
-    }
-  }
+  return deniedWrite(policy, rd.target, cwd);
+}
 
-  const secretVar = seg.vars.find((v) => SECRET_VAR.test(v));
-  if (secretVar) {
-    checks.push(
-      deny(
-        `$${secretVar} is a credential by its name; expanding it could print it.`,
-        "secrets.variable",
-      ),
-    );
-  }
+function deniedWrite(policy: Policy, target: string, cwd: string): Decision[] {
+  const d = checkPath(policy, "write", target, cwd);
 
-  for (const sub of seg.subs) {
-    checks.push(judgeLine({ ...ctx, depth: ctx.depth + 1 }, sub, [cwd]));
-  }
+  return d.rule === "paths.write.deny" ? [d] : [];
+}
 
-  checks.push(judgeCommand(ctx, seg.words, cwd));
-  return worst(checks);
+function secretVariable(vars: string[]): Decision[] {
+  const secretVar = vars.find((v) => SECRET_VAR.test(v));
+
+  return secretVar
+    ? [
+        deny(
+          `$${secretVar} is a credential by its name; expanding it could print it.`,
+          "secrets.variable",
+        ),
+      ]
+    : [];
 }
 
 /** Where `cd <target>` (or `pushd`) leads from `cwd`; the unknown directory when it cannot be followed. */
 function cdTarget(policy: Policy, words: string[], cwd: string): string {
   const target = words.slice(1).find((w) => !w.startsWith("-"));
-  if (words[0] === "popd" || target === "-" || (target !== undefined && isDynamic(target))) {
-    return UNKNOWN_CWD;
-  }
-
-  if (cwd === UNKNOWN_CWD && target !== undefined && !/^[/~]/.test(target)) {
+  if (cannotFollow(words[0], target, cwd)) {
     return UNKNOWN_CWD;
   }
 
   return resolvePath(target ?? "~", cwd, policy.home);
+}
+
+function cannotFollow(
+  command: string | undefined,
+  target: string | undefined,
+  cwd: string,
+): boolean {
+  if (command === "popd" || target === "-") {
+    return true;
+  }
+
+  if (target === undefined) {
+    return false;
+  }
+
+  // From an unknown directory only an absolute or home-relative target leads somewhere known.
+  return isDynamic(target) || (cwd === UNKNOWN_CWD && !/^[/~]/.test(target));
 }
 
 /** Judges a command line from each directory the shell may be in. */
@@ -226,23 +196,30 @@ function judgeLine(ctx: Ctx, command: string, start: string[]): Decision {
   let cwds = start;
   const results: Decision[] = [];
   for (const seg of parsed.segments) {
-    for (const cwd of cwds) {
-      results.push(evaluateSegment(ctx, seg, cwd));
-    }
-
-    const first = seg.words[0];
-    const moves = first === "cd" || first === "pushd" || first === "popd";
-    const detached = seg.sep === "|" || seg.sep === "&" || seg.before === "|";
-    if (moves && !detached) {
-      const moved = cwds.map((c) => cdTarget(ctx.policy, seg.words, c));
-      cwds = seg.sep === "&&" ? [...new Set(moved)] : [...new Set([...cwds, ...moved])];
-      if (cwds.length > MAX_CWDS) {
-        return deny("Too many directory changes to track.", "shell.cd");
-      }
+    results.push(...cwds.map((cwd) => evaluateSegment(ctx, seg, cwd)));
+    cwds = cwdsAfter(ctx.policy, seg, cwds);
+    if (cwds.length > MAX_CWDS) {
+      return deny("Too many directory changes to track.", "shell.cd");
     }
   }
 
   return worst(results.length > 0 ? results : [allow("Empty command.")]);
+}
+
+/** The directories the shell may be in after a segment. */
+function cwdsAfter(policy: Policy, seg: Segment, cwds: string[]): string[] {
+  if (!MOVES.has(seg.words[0] ?? "") || isDetached(seg)) {
+    return cwds;
+  }
+
+  const moved = cwds.map((c) => cdTarget(policy, seg.words, c));
+
+  return seg.sep === "&&" ? [...new Set(moved)] : [...new Set([...cwds, ...moved])];
+}
+
+/** A segment in a pipeline or run in the background runs in a subshell; its `cd` does not move the shell. */
+function isDetached(seg: Segment): boolean {
+  return seg.sep === "|" || seg.sep === "&" || seg.before === "|";
 }
 
 export function evaluateShell(policy: Policy, call: ToolCall): Decision {

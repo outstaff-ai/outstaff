@@ -1,6 +1,7 @@
 import { check } from "./evaluate-check.js";
-import { performAll, person, variables } from "./evaluate-actions.js";
+import { performAll, person } from "./evaluate-actions.js";
 import type { Ctx } from "./evaluate.types.js";
+import { variables } from "./template-variables.js";
 import type {
   ConditionEvent,
   Effect,
@@ -57,54 +58,58 @@ export function explainWorkflow(
   opts: WorkflowOptions = {},
 ): WorkflowExplanation {
   const ctx = createEvaluationContext(event, state, opts);
+  const explained = rules.map((rule) => explainRule(rule, ctx));
 
-  const out: RuleExplanation[] = [];
-  const seen = new Set<string>();
+  return { event, rules: explained, effects: distinct(explained.flatMap((r) => r.effects)) };
+}
+
+function explainRule(rule: Rule, ctx: Ctx): RuleExplanation {
+  const types: readonly string[] = Array.isArray(rule.on) ? rule.on : [rule.on];
+  if (!types.includes(ctx.event.type)) {
+    return unmatched(rule, `listens to ${types.join(", ")}, not ${ctx.event.type}`);
+  }
+
+  const c = rule.if ? check(rule.if, ctx) : { ok: true, detail: "no condition" };
+  if (!c.ok) {
+    return unmatched(rule, c.detail);
+  }
+
   const effects: Effect[] = [];
-  for (const rule of rules) {
-    const types = Array.isArray(rule.on) ? rule.on : [rule.on];
-    if (!types.includes(event.type)) {
-      out.push({
-        id: rule.id,
-        matched: false,
-        reason: `listens to ${types.join(", ")}, not ${event.type}`,
-        effects: [],
-        skipped: [],
-      });
-
-      continue;
-    }
-
-    const c = rule.if ? check(rule.if, ctx) : { ok: true, detail: "no condition" };
-    if (!c.ok) {
-      out.push({ id: rule.id, matched: false, reason: c.detail, effects: [], skipped: [] });
-      continue;
-    }
-
-    const mine: Effect[] = [];
-    const skipped: string[] = [];
-    for (const action of rule.do) {
-      const r = performAll(action, ctx);
-      if ("skip" in r) {
-        skipped.push(`${Object.keys(action)[0]}: ${r.skip}`);
-      } else {
-        mine.push(...r.value);
-      }
-    }
-
-    out.push({ id: rule.id, matched: true, reason: c.detail, effects: mine, skipped });
-    for (const e of mine) {
-      const k = stable(e);
-      if (seen.has(k)) {
-        continue;
-      }
-
-      seen.add(k);
-      effects.push(e);
+  const skipped: string[] = [];
+  for (const action of rule.do) {
+    const r = performAll(action, ctx);
+    if ("skip" in r) {
+      skipped.push(`${Object.keys(action)[0]}: ${r.skip}`);
+    } else {
+      effects.push(...r.value);
     }
   }
 
-  return { event, rules: out, effects };
+  return { id: rule.id, matched: true, reason: c.detail, effects, skipped };
+}
+
+const unmatched = (rule: Rule, reason: string): RuleExplanation => ({
+  id: rule.id,
+  matched: false,
+  reason,
+  effects: [],
+  skipped: [],
+});
+
+/** The effects without repeats, first occurrence first. */
+function distinct(effects: Effect[]): Effect[] {
+  const seen = new Set<string>();
+
+  return effects.filter((e) => {
+    const k = stable(e);
+    if (seen.has(k)) {
+      return false;
+    }
+
+    seen.add(k);
+
+    return true;
+  });
 }
 
 /** Ordered, deduplicated effects for an event. */

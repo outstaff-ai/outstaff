@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
 import { customIssue } from "./issues.js";
-import type { AdbGrant, HttpGrant, Network, NetworkGrants } from "./types.js";
+import type { Network, NetworkGrants } from "./types.js";
 
 const d = (description: string) => ({ description });
 
@@ -145,21 +145,23 @@ export function networkGrants(
   team: { roles?: Record<string, { network?: Network | undefined } | undefined> | undefined },
   person: { role: string; extends?: string[] | undefined; network?: Network | undefined },
 ): NetworkGrants {
-  const layers = [person.role, ...(person.extends ?? [])].map((r) => team.roles?.[r]?.network);
-  layers.push(person.network);
-  const http = new Map<string, HttpGrant>();
-  const adb = new Map<string, AdbGrant>();
-  for (const layer of layers) {
-    for (const g of layer?.http ?? []) {
-      http.set(g.name, g);
-    }
+  const roles = [person.role, ...(person.extends ?? [])];
+  const layers = [...roles.map((r) => team.roles?.[r]?.network), person.network];
 
-    for (const g of layer?.adb ?? []) {
-      adb.set(g.name, g);
-    }
+  return {
+    http: latestByName(layers.map((layer) => layer?.http)),
+    adb: latestByName(layers.map((layer) => layer?.adb)),
+  };
+}
+
+/** The grants of every layer, a later one replacing an earlier one with the same name. */
+function latestByName<T extends { name: string }>(layers: (T[] | undefined)[]): T[] {
+  const byName = new Map<string, T>();
+  for (const g of layers.flatMap((layer) => layer ?? [])) {
+    byName.set(g.name, g);
   }
 
-  return { http: [...http.values()], adb: [...adb.values()] };
+  return [...byName.values()];
 }
 
 /** The secret keys the bearer tokens of these grants name. */

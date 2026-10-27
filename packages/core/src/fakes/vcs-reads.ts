@@ -1,5 +1,5 @@
 import { PortError } from "../ports/index.js";
-import type { CheckLog } from "../ports/index.js";
+import type { CheckLog, ReviewThread } from "../ports/index.js";
 import type { FakeVcsState, VcsReads } from "./vcs.types.js";
 
 /** What a fake vcs answers: credentials, pull requests, checks, threads, the conversation and events. */
@@ -82,26 +82,15 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
       return structuredClone(comments);
     },
     async resolveThread(repo, threadId, login) {
-      const asLogin = login ?? self;
-      for (const s of prs.get(key(repo))?.values() ?? []) {
-        const thread = s.threads.find((t) => t.id === threadId);
-        if (!thread) {
-          continue;
-        }
+      const thread = [...(prs.get(key(repo))?.values() ?? [])]
+        .flatMap((s) => s.threads)
+        .find((t) => t.id === threadId);
 
-        const last = thread.comments[thread.comments.length - 1];
-        if (last?.author !== asLogin) {
-          return {
-            resolved: false,
-            reason: `The last comment is by ${last?.author ?? "nobody"}, not ${asLogin}.`,
-          };
-        }
-
-        thread.resolved = true;
-        return { resolved: true };
+      if (!thread) {
+        throw new PortError("not_found", `Thread ${threadId} not found.`);
       }
 
-      throw new PortError("not_found", `Thread ${threadId} not found.`);
+      return resolveAs(thread, login ?? self);
     },
     async reviewState(repo, number) {
       const s = need(repo, number);
@@ -132,4 +121,18 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
       return { events: page.events.filter((e) => wanted.has(key(e.repo))), cursor: page.cursor };
     },
   };
+}
+
+/** Resolves a thread as `login`, which only the author of its last comment may do. */
+function resolveAs(thread: ReviewThread, login: string): { resolved: boolean; reason?: string } {
+  const last = thread.comments[thread.comments.length - 1];
+  if (last?.author !== login) {
+    return {
+      resolved: false,
+      reason: `The last comment is by ${last?.author ?? "nobody"}, not ${login}.`,
+    };
+  }
+
+  thread.resolved = true;
+  return { resolved: true };
 }
