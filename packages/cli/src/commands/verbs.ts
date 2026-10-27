@@ -16,6 +16,7 @@ import {
   buildPolicy,
   envSecretSource,
   formatIssue,
+  type TeamConfig,
 } from "@outstaff/core";
 import { githubVcs } from "@outstaff/integration.vcs.github";
 import { defineCommand } from "../define.js";
@@ -59,33 +60,52 @@ export async function buildEnv(ctx: Context, options: GlobalOptions): Promise<Ag
     ...(ctx.office ? { office: ctx.office } : {}),
   });
 
-  // The same read rules the agent's Read tool gets (the profile only changes what may be written).
-  const me = loaded.config.people.find((p) => p.handle === person);
-  if (me) {
-    const layout = agentLayout(
-      ctx.env["HOME"] ?? homedir(),
-      ctx.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
-    );
-
-    env.layout = layout;
-    env.policy = buildPolicy({ profile: "readonly", person: me, team: loaded.config, layout });
-  }
-
+  applyReadPolicy(ctx, env, loaded.config, person);
   return env;
 }
+
+/** Gives the env the same read rules the agent's Read tool gets (the profile only changes what may be written). */
+function applyReadPolicy(ctx: Context, env: AgentEnv, team: TeamConfig, person: string): void {
+  const me = team.people.find((p) => p.handle === person);
+  if (!me) {
+    return;
+  }
+
+  const layout = agentLayout(
+    ctx.env["HOME"] ?? homedir(),
+    ctx.env["OUTSTAFF_SECRETS_DIR"] ?? "/run/secrets/outstaff",
+  );
+
+  env.layout = layout;
+  env.policy = buildPolicy({ profile: "readonly", person: me, team, layout });
+}
+
+type VerbField = ReturnType<typeof describeVerb>[number];
+
+/** The raw value of a field: its option, its positional argument, or the rest of the arguments for an array. */
+function rawValue(f: VerbField, args: string[], options: Record<string, unknown>): unknown {
+  if (f.arg === undefined) {
+    return options[f.name];
+  }
+
+  if (f.type !== "array") {
+    return args[f.arg];
+  }
+
+  // An array with nothing at its position is left out rather than given as [].
+  return args.length > f.arg ? args.slice(f.arg) : undefined;
+}
+
+const isNumeric = (f: VerbField): boolean => f.type === "integer" || f.type === "number";
 
 /** Positional arguments and options (commander's camelCase keys) -> the verb's input object. */
 function toInput(verb: Verb, args: string[], options: Record<string, unknown>) {
   const input: Record<string, unknown> = {};
   for (const f of describeVerb(verb)) {
-    const raw =
-      f.arg === undefined ? options[f.name] : f.type === "array" ? args.slice(f.arg) : args[f.arg];
-
-    if (raw === undefined || (f.type === "array" && f.arg !== undefined && args.length <= f.arg)) {
-      continue;
+    const raw = rawValue(f, args, options);
+    if (raw !== undefined) {
+      input[f.name] = isNumeric(f) ? Number(raw) : raw;
     }
-
-    input[f.name] = f.type === "integer" || f.type === "number" ? Number(raw) : raw;
   }
 
   return input;

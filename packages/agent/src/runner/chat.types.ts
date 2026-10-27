@@ -1,5 +1,12 @@
 import type { Chat, Logger, TeamConfig, Tracker } from "@outstaff/core";
-import type { Attached, Filed, Link, QueuedReport, WorkSummary } from "@outstaff/protocol";
+import type {
+  Attached,
+  ChatOrigin,
+  Filed,
+  Link,
+  QueuedReport,
+  WorkSummary,
+} from "@outstaff/protocol";
 import type { Offer } from "../office-client/index.js";
 import type { ChatReportKind, OfficeClient } from "../verbs/office.types.js";
 import type { Attachment, ProfilePublisher } from "./types.js";
@@ -80,4 +87,17 @@ export interface ChatContextDeps {
 
   /** The numbered list of the agent's work: one line per piece of work. */
   describe(work: WorkSummary[]): string[];
+}
+
+/** The threads a report belongs to, and the requester to message directly when there are none. */
+export interface ReportDestination {
+  direct?: string;
+  threads: Pick<ChatOrigin, "channel" | "thread" | "direct" | "participant" | "requester">[];
+}
+
+/** One place a report is posted, and how the requester is tagged there. */
+export interface ReportTarget {
+  channel: string;
+  thread?: string;
+  mention: string;
 }

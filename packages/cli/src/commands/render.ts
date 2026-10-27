@@ -10,8 +10,85 @@ import { loadCatalogs } from "../catalogs.js";
 import { defineCommand } from "../define.js";
 import { loadTeam } from "../load.js";
 import { table } from "../table.js";
+import type { Context } from "../types.js";
 
 const size = (text: string) => Buffer.byteLength(text);
+
+type Rendered = ReturnType<typeof renderPerson>;
+type RenderedFile = { path: string; bytes: number; content: string };
+
+function printErrors(ctx: Context, messages: string[]): void {
+  for (const m of messages) {
+    ctx.err(`error    ${m}\n`);
+  }
+}
+
+/** --out as an absolute path; undefined when it was not given. */
+function outDir(ctx: Context, out: string | undefined): string | undefined {
+  if (out === undefined) {
+    return undefined;
+  }
+
+  return isAbsolute(out) ? out : resolve(ctx.cwd, out);
+}
+
+/** Renders the person, writing the files below `target` when given, with each file's size. */
+function renderFiles(
+  input: Parameters<typeof renderPerson>[0],
+  target: string | undefined,
+  force: boolean | undefined,
+): { result: Rendered; files: RenderedFile[] } {
+  const result = target
+    ? renderToDir({ ...input, out: target, ...(force ? { force } : {}) })
+    : renderPerson(input);
+
+  const files = [...result.files].map(([path, content]) => ({
+    path,
+    bytes: size(content),
+    content,
+  }));
+
+  return { result, files };
+}
+
+function printText(
+  ctx: Context,
+  result: Rendered,
+  files: RenderedFile[],
+  target: string | undefined,
+): void {
+  ctx.out(
+    `${table(
+      ["FILE", "BYTES"],
+      files.map((f) => [f.path, String(f.bytes)]),
+    )}\n`,
+  );
+
+  for (const w of result.warnings) {
+    ctx.err(`warning  ${w.message}\n`);
+  }
+
+  ctx.out(
+    target
+      ? `Wrote ${files.length} files to ${target}\n`
+      : `${files.length} files (pass --out <dir> to write them)\n`,
+  );
+}
+
+/** Prints why rendering or writing failed and returns the exit code; rethrows anything that is not an Error. */
+function reportFailure(ctx: Context, e: unknown): number {
+  if (e instanceof RenderError) {
+    printErrors(ctx, e.issues.map(formatCatalogIssue));
+    return 1;
+  }
+
+  if (e instanceof Error) {
+    ctx.err(`error    ${e.message}\n`);
+    return 1;
+  }
+
+  throw e;
+}
 
 export const render = defineCommand({
   name: "render",
@@ -38,19 +115,13 @@ export const render = defineCommand({
     const { out, force } = options as { out?: string; force?: boolean };
     const loaded = await loadTeam(ctx, options);
     if (!loaded.ok) {
-      for (const i of loaded.issues) {
-        ctx.err(`error    ${formatIssue(i)}\n`);
-      }
-
+      printErrors(ctx, loaded.issues.map(formatIssue));
       return 1;
     }
 
     const found = loadCatalogs(ctx, loaded.config, loaded.source.dir);
     if (!found.ok) {
-      for (const i of found.issues) {
-        ctx.err(`error    ${formatCatalogIssue(i)}\n`);
-      }
-
+      printErrors(ctx, found.issues.map(formatCatalogIssue));
       return 1;
     }
 
@@ -62,17 +133,8 @@ export const render = defineCommand({
     };
 
     try {
-      const target = out === undefined ? undefined : isAbsolute(out) ? out : resolve(ctx.cwd, out);
-      const result = target
-        ? renderToDir({ ...input, out: target, ...(force ? { force } : {}) })
-        : renderPerson(input);
-
-      const files = [...result.files].map(([path, content]) => ({
-        path,
-        bytes: size(content),
-        content,
-      }));
-
+      const target = outDir(ctx, out);
+      const { result, files } = renderFiles(input, target, force);
       if (options.json) {
         ctx.out(
           `${JSON.stringify(
@@ -89,40 +151,12 @@ export const render = defineCommand({
           )}\n`,
         );
       } else {
-        ctx.out(
-          `${table(
-            ["FILE", "BYTES"],
-            files.map((f) => [f.path, String(f.bytes)]),
-          )}\n`,
-        );
-
-        for (const w of result.warnings) {
-          ctx.err(`warning  ${w.message}\n`);
-        }
-
-        ctx.out(
-          target
-            ? `Wrote ${files.length} files to ${target}\n`
-            : `${files.length} files (pass --out <dir> to write them)\n`,
-        );
+        printText(ctx, result, files, target);
       }
 
       return 0;
     } catch (e) {
-      if (e instanceof RenderError) {
-        for (const i of e.issues) {
-          ctx.err(`error    ${formatCatalogIssue(i)}\n`);
-        }
-
-        return 1;
-      }
-
-      if (e instanceof Error) {
-        ctx.err(`error    ${e.message}\n`);
-        return 1;
-      }
-
-      throw e;
+      return reportFailure(ctx, e);
     }
   },
 });

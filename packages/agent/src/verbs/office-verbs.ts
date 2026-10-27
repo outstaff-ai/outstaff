@@ -2,7 +2,7 @@ import { PortError } from "@outstaff/core";
 import { formatWorkGroups, groupWork } from "@outstaff/protocol";
 import { z } from "zod";
 import { uploadAttachments, uploadedLines } from "./attachments.js";
-import type { Uploaded } from "./types.js";
+import type { AgentEnv, Uploaded } from "./types.js";
 import { filedLine, requireOffice } from "./support.js";
 import { defineVerb, result } from "./define.js";
 
@@ -156,6 +156,15 @@ export const workQueue = defineVerb({
   },
 });
 
+/** Attaches the files of the chat message to a ticket; with no ticket, nothing is uploaded. */
+async function uploadToTicket(env: AgentEnv, ticket: string | undefined): Promise<Uploaded> {
+  if (!ticket) {
+    return { attached: [], failed: [] };
+  }
+
+  return uploadAttachments(env, ticket, env.attachments ?? []);
+}
+
 export const workAttach = defineVerb({
   name: "work.attach",
   summary: "Add a chat request to work you already have.",
@@ -199,13 +208,9 @@ export const workAttach = defineVerb({
       ...(input.request ? { request: input.request } : {}),
     });
 
-    const pr = done.attached.pr;
-    const ticket = done.attached.ticket;
+    const { pr, ticket } = done.attached;
     // The files of the message join the ticket the request was added to.
-    const uploaded: Uploaded = ticket
-      ? await uploadAttachments(env, ticket.ref, env.attachments ?? [])
-      : { attached: [], failed: [] };
-
+    const uploaded = await uploadToTicket(env, ticket?.ref);
     return result(
       [
         `Added the request to ${[pr && `PR ${pr.ref}`, ticket?.ref].filter(Boolean).join(" for ")}.`,

@@ -10,6 +10,11 @@ export function typeOf(s: JsonSchema): string {
     return s.anyOf.map(typeOf).join(" or ");
   }
 
+  return containerType(s) ?? plainType(s);
+}
+
+/** A list or an object, described by its items or its fields. */
+function containerType(s: JsonSchema): string | undefined {
   if (s.type === "array" && s.items) {
     return `list of ${typeOf(s.items)}`;
   }
@@ -18,8 +23,11 @@ export function typeOf(s: JsonSchema): string {
     return `object (${Object.keys(s.properties).join(", ")})`;
   }
 
-  return Array.isArray(s.type) ? s.type.join(" or ") : (s.type ?? "any");
+  return undefined;
 }
+
+const plainType = (s: JsonSchema) =>
+  Array.isArray(s.type) ? s.type.join(" or ") : (s.type ?? "any");
 
 export const escape = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", " ");
 
@@ -38,16 +46,26 @@ export function table(rows: string[][]): string[] {
   ];
 }
 
+const listItems = (field: JsonSchema) => (field.type === "array" ? field.items : undefined);
+
+/** The schema whose fields are documented under a field: its own, or those of its list items. */
+const nestedOf = (field: JsonSchema, item?: JsonSchema) =>
+  field.properties ? field : item?.properties ? item : undefined;
+
 /** One row per field; fields of nested objects get dotted names, and `[]` marks list items. */
 export function fieldRows(s: JsonSchema, prefix: string): string[][] {
   return Object.entries(s.properties ?? {}).flatMap(([name, field]) => {
     const required = s.required?.includes(name) ? "yes" : "no";
     const path = `${prefix}${name}`;
-    const item = field.type === "array" ? field.items : undefined;
-    const nested = field.properties ? field : item?.properties ? item : undefined;
-    const type = nested ? (item ? "list of objects" : "object") : typeOf(field);
-    const row = [`\`${path}\``, escape(type), required, escape(field.description ?? "")];
-    return nested ? [row, ...fieldRows(nested, `${path}${item ? "[]" : ""}.`)] : [row];
+    const item = listItems(field);
+    const nested = nestedOf(field, item);
+    if (!nested) {
+      return [[`\`${path}\``, escape(typeOf(field)), required, escape(field.description ?? "")]];
+    }
+
+    const type = item ? "list of objects" : "object";
+    const row = [`\`${path}\``, type, required, escape(field.description ?? "")];
+    return [row, ...fieldRows(nested, `${path}${item ? "[]" : ""}.`)];
   });
 }
 

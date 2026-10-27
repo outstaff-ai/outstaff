@@ -8,8 +8,8 @@ import {
   installTools,
   renderGlobalMiseToml,
   renderMiseToml,
-  verifyTools,
 } from "../install.js";
+import { verifyTools } from "../verify.js";
 import { withGlobalConfig } from "../testing.js";
 import type { MiseRunner } from "../types.js";
 

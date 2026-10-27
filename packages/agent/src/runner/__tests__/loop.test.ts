@@ -36,6 +36,70 @@ import type { WorkLoop } from "../loop.types.js";
 import { createUsageReporter } from "../usage.js";
 import type { UsageReporter } from "../types.js";
 
+interface OfferExtras {
+  sessionId?: string;
+  journal?: boolean;
+  origin?: boolean;
+  files?: Record<string, unknown>[];
+  kind?: string;
+  feedback?: Record<string, unknown>[];
+}
+
+type Reply = [type: string, payload?: unknown];
+
+const filedReply = {
+  item: { id: "w9", title: "Filed", status: "queued" },
+  waiting: false,
+  work: [],
+};
+
+// The chat sessions of these tests are the items called c*.
+const chatItems = (id: string | undefined) =>
+  id?.startsWith("c") ? [{ id, title: "Chat", status: "active", kind: "chat", current: true }] : [];
+
+/** What the office answers each request with; anything else is acknowledged. */
+const officeReplies: Partial<{
+  [T in Message["type"]]: (m: Extract<Message, { type: T }>) => Reply;
+}> = {
+  ask: (m) => ["ask_result", { id: "q1", to: m.payload.to, status: "pending" }],
+  work_list: (m) => ["work_list_result", { items: chatItems(m.payload.workItemId) }],
+  work_link: () => ["work_link_result", filedReply],
+  work_queue: () => ["work_queue_result", filedReply],
+};
+
+const chatOrigin = (files: Record<string, unknown>[] | undefined) => ({
+  channel: "D1",
+  thread: "t1",
+  requester: { id: "U0REQ0001", name: "Dana" },
+  direct: true,
+  participant: true,
+  ...(files ? { files } : {}),
+});
+
+const offeredItem = (id: string, extra: OfferExtras) => ({
+  id,
+  kind: extra.kind ?? (extra.origin ? "chat" : "ticket"),
+  ...(extra.feedback ? { subject: { type: "pr", ref: "git.acme.example/acme/app#1" } } : {}),
+  title: `Fix ${id}`,
+  priority: 1,
+  trigger: "human",
+  ...(extra.origin ? { origin: chatOrigin(extra.files) } : {}),
+});
+
+const offerContext = (extra: OfferExtras) => ({
+  journal: extra.journal ? [{ at: "2030-01-01T00:00:00Z", author: "sam", text: "Plan: a" }] : [],
+  subjects: [
+    {
+      type: "ticket",
+      ref: "SHOP-1",
+      title: "Checkout",
+      url: "https://t.acme.example/SHOP-1",
+    },
+  ],
+  links: [],
+  ...(extra.feedback ? { feedback: extra.feedback } : {}),
+});
+
 /** An office that acknowledges everything and says a question is still open. */
 class OfficeSocket extends FakeSocket {
   failJournal = false;
@@ -47,83 +111,27 @@ class OfficeSocket extends FakeSocket {
       return;
     }
 
-    queueMicrotask(() => {
-      if (m.type === "ask") {
-        this.reply(m, "ask_result", { id: "q1", to: m.payload.to, status: "pending" });
-      } else if (m.type === "journal" && this.failJournal) {
-        this.reply(m, "error", { code: "invalid", message: "No journal today." });
-      } else if (m.type === "work_list") {
-        // The chat sessions of these tests are the items called c*.
-        const id = m.payload.workItemId;
-        this.reply(m, "work_list_result", {
-          items: id?.startsWith("c")
-            ? [{ id, title: "Chat", status: "active", kind: "chat", current: true }]
-            : [],
-        });
-      } else if (m.type === "work_link" || m.type === "work_queue") {
-        this.reply(m, m.type === "work_link" ? "work_link_result" : "work_queue_result", {
-          item: { id: "w9", title: "Filed", status: "queued" },
-          waiting: false,
-          work: [],
-        });
-      } else {
-        this.reply(m, "ack");
-      }
-    });
+    queueMicrotask(() => this.answer(m));
   }
 
-  offerWith(
-    id: string,
-    extra: {
-      sessionId?: string;
-      journal?: boolean;
-      origin?: boolean;
-      files?: Record<string, unknown>[];
-      kind?: string;
-      feedback?: Record<string, unknown>[];
-    } = {},
-  ) {
+  private answer(m: Message) {
+    if (m.type === "journal" && this.failJournal) {
+      this.reply(m, "error", { code: "invalid", message: "No journal today." });
+      return;
+    }
+
+    const reply = officeReplies[m.type] as ((m: Message) => Reply) | undefined;
+    const [type, payload] = reply ? reply(m) : ["ack"];
+    this.reply(m, type, payload);
+  }
+
+  offerWith(id: string, extra: OfferExtras = {}) {
     this.receive({
       id: `offer-${id}`,
       type: "offer",
       payload: {
-        workItem: {
-          id,
-          kind: extra.kind ?? (extra.origin ? "chat" : "ticket"),
-          ...(extra.feedback
-            ? { subject: { type: "pr", ref: "git.acme.example/acme/app#1" } }
-            : {}),
-          title: `Fix ${id}`,
-          priority: 1,
-          trigger: "human",
-          ...(extra.origin
-            ? {
-                origin: {
-                  channel: "D1",
-                  thread: "t1",
-                  requester: { id: "U0REQ0001", name: "Dana" },
-                  direct: true,
-                  participant: true,
-                  ...(extra.files ? { files: extra.files } : {}),
-                },
-              }
-            : {}),
-        },
-        context: {
-          journal: extra.journal
-            ? [{ at: "2030-01-01T00:00:00Z", author: "sam", text: "Plan: a" }]
-            : [],
-          subjects: [
-            {
-              type: "ticket",
-              ref: "SHOP-1",
-              title: "Checkout",
-              url: "https://t.acme.example/SHOP-1",
-            },
-          ],
-          links: [],
-          ...(extra.feedback ? { feedback: extra.feedback } : {}),
-        },
+        workItem: offeredItem(id, extra),
+        context: offerContext(extra),
         ...(extra.sessionId ? { sessionId: extra.sessionId } : {}),
       },
     });

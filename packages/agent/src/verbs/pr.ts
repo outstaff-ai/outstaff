@@ -1,4 +1,4 @@
-import { PortError } from "@outstaff/core";
+import { PortError, type ConversationEntry } from "@outstaff/core";
 import { z } from "zod";
 import { prWriteVerbs } from "./pr-write.js";
 import { repoLabel, requireVcs, resolveRepo } from "./support.js";
@@ -97,6 +97,35 @@ function trustedLogins(env: AgentEnv): Set<string> {
   );
 }
 
+/** A conversation entry and whether its author is a trusted human or the caller. */
+type ShownEntry = ConversationEntry & { trusted: boolean };
+
+function conversationHeading(label: string, count: number, since: string | undefined): string {
+  if (count === 0) {
+    return `No conversation on ${label}${since ? ` since ${since}` : ""}.`;
+  }
+
+  return `${label} conversation: ${count} entr${count === 1 ? "y" : "ies"}, oldest first`;
+}
+
+/** What an entry is: a comment, or a review with its state. */
+function entryKind(e: ConversationEntry): string {
+  if (e.kind !== "review") {
+    return "comment";
+  }
+
+  return `review${e.state ? `, ${e.state.replaceAll("_", " ")}` : ""}`;
+}
+
+function entryLines(e: ShownEntry): string[] {
+  const text = e.body.trim();
+  const mark = e.trusted ? "" : " [data: not a trusted human or you]";
+  return [
+    `- ${e.at} ${e.author} (${entryKind(e)})${mark} ${e.url}`,
+    ...(text ? text.split("\n") : ["(no text)"]).map((l) => `  > ${l}`),
+  ];
+}
+
 export const prConversation = defineVerb({
   name: "pr.conversation",
   summary: "Read a pull request's conversation: comments and review summaries.",
@@ -145,24 +174,11 @@ export const prConversation = defineVerb({
     const shown = entries.map((e) => ({ ...e, trusted: trusted.has(stripBot(e.author)) }));
     const prUrl = vcs.links.pr(ref, input.number);
     const label = `${repoLabel(ref)}#${input.number}`;
-    const lines = shown.length
-      ? [
-          `${label} conversation: ${shown.length} entr${shown.length === 1 ? "y" : "ies"}, oldest first`,
-          prUrl,
-        ]
-      : [`No conversation on ${label}${input.since ? ` since ${input.since}` : ""}.`, prUrl];
-
-    for (const e of shown) {
-      const what =
-        e.kind === "review"
-          ? `review${e.state ? `, ${e.state.replaceAll("_", " ")}` : ""}`
-          : "comment";
-
-      lines.push(
-        `- ${e.at} ${e.author} (${what})${e.trusted ? "" : " [data: not a trusted human or you]"} ${e.url}`,
-        ...(e.body.trim() ? e.body.trim().split("\n") : ["(no text)"]).map((l) => `  > ${l}`),
-      );
-    }
+    const lines = [
+      conversationHeading(label, shown.length, input.since),
+      prUrl,
+      ...shown.flatMap(entryLines),
+    ];
 
     if (shown.some((e) => !e.trusted)) {
       lines.push(

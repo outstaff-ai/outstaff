@@ -1,23 +1,122 @@
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
-import { formatIssue, type SetupStep } from "@outstaff/core";
-import { loadCatalogs, roleProfile } from "../catalogs.js";
+import { join, resolve } from "node:path";
+import { formatIssue, type AdapterRegistry, type TeamConfig } from "@outstaff/core";
 import { defineCommand } from "../define.js";
 import { loadTeam } from "../load.js";
-import { projectRoot, secretsLocation, shown } from "../project.js";
-import { renderEnvExample, sections } from "./setup-template.js";
+import { projectRoot, secretsLocation } from "../project.js";
+import type { Context, GlobalOptions, Loaded, SecretsLocation } from "../types.js";
 import { runDerive } from "./setup/derive.js";
-import { renderGuide } from "./setup/guide.js";
 import { missingIgnores } from "./setup/ignores.js";
 import { configuredAdapters, shippedRegistry } from "./setup/registry.js";
+import { writeTemplate } from "./setup/template-step.js";
+import type { SetupOptions, SetupPlan } from "./setup/types.js";
 import type { Scope } from "./types.js";
 
-export const setup = defineCommand<{
-  out?: string;
-  derive?: boolean;
-  secretsDir?: string;
-  yes?: boolean;
-}>({
+type LoadedTeam = Extract<Loaded, { ok: true }>;
+
+const scopeOf = (target: string): Scope => (target === "office" ? "office" : "person");
+
+/** The scope's `.env` file, relative to the project directory. */
+const envFileOf = (scope: Scope, target: string): string =>
+  scope === "office"
+    ? join(".outstaff", "office", ".env")
+    : join(".outstaff", "people", target, ".env");
+
+/** The adapters a test passed in, or every adapter this build ships. */
+const registryOf = async (ctx: Context): Promise<AdapterRegistry> =>
+  ctx.registry && ctx.registry.list().length > 0 ? ctx.registry : shippedRegistry();
+
+/** The person the target names; undefined for the office, or (after printing why) when unknown. */
+function findPerson(ctx: Context, config: TeamConfig, target: string) {
+  const person = config.people.find((p) => p.handle === target);
+  if (!person) {
+    ctx.err(
+      `Unknown person "${target}". People in this team: ${config.people.map((p) => p.handle).join(", ") || "none"}. Use "office" for the office.\n`,
+    );
+  }
+
+  return person;
+}
+
+/** Whether git ignores the scope's `.env` and secrets; prints what to add to .gitignore when not. */
+function ignoresSecrets(ctx: Context, out: string, envFile: string, secrets: SecretsLocation) {
+  const missing = missingIgnores(out, envFile, secrets);
+  if (missing.length > 0) {
+    ctx.err(
+      `Refusing to run: these would not be ignored by git, so real secrets could be committed.\nAdd to .gitignore and run again:\n${missing.map((m) => `  ${m}`).join("\n")}\n`,
+    );
+  }
+
+  return missing.length === 0;
+}
+
+/** Resolves what to set up; undefined (after printing why) when the person is unknown or secrets are not ignored. */
+async function planSetup(
+  ctx: Context,
+  options: SetupOptions & GlobalOptions,
+  loaded: LoadedTeam,
+  target: string,
+): Promise<SetupPlan | undefined> {
+  const { config } = loaded;
+  const scope = scopeOf(target);
+  const person = scope === "person" ? findPerson(ctx, config, target) : undefined;
+  if (scope === "person" && !person) {
+    return undefined;
+  }
+
+  const out = resolve(ctx.cwd, options.out ?? projectRoot(ctx, loaded.source));
+  const secrets = secretsLocation(ctx, options, out, target);
+  const envFile = envFileOf(scope, target);
+  if (!ignoresSecrets(ctx, out, envFile, secrets)) {
+    return undefined;
+  }
+
+  const { found, unknown } = configuredAdapters(config, await registryOf(ctx), scope);
+  const teamDir = loaded.source.dir;
+  return {
+    config,
+    teamDir,
+    scope,
+    target,
+    person,
+    out,
+    secretsDir: secrets.dir,
+    envFile,
+    found,
+    unknown,
+  };
+}
+
+/** `ost setup --derive`: fills derivable secrets and reports what it wrote. */
+async function deriveSecrets(
+  ctx: Context,
+  options: SetupOptions & GlobalOptions,
+  plan: SetupPlan,
+): Promise<number> {
+  const dir = plan.secretsDir;
+  const { config, found, scope, person } = plan;
+  const report = await runDerive(ctx, config, found, scope, person, dir, options.yes === true);
+  if (options.json) {
+    ctx.out(
+      `${JSON.stringify({ secretsDir: dir, written: report.written, warnings: report.warnings }, null, 2)}\n`,
+    );
+
+    return 0;
+  }
+
+  ctx.out(
+    report.written.length > 0
+      ? `Wrote ${report.written.join(", ")} to ${dir}\n`
+      : "Nothing new to derive.\n",
+  );
+
+  for (const w of report.warnings) {
+    ctx.out(`warning  ${w}\n`);
+  }
+
+  return 0;
+}
+
+export const setup = defineCommand<SetupOptions>({
   name: "setup",
   summary: "Prepare the credentials of one person or of the office.",
   description:
@@ -65,120 +164,13 @@ export const setup = defineCommand<{
       return 1;
     }
 
-    const { config } = loaded;
-    const scope: Scope = target === "office" ? "office" : "person";
-    const person = scope === "person" ? config.people.find((p) => p.handle === target) : undefined;
-    if (scope === "person" && !person) {
-      ctx.err(
-        `Unknown person "${target}". People in this team: ${config.people.map((p) => p.handle).join(", ") || "none"}. Use "office" for the office.\n`,
-      );
-
+    const plan = await planSetup(ctx, options, loaded, target);
+    if (!plan) {
       return 1;
     }
 
-    const out = resolve(ctx.cwd, options.out ?? projectRoot(ctx, loaded.source));
-    const secrets = secretsLocation(ctx, options, out, target);
-    const envFile =
-      scope === "office"
-        ? join(".outstaff", "office", ".env")
-        : join(".outstaff", "people", target, ".env");
-
-    const missing = missingIgnores(out, envFile, secrets);
-    if (missing.length > 0) {
-      ctx.err(
-        `Refusing to run: these would not be ignored by git, so real secrets could be committed.\nAdd to .gitignore and run again:\n${missing.map((m) => `  ${m}`).join("\n")}\n`,
-      );
-
-      return 1;
-    }
-
-    const registry =
-      ctx.registry && ctx.registry.list().length > 0 ? ctx.registry : await shippedRegistry();
-
-    const { found, unknown } = configuredAdapters(config, registry, scope);
-
-    if (options.derive) {
-      const dir = secrets.dir;
-      const report = await runDerive(ctx, config, found, scope, person, dir, options.yes === true);
-      if (options.json) {
-        ctx.out(
-          `${JSON.stringify({ secretsDir: dir, written: report.written, warnings: report.warnings }, null, 2)}\n`,
-        );
-      } else {
-        ctx.out(
-          report.written.length > 0
-            ? `Wrote ${report.written.join(", ")} to ${dir}\n`
-            : "Nothing new to derive.\n",
-        );
-
-        for (const w of report.warnings) {
-          ctx.out(`warning  ${w}\n`);
-        }
-      }
-
-      return 0;
-    }
-
-    const defs = found.map((f) => f.def);
-    const list = sections(config, defs, scope, person);
-    const text = renderEnvExample(config, scope, target, list, shown(ctx, secrets.dir));
-    const file = join(out, `${envFile}.example`);
-    mkdirSync(join(file, ".."), { recursive: true });
-    writeFileSync(file, text);
-
-    const catalogs = loadCatalogs(ctx, config, loaded.source.dir);
-    const profile = person
-      ? roleProfile(catalogs.ok ? catalogs.catalogs : undefined, person.role)
-      : {};
-
-    const seen = new Set<string>();
-    const guides: { adapter: string; steps: SetupStep[] }[] = [];
-    for (const { def, options: opts } of found) {
-      const steps =
-        def.setupGuide?.({
-          team: config,
-          scope,
-          options: opts,
-          ...(person ? { person } : {}),
-          ...profile,
-        }) ?? [];
-
-      const key = JSON.stringify([def.name, steps]);
-      if (steps.length > 0 && !seen.has(key)) {
-        seen.add(key);
-        guides.push({ adapter: `${def.name} (${def.port})`, steps });
-      }
-    }
-
-    if (options.json) {
-      ctx.out(
-        `${JSON.stringify(
-          {
-            file,
-            secretsDir: secrets.dir,
-            keys: list.flatMap((s) => s.specs.map((k) => k.key)),
-            guides,
-            unsupported: unknown,
-          },
-          null,
-          2,
-        )}\n`,
-      );
-
-      return 0;
-    }
-
-    ctx.out(`Wrote ${relative(ctx.cwd, file) || file}\n`);
-    ctx.out(`Secret files go in ${shown(ctx, secrets.dir)}/, one file per key.\n\n`);
-    for (const g of guides) {
-      ctx.out(`${renderGuide(g.adapter, g.steps)}\n`);
-    }
-
-    for (const u of unknown) {
-      ctx.out(`${u}: not shipped in this build, so no secrets or guide are listed for it.\n`);
-    }
-
-    ctx.out(`When the keys are in place, run \`ost setup ${target} --derive\` for the rest.\n`);
-    return 0;
+    return options.derive
+      ? deriveSecrets(ctx, options, plan)
+      : writeTemplate(ctx, options.json === true, plan);
   },
 });

@@ -10,6 +10,42 @@ import { join } from "node:path";
 import type { WorkLoopOptions, ItemEnv } from "./loop.types.js";
 import { reason } from "./reason.js";
 
+/** The files of the chat message the item came from, saved under `dir`; none when it has none or there is no chat. */
+async function chatAttachments(
+  opts: WorkLoopOptions,
+  offer: Offer,
+  dir: string,
+  log: Logger,
+): Promise<Attachment[]> {
+  if (!offer.workItem.origin?.files?.length || !opts.chat) {
+    return [];
+  }
+
+  return opts.chat.attachments(offer, dir).catch((err) => {
+    log.warn("could not read the files of a chat message", {
+      workItemId: offer.workItem.id,
+      error: reason(err),
+    });
+
+    return [];
+  });
+}
+
+/** The files attached to the tickets the item concerns, saved under `dir`. */
+async function ticketAttachments(
+  opts: WorkLoopOptions,
+  offer: Offer,
+  dir: string,
+  log: Logger,
+): Promise<Record<string, Attachment[]>> {
+  const ticketKeys = offer.context.subjects.filter((s) => s.type === "ticket").map((s) => s.ref);
+  if (!ticketKeys.length) {
+    return {};
+  }
+
+  return saveTicketFiles(opts.env.tracker, ticketKeys, dir, log);
+}
+
 /**
  * Files people shared with the request or attached to its tickets: data, downloaded into the item's scratch
  * directory (deleted with it) so the model can read them.
@@ -19,25 +55,13 @@ export async function itemFiles(
   offer: Offer,
   log: Logger,
 ): Promise<{ attachments: Attachment[]; ticketFiles: Record<string, Attachment[]> }> {
-  const id = offer.workItem.id;
-  const scratch = opts.env.layout ? join(opts.env.layout.scratchDir, safeId(id)) : undefined;
-  const attachments: Attachment[] =
-    scratch && offer.workItem.origin?.files?.length && opts.chat
-      ? await opts.chat.attachments(offer, join(scratch, "files")).catch((err) => {
-          log.warn("could not read the files of a chat message", {
-            workItemId: id,
-            error: reason(err),
-          });
+  if (!opts.env.layout) {
+    return { attachments: [], ticketFiles: {} };
+  }
 
-          return [];
-        })
-      : [];
-
-  const ticketKeys = offer.context.subjects.filter((s) => s.type === "ticket").map((s) => s.ref);
-  const ticketFiles =
-    scratch && ticketKeys.length
-      ? await saveTicketFiles(opts.env.tracker, ticketKeys, join(scratch, "tickets"), log)
-      : {};
+  const scratch = join(opts.env.layout.scratchDir, safeId(offer.workItem.id));
+  const attachments = await chatAttachments(opts, offer, join(scratch, "files"), log);
+  const ticketFiles = await ticketAttachments(opts, offer, join(scratch, "tickets"), log);
 
   return { attachments, ticketFiles };
 }

@@ -1,10 +1,11 @@
-import { PortError } from "@outstaff/core";
+import { PortError, type RepoRef } from "@outstaff/core";
 import { z } from "zod";
 import { repoLabel, requireVcs } from "./support.js";
 import { defineVerb, result } from "./define.js";
 import { checkMergeable, chooseMethod, mergeOn, requireMergeVcs, teamRepoName } from "./merge.js";
 import { repoOrWorktree } from "./worktree.js";
 import { number, repo } from "./pr-write-support.js";
+import type { AgentEnv } from "./types.js";
 
 export const prDiff = defineVerb({
   name: "pr.diff",
@@ -27,6 +28,22 @@ export const prDiff = defineVerb({
   },
 });
 
+/** Refuses a repository outside `policies.merge.repos`, when the team limits merging to some repositories. */
+function requireMergeScope(env: AgentEnv, ref: RepoRef): void {
+  const scope = env.team.policies?.merge.repos;
+  if (!scope) {
+    return;
+  }
+
+  const name = teamRepoName(env, ref);
+  if (!name || !scope.includes(name)) {
+    throw new PortError(
+      "forbidden",
+      `${repoLabel(ref)} is not in policies.merge.repos (${scope.join(", ")}). Do not merge this pull request; leave it to a person.`,
+    );
+  }
+}
+
 export const prMerge = defineVerb({
   name: "pr.merge",
   summary: "Merge your own approved pull request, or put it in the merge queue.",
@@ -46,15 +63,7 @@ export const prMerge = defineVerb({
     const vcs = requireMergeVcs(requireVcs(env));
     const ref = await repoOrWorktree(env, ctx, input.repo);
     const label = `${repoLabel(ref)}#${input.number}`;
-    const scope = env.team.policies?.merge.repos;
-    const name = teamRepoName(env, ref);
-    if (scope && (!name || !scope.includes(name))) {
-      throw new PortError(
-        "forbidden",
-        `${repoLabel(ref)} is not in policies.merge.repos (${scope.join(", ")}). Do not merge this pull request; leave it to a person.`,
-      );
-    }
-
+    requireMergeScope(env, ref);
     const pr = await vcs.getPullRequest(ref, input.number, { waitForMergeable: true });
     const url = vcs.links.pr(ref, input.number);
     const problems = await checkMergeable(env, vcs, ref, pr);
@@ -68,15 +77,11 @@ export const prMerge = defineVerb({
     const options = await vcs.mergeOptions(ref, pr.base.ref);
     const method = chooseMethod(env.team.policies?.merge.method, options, repoLabel(ref));
     const done = await vcs.mergePullRequest(ref, input.number, { method, sha: pr.head.sha });
-    return result(
-      [
-        done.outcome === "queued"
-          ? `Queued ${label} in the merge queue: ${pr.title}. The host merges it when the queue passes.`
-          : `Merged ${label} (${method}): ${pr.title}`,
-        url,
-      ],
-      { outcome: done.outcome, method },
-      [url],
-    );
+    const line =
+      done.outcome === "queued"
+        ? `Queued ${label} in the merge queue: ${pr.title}. The host merges it when the queue passes.`
+        : `Merged ${label} (${method}): ${pr.title}`;
+
+    return result([line, url], { outcome: done.outcome, method }, [url]);
   },
 });

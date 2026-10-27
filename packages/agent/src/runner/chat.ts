@@ -3,16 +3,17 @@ import {
   formatWorkGroups,
   groupWork,
   type Link,
+  type QueuedReport,
   type WorkSummary,
-  type ChatOrigin,
-  MAX_CHAT_FILES,
 } from "@outstaff/protocol";
-import type { ChatMessageResult, ChatReportKind } from "../verbs/office.types.js";
+import type { ChatReportKind } from "../verbs/office.types.js";
 import { saveAttachments } from "./attachments.js";
-import type { ChatRelayOptions, ChatRelay } from "./chat.types.js";
+import { acknowledgement } from "./chat-acknowledge.js";
+import { fromTrustedHuman, linksToList, officeMessage, reportBody } from "./chat-report.js";
+import type { ChatRelayOptions, ChatRelay, ReportDestination, ReportTarget } from "./chat.types.js";
 import { chatContext } from "./chat-context.js";
 import { placementQuestion, replyFor } from "./chat-replies.js";
-import { clip, linkLine, splitReply, tag } from "./chat-text.js";
+import { linkLine, splitReply, tag } from "./chat-text.js";
 import { reason } from "./reason.js";
 
 export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
@@ -65,9 +66,25 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
   }
 
+  /** Passes the message to the office; when it cannot be reached, says so in the thread and gives up. */
+  async function toOffice(m: ChatMessage, participant: boolean, thread: string) {
+    try {
+      return await office.chatMessage(officeMessage(m, participant));
+    } catch (e) {
+      log.warn("the office did not take a chat message", { error: reason(e) });
+      await post(
+        m.channel,
+        thread,
+        "I could not reach the office just now. Please ask again in a moment.",
+      );
+
+      return undefined;
+    }
+  }
+
   async function onMessage(m: ChatMessage) {
     // The adapter filters already; the relay never relies on that alone.
-    if (!m.author.trusted || m.author.bot) {
+    if (!fromTrustedHuman(m)) {
       return;
     }
 
@@ -77,30 +94,8 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       chat.react(m.channel, m.id, "eyes").catch(() => {});
     }
 
-    let result: ChatMessageResult;
-    try {
-      result = await office.chatMessage({
-        messageId: m.id,
-        channel: m.channel,
-        ...(m.thread ? { thread: m.thread } : {}),
-        text: m.text,
-        author: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
-        direct: m.direct ?? false,
-        participant,
-        ...(m.files?.length ? { files: m.files.slice(0, MAX_CHAT_FILES) } : {}),
-      });
-    } catch (e) {
-      log.warn("the office did not take a chat message", { error: reason(e) });
-      await post(
-        m.channel,
-        thread,
-        "I could not reach the office just now. Please ask again in a moment.",
-      );
-
-      return;
-    }
-
-    if (result.repeated) {
+    const result = await toOffice(m, participant, thread);
+    if (!result || result.repeated) {
       return;
     }
 
@@ -110,52 +105,64 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
   }
 
+  /** Where a report goes: the threads it belongs to, else a direct message with the requester (no thread, no mention). */
+  async function reportTargets(where: ReportDestination): Promise<ReportTarget[]> {
+    const targets = where.threads.map((t) => ({
+      channel: t.channel,
+      thread: t.thread,
+      mention: tag(t),
+    }));
+
+    if (!where.direct || targets.length > 0) {
+      return targets;
+    }
+
+    return [{ channel: await chat.openDirect(where.direct), mention: "" }];
+  }
+
+  /** Posts a reply split into parts: the mention leads the first, the links follow the last. */
+  async function postParts(t: ReportTarget, parts: string[], links: Link[], strict: boolean) {
+    for (const [i, part] of parts.entries()) {
+      const mention = i === 0 ? t.mention : "";
+      const trailer = i === parts.length - 1 ? links.map(linkLine) : [];
+      await post(t.channel, t.thread, [linked(`${mention}${part}`), ...trailer].join("\n"), strict);
+    }
+  }
+
   /** Posts a report in the threads it belongs to, or in a direct message with the requester. */
   async function deliver(
     kind: Exclude<ChatReportKind, "ack">,
     text: string,
     links: Link[],
-    where: {
-      direct?: string;
-      threads: Pick<ChatOrigin, "channel" | "thread" | "direct" | "participant" | "requester">[];
-    },
+    where: ReportDestination,
     strict = false,
   ) {
-    const body =
-      kind === "result"
-        ? text.trim()
-        : kind === "blocked"
-          ? `I am blocked. ${text.trim()}`
-          : `I hit an error and could not finish this. I will try again. ${clip(text, 1).slice(0, 300)}`;
-
-    const all = links.filter(
-      (l, i, a) => a.findIndex((x) => x.url === l.url) === i && !body.includes(l.url),
-    );
-
+    const body = reportBody(kind, text);
+    const listed = linksToList(links, body);
     const parts = splitReply(body);
-    const targets: { channel: string; thread?: string; mention: string }[] = [];
-    for (const t of where.threads) {
-      targets.push({ channel: t.channel, thread: t.thread, mention: tag(t) });
+    for (const t of await reportTargets(where)) {
+      await postParts(t, parts, listed, strict);
     }
+  }
 
-    // A direct message is the requester's own: no thread, no mention.
-    if (where.direct && targets.length === 0) {
-      targets.push({ channel: await chat.openDirect(where.direct), mention: "" });
-    }
-
-    for (const t of targets) {
-      for (const [i, part] of parts.entries()) {
-        const last = i === parts.length - 1;
-        await post(
-          t.channel,
-          t.thread,
-          [linked(`${i === 0 ? t.mention : ""}${part}`), ...(last ? all.map(linkLine) : [])].join(
-            "\n",
-          ),
-          strict,
-        );
+  /** Posts a queued report once, and confirms it to the office; one that cannot be posted is left for next time. */
+  async function postQueuedReport(r: QueuedReport) {
+    if (!postedReports.has(r.id)) {
+      try {
+        const where = { ...(r.direct ? { direct: r.direct } : {}), threads: r.threads ?? [] };
+        await deliver(r.kind, r.text, r.links, where, true);
+        postedReports.add(r.id);
+      } catch (e) {
+        // Not confirmed: the office sends it again with the next connection.
+        log.warn("could not post a queued report", { workItemId: r.workItemId, error: reason(e) });
+        return;
       }
     }
+
+    // Confirm a report posted earlier too: the first confirmation may have been lost.
+    await office.reportPosted(r.workItemId, r.id).catch((e: unknown) => {
+      log.warn("could not confirm a posted report", { workItemId: r.workItemId, error: reason(e) });
+    });
   }
 
   return {
@@ -195,38 +202,12 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         return;
       }
 
-      const url = what.key ? (filed.url ?? opts.tracker?.links.issue(what.key)) : undefined;
-      const a = what.attached;
-      const link = (r: { ref: string; url?: string | undefined }, text: string) =>
-        r.url ? `[${text}](${r.url})` : text;
-
-      const joined = a
-        ? [
-            a.pr ? link(a.pr, `PR ${a.pr.ref}`) : undefined,
-            a.ticket
-              ? link(
-                  {
-                    ref: a.ticket.ref,
-                    url: a.ticket.url ?? opts.tracker?.links.issue(a.ticket.ref),
-                  },
-                  a.ticket.ref,
-                )
-              : undefined,
-          ].filter(Boolean)
-        : [];
-
-      const tracked = a
-        ? `Adding this to ${joined.join(" for ")}.${filed.item.status === "active" ? " I'll pick it up when the current round ends." : ""}`
-        : what.key
-          ? `Tracked in ${url ? `[${what.key}](${url})` : what.key}.`
-          : `Queued: ${what.title}.`;
-
       await post(
         origin.channel,
         origin.thread,
         linked(
           [
-            `${tag(origin)}${a ? tracked : `On it. ${tracked}`}`,
+            `${tag(origin)}${acknowledgement(what, filed, ticketUrl)}`,
             ...(filed.waiting ? [placementQuestion(hasPm, describe, filed.work)] : []),
           ].join("\n"),
         ),
@@ -249,35 +230,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
     async postQueued(reports) {
       for (const r of reports) {
-        if (!postedReports.has(r.id)) {
-          try {
-            await deliver(
-              r.kind,
-              r.text,
-              r.links,
-              { ...(r.direct ? { direct: r.direct } : {}), threads: r.threads ?? [] },
-              true,
-            );
-
-            postedReports.add(r.id);
-          } catch (e) {
-            // Not confirmed: the office sends it again with the next connection.
-            log.warn("could not post a queued report", {
-              workItemId: r.workItemId,
-              error: reason(e),
-            });
-
-            continue;
-          }
-        }
-
-        // Confirm a report posted earlier too: the first confirmation may have been lost.
-        await office.reportPosted(r.workItemId, r.id).catch((e: unknown) => {
-          log.warn("could not confirm a posted report", {
-            workItemId: r.workItemId,
-            error: reason(e),
-          });
-        });
+        await postQueuedReport(r);
       }
     },
   };

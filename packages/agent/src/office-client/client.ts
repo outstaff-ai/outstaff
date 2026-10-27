@@ -30,13 +30,25 @@ export const systemClientClock: ClientClock = {
   },
 };
 
-export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeConnection {
-  const clock = opts.clock ?? systemClientClock;
-  const log = opts.logger ?? silentLogger;
-  const open = opts.socket ?? ((url: string) => new WebSocket(url) as unknown as ClientSocket);
+const openWebSocket = (url: string) => new WebSocket(url) as unknown as ClientSocket;
+
+/** How long to wait before reconnecting: exponential with jitter, between half the ceiling and the ceiling. */
+function backoffDelay(opts: OfficeConnectionOptions) {
   const baseMs = opts.backoff?.baseMs ?? 1_000;
   const maxMs = opts.backoff?.maxMs ?? 30_000;
   const random = opts.random ?? Math.random;
+
+  return (attempt: number) => {
+    const ceiling = Math.min(maxMs, baseMs * 2 ** attempt);
+    return Math.round(ceiling / 2 + (ceiling / 2) * random());
+  };
+}
+
+export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeConnection {
+  const clock = opts.clock ?? systemClientClock;
+  const log = opts.logger ?? silentLogger;
+  const open = opts.socket ?? openWebSocket;
+  const delayFor = backoffDelay(opts);
   const requestTimeoutMs = opts.requestTimeoutMs ?? 30_000;
 
   let state: ConnectionState = "idle";
@@ -103,6 +115,27 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     }, heartbeatMs);
   }
 
+  function welcomed(welcome: PayloadOf<"welcome">) {
+    attempt = 0;
+    state = "connected";
+    resumeIds = welcome.resume;
+    if (welcome.reports?.length) {
+      deliverReports(welcome.reports);
+    }
+
+    scheduleBeat(welcome.heartbeatMs);
+    settleWaiters();
+  }
+
+  /** An error that answers no request: a fatal one means the office refuses this agent. */
+  function officeError(error: PayloadOf<"error">) {
+    if (FATAL.includes(error.code)) {
+      rejected = error;
+    } else {
+      log.warn("error from the office", error);
+    }
+  }
+
   function connect() {
     state = "connecting";
     const ws = open(opts.url);
@@ -126,15 +159,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
 
       const m = decoded.message;
       if (m.type === "welcome") {
-        attempt = 0;
-        state = "connected";
-        resumeIds = m.payload.resume;
-        if (m.payload.reports?.length) {
-          deliverReports(m.payload.reports);
-        }
-
-        scheduleBeat(m.payload.heartbeatMs);
-        settleWaiters();
+        welcomed(m.payload);
         return;
       }
 
@@ -158,11 +183,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
 
       if (m.type === "error") {
-        if (FATAL.includes(m.payload.code)) {
-          rejected = m.payload;
-        } else {
-          log.warn("error from the office", m.payload);
-        }
+        officeError(m.payload);
       }
     });
 
@@ -187,8 +208,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
         return;
       }
 
-      const ceiling = Math.min(maxMs, baseMs * 2 ** attempt);
-      const delay = Math.round(ceiling / 2 + (ceiling / 2) * random());
+      const delay = delayFor(attempt);
       attempt += 1;
       state = "backoff";
       log.info("reconnecting to the office", { delayMs: delay });

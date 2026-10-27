@@ -4,42 +4,63 @@ import { MESSAGE_META } from "./meta.js";
 
 const MAX_ID = 200;
 
-/** Parses one frame. Never throws: bad input comes back as an error to send to the peer. */
-export function decode(raw: string): DecodeResult {
+type Failure = Extract<DecodeResult, { ok: false }>;
+
+const malformed = (message: string): Failure => ({ ok: false, code: "malformed", message });
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** The frame as a JSON object, or the error explaining why it is not one. */
+function parseObject(raw: string): { ok: true; rec: Record<string, unknown> } | Failure {
   let value: unknown;
   try {
     value = JSON.parse(raw);
   } catch {
-    return { ok: false, code: "malformed", message: "The message is not valid JSON." };
+    return malformed("The message is not valid JSON.");
   }
 
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { ok: false, code: "malformed", message: "The message must be a JSON object." };
+  return isPlainObject(value)
+    ? { ok: true, rec: value }
+    : malformed("The message must be a JSON object.");
+}
+
+/** The id to echo back in an error, when the frame carries a usable one. */
+function echoId(rec: Record<string, unknown>): { id?: string } {
+  const id = rec["id"];
+  return typeof id === "string" && id.length <= MAX_ID ? { id } : {};
+}
+
+const describeIssues = (issues: readonly { path: readonly PropertyKey[]; message: string }[]) =>
+  issues.map((i) => (i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message)).join("; ");
+
+/** Parses one frame. Never throws: bad input comes back as an error to send to the peer. */
+export function decode(raw: string): DecodeResult {
+  const object = parseObject(raw);
+  if (!object.ok) {
+    return object;
   }
 
-  const rec = value as Record<string, unknown>;
-  const id = typeof rec["id"] === "string" && rec["id"].length <= MAX_ID ? rec["id"] : undefined;
-  const base = id === undefined ? {} : { id };
-  if (typeof rec["type"] !== "string") {
-    return { ok: false, code: "malformed", message: "The message has no type.", ...base };
+  const { rec } = object;
+  const base = echoId(rec);
+  const type = rec["type"];
+  if (typeof type !== "string") {
+    return { ...malformed("The message has no type."), ...base };
   }
 
-  if (!Object.hasOwn(MESSAGE_META, rec["type"])) {
+  if (!Object.hasOwn(MESSAGE_META, type)) {
+    const message = `Unknown message type "${type.slice(0, 50)}".`;
+    return { ok: false, code: "unknown_type", message, ...base };
+  }
+
+  const parsed = messageSchema.safeParse(rec);
+  if (!parsed.success) {
     return {
       ok: false,
-      code: "unknown_type",
-      message: `Unknown message type "${rec["type"].slice(0, 50)}".`,
+      code: "invalid_message",
+      message: describeIssues(parsed.error.issues),
       ...base,
     };
-  }
-
-  const parsed = messageSchema.safeParse(value);
-  if (!parsed.success) {
-    const problems = parsed.error.issues.map((i) =>
-      i.path.length ? `${i.path.join(".")}: ${i.message}` : i.message,
-    );
-
-    return { ok: false, code: "invalid_message", message: problems.join("; "), ...base };
   }
 
   return { ok: true, message: parsed.data };

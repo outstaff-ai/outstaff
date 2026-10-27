@@ -1,10 +1,5 @@
-export {
-  globalConfigFile,
-  installTools,
-  renderGlobalMiseToml,
-  renderMiseToml,
-  verifyTools,
-} from "./install.js";
+export { globalConfigFile, installTools, renderGlobalMiseToml, renderMiseToml } from "./install.js";
+export { verifyTools } from "./verify.js";
 
 export { runMise } from "./mise.js";
 export type {

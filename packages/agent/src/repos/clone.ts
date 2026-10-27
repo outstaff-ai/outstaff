@@ -3,7 +3,12 @@ import { join } from "node:path";
 import { parseRepoUrl, repoGrant, silentLogger, type GitMode, type RepoRef } from "@outstaff/core";
 import { cappedAccess } from "./access.js";
 import { runGit } from "./git.js";
-import type { ClonedRepo, SyncRepositoriesOptions } from "./types.js";
+import type { ClonedRepo, RunGit, SyncRepositoriesOptions } from "./types.js";
+
+type TeamRepo = SyncRepositoriesOptions["team"]["repos"][number];
+type Author = NonNullable<
+  Awaited<ReturnType<SyncRepositoriesOptions["vcs"]["credentials"]>>["author"]
+>;
 
 /** Default credential helper of every clone. The `!` makes git run it as a shell command. */
 export const CREDENTIAL_HELPER = "!ost git-credential";
@@ -41,16 +46,84 @@ export function prePushHook(access: GitMode, defaultBranch: string): string {
 const defaultRemote = (r: Required<RepoRef>) => `https://${r.host}/${r.owner}/${r.name}.git`;
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** The `-c` options that hand git's credentials to the helper alone, for a clone or fetch. */
+const helperConfig = (helper: string) => [
+  "-c",
+  "credential.helper=",
+  "-c",
+  `credential.helper=${helper}`,
+  "-c",
+  "credential.useHttpPath=true",
+];
+
+/** Fetches a clone that is there, or clones into a directory that is absent or empty. */
+async function fetchOrClone(git: RunGit, helper: string, dir: string, url: string) {
+  const config = helperConfig(helper);
+  if (existsSync(join(dir, ".git"))) {
+    await git([...config, "fetch", "--prune", "origin"], { cwd: dir });
+
+    return;
+  }
+
+  if (existsSync(dir) && readdirSync(dir).length > 0) {
+    throw new Error(`${dir} exists and is not a git repository.`);
+  }
+
+  await git([...config, "clone", url, dir]);
+}
+
+/** Points the clone's credentials at the helper, and sets the commit author when the vcs gave one. */
+async function configureClone(git: RunGit, dir: string, helper: string, author?: Author) {
+  // Per clone: helper list reset first, so no global helper (a keychain, say) is ever offered the token.
+  await git(["config", "--local", "--replace-all", "credential.helper", ""], { cwd: dir });
+  await git(["config", "--local", "--add", "credential.helper", helper], { cwd: dir });
+  await git(["config", "--local", "credential.useHttpPath", "true"], { cwd: dir });
+  if (author) {
+    await git(["config", "--local", "user.name", author.name], { cwd: dir });
+    await git(["config", "--local", "user.email", author.email], { cwd: dir });
+  }
+}
+
+function writePrePushHook(dir: string, access: GitMode, defaultBranch: string) {
+  const hooks = join(dir, ".git", "hooks");
+  mkdirSync(hooks, { recursive: true });
+  writeFileSync(join(hooks, "pre-push"), prePushHook(access, defaultBranch), { mode: 0o755 });
+}
+
+async function prepareRepository(
+  opts: SyncRepositoriesOptions,
+  repo: TeamRepo,
+  access: GitMode,
+  ref: Required<RepoRef>,
+): Promise<ClonedRepo> {
+  const git = opts.git ?? runGit;
+  const helper = opts.helper ?? CREDENTIAL_HELPER;
+  const remote = opts.remoteUrl ?? defaultRemote;
+  const dir = join(opts.reposDir, repo.name);
+  const issued = await opts.vcs.credentials(opts.person, ref, access);
+  await fetchOrClone(git, helper, dir, remote(ref));
+  await configureClone(git, dir, helper, issued.author);
+  writePrePushHook(dir, access, repo.default_branch);
+
+  return {
+    name: repo.name,
+    dir,
+    ref,
+    defaultBranch: repo.default_branch,
+    access,
+    kind: repo.kind,
+    instructions: repo.instructions ?? [],
+    trackerLabels: repo.tracker?.labels ?? [],
+  };
+}
+
 /**
  * Clones every team repo the person has a grant on into `<reposDir>/<name>`, or fetches it when it is there.
  * Repos without a grant are never touched. The credentials asked for here only validate the grant and give the
  * commit author: git itself gets its token from the credential helper, at each request.
  */
 export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<ClonedRepo[]> {
-  const git = opts.git ?? runGit;
   const log = opts.log ?? silentLogger;
-  const helper = opts.helper ?? CREDENTIAL_HELPER;
-  const remote = opts.remoteUrl ?? defaultRemote;
   const me = opts.team.people.find((p) => p.handle === opts.person);
   const out: ClonedRepo[] = [];
   if (!me) {
@@ -65,53 +138,9 @@ export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<C
     }
 
     const access = cappedAccess(grant, opts.profile);
-
     const ref = parseRepoUrl(repo.url);
-    const dir = join(opts.reposDir, repo.name);
     try {
-      const issued = await opts.vcs.credentials(opts.person, ref, access);
-      const config = [
-        "-c",
-        "credential.helper=",
-        "-c",
-        `credential.helper=${helper}`,
-        "-c",
-        "credential.useHttpPath=true",
-      ];
-
-      if (existsSync(join(dir, ".git"))) {
-        await git([...config, "fetch", "--prune", "origin"], { cwd: dir });
-      } else if (existsSync(dir) && readdirSync(dir).length > 0) {
-        throw new Error(`${dir} exists and is not a git repository.`);
-      } else {
-        await git([...config, "clone", remote(ref), dir]);
-      }
-
-      // Per clone: helper list reset first, so no global helper (a keychain, say) is ever offered the token.
-      await git(["config", "--local", "--replace-all", "credential.helper", ""], { cwd: dir });
-      await git(["config", "--local", "--add", "credential.helper", helper], { cwd: dir });
-      await git(["config", "--local", "credential.useHttpPath", "true"], { cwd: dir });
-      if (issued.author) {
-        await git(["config", "--local", "user.name", issued.author.name], { cwd: dir });
-        await git(["config", "--local", "user.email", issued.author.email], { cwd: dir });
-      }
-
-      const hooks = join(dir, ".git", "hooks");
-      mkdirSync(hooks, { recursive: true });
-      writeFileSync(join(hooks, "pre-push"), prePushHook(access, repo.default_branch), {
-        mode: 0o755,
-      });
-
-      out.push({
-        name: repo.name,
-        dir,
-        ref,
-        defaultBranch: repo.default_branch,
-        access,
-        kind: repo.kind,
-        instructions: repo.instructions ?? [],
-        trackerLabels: repo.tracker?.labels ?? [],
-      });
+      out.push(await prepareRepository(opts, repo, access, ref));
     } catch (e) {
       log.warn("could not prepare a repository", { repo: repo.name, error: reason(e) });
     }

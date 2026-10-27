@@ -1,9 +1,19 @@
-import { PortError } from "@outstaff/core";
 import { z } from "zod";
-import { attachmentsSection, canAttach, uploadAttachments, uploadedLines } from "./attachments.js";
-import { filedLine, requireOffice, requireTracker } from "./support.js";
+import { uploadAttachments, uploadedLines } from "./attachments.js";
+import { requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./define.js";
-import { key, memberFor, summary } from "./ticket-support.js";
+import { key, summary } from "./ticket-support.js";
+import {
+  assigneeFor,
+  chatFiles,
+  closingLines,
+  currentItem,
+  linkParent,
+  linkRelated,
+  newIssue,
+  noteFailedUploads,
+  parentIssue,
+} from "./ticket-create-steps.js";
 
 export const ticketCreate = defineVerb({
   name: "ticket.create",
@@ -44,83 +54,30 @@ export const ticketCreate = defineVerb({
   ],
   async run(env, input, ctx) {
     const tracker = requireTracker(env);
-    const current = ctx.workItemId
-      ? (await requireOffice(env).work({ workItemId: ctx.workItemId })).find(
-          (i) => i.id === ctx.workItemId,
-        )
-      : undefined;
+    const current = await currentItem(env, ctx);
 
     // A chat session files the ticket as work; the work item that does it moves the ticket when it starts.
-    const chat = current?.kind === "chat";
+    const chat = current?.kind === "chat" ? current : undefined;
 
     // Every refusal comes before the first write: a ticket the office would then refuse must not exist.
     if (chat) {
-      await requireOffice(env).checkFiling(current.id, input.title);
+      await requireOffice(env).checkFiling(chat.id, input.title);
     }
 
-    const parentKey = input.parent ?? (chat || input.related ? undefined : current?.ticketKey);
-    const parent = parentKey ? await tracker.getIssue(parentKey) : undefined;
-    const partOf = parent ? `Part of ${parent.key}: ${tracker.links.issue(parent.key)}` : undefined;
+    const parent = await parentIssue(tracker, input, current, !!chat);
+    const assignee = await assigneeFor(env, tracker, input, !!chat);
+    const files = chatFiles(env, !!chat);
+    const issue = await tracker.createIssue(
+      newIssue(tracker, input, { parent, assignee, files, chat: !!chat }),
+    );
 
-    // A chat ticket is the chat session's own work; any other ticket belongs to nobody until it is given.
-    const handle = env.team.people.find((p) => p.handle === env.person)?.identities?.tracker;
-    const assignee = chat
-      ? handle
-        ? (await tracker.members()).find((m) => m.id === handle || m.username === handle)
-        : undefined
-      : input.assignee
-        ? await memberFor(env, tracker, input.assignee)
-        : undefined;
-
-    // The files of the chat message go with the ticket; the body says where they are.
-    const files = chat ? (env.attachments ?? []) : [];
-    const described = files.length ? attachmentsSection(files, canAttach(tracker)) : "";
-    const text = [partOf, input.body, described].filter(Boolean).join("\n\n").trimEnd();
-    const created = await tracker.createIssue({
-      title: input.title,
-      body: text,
-      status: input.status ?? (chat ? "ready" : "backlog"),
-      ...(assignee ? { assignee: assignee.id } : {}),
-      ...(parent && tracker.setParent ? { parent: parent.key } : {}),
-    });
-
-    // The real parent went in with the ticket where the tracker has one; otherwise a "relates" link.
-    const issue = created;
-    let parentLine: string | undefined;
-    if (parent && tracker.setParent) {
-      parentLine = `Parent: ${parent.key}.`;
-    } else if (parent) {
-      await tracker.link(issue.key, parent.key, "relates").catch((error: unknown) => {
-        if (!(error instanceof PortError)) {
-          throw error;
-        }
-      });
-
-      parentLine = `Related to ${parent.key} (this tracker has no parent field).`;
-    }
-
-    if (input.related) {
-      await tracker.link(issue.key, input.related, "relates").catch((error: unknown) => {
-        if (!(error instanceof PortError)) {
-          throw error;
-        }
-      });
-    }
-
+    const parentLine = await linkParent(tracker, issue.key, parent);
+    await linkRelated(tracker, issue.key, input.related);
     const uploaded = await uploadAttachments(env, issue.key, files);
-    if (uploaded.failed.length) {
-      // The body says they are attached; say here that they are not.
-      await tracker
-        .comment(
-          issue.key,
-          `These files could not be attached and stayed in chat: ${uploaded.failed.map((f) => f.name).join(", ")}.`,
-        )
-        .catch(() => {});
-    }
-
+    await noteFailedUploads(tracker, issue.key, uploaded);
     const url = tracker.links.issue(issue.key);
     const filed = chat
-      ? await requireOffice(env).linkTicket(current.id, issue.key, input.title)
+      ? await requireOffice(env).linkTicket(chat.id, issue.key, input.title)
       : undefined;
 
     return result(
@@ -128,9 +85,7 @@ export const ticketCreate = defineVerb({
         `Created ${issue.key}.`,
         ...summary(issue, url),
         ...uploadedLines(uploaded),
-        ...(parentLine ? [parentLine] : []),
-        ...(filed ? [filedLine(filed)] : []),
-        ...(!chat && current ? [`Name ${issue.key} in your hand-back.`] : []),
+        ...closingLines(issue.key, parentLine, filed, !chat && !!current),
       ],
       { issue, ...(filed ? { filed } : {}) },
       [url],

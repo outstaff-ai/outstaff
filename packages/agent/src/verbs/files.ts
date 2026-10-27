@@ -1,6 +1,6 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
-import { PortError, evaluate } from "@outstaff/core";
+import { PortError, evaluate, type Policy } from "@outstaff/core";
 import { safeId } from "../repos/workspaces.js";
 import type { AgentEnv, VerbContext } from "./types.js";
 
@@ -72,6 +72,29 @@ export function readInputBytes(
   }
 }
 
+/** Whether the call has the worktree it needs: always, unless a worktree is required and there is none. */
+const hasWorkdir = (ctx: VerbContext, needCwd: boolean) => !needCwd || !!ctx.cwd;
+
+/** The item's scratch directory, or the person's when the call belongs to no item. */
+function scratchDirOf(scratchDir: string, ctx: VerbContext): string {
+  return ctx.workItemId ? join(scratchDir, safeId(ctx.workItemId)) : scratchDir;
+}
+
+/** Whether `target` is under the worktree or the scratch directory, both resolved through symlinks. */
+function underRoots(roots: (string | undefined)[], target: string): boolean {
+  return roots
+    .filter((r): r is string => !!r)
+    .map((r) => real(r) ?? r)
+    .some((r) => inside(r, target));
+}
+
+/** Whether the Policy lets the Read tool read every one of `paths`. */
+function readAllowed(policy: Policy, paths: Set<string>, cwd: string): boolean {
+  return [...paths].every(
+    (p) => evaluate(policy, { kind: "read", path: p, cwd }).effect === "allow",
+  );
+}
+
 function checkedPath(
   env: AgentEnv,
   ctx: VerbContext,
@@ -83,14 +106,12 @@ function checkedPath(
     throw new PortError("invalid", `Refusing to read ${what} ${path}: ${why}`);
   };
 
-  if (!env.policy || !env.layout || (needCwd && !ctx.cwd)) {
+  const { policy, layout } = env;
+  if (!policy || !layout || !hasWorkdir(ctx, needCwd)) {
     return refuse("reading files is not available here; pass the text inline instead.");
   }
 
-  const scratch = ctx.workItemId
-    ? join(env.layout.scratchDir, safeId(ctx.workItemId))
-    : env.layout.scratchDir;
-
+  const scratch = scratchDirOf(layout.scratchDir, ctx);
   const base = ctx.cwd ?? scratch;
   const named = resolve(base, path);
   const target = real(named);
@@ -98,16 +119,12 @@ function checkedPath(
     return refuse("no such file.");
   }
 
-  const roots = [ctx.cwd, scratch].filter((r): r is string => !!r).map((r) => real(r) ?? r);
-  if (!roots.some((r) => inside(r, target))) {
+  if (!underRoots([ctx.cwd, scratch], target)) {
     return refuse("it is outside the worktree and the scratch directory of this item.");
   }
 
-  for (const p of new Set([named, target])) {
-    const decision = evaluate(env.policy, { kind: "read", path: p, cwd: base });
-    if (decision.effect !== "allow") {
-      return refuse("the read policy does not allow it.");
-    }
+  if (!readAllowed(policy, new Set([named, target]), base)) {
+    return refuse("the read policy does not allow it.");
   }
 
   return target;

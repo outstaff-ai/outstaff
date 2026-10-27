@@ -4,6 +4,51 @@ import { defineCommand } from "../define.js";
 import { EJECTABLE, badCatalogPath, baseFile, tryIndex } from "../ejected.js";
 import { unifiedDiff } from "../merge.js";
 import { openTeam } from "../open-team.js";
+import type { Context } from "../types.js";
+
+type Change = { path: string; status: "modified" | "deleted"; diff: string };
+
+/** The path argument without a leading `./` or trailing slashes; "" for every ejected file. */
+const normalizePath = (arg: string | undefined): string =>
+  (arg ?? "").replace(/^\.\//, "").replace(/\/+$/, "");
+
+/** Whether `want` is neither a catalog path nor an ejectable folder. */
+const isInvalidPath = (dir: string, want: string): boolean =>
+  want !== "" &&
+  Boolean(badCatalogPath(dir, want.replace(/\.md$/, ""))) &&
+  !EJECTABLE.includes(want as never);
+
+/** Whether the ejected file `p` is `want`, lies below it, or is its `.md` file. */
+const isSelected = (p: string, want: string): boolean =>
+  want === "" || p === want || p.startsWith(`${want}/`) || p === `${want}.md`;
+
+/** How one ejected file differs from its base; undefined when it has no base or no changes. */
+function changeOf(ctx: Context, dir: string, p: string): Change | undefined {
+  if (!existsSync(baseFile(dir, p))) {
+    ctx.err(`warning  ${p}: no stored base under .base/; cannot diff.\n`);
+    return undefined;
+  }
+
+  const base = readFileSync(baseFile(dir, p), "utf8");
+  if (!existsSync(join(dir, p))) {
+    return { path: p, status: "deleted", diff: unifiedDiff(p, base, "") };
+  }
+
+  const d = unifiedDiff(p, base, readFileSync(join(dir, p), "utf8"));
+  return d ? { path: p, status: "modified", diff: d } : undefined;
+}
+
+function printChanges(ctx: Context, changes: Change[]): void {
+  if (!changes.length) {
+    ctx.out("No changes against the recorded bases.\n");
+    return;
+  }
+
+  for (const c of changes) {
+    ctx.out(c.status === "deleted" ? `# ${c.path}: deleted\n` : "");
+    ctx.out(c.diff.endsWith("\n") ? c.diff : `${c.diff}\n`);
+  }
+}
 
 export const diff = defineCommand({
   name: "diff",
@@ -29,20 +74,13 @@ export const diff = defineCommand({
       return 1;
     }
 
-    const want = (args[0] ?? "").replace(/^\.\//, "").replace(/\/+$/, "");
-    if (
-      want !== "" &&
-      badCatalogPath(dir, want.replace(/\.md$/, "")) &&
-      !EJECTABLE.includes(want as never)
-    ) {
+    const want = normalizePath(args[0]);
+    if (isInvalidPath(dir, want)) {
       ctx.err(`error    Invalid path "${want}".\n`);
       return 1;
     }
 
-    const paths = Object.keys(index).filter(
-      (p) => want === "" || p === want || p.startsWith(`${want}/`) || p === `${want}.md`,
-    );
-
+    const paths = Object.keys(index).filter((p) => isSelected(p, want));
     if (!paths.length) {
       ctx.err(
         want === ""
@@ -53,37 +91,11 @@ export const diff = defineCommand({
       return 1;
     }
 
-    const changes: { path: string; status: "modified" | "deleted"; diff: string }[] = [];
-    for (const p of paths) {
-      const base = existsSync(baseFile(dir, p))
-        ? readFileSync(baseFile(dir, p), "utf8")
-        : undefined;
-
-      if (base === undefined) {
-        ctx.err(`warning  ${p}: no stored base under .base/; cannot diff.\n`);
-        continue;
-      }
-
-      if (!existsSync(join(dir, p))) {
-        changes.push({ path: p, status: "deleted", diff: unifiedDiff(p, base, "") });
-        continue;
-      }
-
-      const d = unifiedDiff(p, base, readFileSync(join(dir, p), "utf8"));
-      if (d) {
-        changes.push({ path: p, status: "modified", diff: d });
-      }
-    }
-
+    const changes = paths.flatMap((p) => changeOf(ctx, dir, p) ?? []);
     if (options.json) {
       ctx.out(`${JSON.stringify({ changes }, null, 2)}\n`);
-    } else if (!changes.length) {
-      ctx.out("No changes against the recorded bases.\n");
     } else {
-      for (const c of changes) {
-        ctx.out(c.status === "deleted" ? `# ${c.path}: deleted\n` : "");
-        ctx.out(c.diff.endsWith("\n") ? c.diff : `${c.diff}\n`);
-      }
+      printChanges(ctx, changes);
     }
 
     return 0;
