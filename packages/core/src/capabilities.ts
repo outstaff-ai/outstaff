@@ -19,6 +19,7 @@ export const CAPABILITIES = [
   "chat.files",
   "runtime.sessions",
   "runtime.usage",
+  "runtime.permissions",
   "avatars.generate",
   "design.canvas",
 ] as const;
@@ -42,6 +43,7 @@ export const CAPABILITY_PORT: Record<Capability, AdapterPort> = {
   "chat.files": "chat",
   "runtime.sessions": "runtime",
   "runtime.usage": "runtime",
+  "runtime.permissions": "runtime",
   "avatars.generate": "avatars",
   "design.canvas": "runtime",
 };

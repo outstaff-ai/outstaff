@@ -61,6 +61,9 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 # ---------------------------------------------------------------- agent
 FROM base AS agent
 ARG BUBBLEWRAP_VERSION=0.8.0-2+deb12u1
+# The runtime adapters this image carries, space-separated; a person's runtime (people[].runtime, else
+# integrations.runtime) must be one of them. `ost-agent --runtimes` prints the same list, and the smoke test compares them.
+LABEL work.outstaff.runtimes="claude-agent-sdk"
 ARG SOCAT_VERSION=1.7.4.4-2
 # Claude Code runs each of the agent's commands in a bubblewrap sandbox (user and PID namespaces, a fresh /proc) so
 # they cannot read its credential; it needs socat for that sandbox too. bwrap must not be setuid: it works through an
@@ -109,6 +112,8 @@ RUN pnpm --filter @outstaff/runtime-scripted... run build \
  && pnpm --filter @outstaff/runtime-scripted deploy --prod /out/e2e
 
 FROM agent AS agent-e2e
+# Its CMD, the e2e bin, carries the scripted runtime too; `ost-agent --runtimes` here still lists the agent's own.
+LABEL work.outstaff.runtimes="claude-agent-sdk scripted"
 COPY --from=builder-e2e /out/e2e /opt/outstaff-e2e
 # The developer toolset's pnpm, installed now because the test downloads nothing at start. The agent still writes
 # the global mise config at start, which is what makes the shim work in the worktree.

@@ -32,7 +32,7 @@ The tool belongs to Claude Code and is withheld unless all of these hold:
 - **Claude Code 2.1.281 or newer.** The `claude-agent-sdk` adapter pins a build that is new enough.
 - **The account's organisation allows artifacts.** An administrator can switch them off.
 
-`ost doctor <handle>` reports the login for a person whose role has the capability: ok with the token, a warning with anything else. It reads which credential is set; it cannot tell whether the plan or the organisation allows artifacts. `ost validate` cannot see credentials, so it warns only when a role declares the capability and the configured runtime adapter does not provide `design.canvas`.
+`ost doctor <handle>` reports the login for a person whose role has the capability: ok with the token, a warning with anything else. It reads which credential is set; it cannot tell whether the plan or the organisation allows artifacts. `ost validate` cannot see credentials, so it warns only when a role declares the capability and the runtime that person runs on (their own `runtime`, else the team's) does not provide `design.canvas`. The agent leaves the canvas off for such a person.
 
 ## Where canvases live
 

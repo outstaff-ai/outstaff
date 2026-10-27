@@ -6,7 +6,7 @@ import type { Clock } from "#/types.js";
 
 export interface UsageTrackerOptions {
   store: Pick<Store, "upsertSubject" | "getSubject">;
-  team: Pick<TeamConfig, "policies" | "people">;
+  team: Pick<TeamConfig, "policies" | "people" | "integrations">;
   clock: Clock;
   logger?: Logger;
 

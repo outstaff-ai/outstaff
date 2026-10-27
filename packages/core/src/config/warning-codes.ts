@@ -12,4 +12,5 @@ export const WARNING_CODES = {
   identityTrackerEmpty: "identities.tracker_empty",
   policyCapabilityMissing: "policies.capability_missing",
   policyMergeWithoutChecks: "policies.merge_without_checks",
+  peopleRuntimeWithoutUsage: "people.runtime_without_usage",
 } as const;

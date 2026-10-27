@@ -154,7 +154,7 @@ function requireSandbox(): void {
 export const claudeAgentSdk = defineAdapter({
   port: "runtime",
   name: "claude-agent-sdk",
-  capabilities: ["runtime.sessions", "runtime.usage", "design.canvas"],
+  capabilities: ["runtime.sessions", "runtime.usage", "runtime.permissions", "design.canvas"],
   options: agentSdkOptions,
   secrets: () => secrets,
   setupGuide,

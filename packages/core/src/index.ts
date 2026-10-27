@@ -15,6 +15,7 @@ export {
 } from "./config/adapters.js";
 
 export { loadTeamConfig, formatIssue } from "./config/load.js";
+export { integrationsFor, runtimeOf, teamFor } from "./config/runtime-of.js";
 export { CAPABILITIES, CAPABILITY_PORT } from "./capabilities.js";
 export type { Capability } from "./types.js";
 export { validateTeam } from "./config/validate.js";

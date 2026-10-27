@@ -107,15 +107,15 @@ Repos
   docs-site      other     github.com/acme-example/docs-site      main
 
 People
-  HANDLE  NAME         ROLE                 MODEL    GRANTS
-  priya   Priya Raman  pm                   default  *:read, docs-site:write
-  tomas   Tomas Novak  product              default  *:read, docs-site:write
-  mira    Mira Okafor  architect+developer  default  shop:write, kind:baseline:read
-  leo     Leo Fischer  designer             default  none
-  sam     Sam Duarte   developer            default  shop:write, kind:baseline:read
-  noor    Noor Haddad  developer            default  shop:write, kind:baseline:read
-  ines    Ines Varga   reviewer             default  *:read
-  kofi    Kofi Mensah  devops               default  infra:write, shop:read
+  HANDLE  NAME         ROLE                 RUNTIME           MODEL    GRANTS
+  priya   Priya Raman  pm                   claude-agent-sdk  default  *:read, docs-site:write
+  tomas   Tomas Novak  product              claude-agent-sdk  default  *:read, docs-site:write
+  mira    Mira Okafor  architect+developer  claude-agent-sdk  default  shop:write, kind:baseline:read
+  leo     Leo Fischer  designer             claude-agent-sdk  default  none
+  sam     Sam Duarte   developer            claude-agent-sdk  default  shop:write, kind:baseline:read
+  noor    Noor Haddad  developer            claude-agent-sdk  default  shop:write, kind:baseline:read
+  ines    Ines Varga   reviewer             claude-agent-sdk  default  *:read
+  kofi    Kofi Mensah  devops               claude-agent-sdk  default  infra:write, shop:read
 
 Integrations
   PORT       ADAPTER

@@ -248,7 +248,9 @@ integrations:
     adapter: github
     apiUrl: http://github.acme.example:8081/api/v3
     webUrl: https://github.acme.example
-  runtime: { adapter: scripted }
+  # The team's default runtime; sam runs on the scripted one of their own (people[].runtime), which only this
+  # image carries, so the agent picking it proves the per-person choice.
+  runtime: { adapter: claude-agent-sdk }
   tracker:
     adapter: itsaplan
     url: http://tracker.acme.example:8081/tracker
@@ -314,10 +316,11 @@ function hire() {
     }
 
     const text = readFileSync(file, "utf8");
-    // Sam may also reach the stub's two services: the hub with no authentication, the home service with a token.
+    // Sam runs on the scripted runtime and may also reach the stub's two services: the hub with no authentication,
+    // the home service with a token.
     const network =
       p.handle === "sam"
-        ? `    network:\n      http:\n        - { name: hub, url: "http://hub.acme.example:8081" }\n        - { name: home, url: "http://home.acme.example:8081", token: E2E_HOME_TOKEN }\n`
+        ? `    runtime: { adapter: scripted }\n    network:\n      http:\n        - { name: hub, url: "http://hub.acme.example:8081" }\n        - { name: home, url: "http://home.acme.example:8081", token: E2E_HOME_TOKEN }\n`
         : "";
 
     const patched = text.replace(
@@ -397,7 +400,11 @@ async function startStack() {
     throw new Error("The agent never connected to the office.");
   }
 
-  step("agent: sam connected to the office");
+  if (!/runtime selected {"person":"sam","runtime":"scripted"/.test(logs("sam"))) {
+    throw new Error("sam did not start on its own runtime (people[].runtime: scripted).");
+  }
+
+  step("agent: sam connected to the office, on its own runtime");
 }
 
 async function main() {

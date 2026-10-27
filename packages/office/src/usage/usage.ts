@@ -1,4 +1,4 @@
-import { silentLogger, type TeamConfig } from "@outstaff/core";
+import { runtimeOf, silentLogger, type TeamConfig } from "@outstaff/core";
 import type { UsageWindowReport } from "@outstaff/protocol";
 import { peakWindow } from "#/scheduler/policy.js";
 import type { UsageTracker, UsageTrackerOptions } from "./types.js";
@@ -14,12 +14,22 @@ interface UsageRecord {
   via?: string;
 }
 
-/** The people whose limit is the same as `person`'s, the person included. */
+/**
+ * The people whose limit is the same as `person`'s, the person included: their `policies.usage.shared` group, kept to
+ * the members on the person's runtime, since a group shares one credential and a credential belongs to one runtime.
+ */
 export function usageGroupOf(
-  team: Pick<TeamConfig, "policies">,
+  team: Pick<TeamConfig, "policies" | "people" | "integrations">,
   person: string,
 ): readonly string[] {
-  return team.policies?.usage?.shared?.find((g) => g.includes(person)) ?? [person];
+  const group = team.policies?.usage?.shared?.find((g) => g.includes(person));
+  if (!group) {
+    return [person];
+  }
+
+  const runtimes = new Map(team.people.map((p) => [p.handle, runtimeOf(team, p).adapter]));
+  const mine = runtimes.get(person);
+  return group.filter((member) => runtimes.get(member) === mine);
 }
 
 export function createUsageTracker(opts: UsageTrackerOptions): UsageTracker {

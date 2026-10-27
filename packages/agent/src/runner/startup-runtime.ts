@@ -1,18 +1,12 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { grantTokenKeys, networkGrants, type RenderedWorkdir, type Runtime } from "@outstaff/core";
-import { StartupError } from "./startup-error.js";
+import { selectRuntime } from "./runtime-select.js";
 import type { RuntimeAdapter, StartupContext } from "./startup.types.js";
 
-/** The runtime adapter the team names; one this build does not have is a startup error. */
-export function runtimeAdapter({ opts, team }: StartupContext): RuntimeAdapter {
-  const adapter = team.integrations.runtime.adapter;
-  const def = opts.registry.get("runtime", adapter);
-  if (!def) {
-    throw new StartupError(`The runtime adapter "${adapter}" is not installed in this build.`);
-  }
-
-  return def;
+/** The runtime adapter the person runs on; one this build does not have or that cannot enforce a policy is a startup error. */
+export function runtimeAdapter({ opts, team, me }: StartupContext): RuntimeAdapter {
+  return selectRuntime(opts.registry, team, me).def;
 }
 
 /** Writes the rendered working files, laid out the way the runtime expects them. */

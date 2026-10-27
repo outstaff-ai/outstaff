@@ -14,6 +14,7 @@ import { workflowSchema } from "./workflow-schema.js";
 import { linkSchema } from "./link.js";
 import { pipelineSchema } from "./pipeline.js";
 import { checkWorkflowConfig } from "#/workflow/validate.js";
+import { usageSharedIssues } from "./usage-shared.js";
 
 const GRANT_KEY = /^(\*|kind:(primary|baseline|infra|other)|[a-z][a-z0-9-]*)$/;
 
@@ -199,32 +200,9 @@ export const teamConfigSchema = z
       }
     });
 
-    const handles = new Set(cfg.people.map((p) => p.handle));
-    const grouped = new Set<string>();
-    cfg.policies?.usage.shared?.forEach((group, g) => {
-      group.forEach((handle, n) => {
-        const path = ["policies", "usage", "shared", g, n];
-        if (!handles.has(handle)) {
-          ctx.addIssue(
-            customIssue(
-              CONFIG_CODES.usageSharedUnknownPerson,
-              `Usage group refers to unknown person "${handle}".`,
-              path,
-            ),
-          );
-        } else if (grouped.has(handle)) {
-          ctx.addIssue(
-            customIssue(
-              CONFIG_CODES.usageSharedOverlap,
-              `"${handle}" is in more than one usage group (or twice in one); a person has one subscription.`,
-              path,
-            ),
-          );
-        }
-
-        grouped.add(handle);
-      });
-    });
+    for (const issue of usageSharedIssues(cfg)) {
+      ctx.addIssue(issue);
+    }
 
     const seenHandles = new Map<string, number>();
     cfg.people.forEach((p, i) => {

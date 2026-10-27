@@ -60,7 +60,7 @@ export async function checkScope(
     team,
     scope,
     ...(person ? { person } : {}),
-    adapters: configuredAdapters(team, registry, scope),
+    adapters: configuredAdapters(team, registry, scope, person),
     secrets,
     dir,
     handle,

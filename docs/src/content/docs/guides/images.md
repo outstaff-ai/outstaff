@@ -5,10 +5,21 @@ description: What the agent and office images contain, how tools get into an age
 
 Outstaff publishes two images to `ghcr.io/outstaff-ai`, for `linux/amd64` and `linux/arm64`. There is one Dockerfile, `images/Dockerfile`, with one target per image. Both targets share the builder stage and the pinned base. The office image contains only Node, tini, CA certificates, git (for `OUTSTAFF_TEAM_REPO`) and the office bundle: no mise, `gh` or Claude Code. Agents use `ost pr` for pull requests, so no GitHub CLI is shipped. Each release tag `vX.Y.Z` publishes `:X.Y.Z` of both; `:latest` moves only for releases without a prerelease part. Pin the version in your own setup.
 
-| Image                        | Run as            | Contains                                                                                                               |
-| ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `ghcr.io/outstaff-ai/office` | `outstaff-office` | Node, tini, CA certificates, git (to read a team config from a repository) and the office bundle. Health on port 8081. |
-| `ghcr.io/outstaff-ai/agent`  | `ost-agent`       | The agent, the `ost` CLI, the stock catalog, git, [mise](https://mise.jdx.dev) and the Claude Code binary.             |
+| Image                        | Run as            | Contains                                                                                                                                 |
+| ---------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `ghcr.io/outstaff-ai/office` | `outstaff-office` | Node, tini, CA certificates, git (to read a team config from a repository) and the office bundle. Health on port 8081.                   |
+| `ghcr.io/outstaff-ai/agent`  | `ost-agent`       | The agent, the `ost` CLI, the stock catalog, git, [mise](https://mise.jdx.dev) and the Claude Code binary. Runtimes: `claude-agent-sdk`. |
+
+## Runtimes an image carries
+
+An agent runs on the runtime adapter its person names (`people[].runtime`, else `integrations.runtime`), and that adapter has to be in the image: it is code, not configuration. The `agent` image carries `claude-agent-sdk`. Each agent image lists its runtimes in the label `work.outstaff.runtimes` (space-separated), and `ost-agent --runtimes` prints the same list, one per line:
+
+```sh
+docker image inspect -f '{{ index .Config.Labels "work.outstaff.runtimes" }}' ghcr.io/outstaff-ai/agent:1.2.3
+docker run --rm ghcr.io/outstaff-ai/agent:1.2.3 ost-agent --runtimes
+```
+
+An agent whose person names a runtime the image does not carry stops at start with an error that names the person and lists what the image carries. See [Runtimes](/guides/runtimes/).
 
 ## Tools come from the toolsets
 
@@ -25,6 +36,7 @@ If you want instant starts, or a machine without outbound access to the tool hos
 - **No secrets inside.** Secrets come from files under `/run/secrets/outstaff`, or from the environment as a fallback ([0008](/decisions/0008-hosting-and-secrets-out-of-scope/)).
 - **Health.** The office image has a `HEALTHCHECK` that calls `/healthz` on `OUTSTAFF_HEALTH_PORT` (default 8081). Use `/readyz` for readiness. The agent has no port; it exits when the office rejects it, so let your platform restart it.
 - **Versions.** `ost-agent --version`, `ost --version` and `outstaff-office --version` print the package version.
+- **Runtimes.** `ost-agent --runtimes` prints the runtime adapters the agent image carries, the same list as its `work.outstaff.runtimes` label.
 
 ## Extending an image
 
@@ -73,4 +85,4 @@ docker build -f images/Dockerfile --target office -t outstaff/office:dev .
 images/smoke.sh outstaff dev
 ```
 
-`images/smoke.sh` starts each image with a read-only root, checks the version commands (including `mise --version`), installs pnpm and yarn from the code toolset with mise and runs `pnpm --version` and `yarn --version` in an unrelated directory (this needs egress to the tool sources), and starts the office on SQLite with a minimal team file until its health check passes. The `Images` workflow does the same on every pull request and in the merge queue, for both architectures, and publishes on `v*` tags.
+`images/smoke.sh` starts each image with a read-only root, checks the version commands (including `mise --version`), checks that the agent's `work.outstaff.runtimes` label matches `ost-agent --runtimes`, installs pnpm and yarn from the code toolset with mise and runs `pnpm --version` and `yarn --version` in an unrelated directory (this needs egress to the tool sources), and starts the office on SQLite with a minimal team file until its health check passes. The `Images` workflow does the same on every pull request and in the merge queue, for both architectures, and publishes on `v*` tags.

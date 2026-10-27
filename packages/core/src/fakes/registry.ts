@@ -64,7 +64,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "runtime",
         name: "fake",
-        capabilities: ["runtime.sessions", "runtime.usage"],
+        capabilities: ["runtime.sessions", "runtime.usage", "runtime.permissions"],
         options,
         secrets: none,
         create: () => createFakeRuntime(),

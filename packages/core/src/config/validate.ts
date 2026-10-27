@@ -12,6 +12,7 @@ import type {
 import { adapterKey } from "./validate-capabilities.js";
 import { personErrors, personWarnings } from "./validate-people.js";
 import { idleSwitches, mergesWithoutChecks } from "./validate-policies.js";
+import { runtimeReport } from "./validate-runtime.js";
 import type { TeamCheck } from "./validate.types.js";
 import { WARNING_CODES } from "./warning-codes.js";
 
@@ -25,12 +26,14 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
     checkRoles: ctx.roles.size > 0,
   };
 
+  const runtimes = runtimeReport(config, ctx);
   return {
     errors: [
       ...adapters.errors,
       ...unknownRoles(c),
       ...reservedTokens(c),
       ...config.people.flatMap((person, i) => personErrors(c, person, i)),
+      ...runtimes.errors,
     ],
     warnings: [
       ...config.people.flatMap((person, i) => personWarnings(c, person, i)),
@@ -38,11 +41,15 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       ...mergesWithoutChecks(config),
       ...defaultTrust(config),
       ...identityWarnings(c),
+      ...runtimes.warnings,
     ],
   };
 }
 
-/** Capabilities provided by the adapters the team actually configured, and the adapters not installed. */
+/**
+ * Capabilities provided by the adapters the team actually configured, and the adapters not installed. Runtime
+ * capabilities are each person's own (see validate-runtime).
+ */
 function configuredAdapters(
   config: TeamConfig,
   ctx: ValidationContext,

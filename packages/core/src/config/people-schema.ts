@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { toolsSchema } from "#/permissions/schema.js";
+import { adapterRefSchema } from "./integrations-schema.js";
 import { networkSchema } from "./network.js";
 import { d, SLUG } from "./schema-meta.js";
 
@@ -40,6 +41,13 @@ export const peopleSchema = z
       .min(1)
       .optional()
       .meta(d("LLM model for this agent; the runtime adapter's default when omitted.")),
+    runtime: adapterRefSchema
+      .optional()
+      .meta(
+        d(
+          "Runtime adapter for this agent, in the same shape as integrations.runtime: `adapter` and that adapter's options. It replaces the team's runtime for this agent as a whole (options are not merged); integrations.runtime when omitted.",
+        ),
+      ),
     identities: z
       .strictObject({
         vcs: z
