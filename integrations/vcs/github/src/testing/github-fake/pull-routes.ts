@@ -1,9 +1,57 @@
 import { actorOf } from "./requests.js";
-import type { FakeState, Route, StoredPull } from "../types.js";
+import type {
+  FakeState,
+  Route,
+  StoredCheckRun,
+  StoredPull,
+  StubReply,
+  StubRequest,
+} from "../types.js";
+
+/** Whether the request asks for a merge the repository's settings allow. */
+function methodAllowed(s: FakeState, r: StubRequest, queue: boolean): boolean {
+  return queue
+    ? r.json.merge_action === "merge_queue" && s.mergeSettings.queue
+    : s.mergeSettings.methods.includes(r.json.merge_method);
+}
+
+/** A required check that has not passed (yet). */
+const isOpenRequired = (pr: StoredPull, c: StoredCheckRun): boolean =>
+  Boolean(pr.required?.has(c.name)) && (c.status !== "completed" || c.conclusion !== "success");
+
+/** Why GitHub refuses to merge the pull request; undefined when it merges. */
+function mergeRefusal(
+  s: FakeState,
+  pr: StoredPull,
+  r: StubRequest,
+  queue: boolean,
+): StubReply | undefined {
+  if (pr.state !== "open") {
+    return { status: 405, body: { message: "Pull Request is not mergeable" } };
+  }
+
+  if (r.json.sha !== pr.head.sha) {
+    return {
+      status: 409,
+      body: { message: "Head branch was modified. Review and try the merge again." },
+    };
+  }
+
+  if (!methodAllowed(s, r, queue)) {
+    return { status: 405, body: { message: "Merge method not allowed" } };
+  }
+
+  const open = (s.checks.get(pr.head.sha) ?? []).filter((c) => isOpenRequired(pr, c));
+  if (pr.draft || open.length > 0 || pr.mergeable[0] === "conflicting") {
+    return { status: 405, body: { message: "Required status check is expected." } };
+  }
+
+  return undefined;
+}
 
 /** Listing, reading the repository of, merging, opening and editing pull requests. */
 export function pullRoutes(s: FakeState): Route[] {
-  const { repo, counters: n, prs, checks, emit, rest, touch, prPayload, clockIso } = s;
+  const { repo, counters: n, prs, emit, rest, touch, prPayload, clockIso } = s;
   return [
     {
       method: "GET",
@@ -36,33 +84,10 @@ export function pullRoutes(s: FakeState): Route[] {
           return { status: 404, body: { message: "Not Found" } };
         }
 
-        if (pr.state !== "open") {
-          return { status: 405, body: { message: "Pull Request is not mergeable" } };
-        }
-
-        if (r.json.sha !== pr.head.sha) {
-          return {
-            status: 409,
-            body: { message: "Head branch was modified. Review and try the merge again." },
-          };
-        }
-
         const queue = kind === "merge-async";
-        const allowed = queue
-          ? r.json.merge_action === "merge_queue" && s.mergeSettings.queue
-          : s.mergeSettings.methods.includes(r.json.merge_method);
-
-        if (!allowed) {
-          return { status: 405, body: { message: "Merge method not allowed" } };
-        }
-
-        const open = (checks.get(pr.head.sha) ?? []).filter(
-          (c) =>
-            pr.required?.has(c.name) && (c.status !== "completed" || c.conclusion !== "success"),
-        );
-
-        if (pr.draft || open.length > 0 || pr.mergeable[0] === "conflicting") {
-          return { status: 405, body: { message: "Required status check is expected." } };
+        const refusal = mergeRefusal(s, pr, r, queue);
+        if (refusal) {
+          return refusal;
         }
 
         if (queue) {

@@ -54,16 +54,14 @@ function callOf(a: Action): ToolCall {
   }
 }
 
-const nameOf = (a: Action) =>
-  a.type === "tool"
-    ? a.tool
-    : a.type === "shell"
-      ? "Bash"
-      : a.type === "write"
-        ? "Write"
-        : a.type === "gate"
-          ? "Gate"
-          : "Read";
+const NAMES: Record<Exclude<Action["type"], "tool">, string> = {
+  shell: "Bash",
+  write: "Write",
+  read: "Read",
+  gate: "Gate",
+};
+
+const nameOf = (a: Action) => (a.type === "tool" ? a.tool : NAMES[a.type]);
 
 /** Holds the round while the driver keeps the gate closed (see e2e/stubs/chat.ts). Open unless it was closed. */
 async function waitAtGate(name: string, signal?: AbortSignal): Promise<void> {
@@ -76,6 +74,104 @@ async function waitAtGate(name: string, signal?: AbortSignal): Promise<void> {
 
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
+}
+
+type Step = IteratorResult<Action, string>;
+
+/** One round of a script: the request it answers, the script's steps, and the result of its last step. */
+interface Round {
+  req: RunRequest;
+  tools: Map<string, RunRequest["tools"][number]>;
+  steps: AsyncGenerator<Action, string, string>;
+  log: Logger;
+  last: string;
+}
+
+async function runTool(action: Extract<Action, { type: "tool" }>, round: Round): Promise<string> {
+  const tool = round.tools.get(action.tool);
+  if (!tool) {
+    throw new Error(`No tool ${action.tool}.`);
+  }
+
+  return tool.handler(
+    tool.input.parse(action.input),
+    round.req.workItemId ? { workItemId: round.req.workItemId } : {},
+  );
+}
+
+/** Carries out an allowed action and returns its output. */
+async function perform(action: Exclude<Action, { type: "gate" }>, round: Round): Promise<string> {
+  switch (action.type) {
+    case "tool":
+      return runTool(action, round);
+    case "shell":
+      return sh(action.command, action.cwd);
+    case "write":
+      mkdirSync(dirname(action.path), { recursive: true });
+      writeFileSync(action.path, action.text);
+      return "";
+    case "read":
+      return readFileSync(action.path, "utf8");
+  }
+}
+
+/** Waits at the gate; undefined when the agent is shutting down meanwhile, after saying the round was interrupted. */
+async function* passGate(
+  action: Extract<Action, { type: "gate" }>,
+  round: Round,
+): AsyncGenerator<RuntimeEvent, Step | undefined> {
+  await waitAtGate(action.name, round.req.signal);
+  // The agent is shutting down: the round stops here, as the real runtime does when it is interrupted.
+  if (round.req.signal?.aborted) {
+    yield { type: "finished", ok: false, text: round.last, interrupted: true };
+    return undefined;
+  }
+
+  return await round.steps.next("");
+}
+
+/** Judges the action with the policy, runs it when allowed and returns the script's next step. */
+async function* playAction(
+  action: Action,
+  round: Round,
+): AsyncGenerator<RuntimeEvent, Step | undefined> {
+  if (action.type === "gate") {
+    return yield* passGate(action, round);
+  }
+
+  const decision: Decision = evaluate(round.req.policy, callOf(action));
+  yield { type: "tool_call", tool: nameOf(action), input: action, decision };
+  if (decision.effect !== "allow") {
+    // Thrown into the script, which may expect it (a step that must be denied); otherwise the script fails.
+    return await round.steps.throw(
+      new Error(`${nameOf(action)} was denied by the policy: ${decision.reason}`),
+    );
+  }
+
+  let out: string;
+  try {
+    out = await perform(action, round);
+  } catch (e) {
+    // A script may expect a step to fail (a rebase that stops on a conflict).
+    round.log.info("step failed", { step: nameOf(action), error: String(e) });
+    return await round.steps.throw(e);
+  }
+
+  round.last = out;
+  return await round.steps.next(out);
+}
+
+/** Plays the script to its end and returns its last message; undefined when the round was interrupted. */
+async function* playScript(round: Round): AsyncGenerator<RuntimeEvent, string | undefined> {
+  let step: Step | undefined = await round.steps.next();
+  while (!step.done) {
+    step = yield* playAction(step.value, round);
+    if (!step) {
+      return undefined;
+    }
+  }
+
+  return step.value;
 }
 
 export interface ScriptedConfig {
@@ -93,6 +189,50 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
   // What a model would remember: the conversation of each chat session, which a resumed prompt does not repeat.
   const talks = new Map<string, NonNullable<ItemContext["conversation"]>>();
 
+  /** Keeps the conversation of a chat session, and gives a resumed prompt the one it does not repeat. */
+  function recall(session: string, ctx: ItemContext | undefined, prompt: string): void {
+    if (ctx?.kind !== "chat") {
+      return;
+    }
+
+    if (ctx.conversation) {
+      talks.set(session, [...ctx.conversation]);
+      return;
+    }
+
+    const known = talks.get(session);
+    const latest = [...prompt.matchAll(/asked in chat \(thread [^)]*\):\n([^\n]*)/g)].at(-1)?.[1];
+    if (known && latest) {
+      known.push({ from: "human", agent: false, text: latest });
+      ctx.conversation = [...known];
+    }
+  }
+
+  async function* playRound(
+    round: Round,
+    ctx: ItemContext,
+    session: string,
+  ): AsyncGenerator<RuntimeEvent> {
+    try {
+      const text = yield* playScript(round);
+      if (text === undefined) {
+        return;
+      }
+
+      round.last = text;
+      if (ctx.kind === "chat") {
+        talks.get(session)?.push({ from: "agent", agent: true, text });
+      }
+
+      yield { type: "text", text };
+      yield { type: "finished", ok: true, text };
+    } catch (e) {
+      const error = e instanceof Error ? e.message : String(e);
+      log.error("the script failed", { error });
+      yield { type: "finished", ok: false, text: round.last, error };
+    }
+  }
+
   async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
     const session = req.sessionId ?? `scripted-${++sessions}-${Date.now()}`;
     yield { type: "started", sessionId: session };
@@ -109,20 +249,7 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
     }
 
     const ctx = parsePrompt(req.prompt);
-    if (ctx?.kind === "chat") {
-      const known = talks.get(session);
-      const latest = [...req.prompt.matchAll(/asked in chat \(thread [^)]*\):\n([^\n]*)/g)].at(
-        -1,
-      )?.[1];
-
-      if (ctx.conversation) {
-        talks.set(session, [...ctx.conversation]);
-      } else if (known && latest) {
-        known.push({ from: "human", agent: false, text: latest });
-        ctx.conversation = [...known];
-      }
-    }
-
+    recall(session, ctx, req.prompt);
     const script = ctx ? SCRIPTS[ctx.kind] : undefined;
     if (!ctx || !script) {
       yield {
@@ -135,85 +262,17 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
     }
 
     log.info("running the script", { kind: ctx.kind, ticket: ctx.ticket, pr: ctx.pr });
-    const tools = new Map(req.tools.map((t) => [t.name, t]));
-    const steps = script(ctx);
-    let last = "";
-    try {
-      let step = await steps.next();
-      while (!step.done) {
-        const action = step.value;
-        if (action.type === "gate") {
-          await waitAtGate(action.name, req.signal);
-          // The agent is shutting down: the round stops here, as the real runtime does when it is interrupted.
-          if (req.signal?.aborted) {
-            yield { type: "finished", ok: false, text: last, interrupted: true };
-            return;
-          }
-
-          step = await steps.next("");
-          continue;
-        }
-
-        const decision: Decision = evaluate(req.policy, callOf(action));
-        yield {
-          type: "tool_call",
-          tool: nameOf(action),
-          input: action,
-          decision,
-        };
-
-        if (decision.effect !== "allow") {
-          // Thrown into the script, which may expect it (a step that must be denied); otherwise the script fails.
-          step = await steps.throw(
-            new Error(`${nameOf(action)} was denied by the policy: ${decision.reason}`),
-          );
-
-          continue;
-        }
-
-        let out = "";
-        try {
-          if (action.type === "tool") {
-            const tool = tools.get(action.tool);
-            if (!tool) {
-              throw new Error(`No tool ${action.tool}.`);
-            }
-
-            out = await tool.handler(
-              tool.input.parse(action.input),
-              req.workItemId ? { workItemId: req.workItemId } : {},
-            );
-          } else if (action.type === "shell") {
-            out = await sh(action.command, action.cwd);
-          } else if (action.type === "write") {
-            mkdirSync(dirname(action.path), { recursive: true });
-            writeFileSync(action.path, action.text);
-          } else {
-            out = readFileSync(action.path, "utf8");
-          }
-        } catch (e) {
-          // A script may expect a step to fail (a rebase that stops on a conflict).
-          log.info("step failed", { step: nameOf(action), error: String(e) });
-          step = await steps.throw(e);
-          continue;
-        }
-
-        last = out;
-        step = await steps.next(out);
-      }
-
-      last = step.value;
-      if (ctx?.kind === "chat") {
-        talks.get(session)?.push({ from: "agent", agent: true, text: last });
-      }
-
-      yield { type: "text", text: last };
-      yield { type: "finished", ok: true, text: last };
-    } catch (e) {
-      const error = e instanceof Error ? e.message : String(e);
-      log.error("the script failed", { error });
-      yield { type: "finished", ok: false, text: last, error };
-    }
+    yield* playRound(
+      {
+        req,
+        tools: new Map(req.tools.map((t) => [t.name, t])),
+        steps: script(ctx),
+        log,
+        last: "",
+      },
+      ctx,
+      session,
+    );
   }
 
   return { run, probeUsage: async () => structuredClone(USAGE) };

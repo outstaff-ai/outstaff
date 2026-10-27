@@ -1,5 +1,5 @@
-import type { Check, PullRequest, RepoRef, VcsEvent, VcsPermission } from "@outstaff/core";
-import type { RestCheckRun, RestEvent, RestPull } from "./api.types.js";
+import type { Check, PullRequest, RepoRef, VcsPermission } from "@outstaff/core";
+import type { RestCheckRun, RestPull } from "./api.types.js";
 
 const BOT_SUFFIX = "[bot]";
 
@@ -95,97 +95,6 @@ export function permissionLevel(value: string): VcsPermission {
       return "read";
     default:
       return "none";
-  }
-}
-
-/** Normalises one repo event; returns undefined for anything the office does not act on. */
-export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
-  const p = e.payload;
-  const base = { externalId: e.id, repo, actor: e.actor?.login ?? "ghost", at: e.created_at };
-  switch (e.type) {
-    case "PullRequestEvent": {
-      const pr = p["pull_request"];
-      const number: number = p["number"] ?? pr?.number;
-      const data = {
-        title: pr?.title,
-        headRef: pr?.head?.ref,
-        headSha: pr?.head?.sha,
-        baseRef: pr?.base?.ref,
-      };
-
-      switch (p["action"]) {
-        case "opened":
-          return { ...base, type: "pr.opened", number, data };
-        case "reopened":
-          return { ...base, type: "pr.opened", number, data: { ...data, reopened: true } };
-        // The events feed reports a merge as its own action; webhooks send `closed` with `merged: true`.
-        case "merged":
-          return { ...base, type: "pr.merged", number, data };
-        case "closed":
-          return { ...base, type: pr?.merged ? "pr.merged" : "pr.closed", number, data };
-        case "synchronize":
-          return { ...base, type: "pr.synchronize", number, data };
-        default:
-          return undefined;
-      }
-    }
-
-    case "PullRequestReviewEvent":
-      // Webhooks say `submitted`; the repository events feed says `created`.
-      if (p["action"] !== "submitted" && p["action"] !== "created") {
-        return undefined;
-      }
-
-      return {
-        ...base,
-        type: "pr.review_submitted",
-        number: p["pull_request"].number,
-        data: {
-          state: String(p["review"]?.state ?? "").toLowerCase(),
-          body: p["review"]?.body ?? "",
-          reviewId: p["review"]?.id,
-          url: p["review"]?.html_url,
-        },
-      };
-    case "PullRequestReviewCommentEvent":
-      if (p["action"] !== "created") {
-        return undefined;
-      }
-
-      return {
-        ...base,
-        type: "pr.comment",
-        number: p["pull_request"].number,
-        data: {
-          kind: "review_comment",
-          body: p["comment"]?.body ?? "",
-          path: p["comment"]?.path,
-          commentId: p["comment"]?.id,
-          // An inline comment of a review; while that review is pending the host already announces it.
-          ...(p["comment"]?.pull_request_review_id != null
-            ? { reviewId: p["comment"].pull_request_review_id }
-            : {}),
-          url: p["comment"]?.html_url,
-        },
-      };
-    case "IssueCommentEvent":
-      if (p["action"] !== "created" || !p["issue"]?.pull_request) {
-        return undefined;
-      }
-
-      return {
-        ...base,
-        type: "pr.comment",
-        number: p["issue"].number,
-        data: {
-          kind: "comment",
-          body: p["comment"]?.body ?? "",
-          commentId: p["comment"]?.id,
-          url: p["comment"]?.html_url,
-        },
-      };
-    default:
-      return undefined;
   }
 }
 

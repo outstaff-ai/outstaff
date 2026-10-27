@@ -44,6 +44,49 @@ function isBinary(buf) {
   return buf.subarray(0, 8000).includes(0);
 }
 
+function trackedFiles() {
+  return execFileSync("git", ["ls-files", "-z"], { maxBuffer: 1 << 28 })
+    .toString()
+    .split("\0")
+    .filter((f) => f && !SKIP_FILES.has(f));
+}
+
+/** The file's text, or null when it can't be read or is binary. */
+function readText(file) {
+  let buf;
+  try {
+    buf = readFileSync(file);
+  } catch {
+    return null;
+  }
+
+  return isBinary(buf) ? null : buf.toString("utf8");
+}
+
+/** Logs every hit and returns how many there were. */
+function report(where, hits) {
+  for (const { line, pattern } of hits) {
+    console.log(`${where}:${line}: matches deny-list pattern #${pattern}`);
+  }
+
+  return hits.length;
+}
+
+/** Scans the files and the PR title and body, logs every hit and returns how many there were. */
+function scanAll(files, patterns) {
+  let hits = 0;
+  for (const file of files) {
+    const text = readText(file);
+    if (text !== null) {
+      hits += report(file, scanText(text, patterns));
+    }
+  }
+
+  hits += report("PR title", scanText(process.env.PR_TITLE ?? "", patterns));
+  hits += report("PR body", scanText(process.env.PR_BODY ?? "", patterns));
+  return hits;
+}
+
 function main() {
   const raw = process.env.DENYLIST ?? "";
   if (!raw.trim()) {
@@ -52,49 +95,19 @@ function main() {
   }
 
   const { patterns, invalid } = parsePatterns(raw);
-  let failed = false;
   for (const n of invalid) {
     console.log(`deny-list pattern #${n} is not a valid regular expression`);
-    failed = true;
   }
 
-  const report = (where, hits) => {
-    for (const { line, pattern } of hits) {
-      console.log(`${where}:${line}: matches deny-list pattern #${pattern}`);
-      failed = true;
-    }
-  };
-
-  const files = execFileSync("git", ["ls-files", "-z"], { maxBuffer: 1 << 28 })
-    .toString()
-    .split("\0")
-    .filter((f) => f && !SKIP_FILES.has(f));
-
-  for (const file of files) {
-    let buf;
-    try {
-      buf = readFileSync(file);
-    } catch {
-      continue;
-    }
-
-    if (isBinary(buf)) {
-      continue;
-    }
-
-    report(file, scanText(buf.toString("utf8"), patterns));
-  }
-
-  report("PR title", scanText(process.env.PR_TITLE ?? "", patterns));
-  report("PR body", scanText(process.env.PR_BODY ?? "", patterns));
-
-  if (failed) {
+  const files = trackedFiles();
+  const hits = scanAll(files, patterns);
+  if (invalid.length || hits) {
     console.log("Deny-list scan failed.");
-  } else {
-    console.log(`Deny-list scan passed (${files.length} files).`);
+    return 1;
   }
 
-  return failed ? 1 : 0;
+  console.log(`Deny-list scan passed (${files.length} files).`);
+  return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

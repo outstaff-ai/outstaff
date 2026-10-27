@@ -11,6 +11,21 @@ import type {
   StoredThread,
 } from "../types.js";
 
+type RestMergeable = Pick<RestPull, "mergeable" | "mergeable_state">;
+
+/** How REST reports the mergeability of an open pull request. */
+const REST_MERGEABLE = new Map<string, RestMergeable>([
+  ["clean", { mergeable: true, mergeable_state: "clean" }],
+  ["conflicting", { mergeable: false, mergeable_state: "dirty" }],
+]);
+
+const UNKNOWN: RestMergeable = { mergeable: null, mergeable_state: "unknown" };
+
+/** The mergeability this read reports: seeded ones are used up in order, and the last one sticks. */
+function nextMergeable(pr: StoredPull): string {
+  return pr.mergeable.length > 1 ? pr.mergeable.shift()! : (pr.mergeable[0] ?? "unknown");
+}
+
 /** The fake's stored pull requests, threads, reviews and events, with the helpers that keep them consistent. */
 export function createFakeState(repo: RepoRef): FakeState {
   const n = {
@@ -66,7 +81,7 @@ export function createFakeState(repo: RepoRef): FakeState {
   };
 
   const rest = (pr: StoredPull): RestPull => {
-    const next = pr.mergeable.length > 1 ? pr.mergeable.shift()! : (pr.mergeable[0] ?? "unknown");
+    const next = nextMergeable(pr);
     return {
       number: pr.number,
       node_id: `PR_${pr.number}`,
@@ -81,22 +96,7 @@ export function createFakeState(repo: RepoRef): FakeState {
       draft: pr.draft,
       requested_reviewers: [...(pr.requested ?? [])].map((login) => ({ login })),
       updated_at: pr.updatedAt,
-      mergeable:
-        pr.state !== "open"
-          ? null
-          : next === "clean"
-            ? true
-            : next === "conflicting"
-              ? false
-              : null,
-      mergeable_state:
-        pr.state !== "open"
-          ? "unknown"
-          : next === "clean"
-            ? "clean"
-            : next === "conflicting"
-              ? "dirty"
-              : "unknown",
+      ...(pr.state === "open" ? (REST_MERGEABLE.get(next) ?? UNKNOWN) : UNKNOWN),
     };
   };
 

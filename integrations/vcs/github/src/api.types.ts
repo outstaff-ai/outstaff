@@ -37,34 +37,37 @@ export interface RestEvent {
   payload: Record<string, any>; // oxlint-disable-line no-explicit-any
 }
 
+/** One status check context of a commit's rollup: a check run or a commit status. */
+export type RollupContext =
+  | {
+      __typename: "CheckRun";
+      name: string;
+      status: string;
+      conclusion: string | null;
+      detailsUrl: string | null;
+      isRequired: boolean;
+    }
+  | {
+      __typename: "StatusContext";
+      context: string;
+      state: string;
+      targetUrl: string | null;
+      isRequired: boolean;
+    };
+
+/** One page of a commit's status check rollup. */
+export interface RollupContexts {
+  pageInfo: { hasNextPage: boolean; endCursor: string | null };
+  nodes: RollupContext[];
+}
+
 export interface RequiredChecksData {
   repository: {
     pullRequest: {
       commits: {
         nodes: {
           commit: {
-            statusCheckRollup: {
-              contexts: {
-                pageInfo: { hasNextPage: boolean; endCursor: string | null };
-                nodes: (
-                  | {
-                      __typename: "CheckRun";
-                      name: string;
-                      status: string;
-                      conclusion: string | null;
-                      detailsUrl: string | null;
-                      isRequired: boolean;
-                    }
-                  | {
-                      __typename: "StatusContext";
-                      context: string;
-                      state: string;
-                      targetUrl: string | null;
-                      isRequired: boolean;
-                    }
-                )[];
-              };
-            } | null;
+            statusCheckRollup: { contexts: RollupContexts } | null;
           };
         }[];
       };

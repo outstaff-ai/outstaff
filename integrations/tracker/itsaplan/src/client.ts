@@ -90,20 +90,26 @@ export class Itsaplan {
 
   toMember(a: ApiAssignee): Member {
     const username = a.username ?? undefined;
+    return {
+      id: a.userId,
+      name: a.name,
+      ...(username ? { username } : {}),
+      kind: this.isAgent(a, username) ? "agent" : "human",
+    };
+  }
+
+  /** An agent by its kind, or by a username or name that is one of the team's agents or people. */
+  private isAgent(a: ApiAssignee, username: string | undefined): boolean {
+    if (a.kind === "agent") {
+      return true;
+    }
+
     const known = new Set([
       ...this.conn.agents,
       ...(this.ctx.team?.people ?? []).map((p) => p.handle),
     ]);
 
-    const isAgent =
-      a.kind === "agent" || (username !== undefined && known.has(username)) || known.has(a.name);
-
-    return {
-      id: a.userId,
-      name: a.name,
-      ...(username ? { username } : {}),
-      kind: isAgent ? "agent" : "human",
-    };
+    return (username !== undefined && known.has(username)) || known.has(a.name);
   }
 
   /** A member id from an id, a username or a team handle. */

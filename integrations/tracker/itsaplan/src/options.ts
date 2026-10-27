@@ -68,20 +68,35 @@ export function deriveApiUrl(url: string): string {
   return u.origin;
 }
 
+/** The tracker integration's options without its adapter name, when that tracker is Its a Plan. */
+function itsaplanTracker(
+  ctx: Pick<AdapterContext<unknown>, "team">,
+): Record<string, unknown> | undefined {
+  const tracker = (ctx.team?.integrations as Record<string, unknown> | undefined)?.["tracker"] as
+    | ({ adapter?: string } & Record<string, unknown>)
+    | undefined;
+
+  if (tracker?.adapter !== "itsaplan") {
+    return undefined;
+  }
+
+  const { adapter: _adapter, ...rest } = tracker;
+  return rest;
+}
+
+/** The connection options a knowledge adapter may take from an Its a Plan tracker; none when they do not parse. */
+function trackerDefaults(ctx: Pick<AdapterContext<unknown>, "team">) {
+  const tracker = itsaplanTracker(ctx);
+  const parsed = tracker ? trackerOptions.partial().safeParse(tracker) : undefined;
+  return parsed?.success ? parsed.data : {};
+}
+
 /** The options a knowledge adapter runs with: its own, completed from the tracker integration when that is Its a Plan. */
 export function resolveConnection(
   ctx: Pick<AdapterContext<unknown>, "team">,
   own: KnowledgeOptions | TrackerOptions,
 ): Connection {
-  const tracker = (ctx.team?.integrations as Record<string, unknown> | undefined)?.["tracker"] as
-    | ({ adapter?: string } & Record<string, unknown>)
-    | undefined;
-
-  const { adapter: _adapter, ...trackerRest } = tracker ?? {};
-  const fallback =
-    tracker?.adapter === "itsaplan" ? trackerOptions.partial().safeParse(trackerRest) : undefined;
-
-  const base = fallback?.success ? fallback.data : {};
+  const base = trackerDefaults(ctx);
   const merged = {
     ...base,
     ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)),

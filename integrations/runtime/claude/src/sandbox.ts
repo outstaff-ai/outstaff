@@ -57,6 +57,27 @@ const defaultSpawn: ProbeSpawn = (command, args) => {
   return { status: r.status, stderr: r.stderr ?? "", ...(errorCode ? { errorCode } : {}) };
 };
 
+/** The first of bubblewrap and socat that is not installed, if any. */
+function missingTool(spawn: ProbeSpawn): string | undefined {
+  const tools = [
+    ["bwrap", ["--version"]],
+    ["socat", ["-V"]],
+  ] as const;
+
+  return tools.find(([tool, args]) => spawn(tool, args).errorCode === "ENOENT")?.[0];
+}
+
+/** Why bwrap failed, from the first line of what it said and the known causes. */
+function bwrapFailure(r: ReturnType<ProbeSpawn>): SandboxProbe {
+  const said = r.stderr.trim().split("\n")[0] || `exit status ${r.status}`;
+  const cause = CAUSES.find((c) => c.test.test(said));
+  return {
+    ok: false,
+    detail: `${cause?.detail ?? "bubblewrap does not run."} bwrap said: ${said}`,
+    fix: `${cause?.fix ?? "Check the container's seccomp profile, AppArmor profile and /proc mount."} See ${GUIDE}`,
+  };
+}
+
 /** Runs bwrap as Claude Code does. Off Linux, Claude Code does not use bubblewrap and there is nothing to check. */
 export function probeSubprocessSandbox(
   spawn: ProbeSpawn = defaultSpawn,
@@ -66,17 +87,13 @@ export function probeSubprocessSandbox(
     return { ok: true, detail: `Claude Code does not use bubblewrap on ${platform}.` };
   }
 
-  for (const [tool, args] of [
-    ["bwrap", ["--version"]],
-    ["socat", ["-V"]],
-  ] as const) {
-    if (spawn(tool, args).errorCode === "ENOENT") {
-      return {
-        ok: false,
-        detail: `${tool} is not installed. Claude Code needs bubblewrap and socat to run the agent's commands in its sandbox.`,
-        fix: `Use the agent image built from images/Dockerfile (target agent), which has both. See ${GUIDE}`,
-      };
-    }
+  const missing = missingTool(spawn);
+  if (missing) {
+    return {
+      ok: false,
+      detail: `${missing} is not installed. Claude Code needs bubblewrap and socat to run the agent's commands in its sandbox.`,
+      fix: `Use the agent image built from images/Dockerfile (target agent), which has both. See ${GUIDE}`,
+    };
   }
 
   const r = spawn("bwrap", BWRAP_PROBE_ARGS);
@@ -84,11 +101,5 @@ export function probeSubprocessSandbox(
     return { ok: true, detail: "bubblewrap runs with user and PID namespaces and a fresh /proc." };
   }
 
-  const said = r.stderr.trim().split("\n")[0] || `exit status ${r.status}`;
-  const cause = CAUSES.find((c) => c.test.test(said));
-  return {
-    ok: false,
-    detail: `${cause?.detail ?? "bubblewrap does not run."} bwrap said: ${said}`,
-    fix: `${cause?.fix ?? "Check the container's seccomp profile, AppArmor profile and /proc mount."} See ${GUIDE}`,
-  };
+  return bwrapFailure(r);
 }

@@ -90,40 +90,42 @@ export class AppAuth {
     }
   }
 
+  /** The requested permissions plus the optional ones the installation has been granted. */
+  private async withGranted(id: string, scope: TokenScope): Promise<TokenScope["permissions"]> {
+    if (!scope.optionalPermissions) {
+      return scope.permissions;
+    }
+
+    const granted = await this.grantedPermissions(id);
+    const extra = Object.entries(scope.optionalPermissions).filter(([name, level]) =>
+      level === "read" ? granted[name] !== undefined : granted[name] === "write",
+    );
+
+    return extra.length > 0
+      ? { ...scope.permissions, ...Object.fromEntries(extra) }
+      : scope.permissions;
+  }
+
   /** An installation token for `repo`'s owner, optionally narrowed. Reused until five minutes before it expires. */
   async token(repo: RepoRef, scope: TokenScope = {}): Promise<InstallationToken> {
     const id = await this.installationId(repo.owner);
-    let permissions = scope.permissions;
-    if (scope.optionalPermissions) {
-      const granted = await this.grantedPermissions(id);
-      const extra = Object.entries(scope.optionalPermissions).filter(([name, level]) =>
-        level === "read" ? granted[name] !== undefined : granted[name] === "write",
-      );
-
-      if (extra.length > 0) {
-        permissions = { ...permissions, ...Object.fromEntries(extra) };
-      }
-    }
-
+    const permissions = await this.withGranted(id, scope);
     const key = JSON.stringify([id, scope.repositories ?? null, permissions ?? null]);
     const cached = this.tokens.get(key);
     if (cached && Date.parse(cached.expiresAt) - this.now().getTime() > REFRESH_MARGIN_MS) {
       return cached;
     }
 
-    const body: Record<string, unknown> = {};
-    if (scope.repositories) {
-      body["repositories"] = scope.repositories;
-    }
-
-    if (permissions) {
-      body["permissions"] = permissions;
-    }
-
     const res = await this.http.request<{ token: string; expires_at: string }>(
       "POST",
       `/app/installations/${id}/access_tokens`,
-      { token: this.jwt(), body },
+      {
+        token: this.jwt(),
+        body: {
+          ...(scope.repositories ? { repositories: scope.repositories } : {}),
+          ...(permissions ? { permissions } : {}),
+        },
+      },
     );
 
     const fresh = { token: res.data.token, expiresAt: res.data.expires_at };

@@ -56,6 +56,17 @@ async function play(
   return { seen, text: step.value };
 }
 
+const isTool = (a: Action, tool: string) => a.type === "tool" && a.tool === tool;
+const isShell = (a: Action, command: string) => a.type === "shell" && a.command === command;
+const shellStarts = (a: Action, prefix: string) =>
+  a.type === "shell" && a.command.startsWith(prefix);
+
+/** Answers an action with the reply of the first rule that matches it, else with `fallback`. */
+const answerBy =
+  (rules: [(a: Action) => boolean, string][], fallback: string) =>
+  (a: Action): string =>
+    rules.find(([matches]) => matches(a))?.[1] ?? fallback;
+
 describe("the greeting edits", () => {
   it("changes line one only", () => {
     expect(withGreeting("hello\nworld\n!\n", "SHOP-1")).toBe("hello from SHOP-1\nworld\n!\n");
@@ -237,18 +248,19 @@ describe("assigned, for a ticket that asks for the granted services", () => {
 });
 
 describe("assigned, for a ticket that needs two pull requests", () => {
-  const answer = (a: Action) =>
-    a.type === "read"
-      ? "hello\nworld\n"
-      : a.type === "tool" && a.tool === "pr_open"
-        ? "Opened https://git.example/acme/shop/pull/1"
-        : a.type === "tool" && a.tool === "ticket_create"
-          ? "Created SHOP-2.\nSHOP-2: Add a farewell\nhttps://tracker.example/issue/SHOP-2\nPart of SHOP-1: https://tracker.example/issue/SHOP-1"
-          : a.type === "tool" && a.tool === "ticket_show"
-            ? "SHOP-1 Add a greeting\n\nsplit: Add a farewell"
-            : a.type === "shell" && a.command === "CI=1 pnpm --version"
-              ? "12.9.1\n"
-              : "";
+  const answer = answerBy(
+    [
+      [(a) => a.type === "read", "hello\nworld\n"],
+      [(a) => isTool(a, "pr_open"), "Opened https://git.example/acme/shop/pull/1"],
+      [
+        (a) => isTool(a, "ticket_create"),
+        "Created SHOP-2.\nSHOP-2: Add a farewell\nhttps://tracker.example/issue/SHOP-2\nPart of SHOP-1: https://tracker.example/issue/SHOP-1",
+      ],
+      [(a) => isTool(a, "ticket_show"), "SHOP-1 Add a greeting\n\nsplit: Add a farewell"],
+      [(a) => isShell(a, "CI=1 pnpm --version"), "12.9.1\n"],
+    ],
+    "",
+  );
 
   it("splits first, then opens one pull request per ticket, and a second for the parent is refused", async () => {
     // The third pull request is the parent's second one; the verb refuses it and names the first.
@@ -310,27 +322,22 @@ describe("conflict", () => {
   it("pushes with a lease on the sha it started from, and only after resolving the rebase", async () => {
     const { seen } = await play(
       conflict({ ...ctx, kind: "conflict", pr: 2, ticket: "SHOP-2" }),
-      (a) => {
-        if (a.type === "shell" && a.command.startsWith("git log --remotes")) {
-          return "origin/main, origin/HEAD|Merge pull request #1\norigin/assigned/w2-second|SHOP-2: Second\n";
-        }
-
-        if (a.type === "shell" && a.command === "git rev-parse --abbrev-ref HEAD") {
-          return "assigned/w2-second\n";
-        }
-
-        if (a.type === "shell" && a.command === "git rev-parse origin/assigned/w2-second") {
-          return "abc123\n";
-        }
-
-        if (a.type === "shell" && a.command.startsWith("git show")) {
-          return "hello from SHOP-1\nworld\n";
-        }
-
-        return a.type === "read"
-          ? "<<<<<<< x\nhello from SHOP-1\n=======\nhello from SHOP-2\n>>>>>>> y\n"
-          : "";
-      },
+      answerBy(
+        [
+          [
+            (a) => shellStarts(a, "git log --remotes"),
+            "origin/main, origin/HEAD|Merge pull request #1\norigin/assigned/w2-second|SHOP-2: Second\n",
+          ],
+          [(a) => isShell(a, "git rev-parse --abbrev-ref HEAD"), "assigned/w2-second\n"],
+          [(a) => isShell(a, "git rev-parse origin/assigned/w2-second"), "abc123\n"],
+          [(a) => shellStarts(a, "git show"), "hello from SHOP-1\nworld\n"],
+          [
+            (a) => a.type === "read",
+            "<<<<<<< x\nhello from SHOP-1\n=======\nhello from SHOP-2\n>>>>>>> y\n",
+          ],
+        ],
+        "",
+      ),
       // The rebase stops on the conflict.
       (a) => a.type === "shell" && a.command === "git rebase origin/main",
     );
@@ -573,18 +580,19 @@ describe("reviewFeedback follows the repository's own commit rules", () => {
         pr: 1,
         feedback: [{ kind: "review", body: "Please fix.", threads: ["PRRT_1"] }],
       }),
-      (a) =>
-        a.type === "read" && a.path.endsWith("CONTRIBUTING.md")
-          ? rules
-          : a.type === "read"
-            ? "hello\nworld\n"
-            : a.type === "shell" && a.command === "git rev-parse --abbrev-ref HEAD"
-              ? "assigned/w1-add-a-greeting"
-              : a.type === "shell" && a.command.startsWith("git log")
-                ? "origin/assigned/w1-add-a-greeting|SHOP-1: Add a greeting"
-                : a.type === "tool" && a.tool === "pr_threads"
-                  ? "PRRT_1 open"
-                  : "abc123",
+      answerBy(
+        [
+          [(a) => a.type === "read" && a.path.endsWith("CONTRIBUTING.md"), rules],
+          [(a) => a.type === "read", "hello\nworld\n"],
+          [(a) => isShell(a, "git rev-parse --abbrev-ref HEAD"), "assigned/w1-add-a-greeting"],
+          [
+            (a) => shellStarts(a, "git log"),
+            "origin/assigned/w1-add-a-greeting|SHOP-1: Add a greeting",
+          ],
+          [(a) => isTool(a, "pr_threads"), "PRRT_1 open"],
+        ],
+        "abc123",
+      ),
     );
 
   const shells = (seen: Action[]) => seen.flatMap((a) => (a.type === "shell" ? [a.command] : []));

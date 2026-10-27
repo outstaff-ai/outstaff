@@ -25,6 +25,22 @@ export function fakeRoutes(state: FakeState): Route[] {
     nextLabelId,
   } = state;
 
+  // A move to another column, logged as the status change the activity feed reports.
+  const move = (issue: StoredIssue, columnId: number | undefined) => {
+    if (columnId === undefined || columnId === issue.columnId) {
+      return;
+    }
+
+    const from = column(issue.columnId)?.name;
+    issue.columnId = columnId;
+    log(issue, {
+      kind: "history",
+      action: "status",
+      body: null,
+      payload: { from: { value: from }, to: { value: column(columnId)?.name } },
+    });
+  };
+
   return [
     {
       method: "GET",
@@ -114,17 +130,7 @@ export function fakeRoutes(state: FakeState): Route[] {
         }
 
         const b = r.json as Partial<StoredIssue>;
-        if (b.columnId !== undefined && b.columnId !== issue.columnId) {
-          const from = column(issue.columnId)?.name;
-          issue.columnId = b.columnId;
-          log(issue, {
-            kind: "history",
-            action: "status",
-            body: null,
-            payload: { from: { value: from }, to: { value: column(b.columnId)?.name } },
-          });
-        }
-
+        move(issue, b.columnId);
         if (b.assigneeUserId !== undefined) {
           issue.assigneeUserId = b.assigneeUserId;
           log(issue, { kind: "history", action: "assignee", body: null, payload: {} });

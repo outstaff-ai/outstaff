@@ -34,78 +34,107 @@ const isReply = (v: unknown): v is StubReply =>
   !Array.isArray(v) &&
   Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body" || k === "text");
 
+type Compiled = { r: Route; match: ReturnType<typeof compile> }[];
+
+const urlOf = (input: string | URL | Request): URL =>
+  new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
+
+/** A route whose path is a full URL serves another host (a log download); it must never get the token. */
+function expectExternalCall(compiled: Compiled, url: URL, headers: Headers): void {
+  expect(
+    compiled.some(({ r }) => r.path.startsWith(url.origin)),
+    `requests must stay on the API host, not ${url.origin}`,
+  ).toBe(true);
+
+  expect(headers.get("authorization"), `${url.origin} must not receive the token`).toBeNull();
+}
+
+/** Every call to the API identifies itself the way GitHub requires. */
+function expectApiCall(url: URL, headers: Headers, method: string | undefined): void {
+  expect(headers.get("authorization"), `${method} ${url.pathname} is unauthenticated`).toMatch(
+    /^Bearer \S+/,
+  );
+
+  expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
+    headers.get("accept"),
+  );
+
+  expect(headers.get("x-github-api-version")).toBe("2022-11-28");
+}
+
+/** Checks the headers of a call to another host or to the API; every call names a user agent. */
+function expectCall(
+  compiled: Compiled,
+  url: URL,
+  headers: Headers,
+  external: boolean,
+  method: string | undefined,
+): void {
+  if (external) {
+    expectExternalCall(compiled, url, headers);
+  } else {
+    expectApiCall(url, headers, method);
+  }
+
+  expect(headers.get("user-agent")).toBeTruthy();
+}
+
+const jsonOf = (body: RequestInit["body"]): unknown =>
+  typeof body === "string" ? JSON.parse(body) : undefined;
+
+function findRoute(compiled: Compiled, method: string, path: string) {
+  for (const { r, match } of compiled) {
+    const params = r.method === method ? match(path) : undefined;
+    if (params) {
+      return { r, params };
+    }
+  }
+
+  return undefined;
+}
+
+function toResponse(out: unknown): Response {
+  const reply: StubReply = isReply(out) ? out : { body: out };
+  const status = reply.status ?? 200;
+  const body =
+    status === 304 || status === 204 ? null : (reply.text ?? JSON.stringify(reply.body ?? {}));
+
+  return new Response(body, {
+    status,
+    headers: {
+      "content-type": reply.text === undefined ? "application/json" : "text/plain",
+      ...reply.headers,
+    },
+  });
+}
+
 /** A fetch that serves JSON by method and path and records every call. Unmatched requests fail the test. */
 export function createStubFetch(routes: Route[], origin = "https://api.github.test") {
-  const compiled = routes.map((r) => ({ r, match: compile(r.path) }));
+  const compiled: Compiled = routes.map((r) => ({ r, match: compile(r.path) }));
   const calls: StubRequest[] = [];
   const stub = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-    );
-
+    const url = urlOf(input);
     const headers = new Headers(init?.headers);
-    // A route whose path is a full URL serves another host (a log download); it must never get the token.
     const external = url.origin !== origin;
-    if (external) {
-      expect(
-        compiled.some(({ r }) => r.path.startsWith(url.origin)),
-        `requests must stay on the API host, not ${url.origin}`,
-      ).toBe(true);
-
-      expect(headers.get("authorization"), `${url.origin} must not receive the token`).toBeNull();
-    } else {
-      // Every call identifies itself the way GitHub requires.
-      expect(
-        headers.get("authorization"),
-        `${init?.method} ${url.pathname} is unauthenticated`,
-      ).toMatch(/^Bearer \S+/);
-
-      expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
-        headers.get("accept"),
-      );
-
-      expect(headers.get("x-github-api-version")).toBe("2022-11-28");
-    }
-
-    expect(headers.get("user-agent")).toBeTruthy();
+    expectCall(compiled, url, headers, external, init?.method);
     const method = (init?.method ?? "GET").toUpperCase();
     const path = external ? `${url.origin}${url.pathname}` : url.pathname;
-    for (const { r, match } of compiled) {
-      if (r.method !== method) {
-        continue;
-      }
-
-      const params = match(path);
-      if (!params) {
-        continue;
-      }
-
-      const req: StubRequest = {
-        method,
-        path: decodeURIComponent(path),
-        query: url.searchParams,
-        headers,
-        params,
-        json: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
-      };
-
-      calls.push(req);
-      const out = await r.handler(req);
-      const reply: StubReply = isReply(out) ? out : { body: out };
-      const status = reply.status ?? 200;
-      const body =
-        status === 304 || status === 204 ? null : (reply.text ?? JSON.stringify(reply.body ?? {}));
-
-      return new Response(body, {
-        status,
-        headers: {
-          "content-type": reply.text === undefined ? "application/json" : "text/plain",
-          ...reply.headers,
-        },
-      });
+    const found = findRoute(compiled, method, path);
+    if (!found) {
+      throw new Error(`stub: no route for ${method} ${path}${url.search}`);
     }
 
-    throw new Error(`stub: no route for ${method} ${path}${url.search}`);
+    const req: StubRequest = {
+      method,
+      path: decodeURIComponent(path),
+      query: url.searchParams,
+      headers,
+      params: found.params,
+      json: jsonOf(init?.body),
+    };
+
+    calls.push(req);
+    return toResponse(await found.r.handler(req));
   }) as typeof fetch;
 
   return {

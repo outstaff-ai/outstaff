@@ -5,9 +5,37 @@ import { findRange } from "../text-range.js";
 import { createItsaplanFake as createTrackerFake } from "../../../../tracker/itsaplan/src/testing/itsaplan-fake.js";
 import type { FakeOptions } from "../../../../tracker/itsaplan/src/testing/types.js";
 import type { ApiDoc, ApiDocSummary } from "../types.js";
-import type { ItsaplanFake, StoredDoc, StoredDocComment } from "./types.js";
+import type { ItsaplanFake, NewDocComment, StoredDoc, StoredDocComment } from "./types.js";
 
 // The tracker package's stand-in for the Its a Plan REST API, plus the document routes the knowledge adapter uses.
+
+/** Whether the comment's quote is in the document at exactly the positions it gives. */
+function quotedAt(d: StoredDoc, b: NewDocComment): boolean {
+  const range = d.contentJson && b.quote ? findRange(d.contentJson, b.quote) : undefined;
+  return range !== undefined && range[0] === b.from && range[1] === b.to;
+}
+
+function storedComment(
+  id: string,
+  d: StoredDoc,
+  b: NewDocComment,
+  actor: { userId: string; name: string },
+  at: string,
+): StoredDocComment {
+  return {
+    id,
+    documentId: d.id,
+    parentId: b.parentId ?? null,
+    authorId: actor.userId,
+    authorName: actor.name,
+    body: b.body,
+    quote: b.quote ?? null,
+    from: b.from ?? null,
+    to: b.to ?? null,
+    resolvedAt: null,
+    createdAt: at,
+  };
+}
 
 export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
   let commentCounter = 0;
@@ -30,6 +58,17 @@ export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
 
   const fake = createTrackerFake(opts, (shared) => {
     const { clock, err, actor } = shared;
+    // A reply needs its parent; a new thread needs its quote at the positions it gives.
+    const anchorRefusal = (d: StoredDoc, b: NewDocComment) => {
+      if (b.parentId) {
+        return docComments.some((c) => c.id === b.parentId)
+          ? undefined
+          : err(404, "comment not found");
+      }
+
+      return quotedAt(d, b) ? undefined : err(400, "The quote is not at those positions.");
+    };
+
     return [
       {
         method: "GET",
@@ -119,42 +158,17 @@ export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
             return err(404, "document not found");
           }
 
-          const b = r.json as {
-            body: string;
-            parentId?: string;
-            quote?: string;
-            from?: number;
-            to?: number;
-            version: number;
-          };
-
+          const b = r.json as NewDocComment;
           if (b.version !== d.version) {
             return err(409, "The page changed; read it again.", "version_conflict");
           }
 
-          if (!b.parentId) {
-            const range = d.contentJson && b.quote ? findRange(d.contentJson, b.quote) : undefined;
-            if (!range || range[0] !== b.from || range[1] !== b.to) {
-              return err(400, "The quote is not at those positions.");
-            }
-          } else if (!docComments.some((c) => c.id === b.parentId)) {
-            return err(404, "comment not found");
+          const refused = anchorRefusal(d, b);
+          if (refused) {
+            return refused;
           }
 
-          const row: StoredDocComment = {
-            id: `c-${++commentCounter}`,
-            documentId: d.id,
-            parentId: b.parentId ?? null,
-            authorId: actor.userId,
-            authorName: actor.name,
-            body: b.body,
-            quote: b.quote ?? null,
-            from: b.from ?? null,
-            to: b.to ?? null,
-            resolvedAt: null,
-            createdAt: clock(),
-          };
-
+          const row = storedComment(`c-${++commentCounter}`, d, b, actor, clock());
           docComments.push(row);
           return { status: 201, body: { id: row.id } };
         },

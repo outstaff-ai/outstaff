@@ -6,6 +6,12 @@ const HEADER = /^([a-z]+)(?:\(([^)\n]+)\))?(!)?: (.+)$/;
 const BREAKING_FOOTER = /^BREAKING[ -]CHANGE: ?(.*(?:\n(?!\s*\n).*)*)/m;
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/;
 
+// The text of a BREAKING CHANGE footer on one line, or null when there is none or it is empty.
+function breakingNote(footer: RegExpExecArray | null): string | null {
+  const note = footer?.[1]?.trim().replaceAll(/\s*\n\s*/g, " ");
+  return note || null;
+}
+
 export function parseCommit(hash: string, message: string): Commit | null {
   const [header = "", ...rest] = message.trim().split("\n");
   const match = HEADER.exec(header.trim());
@@ -14,14 +20,13 @@ export function parseCommit(hash: string, message: string): Commit | null {
   }
 
   const footer = BREAKING_FOOTER.exec(rest.join("\n"));
-  const note = footer?.[1]?.trim().replaceAll(/\s*\n\s*/g, " ") ?? null;
   return {
     hash,
     type: match[1] as string,
     scope: match[2] ?? null,
     breaking: match[3] === "!" || footer !== null,
     summary: (match[4] as string).trim(),
-    breakingNote: note === "" ? null : note,
+    breakingNote: breakingNote(footer),
   };
 }
 

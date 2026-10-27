@@ -21,12 +21,8 @@ export const filesOf = (files: SlackFile[] | undefined): ChatFile[] =>
       : [];
   });
 
-/** Download a shared file from Slack's file host with the bot token. */
-export async function downloadSlackFile(
-  fetchFn: typeof fetch,
-  token: string,
-  file: ChatFile,
-): Promise<Uint8Array> {
+/** The file's download address, which must be an https URL on a Slack host. */
+function slackUrlOf(file: ChatFile): URL {
   let url: URL;
   try {
     url = new URL(file.url);
@@ -38,15 +34,11 @@ export async function downloadSlackFile(
     throw new PortError("invalid", `File ${file.id} is not hosted by Slack.`);
   }
 
-  let res: Response;
-  try {
-    res = await fetchFn(url, { headers: { authorization: `Bearer ${token}` } });
-  } catch (error) {
-    throw new PortError("unavailable", `Slack could not be reached for file ${file.id}.`, {
-      cause: error,
-    });
-  }
+  return url;
+}
 
+/** Throws when Slack refused the file or answered with something other than the file. */
+function assertFileResponse(res: Response, file: ChatFile): void {
   if (!res.ok) {
     throw new PortError(
       res.status === 401 || res.status === 403 ? "forbidden" : "unavailable",
@@ -64,6 +56,24 @@ export async function downloadSlackFile(
       "Slack sent a web page instead of the file: the app needs the files:read scope.",
     );
   }
+}
 
+/** Download a shared file from Slack's file host with the bot token. */
+export async function downloadSlackFile(
+  fetchFn: typeof fetch,
+  token: string,
+  file: ChatFile,
+): Promise<Uint8Array> {
+  const url = slackUrlOf(file);
+  let res: Response;
+  try {
+    res = await fetchFn(url, { headers: { authorization: `Bearer ${token}` } });
+  } catch (error) {
+    throw new PortError("unavailable", `Slack could not be reached for file ${file.id}.`, {
+      cause: error,
+    });
+  }
+
+  assertFileResponse(res, file);
   return new Uint8Array(await res.arrayBuffer());
 }

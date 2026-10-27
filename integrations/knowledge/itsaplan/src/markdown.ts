@@ -4,112 +4,72 @@
 // Supported: headings, paragraphs, bullet/ordered/task lists (nested), blockquotes, fenced code, horizontal rules,
 // tables, hard breaks, bold, italic, strike, inline code and links. Anything else degrades to plain text.
 
-import type { Mark, PmNode } from "./types.js";
+import { inline, paragraph, text } from "./markdown-inline.js";
+import { LIST, parseList } from "./markdown-list.js";
+import type { PmNode } from "./types.js";
 
-const LINK_ATTRS = {
-  title: null,
-  target: "_blank",
-  rel: "noopener noreferrer nofollow",
-  class: null,
-};
+/** A parsed block and the line after it. */
+type Parsed = [PmNode, number];
 
-const text = (t: string, marks?: Mark[]): PmNode => ({
-  type: "text",
-  text: t,
-  ...(marks?.length ? { marks } : {}),
-});
-
-const INLINE =
-  /(\*\*(.+?)\*\*|~~(.+?)~~|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\)|(?<![*\w])\*([^*\n]+?)\*(?![*\w])|  \n)/g;
-
-export function inline(s: string, marks: Mark[] = []): PmNode[] {
-  const out: PmNode[] = [];
-  let pos = 0;
-  for (const m of s.matchAll(INLINE)) {
-    const start = m.index;
-    if (start > pos) {
-      out.push(text(s.slice(pos, start), marks));
-    }
-
-    if (m[0] === "  \n") {
-      out.push({ type: "hardBreak" });
-    } else if (m[2] !== undefined) {
-      out.push(...inline(m[2], [...marks, { type: "bold" }]));
-    } else if (m[3] !== undefined) {
-      out.push(...inline(m[3], [...marks, { type: "strike" }]));
-    } else if (m[4] !== undefined) {
-      out.push(text(m[4], [{ type: "code" }]));
-    } else if (m[5] !== undefined) {
-      out.push(...inline(m[5], [...marks, { type: "link", attrs: { ...LINK_ATTRS, href: m[6] } }]));
-    } else {
-      out.push(...inline(m[7]!, [...marks, { type: "italic" }]));
-    }
-
-    pos = start + m[0].length;
-  }
-
-  if (pos < s.length) {
-    out.push(text(s.slice(pos), marks));
-  }
-
-  return out.filter((n) => n.type !== "text" || n.text);
-}
-
-function paragraph(t: string): PmNode {
-  const content = inline(t);
-  return content.length ? { type: "paragraph", content } : { type: "paragraph" };
-}
-
-const LIST = /^(\s*)([-*+]|\d+\.)\s+(.*)$/;
-const TASK = /^\[( |x|X)\]\s+(.*)$/;
-
-function parseList(lines: string[], start: number, indent: number): [PmNode, number] {
+/** The first line from `start` that `keep` rejects, or the end. */
+function takeWhile(lines: string[], start: number, keep: (line: string) => boolean): number {
   let i = start;
-  const ordered = /\d/.test(LIST.exec(lines[i]!)![2]![0]!);
-  const items: PmNode[] = [];
-  let task = false;
-  while (i < lines.length) {
-    const m = LIST.exec(lines[i]!);
-    if (!m || m[1]!.length !== indent || /\d/.test(m[2]![0]!) !== ordered) {
-      break;
-    }
-
-    let body = m[3]!;
-    const t = TASK.exec(body);
-    if (t) {
-      task = true;
-      body = t[2]!;
-    }
-
-    const blocks: PmNode[] = [paragraph(body)];
+  while (i < lines.length && keep(lines[i]!)) {
     i++;
-    while (i < lines.length) {
-      const n = LIST.exec(lines[i]!);
-      if (n && n[1]!.length > indent) {
-        const [sub, next] = parseList(lines, i, n[1]!.length);
-        blocks.push(sub);
-        i = next;
-      } else if (!n && lines[i]!.startsWith(" ".repeat(indent + 2)) && lines[i]!.trim()) {
-        const first = blocks[0]!;
-        first.content = [...(first.content ?? []), text(` ${lines[i]!.trim()}`)];
-        i++;
-      } else {
-        break;
-      }
-    }
-
-    items.push(
-      task
-        ? {
-            type: "taskItem",
-            attrs: { checked: t !== null && "xX".includes(t[1]!) },
-            content: blocks,
-          }
-        : { type: "listItem", content: blocks },
-    );
   }
 
-  return [{ type: task ? "taskList" : ordered ? "orderedList" : "bulletList", content: items }, i];
+  return i;
+}
+
+function codeBlock(lines: string[], i: number): Parsed | undefined {
+  const ln = lines[i]!;
+  if (!ln.startsWith("```")) {
+    return undefined;
+  }
+
+  const end = takeWhile(lines, i + 1, (l) => !l.startsWith("```"));
+  const body = lines.slice(i + 1, end);
+  const node: PmNode = {
+    type: "codeBlock",
+    attrs: { language: ln.slice(3).trim() || null },
+    ...(body.length ? { content: [text(body.join("\n"))] } : {}),
+  };
+
+  return [node, end + 1];
+}
+
+function heading(lines: string[], i: number): Parsed | undefined {
+  const ln = lines[i]!;
+  if (!/^#{1,6}\s/.test(ln)) {
+    return undefined;
+  }
+
+  const level = ln.length - ln.replace(/^#+/, "").length;
+  const content = inline(ln.slice(level).trim());
+  return [{ type: "heading", attrs: { level }, ...(content.length ? { content } : {}) }, i + 1];
+}
+
+function rule(lines: string[], i: number): Parsed | undefined {
+  return /^(-{3,}|\*{3,}|_{3,})\s*$/.test(lines[i]!)
+    ? [{ type: "horizontalRule" }, i + 1]
+    : undefined;
+}
+
+const quoted = (l: string) => l.startsWith(">");
+
+function blockquote(lines: string[], i: number): Parsed | undefined {
+  if (!quoted(lines[i]!)) {
+    return undefined;
+  }
+
+  const end = takeWhile(lines, i, quoted);
+  const inner = lines.slice(i, end).map((l) => l.slice(1).trimStart());
+  return [{ type: "blockquote", content: mdToDoc(inner.join("\n")).content! }, end];
+}
+
+function list(lines: string[], i: number): Parsed | undefined {
+  const m = LIST.exec(lines[i]!);
+  return m ? parseList(lines, i, m[1]!.length) : undefined;
 }
 
 function cells(row: string, header: boolean): PmNode[] {
@@ -123,77 +83,65 @@ function cells(row: string, header: boolean): PmNode[] {
     }));
 }
 
+/** A header row followed by a delimiter row. */
+const startsTable = (lines: string[], i: number) =>
+  lines[i]!.startsWith("|") && i + 1 < lines.length && /^\|[\s:|-]+\|?\s*$/.test(lines[i + 1]!);
+
+function table(lines: string[], i: number): Parsed | undefined {
+  if (!startsTable(lines, i)) {
+    return undefined;
+  }
+
+  const end = takeWhile(lines, i + 2, (l) => l.startsWith("|"));
+  const rows = [
+    { type: "tableRow", content: cells(lines[i]!, true) },
+    ...lines.slice(i + 2, end).map((r) => ({ type: "tableRow", content: cells(r, false) })),
+  ];
+
+  return [{ type: "table", content: rows }, end];
+}
+
+/** Whether a line joins the paragraph above it rather than starting a block of its own. */
+const continuesParagraph = (l: string) =>
+  l.trim() !== "" && !/^(#{1,6}\s|```|>|\||-{3,}\s*$)/.test(l) && !LIST.test(l);
+
+function paragraphBlock(lines: string[], i: number): Parsed {
+  const end = takeWhile(lines, i + 1, continuesParagraph);
+  const joined = lines
+    .slice(i, end)
+    .map((b) => b.trimEnd())
+    .join("  \n");
+
+  return [paragraph(joined), end];
+}
+
+// Tried in order; a line that starts none of them begins a paragraph.
+const BLOCKS = [codeBlock, heading, rule, blockquote, list, table];
+
+function parseBlock(lines: string[], i: number): Parsed {
+  for (const parse of BLOCKS) {
+    const parsed = parse(lines, i);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return paragraphBlock(lines, i);
+}
+
 export function mdToDoc(md: string): PmNode {
   const lines = md.replaceAll("\r\n", "\n").split("\n");
   const blocks: PmNode[] = [];
   let i = 0;
   while (i < lines.length) {
-    const ln = lines[i]!;
-    if (!ln.trim()) {
+    if (!lines[i]!.trim()) {
       i++;
-    } else if (ln.startsWith("```")) {
-      const lang = ln.slice(3).trim() || null;
-      i++;
-      const buf: string[] = [];
-      while (i < lines.length && !lines[i]!.startsWith("```")) {
-        buf.push(lines[i]!);
-        i++;
-      }
-
-      i++;
-      blocks.push({
-        type: "codeBlock",
-        attrs: { language: lang },
-        ...(buf.length ? { content: [text(buf.join("\n"))] } : {}),
-      });
-    } else if (/^#{1,6}\s/.test(ln)) {
-      const level = ln.length - ln.replace(/^#+/, "").length;
-      const content = inline(ln.slice(level).trim());
-      blocks.push({ type: "heading", attrs: { level }, ...(content.length ? { content } : {}) });
-      i++;
-    } else if (/^(-{3,}|\*{3,}|_{3,})\s*$/.test(ln)) {
-      blocks.push({ type: "horizontalRule" });
-      i++;
-    } else if (ln.startsWith(">")) {
-      const buf: string[] = [];
-      while (i < lines.length && lines[i]!.startsWith(">")) {
-        buf.push(lines[i]!.slice(1).trimStart());
-        i++;
-      }
-
-      blocks.push({ type: "blockquote", content: mdToDoc(buf.join("\n")).content! });
-    } else if (LIST.test(ln)) {
-      const [node, next] = parseList(lines, i, LIST.exec(ln)![1]!.length);
-      blocks.push(node);
-      i = next;
-    } else if (
-      ln.startsWith("|") &&
-      i + 1 < lines.length &&
-      /^\|[\s:|-]+\|?\s*$/.test(lines[i + 1]!)
-    ) {
-      const rows: PmNode[] = [{ type: "tableRow", content: cells(ln, true) }];
-      i += 2;
-      while (i < lines.length && lines[i]!.startsWith("|")) {
-        rows.push({ type: "tableRow", content: cells(lines[i]!, false) });
-        i++;
-      }
-
-      blocks.push({ type: "table", content: rows });
-    } else {
-      const buf = [ln];
-      i++;
-      while (
-        i < lines.length &&
-        lines[i]!.trim() &&
-        !/^(#{1,6}\s|```|>|\||-{3,}\s*$)/.test(lines[i]!) &&
-        !LIST.test(lines[i]!)
-      ) {
-        buf.push(lines[i]!);
-        i++;
-      }
-
-      blocks.push(paragraph(buf.map((b) => b.trimEnd()).join("  \n")));
+      continue;
     }
+
+    const [node, next] = parseBlock(lines, i);
+    blocks.push(node);
+    i = next;
   }
 
   return { type: "doc", content: blocks.length ? blocks : [{ type: "paragraph" }] };

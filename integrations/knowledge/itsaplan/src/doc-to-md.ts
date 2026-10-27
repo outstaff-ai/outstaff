@@ -22,32 +22,40 @@ function wrapMark(mark: Mark, inner: string): string {
 const sameMark = (a: Mark | undefined, b: Mark | undefined) =>
   a !== undefined && b !== undefined && JSON.stringify(a) === JSON.stringify(b);
 
+/** The index after the run of nodes, from `start`, whose outermost mark is `outer`. */
+function runEnd(nodes: PmNode[], start: number, outer: Mark): number {
+  let i = start;
+  while (i < nodes.length && sameMark(nodes[i]!.marks?.[0], outer)) {
+    i++;
+  }
+
+  return i;
+}
+
+/** The markdown of the node at `i`, with any neighbours wrapped in the same outer mark, and the index after it. */
+function inlineRun(nodes: PmNode[], i: number): [string, number] {
+  const node = nodes[i]!;
+  if (node.type === "hardBreak") {
+    return ["  \n", i + 1];
+  }
+
+  const outer = node.marks?.[0];
+  if (!outer) {
+    return [node.text ?? "", i + 1];
+  }
+
+  const end = runEnd(nodes, i, outer);
+  const run = nodes.slice(i, end).map((n) => ({ ...n, marks: n.marks!.slice(1) }));
+  return [wrapMark(outer, inlineMd(run)), end];
+}
+
 // Marks are listed outermost first; neighbours that share their outer mark are wrapped together.
 function inlineMd(nodes: PmNode[] = []): string {
   let out = "";
   for (let i = 0; i < nodes.length;) {
-    const node = nodes[i]!;
-    if (node.type === "hardBreak") {
-      out += "  \n";
-      i++;
-      continue;
-    }
-
-    const outer = node.marks?.[0];
-    if (!outer) {
-      out += node.text ?? "";
-      i++;
-      continue;
-    }
-
-    const run: PmNode[] = [];
-    while (i < nodes.length && sameMark(nodes[i]!.marks?.[0], outer)) {
-      const n = nodes[i]!;
-      run.push({ ...n, marks: n.marks!.slice(1) });
-      i++;
-    }
-
-    out += wrapMark(outer, inlineMd(run));
+    const [md, next] = inlineRun(nodes, i);
+    out += md;
+    i = next;
   }
 
   return out;
@@ -73,42 +81,52 @@ function listMd(node: PmNode, indent: string): string[] {
   return lines;
 }
 
+function headingMd(node: PmNode): string {
+  return `${"#".repeat(Number(node.attrs?.["level"] ?? 1))} ${inlineMd(node.content)}`;
+}
+
+function quoteMd(node: PmNode): string {
+  return (node.content ?? [])
+    .map(blockMd)
+    .join("\n\n")
+    .split("\n")
+    .map((l) => (l ? `> ${l}` : ">"))
+    .join("\n");
+}
+
+function codeMd(node: PmNode): string {
+  const lang = node.attrs?.["language"];
+  const body = (node.content ?? []).map((c) => c.text ?? "").join("");
+  return `\`\`\`${typeof lang === "string" ? lang : ""}\n${body}${body ? "\n" : ""}\`\`\``;
+}
+
+function tableMd(node: PmNode): string {
+  const rows = (node.content ?? []).map(
+    (r) => `| ${(r.content ?? []).map((c) => inlineMd(c.content?.[0]?.content)).join(" | ")} |`,
+  );
+
+  const width = node.content?.[0]?.content?.length ?? 1;
+  rows.splice(1, 0, `|${" --- |".repeat(width)}`);
+  return rows.join("\n");
+}
+
+const listBlockMd = (node: PmNode) => listMd(node, "").join("\n");
+
+const BLOCK_MD = new Map<string, (node: PmNode) => string>([
+  ["heading", headingMd],
+  ["bulletList", listBlockMd],
+  ["orderedList", listBlockMd],
+  ["taskList", listBlockMd],
+  ["blockquote", quoteMd],
+  ["codeBlock", codeMd],
+  ["horizontalRule", () => "---"],
+  ["table", tableMd],
+]);
+
+// Any other block is written as its inline content.
 function blockMd(node: PmNode): string {
-  switch (node.type) {
-    case "heading":
-      return `${"#".repeat(Number(node.attrs?.["level"] ?? 1))} ${inlineMd(node.content)}`;
-    case "bulletList":
-    case "orderedList":
-    case "taskList":
-      return listMd(node, "").join("\n");
-    case "blockquote":
-      return (node.content ?? [])
-        .map(blockMd)
-        .join("\n\n")
-        .split("\n")
-        .map((l) => (l ? `> ${l}` : ">"))
-        .join("\n");
-    case "codeBlock": {
-      const lang = node.attrs?.["language"];
-      const body = (node.content ?? []).map((c) => c.text ?? "").join("");
-      return `\`\`\`${typeof lang === "string" ? lang : ""}\n${body}${body ? "\n" : ""}\`\`\``;
-    }
-
-    case "horizontalRule":
-      return "---";
-    case "table": {
-      const rows = (node.content ?? []).map(
-        (r) => `| ${(r.content ?? []).map((c) => inlineMd(c.content?.[0]?.content)).join(" | ")} |`,
-      );
-
-      const width = node.content?.[0]?.content?.length ?? 1;
-      rows.splice(1, 0, `|${" --- |".repeat(width)}`);
-      return rows.join("\n");
-    }
-
-    default:
-      return inlineMd(node.content);
-  }
+  const render = BLOCK_MD.get(node.type);
+  return render ? render(node) : inlineMd(node.content);
 }
 
 export function docToMd(doc: PmNode): string {

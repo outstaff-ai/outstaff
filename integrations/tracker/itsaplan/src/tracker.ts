@@ -5,6 +5,7 @@ import {
   type Comment,
   type EventPage,
   type NewIssue,
+  type TicketAttachment,
   type Tracker,
   type TrackerEvent,
 } from "@outstaff/core";
@@ -18,6 +19,26 @@ export function createItsaplanTracker(
   deps: ClientDeps = {},
 ): Promise<Tracker> {
   return createClient(ctx, deps).then((api) => buildTracker(api));
+}
+
+const attachmentId = (a: ApiAttachment) =>
+  a.publicId ?? (a.id === undefined ? undefined : String(a.id));
+
+/** An attachment as the port lists it; one without any id cannot be downloaded and is left out. */
+function listedAttachment(a: ApiAttachment): TicketAttachment[] {
+  const id = attachmentId(a);
+  if (!id) {
+    return [];
+  }
+
+  return [
+    {
+      id,
+      name: a.filename ?? a.name ?? id,
+      mimetype: a.mimeType ?? a.contentType ?? "application/octet-stream",
+      size: a.size ?? 0,
+    },
+  ];
 }
 
 function buildTracker(api: Itsaplan): Tracker {
@@ -170,19 +191,7 @@ function buildTracker(api: Itsaplan): Tracker {
         `/issues/${issue.id}/attachments`,
       );
 
-      return (Array.isArray(res) ? res : res.items).flatMap((a) => {
-        const id = a.publicId ?? (a.id === undefined ? undefined : String(a.id));
-        return id
-          ? [
-              {
-                id,
-                name: a.filename ?? a.name ?? id,
-                mimetype: a.mimeType ?? a.contentType ?? "application/octet-stream",
-                size: a.size ?? 0,
-              },
-            ]
-          : [];
-      });
+      return (Array.isArray(res) ? res : res.items).flatMap(listedAttachment);
     },
 
     async download(attachment) {

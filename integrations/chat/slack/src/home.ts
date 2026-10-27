@@ -43,23 +43,44 @@ export function createHome(deps: {
     await callSlack(() => web.views.publish({ user_id: userId, view: homeView(profile, tz) }));
   };
 
+  type Held = { profile: AgentProfile; at: number };
+
+  const isStale = (held: Held | undefined) =>
+    !held || ctx.now().getTime() - held.at >= PROFILE_FRESH_MS;
+
+  /** Only trusted people see the work; a profile held for a person was published for them. */
+  const mayShow = async (user: string, held: Held | undefined) =>
+    Boolean(held) || (await trust.resolve(user)).trusted;
+
+  /** Asks the agent for a fresh profile; keeps the held one when there is none or the agent fails. */
+  const refresh = async (
+    user: string,
+    source: (userId: string) => Promise<AgentProfile | undefined>,
+    held: Held | undefined,
+  ) => {
+    try {
+      const fresh = await source(user);
+      if (!fresh) {
+        return held;
+      }
+
+      const next = { profile: structuredClone(fresh), at: ctx.now().getTime() };
+      profiles.set(user, next);
+      return next;
+    } catch (error) {
+      ctx.log.warn("could not refresh the profile; showing the one held", {
+        error: String(error),
+      });
+
+      return held;
+    }
+  };
+
   return {
     async opened(user: string) {
       let held = profiles.get(user);
-      const stale = !held || ctx.now().getTime() - held.at >= PROFILE_FRESH_MS;
-      // Only trusted people see the work; a profile held for a person was published for them.
-      if (profileSource && stale && (held || (await trust.resolve(user)).trusted)) {
-        try {
-          const fresh = await profileSource(user);
-          if (fresh) {
-            held = { profile: structuredClone(fresh), at: ctx.now().getTime() };
-            profiles.set(user, held);
-          }
-        } catch (error) {
-          ctx.log.warn("could not refresh the profile; showing the one held", {
-            error: String(error),
-          });
-        }
+      if (profileSource && isStale(held) && (await mayShow(user, held))) {
+        held = await refresh(user, profileSource, held);
       }
 
       if (held) {

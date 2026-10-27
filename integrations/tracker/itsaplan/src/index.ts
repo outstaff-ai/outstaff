@@ -14,7 +14,7 @@ export { ItsaplanHttp } from "./http.js";
 
 // The knowledge adapter (@outstaff/integration.knowledge.itsaplan) shares the client, cursor, setup and doctor.
 export { createClient, type Itsaplan } from "./client.js";
-export { OVERLAP_MS, parseCursor } from "./cursor.js";
+export { nextCursor, OVERLAP_MS, parseCursor } from "./cursor.js";
 export { doctorItsaplan } from "./doctor.js";
 export { deriveItsaplan, itsaplanSetupGuide } from "./setup.js";
 

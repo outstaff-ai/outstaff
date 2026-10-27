@@ -2,7 +2,8 @@ import { defineAdapter, repoAccess, type SecretSpec, type SecretsContext } from 
 import { validateGithubIdentities } from "./identities.js";
 import { githubCommandRules } from "./permissions.js";
 import { doctorGithub } from "./doctor.js";
-import { deriveGithub, githubSetupGuide } from "./setup.js";
+import { deriveGithub } from "./setup.js";
+import { githubSetupGuide } from "./setup-guide.js";
 import { githubOptions } from "./options.js";
 import { createGithubVcs } from "./vcs.js";
 

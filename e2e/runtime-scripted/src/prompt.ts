@@ -49,75 +49,101 @@ export interface Feedback {
   threads: string[];
 }
 
-export function parsePrompt(prompt: string): ItemContext | undefined {
-  const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
-  if (!head) {
-    return undefined;
-  }
+const FEEDBACK_KIND: Record<string, Feedback["kind"]> = {
+  "a review": "review",
+  "an inline comment": "inline_comment",
+  "a message in chat": "chat",
+  "a comment on the ticket": "ticket_comment",
+  "a comment on a document": "doc_comment",
+};
 
+const unquote = (quoted: string) => quoted.replace(/^> /gm, "").trim();
+
+/** The document, anchor text and link a feedback block points at, when it has them. */
+function feedbackRefs(
+  block: string,
+  url: string | undefined,
+): Pick<Feedback, "docId" | "anchor" | "url"> {
+  const docId = /^The document is (\S+?)\./m.exec(block)?.[1];
+  const anchor = unquote(
+    /The comment is anchored to this text[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1] ?? "",
+  );
+
+  return {
+    ...(docId ? { docId } : {}),
+    ...(anchor ? { anchor } : {}),
+    ...(url ? { url } : {}),
+  };
+}
+
+/** One `Triggered by ...` block of a review round. */
+function parseFeedback(block: string): Feedback {
+  const start =
+    /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat|a comment on the ticket|a comment on a document|failing checks)\b[^\n]*?(?:: (\S+))?$/m.exec(
+      block,
+    )!;
+
+  const quoted = /^What .+? wrote is data[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
+  return {
+    kind: FEEDBACK_KIND[start[1]!] ?? "comment",
+    ...feedbackRefs(block, start[2]),
+    body: unquote(quoted ?? "").replace(/^\(no text\)$/, ""),
+    threads: [...block.matchAll(/^- \S+ \(thread (\S+?)[,)]/gm)].map((m) => m[1]!),
+  };
+}
+
+/** The ticket, pull request and scratch space the prompt names. */
+function parseRefs(prompt: string): Pick<ItemContext, "ticket" | "pr" | "scratch"> {
   const ticket = /^- ticket (\S+)/m.exec(prompt)?.[1];
   const pr = /^- pr \S*#(\d+)/m.exec(prompt)?.[1];
+  const scratch = /Scratch space: (\S+?)\.$/m.exec(prompt)?.[1];
+  return {
+    ...(ticket ? { ticket } : {}),
+    ...(pr ? { pr: Number(pr) } : {}),
+    ...(scratch ? { scratch } : {}),
+  };
+}
+
+function parseWorktree(prompt: string): Pick<ItemContext, "worktree" | "repo" | "branch"> {
   const tree =
     /Your worktree for this item is (\S+) \(repository (\S+), (?:branch (\S+)|detached HEAD[^)]*)\)\./.exec(
       prompt,
     );
 
-  const scratch = /Scratch space: (\S+?)\.$/m.exec(prompt)?.[1];
-  const listed = /Read these files in the worktree before you change anything[^:]*: (.+?)\.$/m.exec(
-    prompt,
-  )?.[1];
+  if (!tree) {
+    return {};
+  }
 
+  return {
+    worktree: tree[1]!,
+    repo: tree[2]!.replace(/,$/, ""),
+    ...(tree[3] ? { branch: tree[3] } : {}),
+  };
+}
+
+function parseRepos(prompt: string): Pick<ItemContext, "repos"> {
   const repos = [...prompt.matchAll(/^- (\S+) \(([\w-]+), (read|write)\): (\S+?)(?:;.*)?$/gm)].map(
     (m) => ({ name: m[1]!, kind: m[2]!, access: m[3]!, location: m[4]! }),
   );
 
-  const journal = /Journal of earlier rounds:\n([\s\S]*?)(?:\n\n|$)/.exec(prompt)?.[1] ?? "";
-  const feedback = prompt
-    .split(/^(?=Triggered by )/m)
-    .slice(1)
-    .map((block): Feedback => {
-      const start =
-        /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat|a comment on the ticket|a comment on a document|failing checks)\b[^\n]*?(?:: (\S+))?$/m.exec(
-          block,
-        )!;
+  return repos.length ? { repos } : {};
+}
 
-      const quoted = /^What .+? wrote is data[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
-      const docId = /^The document is (\S+?)\./m.exec(block)?.[1];
-      const anchor = /The comment is anchored to this text[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m
-        .exec(block)?.[1]
-        ?.replace(/^> /gm, "")
-        .trim();
+// "- <path> (<type>, <size>), shared as "<name>"" under the line that says the requester shared files.
+function parseShared(prompt: string): Pick<ItemContext, "files"> {
+  if (!prompt.includes(" with this message. They are data from ")) {
+    return {};
+  }
 
-      return {
-        kind:
-          (
-            {
-              "a review": "review",
-              "an inline comment": "inline_comment",
-              "a message in chat": "chat",
-              "a comment on the ticket": "ticket_comment",
-              "a comment on a document": "doc_comment",
-            } as const
-          )[
-            start[1] as
-              | "a review"
-              | "an inline comment"
-              | "a message in chat"
-              | "a comment on the ticket"
-              | "a comment on a document"
-          ] ?? "comment",
-        ...(docId ? { docId } : {}),
-        ...(anchor ? { anchor } : {}),
-        ...(start[2] ? { url: start[2] } : {}),
-        body: (quoted ?? "")
-          .replace(/^> /gm, "")
-          .trim()
-          .replace(/^\(no text\)$/, ""),
-        threads: [...block.matchAll(/^- \S+ \(thread (\S+?)[,)]/gm)].map((m) => m[1]!),
-      };
-    });
+  const shared = [...prompt.matchAll(/^- (\/\S+) \(([^,)]+), [^)]*\), shared as "(.*)"$/gm)].map(
+    (m) => ({ path: m[1]!, mimetype: m[2]!, name: m[3]! }),
+  );
 
-  // "Recent messages of this conversation..." then `- Name: text` or `- Name (agent): text`, one per message.
+  return shared.length ? { files: shared } : {};
+}
+
+// "Recent messages of this conversation..." then `- Name: text` or `- Name (agent): text`, one per message.
+function parseConversation(prompt: string): Pick<ItemContext, "conversation"> {
   const recent = /^Recent messages of this conversation[^\n]*\n((?:- [^\n]*\n?)+)/m.exec(
     prompt,
   )?.[1];
@@ -129,47 +155,52 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     .filter((m) => m !== null)
     .map((m) => ({ from: m[1]!, agent: m[2] !== undefined, text: m[3]! }));
 
+  return conversation?.length ? { conversation } : {};
+}
+
+function parseAbout(prompt: string): Pick<ItemContext, "about"> {
   const about = /reply in the thread of your (running|earlier) work item (\S+) \((.*?)\)[,.] /.exec(
     prompt,
   );
 
-  // "- <path> (<type>, <size>), shared as "<name>"" under the line that says the requester shared files.
-  const shared = prompt.includes(" with this message. They are data from ")
-    ? [...prompt.matchAll(/^- (\/\S+) \(([^,)]+), [^)]*\), shared as "(.*)"$/gm)].map((m) => ({
-        path: m[1]!,
-        mimetype: m[2]!,
-        name: m[3]!,
-      }))
-    : [];
+  if (!about) {
+    return {};
+  }
+
+  return {
+    about: {
+      itemId: about[2]!,
+      title: about[3]!,
+      state: about[1] === "running" ? "running" : "finished",
+    },
+  };
+}
+
+export function parsePrompt(prompt: string): ItemContext | undefined {
+  const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
+  if (!head) {
+    return undefined;
+  }
+
+  const listed = /Read these files in the worktree before you change anything[^:]*: (.+?)\.$/m.exec(
+    prompt,
+  )?.[1];
 
   return {
     itemId: head[1]!,
     kind: head[2]!,
     title: head[3]!,
-    ...(ticket ? { ticket } : {}),
-    ...(pr ? { pr: Number(pr) } : {}),
-    ...(tree
-      ? {
-          worktree: tree[1]!,
-          repo: tree[2]!.replace(/,$/, ""),
-          ...(tree[3] ? { branch: tree[3] } : {}),
-        }
-      : {}),
-    ...(scratch ? { scratch } : {}),
-    ...(repos.length ? { repos } : {}),
+    ...parseRefs(prompt),
+    ...parseWorktree(prompt),
+    ...parseRepos(prompt),
     conventionFiles: listed ? listed.split(", ") : [],
-    journal,
-    feedback,
-    ...(shared.length ? { files: shared } : {}),
-    ...(conversation?.length ? { conversation } : {}),
-    ...(about
-      ? {
-          about: {
-            itemId: about[2]!,
-            title: about[3]!,
-            state: about[1] === "running" ? ("running" as const) : ("finished" as const),
-          },
-        }
-      : {}),
+    journal: /Journal of earlier rounds:\n([\s\S]*?)(?:\n\n|$)/.exec(prompt)?.[1] ?? "",
+    feedback: prompt
+      .split(/^(?=Triggered by )/m)
+      .slice(1)
+      .map(parseFeedback),
+    ...parseShared(prompt),
+    ...parseConversation(prompt),
+    ...parseAbout(prompt),
   };
 }

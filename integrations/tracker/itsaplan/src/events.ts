@@ -1,24 +1,30 @@
 import { mentionData, type EventPage, type Member, type TrackerEvent } from "@outstaff/core";
 import type { Itsaplan } from "./client.js";
-import { OVERLAP_MS, parseCursor } from "./cursor.js";
+import { nextCursor, OVERLAP_MS, parseCursor } from "./cursor.js";
 import { FEED_PAGE } from "./issues.js";
-import type { ApiActivityItem, ApiFeedItem, ApiProject, Page } from "./types.js";
+import type { ApiActivityItem, ApiFeedItem, ApiProject, EventCursor, Page } from "./types.js";
 
 const EVENT_PAGES = 20;
 
-/** One page of tracker events from the project's activity feed, after `cursor`. */
-export async function readEvents(
+const at = (item: ApiActivityItem) => Date.parse(item.createdAt);
+
+/** Whether this feed page is the last to read: the feed ends, or it reaches older than the floor. */
+function lastPage(res: Page<ApiActivityItem>, floor: number): boolean {
+  const oldest = res.items.at(-1);
+  return !res.nextCursor || !oldest || at(oldest) < floor;
+}
+
+/**
+ * Pages back through the feed (newest first) until a page reaches older than the overlap window. Returns what was
+ * read and the floor of the window. Without a usable position the window is what lies within the overlap of the
+ * newest item.
+ */
+async function readFeed(
   api: Itsaplan,
-  actor: (setup: ApiProject, item: ApiFeedItem) => Member,
-  cursor: string | undefined,
-): Promise<EventPage<TrackerEvent>> {
-  const after = parseCursor(cursor);
-  const setup = await api.project();
+  after: EventCursor | undefined,
+): Promise<{ read: ApiActivityItem[]; floor: number }> {
   const read: ApiActivityItem[] = [];
   let next: string | undefined;
-  // Activity ids are identifiers only; progress is tracked by createdAt.
-  // The feed is newest first: page back until a page reaches older than the overlap window.
-  // Without a usable position the caller just wants to know where "now" is, plus the ids inside the overlap so they are not handed back later.
   let floor = (after?.since ?? Number.NaN) - OVERLAP_MS;
   for (let page = 0; page < EVENT_PAGES; page++) {
     const res = await api.http.request<Page<ApiActivityItem>>(
@@ -29,76 +35,83 @@ export async function readEvents(
 
     read.push(...res.items);
     if (!after && page === 0) {
-      // Without a position, the window is what lies within the overlap of the newest item.
-      floor = Math.max(...res.items.map((i) => Date.parse(i.createdAt))) - OVERLAP_MS;
+      floor = Math.max(...res.items.map(at)) - OVERLAP_MS;
     }
 
-    const oldest = res.items.at(-1);
-    if (!res.nextCursor || !oldest || Date.parse(oldest.createdAt) < floor) {
+    if (lastPage(res, floor)) {
       break;
     }
 
     next = JSON.stringify(res.nextCursor);
   }
 
+  return { read, floor };
+}
+
+/** The data of a comment event: its id and link. */
+function commentLink(api: Itsaplan, key: string, item: ApiActivityItem) {
+  return {
+    commentId: String(item.id),
+    url: `${api.issueUrl(key)}#comment-${item.id}`,
+  };
+}
+
+/** The status change of a move, where the feed has it. */
+function change(item: ApiActivityItem) {
+  const from = item.payload?.from?.value;
+  const to = item.payload?.to?.value;
+  return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+}
+
+function toEvent(
+  api: Itsaplan,
+  setup: ApiProject,
+  actor: Member,
+  item: ApiActivityItem,
+  type: TrackerEvent["type"],
+): TrackerEvent {
+  const key = `${setup.project.key}-${item.issueSequence}`;
+  const comment = type === "commented";
+  return {
+    externalId: `itsaplan:${item.id}`,
+    type,
+    key,
+    actor,
+    at: item.createdAt,
+    data: {
+      ...(comment ? commentLink(api, key, item) : {}),
+      ...(item.issueTitle ? { title: item.issueTitle } : {}),
+      ...(item.body ? { body: item.body } : {}),
+      ...(comment ? mentionData(item.body) : {}),
+      ...change(item),
+    },
+  };
+}
+
+/** One page of tracker events from the project's activity feed, after `cursor`. */
+export async function readEvents(
+  api: Itsaplan,
+  actor: (setup: ApiProject, item: ApiFeedItem) => Member,
+  cursor: string | undefined,
+): Promise<EventPage<TrackerEvent>> {
+  // Activity ids are identifiers only; progress is tracked by createdAt.
+  const after = parseCursor(cursor);
+  const setup = await api.project();
+  const { read, floor } = await readFeed(api, after);
   // No cursor at all is the first poll (intake decides if it is a baseline); a cursor we cannot use baselines here.
   const baseline = cursor !== undefined && !after;
-  const fresh = baseline
-    ? []
-    : read.filter(
-        (i) => !after || (Date.parse(i.createdAt) >= floor && !after.seen.has(String(i.id))),
-      );
-
-  const ordered = fresh.toSorted(
-    (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.id - b.id,
-  );
-
+  const isNew = (i: ApiActivityItem) => !after || (at(i) >= floor && !after.seen.has(String(i.id)));
+  const fresh = baseline ? [] : read.filter(isNew);
   const events: TrackerEvent[] = [];
-  for (const item of ordered) {
+  for (const item of fresh.toSorted((a, b) => at(a) - at(b) || a.id - b.id)) {
     const type = eventType(item);
-    if (!type) {
-      continue;
+    if (type) {
+      events.push(toEvent(api, setup, actor(setup, item), item, type));
     }
-
-    events.push({
-      externalId: `itsaplan:${item.id}`,
-      type,
-      key: `${setup.project.key}-${item.issueSequence}`,
-      actor: actor(setup, item),
-      at: item.createdAt,
-      data: {
-        ...(type === "commented"
-          ? {
-              commentId: String(item.id),
-              url: `${api.issueUrl(`${setup.project.key}-${item.issueSequence}`)}#comment-${item.id}`,
-            }
-          : {}),
-        ...(item.issueTitle ? { title: item.issueTitle } : {}),
-        ...(item.body ? { body: item.body } : {}),
-        ...(type === "commented" ? mentionData(item.body) : {}),
-        ...(item.payload?.from?.value ? { from: item.payload.from.value } : {}),
-        ...(item.payload?.to?.value ? { to: item.payload.to.value } : {}),
-      },
-    });
   }
 
-  const times = read.map((i) => Date.parse(i.createdAt)).filter((t) => !Number.isNaN(t));
-  const newest = Math.max(after?.since ?? Number.NEGATIVE_INFINITY, ...times);
-  const since = new Date(Number.isFinite(newest) ? newest : Date.now()).toISOString();
-  // Ids read at baseline time, kept while they are inside the overlap so that history is not handed back as news.
-  const keep = after?.seen;
-  const seenIds = read
-    .filter(
-      (i) =>
-        (keep ? keep.has(String(i.id)) : true) &&
-        Date.parse(i.createdAt) >= Date.parse(since) - OVERLAP_MS,
-    )
-    .map((i) => String(i.id));
-
-  return {
-    events,
-    cursor: JSON.stringify({ since, ...(seenIds.length > 0 ? { seen: seenIds } : {}) }),
-  };
+  const seen = read.map((i) => ({ id: String(i.id), at: at(i) }));
+  return { events, cursor: nextCursor(after, seen, Date.now) };
 }
 
 /** Activity actions other than these (labels, priority, links and so on) are not events the office acts on. */

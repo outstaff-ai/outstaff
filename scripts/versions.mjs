@@ -38,43 +38,56 @@ function projects() {
   );
 }
 
-function main(mode) {
-  let failed = 0;
-  for (const project of projects()) {
-    const file = path.join(project.path, "package.json");
-    const manifest = JSON.parse(readFileSync(file, "utf8"));
-    const ranges = findRanges(manifest);
-    if (mode === "check") {
-      const issue = licenseIssue(manifest);
-      if (issue) {
-        console.error(`${path.relative(process.cwd(), file)}: ${issue}`);
-        failed += 1;
-      }
+function readManifest(project) {
+  const file = path.join(project.path, "package.json");
+  return { file, manifest: JSON.parse(readFileSync(file, "utf8")) };
+}
 
-      for (const r of ranges) {
-        console.error(
-          `${path.relative(process.cwd(), file)}: ${r.field}.${r.name} is "${r.spec}"; pin an exact version`,
-        );
-      }
+/** Logs the project's problems and returns how many there are. */
+function checkProject(project) {
+  const { file, manifest } = readManifest(project);
+  const where = path.relative(process.cwd(), file);
+  const problems = findRanges(manifest).map(
+    (r) => `${r.field}.${r.name} is "${r.spec}"; pin an exact version`,
+  );
 
-      failed += ranges.length;
-      continue;
-    }
-
-    for (const r of ranges) {
-      const resolved = project[r.field]?.[r.name]?.version;
-      if (!resolved || !EXACT.test(resolved)) {
-        throw new Error(`${file}: cannot resolve ${r.name} (${r.spec})`);
-      }
-
-      manifest[r.field][r.name] = resolved;
-    }
-
-    if (ranges.length) {
-      writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
-    }
+  const issue = licenseIssue(manifest);
+  if (issue) {
+    problems.unshift(issue);
   }
 
+  for (const problem of problems) {
+    console.error(`${where}: ${problem}`);
+  }
+
+  return problems.length;
+}
+
+/** Rewrites the project's ranges to the versions pnpm resolved. */
+function pinProject(project) {
+  const { file, manifest } = readManifest(project);
+  const ranges = findRanges(manifest);
+  for (const r of ranges) {
+    const resolved = project[r.field]?.[r.name]?.version;
+    if (!resolved || !EXACT.test(resolved)) {
+      throw new Error(`${file}: cannot resolve ${r.name} (${r.spec})`);
+    }
+
+    manifest[r.field][r.name] = resolved;
+  }
+
+  if (ranges.length) {
+    writeFileSync(file, JSON.stringify(manifest, null, 2) + "\n");
+  }
+}
+
+function main(mode) {
+  if (mode === "pin") {
+    projects().forEach(pinProject);
+    return;
+  }
+
+  const failed = projects().reduce((sum, project) => sum + checkProject(project), 0);
   if (failed) {
     console.error(
       `${failed} problem${failed === 1 ? "" : "s"} found. Pin dependencies with: node scripts/versions.mjs pin && pnpm install`,

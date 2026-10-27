@@ -2,22 +2,18 @@ import { WebClient } from "@slack/web-api";
 import { PortError, type AdapterContext, type Chat, type ChatMessage } from "@outstaff/core";
 import type { SlackEvent, SlackMessage, SlackWeb } from "./api.js";
 import { callSlack, slackErrorName, toPortError } from "./errors.js";
-import { downloadSlackFile, filesOf } from "./files.js";
+import { chatMessageOf, isHomeOpened, isRequest } from "./chat-message.js";
+import { downloadSlackFile } from "./files.js";
 import { readPages } from "./history.js";
 import { createHome } from "./home.js";
 import { splitMrkdwn, toMrkdwn } from "./mrkdwn.js";
 import { createSocketModeSocket } from "./socket.js";
 import { createTrust } from "./trust.js";
-import type { SlackDeps, SlackOptions } from "./types.js";
+import type { Sender, SlackDeps, SlackOptions } from "./types.js";
 
 const REACTIONS = { eyes: "eyes", done: "white_check_mark", error: "x" } as const;
 const SEEN_LIMIT = 500;
 const PAGE = 200;
-
-/** Message subtypes that are a person's own content; edits, deletes, joins and bot messages are not requests. */
-const CONTENT_SUBTYPES = new Set(["file_share", "thread_broadcast"]);
-
-const isoOf = (ts: string) => new Date(Number(ts) * 1000).toISOString();
 
 function requireToken(ctx: AdapterContext<SlackOptions>, key: string): string {
   const token = ctx.secrets.get(key);
@@ -67,39 +63,26 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
   const clean = (text: string | undefined) =>
     botUserId ? (text ?? "").replaceAll(`<@${botUserId}>`, "").trim() : (text ?? "").trim();
 
+  const senderOf = async (m: SlackMessage, userId: string | undefined): Promise<Sender> => {
+    if (m.bot_id || !userId) {
+      return { bot: true, trusted: Boolean(userId) && userId === botUserId };
+    }
+
+    if (userId === botUserId) {
+      return { bot: true, trusted: true };
+    }
+
+    return trust.resolve(userId);
+  };
+
   const toMessage = async (
     channel: string,
     m: SlackMessage,
     userId = m.user,
   ): Promise<ChatMessage> => {
     const id = userId ?? m.bot_id ?? "unknown";
-    const own = Boolean(userId) && userId === botUserId;
-    const sender =
-      m.bot_id || !userId
-        ? { bot: true, trusted: own }
-        : own
-          ? { bot: true, trusted: true }
-          : await trust.resolve(userId);
-
-    const thread = m.thread_ts;
-    // A direct message channel has an id that starts with D.
-    const direct = channel.startsWith("D");
-    const files = filesOf(m.files);
-    return {
-      id: m.ts!,
-      channel,
-      ...(thread ? { thread } : {}),
-      author: {
-        id,
-        ...(sender.name ? { name: sender.name } : {}),
-        trusted: sender.trusted,
-        bot: sender.bot,
-      },
-      text: clean(m.text),
-      at: isoOf(m.ts!),
-      ...(direct ? { direct } : {}),
-      ...(files.length ? { files } : {}),
-    };
+    const sender = await senderOf(m, userId);
+    return chatMessageOf(channel, m, { id, sender }, clean(m.text));
   };
 
   const remember = (key: string) => {
@@ -115,42 +98,33 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     return true;
   };
 
+  const receive = async (e: SlackEvent) => {
+    if (isHomeOpened(e)) {
+      await home.opened(e.user!);
+      return;
+    }
+
+    if (!handler || !isRequest(e)) {
+      return;
+    }
+
+    await ensureBotUserId();
+    if (e.user === botUserId || !remember(`${e.channel}:${e.ts}`)) {
+      return;
+    }
+
+    const message = await toMessage(e.channel!, e as SlackMessage);
+    if (message.author.bot || !message.author.trusted) {
+      ctx.log.info("ignoring a message from an untrusted sender", { user: e.user });
+      return;
+    }
+
+    await handler(message);
+  };
+
   const onEvent = async (e: SlackEvent) => {
     try {
-      if (e.type === "app_home_opened" && e.tab === "home" && e.user) {
-        await home.opened(e.user);
-        return;
-      }
-
-      if (e.type !== "message" && e.type !== "app_mention") {
-        return;
-      }
-
-      // Direct messages and mentions only; edits, joins and other subtypes are not requests. A message with files
-      // arrives as `file_share`.
-      if (
-        e.type === "message" &&
-        (e.channel_type !== "im" || (e.subtype && !CONTENT_SUBTYPES.has(e.subtype)))
-      ) {
-        return;
-      }
-
-      if (e.bot_id || !e.user || !e.channel || !e.ts || !handler) {
-        return;
-      }
-
-      await ensureBotUserId();
-      if (e.user === botUserId || !remember(`${e.channel}:${e.ts}`)) {
-        return;
-      }
-
-      const message = await toMessage(e.channel, e as SlackMessage);
-      if (message.author.bot || !message.author.trusted) {
-        ctx.log.info("ignoring a message from an untrusted sender", { user: e.user });
-        return;
-      }
-
-      await handler(message);
+      await receive(e);
     } catch (error) {
       ctx.log.error("handling a Slack event failed", { type: e.type, error: String(error) });
     }

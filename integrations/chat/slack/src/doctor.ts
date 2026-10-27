@@ -1,4 +1,12 @@
 import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
+import {
+  appTokenChecks,
+  botUserIdChecks,
+  filesScopeChecks,
+  identityCheck,
+} from "./doctor-checks.js";
+
+type Person = NonNullable<DeriveContext["person"]>;
 
 type AuthTest = {
   ok: boolean;
@@ -85,49 +93,16 @@ async function doctorOfficeSlack(
   ];
 }
 
-export async function doctorSlack(
+/** auth.test with the agent's bot token, then the checks that need its answer. */
+async function botTokenChecks(
+  token: string,
   secrets: SecretSource,
+  person: Person,
   ctx: DeriveContext,
 ): Promise<DoctorCheck[]> {
-  if (ctx.scope === "office") {
-    return doctorOfficeSlack(secrets, ctx);
-  }
-
-  if (!ctx.person) {
-    return [];
-  }
-
-  const out: DoctorCheck[] = [];
-  const appToken = secrets.get("SLACK_APP_TOKEN");
-  if (appToken) {
-    out.push(
-      appToken.startsWith("xapp-")
-        ? {
-            key: "SLACK_APP_TOKEN",
-            name: "Slack app token",
-            status: "ok",
-            detail: "SLACK_APP_TOKEN is set, so Socket Mode can connect.",
-          }
-        : {
-            key: "SLACK_APP_TOKEN",
-            name: "Slack app token",
-            status: "fail",
-            detail:
-              "SLACK_APP_TOKEN does not start with xapp-; it looks like a bot token or a copy mistake.",
-            fix: "Use the app-level token with connections:write from Basic Information > App-Level Tokens.",
-          },
-    );
-  }
-
-  const token = secrets.get("SLACK_BOT_TOKEN");
-  if (!token) {
-    return out;
-  }
-
   const body = await authTest(token, ctx);
   if (body instanceof Error) {
     return [
-      ...out,
       {
         key: "SLACK_BOT_TOKEN",
         name: "Slack auth.test",
@@ -140,7 +115,6 @@ export async function doctorSlack(
 
   if (!body.ok || !body.user_id) {
     return [
-      ...out,
       {
         key: "SLACK_BOT_TOKEN",
         name: "Slack auth.test",
@@ -151,58 +125,36 @@ export async function doctorSlack(
     ];
   }
 
-  out.push({
-    key: "SLACK_BOT_TOKEN",
-    name: "Slack auth.test",
-    status: "ok",
-    detail: `SLACK_BOT_TOKEN is valid for bot user ${body.user_id}.`,
-  });
-
-  // Without files:read the bot cannot download what people send; chat itself keeps working.
-  if (body.scopes && !body.scopes.includes("files:read")) {
-    out.push({
+  return [
+    {
       key: "SLACK_BOT_TOKEN",
-      name: "Slack files scope",
-      status: "warn",
-      detail:
-        "The bot token lacks the files:read scope, so the agent cannot read pictures and files people send it; it only sees their names.",
-      fix: "Add files:read under OAuth & Permissions > Bot Token Scopes, then reinstall the app and copy the new bot token.",
-    });
-  }
-
-  const wanted = ctx.person.identities?.chat;
-  if (!wanted) {
-    out.push({
-      name: "Slack identity",
-      status: "warn",
-      detail: `identities.chat is not set for ${ctx.person.handle}, so the office cannot recognise its messages.`,
-      fix: `Set identities.chat to ${body.user_id} for ${ctx.person.handle} in team.yaml.`,
-    });
-  } else if (wanted !== body.user_id && wanted !== body.user) {
-    out.push({
-      name: "Slack identity",
-      status: "fail",
-      detail: `identities.chat is "${wanted}" but the bot token belongs to ${body.user_id}.`,
-      fix: `Set identities.chat to ${body.user_id} for ${ctx.person.handle} in team.yaml, or use the token of the right app.`,
-    });
-  } else {
-    out.push({
-      name: "Slack identity",
+      name: "Slack auth.test",
       status: "ok",
-      detail: `identities.chat matches ${body.user_id}.`,
-    });
+      detail: `SLACK_BOT_TOKEN is valid for bot user ${body.user_id}.`,
+    },
+    ...filesScopeChecks(body.scopes),
+    identityCheck(person.handle, person.identities?.chat, { id: body.user_id, name: body.user }),
+    ...botUserIdChecks(secrets.get("SLACK_BOT_USER_ID"), body.user_id),
+  ];
+}
+
+export async function doctorSlack(
+  secrets: SecretSource,
+  ctx: DeriveContext,
+): Promise<DoctorCheck[]> {
+  if (ctx.scope === "office") {
+    return doctorOfficeSlack(secrets, ctx);
   }
 
-  const configured = secrets.get("SLACK_BOT_USER_ID");
-  if (configured && configured !== body.user_id) {
-    out.push({
-      key: "SLACK_BOT_USER_ID",
-      name: "Slack bot user id",
-      status: "fail",
-      detail: `SLACK_BOT_USER_ID is "${configured}" but the bot token belongs to ${body.user_id}.`,
-      fix: "Run `ost setup --derive` after removing the old value, or set it to the id above.",
-    });
+  if (!ctx.person) {
+    return [];
   }
 
-  return out;
+  const out = appTokenChecks(secrets.get("SLACK_APP_TOKEN"));
+  const token = secrets.get("SLACK_BOT_TOKEN");
+  if (!token) {
+    return out;
+  }
+
+  return [...out, ...(await botTokenChecks(token, secrets, ctx.person, ctx))];
 }

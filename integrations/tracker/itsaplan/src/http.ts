@@ -31,6 +31,53 @@ export function errorCode(status: number): PortErrorCode {
   return "invalid";
 }
 
+function withQuery(href: string, { query }: RequestOptions): URL {
+  const url = new URL(href);
+  for (const [k, v] of Object.entries(query ?? {})) {
+    if (v !== undefined) {
+      url.searchParams.set(k, String(v));
+    }
+  }
+
+  return url;
+}
+
+/** The JSON of a response body; undefined when it is empty or not JSON. */
+function parseJson(raw: string): unknown {
+  if (!raw) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+/** A Retry-After in seconds, or the default wait when there is none. */
+function retryAfterMs(res: Response): number {
+  const retry = Number(res.headers.get("retry-after"));
+  return Number.isFinite(retry) && retry > 0 ? retry * 1000 : DEFAULT_RETRY_MS;
+}
+
+function requestError(
+  method: string,
+  path: string,
+  res: Response,
+  raw: string,
+  data: unknown,
+): PortError {
+  const body = (data ?? {}) as { error?: string; code?: string };
+  const code = errorCode(res.status);
+  const reason = body.error ?? (raw.slice(0, 200) || res.statusText);
+  return new PortError(
+    code,
+    `Its a Plan ${method} ${path} -> ${res.status}${body.code ? ` ${body.code}` : ""}: ${reason}`,
+    code === "rate_limited" ? { retryAfterMs: retryAfterMs(res) } : {},
+  );
+}
+
 /** A small typed JSON client. Every failure leaves here as a PortError. */
 export class ItsaplanHttp {
   private readonly pacer: Pacer;
@@ -42,51 +89,38 @@ export class ItsaplanHttp {
   }
 
   async request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
-    const url = new URL(`${this.cfg.apiUrl}${path}`);
-    for (const [k, v] of Object.entries(opts.query ?? {})) {
-      if (v !== undefined) {
-        url.searchParams.set(k, String(v));
-      }
-    }
-
-    let { res, burst } = await this.send(method, url, opts);
-    // Past its burst limit the service answers 500 until the key has been idle for a second.
-    if (res.status === 500 && burst > 1 && IDEMPOTENT.has(method)) {
-      this.cfg.log?.warn("rate limited", {
-        method,
-        path,
-        status: res.status,
-        retryInMs: RETRY_AFTER_BURST_MS,
-      });
-
-      await this.clock.sleep(RETRY_AFTER_BURST_MS);
-      ({ res } = await this.send(method, url, opts));
-    }
-
+    const url = withQuery(`${this.cfg.apiUrl}${path}`, opts);
+    const res = await this.sendRetryingBurst(method, path, url, opts);
     const raw = await res.text();
-    let data: unknown = undefined;
-    if (raw) {
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        data = undefined;
-      }
-    }
-
+    const data = parseJson(raw);
     if (!res.ok) {
-      const body = (data ?? {}) as { error?: string; code?: string };
-      const code = errorCode(res.status);
-      const retry = Number(res.headers.get("retry-after"));
-      throw new PortError(
-        code,
-        `Its a Plan ${method} ${path} -> ${res.status}${body.code ? ` ${body.code}` : ""}: ${body.error ?? (raw.slice(0, 200) || res.statusText)}`,
-        code === "rate_limited"
-          ? { retryAfterMs: Number.isFinite(retry) && retry > 0 ? retry * 1000 : DEFAULT_RETRY_MS }
-          : {},
-      );
+      throw requestError(method, path, res, raw, data);
     }
 
     return data as T;
+  }
+
+  // Past its burst limit the service answers 500 until the key has been idle for a second.
+  private async sendRetryingBurst(
+    method: string,
+    path: string,
+    url: URL,
+    opts: RequestOptions,
+  ): Promise<Response> {
+    const { res, burst } = await this.send(method, url, opts);
+    if (res.status !== 500 || burst <= 1 || !IDEMPOTENT.has(method)) {
+      return res;
+    }
+
+    this.cfg.log?.warn("rate limited", {
+      method,
+      path,
+      status: res.status,
+      retryInMs: RETRY_AFTER_BURST_MS,
+    });
+
+    await this.clock.sleep(RETRY_AFTER_BURST_MS);
+    return (await this.send(method, url, opts)).res;
   }
 
   /** The bytes behind a path, for a file download. Failures leave as PortErrors like `request`. */
