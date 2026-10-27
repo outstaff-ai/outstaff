@@ -1,5 +1,5 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
-import { knowledgeOptions } from "@outstaff/integration.tracker.itsaplan";
+import { knowledgeOptions } from "../index.js";
 import { describe, expect, it } from "vitest";
 import { API_KEY, createStubFetch, type Route, secretMap, team } from "@outstaff/testing.itsaplan";
 import { itsaplanKnowledge } from "../index.js";

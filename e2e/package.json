@@ -10,8 +10,7 @@
     "start": "node run.ts"
   },
   "devDependencies": {
-    "@outstaff/integration.knowledge.itsaplan": "workspace:*",
-    "@outstaff/integration.tracker.itsaplan": "workspace:*",
+    "@outstaff/integration.shared.itsaplan": "workspace:*",
     "@outstaff/integration.vcs.github": "workspace:*",
     "@outstaff/testing.github": "workspace:*"
   }

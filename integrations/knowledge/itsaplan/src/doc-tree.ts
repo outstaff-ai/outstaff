@@ -1,4 +1,5 @@
-import type { ApiDocSummary, Tree } from "./types.js";
+import type { ApiDocSummary } from "@outstaff/integration.shared.itsaplan";
+import type { Tree } from "./types.js";
 
 // Documents form a tree; a path is the titles from the root, or the path stored in metadata.
 

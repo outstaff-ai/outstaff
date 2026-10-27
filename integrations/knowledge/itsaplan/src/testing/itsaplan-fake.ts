@@ -6,7 +6,7 @@ import {
   createItsaplanFake as createTrackerFake,
   type FakeOptions,
 } from "@outstaff/testing.itsaplan";
-import type { ApiDoc, ApiDocSummary } from "../types.js";
+import type { ApiDoc, ApiDocSummary } from "@outstaff/integration.shared.itsaplan";
 import type { ItsaplanFake, NewDocComment, StoredDoc, StoredDocComment } from "./types.js";
 
 // The tracker package's stand-in for the Its a Plan REST API, plus the document routes the knowledge adapter uses.

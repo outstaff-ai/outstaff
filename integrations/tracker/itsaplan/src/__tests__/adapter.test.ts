@@ -1,9 +1,15 @@
 import { PortError, silentLogger, type AdapterContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { eventType } from "../events.js";
-import { buildFetch } from "../fetch.js";
-import { errorCode, ItsaplanHttp } from "../http.js";
-import { knowledgeOptions, resolveConnection, trackerOptions, deriveApiUrl } from "../options.js";
+import {
+  buildFetch,
+  deriveApiUrl,
+  errorCode,
+  ItsaplanHttp,
+  optionalConnectionOptions as knowledgeOptions,
+  resolveConnection,
+} from "@outstaff/integration.shared.itsaplan";
+import { trackerOptions } from "../index.js";
 import { createItsaplanTracker } from "../tracker.js";
 import {
   API_KEY,
@@ -580,5 +586,35 @@ describe("custom CA", () => {
     const f = await buildFetch(fetch, { ...conn, ca_file: "x" }, { readFile: () => "not a pem" });
     expect(typeof f).toBe("function");
     expect(f).not.toBe(fetch);
+  });
+});
+
+describe("tracker links", () => {
+  it("links a comment to its parent unless a comment template is set", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const issue = await tracker.createIssue({ title: "T", body: "" });
+    expect(tracker.links.comment!("SHOP-7", "41")).toBe(
+      "https://tracker.acme.example/acme/issue/SHOP-7",
+    );
+
+    const made = await tracker.comment(issue.key, "hi");
+    expect(made.url).toBe(tracker.links.issue(issue.key));
+
+    const custom = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      options: trackerOptions.parse({
+        url: "https://tracker.acme.example",
+        project: "SHOP",
+        issue_comment_url: "{url}/{workspace}/issue/{key}?comment={commentId}",
+      }),
+    });
+
+    const again = await custom.comment(issue.key, "hi again");
+    expect(again.url).toBe(
+      `https://tracker.acme.example/acme/issue/${issue.key}?comment=${again.id}`,
+    );
+
+    expect((await custom.listComments(issue.key)).map((c) => c.url)).toContain(again.url);
   });
 });

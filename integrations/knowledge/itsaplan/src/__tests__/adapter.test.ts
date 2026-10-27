@@ -1,23 +1,9 @@
-import { silentLogger, type AdapterContext, type TeamConfig } from "@outstaff/core";
-import {
-  createItsaplanTracker,
-  knowledgeOptions,
-  trackerOptions,
-} from "@outstaff/integration.tracker.itsaplan";
+import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { API_KEY, secretMap, team } from "@outstaff/testing.itsaplan";
+import { knowledgeOptions } from "../index.js";
 import { createItsaplanKnowledge } from "../knowledge.js";
 import { createItsaplanFake } from "../testing/itsaplan-fake.js";
-
-const trackerCtx = (fake: ReturnType<typeof createItsaplanFake>, t: TeamConfig = team) =>
-  ({
-    options: trackerOptions.parse({ url: "https://tracker.acme.example", project: "SHOP" }),
-    secrets: secretMap({ ITSAPLAN_API_KEY: API_KEY }),
-    team: t,
-    log: silentLogger,
-    fetch: fake.fetch,
-    now: () => new Date("2026-01-01T00:00:00Z"),
-  }) satisfies AdapterContext<ReturnType<typeof trackerOptions.parse>>;
 
 const knowledgeCtx = (fake: ReturnType<typeof createItsaplanFake>) =>
   ({
@@ -46,31 +32,6 @@ describe("tracker", () => {
 
   it("links a comment to its parent unless a comment template is set", async () => {
     const fake = createItsaplanFake();
-    const tracker = await createItsaplanTracker(trackerCtx(fake));
-    const issue = await tracker.createIssue({ title: "T", body: "" });
-    expect(tracker.links.comment!("SHOP-7", "41")).toBe(
-      "https://tracker.acme.example/acme/issue/SHOP-7",
-    );
-
-    const made = await tracker.comment(issue.key, "hi");
-    expect(made.url).toBe(tracker.links.issue(issue.key));
-
-    const custom = await createItsaplanTracker({
-      ...trackerCtx(fake),
-      options: trackerOptions.parse({
-        url: "https://tracker.acme.example",
-        project: "SHOP",
-        issue_comment_url: "{url}/{workspace}/issue/{key}?comment={commentId}",
-      }),
-    });
-
-    const again = await custom.comment(issue.key, "hi again");
-    expect(again.url).toBe(
-      `https://tracker.acme.example/acme/issue/${issue.key}?comment=${again.id}`,
-    );
-
-    expect((await custom.listComments(issue.key)).map((c) => c.url)).toContain(again.url);
-
     const kb = await createItsaplanKnowledge({
       ...knowledgeCtx(fake),
       options: knowledgeOptions.parse({

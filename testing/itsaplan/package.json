@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@outstaff/core": "workspace:*",
-    "@outstaff/integration.tracker.itsaplan": "workspace:*",
+    "@outstaff/integration.shared.itsaplan": "workspace:*",
     "vitest": "5.0.5"
   }
 }

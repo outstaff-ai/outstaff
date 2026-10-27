@@ -31,6 +31,12 @@ const coreAlias = [
     replacement: fileURLToPath(new URL("integrations/vcs/github/src/index.ts", import.meta.url)),
   },
   {
+    find: /^@outstaff\/integration\.shared\.itsaplan$/,
+    replacement: fileURLToPath(
+      new URL("integrations/shared/itsaplan/src/index.ts", import.meta.url),
+    ),
+  },
+  {
     find: /^@outstaff\/integration\.tracker\.itsaplan$/,
     replacement: fileURLToPath(
       new URL("integrations/tracker/itsaplan/src/index.ts", import.meta.url),
@@ -60,6 +66,7 @@ const integrations = [
   "tracker/itsaplan",
   "knowledge/itsaplan",
   "avatars/dicebear",
+  "shared/itsaplan",
 ];
 
 export default defineConfig({

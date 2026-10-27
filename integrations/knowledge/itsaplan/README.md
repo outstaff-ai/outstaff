@@ -2,7 +2,7 @@
 
 Its a Plan knowledge adapter (`knowledge/itsaplan`) for Outstaff: the project's document tree, markdown in and out of the editor's JSON, search, versions, inline comments, replies and resolve.
 
-It runs on the REST client, options, setup guide and doctor checks of [`@outstaff/integration.tracker.itsaplan`](../../tracker/itsaplan/README.md); identity, self-hosted instances and custom CAs, the rate limit and error mapping are described there. The two adapters of a process share one pacer per API key.
+It runs on the REST client, options, setup guide and doctor checks of [`@outstaff/integration.shared.itsaplan`](../../shared/itsaplan/README.md), which the tracker adapter uses too; identity, self-hosted instances and custom CAs, the rate limit and error mapping are described there. The two adapters of a process share one pacer per API key.
 
 ```yaml
 integrations:
@@ -28,4 +28,4 @@ Setup (members for agents, emails, API keys) is in the [adapter guide](https://d
 
 ## Tests
 
-`pnpm test` runs the knowledge contract kit against the adapter over the tracker package's stand-in for the REST API, with the document routes added (`src/testing/`), plus markdown round-trips, links and document comment events. `src/__tests__/live.test.ts` runs against a real scratch project only when `OUTSTAFF_TEST_ITSAPLAN_URL`, `OUTSTAFF_TEST_ITSAPLAN_PROJECT` and `ITSAPLAN_API_KEY` are set (optionally `OUTSTAFF_TEST_ITSAPLAN_API_URL` and `OUTSTAFF_TEST_ITSAPLAN_CA_FILE`); otherwise it shows as skipped. It creates pages in that project.
+`pnpm test` runs the knowledge contract kit against the adapter over the Its a Plan stand-in (`@outstaff/testing.itsaplan`) with the document routes added (`src/testing/`), plus markdown round-trips, links and document comment events. `src/__tests__/live.test.ts` runs against a real scratch project only when `OUTSTAFF_TEST_ITSAPLAN_URL`, `OUTSTAFF_TEST_ITSAPLAN_PROJECT` and `ITSAPLAN_API_KEY` are set (optionally `OUTSTAFF_TEST_ITSAPLAN_API_URL` and `OUTSTAFF_TEST_ITSAPLAN_CA_FILE`); otherwise it shows as skipped. It creates pages in that project.

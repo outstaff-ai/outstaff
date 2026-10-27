@@ -3,10 +3,11 @@ import {
   nextCursor,
   OVERLAP_MS,
   parseCursor,
+  type ApiDocComment,
   type Itsaplan,
-} from "@outstaff/integration.tracker.itsaplan";
+} from "@outstaff/integration.shared.itsaplan";
 import { commentId } from "./comment-ids.js";
-import type { ApiDocComment, DocEventDeps, ReadComment } from "./types.js";
+import type { DocEventDeps, ReadComment } from "./types.js";
 
 /** A document that was deleted or closed to this account is no longer news; anything else is retried. */
 const isGone = (error: unknown) =>

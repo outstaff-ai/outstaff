@@ -1,5 +1,11 @@
-import { PortError, type CanonicalStatus, type StatusMap } from "@outstaff/core";
-import type { ApiColumn, ApiProject } from "./types.js";
+import {
+  PortError,
+  type AdapterContext,
+  type CanonicalStatus,
+  type StatusMap,
+} from "@outstaff/core";
+import type { ApiColumn, ApiProject } from "@outstaff/integration.shared.itsaplan";
+import type { Statuses } from "./types.js";
 
 /** Default status names, Title Case; `team.workflow.statuses` overrides them. */
 export const DEFAULT_NAMES: Record<CanonicalStatus, string> = {
@@ -76,4 +82,13 @@ export function statusOf(
 
   const canonical = named ?? CANONICAL_FOR_STATE[col.stateType];
   return canonical ? { name: col.name, canonical } : { name: col.name };
+}
+
+/** The statuses of a team: the default names with `team.workflow.statuses` over them. */
+export function teamStatuses(team: AdapterContext<unknown>["team"]): Statuses {
+  const map: StatusMap = { ...DEFAULT_NAMES, ...team?.workflow?.statuses };
+  return {
+    column: (setup, status) => columnFor(map, setup, status),
+    status: (setup, columnId) => statusOf(map, setup, columnId),
+  };
 }

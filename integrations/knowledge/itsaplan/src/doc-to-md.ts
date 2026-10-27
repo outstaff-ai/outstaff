@@ -1,4 +1,4 @@
-import type { Mark, PmNode } from "./types.js";
+import type { Mark, PmNode } from "@outstaff/integration.shared.itsaplan";
 
 // --- editor JSON -> markdown
 

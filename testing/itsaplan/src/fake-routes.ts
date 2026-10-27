@@ -1,5 +1,5 @@
 import { err } from "./fake-state.js";
-import type { ApiAttachment, ApiProject } from "@outstaff/integration.tracker.itsaplan";
+import type { ApiAttachment, ApiProject } from "@outstaff/integration.shared.itsaplan";
 import type { FakeState, Route, StoredIssue } from "./types.js";
 
 /** The REST routes of the tracker API, over the fake's state. */

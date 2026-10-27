@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { docToMd } from "../doc-to-md.js";
 import { mdToDoc } from "../markdown.js";
 import { findRange, plainText } from "../text-range.js";
-import type { PmNode } from "../types.js";
+import type { PmNode } from "@outstaff/integration.shared.itsaplan";
 
 /** The node at the given content indexes, or undefined where the path runs out. */
 const nodeAt = (node: PmNode | undefined, ...path: number[]): PmNode | undefined =>

@@ -3,7 +3,7 @@ title: Its a Plan
 description: Set up the Its a Plan tracker and knowledge adapters, with one member account per agent.
 ---
 
-The `itsaplan` adapters implement two ports: the **tracker** (issues, columns, comments, labels, links, members and an event feed) in `@outstaff/integration.tracker.itsaplan`, and **knowledge** (the project's documents, with comments) in `@outstaff/integration.knowledge.itsaplan`, which uses the tracker package's client and setup.
+The `itsaplan` adapters implement two ports: the **tracker** (issues, columns, comments, labels, links, members and an event feed) in `@outstaff/integration.tracker.itsaplan`, and **knowledge** (the project's documents, with comments) in `@outstaff/integration.knowledge.itsaplan`. Both run on `@outstaff/integration.shared.itsaplan`, which holds the client, its rate-limit pacer, the options, setup and doctor checks; neither adapter depends on the other.
 
 ## Agents are members
 

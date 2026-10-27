@@ -9,16 +9,24 @@ import {
   type Tracker,
   type TrackerEvent,
 } from "@outstaff/core";
-import { createClient, type Itsaplan } from "./client.js";
+import {
+  createClient,
+  type ApiAttachment,
+  type ApiFeedItem,
+  type ApiIssue,
+  type ClientDeps,
+  type Itsaplan,
+} from "@outstaff/integration.shared.itsaplan";
 import { readEvents } from "./events.js";
 import { issueHelpers } from "./issues.js";
-import type { ApiAttachment, ApiFeedItem, ApiIssue, ClientDeps, TrackerOptions } from "./types.js";
+import { teamStatuses } from "./statuses.js";
+import type { Statuses, TrackerOptions } from "./types.js";
 
 export function createItsaplanTracker(
   ctx: AdapterContext<TrackerOptions>,
   deps: ClientDeps = {},
 ): Promise<Tracker> {
-  return createClient(ctx, deps).then((api) => buildTracker(api));
+  return createClient(ctx, deps).then((api) => buildTracker(api, teamStatuses(ctx.team)));
 }
 
 const attachmentId = (a: ApiAttachment) =>
@@ -41,8 +49,11 @@ function listedAttachment(a: ApiAttachment): TicketAttachment[] {
   ];
 }
 
-function buildTracker(api: Itsaplan): Tracker {
-  const { toIssue, fetchIssue, labelIds, hydrate, patch, commentFeed, actor } = issueHelpers(api);
+function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
+  const { toIssue, fetchIssue, labelIds, hydrate, patch, commentFeed, actor } = issueHelpers(
+    api,
+    statuses,
+  );
 
   return {
     links: {
@@ -58,7 +69,7 @@ function buildTracker(api: Itsaplan): Tracker {
       const setup = await api.project();
       const items = await api.http.request<ApiIssue[]>("GET", `${api.projectPath}/issues`, {
         query: {
-          columnId: filter.status ? api.column(setup, filter.status).id : undefined,
+          columnId: filter.status ? statuses.column(setup, filter.status).id : undefined,
           assigneeUserId: filter.assignee ? api.resolveMemberId(setup, filter.assignee) : undefined,
           updatedFrom: filter.updatedSince,
           limit: filter.limit,
@@ -81,7 +92,7 @@ function buildTracker(api: Itsaplan): Tracker {
       const body: Record<string, unknown> = {
         title: issue.title,
         description: issue.body,
-        columnId: api.column(setup, issue.status ?? "backlog").id,
+        columnId: statuses.column(setup, issue.status ?? "backlog").id,
       };
 
       if (issue.assignee) {
@@ -105,7 +116,7 @@ function buildTracker(api: Itsaplan): Tracker {
 
     async transition(key, to: CanonicalStatus) {
       const setup = await api.project();
-      return patch(key, { columnId: api.column(setup, to).id });
+      return patch(key, { columnId: statuses.column(setup, to).id });
     },
 
     async assign(key, memberId) {

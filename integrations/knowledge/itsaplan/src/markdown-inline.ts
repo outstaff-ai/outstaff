@@ -1,6 +1,6 @@
 // Inline markdown (bold, italic, strike, code, links, hard breaks) to editor JSON text nodes.
 
-import type { Mark, PmNode } from "./types.js";
+import type { Mark, PmNode } from "@outstaff/integration.shared.itsaplan";
 
 const LINK_ATTRS = {
   title: null,

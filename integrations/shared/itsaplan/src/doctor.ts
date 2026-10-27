@@ -1,7 +1,7 @@
 import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
 import { Itsaplan } from "./client.js";
 import { ItsaplanHttp } from "./http.js";
-import { knowledgeOptions, resolveConnection } from "./options.js";
+import { optionalConnectionOptions, resolveConnection } from "./options.js";
 
 interface Me {
   id?: number | string;
@@ -21,7 +21,7 @@ function memberOf(me: Me): KeyOwner {
 }
 
 async function connect(apiKey: string, ctx: DeriveContext): Promise<{ api: Itsaplan; me: Me }> {
-  const conn = resolveConnection(ctx, knowledgeOptions.parse(ctx.options ?? {}));
+  const conn = resolveConnection(ctx, optionalConnectionOptions.parse(ctx.options ?? {}));
   const http = new ItsaplanHttp({
     fetch: ctx.fetch,
     apiUrl: conn.api_url,

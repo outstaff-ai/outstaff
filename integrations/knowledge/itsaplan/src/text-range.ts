@@ -1,4 +1,4 @@
-import type { PmNode } from "./types.js";
+import type { PmNode } from "@outstaff/integration.shared.itsaplan";
 
 // --- editor positions, for anchored comments
 
