@@ -1,3 +1,4 @@
+import type { ActOutcome } from "@outstaff/core";
 import type { Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { PipelineCondition } from "./policy.types.js";
@@ -20,10 +21,14 @@ export interface Trace {
   event: PipelineEvent;
   policies: PolicyTrace[];
   decisions: Decision[];
+
+  /** What each executed act did, by act id (`<event id>:<policy>`), once its result is in. */
+  results?: Record<string, ActOutcome> | undefined;
 }
 
 /** Where traces are kept; `id` is the event's id. */
 export interface TraceStore {
+  /** Replaces the event's trace; act results already recorded for it are kept. */
   record(trace: Trace): Promise<void>;
   get(id: string): Promise<Trace | undefined>;
 

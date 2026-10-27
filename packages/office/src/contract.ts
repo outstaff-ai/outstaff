@@ -39,6 +39,16 @@ const CORE_ROWS: Row[] = [
     text: "One token per person, so the office accepts that agent's connection. The handle is upper case with `-` as `_`. Choose a long random value and give the same value to that agent as `OUTSTAFF_AGENT_TOKEN`.",
   },
   {
+    key: "OUTSTAFF_LINK_TOKEN",
+    container: "office",
+    optional: true,
+    conditional: false,
+    derivable: false,
+    visible: false,
+    markdown: true,
+    text: "Proposed (decision 0016). The bearer token the office connects with to the monitoring or management service its office link names (`link.url` in the team file). Without it, or without the URL, the office connects to none. The service gives it out for the office.",
+  },
+  {
     key: "OUTSTAFF_AGENT_TOKEN",
     container: "agent",
     optional: false,

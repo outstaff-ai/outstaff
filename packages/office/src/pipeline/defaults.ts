@@ -87,7 +87,7 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
   {
     id: "merged_closes_ticket",
     summary:
-      "A merge into the default branch closes the ticket as the author, unless another of its pull requests is open.",
+      "A merge into the default branch closes the ticket for the author, unless another of its pull requests is open.",
     on: ["pr.merged"],
     when: {
       all: [
@@ -97,6 +97,7 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
       ],
     },
     decide: { act: { as: "author", ops: [{ move: "done" }] } },
+    instruction: "Moved to done for {{person}} (pull request #{{pr.number}} merged).",
   },
   {
     id: "rebase_to_author",
@@ -119,10 +120,11 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
   },
   {
     id: "opened_to_review",
-    summary: "A pull request opened for review moves its ticket to review, as the author.",
+    summary: "A pull request opened for review moves its ticket to review, for the author.",
     on: ["pr.opened"],
     when: { all: [{ not: { pr_draft: true } }, { ticket_status: ["backlog", "ready", "active"] }] },
     decide: { act: { as: "author", ops: [{ move: "review" }] } },
+    instruction: "Moved to review for {{person}} (pull request #{{pr.number}} opened).",
   },
   {
     id: "assigned_to_assignee",
@@ -170,7 +172,7 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
   {
     id: "hand_back_done",
     summary:
-      "A hand-back as done moves the ticket to review and gives it to the requester, as the agent.",
+      "A hand-back as done moves the ticket to review and gives it to the requester, for the agent.",
     on: ["agent.handed_back"],
     when: {
       all: [
@@ -179,11 +181,13 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
       ],
     },
     decide: { act: { as: "actor", ops: [{ move: "review" }, { assign: "requester" }] } },
+    instruction:
+      "Moved to review and assigned to the requester for {{person}}, who handed the work back as done.",
   },
   {
     id: "hand_back_blocked",
     summary:
-      "A hand-back as blocked, or as done on a ticket the agent moved to blocked, moves the ticket to blocked and gives it to the requester, as the agent.",
+      "A hand-back as blocked, or as done on a ticket the agent moved to blocked, moves the ticket to blocked and gives it to the requester, for the agent.",
     on: ["agent.handed_back"],
     when: {
       all: [
@@ -197,6 +201,8 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
       ],
     },
     decide: { act: { as: "actor", ops: [{ move: "blocked" }, { assign: "requester" }] } },
+    instruction:
+      "Moved to blocked and assigned to the requester for {{person}}, who handed the work back as blocked.",
   },
   {
     id: "idle_pulls_next",

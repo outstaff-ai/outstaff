@@ -1,41 +1,9 @@
-import { z } from "zod";
+import { fieldRows, payloadSchema, table } from "./docs-format.js";
+import type { JsonSchema } from "./docs-format.types.js";
 import { MESSAGE_META } from "./meta.js";
 import { ERROR_CODES, PROTOCOL_VERSION } from "./constants.js";
 import { messageSchema } from "./schemas/message.js";
 import type { MessageType } from "./types.js";
-
-interface JsonSchema {
-  type?: string | string[];
-  enum?: unknown[];
-  const?: unknown;
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  items?: JsonSchema;
-  description?: string;
-  anyOf?: JsonSchema[];
-}
-
-function typeOf(s: JsonSchema): string {
-  if (s.enum) {
-    return s.enum.map((v) => `\`${String(v)}\``).join(" or ");
-  }
-
-  if (s.anyOf) {
-    return s.anyOf.map(typeOf).join(" or ");
-  }
-
-  if (s.type === "array" && s.items) {
-    return `list of ${typeOf(s.items)}`;
-  }
-
-  if (s.type === "object" && s.properties) {
-    return `object (${Object.keys(s.properties).join(", ")})`;
-  }
-
-  return Array.isArray(s.type) ? s.type.join(" or ") : (s.type ?? "any");
-}
-
-const escape = (s: string) => s.replaceAll("|", "\\|").replaceAll("\n", " ");
 
 function payloadOf(type: MessageType): JsonSchema {
   const option = messageSchema.options.find((o) => o.shape.type.value === type);
@@ -43,35 +11,7 @@ function payloadOf(type: MessageType): JsonSchema {
     throw new Error(`No schema for ${type}`);
   }
 
-  return z.toJSONSchema(option.shape.payload, { io: "input" }) as JsonSchema;
-}
-
-/** A table padded the way the formatter writes it, so the committed page stays formatted. */
-function table(rows: string[][]): string[] {
-  const widths = (rows[0] ?? []).map((_, i) =>
-    Math.max(3, ...rows.map((r) => (r[i] ?? "").length)),
-  );
-
-  const line = (r: string[]) => `| ${r.map((c, i) => c.padEnd(widths[i] ?? 0)).join(" | ")} |`;
-  const [head, ...body] = rows;
-  return [
-    line(head ?? []),
-    `| ${widths.map((w) => "-".repeat(w)).join(" | ")} |`,
-    ...body.map(line),
-  ];
-}
-
-/** One row per field; fields of nested objects get dotted names, and `[]` marks list items. */
-function fieldRows(s: JsonSchema, prefix: string): string[][] {
-  return Object.entries(s.properties ?? {}).flatMap(([name, field]) => {
-    const required = s.required?.includes(name) ? "yes" : "no";
-    const path = `${prefix}${name}`;
-    const item = field.type === "array" ? field.items : undefined;
-    const nested = field.properties ? field : item?.properties ? item : undefined;
-    const type = nested ? (item ? "list of objects" : "object") : typeOf(field);
-    const row = [`\`${path}\``, escape(type), required, escape(field.description ?? "")];
-    return nested ? [row, ...fieldRows(nested, `${path}${item ? "[]" : ""}.`)] : [row];
-  });
+  return payloadSchema(option.shape.payload);
 }
 
 function section(type: MessageType): string[] {

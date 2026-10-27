@@ -236,8 +236,30 @@ describe("decide: act", () => {
     expect(run(asAuthor, event("pr.merged", { subject: { pr: prRef(4) } }))).toEqual({
       type: "drop",
       policy: "p",
-      reason:
-        "no agent to act as (the office never acts as itself): pull request has no agent author",
+      reason: "no agent to act for: pull request has no agent author",
+    });
+  });
+});
+
+describe("decide: an act's note", () => {
+  const sam = { kind: "agent" as const, id: "sam" };
+  const e = event("agent.handed_back", { subject: { ticket: "ACME-1" }, actor: sam });
+  const world = { tickets: { "ACME-1": { status: "active" as const } } };
+  const moveFor = (instruction: string) =>
+    policy({ act: { as: "actor", ops: [{ move: "review" }] } }, instruction);
+
+  it("is the policy's template, naming the agent the changes are for", () => {
+    expect(run(moveFor("Moved to review for {{person}}."), e, world)).toMatchObject({
+      type: "act",
+      note: "Moved to review for sam.",
+    });
+  });
+
+  it("drops the act when the note cannot be rendered", () => {
+    expect(run(moveFor("{{nope}}"), e, world)).toEqual({
+      type: "drop",
+      policy: "p",
+      reason: 'the note cannot be rendered: Unknown template variable "nope".',
     });
   });
 });

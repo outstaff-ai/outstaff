@@ -886,11 +886,11 @@ Team chat channel where the office mirrors agent-to-agent questions and answers,
 
 ### office.pipeline
 
-Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`. Default off.
+Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.
 
 - Type: `string`
 - Optional
-- Allowed values: `off`, `shadow`
+- Allowed values: `off`, `shadow`, `live`
 
 ## tools
 
@@ -1614,6 +1614,21 @@ Wakes for the same person and subject within this many seconds become one run. D
 - Optional
 - Minimum 0
 - Maximum 3600
+
+## link
+
+Proposed (decision 0016): a monitoring or management service the office connects out to, with the secret OUTSTAFF_LINK_TOKEN, that shows its people, queues and event traces (a dashboard, for example). Without it, or without the token, the office connects to none.
+
+- Type: `object`
+- Optional
+
+### link.url
+
+Where the office connects, for example wss://ops.acme.example/link.
+
+- Type: `string`
+- Required
+- Must match `^wss?:\/\/\S+$`
 
 ## policies
 

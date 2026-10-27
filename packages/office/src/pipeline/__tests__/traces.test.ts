@@ -39,6 +39,18 @@ describe.each(kinds)("traces %s", (_name, make) => {
     expect(await traces.get("tracker:1")).toEqual(replaced);
   });
 
+  it("keeps the act results of a trace that is recorded again", async () => {
+    const traces = await make();
+    const done = {
+      ...trace("e", "2026-10-05T09:00:00.000Z"),
+      results: { "e:p": { ok: true, results: ["moved"] } },
+    };
+
+    await traces.record(done);
+    await traces.record(trace("e", "2026-10-05T09:00:00.000Z"));
+    expect((await traces.get("e"))?.results).toEqual(done.results);
+  });
+
   it("lists the newest event first, by time, in pages", async () => {
     const traces = await make();
     await traces.record(trace("a", "2026-10-05T09:00:00.000Z"));

@@ -1,5 +1,7 @@
-import type { CanonicalStatus } from "@outstaff/core";
+import type { ActOp } from "@outstaff/core";
 import type { Feedback } from "@outstaff/protocol";
+
+export type { ActOp, ActTarget } from "@outstaff/core";
 
 /** What a woken agent's run is about; the key coalescing groups by, together with the person. */
 export interface WakeSubject {
@@ -20,23 +22,25 @@ export interface Wake {
   /** The reviews, comments or messages the run must act on, oldest first. */
   feedback: Feedback[];
   subject: WakeSubject;
+
+  /** The work item the wake queued, or joined; set once the live pipeline has queued it. */
+  itemId?: string | undefined;
 }
 
-export type ActTarget = { kind: "agent" | "human"; id: string };
-
-/** A tracker or knowledge-base change, made with the acting agent's own identity. */
-export type ActOp =
-  | { op: "move"; ticket: string; to: CanonicalStatus }
-  | { op: "assign"; ticket: string; to: ActTarget | null }
-  | { op: "comment"; on: { ticket: string } | { doc: string }; body: string }
-  | { op: "set_parent"; ticket: string; parent: string };
-
-/** Change the tracker as `as`, without a model run and without waking them. */
+/**
+ * Change the tracker on behalf of `as`, without a model run and without waking them. The office makes the changes
+ * with its own account, and posts `note` with them, saying whom they are for.
+ */
 export interface Act {
   type: "act";
   policy: string;
+
+  /** The agent the changes are made for. */
   as: string;
   ops: ActOp[];
+
+  /** The comment the office posts on the ticket with the changes. */
+  note?: string | undefined;
 }
 
 /** Nothing happens; recorded so it can be explained. */

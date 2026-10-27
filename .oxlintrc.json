@@ -90,6 +90,7 @@
         "packages/cli/src/commands/workflow.ts",
         "packages/cli/src/ejected.ts",
         "packages/cli/src/load.ts",
+        "packages/core/src/acts/apply.ts",
         "packages/core/src/catalog/context.ts",
         "packages/core/src/catalog/load.ts",
         "packages/core/src/catalog/template-parse.ts",
@@ -137,6 +138,8 @@
         "packages/office/src/intake/intake.ts",
         "packages/office/src/item-refs.ts",
         "packages/office/src/item-summary.ts",
+        "packages/office/src/link/client.ts",
+        "packages/office/src/link/events.ts",
         "packages/office/src/main.ts",
         "packages/office/src/messaging/messaging.ts",
         "packages/office/src/messaging/mirror.ts",
@@ -170,7 +173,9 @@
         "packages/office/src/workstate/rescan.ts",
         "packages/office/src/workstate/tickets.ts",
         "packages/protocol/src/codec.ts",
+        "packages/protocol/src/docs-format.ts",
         "packages/protocol/src/docs.ts",
+        "packages/protocol/src/link/codec.ts",
         "packages/protocol/src/work-groups.ts"
       ],
       "rules": {

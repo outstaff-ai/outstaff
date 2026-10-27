@@ -50,14 +50,24 @@ const prWorld = (
 });
 
 describe("default policies", () => {
-  it("are listed once each, wakes with an instruction and acts without", () => {
+  it("are listed once each; wakes have an instruction and acts a note naming the agent", () => {
     expect(new Set(DEFAULT_POLICIES.map((p) => p.id)).size).toBe(DEFAULT_POLICIES.length);
-    for (const p of DEFAULT_POLICIES) {
-      expect({ id: p.id, instruction: p.instruction !== undefined }).toEqual({
-        id: p.id,
-        instruction: "wake" in p.decide,
-      });
-    }
+    expect(DEFAULT_POLICIES.filter((p) => p.instruction === undefined)).toEqual([]);
+    const acts = DEFAULT_POLICIES.filter((p) => "act" in p.decide);
+    expect(acts.filter((p) => !p.instruction!.includes("for {{person}}"))).toEqual([]);
+  });
+
+  it("acts post a note saying whom the changes are for", () => {
+    const trace = evaluatePipeline(
+      event("pr.opened", { subject: { pr: prRef(9) }, actor: SAM }),
+      stateOf(prWorld({}, "active")),
+      DEFAULT_POLICIES,
+      OPTS,
+    );
+
+    expect(trace.decisions).toMatchObject([
+      { type: "act", as: "sam", note: "Moved to review for sam (pull request #9 opened)." },
+    ]);
   });
 
   it("chat_to_addressed: a human's message wakes the agent it is written to", () => {
@@ -131,7 +141,7 @@ describe("default policies", () => {
   it("merged_closes_ticket: as the author, unless the merge was into another branch or another pull request is open", () => {
     const merged = onPr("pr.merged");
     expect(judge("merged_closes_ticket", merged, prWorld({ state: "merged" }))).toEqual([
-      "act as sam: move ACME-9 to done",
+      "act for sam: move ACME-9 to done",
     ]);
 
     expect(
@@ -152,9 +162,7 @@ describe("default policies", () => {
 
     expect(
       judge("merged_closes_ticket", merged, prWorld({ state: "merged", author: HUMAN_AUTHOR })),
-    ).toEqual([
-      "drop: no agent to act as (the office never acts as itself): pull request has no agent author",
-    ]);
+    ).toEqual(["drop: no agent to act for: pull request has no agent author"]);
   });
 
   it("rebase_to_author: conflicts, a base behind or merged, on an agent's open pull request, naming the cause", () => {
@@ -199,7 +207,7 @@ describe("default policies", () => {
   it("opened_to_review: a pull request ready for review moves its open ticket, as the author", () => {
     const opened = onPr("pr.opened", {}, SAM);
     expect(judge("opened_to_review", opened, prWorld({}, "active"))).toEqual([
-      "act as sam: move ACME-9 to review",
+      "act for sam: move ACME-9 to review",
     ]);
 
     expect(judge("opened_to_review", opened, prWorld({ draft: true }, "active"))).toEqual({
@@ -319,7 +327,7 @@ describe("default policies", () => {
     });
 
     expect(judge("hand_back_done", back("done"), world("active"))).toEqual([
-      "act as sam: move ACME-1 to review, assign ACME-1 to human ada.admin",
+      "act for sam: move ACME-1 to review, assign ACME-1 to human ada.admin",
     ]);
 
     expect(judge("hand_back_done", back("done"), world("blocked"))).toMatchObject({
@@ -327,11 +335,11 @@ describe("default policies", () => {
     });
 
     expect(judge("hand_back_blocked", back("blocked"), world("active"))).toEqual([
-      "act as sam: move ACME-1 to blocked, assign ACME-1 to human ada.admin",
+      "act for sam: move ACME-1 to blocked, assign ACME-1 to human ada.admin",
     ]);
 
     expect(judge("hand_back_blocked", back("done"), world("blocked"))).toEqual([
-      "act as sam: assign ACME-1 to human ada.admin",
+      "act for sam: assign ACME-1 to human ada.admin",
     ]);
 
     expect(judge("hand_back_blocked", back("waiting"), world("active"))).toMatchObject({

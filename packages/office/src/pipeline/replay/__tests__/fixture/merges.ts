@@ -88,7 +88,7 @@ export const unrelatedConflict: ReplayScenario = {
         requiresUpToDate: true,
         notes: {
           "derived:pr.conflicted:acme-example/shop#51:after:acme-example/shop#50":
-            "intended fix: sam is woken and told #50 caused it; the office no longer reassigns, moves or comments on ACME-131 as itself",
+            "intended fix: sam is woken and told #50 caused it; reassigning and moving ACME-131 is left to sam, and nothing is commented",
           "derived:pr.conflicted:acme-example/shop#52:after:acme-example/shop#50":
             "intended fix: #52 conflicted already, but against an older main; today the new conflict is ignored",
           "derived:pr.behind_base:acme-example/shop#53:after:acme-example/shop#50":

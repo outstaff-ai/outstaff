@@ -1,7 +1,7 @@
-import { silentLogger } from "@outstaff/core";
+import { silentLogger, type WorkflowEvent } from "@outstaff/core";
 import type { Human } from "@outstaff/protocol";
 import { createChatDesk } from "./chat/index.js";
-import { createEngine } from "./engine/index.js";
+import { createEngine, type EngineMeta } from "./engine/index.js";
 import { createIntake } from "./intake/index.js";
 import { createMessaging, type RoleInfo } from "./messaging/index.js";
 import { officeDocLinks } from "./office-doc-links.js";
@@ -11,7 +11,8 @@ import { requesterChat } from "./office-requester.js";
 import { officeTicketPrs } from "./office-ticket-prs.js";
 import type { CreateOfficeInput, Office } from "./office.types.js";
 import { createOfficePorts } from "./ports.js";
-import { createOfficeShadow } from "./pipeline/office-shadow.js";
+import { createOfficePipeline } from "./pipeline/office-pipeline.js";
+import { createLinkForOffice } from "./office-link.js";
 import {
   agentAuthFromSecrets,
   createProtocolServer,
@@ -141,15 +142,16 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     return p;
   };
 
-  const { judge, pipeline } = createOfficeShadow({
-    team,
-    workState,
-    store,
-    clock,
-    log,
-    engine,
-    track,
-  });
+  // Proposed (decision 0016): the event pipeline beside the engine, off unless `office.pipeline` turns it on. In shadow
+  // mode it judges each event before the engine applies anything, so both judge the same state: after the engine it
+  // would see the engine's own moves already made, decide "nothing to change", and its traces could not be compared
+  // with the engine's. It never throws, so it cannot hold up or fail the engine. Live, it judges instead of the engine.
+  const pipelineOptions = { team, store, workState, scheduler, ports, clock, logger: log };
+  const officePipeline = createOfficePipeline(pipelineOptions);
+
+  const pipeline = officePipeline.runner;
+  const judge = (event: WorkflowEvent, meta: EngineMeta) =>
+    track(officePipeline.route(event, meta, () => track(engine.handle(event, meta))));
 
   // At-least-once and in order: the state reflects the event before the engine judges it, and both are idempotent.
   intake.onEvent(async (event, meta) => {
@@ -275,7 +277,9 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   const protocol = server;
+  const link = createLinkForOffice({ input, ports, protocol, log });
   const lifecycle = officeLifecycle({
+    link,
     team,
     store,
     log,
@@ -289,7 +293,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   return {
-    parts: { intake, workState, engine, scheduler, usage, server: protocol, ports, pipeline },
+    parts: { intake, workState, engine, scheduler, usage, server: protocol, ports, pipeline, link },
     ...lifecycle,
     agentPort: () => protocol.port(),
   };

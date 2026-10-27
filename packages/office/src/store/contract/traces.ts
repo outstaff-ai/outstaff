@@ -36,4 +36,22 @@ export function traceCases(ctx: ContractContext): void {
       (await ctx.store.listTraces({ before: "2026-10-01T11:00:00.000Z" })).map((t) => t.ref),
     ).toEqual(["vcs:1"]);
   });
+
+  it("lists pipeline traces in the order they were recorded, from a time on", async () => {
+    expect(await ctx.store.listTracesRecorded({ limit: 10 })).toEqual([]);
+    await ctx.store.recordTrace(trace("vcs:b", "2026-10-01T09:00:00.000Z"));
+    await ctx.store.recordTrace(trace("vcs:a", "2026-10-01T08:00:00.000Z"));
+    const all = await ctx.store.listTracesRecorded({ limit: 10 });
+    expect(all.map((t) => t.ref).toSorted()).toEqual(["vcs:a", "vcs:b"]);
+    expect(all[0]!.recordedAt <= all[1]!.recordedAt).toBe(true);
+    expect((await ctx.store.listTracesRecorded({ limit: 1 })).map((t) => t.ref)).toEqual([
+      all[0]!.ref,
+    ]);
+
+    const from = await ctx.store.listTracesRecorded({ from: all[1]!.recordedAt, limit: 10 });
+    expect(from.map((t) => t.ref)).toContain(all[1]!.ref);
+    expect(
+      await ctx.store.listTracesRecorded({ from: "2999-01-01T00:00:00.000Z", limit: 10 }),
+    ).toEqual([]);
+  });
 }

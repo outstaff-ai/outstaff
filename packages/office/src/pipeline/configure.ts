@@ -8,7 +8,7 @@ type Team = Pick<TeamConfig, "pipeline" | "policies" | "humans" | "workflow" | "
 
 /**
  * The team's policies: the defaults in order, with `pipeline.policies.<id>` applied. `enabled` turns one on or off,
- * `instruction` replaces a wake's text and `when` narrows it: both its own condition and the team's must hold.
+ * `instruction` replaces a wake's instruction or an act's note, and `when` narrows it: both its own condition and the team's must hold.
  */
 export function configurePipeline(team: Team): ConfiguredPipeline {
   const overrides = team.pipeline?.policies ?? {};
@@ -33,8 +33,7 @@ export function configurePipeline(team: Team): ConfiguredPipeline {
     }
 
     if (o?.instruction !== undefined) {
-      const problem =
-        "wake" in base.decide ? instructionProblem(o.instruction) : "only a wake has one";
+      const problem = instructionProblem(o.instruction);
 
       if (problem) {
         issues.push(`pipeline.policies.${base.id}.instruction: ${problem}; the default is kept`);

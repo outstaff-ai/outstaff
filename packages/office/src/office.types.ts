@@ -4,6 +4,7 @@ import type { Intake } from "./intake/index.js";
 import type { ProtocolServer } from "./protocol/index.js";
 import type { Scheduler } from "./scheduler/index.js";
 import type { Store } from "./store/types.js";
+import type { OfficeLink } from "./link/index.js";
 import type { ShadowPipeline } from "./pipeline/index.js";
 import type { Clock, OfficePorts } from "./types.js";
 import type { UsageTracker } from "./usage/index.js";
@@ -76,7 +77,10 @@ export interface Office {
     server: ProtocolServer;
     ports: OfficePorts;
 
-    /** The event pipeline in shadow mode (`office.pipeline: shadow`); absent when it is off. */
+    /** The event pipeline in shadow or live mode (`office.pipeline`); absent when it is off. */
     pipeline?: ShadowPipeline | undefined;
+
+    /** The office link to a monitoring or management service (`link.url` and `OUTSTAFF_LINK_TOKEN`); absent without them. */
+    link?: OfficeLink | undefined;
   };
 }

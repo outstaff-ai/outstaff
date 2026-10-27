@@ -20,7 +20,7 @@ const HEADER = [
   "How to read it:",
   "",
   "- **Today** is the engine's workflow rules (the acme team's kanban preset, with `policies.merge.on_approval` on), plus the checks the engine makes before applying an effect that need no store: untrusted events and pending review comments are ignored, and a schedule for the agent who caused the event is skipped. It leaves out what the engine does outside its rules (moving a ticket to active when work starts, assigning an attached ticket back, retrying blocked items on a human's signal, joining or attaching to a queued item), so a move missing from the pipeline column is not by itself a regression.",
-  "- **Pipeline** is the default policy set. Tracker changes are made as the agent named, never as the office; a drop says why nothing happens.",
+  "- **Pipeline** is the default policy set. Tracker changes are made by the office for the agent named, with a comment saying so; a drop says why nothing happens.",
   "- Two sides are the same when they wake the same people for the same kinds and make the same tracker changes, whoever makes them. Today's `conflict` kind is compared as the pipeline's `rebase`.",
   "- A merge re-checks the repository's other open pull requests. Today raises `pr.conflicted` only for a pull request that turned conflicting; the pipeline raises `pr.conflicted`, `pr.behind_base` or `pr.base_merged` for every pull request the merge changed something under.",
   "- Every difference has a note: an intended fix or a regression.",

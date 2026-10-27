@@ -129,30 +129,47 @@ function op(spec: OpSpec, as: string, input: DecideInput): Resolved<ActOp> {
     : { skip: "set_parent: the event names no parent ticket" };
 }
 
+/** The changes an act makes, and why each other one is not needed. */
+function actOps(
+  spec: ActSpec,
+  as: string,
+  input: DecideInput,
+): { ops: ActOp[]; skipped: string[] } {
+  const results = spec.ops.map((item) => op(item, as, input));
+  return {
+    ops: results.flatMap((r) => ("value" in r ? [r.value] : [])),
+    skipped: results.flatMap((r) => ("skip" in r ? [r.skip] : [])),
+  };
+}
+
 function act(policy: Policy, spec: ActSpec, input: DecideInput): Decision {
+  const drop = (reason: string): Decision => ({ type: "drop", policy: policy.id, reason });
   const as = resolveSpec(spec.as, input.ctx, input.opts);
   if ("skip" in as) {
-    return {
-      type: "drop",
-      policy: policy.id,
-      reason: `no agent to act as (the office never acts as itself): ${as.skip}`,
-    };
+    return drop(`no agent to act for: ${as.skip}`);
   }
 
-  const ops: ActOp[] = [];
-  const skipped: string[] = [];
-  for (const item of spec.ops) {
-    const r = op(item, as.value, input);
-    if ("skip" in r) {
-      skipped.push(r.skip);
-    } else {
-      ops.push(r.value);
-    }
+  const { ops, skipped } = actOps(spec, as.value, input);
+  if (ops.length === 0) {
+    return drop(`nothing to change: ${skipped.join("; ")}`);
   }
 
-  return ops.length > 0
-    ? { type: "act", policy: policy.id, as: as.value, ops }
-    : { type: "drop", policy: policy.id, reason: `nothing to change: ${skipped.join("; ")}` };
+  const note = render(
+    policy.instruction ?? "",
+    instructionVariables(input.ctx, { person: as.value }),
+  );
+
+  if ("skip" in note) {
+    return drop(`the note cannot be rendered: ${note.skip}`);
+  }
+
+  return {
+    type: "act",
+    policy: policy.id,
+    as: as.value,
+    ops,
+    ...(note.value ? { note: note.value } : {}),
+  };
 }
 
 /** The decision of a policy that matched the event. */

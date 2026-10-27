@@ -10,6 +10,7 @@ import { policiesSchema } from "./policies-schema.js";
 import { repoSchema } from "./repo-schema.js";
 import { d, slug, SLUG } from "./schema-meta.js";
 import { workflowSchema } from "./workflow-schema.js";
+import { linkSchema } from "./link.js";
 import { pipelineSchema } from "./pipeline.js";
 import { checkWorkflowConfig } from "../workflow/validate.js";
 
@@ -101,11 +102,11 @@ export const teamConfigSchema = z
             ),
           ),
         pipeline: z
-          .enum(["off", "shadow"])
+          .enum(["off", "shadow", "live"])
           .optional()
           .meta(
             d(
-              "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`. Default off.",
+              "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.",
             ),
           ),
       })
@@ -123,6 +124,7 @@ export const teamConfigSchema = z
       .meta(d("Settings per catalog role, for everyone who plays it.")),
     workflow: workflowSchema.optional(),
     pipeline: pipelineSchema.optional(),
+    link: linkSchema.optional(),
     policies: policiesSchema.optional(),
   })
   .superRefine((cfg, ctx) => {

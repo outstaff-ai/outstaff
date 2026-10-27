@@ -22,7 +22,7 @@ const toTrace = (r: {
 export function traceQueries({
   db,
   now,
-}: StoreInternals): Pick<Store, "recordTrace" | "getTrace" | "listTraces"> {
+}: StoreInternals): Pick<Store, "recordTrace" | "getTrace" | "listTraces" | "listTracesRecorded"> {
   const stamp = () => iso(now());
   return {
     async recordTrace({ ref, type, at, data }) {
@@ -57,6 +57,21 @@ export function traceQueries({
         .orderBy("at", "desc")
         .orderBy("recorded_at", "desc")
         .limit(query.limit ?? DEFAULT_LIMIT)
+        .execute();
+
+      return rows.map(toTrace);
+    },
+
+    async listTracesRecorded({ from, limit }) {
+      let q = db.selectFrom("pipeline_traces").selectAll();
+      if (from !== undefined) {
+        q = q.where("recorded_at", ">=", from);
+      }
+
+      const rows = await q
+        .orderBy("recorded_at", "asc")
+        .orderBy("ref", "asc")
+        .limit(limit)
         .execute();
 
       return rows.map(toTrace);
