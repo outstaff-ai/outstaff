@@ -1,7 +1,7 @@
 import { createPublicKey, verify } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { signAppJwt } from "../jwt.js";
-import { testKey } from "../testing/keys.js";
+import { testKey } from "@outstaff/testing.core";
 
 describe("signAppJwt", () => {
   const now = new Date("2026-01-01T00:00:00Z");

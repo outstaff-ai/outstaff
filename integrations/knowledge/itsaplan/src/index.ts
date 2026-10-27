@@ -13,6 +13,8 @@ export { docToMd } from "./doc-to-md.js";
 export { mdToDoc } from "./markdown.js";
 export { findRange, plainText } from "./text-range.js";
 export type { PmNode } from "./types.js";
+// The REST shapes the adapter reads, for the Its a Plan stand-ins used in tests.
+export type { ApiDoc, ApiDocComment, ApiDocSummary } from "./types.js";
 
 export const itsaplanKnowledge = defineAdapter({
   port: "knowledge",

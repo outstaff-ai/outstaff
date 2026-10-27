@@ -3,11 +3,13 @@ import { fileURLToPath } from "node:url";
 
 /** Absolute path of the synthetic acme team file shipped in the repository. */
 export const ACME_TEAM_FILE = fileURLToPath(
-  new URL("../../../../examples/acme/.outstaff/team.yaml", import.meta.url),
+  new URL("../../../examples/acme/.outstaff/team.yaml", import.meta.url),
 );
 
 /** The real stock catalog (packages/catalog). */
-export const STOCK_CATALOG_DIR = fileURLToPath(new URL("../../../catalog", import.meta.url));
+export const STOCK_CATALOG_DIR = fileURLToPath(
+  new URL("../../../packages/catalog", import.meta.url),
+);
 
 /** A tiny catalog with one `example` role, for tests of the loader and renderer. */
 export const EXAMPLE_CATALOG_DIR = fileURLToPath(new URL("./example-catalog", import.meta.url));

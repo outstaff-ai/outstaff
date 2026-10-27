@@ -23,7 +23,7 @@ import {
   toolName,
 } from "../index.js";
 import { agentLayout } from "../../runner/layout.js";
-import { acmeTeam, fakeEnv } from "../testing.js";
+import { acmeTeam, fakeEnv } from "@outstaff/testing.agent";
 
 const verb = (name: string) => findVerb(name)!;
 const run = (name: string, env: ReturnType<typeof fakeEnv>["env"], input: unknown = {}, ctx = {}) =>

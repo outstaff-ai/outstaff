@@ -16,6 +16,12 @@ const coreAlias = [
     find: /^@outstaff\/office$/,
     replacement: fileURLToPath(new URL("packages/office/src/index.ts", import.meta.url)),
   },
+  // Private test kits (testing/*), from source. An adapter's own tests reach its kit through this alias only: the
+  // kit depends on the adapter, so a dependency back would be a cycle.
+  ...["core", "github", "itsaplan", "office", "agent"].map((kit) => ({
+    find: new RegExp(`^@outstaff/testing\\.${kit}$`),
+    replacement: fileURLToPath(new URL(`testing/${kit}/src/index.ts`, import.meta.url)),
+  })),
   {
     find: /^@outstaff\/agent$/,
     replacement: fileURLToPath(new URL("packages/agent/src/index.ts", import.meta.url)),

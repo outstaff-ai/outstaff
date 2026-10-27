@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readAcmeTeam } from "../../../core/src/testing/fixtures.js";
+import { readAcmeTeam } from "@outstaff/testing.core";
 import type { Context } from "../types.js";
 import { run } from "../program.js";
 

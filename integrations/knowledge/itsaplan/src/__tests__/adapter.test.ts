@@ -5,8 +5,7 @@ import {
   trackerOptions,
 } from "@outstaff/integration.tracker.itsaplan";
 import { describe, expect, it } from "vitest";
-import { secretMap, team } from "../../../../tracker/itsaplan/src/testing/harness.js";
-import { API_KEY } from "../../../../tracker/itsaplan/src/testing/http-stub.js";
+import { API_KEY, secretMap, team } from "@outstaff/testing.itsaplan";
 import { createItsaplanKnowledge } from "../knowledge.js";
 import { createItsaplanFake } from "../testing/itsaplan-fake.js";
 

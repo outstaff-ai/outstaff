@@ -8,7 +8,7 @@ import {
   MISSING_REPOS_TEAM,
   UNKNOWN_REPO_GRANT_TEAM,
   YAML_SYNTAX_ERROR_TEAM,
-} from "../../../core/src/testing/fixtures.js";
+} from "@outstaff/testing.core";
 import { renderCliReference } from "../reference.js";
 import type { Context } from "../types.js";
 import { run, version } from "../program.js";

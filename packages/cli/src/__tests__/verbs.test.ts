@@ -6,7 +6,7 @@ import { VERBS, cliPath, createAgentEnv, createFakeOffice } from "@outstaff/agen
 import { createFakeAdapterRegistry, createFakeVcs } from "@outstaff/core/fakes";
 import { envSecretSource } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { acmeTeam, fakeEnv } from "../../../agent/src/verbs/testing.js";
+import { acmeTeam, fakeEnv } from "@outstaff/testing.agent";
 import type { Context } from "../types.js";
 import { run } from "../program.js";
 

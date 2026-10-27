@@ -6,7 +6,7 @@ import { silentLogger, type RepoRef, type Vcs } from "@outstaff/core";
 import { createFakeVcs } from "@outstaff/core/fakes";
 import { describe, expect, it, vi } from "vitest";
 import type { Offer } from "../../office-client/index.js";
-import { acmeTeam } from "../../verbs/testing.js";
+import { acmeTeam } from "@outstaff/testing.agent";
 import { cappedAccess, fileOnlySecrets } from "../access.js";
 import { syncRepositories } from "../clone.js";
 import {

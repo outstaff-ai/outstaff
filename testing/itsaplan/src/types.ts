@@ -1,4 +1,10 @@
-import type { ApiActivityItem, ApiAssignee, ApiColumn, ApiIssue, ApiLabel } from "../types.js";
+import type {
+  ApiActivityItem,
+  ApiAssignee,
+  ApiColumn,
+  ApiIssue,
+  ApiLabel,
+} from "@outstaff/integration.tracker.itsaplan";
 import type { createFakeState } from "./fake-state.js";
 import type { createItsaplanFake } from "./itsaplan-fake.js";
 

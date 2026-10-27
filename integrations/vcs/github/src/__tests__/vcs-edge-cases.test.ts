@@ -4,16 +4,16 @@ import { join } from "node:path";
 import { type TeamConfig } from "@outstaff/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  REPO,
   appRoutes,
   build,
   expectPortError,
   officeSecrets,
   ownSecrets,
+  REPO,
+  type Route,
   team,
-} from "../testing/harness.js";
-import type { Route } from "../testing/types.js";
-import { testKey } from "../testing/keys.js";
+} from "@outstaff/testing.github";
+import { testKey } from "@outstaff/testing.core";
 
 afterEach(() => {
   vi.useRealTimers();

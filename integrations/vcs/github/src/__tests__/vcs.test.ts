@@ -6,19 +6,19 @@ import { PortError, silentLogger } from "@outstaff/core";
 import { githubOptions } from "../options.js";
 import { createGithubVcs } from "../vcs.js";
 import {
-  secretMap,
-  team,
-  REPO,
-  ORIGIN,
   appRoutes,
   build,
   clock,
   expectPortError,
   officeSecrets,
+  ORIGIN,
   ownSecrets,
-} from "../testing/harness.js";
-import { testKey } from "../testing/keys.js";
-import type { Route } from "../testing/types.js";
+  REPO,
+  type Route,
+  secretMap,
+  team,
+} from "@outstaff/testing.github";
+import { testKey } from "@outstaff/testing.core";
 
 const pull = (over: Record<string, unknown> = {}) => ({
   number: 1,

@@ -1,5 +1,5 @@
 import type { KnowledgeSeed } from "@outstaff/core/contracts";
-import type { ItsaplanFake as TrackerFake } from "../../../../tracker/itsaplan/src/testing/types.js";
+import type { ItsaplanFake as TrackerFake } from "@outstaff/testing.itsaplan";
 import type { ApiDoc, ApiDocComment } from "../types.js";
 
 /** A document as the fake stores it: the full form, with the fields the API may leave out always set. */

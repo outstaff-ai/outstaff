@@ -1,0 +1,23 @@
+{
+  "name": "@outstaff/testing.github",
+  "version": "0.0.0",
+  "description": "The GitHub stand-in for tests: an in-memory GitHub REST and GraphQL fake, a stub fetch and a harness that builds the vcs adapter against it. Private: never packed or published.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@outstaff/core": "workspace:*",
+    "@outstaff/integration.vcs.github": "workspace:*",
+    "@outstaff/testing.core": "workspace:*",
+    "vitest": "5.0.5"
+  }
+}

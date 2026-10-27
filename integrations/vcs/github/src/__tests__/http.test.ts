@@ -1,7 +1,7 @@
 import { PortError } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { GithubHttp, nextLink } from "../http.js";
-import { expectPortError } from "../testing/harness.js";
+import { expectPortError } from "@outstaff/testing.github";
 
 const API = "https://api.github.test";
 

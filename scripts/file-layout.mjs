@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // Source files stay small and keep types apart from implementations. Fails on a source file over
 // MAX_LINES lines, and on a non-index file that exports both a type (or interface) and a runtime
-// value. Shared types go in a folder's `types.ts`, a larger contract in `<name>.types.ts`.
+// value. Shared types go in a folder's `types.ts`, a larger contract in `<name>.types.ts`. Also fails
+// on a relative import that leaves its workspace package: another package is imported by name.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, normalize } from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const MAX_LINES = 300;
@@ -111,6 +113,48 @@ export function layoutProblems(files, read) {
   return problems;
 }
 
+const CODE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
+
+// `from "x"`, `import "x"`, `import("x")`, `vi.mock("x")` and `require("x")`.
+const SPECIFIER =
+  /(?:\bfrom\s+|\bimport\s*\(\s*|\bimport\s+|\bvi\.mock\(\s*|\brequire\(\s*)["']([^"']+)["']/g;
+
+/** The relative module specifiers in a source file. */
+export function relativeSpecifiers(source) {
+  return [...source.matchAll(SPECIFIER)].map((m) => m[1]).filter((spec) => spec.startsWith("."));
+}
+
+/** The workspace package a path belongs to: the nearest folder in `roots` above it ("." is the root). */
+export function packageOf(path, roots) {
+  let dir = dirname(path);
+  while (dir !== "." && !roots.has(dir)) {
+    dir = dirname(dir);
+  }
+
+  return dir;
+}
+
+/** Returns the relative imports that resolve into another package, given the package folders. */
+export function crossPackageImports(files, read) {
+  const roots = new Set(
+    files.filter((f) => f.endsWith("package.json") && !/(^|\/)node_modules\//.test(f)).map(dirname),
+  );
+
+  const problems = [];
+
+  for (const file of files.filter((f) => CODE.test(f) && !/(^|\/)(node_modules|dist)\//.test(f))) {
+    const own = packageOf(file, roots);
+    for (const spec of relativeSpecifiers(read(file))) {
+      const target = normalize(join(dirname(file), spec));
+      if (target.startsWith("..") || packageOf(join(target, "x"), roots) !== own) {
+        problems.push(`${file}: ${spec} leaves the package; import it by package name`);
+      }
+    }
+  }
+
+  return problems;
+}
+
 function main() {
   // Untracked files count too, so a split is checked before it is staged.
   const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
@@ -119,7 +163,8 @@ function main() {
     .split("\n")
     .filter((file) => file && existsSync(file));
 
-  const problems = layoutProblems(files, (file) => readFileSync(file, "utf8"));
+  const read = (file) => readFileSync(file, "utf8");
+  const problems = [...layoutProblems(files, read), ...crossPackageImports(files, read)];
   for (const problem of problems) {
     console.error(problem);
   }

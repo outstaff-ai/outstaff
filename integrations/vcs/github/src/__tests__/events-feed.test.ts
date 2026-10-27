@@ -5,9 +5,7 @@ import { toVcsEvent } from "../event-mapping.js";
 
 // Trimmed from real payloads of the repository events feed (not webhooks), with names replaced.
 const fixture = (name: string): RestEvent =>
-  JSON.parse(
-    readFileSync(new URL(`../testing/fixtures/events-feed/${name}.json`, import.meta.url), "utf8"),
-  );
+  JSON.parse(readFileSync(new URL(`./fixtures/events-feed/${name}.json`, import.meta.url), "utf8"));
 
 const REPO = { owner: "acme", name: "app" };
 const map = (name: string) => toVcsEvent(REPO, fixture(name));

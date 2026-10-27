@@ -1,6 +1,5 @@
 import type { Member, WorkSummary } from "@outstaff/protocol";
-import { ProtocolError } from "./errors.js";
-import type { Offer } from "./source.types.js";
+import { ProtocolError, type Offer } from "@outstaff/office";
 import type { FakeSource } from "./types.js";
 
 type State = NonNullable<ReturnType<FakeSource["stateOf"]>>;

@@ -26,7 +26,7 @@ import {
 } from "../../office-client/index.js";
 import { FakeSocket, createManualClock } from "../../office-client/testing.js";
 import type { ManualClientClock } from "../../office-client/types.js";
-import { fakeEnv } from "../../verbs/testing.js";
+import { fakeEnv } from "@outstaff/testing.agent";
 import type { Workspaces } from "../../repos/index.js";
 import { JOURNAL_PROMPT } from "../journal.js";
 import type { ChatRelay } from "../chat.types.js";

@@ -1,4 +1,8 @@
-import type { RequiredChecksData, RollupContext, ThreadsData } from "../../api.types.js";
+import type {
+  RequiredChecksData,
+  RollupContext,
+  ThreadsData,
+} from "@outstaff/integration.vcs.github";
 import type { FakeState, Route, StoredPull, StubRequest } from "../types.js";
 import { actorOf, toNode } from "./requests.js";
 

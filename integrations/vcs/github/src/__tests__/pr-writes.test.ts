@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
-  REPO,
   appRoutes,
   build,
   expectPortError,
   officeSecrets,
   ownSecrets,
-} from "../testing/harness.js";
-import type { Route } from "../testing/types.js";
+  REPO,
+  type Route,
+} from "@outstaff/testing.github";
 
 const own = (person: string) => ({
   ...officeSecrets,

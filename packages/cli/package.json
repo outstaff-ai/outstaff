@@ -48,6 +48,9 @@
   },
   "devDependencies": {
     "@outstaff/office": "workspace:*",
+    "@outstaff/testing.agent": "workspace:*",
+    "@outstaff/testing.core": "workspace:*",
+    "@outstaff/testing.office": "workspace:*",
     "tsx": "4.23.15"
   }
 }

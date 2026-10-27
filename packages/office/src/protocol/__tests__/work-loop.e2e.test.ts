@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "../../clock.js";
 import { createAgentAuth } from "../auth.js";
 import { createProtocolServer } from "../server.js";
-import { createFakeSource } from "../testing.js";
-import type { FakeSource, ProtocolServer } from "../types.js";
+import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
+import type { ProtocolServer } from "../types.js";
 
 const until = async (cond: () => boolean) => {
   for (let i = 0; i < 400 && !cond(); i++) {

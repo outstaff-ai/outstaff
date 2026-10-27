@@ -1,15 +1,8 @@
 import type { Logger } from "@outstaff/core";
-import type { ErrorCode, Link, MessageType, PayloadOf } from "@outstaff/protocol";
+import type { ErrorCode, MessageType, PayloadOf } from "@outstaff/protocol";
 import type { WebSocket } from "ws";
 import type { Clock } from "../types.js";
-import type {
-  ChatDesk,
-  DocLinks,
-  Messaging,
-  Offer,
-  TicketPrs,
-  WorkSource,
-} from "./source.types.js";
+import type { ChatDesk, DocLinks, Messaging, TicketPrs, WorkSource } from "./source.types.js";
 
 export interface AgentAuth {
   /** True only when the person has a token and `token` matches it. Takes the same time either way. */
@@ -94,26 +87,4 @@ export interface HelloContext extends RequestContext {
   log: Logger;
   sendError(c: Connection, code: ErrorCode, message: string, replyTo?: string): void;
   armIdle(c: Connection, ms: number): void;
-}
-
-type FakeState =
-  | "queued"
-  | "offered"
-  | "accepted"
-  | "done"
-  | "failed"
-  | "waiting"
-  | "blocked"
-  | "canceled";
-
-export interface FakeSource extends WorkSource {
-  enqueue(person: string, id: string, title?: string): Offer;
-  stateOf(id: string): FakeState | undefined;
-
-  /** Every call the server made, as `method:person:id`. */
-  calls: string[];
-  sessions: Map<string, string>;
-  journalLines: { id: string; text: string }[];
-  handBacks: { id: string; summary: string; links: Link[]; status: string }[];
-  failNext(error: Error): void;
 }

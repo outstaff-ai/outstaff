@@ -18,7 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { agentLayout } from "../../runner/layout.js";
 import { adbRefusal } from "../adb.js";
 import { findVerb, runVerb } from "../index.js";
-import { fakeEnv } from "../testing.js";
+import { fakeEnv } from "@outstaff/testing.agent";
 import type { AgentEnv } from "../types.js";
 
 const TOKEN = "tok_9f8e7d6c5b4a39281706"; // gitleaks:allow (test fixture)
