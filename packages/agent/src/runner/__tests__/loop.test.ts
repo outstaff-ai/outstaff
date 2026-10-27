@@ -491,6 +491,7 @@ describe("work loop", () => {
           conventionFiles: [],
         };
       },
+      held: () => [],
       async release(id) {
         released.push(id);
       },

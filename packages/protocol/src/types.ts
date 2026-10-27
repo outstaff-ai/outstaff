@@ -23,7 +23,12 @@ import type {
   memberUsageSchema,
   usageWindowSchema,
 } from "./schemas/team.js";
-import type { filedSchema, queuedReportSchema, workSummarySchema } from "./schemas/work.js";
+import type {
+  filedSchema,
+  queuedReportSchema,
+  workStateSchema,
+  workSummarySchema,
+} from "./schemas/work.js";
 
 export type Message = z.infer<typeof messageSchema>;
 export type MessageType = Message["type"];
@@ -40,6 +45,7 @@ export type Feedback = z.infer<typeof feedbackSchema>;
 export type ConversationEntry = z.infer<typeof conversationEntrySchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
+export type WorkState = z.infer<typeof workStateSchema>;
 export type Filed = z.infer<typeof filedSchema>;
 export type Attached = PayloadOf<"work_attach_result">;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;

@@ -407,6 +407,15 @@ describe("protocol server", () => {
         items: [{ id: "w1", title: "Item w1", status: "offered", current: true }],
       });
 
+      a.send("work_status", { workItemIds: ["w1", "w9", "w0"] });
+      expect((await a.next("work_status_result")).payload).toEqual({
+        items: [
+          { workItemId: "w1", state: "active" },
+          { workItemId: "w9", state: "not_yours" },
+          { workItemId: "w0", state: "unknown" },
+        ],
+      });
+
       a.send("work_move", { workItemId: "w1", status: "blocked" });
       expect((await a.next("work_move_result")).payload).toMatchObject({
         item: { id: "w1", status: "blocked" },

@@ -7,6 +7,7 @@ import type {
   Link,
   Member,
   PayloadOf,
+  WorkState,
   WorkSummary,
 } from "@outstaff/protocol";
 
@@ -53,6 +54,12 @@ export interface WorkSource {
 
   roster(): Promise<Member[]>;
   list(person: string, q: { workItemId?: string }): Promise<WorkSummary[]>;
+
+  /**
+   * The state of each item, in the order asked, as the person may see it: an item of someone else is `not_yours`
+   * whatever its status, and one the office does not have is `unknown`. Never an error for either.
+   */
+  status(person: string, workItemIds: string[]): Promise<WorkState[]>;
   move(
     person: string,
     workItemId: string,

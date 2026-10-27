@@ -75,6 +75,9 @@ export interface Workspaces {
 
   /** Removes the item's worktree and scratch directory. The branch stays, so unmerged commits are not lost. */
   release(workItemId: string): Promise<void>;
+
+  /** The ids of the items that have a worktree or a scratch directory now. */
+  held(): string[];
 }
 
 export interface WorkspacesOptions {

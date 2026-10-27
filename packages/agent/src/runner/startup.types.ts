@@ -8,8 +8,9 @@ import type {
   SecretSource,
   TeamConfig,
 } from "@outstaff/core";
-import type { OfficeConnection } from "#/office-client/index.js";
-import type { ClonedRepo, SyncRepositoriesOptions } from "#/repos/index.js";
+import type { ClientClock, OfficeConnection } from "#/office-client/index.js";
+import type { ClonedRepo, SyncRepositoriesOptions, Workspaces } from "#/repos/index.js";
+import type { Sweeper } from "#/sweep/index.js";
 import type { MiseRunner, ToolStatus } from "#/tools/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import type { ChatRelay } from "./chat.types.js";
@@ -36,6 +37,12 @@ export interface StartupOptions {
 
   /** Milliseconds between usage probes while idle. Default 600000 (10 minutes). */
   usageProbeEveryMs?: number;
+
+  /** Milliseconds between sweeps of the workspaces of finished items. Default one day. */
+  sweepEveryMs?: number;
+
+  /** Times the sweeps (tests only). Default the system clock. */
+  clock?: ClientClock;
 
   /** Replaces the WebSocket connection (tests only). */
   connection?: OfficeConnection;
@@ -64,6 +71,9 @@ export interface PreparedAgent {
 
   /** The repos cloned for the person, one per grant. */
   repos: ClonedRepo[];
+
+  /** Removes the workspaces of items the person has no work on any more. Not started by `prepareAgent`: call `start()` once connected. */
+  sweeper: Sweeper;
 
   /** The declared tools and whether each is available. */
   tools: ToolStatus[];
@@ -116,6 +126,7 @@ export interface LoopParts extends StartedChat {
   chatPolicy: Policy;
   systemPrompt: string;
   repos: ClonedRepo[];
+  workspaces: Workspaces;
 
   /** Directories besides the working directory the runtime may use. */
   addDirs: string[];

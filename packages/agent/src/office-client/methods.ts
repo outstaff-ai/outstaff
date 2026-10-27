@@ -1,3 +1,4 @@
+import type { WorkState } from "@outstaff/protocol";
 import type {
   ChatMessageResult,
   ChatReportResult,
@@ -83,6 +84,10 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
     async work(q): Promise<OfficeWorkItem[]> {
       const r = await call("work_list", q, "work_list_result");
       return r.items.map((i) => compact(i) as OfficeWorkItem);
+    },
+
+    async workStatus(workItemIds): Promise<WorkState[]> {
+      return (await call("work_status", { workItemIds }, "work_status_result")).items;
     },
 
     async team(): Promise<OfficeTeam> {

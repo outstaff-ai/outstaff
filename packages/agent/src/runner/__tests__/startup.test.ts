@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AdapterRegistry, defineAdapter, evaluate, repoAccess } from "@outstaff/core";
 import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fakes";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createOfficeConnection } from "#/office-client/index.js";
-import { FakeSocket } from "#/office-client/testing.js";
+import { FakeSocket, createManualClock } from "#/office-client/testing.js";
 import { withGlobalConfig } from "#/tools/testing.js";
 import { StartupError } from "#/runner/startup-error.js";
 import { prepareAgent } from "#/runner/startup.js";
@@ -185,6 +185,51 @@ people:`,
     expect(run("curl -s https://hub.acme.example/status").effect).toBe("allow");
     expect(run("adb -s 10.0.0.18:5555 shell ls").effect).toBe("allow");
     expect(run("adb -s 10.0.0.18:5555 shell rm -rf /data").effect).toBe("deny");
+  });
+
+  it("prepares a sweeper that removes the scratch folders of items the person no longer has", async () => {
+    const { home, options } = setup();
+    for (const id of ["ACME-12", "ACME-20"]) {
+      mkdirSync(join(home, "scratch", id), { recursive: true });
+    }
+
+    const asked: string[][] = [];
+    options.connection.workStatus = async (ids) => {
+      asked.push(ids);
+
+      return ids.map((workItemId) => ({
+        workItemId,
+        state: workItemId === "ACME-12" ? "done" : "blocked",
+      }));
+    };
+
+    const agent = await prepareAgent(options);
+
+    expect(await agent.sweeper.sweep()).toEqual(["ACME-12"]);
+    expect(asked).toEqual([["ACME-12", "ACME-20"]]);
+    expect(existsSync(join(home, "scratch/ACME-12"))).toBe(false);
+    expect(existsSync(join(home, "scratch/ACME-20"))).toBe(true);
+  });
+
+  it("sweeps on the interval and clock it is given", async () => {
+    const { home, options } = setup();
+    mkdirSync(join(home, "scratch", "ACME-12"), { recursive: true });
+    const clock = createManualClock();
+    const asked: string[][] = [];
+    options.connection.workStatus = async (ids) => {
+      asked.push(ids);
+
+      return ids.map((workItemId) => ({ workItemId, state: "done" as const }));
+    };
+
+    const agent = await prepareAgent({ ...options, clock, sweepEveryMs: 1000 });
+    agent.sweeper.start();
+    await vi.waitFor(() => expect(asked).toHaveLength(1));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    mkdirSync(join(home, "scratch", "ACME-13"), { recursive: true });
+    clock.advance(1000);
+    await vi.waitFor(() => expect(asked).toEqual([["ACME-12"], ["ACME-13"]]));
+    agent.sweeper.stop();
   });
 
   it("starts a person without repository grants with no vcs port", async () => {

@@ -6,6 +6,7 @@ import type {
   MessageType,
   PayloadOf,
   QueuedReport,
+  WorkState,
 } from "@outstaff/protocol";
 import type { OfficeClient } from "#/verbs/office.types.js";
 
@@ -104,6 +105,9 @@ export interface OfficeConnection extends OfficeClient {
   /** Reports the checks the agent ran at start; the office stores them with its own. */
   doctorReport(checks: PayloadOf<"doctor_report">["checks"]): Promise<void>;
   answer(questionId: string, answer: string): Promise<void>;
+
+  /** The state of each of the items as the person may see it; an item of someone else is `not_yours`. */
+  workStatus(workItemIds: string[]): Promise<WorkState[]>;
 }
 
 export interface ManualClientClock extends ClientClock {

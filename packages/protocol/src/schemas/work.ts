@@ -18,6 +18,16 @@ export const workSummarySchema = z.strictObject({
   current: z.boolean().optional().describe("True for the item the caller asked about."),
 });
 
+/** The state of one work item as its asker may see it. Items of someone else are only `not_yours`. */
+export const workStateSchema = z.strictObject({
+  workItemId: itemId,
+  state: z
+    .enum(["queued", "active", "waiting", "blocked", "done", "canceled", "not_yours", "unknown"])
+    .describe(
+      "The item's status. `not_yours` when it belongs to someone else, whatever its status; `unknown` when the office has no such item.",
+    ),
+});
+
 /** What the office did with work a chat session filed: a ticket or a request, and where the work stands. */
 export const filedSchema = z.strictObject({
   url: z.string().optional().describe("Link to the ticket."),

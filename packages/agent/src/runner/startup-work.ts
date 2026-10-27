@@ -11,8 +11,14 @@ import {
   type RenderedWorkdir,
   type Runtime,
 } from "@outstaff/core";
-import type { OfficeConnection } from "#/office-client/index.js";
-import { createWorkspaces, syncRepositories, type ClonedRepo } from "#/repos/index.js";
+import { systemClientClock, type OfficeConnection } from "#/office-client/index.js";
+import {
+  createWorkspaces,
+  syncRepositories,
+  type ClonedRepo,
+  type Workspaces,
+} from "#/repos/index.js";
+import { createSweeper, type Sweeper } from "#/sweep/index.js";
 import type { ToolStatus } from "#/tools/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import { createWorkLoop } from "./loop.js";
@@ -142,7 +148,36 @@ const chatParts = ({ chat, profile, chatPolicy }: LoopParts) => ({
     : {}),
 });
 
-export function workLoop({ opts, team, log }: StartupContext, parts: LoopParts): WorkLoop {
+/** The per-item worktrees and scratch folders under the agent's home. */
+export function agentWorkspaces(
+  { opts, log }: StartupContext,
+  layout: Layout,
+  repos: ClonedRepo[],
+): Workspaces {
+  return createWorkspaces({
+    layout,
+    repos,
+    log,
+    ...(opts.repositories?.git ? { git: opts.repositories.git } : {}),
+  });
+}
+
+/** Sweeps the workspaces of items that are finished, canceled or no longer the person's. Not started yet. */
+export function workSweeper(
+  { opts, log }: StartupContext,
+  connection: OfficeConnection,
+  workspaces: Workspaces,
+): Sweeper {
+  return createSweeper({
+    office: connection,
+    workspaces,
+    clock: opts.clock ?? systemClientClock,
+    log,
+    ...(opts.sweepEveryMs === undefined ? {} : { everyMs: opts.sweepEveryMs }),
+  });
+}
+
+export function workLoop({ team, log }: StartupContext, parts: LoopParts): WorkLoop {
   const { layout, policy, repos, model } = parts;
 
   return createWorkLoop({
@@ -156,12 +191,7 @@ export function workLoop({ opts, team, log }: StartupContext, parts: LoopParts):
     builtinTools: [...policy.tools.allow],
     workdir: layout.workDir,
     repos,
-    workspaces: createWorkspaces({
-      layout,
-      repos,
-      log,
-      ...(opts.repositories?.git ? { git: opts.repositories.git } : {}),
-    }),
+    workspaces: parts.workspaces,
     addDirs: parts.addDirs,
     ...(model ? { model } : {}),
     ...(team.policies ? { policies: team.policies } : {}),
