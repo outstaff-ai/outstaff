@@ -1,12 +1,20 @@
 import { linkMessageSchema } from "./schemas.js";
 import type { LinkMessage } from "./types.js";
 
+type Failure = { ok: false; problem: string; id?: string; method?: string };
+
+const text = (v: unknown) => (typeof v === "string" ? v : undefined);
+
+/** What is wrong with a frame that parsed as JSON, and the request's id and method, when they can be read. */
+function failure(value: unknown, problem: string): Failure {
+  const payload = (value as { payload?: { id?: unknown; method?: unknown } } | null)?.payload;
+  const id = text(payload?.id);
+  const method = text(payload?.method);
+  return { ok: false, problem, ...(id ? { id } : {}), ...(method ? { method } : {}) };
+}
+
 /** Parses one frame of the office link. Never throws: the error says what is wrong. */
-export function decodeLinkMessage(
-  raw: string,
-):
-  | { ok: true; message: LinkMessage }
-  | { ok: false; problem: string; id?: string; method?: string } {
+export function decodeLinkMessage(raw: string): { ok: true; message: LinkMessage } | Failure {
   let value: unknown;
   try {
     value = JSON.parse(raw);
@@ -20,17 +28,11 @@ export function decodeLinkMessage(
   }
 
   // A request the office cannot read is still answered, when its id can be found.
-  const payload = (value as { payload?: { id?: unknown; method?: unknown } } | null)?.payload;
-  const id = typeof payload?.id === "string" ? payload.id : undefined;
-  const method = typeof payload?.method === "string" ? payload.method : undefined;
-  return {
-    ok: false,
-    problem: parsed.error.issues
-      .map((i) => `${i.path.join(".") || "message"}: ${i.message}`)
-      .join("; "),
-    ...(id ? { id } : {}),
-    ...(method ? { method } : {}),
-  };
+  const problem = parsed.error.issues
+    .map((i) => `${i.path.join(".") || "message"}: ${i.message}`)
+    .join("; ");
+
+  return failure(value, problem);
 }
 
 export const encodeLinkMessage = (message: LinkMessage): string => JSON.stringify(message);

@@ -2,6 +2,8 @@ import {
   LINK_VERSION,
   decodeLinkMessage,
   encodeLinkMessage,
+  type LinkErrorCode,
+  LINK_METHOD_META,
   type LinkMessage,
   type LinkPayloadOf,
   type LinkRequest,
@@ -15,18 +17,38 @@ import { answer } from "./requests.js";
 /** Close code for a service that speaks another link version. */
 export const CLOSE_VERSION = 4426;
 
+/** The link's timings, with their defaults. */
+const timings = (opts: OfficeLinkOptions) => ({
+  pollMs: opts.pollMs ?? 1000,
+  pingMs: opts.pingMs ?? 15_000,
+  requestTimeoutMs: opts.requestTimeoutMs ?? 10_000,
+  random: opts.random ?? Math.random,
+});
+
+/** How long to wait before connecting again: doubling from `baseMs` up to `maxMs`. */
+const backoff = (opts: OfficeLinkOptions) => ({
+  baseMs: opts.backoff?.baseMs ?? 1000,
+  maxMs: opts.backoff?.maxMs ?? 60_000,
+});
+
+/** The error for a request the office could not read: an unknown method, or params that do not fit it. */
+function unreadable(
+  problem: string,
+  method: string | undefined,
+): { code: LinkErrorCode; message: string } {
+  return Object.hasOwn(LINK_METHOD_META, method ?? "")
+    ? { code: "invalid", message: problem }
+    : { code: "unknown_method", message: `No method ${method ?? "(none)"}.` };
+}
+
 /**
  * Connects the office out to a service, answers its requests and notifies it of changes. Reconnects with capped
  * backoff; every failure is logged and shows in `status()`, and none reaches the office.
  */
 export function createOfficeLink(opts: OfficeLinkOptions): OfficeLink {
   const { clock, logger } = opts;
-  const pollMs = opts.pollMs ?? 1000;
-  const pingMs = opts.pingMs ?? 15_000;
-  const requestTimeoutMs = opts.requestTimeoutMs ?? 10_000;
-  const baseMs = opts.backoff?.baseMs ?? 1000;
-  const maxMs = opts.backoff?.maxMs ?? 60_000;
-  const random = opts.random ?? Math.random;
+  const { pollMs, pingMs, requestTimeoutMs, random } = timings(opts);
+  const { baseMs, maxMs } = backoff(opts);
   const status: LinkStatus = { state: "idle" };
   let ws: WebSocket | undefined;
   let attempt = 0;
@@ -114,24 +136,17 @@ export function createOfficeLink(opts: OfficeLinkOptions): OfficeLink {
   function onMessage(raw: string) {
     watchSilence();
     const decoded = decodeLinkMessage(raw);
-    if (!decoded.ok) {
-      if (decoded.id !== undefined) {
-        const known = ["people", "events", "event", "item"].includes(decoded.method ?? "");
-        send({
-          type: "response",
-          payload: {
-            id: decoded.id,
-            error: known
-              ? { code: "invalid", message: decoded.problem }
-              : { code: "unknown_method", message: `No method ${decoded.method ?? "(none)"}.` },
-          },
-        });
-      }
-
-      return;
+    if (decoded.ok) {
+      dispatch(decoded.message);
+    } else if (decoded.id !== undefined) {
+      send({
+        type: "response",
+        payload: { id: decoded.id, error: unreadable(decoded.problem, decoded.method) },
+      });
     }
+  }
 
-    const m = decoded.message;
+  function dispatch(m: LinkMessage) {
     if (m.type === "welcome") {
       welcome(m.payload);
     } else if (m.type === "request" && status.state === "connected") {

@@ -1,4 +1,5 @@
 import type { ActOutcome } from "@outstaff/core";
+import type { Comparison, EngineRecord } from "./compare/compare.types.js";
 import type { Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { PipelineCondition } from "./policy.types.js";
@@ -24,6 +25,12 @@ export interface Trace {
 
   /** What each executed act did, by act id (`<event id>:<policy>`), once its result is in. */
   results?: Record<string, ActOutcome> | undefined;
+
+  /** In shadow mode: what the engine applied for the same event. */
+  engine?: EngineRecord | undefined;
+
+  /** In shadow mode: how the engine's outcome and the pipeline's compare. */
+  comparison?: Comparison | undefined;
 }
 
 /** Where traces are kept; `id` is the event's id. */

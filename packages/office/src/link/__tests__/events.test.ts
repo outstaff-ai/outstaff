@@ -47,6 +47,14 @@ describe("findEvents", () => {
     expect(ids(await findEvents(store, { pr: "acme-example/shop#9" }))).toEqual(["vcs:1"]);
     expect(ids(await findEvents(store, { since: at(3) }))).toEqual(["vcs:5", "workstate:4"]);
     expect(await findEvents(store, { since: at(9) })).toEqual({ events: [] });
+
+    const differing = trace("workstate:6", at(6));
+    differing.comparison = { agree: false, differences: [{ kind: "extra_in_pipeline" }] };
+    const agreeing = trace("workstate:7", at(7));
+    agreeing.comparison = { agree: true, differences: [] };
+    await record(store, differing);
+    await record(store, agreeing);
+    expect(ids(await findEvents(store, { differs: true }))).toEqual(["workstate:6"]);
   });
 
   it("pages by time without splitting the events of one time", async () => {

@@ -426,7 +426,7 @@ ost workflow explain '{"type":"ticket.assigned","subject":{"ticket":"ACME-1"},"a
 
 Show what the event pipeline decided for an event, and why.
 
-Proposed (decision 0016). Reads the trace the office recorded for one event while running the event pipeline in shadow mode (office.pipeline: shadow) and prints every policy that listens to the event: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.
+Proposed (decision 0016). Reads the trace the office recorded for one event while running the event pipeline in shadow mode (office.pipeline: shadow) and prints every policy that listens to the event: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop, and in shadow mode what the engine applied for the same event and how the two compare. --compare sums that up over many events: how many agree and differ, the differences by kind and by policy, and the events that differ. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.
 
 ```
 ost explain [event-id] [options]
@@ -436,17 +436,20 @@ ost explain [event-id] [options]
 | --- | --- |
 | `--store <url>` | The office store: postgres://..., sqlite:///path/office.db. Defaults to OUTSTAFF_STORE_URL. |
 | `--recent <n>` | List the n latest traced events instead. |
+| `--compare` | Compare the engine and the pipeline over the traced events instead. |
+| `--since <when>` | With --compare: only events since then, a duration back from now (30m, 24h, 7d) or an ISO-8601 time. |
 
 Exit codes:
 
-- 0: the trace or the list was printed
-- 1: no store is given or it cannot be read, no event id is given, or the event has no trace
+- 0: the trace, the list or the comparison was printed
+- 1: no store is given or it cannot be read, no event id is given, the event has no trace, or --since is not a time
 
 Examples:
 
 ```sh
 ost explain vcs:pr.merged:acme-example/shop#41 --store sqlite:///var/lib/outstaff/office.db
 ost explain --recent 20
+ost explain --compare --since 24h
 ```
 
 ## ost git-credential

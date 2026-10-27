@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { itemSchema, itemSummarySchema, personSchema, time, traceSchema } from "./entities.js";
+import { comparisonSummarySchema } from "./comparison.js";
+import { itemSchema, itemSummarySchema, personSchema, traceSchema } from "./entities.js";
+import { time } from "./fields.js";
 
 /** Version of the office link; the office sends it as the `Outstaff-Link-Version` header. */
 export const LINK_VERSION = 1;
@@ -59,6 +61,10 @@ export const requestSchema = z.discriminatedUnion("method", [
           .min(1)
           .optional()
           .describe("Only events about this pull request: `owner/name#number`."),
+        differs: z
+          .literal(true)
+          .optional()
+          .describe("Only events where the engine and the pipeline differ (shadow mode)."),
       })
       .optional(),
   }),
@@ -78,6 +84,16 @@ export const requestSchema = z.discriminatedUnion("method", [
           .optional()
           .describe("Only items created before this time: the cursor for the next page."),
         limit,
+      })
+      .optional(),
+  }),
+  z.strictObject({
+    id: requestId,
+    method: z.literal("compare"),
+    params: z
+      .strictObject({
+        since: time.optional().describe("Only events from this time on."),
+        until: time.optional().describe("Only events before this time."),
       })
       .optional(),
   }),
@@ -103,6 +119,7 @@ const results = {
       .optional()
       .describe("Pass as `before` for the next page; absent when there are no more items."),
   }),
+  compare: comparisonSummarySchema,
   item: z.strictObject({
     item: itemSchema,
     traces: z
@@ -114,7 +131,14 @@ const results = {
 export const responseSchema = z.union([
   z.strictObject({
     id: z.string().describe("The request's `id`."),
-    result: z.union([results.people, results.events, results.event, results.items, results.item]),
+    result: z.union([
+      results.people,
+      results.events,
+      results.event,
+      results.compare,
+      results.items,
+      results.item,
+    ]),
   }),
   z.strictObject({
     id: z.string().describe("The request's `id`."),

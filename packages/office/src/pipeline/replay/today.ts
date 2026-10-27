@@ -7,10 +7,9 @@ import {
 } from "@outstaff/core";
 import { awaitsReview } from "../../engine/feedback.js";
 import type { PipelineEvent } from "../events.types.js";
+import type { Outcome } from "../compare/compare.types.js";
+import { fromEffect, KIND_ALIASES } from "../compare/outcomes.js";
 import type { ReplaySetup, Side } from "./replay.types.js";
-
-/** Kinds the pipeline renamed: compared as the same wake. */
-const KIND_ALIASES: Record<string, string> = { conflict: "rebase" };
 
 const TODAY_TYPES: ReadonlySet<string> = new Set(WORKFLOW_EVENT_TYPES);
 
@@ -47,11 +46,11 @@ function skipped(e: Effect, event: PipelineEvent, setup: ReplaySetup): string | 
  */
 export function todaySide(event: PipelineEvent, state: WorkflowState, setup: ReplaySetup): Side {
   if (!TODAY_TYPES.has(event.type)) {
-    return { shown: ["(no such event today)"], keys: [] };
+    return { shown: ["(no such event today)"], outcomes: [] };
   }
 
   if (event.data["untrusted"] === true || awaitsReview(event)) {
-    return { shown: ["(ignored)"], keys: [] };
+    return { shown: ["(ignored)"], outcomes: [] };
   }
 
   const effects = explainWorkflow(
@@ -62,17 +61,17 @@ export function todaySide(event: PipelineEvent, state: WorkflowState, setup: Rep
   ).effects;
 
   const shown: string[] = [];
-  const keys: string[] = [];
+  const outcomes: Outcome[] = [];
   for (const e of effects) {
     const key = effectKey(e);
     const skip = skipped(e, event, setup);
     if (skip) {
       shown.push(`(${key}: skipped, ${skip})`);
     } else {
-      keys.push(key);
+      outcomes.push(fromEffect(e));
       shown.push(e.type === "schedule" ? key : `${key} (as the office)`);
     }
   }
 
-  return { shown, keys };
+  return { shown, outcomes };
 }

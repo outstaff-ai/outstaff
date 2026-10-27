@@ -117,6 +117,67 @@ describe("createShadowPipeline", () => {
     expect(await traces.list()).toEqual([]);
   });
 
+  it("adds what the engine applied to the event's trace, compared with the pipeline's decisions", async () => {
+    const traces = createMemoryTraceStore();
+    const shadow = createShadowPipeline({
+      team: team(),
+      state,
+      traces,
+      clock: manualClock(),
+      logger: recordingLogger().logger,
+    });
+
+    const meta = { source: "tracker", externalId: "e-3" };
+    await shadow.handle(assigned, meta);
+    const schedule = {
+      type: "schedule" as const,
+      person: "sam",
+      kind: "assigned",
+      priority: "normal" as const,
+      ticket: "ACME-1",
+    };
+
+    const done = await shadow.engineDid(meta, [
+      { effect: schedule, status: "applied", note: "queued", at: "2026-10-05T09:00:00.000Z" },
+    ]);
+
+    expect(done).toMatchObject({
+      engine: {
+        effects: [
+          {
+            type: "wake",
+            person: "sam",
+            kind: "assigned",
+            subject: { type: "ticket", ref: "ACME-1" },
+          },
+        ],
+      },
+      comparison: { agree: true, differences: [] },
+    });
+
+    expect(await traces.get("tracker:e-3")).toEqual(done);
+    expect(await shadow.engineDid({ source: "tracker", externalId: "none" }, [])).toBeUndefined();
+  });
+
+  it("logs, and does not throw, when the engine's side cannot be recorded", async () => {
+    const { lines, logger } = recordingLogger();
+    const broken: TraceStore = {
+      ...createMemoryTraceStore(),
+      get: () => Promise.reject(new Error("disk")),
+    };
+
+    const shadow = createShadowPipeline({
+      team: team(),
+      state,
+      traces: broken,
+      clock: manualClock(),
+      logger,
+    });
+
+    expect(await shadow.engineDid({ source: "t", externalId: "1" }, [])).toBeUndefined();
+    expect(lines).toEqual(["warn pipeline (shadow) could not record what the engine did"]);
+  });
+
   it("logs configuration issues once, and a failure without throwing", async () => {
     const { lines, logger } = recordingLogger();
     const broken: TraceStore = {

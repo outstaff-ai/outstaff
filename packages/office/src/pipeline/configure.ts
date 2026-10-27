@@ -6,6 +6,53 @@ import type { ConfiguredPipeline } from "./state.types.js";
 
 type Team = Pick<TeamConfig, "pipeline" | "policies" | "humans" | "workflow" | "people">;
 
+type Override = NonNullable<NonNullable<Team["pipeline"]>["policies"]>[string];
+
+/** The instruction a policy ends up with: the team's, if it can be used, else the default. */
+function instructionOf(
+  base: Policy,
+  o: Override | undefined,
+  issues: string[],
+): string | undefined {
+  if (o?.instruction === undefined) {
+    return base.instruction;
+  }
+
+  const problem = instructionProblem(o.instruction);
+  if (problem) {
+    issues.push(`pipeline.policies.${base.id}.instruction: ${problem}; the default is kept`);
+    return base.instruction;
+  }
+
+  return o.instruction;
+}
+
+/** A team's `when` narrows the policy's own: both must hold. */
+const whenOf = (base: Policy, o: Override | undefined) => {
+  if (!o?.when) {
+    return base.when;
+  }
+
+  return base.when ? { all: [base.when, o.when] } : o.when;
+};
+
+/** A default policy with the team's changes to it. */
+function applyOverride(
+  base: Policy,
+  o: Override | undefined,
+  on: boolean,
+  issues: string[],
+): Policy {
+  const when = whenOf(base, o);
+  const instruction = instructionOf(base, o, issues);
+  return {
+    ...base,
+    enabled: o?.enabled ?? on,
+    ...(when ? { when } : {}),
+    instruction,
+  };
+}
+
 /**
  * The team's policies: the defaults in order, with `pipeline.policies.<id>` applied. `enabled` turns one on or off,
  * `instruction` replaces a wake's instruction or an act's note, and `when` narrows it: both its own condition and the team's must hold.
@@ -21,29 +68,14 @@ export function configurePipeline(team: Team): ConfiguredPipeline {
   }
 
   const mergeOnApproval = policyOn(team.policies, "merge.on_approval");
-  const policies = DEFAULT_POLICIES.map((base): Policy => {
-    const o = overrides[base.id];
-    const p: Policy = {
-      ...base,
-      enabled: o?.enabled ?? (MERGE_ON_APPROVAL_POLICIES.has(base.id) ? mergeOnApproval : true),
-    };
-
-    if (o?.when) {
-      p.when = p.when ? { all: [p.when, o.when] } : o.when;
-    }
-
-    if (o?.instruction !== undefined) {
-      const problem = instructionProblem(o.instruction);
-
-      if (problem) {
-        issues.push(`pipeline.policies.${base.id}.instruction: ${problem}; the default is kept`);
-      } else {
-        p.instruction = o.instruction;
-      }
-    }
-
-    return p;
-  });
+  const policies = DEFAULT_POLICIES.map((base) =>
+    applyOverride(
+      base,
+      overrides[base.id],
+      MERGE_ON_APPROVAL_POLICIES.has(base.id) ? mergeOnApproval : true,
+      issues,
+    ),
+  );
 
   const { options } = resolveWorkflow(team.workflow, team.humans, team.policies);
   return { policies, options: { ...options, people: team.people.map((p) => p.handle) }, issues };

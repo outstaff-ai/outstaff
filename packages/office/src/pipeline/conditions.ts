@@ -3,24 +3,55 @@ import type { ConditionResult, PipelineCondition, PipelineLeaf } from "./policy.
 
 const isLeaf = (c: PipelineCondition): c is PipelineLeaf => "actor_is" in c;
 
+type Who = (ctx: EvaluationContext) => string | undefined;
+
+/** The agent each `actor_is` names, if there is one. */
+const WHO: Record<PipelineLeaf["actor_is"], Who> = {
+  assignee: (ctx) => {
+    const a = ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined;
+    return a?.kind === "agent" ? a.id : undefined;
+  },
+  author: (ctx) => ctx.pr?.author.person,
+  doc_author: (ctx) => {
+    const doc = ctx.event.subject.doc;
+    return doc ? ctx.state.docAuthor(doc) : undefined;
+  },
+};
+
 function actorIs(c: PipelineLeaf, ctx: EvaluationContext): ConditionResult {
   const { actor } = ctx.event;
-  let who: string | undefined;
-  if (c.actor_is === "assignee") {
-    const a = ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined;
-    who = a?.kind === "agent" ? a.id : undefined;
-  } else if (c.actor_is === "author") {
-    who = ctx.pr?.author.person;
-  } else {
-    who = ctx.event.subject.doc ? ctx.state.docAuthor(ctx.event.subject.doc) : undefined;
+  const who = WHO[c.actor_is](ctx);
+  const ok = actor.kind === "agent" && actor.id === who;
+  const named = who ? ` (${who})` : "";
+  const detail = `actor ${actor.id} is ${ok ? "" : "not "}the ${c.actor_is.replace("_", " ")}${named}`;
+  return ok ? { ok, detail } : { ok, detail, failed: c };
+}
+
+function all(c: { all: PipelineCondition[] }, ctx: EvaluationContext): ConditionResult {
+  const failing = c.all.map((child) => evaluateCondition(child, ctx)).find((r) => !r.ok);
+  return failing ?? { ok: true, detail: "all conditions hold" };
+}
+
+function any(c: { any: PipelineCondition[] }, ctx: EvaluationContext): ConditionResult {
+  const rs = c.any.map((child) => evaluateCondition(child, ctx));
+  const hit = rs.find((r) => r.ok);
+  return hit ?? { ok: false, detail: `none of: ${rs.map((r) => r.detail).join("; ")}`, failed: c };
+}
+
+function not(c: { not: PipelineCondition }, ctx: EvaluationContext): ConditionResult {
+  const r = evaluateCondition(c.not, ctx);
+  return r.ok
+    ? { ok: false, detail: `not (${r.detail})`, failed: c }
+    : { ok: true, detail: `${r.detail}, so not-condition holds` };
+}
+
+function leaf(c: PipelineCondition, ctx: EvaluationContext): ConditionResult {
+  if (isLeaf(c)) {
+    return actorIs(c, ctx);
   }
 
-  const ok = actor.kind === "agent" && who !== undefined && actor.id === who;
-  return {
-    ok,
-    detail: `actor ${actor.id} is ${ok ? "" : "not "}the ${c.actor_is.replace("_", " ")}${who ? ` (${who})` : ""}`,
-    ...(ok ? {} : { failed: c }),
-  };
+  const r = checkCondition(c as Condition, ctx);
+  return r.ok ? r : { ...r, failed: c };
 }
 
 /**
@@ -29,35 +60,12 @@ function actorIs(c: PipelineLeaf, ctx: EvaluationContext): ConditionResult {
  */
 export function evaluateCondition(c: PipelineCondition, ctx: EvaluationContext): ConditionResult {
   if ("all" in c) {
-    for (const child of c.all) {
-      const r = evaluateCondition(child, ctx);
-      if (!r.ok) {
-        return r;
-      }
-    }
-
-    return { ok: true, detail: "all conditions hold" };
+    return all(c, ctx);
   }
 
   if ("any" in c) {
-    const rs = c.any.map((child) => evaluateCondition(child, ctx));
-    const hit = rs.find((r) => r.ok);
-    return (
-      hit ?? { ok: false, detail: `none of: ${rs.map((r) => r.detail).join("; ")}`, failed: c }
-    );
+    return any(c, ctx);
   }
 
-  if ("not" in c) {
-    const r = evaluateCondition(c.not, ctx);
-    return r.ok
-      ? { ok: false, detail: `not (${r.detail})`, failed: c }
-      : { ok: true, detail: `${r.detail}, so not-condition holds` };
-  }
-
-  if (isLeaf(c)) {
-    return actorIs(c, ctx);
-  }
-
-  const r = checkCondition(c as Condition, ctx);
-  return r.ok ? r : { ...r, failed: c };
+  return "not" in c ? not(c, ctx) : leaf(c, ctx);
 }

@@ -31,26 +31,6 @@
         "eslint/complexity": "off",
         "eslint/max-depth": "off"
       }
-    },
-    {
-      "files": [
-        "packages/cli/src/commands/explain.ts",
-        "packages/core/src/acts/apply.ts",
-        "packages/office/src/link/client.ts",
-        "packages/office/src/link/events.ts",
-        "packages/office/src/pipeline/conditions.ts",
-        "packages/office/src/pipeline/configure.ts",
-        "packages/office/src/pipeline/decide.ts",
-        "packages/office/src/pipeline/derive.ts",
-        "packages/office/src/pipeline/describe.ts",
-        "packages/office/src/pipeline/instructions.ts",
-        "packages/office/src/pipeline/replay/replay.ts",
-        "packages/protocol/src/link/codec.ts"
-      ],
-      "rules": {
-        "eslint/complexity": "off",
-        "eslint/max-depth": "off"
-      }
     }
   ],
   "rules": {

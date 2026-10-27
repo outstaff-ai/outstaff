@@ -56,6 +56,30 @@ const TRACE = {
   results: {
     "workstate:handed_back:w1:r1:hand_back_done": { ok: true, results: ["moved ACME-1 to review"] },
   },
+  engine: {
+    effects: [{ type: "move", ticket: "ACME-1", to: "review", as: "office" }],
+    skipped: [
+      { outcome: { type: "wake", person: "priya", kind: "unblock" }, note: "priya caused it" },
+    ],
+  },
+  comparison: {
+    agree: true,
+    differences: [
+      {
+        kind: "actor_changed",
+        engine: { type: "move", ticket: "ACME-1", to: "review", as: "office" },
+        pipeline: {
+          type: "move",
+          ticket: "ACME-1",
+          to: "review",
+          as: "sam",
+          policy: "hand_back_done",
+        },
+        policy: "hand_back_done",
+        note: "attributed to sam, not the office",
+      },
+    ],
+  },
 };
 
 const ITEM = {
@@ -142,6 +166,39 @@ describe("the office link messages", () => {
         },
       },
       { type: "request", payload: { id: "r3", method: "event", params: { id: "vcs:1" } } },
+      {
+        type: "request",
+        payload: { id: "r5", method: "compare", params: { since: "2026-10-05T00:00:00.000Z" } },
+      },
+      { type: "request", payload: { id: "r6", method: "events", params: { differs: true } } },
+      {
+        type: "response",
+        payload: {
+          id: "r5",
+          result: {
+            since: "2026-10-05T00:00:00.000Z",
+            events: 3,
+            compared: 2,
+            agree: 1,
+            differ: 1,
+            byKind: { actor_changed: 1, missing_in_pipeline: 1 },
+            byPolicy: { hand_back_done: 1, "(none)": 1 },
+            differing: [
+              {
+                id: "vcs:1",
+                type: "pr.conflicted",
+                at: "2026-10-05T09:00:00.000Z",
+                differences: [
+                  {
+                    kind: "missing_in_pipeline",
+                    engine: { type: "comment", on: "ACME-1", as: "office" },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
       { type: "request", payload: { id: "r4", method: "item", params: { id: "item-1" } } },
       {
         type: "response",

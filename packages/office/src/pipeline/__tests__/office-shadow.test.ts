@@ -152,9 +152,22 @@ describe("the office with the event pipeline in shadow mode", () => {
     )!;
 
     expect(assigned.decisions).toMatchObject([{ type: "wake", person: "sam", kind: "assigned" }]);
+    // The engine scheduled the same round, so the two agree.
+    expect(assigned.engine?.effects).toMatchObject([
+      { type: "wake", person: "sam", kind: "assigned" },
+    ]);
+
+    expect(assigned.comparison).toEqual({ agree: true, differences: [] });
     const back = recorded.find((t) => t.event.type === "agent.handed_back")!;
     expect(back.event.id).toMatch(/^workstate:handed_back:/);
     expect(back.decisions).toMatchObject([{ type: "act", as: "sam" }]);
+    // The engine moved and assigned as the office; the pipeline would make the same changes as sam.
+    expect(back.comparison?.agree).toBe(true);
+    expect(back.comparison?.differences.map((d) => d.kind)).toEqual([
+      "actor_changed",
+      "actor_changed",
+    ]);
+
     const conflict = recorded.find((t) => t.event.type === "pr.conflicted")!;
     expect(conflict.event.id).toMatch(/^workstate:pr\.conflicted:/);
     expect(conflict.decisions).toMatchObject([{ type: "wake", person: "sam", kind: "rebase" }]);

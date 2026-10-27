@@ -1,3 +1,5 @@
+import { compareOutcomes } from "./compare/compare.js";
+import { engineRecord, fromDecisions } from "./compare/outcomes.js";
 import { configurePipeline } from "./configure.js";
 import { evaluatePipeline } from "./evaluate.js";
 import { toPipelineEvent } from "./from-workflow.js";
@@ -31,6 +33,33 @@ export function createShadowPipeline(opts: ShadowOptions): ShadowPipeline {
         return trace;
       } catch (error) {
         logger.warn("pipeline (shadow) failed on an event", { id: event.id, error: String(error) });
+        return undefined;
+      }
+    },
+
+    async engineDid(meta, outcomes) {
+      const id = `${meta.source}:${meta.externalId}`;
+      try {
+        const trace = await traces.get(id);
+        if (!trace) {
+          return undefined;
+        }
+
+        const engine = engineRecord(outcomes);
+        const done = {
+          ...trace,
+          engine,
+          comparison: compareOutcomes(engine.effects, fromDecisions(trace.decisions)),
+        };
+
+        await traces.record(done);
+        return done;
+      } catch (error) {
+        logger.warn("pipeline (shadow) could not record what the engine did", {
+          id,
+          error: String(error),
+        });
+
         return undefined;
       }
     },

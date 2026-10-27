@@ -110,6 +110,34 @@ describe("formatTrace", () => {
     );
   });
 
+  it("adds what the engine did and the comparison, in shadow mode", () => {
+    const trace: Trace = {
+      event: event("ticket.assigned", { id: "tracker:2", subject: { ticket: "ACME-1" } }),
+      policies: [],
+      decisions: [{ type: "drop", reason: "no policy matched" }],
+      engine: { effects: [{ type: "move", ticket: "ACME-1", to: "active", as: "office" }] },
+      comparison: {
+        agree: false,
+        differences: [
+          {
+            kind: "missing_in_pipeline",
+            engine: { type: "move", ticket: "ACME-1", to: "active", as: "office" },
+          },
+        ],
+      },
+    };
+
+    expect(formatTrace(trace).split("\n").slice(-7)).toEqual([
+      "  drop: no policy matched",
+      "",
+      "Engine (today):",
+      "  move ACME-1 to active (by the office)",
+      "",
+      "Comparison: differ",
+      "  missing_in_pipeline: engine: move ACME-1 to active (by the office)",
+    ]);
+  });
+
   it("prints a gated event with no policies", () => {
     const trace: Trace = {
       event: event("ticket.assigned", { id: "tracker:1", subject: { ticket: "ACME-1" } }),
