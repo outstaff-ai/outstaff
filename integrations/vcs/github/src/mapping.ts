@@ -52,6 +52,7 @@ export function toPullRequest(
     state: merged ? "merged" : pr.state,
     draft: pr.draft === true,
     mergeable: mergeability(pr),
+    ...(pr.auto_merge ? { autoMerge: true } : {}),
     updatedAt: pr.updated_at,
   };
 }

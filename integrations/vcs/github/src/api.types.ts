@@ -15,6 +15,9 @@ export interface RestPull {
   requested_reviewers?: { login: string }[] | null;
   mergeable?: boolean | null;
   mergeable_state?: string;
+
+  /** Set while auto-merge is on: who turned it on and how it merges. */
+  auto_merge?: { merge_method?: string } | null;
   updated_at: string;
 }
 
@@ -139,6 +142,7 @@ export interface RestRepo {
   default_branch: string;
   allow_merge_commit?: boolean;
   allow_squash_merge?: boolean;
+  allow_rebase_merge?: boolean;
 }
 
 /** Required status checks of classic branch protection. */

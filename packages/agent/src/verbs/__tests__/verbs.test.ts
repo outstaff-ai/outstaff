@@ -916,6 +916,24 @@ describe("pr write verbs", () => {
     );
   });
 
+  it("turns on auto-merge when a pull request is marked ready or opened ready, if the team lets agents", async () => {
+    const f = await setup();
+    f.env.team.policies!.merge = { on_approval: true, approvers: ["humans"] } as never;
+    await run("pr.open", f.env, { title: "Draft", body: "b", draft: true }, f.ctx);
+    const r = await run("pr.update", f.env, { number: 1, ready: true }, f.ctx);
+    expect(r.text).toContain("Auto-merge is on");
+    expect((await f.vcs.getPullRequest(f.repo, 1)).autoMerge).toBe(true);
+
+    const opened = await run(
+      "pr.open",
+      f.env,
+      { title: "Ready", body: "b", head: "feat/other" },
+      f.ctx,
+    );
+
+    expect(opened.text).toContain("Auto-merge is on");
+  });
+
   it("updates the pull request and refuses an empty or contradictory update", async () => {
     const f = await setup();
     await run("pr.open", f.env, { title: "Before", body: "old", draft: true }, f.ctx);

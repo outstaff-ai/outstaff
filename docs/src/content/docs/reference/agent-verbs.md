@@ -453,7 +453,7 @@ ost pr resolve shop 42 PRT_abc123
 
 Open a pull request from a pushed branch.
 
-Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.
+Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. A pull request opened ready gets the host's auto-merge (or the merge queue) when the team lets agents merge, as with pr update --ready. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.
 
 ```
 ost pr open [--repo <repo>] [--head <head>] [--base <base>] --title <title> [--body <body>] [--body-file <bodyFile>] [--draft]
@@ -482,7 +482,7 @@ ost pr open --repo shop --head feat/coupons --title "feat(cart): add coupons" --
 
 Change the title, body, base or draft state of a pull request.
 
-Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review.
+Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review. When the team lets agents merge (policies.merge.on_approval), ready also turns on the host's auto-merge, or adds the pull request to the merge queue where the repository has one: the repository's required approvals and checks decide when it merges, and no further run of yours is needed. If that fails, the pull request is still ready; report why and do not merge it another way.
 
 ```
 ost pr update <number> [--repo <repo>] [--title <title>] [--body <body>] [--body-file <bodyFile>] [--base <base>] [--draft] [--ready]

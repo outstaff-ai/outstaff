@@ -131,45 +131,6 @@ const docMentionAssignsRule: Rule = {
   do: [{ assign: "mentioned" }],
 };
 
-/**
- * An allowed approver approved an open pull request an agent wrote: its author merges it (`ost pr merge` checks
- * everything again). Exists only while `policies.merge.on_approval` is on. An approval that carries comments is
- * feedback first: it schedules only the review round, and `approved-merge-after-feedback` merges after that round.
- */
-const approvedMergeRule: Rule = {
-  id: "approved-merge",
-  on: "pr.review_submitted",
-  if: {
-    all: [
-      { approver: true },
-      { pr_author_kind: "agent" },
-      { pr_open: true },
-      { review_state: ["approved"] },
-      { has_body: false },
-    ],
-  },
-  do: [{ schedule: { person: "author", kind: "merge", priority: "high" } }],
-};
-
-/**
- * The author handed back the round on an approval's comments, and the pull request is approved by an allowed
- * approver with no change requested since: now it merges. Same switch as `approved-merge`.
- */
-const approvedMergeAfterFeedbackRule: Rule = {
-  id: "approved-merge-after-feedback",
-  on: "agent.handed_back",
-  if: {
-    all: [
-      { hand_back_status: ["done"] },
-      { hand_back_kind: ["review_feedback"] },
-      { pr_author_kind: "agent" },
-      { pr_open: true },
-      { pr_approved: true },
-    ],
-  },
-  do: [{ schedule: { person: "author", kind: "merge", priority: "high" } }],
-};
-
 const kanbanRules: Rule[] = [
   {
     id: "pr-opened-review",
@@ -223,8 +184,6 @@ const kanbanRules: Rule[] = [
   ticketCommentRule({ not: { ticket_status: ["done", "canceled"] } }),
   ticketCommentReactivatesRule,
   mentionRule(true),
-  approvedMergeRule,
-  approvedMergeAfterFeedbackRule,
   {
     id: "human-feedback-reactivates-ticket",
     on: ["pr.review_submitted", "pr.comment"],
@@ -369,8 +328,6 @@ const minimalRules: Rule[] = [
   docMentionAssignsRule,
   ticketCommentRule({ not: { ticket_status: ["done", "canceled"] } }),
   mentionRule(false),
-  approvedMergeRule,
-  approvedMergeAfterFeedbackRule,
   {
     id: "assigned-agent-scheduled",
     // A ticket created already assigned has one `created` item and no assignment item to go on.

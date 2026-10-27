@@ -91,6 +91,7 @@ export function pullRoutes(s: FakeState): Route[] {
         }
 
         if (queue) {
+          pr.auto_merge = { merge_method: "merge" };
           return { status: 202, body: { status: "enqueued" } };
         }
 

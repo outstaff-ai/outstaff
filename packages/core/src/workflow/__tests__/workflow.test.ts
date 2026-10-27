@@ -11,8 +11,7 @@ import { createStatusMap } from "#/workflow/status-map.js";
 import { renderTemplate, TemplateError } from "#/workflow/template.js";
 import type { Effect, Rule, WorkflowPr } from "#/workflow/types.js";
 
-/** The preset as a team gets it by default: approved-merge exists only while policies.merge.on_approval is on. */
-const kanban = presetRules("kanban").filter((r) => !r.id.startsWith("approved-merge"));
+const kanban = presetRules("kanban");
 
 const baseConfig = () => ({
   version: 1,
@@ -1219,7 +1218,7 @@ describe("comments on documents and tickets", () => {
       ]);
     });
 
-    it("is in every preset", () => {
+    it("works in every preset", () => {
       for (const p of ["kanban", "scrum", "minimal"] as const) {
         expect(run(docEvent(), world(), presetRules(p))).toEqual([docSchedule]);
       }
@@ -1479,14 +1478,46 @@ describe("comments on documents and tickets", () => {
   });
 });
 
-describe("approved-merge (policies.merge.on_approval)", () => {
+describe("merging on approval with a team's own rules", () => {
+  // policies.merge.on_approval adds no rule (the host's auto-merge merges); a team can still schedule a merge itself.
+  const ownRules = [
+    {
+      id: "approved-merge",
+      on: "pr.review_submitted",
+      if: {
+        all: [
+          { approver: true },
+          { pr_author_kind: "agent" },
+          { pr_open: true },
+          { review_state: ["approved"] },
+          { has_body: false },
+        ],
+      },
+      do: [{ schedule: { person: "author", kind: "merge", priority: "high" } }],
+    },
+    {
+      id: "approved-merge-after-feedback",
+      on: "agent.handed_back",
+      if: {
+        all: [
+          { hand_back_status: ["done"] },
+          { hand_back_kind: ["review_feedback"] },
+          { pr_author_kind: "agent" },
+          { pr_open: true },
+          { pr_approved: true },
+        ],
+      },
+      do: [{ schedule: { person: "author", kind: "merge", priority: "high" } }],
+    },
+  ];
+
   const rulesWith = (
     merge?: Record<string, unknown>,
     preset?: string,
   ): ReturnType<typeof resolveWorkflow> => {
     const parsed = parseTeamConfig({
       ...baseConfig(),
-      ...(preset ? { workflow: { preset } } : {}),
+      workflow: { ...(preset ? { preset } : {}), ...(merge ? { rules: ownRules } : {}) },
       ...(merge ? { policies: { merge } } : {}),
     });
 
@@ -1519,12 +1550,27 @@ describe("approved-merge (policies.merge.on_approval)", () => {
       (x) => x.type === "schedule" && x.kind === "merge",
     );
 
-  it("is off by default: no rule, nothing scheduled, no switched entry", () => {
-    const off = rulesWith();
-    expect(off.rules.some((r) => r.id === "approved-merge")).toBe(false);
-    expect(off.switched).toEqual([]);
-    expect(merges(off, approved())).toEqual([]);
-    expect(merges(rulesWith({ on_approval: false }), approved())).toEqual([]);
+  it("the switch adds no rule of its own", () => {
+    for (const preset of ["kanban", "scrum", "minimal"]) {
+      const parsed = parseTeamConfig({
+        ...baseConfig(),
+        workflow: { preset },
+        policies: { merge: { on_approval: true } },
+      });
+
+      if (!parsed.ok) {
+        throw new Error(JSON.stringify(parsed.issues));
+      }
+
+      const w = resolveWorkflow(
+        parsed.config.workflow,
+        parsed.config.humans,
+        parsed.config.policies,
+      );
+
+      expect(w.rules.some((r) => r.id.startsWith("approved-merge"))).toBe(false);
+      expect(merges(w, approved())).toEqual([]);
+    }
   });
 
   it("schedules a merge for the author when an allowed approver approves an open agent pull request", () => {
@@ -1597,15 +1643,9 @@ describe("approved-merge (policies.merge.on_approval)", () => {
 
       expect(merges(on, handBack(), closed)).toEqual([]);
     });
-
-    it("is off with the switch", () => {
-      expect(merges(rulesWith(), handBack(), withVerdicts(verdict("grace", "approved")))).toEqual(
-        [],
-      );
-    });
   });
 
-  it("is in every preset", () => {
+  it("works in every preset", () => {
     for (const preset of ["kanban", "scrum", "minimal"]) {
       expect(merges(rulesWith({ on_approval: true }, preset), approved())).toHaveLength(1);
     }
@@ -1645,20 +1685,5 @@ describe("approved-merge (policies.merge.on_approval)", () => {
     const byRole = rulesWith({ on_approval: true, approvers: ["role:reviewer"] });
     expect(merges(byRole, approved({ actor: { kind: "agent", id: "rex" } }))).toHaveLength(1);
     expect(merges(byRole, approved())).toEqual([]);
-  });
-
-  it("an explicit workflow.rules entry wins over the switch", () => {
-    const parsed = parseTeamConfig({
-      ...baseConfig(),
-      workflow: { rules: [{ id: "approved-merge", disabled: true }] },
-      policies: { merge: { on_approval: true } },
-    });
-
-    if (!parsed.ok) {
-      throw new Error(JSON.stringify(parsed.issues));
-    }
-
-    const w = resolveWorkflow(parsed.config.workflow, parsed.config.humans, parsed.config.policies);
-    expect(merges(w, approved())).toEqual([]);
   });
 });

@@ -49,42 +49,6 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
       "{{actor.id}} commented on your merged pull request #{{pr.number}} ({{pr.title}}). Answer there. If they ask for a change, open a follow-up pull request.",
   },
   {
-    id: "approval_to_merge",
-    summary:
-      "An allowed approver's bare approval of an agent's open pull request wakes its author to merge (policies.merge.on_approval).",
-    on: ["pr.review_submitted"],
-    when: {
-      all: [
-        { approver: true },
-        { pr_author_kind: "agent" },
-        { pr_open: true },
-        { review_state: ["approved"] },
-        { has_body: false },
-      ],
-    },
-    decide: { wake: { person: "author", kind: "merge" } },
-    instruction:
-      "Your pull request #{{pr.number}} ({{pr.title}}) is approved. Merge it the way the repository asks.",
-  },
-  {
-    id: "approval_to_merge_after_feedback",
-    summary:
-      "The author finished the round on an approval's comments and the pull request is still approved: it merges (policies.merge.on_approval).",
-    on: ["agent.handed_back"],
-    when: {
-      all: [
-        { hand_back_status: ["done"] },
-        { hand_back_kind: ["review_feedback"] },
-        { pr_author_kind: "agent" },
-        { pr_open: true },
-        { pr_approved: true },
-      ],
-    },
-    decide: { wake: { person: "author", kind: "merge" } },
-    instruction:
-      "You answered the comments on the approved pull request #{{pr.number}} ({{pr.title}}). Merge it the way the repository asks.",
-  },
-  {
     id: "merged_closes_ticket",
     summary:
       "A merge into the default branch closes the ticket for the author, unless another of its pull requests is open.",
@@ -215,12 +179,7 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
   },
 ];
 
-/**
- * Policies that are on only while a `policies` switch is: merging on approval, as the workflow rules do, and the idle
- * pull, as the scheduler does with the pipeline off.
- */
+/** Policies that are on only while a `policies` switch is: the idle pull, as the scheduler does with the pipeline off. */
 export const POLICY_SWITCH_OF: Readonly<Record<string, string>> = {
-  approval_to_merge: "merge.on_approval",
-  approval_to_merge_after_feedback: "merge.on_approval",
   idle_pulls_next: "pull_ready",
 };

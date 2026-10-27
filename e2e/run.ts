@@ -273,8 +273,9 @@ office:
   # Slack has dummy tokens and no stand-in, so the office's doctor does not call it.
   doctor: { skip: [chat] }
 policies:
-  # Only this approver's approval merges: the other steps approve nothing, and a human here changes none of them.
-  merge: { on_approval: true, approvers: [human:merge-approver] }
+  # Agents turn on auto-merge when a pull request is ready; the stub's ruleset needs one approval, which only the
+  # last step gives.
+  merge: { on_approval: true }
 `;
 
 /**
@@ -1592,17 +1593,24 @@ async function main() {
   const t2 = final.tickets.find((x: Json) => x.key === second);
   assertEq(t2.status, "In Review", "the second ticket waits in review");
 
-  // ---- 12. merge on approval (policies.merge.on_approval): an approver's approval makes the author enqueue the
-  // pull request in the merge queue, the host merges it, and the ticket is done
-  const head12 = (await state()).github.pulls.find((p: Json) => p.number === made.pr.number).head
-    .sha;
+  // ---- 12. merge on approval (policies.merge.on_approval): the author turned on auto-merge when it opened the pull
+  // request, so a human's approval meets the ruleset, the host queues and merges it with no agent run, and the
+  // ticket is done
+  const before12 = (await state()).github.pulls.find((p: Json) => p.number === made.pr.number);
+  assertEq(
+    before12.autoMerge,
+    true,
+    "the author turned on auto-merge when it opened the pull request",
+  );
+
+  const head12 = before12.head.sha;
 
   await stub("POST", `/_test/pulls/${made.pr.number}/review`, {
     state: "approved",
     actor: "merge-approver",
   });
 
-  const queued = await until(`#${made.pr.number} put in the merge queue by its author`, (s) =>
+  const queued = await until(`#${made.pr.number} put in the merge queue by the host`, (s) =>
     s.github.pulls.find((p: Json) => p.number === made.pr.number && p.queued),
   );
 
@@ -1618,7 +1626,7 @@ async function main() {
 
   assertEq(done12.state, "merged", "the pull request merged");
   step(
-    `merge on approval: #${made.pr.number} approved -> enqueued by its author, merged by the queue, ${made.t.key} done`,
+    `merge on approval: #${made.pr.number} approved -> auto-merge queued it, merged by the queue, ${made.t.key} done`,
   );
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);

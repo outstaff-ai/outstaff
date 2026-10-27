@@ -105,11 +105,13 @@ In a chat thread, reply in the same thread that started the work. Link the resul
 === process/merge.md ===
 # Merge
 
-Use this when a work item asks you to merge your own pull request: an allowed approver approved it and the team turned on merging on approval. The work prompt names the pull request.
+Merging is the code host's job, not yours and not the office's. When the team lets agents merge (`policies.merge.on_approval`), marking your pull request ready sets it to merge: `ost pr update <n> --ready` (or `ost pr open` without `--draft`) also turns on the host's auto-merge, or adds the pull request to the merge queue where the repository has one. The repository's own rules (required approvals and checks) decide when it merges, with the repository's merge method. You are not woken for the merge; the ticket moves when it merges.
 
-1. Run `ost pr merge <n>`. The code checks the approvals, the required checks and the state of the pull request, then puts it in the host's merge queue or merges it as the team's policy and the repository's settings say. You do not choose the method.
-2. Report the result in the journal and hand back as in `/work/dir/process/hand-back.md`: merged, queued (the host merges it when its queue passes), or refused, with the reasons the verb listed.
-3. Never retry a refusal by other means: not with `gh` or `git`, not in the host's web page, not by editing the pull request, its checks or the repository's settings. A refusal is the answer. If it names review feedback, handle that as in `/work/dir/process/review-loop.md`; otherwise report it and stop.
+1. Mark a pull request ready only when it is ready to merge as it is: once a person approves it and the checks pass, it merges without you.
+2. Report what the verb said in the journal: auto-merge on, added to the merge queue, or not turned on and why. If it was not turned on, a person merges it; say so in the hand-back.
+3. A new push, a conflict or failing CI can cancel auto-merge on the host. You are woken for the conflict or the failing check as usual; after you fix it and push, run `ost pr update <n> --ready` again to turn auto-merge back on.
+4. If a work item asks you to merge (a team's own workflow rule), run `ost pr merge <n>`. The code checks the approvals, the required checks and the state of the pull request, then queues or merges it as the team's policy and the repository's settings say.
+5. Never merge another way: not with `gh` or `git`, not in the host's web page, not by editing the pull request, its checks or the repository's settings. A refusal is the answer; report it and stop.
 
 Do not rewrite the pull request's history or messages to get the merge through. How a repository wants commits and history handled is in its own files (`/work/dir/references/git.md`), and the host decides what it accepts.
 
@@ -363,7 +365,7 @@ If you have no repository grants you have no GitHub identity and every `ost pr` 
 | Command                                                                                               | What it does                                                                                                                                                           |
 | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ost pr open --title <t> --body-file <f> [--draft] [--head <b>] [--base <b>] [--repo <r>]`            | Opens a pull request. The head is your current branch, the base the default branch. Never from the default branch. Refused when its ticket already has a pull request. |
-| `ost pr update <n> [--title <t>] [--body-file <f>] [--base <b>] [--draft\|--ready]`                   | Changes a pull request you own.                                                                                                                                        |
+| `ost pr update <n> [--title <t>] [--body-file <f>] [--base <b>] [--draft\|--ready]`                   | Changes a pull request you own. `--ready` also sets the host to merge it when the team lets agents merge (`/work/dir/process/merge.md`).                                         |
 | `ost pr review <n> --approve\|--request-changes\|--comment [--body-file <f>] [--comment-file <json>]` | Submits a review. `--comment-file` is a JSON array of `{ "path", "line", "body" }`. Not on your own pull request.                                                      |
 | `ost pr reply <n> <thread-id> --body <text>`                                                          | Replies in a review thread of that pull request.                                                                                                                       |
 | `ost pr comment <n> --body <text>`                                                                    | Comments on the pull request conversation: answers a review summary or a comment.                                                                                      |
@@ -574,7 +576,7 @@ A ticket is assigned and ready.
 1. Read the ticket, the requirements and the design it links. Check that you can state what done looks like. If not, ask before you code. Decide now whether the work needs more than one pull request; if it does, split the ticket into sub-tickets before you write code, as `/work/dir/process/ticket-lifecycle.md` says ("One pull request per ticket"), and work them one pull request each.
 2. Fetch, branch from the up-to-date default branch and write the change in small, readable steps that match the code around it.
 3. Write tests with the change: the acceptance criteria first, then the edge cases you found. Run the checks for what you changed (see "Checks before you push"); fix what you broke.
-4. Commit and push the branch as the repository's conventions say (`/work/dir/references/git.md`). Write the description to a file in your scratch directory, from the repository's pull request template if it has one, else `/work/dir/templates/pull-request.md`, and open the pull request: `ost pr open --title "<title>" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review). The title follows the repository's conventions; if they say nothing, make it a short summary of the change.
+4. Commit and push the branch as the repository's conventions say (`/work/dir/references/git.md`). Write the description to a file in your scratch directory, from the repository's pull request template if it has one, else `/work/dir/templates/pull-request.md`, and open the pull request: `ost pr open --title "<title>" --body-file <file>` (the head is your current branch, the base the default branch; add `--draft` if it is not ready for review; mark it ready later with `ost pr update <n> --ready`). When the team lets agents merge, a ready pull request is set to merge by the host as `/work/dir/process/merge.md` says; report what the verb said. The title follows the repository's conventions; if they say nothing, make it a short summary of the change.
 5. Hand back.
 
 If the change depends on an unmerged one, stack it (below).
@@ -593,7 +595,7 @@ Follow `/work/dir/process/merged-feedback.md`: answer on the pull request, and o
 
 ### merge
 
-An allowed approver approved a pull request of yours and the team lets agents merge on approval.
+A work item asks you to merge a pull request of yours (a team's own workflow rule). Usually there is none: marking a pull request ready sets the host to merge it (`/work/dir/process/merge.md`).
 
 Follow `/work/dir/process/merge.md`: run `ost pr merge`, report the result, and never retry a refusal by other means.
 

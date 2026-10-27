@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expectPortError, requireCapability, requireSeed } from "./harness.js";
 import type { VcsCases } from "./types.js";
 
-/** Review state, required checks, merge options and requirements, and merging. */
+/** Review state, required checks, merge options and requirements, merging, auto-merge and the queue. */
 export function vcsMergingCases({ get, repoOf }: VcsCases): void {
   describe("merging", () => {
     const setupMerge = async (t: Parameters<typeof requireSeed>[0], level: "write" | "read") => {
@@ -120,6 +120,28 @@ export function vcsMergingCases({ get, repoOf }: VcsCases): void {
         s.subject.mergePullRequest!(repo, pr.number, { method: "squash", sha: pr.head.sha }),
         "invalid",
       );
+    });
+
+    it("turns on auto-merge as itself, and the pull request says so", async (t) => {
+      const { s, repo, pr } = await setupMerge(t, "write");
+      expect(pr.autoMerge ?? false).toBe(false);
+      await s.subject.enableAutoMerge!(repo, pr.number);
+      expect((await s.subject.getPullRequest(repo, pr.number)).autoMerge).toBe(true);
+    });
+
+    it("adds a pull request to the merge queue where the repository has one", async (t) => {
+      const { s, repo, pr } = await setupMerge(t, "write");
+      await requireSeed(t, s.seed, "mergeSettings")(repo, { queue: true });
+      await expect(s.subject.enqueue!(repo, pr.number)).resolves.toBeUndefined();
+    });
+
+    it("refuses auto-merge and the queue without a write grant", async (t) => {
+      expect.hasAssertions();
+      const { s, repo, pr } = await setupMerge(t, "write");
+      await requireSeed(t, s.seed, "mergeSettings")(repo, { queue: true });
+      await requireSeed(t, s.seed, "permission")(repo, s.seed.selfLogin!, "read");
+      await expectPortError(s.subject.enableAutoMerge!(repo, pr.number), "forbidden");
+      await expectPortError(s.subject.enqueue!(repo, pr.number), "forbidden");
     });
 
     it("refuses a merge without a write grant", async (t) => {

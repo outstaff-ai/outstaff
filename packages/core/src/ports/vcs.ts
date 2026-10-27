@@ -15,6 +15,9 @@ export interface PullRequest {
   state: "open" | "closed" | "merged";
   draft: boolean;
   mergeable: "clean" | "conflicting" | "unknown";
+
+  /** The host merges it on its own once the repository's rules are met (auto-merge or a merge queue entry). */
+  autoMerge?: boolean;
   updatedAt: string;
 }
 
@@ -249,7 +252,7 @@ export interface Vcs {
   react(repo: RepoRef, target: ReactionTarget, reaction: Reaction): Promise<void>;
 
   /**
-   * Merge support, for adapters with the `vcs.merge` capability; leave all five out otherwise.
+   * Merge support, for adapters with the `vcs.merge` capability; leave all seven out otherwise.
    *
    * `reviewState`: the submitted reviews and the reviewers still asked (read grant).
    * `requiredChecks`: the checks the host requires of this pull request before it merges, at its head, with
@@ -260,11 +263,17 @@ export interface Vcs {
    * rulesets stay the final gate: what it refuses is `invalid` or `conflict` with the host's reason, never bypassed.
    * `mergeRequirements`: what the host requires before anything merges into the repository's default branch, from
    * all of its protection rules (read grant, the office's identity).
+   * `enableAutoMerge`: turns on the host's auto-merge as the person this port instance belongs to (write grant), so
+   * the host merges the pull request with the repository's own method once its rules are met; on a branch with a
+   * merge queue it joins the queue then. `enqueue`: adds the pull request to the merge queue now, as that person
+   * (write grant), including a pull request of a stack. Neither merges past the host's rules.
    */
   reviewState?(repo: RepoRef, number: number): Promise<PullRequestReviewState>;
   requiredChecks?(repo: RepoRef, number: number): Promise<Check[]>;
   mergeOptions?(repo: RepoRef, base: string): Promise<MergeOptions>;
   mergeRequirements?(repo: RepoRef): Promise<MergeRequirements>;
+  enableAutoMerge?(repo: RepoRef, number: number): Promise<void>;
+  enqueue?(repo: RepoRef, number: number): Promise<void>;
   mergePullRequest?(
     repo: RepoRef,
     number: number,
