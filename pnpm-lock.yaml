@@ -207,7 +207,20 @@ importers:
         specifier: 19.0.0
         version: 19.0.0(@types/node@24.19.2)
 
-  e2e: {}
+  e2e:
+    devDependencies:
+      '@outstaff/integration.knowledge.itsaplan':
+        specifier: workspace:*
+        version: link:../integrations/knowledge/itsaplan
+      '@outstaff/integration.tracker.itsaplan':
+        specifier: workspace:*
+        version: link:../integrations/tracker/itsaplan
+      '@outstaff/integration.vcs.github':
+        specifier: workspace:*
+        version: link:../integrations/vcs/github
+      '@outstaff/testing.github':
+        specifier: workspace:*
+        version: link:../testing/github
 
   e2e/runtime-scripted:
     dependencies:
@@ -275,6 +288,9 @@ importers:
         specifier: workspace:*
         version: link:../../tracker/itsaplan
     devDependencies:
+      '@outstaff/testing.itsaplan':
+        specifier: workspace:*
+        version: link:../../../testing/itsaplan
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -320,6 +336,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@outstaff/testing.core':
+        specifier: workspace:*
+        version: link:../../../testing/core
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -405,6 +424,18 @@ importers:
         specifier: 2.9.1
         version: 2.9.1
     devDependencies:
+      '@outstaff/office':
+        specifier: workspace:*
+        version: link:../office
+      '@outstaff/testing.agent':
+        specifier: workspace:*
+        version: link:../../testing/agent
+      '@outstaff/testing.core':
+        specifier: workspace:*
+        version: link:../../testing/core
+      '@outstaff/testing.office':
+        specifier: workspace:*
+        version: link:../../testing/office
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -421,6 +452,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@outstaff/testing.core':
+        specifier: workspace:*
+        version: link:../../testing/core
       '@types/semver':
         specifier: 7.8.0
         version: 7.8.0
@@ -486,6 +520,53 @@ importers:
       tsx:
         specifier: 4.23.15
         version: 4.23.15
+
+  testing/agent:
+    dependencies:
+      '@outstaff/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+
+  testing/core: {}
+
+  testing/github:
+    dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@outstaff/integration.vcs.github':
+        specifier: workspace:*
+        version: link:../../integrations/vcs/github
+      '@outstaff/testing.core':
+        specifier: workspace:*
+        version: link:../core
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  testing/itsaplan:
+    dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@outstaff/integration.tracker.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/tracker/itsaplan
+      vitest:
+        specifier: 5.0.5
+        version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  testing/office:
+    dependencies:
+      '@outstaff/office':
+        specifier: workspace:*
+        version: link:../../packages/office
+      '@outstaff/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
 
 packages:
 

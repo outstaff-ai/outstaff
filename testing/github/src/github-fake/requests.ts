@@ -1,4 +1,4 @@
-import type { ThreadNode } from "../../api.types.js";
+import type { ThreadNode } from "@outstaff/integration.vcs.github";
 import type { StoredThread, StubRequest } from "../types.js";
 
 export const OWN_APP = 201;

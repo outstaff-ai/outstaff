@@ -1,12 +1,10 @@
 import type { AdapterContext, SecretSource, TeamConfig } from "@outstaff/core";
 import { silentLogger, PortError, type PortErrorCode } from "@outstaff/core";
 import { expect } from "vitest";
-import { githubOptions } from "../options.js";
-import type { GithubDeps } from "../types.js";
-import { createGithubVcs } from "../vcs.js";
+import { createGithubVcs, githubOptions, type GithubDeps } from "@outstaff/integration.vcs.github";
 import { createStubFetch } from "./http-stub.js";
 import type { Clock, Route } from "./types.js";
-import { testKey } from "./keys.js";
+import { testKey } from "@outstaff/testing.core";
 
 export const REPO = { owner: "acme", name: "app" };
 export const ORIGIN = "https://api.github.test";

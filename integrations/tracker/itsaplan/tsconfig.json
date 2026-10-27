@@ -6,7 +6,9 @@
     "paths": {
       "@outstaff/core": ["../../../packages/core/src/index.ts"],
       "@outstaff/core/contracts": ["../../../packages/core/src/contracts/index.ts"],
-      "@outstaff/core/fakes": ["../../../packages/core/src/fakes/index.ts"]
+      "@outstaff/core/fakes": ["../../../packages/core/src/fakes/index.ts"],
+      "@outstaff/integration.tracker.itsaplan": ["./src/index.ts"],
+      "@outstaff/testing.itsaplan": ["../../../testing/itsaplan/src/index.ts"]
     }
   },
   "include": ["src"]

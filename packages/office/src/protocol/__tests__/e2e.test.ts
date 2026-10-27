@@ -11,8 +11,8 @@ import { manualClock } from "../../clock.js";
 import { createAgentAuth } from "../auth.js";
 import { createProtocolServer } from "../server.js";
 import type { Messaging } from "../source.types.js";
-import { createFakeSource } from "../testing.js";
-import type { FakeSource, ProtocolServer } from "../types.js";
+import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
+import type { ProtocolServer } from "../types.js";
 
 // Only the people matter to the office verbs.
 const team = { people: [{ handle: "ada" }, { handle: "noor" }] } as unknown as TeamConfig;

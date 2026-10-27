@@ -11,13 +11,13 @@ import type {
   RestReviewComment,
   ThreadNode,
   ThreadsData,
-} from "../../integrations/vcs/github/src/api.types.ts";
+} from "@outstaff/integration.vcs.github";
 import type {
   StoredIssueComment,
   StoredReview,
   StoredThread as FakeStoredThread,
   StoredThreadComment,
-} from "../../integrations/vcs/github/src/testing/types.ts";
+} from "@outstaff/testing.github";
 
 /**
  * The parts of GitHub the vcs adapter and git use: the App and installation endpoints, pull requests, reviews,

@@ -9,6 +9,17 @@ export { createItsaplanTracker } from "./tracker.js";
 export { eventType } from "./events.js";
 export { knowledgeOptions, resolveConnection, trackerOptions } from "./options.js";
 export type { ClientDeps, KnowledgeOptions, TrackerOptions } from "./types.js";
+// The REST shapes the adapter reads, for the Its a Plan stand-ins used in tests.
+export type {
+  ApiActivityItem,
+  ApiAssignee,
+  ApiAttachment,
+  ApiColumn,
+  ApiIssue,
+  ApiLabel,
+  ApiProject,
+  Page,
+} from "./api.types.js";
 
 export { ItsaplanHttp } from "./http.js";
 

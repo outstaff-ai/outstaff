@@ -1,5 +1,5 @@
 import type { PullRequest, RepoRef, VcsPermission } from "@outstaff/core";
-import type { RestEvent, RestPull } from "../../api.types.js";
+import type { RestEvent, RestPull } from "@outstaff/integration.vcs.github";
 import type {
   FakeState,
   StoredCheckRun,

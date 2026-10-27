@@ -1,4 +1,4 @@
-import type { RequiredChecksData, ThreadsData } from "../../api.types.js";
+import type { RequiredChecksData, ThreadsData } from "@outstaff/integration.vcs.github";
 import type { FakeState, Route } from "../types.js";
 import { actorOf, toNode } from "./requests.js";
 

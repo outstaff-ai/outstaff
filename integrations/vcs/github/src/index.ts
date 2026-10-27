@@ -9,6 +9,19 @@ import { createGithubVcs } from "./vcs.js";
 export { createGithubVcs } from "./vcs.js";
 export { githubOptions } from "./options.js";
 export type { GithubDeps, GithubOptions } from "./types.js";
+// The REST and GraphQL shapes the adapter reads, for the GitHub stand-ins used in tests.
+export type {
+  RequiredChecksData,
+  RestCheckRun,
+  RestEvent,
+  RestIssueComment,
+  RestPull,
+  RestReview,
+  RestReviewComment,
+  ThreadNode,
+  ThreadsData,
+} from "./api.types.js";
+
 export { githubCommandRules } from "./permissions.js";
 export { signAppJwt } from "./jwt.js";
 

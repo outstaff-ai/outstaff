@@ -43,6 +43,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@outstaff/testing.core": "workspace:*",
     "@types/semver": "7.8.0",
     "tsx": "4.23.15",
     "vitest": "5.0.5"

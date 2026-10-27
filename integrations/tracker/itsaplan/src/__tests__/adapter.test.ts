@@ -5,9 +5,13 @@ import { buildFetch } from "../fetch.js";
 import { errorCode, ItsaplanHttp } from "../http.js";
 import { knowledgeOptions, resolveConnection, trackerOptions, deriveApiUrl } from "../options.js";
 import { createItsaplanTracker } from "../tracker.js";
-import { secretMap, team } from "../testing/harness.js";
-import { API_KEY, createStubFetch } from "../testing/http-stub.js";
-import { createItsaplanFake } from "../testing/itsaplan-fake.js";
+import {
+  API_KEY,
+  createItsaplanFake,
+  createStubFetch,
+  secretMap,
+  team,
+} from "@outstaff/testing.itsaplan";
 
 const trackerCtx = (fake: ReturnType<typeof createItsaplanFake>, t: TeamConfig = team) =>
   ({

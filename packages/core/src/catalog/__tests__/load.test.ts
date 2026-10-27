@@ -11,7 +11,7 @@ import { loadCatalog } from "../load.js";
 import { render } from "../template.js";
 import { parse } from "yaml";
 import { CAPABILITIES } from "../../capabilities.js";
-import { EXAMPLE_CATALOG_DIR, readAcmeTeam } from "../../testing/fixtures.js";
+import { EXAMPLE_CATALOG_DIR, readAcmeTeam } from "@outstaff/testing.core";
 
 const CATALOG_PKG = fileURLToPath(new URL("../../../../catalog", import.meta.url));
 const root = mkdtempSync(join(tmpdir(), "outstaff-catalog-"));
