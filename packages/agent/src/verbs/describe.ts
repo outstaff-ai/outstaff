@@ -1,17 +1,5 @@
 import { z } from "zod";
-import type { Verb } from "./types.js";
-
-export interface VerbField {
-  name: string;
-  type: "string" | "integer" | "number" | "boolean" | "array";
-  required: boolean;
-  description: string;
-  default?: unknown;
-  enum?: string[];
-
-  /** Position among the positional arguments, or undefined for an option. */
-  arg?: number;
-}
+import type { Verb, VerbField } from "./types.js";
 
 type Prop = { type?: string; description?: string; default?: unknown; enum?: string[] };
 

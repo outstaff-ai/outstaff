@@ -1,6 +1,8 @@
 import { z } from "zod";
-import { CANONICAL_STATUSES, type CanonicalStatus } from "../ports/status.js";
-import { WORKFLOW_EVENT_TYPES, type WorkflowEventType } from "./types.js";
+import { CANONICAL_STATUSES } from "../ports/status.js";
+import type { CanonicalStatus } from "../ports/types.js";
+import { WORKFLOW_EVENT_TYPES } from "./constants.js";
+import type { Action, Condition } from "./types.js";
 
 const d = (description: string) => ({ description });
 
@@ -8,36 +10,8 @@ const status = z.enum(CANONICAL_STATUSES as readonly [CanonicalStatus, ...Canoni
 const SLUG = /^[a-z][a-z0-9_-]*$/;
 const ROLE = "role:[a-z][a-z0-9-]*";
 
-export type Condition =
-  | { all: Condition[] }
-  | { any: Condition[] }
-  | { not: Condition }
-  | { ticket_status: CanonicalStatus[] }
-  | { moved_to: CanonicalStatus[] }
-  | { actor_kind: "human" | "agent" | "automation" }
-  | { assignee_kind: "human" | "agent" | "none" }
-  | { has_label: string }
-  | { pr_author_kind: "human" | "agent" | "bot" }
-  | { approver: boolean }
-  | { pr_draft: boolean }
-  | { pr_open: boolean }
-  | { pr_merged: boolean }
-  | { pr_base_default: boolean }
-  | { has_body: boolean }
-  | { agent_mentioned: boolean }
-  | { review_state: string[] }
-  | { hand_back_status: HandBackStatus[] }
-  | { hand_back_kind: string[] }
-  | { pr_approved: boolean }
-  | { ticket_prs_all_closed: boolean }
-  | { ticket_prs_open: boolean }
-  | { ticket_prs_several: boolean }
-  | { ticket_handed_back: boolean };
-
 /** How an agent ended its turn on a work item: finished, waiting for an answer, or unable to continue. */
 export const HAND_BACK_STATUSES = ["done", "waiting", "blocked"] as const;
-export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
-
 export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
   z.union([
     z.strictObject({ all: z.array(conditionSchema).min(1) }).meta(d("Every condition must hold.")),
@@ -147,12 +121,6 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
   ]),
 );
 
-export type Action =
-  | { move: CanonicalStatus }
-  | { assign: string }
-  | { comment: string | { template: string; on?: "ticket" | "pr" } }
-  | { schedule: { person: string; kind: string; priority: "low" | "normal" | "high" } };
-
 const templateId = z.string().regex(SLUG, "Use lowercase letters, digits, dashes and underscores.");
 
 export const actionSchema: z.ZodType<Action> = z.union([
@@ -218,13 +186,3 @@ export const ruleDisableSchema = z
 
 /** One entry of `workflow.rules` as written in team.yaml. */
 export const ruleInputSchema = z.union([ruleSchema, ruleDisableSchema]);
-
-export type Rule = {
-  id: string;
-  on: WorkflowEventType | WorkflowEventType[];
-  if?: Condition | undefined;
-  do: Action[];
-  disabled?: boolean | undefined;
-};
-
-export type RuleInput = Rule | { id: string; disabled: true };

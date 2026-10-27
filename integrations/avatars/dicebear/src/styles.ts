@@ -1,15 +1,6 @@
 import * as collection from "@dicebear/collection";
 import type { Style } from "@dicebear/core";
-
-export interface StyleInfo {
-  id: string;
-  style: Style<object>;
-  creator: string;
-  license: string;
-
-  /** CC0, MIT and similar: no attribution needed. */
-  permissive: boolean;
-}
+import type { StyleInfo } from "./types.js";
 
 export const DEFAULT_STYLE = "notionists";
 

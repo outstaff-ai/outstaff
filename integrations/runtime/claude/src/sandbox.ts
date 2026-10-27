@@ -1,26 +1,10 @@
 import { spawnSync } from "node:child_process";
+import type { ProbeSpawn, SandboxProbe } from "./types.js";
 
 // With CLAUDE_CODE_SUBPROCESS_ENV_SCRUB=1 on Linux, Claude Code runs every Bash command in bubblewrap with its own user
 // and PID namespaces and a fresh /proc, so a command cannot read the credential from /proc/<pid>/environ. Claude Code
 // only checks that bwrap exists; when the container blocks it, every Bash call fails instead. This probe runs bwrap
 // the way Claude Code does and names what the container is missing.
-
-export interface SandboxProbe {
-  ok: boolean;
-  detail: string;
-  fix?: string;
-}
-
-export interface ProbeResult {
-  /** Exit status; null when the command could not start or was killed. */
-  status: number | null;
-  stderr: string;
-
-  /** Set when the command could not start, for example ENOENT. */
-  errorCode?: string;
-}
-
-export type ProbeSpawn = (command: string, args: readonly string[]) => ProbeResult;
 
 const GUIDE = "https://docs.outstaff.work/guides/kubernetes/#subprocess-sandbox-optional";
 

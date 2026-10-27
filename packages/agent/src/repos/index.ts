@@ -4,26 +4,19 @@ export {
   isCredentialOperation,
   parseCredentialRequest,
   repoForRequest,
-  type CredentialHelper,
-  type CredentialHelperOptions,
-  type CredentialOperation,
 } from "./credential-helper.js";
 
-export {
-  CREDENTIAL_HELPER,
-  prePushHook,
-  syncRepositories,
-  type ClonedRepo,
-  type SyncRepositoriesOptions,
-} from "./clone.js";
-
-export { runGit, type RunGit } from "./git.js";
-export {
-  createWorkspaces,
-  headBranchOf,
-  repoForItem,
-  safeId,
-  type Workspace,
-  type Workspaces,
-  type WorkspacesOptions,
-} from "./workspaces.js";
+export { CREDENTIAL_HELPER, prePushHook, syncRepositories } from "./clone.js";
+export { runGit } from "./git.js";
+export { createWorkspaces, headBranchOf, repoForItem, safeId } from "./workspaces.js";
+export type {
+  ClonedRepo,
+  CredentialHelper,
+  CredentialHelperOptions,
+  CredentialOperation,
+  RunGit,
+  SyncRepositoriesOptions,
+  Workspace,
+  Workspaces,
+  WorkspacesOptions,
+} from "./types.js";

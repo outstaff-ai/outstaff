@@ -1,0 +1,31 @@
+import type { Tracker, TeamConfig, Vcs } from "@outstaff/core";
+import type { Link } from "@outstaff/protocol";
+import type { RosterOptions } from "./messaging/index.js";
+import type { BlockNotice, Scheduler } from "./scheduler/index.js";
+import type { Store, WorkItem } from "./store/types.js";
+
+export interface HandBackResult {
+  summary: string;
+  links: Link[];
+  status: "done" | "waiting" | "blocked" | "interrupted";
+}
+
+export interface WorkSourceOptions {
+  scheduler: Scheduler;
+  store: Store;
+  team: Pick<TeamConfig, "people" | "humans">;
+  ports?: { tracker?: Tracker; vcs?: Vcs };
+  roles?: RosterOptions["roles"];
+
+  /** Called after the item left `active` because of a hand-back, so the workflow can react (move the ticket, notify). */
+  onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;
+
+  /** Called after an item started, before it is offered. */
+  onStarted?: (item: WorkItem) => Promise<void>;
+
+  /** Called after the scheduler blocked an item on its own (repeated failures, loop guard), so the requester hears of it. */
+  onBlocked?: (notice: BlockNotice) => void | Promise<void>;
+
+  /** Called after an item went back to the queue because the agent asked for it. */
+  notify?: (person: string) => void;
+}

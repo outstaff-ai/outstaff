@@ -1,105 +1,28 @@
-import {
-  policyOn,
-  silentLogger,
-  type AdapterRegistry,
-  type Logger,
-  type SecretSource,
-  type TeamConfig,
-  type WorkflowEvent,
-} from "@outstaff/core";
+import { silentLogger } from "@outstaff/core";
 import type { Human } from "@outstaff/protocol";
-import type { Clock } from "./clock.js";
 import { createChatDesk } from "./chat/index.js";
-import { createEngine, type Engine } from "./engine/index.js";
-import { createIntake, type Intake } from "./intake/index.js";
-import { createMessaging } from "./messaging/index.js";
-import type { RoleInfo } from "./messaging/index.js";
-import { createOfficePorts, type OfficePorts } from "./ports.js";
+import { createEngine } from "./engine/index.js";
+import { createIntake } from "./intake/index.js";
+import { createMessaging, type RoleInfo } from "./messaging/index.js";
+import { officeDocLinks } from "./office-doc-links.js";
+import { createHandedBack } from "./office-handback.js";
+import { officeLifecycle } from "./office-lifecycle.js";
+import { requesterChat } from "./office-requester.js";
+import { officeTicketPrs } from "./office-ticket-prs.js";
+import type { CreateOfficeInput, Office } from "./office.types.js";
+import { createOfficePorts } from "./ports.js";
 import {
   agentAuthFromSecrets,
   createProtocolServer,
-  ProtocolError,
   type ProtocolServer,
 } from "./protocol/index.js";
 import { recipeFor } from "./recipes.js";
-import { createUsageTracker, type UsageTracker } from "./usage/index.js";
+import { createUsageTracker } from "./usage/index.js";
 import { createScheduler, type Scheduler } from "./scheduler/index.js";
-import type { Store, WorkItem } from "./store/types.js";
-import { itemRefs, schedulerWorkSource } from "./work-source.js";
-import { createWorkState, type PrRecord, type WorkState } from "./workstate/index.js";
-
-export interface OfficeOptions {
-  /** Port of the agent connection (`/agent`). Default 8080. 0 picks a free one. */
-  agentPort?: number;
-  agentHost?: string;
-
-  /** Port of the webhook receiver when `office.events` is "webhook". Default 8082. */
-  webhookPort?: number;
-  webhookHost?: string;
-
-  /** Heartbeat interval the agents are told, and how often queues are checked for new work. */
-  heartbeatMs?: number;
-  pollMs?: number;
-
-  /** How often the work state rescans open pull requests. */
-  refreshIntervalMs?: number;
-  staleAfterMinutes?: number;
-
-  /** Minutes after which a usage report counts as unknown. Default 30. */
-  usageStaleAfterMinutes?: number;
-  officeVersion?: string;
-}
-
-export interface CreateOfficeInput {
-  team: TeamConfig;
-  registry: AdapterRegistry;
-  secrets: SecretSource;
-  store: Store;
-  clock: Clock;
-  logger?: Logger;
-
-  /** The merged catalog (stock plus ejected); only the role titles and summaries are read. */
-  catalog?: { roles: Record<string, { title: string; summary: string }> };
-  options?: OfficeOptions;
-}
-
-export interface ComponentHealth {
-  ok: boolean;
-  detail?: string;
-}
-
-export interface OfficeHealth {
-  ok: boolean;
-  state: "created" | "starting" | "running" | "stopping" | "stopped";
-  components: Record<string, ComponentHealth>;
-}
-
-export interface Office {
-  /** Starts the agent connection first, then work state and intake, then the scheduler's housekeeping. */
-  start(): Promise<void>;
-
-  /** Stops taking in events, lets running handlers finish, closes connections and the store. Idempotent. */
-  stop(): Promise<void>;
-  health(): Promise<OfficeHealth>;
-
-  /** Port the agents connect to, once started. */
-  agentPort(): number;
-
-  /** The parts, for diagnostics and tests. */
-  readonly parts: {
-    intake: Intake;
-    workState: WorkState;
-    engine: Engine;
-    scheduler: Scheduler;
-    usage: UsageTracker;
-    server: ProtocolServer;
-    ports: OfficePorts;
-  };
-}
-
-type State = OfficeHealth["state"];
-
-const handedBackText = (item: WorkItem) => `handed back ${item.id}`;
+import type { WorkItem } from "./store/types.js";
+import { itemRefs } from "./item-refs.js";
+import { schedulerWorkSource } from "./work-source.js";
+import { createWorkState } from "./workstate/index.js";
 
 export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const { team, store, clock } = input;
@@ -247,55 +170,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     }
   };
 
-  const handedBack = async (item: WorkItem) => {
-    if (
-      (item.status !== "done" && item.status !== "waiting" && item.status !== "blocked") ||
-      !item.subject
-    ) {
-      return;
-    }
-
-    // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
-    // Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
-    if (item.kind === "doc_feedback" || item.kind === "asked" || item.kind === "unblock") {
-      return;
-    }
-
-    let subject: WorkflowEvent["subject"] | undefined;
-    if (item.subject.type === "ticket") {
-      subject = { ticket: item.subject.ref };
-    } else if (item.subject.type === "pr") {
-      const pr = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
-      subject = pr ? { pr: pr.ref, ...(pr.ticket ? { ticket: pr.ticket } : {}) } : undefined;
-    }
-
-    if (!subject) {
-      return;
-    }
-
-    const runs = await store.listRuns(item.id);
-    const event: WorkflowEvent = {
-      type: "agent.handed_back",
-      subject,
-      actor: { kind: "agent", id: item.person },
-      data: { workItem: item.id, kind: item.kind, status: item.status },
-    };
-
-    // The rules read whether the ticket was handed back as done from the state, so it is refreshed first.
-    await workState.refreshWorkers().catch((error: unknown) => {
-      log.warn("refreshing who worked on what failed", { error: String(error) });
-    });
-
-    await track(
-      engine.handle(event, {
-        source: "workstate",
-        externalId: `handed_back:${item.id}:${runs.at(-1)?.id ?? "0"}`,
-        trusted: true,
-      }),
-    );
-
-    log.info(handedBackText(item), { person: item.person });
-  };
+  const handedBack = createHandedBack({ store, workState, engine, log, track });
 
   // An item the scheduler blocked: the PM's `unblock` round when the team routes blocked work there, and the report
   // the blocked agent owes the requester (queued, so the agent posts it as itself). The office posts nothing.
@@ -359,30 +234,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     clock,
     ...(ports.tracker ? { tracker: ports.tracker } : {}),
     // The requester of the item's ticket, else the first human (as the workflow's own fallback does).
-    requesterChat: async (item) => {
-      const ticket =
-        item.subject?.type === "ticket"
-          ? item.subject.ref
-          : item.subject?.type === "pr"
-            ? ((await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined)
-                ?.ticket
-            : undefined;
-
-      if (!ticket) {
-        return undefined;
-      }
-
-      const asked = workState.ticket(ticket)?.requester;
-      const human = asked
-        ? team.humans?.find(
-            (h) => h.identities.tracker === asked || h.identities.vcs === asked || h.name === asked,
-          )
-        : policyOn(team.policies, "hand_back.fallback")
-          ? team.humans?.[0]
-          : undefined;
-
-      return human?.identities.chat;
-    },
+    requesterChat: requesterChat({ store, workState, team }),
     linksOf: async (item) =>
       (await refs.subjectsOf(item)).flatMap((r) =>
         r.url && (r.type === "ticket" || r.type === "pr")
@@ -396,61 +248,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     messaging,
     usage,
     chat: chatDesk,
-    docs: {
-      async link(person, workItemId, doc) {
-        const item = await store.getItem(workItemId);
-        if (!item || item.person !== person) {
-          throw new ProtocolError("unknown_item", `No work item ${workItemId} for ${person}.`);
-        }
-
-        let ticket: string | undefined;
-        if (item.subject?.type === "ticket") {
-          ticket = item.subject.ref;
-        } else if (item.subject?.type === "pr") {
-          ticket = ((await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined)
-            ?.ticket;
-        } else if (item.subject?.type === "doc") {
-          ticket = workState.doc(item.subject.ref)?.ticket;
-        }
-
-        await workState.linkDoc({ ...doc, author: person, ...(ticket ? { ticket } : {}) });
-        log.info(`doc ${doc.id} linked to ${ticket ?? "no ticket"} for ${person}`, {
-          person,
-          doc: doc.id,
-        });
-      },
-    },
-    tickets: {
-      async forDraft(draft) {
-        // A pull request opened a moment ago may not have reached the state yet; the answer must not depend on that.
-        await workState.catchUp().catch((error: unknown) => {
-          log.warn("could not look for new pull requests", { error: String(error) });
-        });
-
-        const ticket = await workState.ticketForDraft({
-          headRef: draft.headRef,
-          title: draft.title,
-          body: draft.body,
-        });
-
-        return {
-          ...(ticket ? { ticket } : {}),
-          prs: ticket
-            ? workState
-                .prsOfTicket(ticket)
-                .toSorted((a, b) => a.ref.number - b.ref.number)
-                .map((p) => ({
-                  ref: workState.prSubject(p.ref),
-                  number: p.ref.number,
-                  title: p.title,
-                  ...(p.url ? { url: p.url } : {}),
-                  state: p.state,
-                  authorKind: p.author.kind,
-                }))
-            : [],
-        };
-      },
-    },
+    docs: officeDocLinks({ store, workState, log }),
+    tickets: officeTicketPrs({ workState, log }),
     auth: agentAuthFromSecrets(
       input.secrets,
       team.people.map((p) => p.handle),
@@ -465,107 +264,22 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   const protocol = server;
-  let state: State = "created";
-  let stopping: Promise<void> | undefined;
-  const up = { server: false, workState: false, intake: false, scheduler: false };
-
-  const halt = async () => {
-    state = "stopping";
-    if (up.intake) {
-      await intake.stop();
-    }
-
-    await Promise.allSettled(inFlight);
-    if (up.workState) {
-      await workState.stop();
-    }
-
-    if (up.scheduler) {
-      baseScheduler.stop();
-    }
-
-    if (up.server) {
-      await protocol.stop();
-    }
-
-    Object.assign(up, { server: false, workState: false, intake: false, scheduler: false });
-    await store.close();
-    state = "stopped";
-  };
-
-  const stop = () => (stopping ??= halt());
+  const lifecycle = officeLifecycle({
+    team,
+    store,
+    log,
+    intake,
+    workState,
+    scheduler: baseScheduler,
+    protocol,
+    inFlight,
+    notify,
+    onBlocked,
+  });
 
   return {
     parts: { intake, workState, engine, scheduler, usage, server: protocol, ports },
-
-    async start() {
-      if (state !== "created") {
-        throw new Error(`The office cannot start from state ${state}.`);
-      }
-
-      state = "starting";
-      try {
-        await protocol.start();
-        up.server = true;
-        await workState.start();
-        up.workState = true;
-        await workState.rescan().catch((error: unknown) => {
-          log.warn("first rescan failed; the next one retries", { error: String(error) });
-        });
-
-        await intake.start();
-        up.intake = true;
-        baseScheduler.start((result) => {
-          for (const item of result.retried) {
-            notify(item.person);
-          }
-
-          for (const item of result.released) {
-            notify(item.person);
-          }
-
-          for (const b of result.blocked) {
-            log.warn("work item blocked", { item: b.item.id, code: b.code, reason: b.reason });
-            void onBlocked(b);
-          }
-        });
-
-        up.scheduler = true;
-        state = "running";
-        log.info("office started", { team: team.team.name, agentPort: protocol.port() });
-      } catch (error) {
-        await stop();
-        throw error;
-      }
-    },
-
-    stop,
-
-    async health() {
-      const components: Record<string, ComponentHealth> = {
-        protocol: {
-          ok: up.server,
-          ...(up.server ? { detail: `${protocol.connected().length} connected` } : {}),
-        },
-        workState: { ok: up.workState },
-        intake: { ok: up.intake },
-        scheduler: { ok: up.scheduler },
-      };
-
-      try {
-        await store.listPauses();
-        components["store"] = { ok: state !== "stopped", detail: store.dialect };
-      } catch (error) {
-        components["store"] = { ok: false, detail: String(error) };
-      }
-
-      return {
-        ok: state === "running" && Object.values(components).every((c) => c.ok),
-        state,
-        components,
-      };
-    },
-
+    ...lifecycle,
     agentPort: () => protocol.port(),
   };
 }

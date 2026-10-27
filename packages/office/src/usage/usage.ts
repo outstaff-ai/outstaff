@@ -1,9 +1,7 @@
-import { silentLogger, type Logger, type TeamConfig } from "@outstaff/core";
-import type { MemberUsage, UsageWindowReport } from "@outstaff/protocol";
-import type { Clock } from "../clock.js";
+import { silentLogger, type TeamConfig } from "@outstaff/core";
+import type { UsageWindowReport } from "@outstaff/protocol";
 import { peakWindow } from "../scheduler/policy.js";
-import type { UsageSource } from "../scheduler/scheduler.js";
-import type { Store } from "../store/types.js";
+import type { UsageTracker, UsageTrackerOptions } from "./types.js";
 
 export const USAGE_SUBJECT = "usage";
 export const DEFAULT_STALE_AFTER_MINUTES = 30;
@@ -14,24 +12,6 @@ interface UsageRecord {
 
   /** Who sent the report, when it was sent for a shared subscription. */
   via?: string;
-}
-
-export interface UsageTrackerOptions {
-  store: Pick<Store, "upsertSubject" | "getSubject">;
-  team: Pick<TeamConfig, "policies" | "people">;
-  clock: Clock;
-  logger?: Logger;
-
-  /** A report older than this counts as unknown. Default 30 minutes. */
-  staleAfterMinutes?: number;
-}
-
-export interface UsageTracker extends UsageSource {
-  /** Stores the latest windows of the reporter and of everyone who shares its subscription. */
-  report(person: string, windows: readonly UsageWindowReport[]): Promise<void>;
-
-  /** The busiest current window of the person, or undefined when nothing fresh is known. */
-  summary(person: string): Promise<MemberUsage | undefined>;
 }
 
 /** The people whose limit is the same as `person`'s, the person included. */

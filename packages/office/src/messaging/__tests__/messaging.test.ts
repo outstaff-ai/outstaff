@@ -1,6 +1,6 @@
 import { createFakeChat } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
-import { ProtocolError } from "../../protocol/source.js";
+import { ProtocolError } from "../../protocol/errors.js";
 import { harness } from "./test-support.js";
 
 const rejection = async (p: Promise<unknown>) => {

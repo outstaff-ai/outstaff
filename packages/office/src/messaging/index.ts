@@ -3,16 +3,18 @@ export {
   DEFAULT_MAX_DEPTH,
   QUESTION_KIND,
   createMessaging,
-  type MessagingOptions,
 } from "./messaging.js";
 
-export { mirror, type MirrorOptions, type MirrorWhere } from "./mirror.js";
-export {
-  loadByPerson,
-  readRoster,
-  type RoleInfo,
-  type Roster,
-  type RosterOptions,
-} from "./roster.js";
-
-export { routeQuestion, type Route, type RoutablePerson } from "./routing.js";
+export { mirror } from "./mirror.js";
+export { loadByPerson, readRoster } from "./roster.js";
+export { routeQuestion } from "./routing.js";
+export type {
+  MessagingOptions,
+  MirrorOptions,
+  MirrorWhere,
+  RoleInfo,
+  Roster,
+  RosterOptions,
+  Route,
+  RoutablePerson,
+} from "./types.js";

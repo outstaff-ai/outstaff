@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatWorkGroups, groupWork } from "../work-groups.js";
-import type { WorkSummary } from "../schemas.js";
+import type { WorkSummary } from "../types.js";
 
 const url = (key: string) => `https://tracker.acme.example/issue/${key}`;
 const PR = "https://git.acme.example/acme/app/pull/12";

@@ -1,13 +1,8 @@
 import { expect, it } from "vitest";
 import type { Chat, ChatMessage } from "../ports/index.js";
 import type { ChatSeed } from "./seeds.js";
-import {
-  contractSuite,
-  expectPortError,
-  requireCapability,
-  requireSeed,
-  type ContractSetupFn,
-} from "./harness.js";
+import { contractSuite, expectPortError, requireCapability, requireSeed } from "./harness.js";
+import type { ContractSetupFn } from "./types.js";
 
 export function chatContract(name: string, setup: ContractSetupFn<Chat, ChatSeed>): void {
   contractSuite(`chat contract: ${name}`, setup, (get) => {

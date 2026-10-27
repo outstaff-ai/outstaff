@@ -1,9 +1,5 @@
 import { PROTOCOL_VERSION, encode, type Message, type PayloadOf } from "@outstaff/protocol";
-import type { ClientClock, ClientSocket } from "./client.js";
-
-export interface ManualClientClock extends ClientClock {
-  advance(ms: number): void;
-}
+import type { ClientSocket, ManualClientClock } from "./types.js";
 
 export function createManualClock(): ManualClientClock {
   let now = Date.parse("2030-01-01T00:00:00.000Z");

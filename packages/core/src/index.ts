@@ -1,69 +1,55 @@
 export const name = "@outstaff/core";
 
-export { CONFIG_CODES, type ConfigCode } from "./config/codes.js";
-export { type ConfigIssue } from "./config/issues.js";
-export {
-  teamConfigSchema,
-  adapterRefSchema,
-  compileTicketLink,
-  TICKET_KEY,
-  type TeamConfig,
-  type TeamConfigInput,
-} from "./config/schema.js";
-
-export {
-  grantTokenKeys,
-  networkGrants,
-  networkSchema,
-  originOf,
-  type AdbGrant,
-  type HttpGrant,
-  type Network,
-  type NetworkGrants,
-} from "./config/network.js";
-
-export { parseTeamConfig, type ParseResult } from "./config/parse.js";
+export { CONFIG_CODES } from "./config/codes.js";
+export { teamConfigSchema } from "./config/schema.js";
+export { adapterRefSchema } from "./config/integrations-schema.js";
+export { compileTicketLink, TICKET_KEY } from "./config/ticket-link.js";
+export { grantTokenKeys, networkGrants, networkSchema, originOf } from "./config/network.js";
+export { parseTeamConfig } from "./config/parse.js";
 export { buildTeamJsonSchema } from "./config/json-schema.js";
 export {
   ADAPTER_PORTS,
   registerAdapterOptions,
   validateAdapterOptions,
   clearAdapterOptions,
-  type AdapterPort,
 } from "./config/adapters.js";
 
-export {
-  loadTeamConfig,
-  formatIssue,
-  type LoadOptions,
-  type LoadResult,
-  type LocatedIssue,
-  type ConfigSource,
-} from "./config/load.js";
-
-export { type ConfigFs, type GitClient } from "./config/io.js";
-export { CAPABILITIES, CAPABILITY_PORT, type Capability } from "./capabilities.js";
-export {
-  validateTeam,
-  documentedCodes,
-  WARNING_CODES,
-  type WarningCode,
-  type RoleNeeds,
-  type AdapterInfo,
-  type IdentityValidator,
-  type ValidationContext,
-  type ValidationReport,
-  type ConfigWarning,
-} from "./config/validate.js";
-
-export {
-  identitiesOf,
-  identityWarning,
-  vcsAgentLogins,
-  type IdentityRef,
-} from "./config/identities.js";
-
-export { parseYaml, type ParsedYaml, type Position } from "./config/locate.js";
+export { loadTeamConfig, formatIssue } from "./config/load.js";
+export { CAPABILITIES, CAPABILITY_PORT } from "./capabilities.js";
+export type { Capability } from "./types.js";
+export { validateTeam } from "./config/validate.js";
+export { documentedCodes } from "./config/documented-codes.js";
+export { WARNING_CODES } from "./config/warning-codes.js";
+export { identitiesOf, identityWarning, vcsAgentLogins } from "./config/identities.js";
+export { parseYaml } from "./config/locate.js";
+export type {
+  AdapterInfo,
+  AdapterPort,
+  AdbGrant,
+  ConfigCode,
+  ConfigFs,
+  ConfigIssue,
+  ConfigSource,
+  ConfigWarning,
+  GitClient,
+  HttpGrant,
+  IdentityRef,
+  IdentityValidator,
+  LoadOptions,
+  LoadResult,
+  LocatedIssue,
+  Network,
+  NetworkGrants,
+  ParsedYaml,
+  ParseResult,
+  Position,
+  RoleNeeds,
+  TeamConfig,
+  TeamConfigInput,
+  ValidationContext,
+  ValidationReport,
+  WarningCode,
+} from "./config/types.js";
 
 export * from "./catalog/index.js";
 export * from "./render/index.js";

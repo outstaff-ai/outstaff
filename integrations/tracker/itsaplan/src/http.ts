@@ -1,29 +1,6 @@
-import { PortError, type Logger, type PortErrorCode } from "@outstaff/core";
-import { RETRY_AFTER_BURST_MS, pacerFor, realClock, type Clock, type Pacer } from "./pacing.js";
-
-export interface HttpConfig {
-  fetch: typeof fetch;
-  apiUrl: string;
-
-  /** Sent as `Origin`, which the API checks on writes. */
-  webUrl: string;
-  apiKey: string;
-  log?: Logger;
-
-  /** Paces this key's requests; by default one shared by every client of the same key and host. */
-  pacer?: Pacer;
-
-  /** Used for the wait before a retry; tests inject their own. */
-  clock?: Clock;
-}
-
-export interface RequestOptions {
-  query?: Record<string, string | number | boolean | undefined>;
-  body?: unknown;
-
-  /** A multipart body, for a file upload. Sent instead of `body`; fetch sets the content type and boundary. */
-  form?: FormData;
-}
+import { PortError, type PortErrorCode } from "@outstaff/core";
+import { RETRY_AFTER_BURST_MS, pacerFor, realClock, type Pacer } from "./pacing.js";
+import type { Clock, HttpConfig, RequestOptions } from "./types.js";
 
 const DEFAULT_RETRY_MS = 30_000;
 

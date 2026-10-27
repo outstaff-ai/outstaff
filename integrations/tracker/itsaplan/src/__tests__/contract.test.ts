@@ -1,7 +1,8 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { trackerContract } from "@outstaff/core/contracts";
 import { itsaplanTracker } from "../index.js";
-import { trackerOptions, type TrackerOptions } from "../options.js";
+import { trackerOptions } from "../options.js";
+import type { TrackerOptions } from "../types.js";
 import { createItsaplanTracker } from "../tracker.js";
 import { secretMap, team } from "../testing/harness.js";
 import { API_KEY } from "../testing/http-stub.js";

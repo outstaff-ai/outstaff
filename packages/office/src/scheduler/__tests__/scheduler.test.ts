@@ -5,10 +5,12 @@ import { join } from "node:path";
 import { Client } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TeamConfig } from "@outstaff/core";
-import { manualClock, type ManualClock } from "../../clock.js";
+import { manualClock } from "../../clock.js";
+import type { ManualClock } from "../../types.js";
 import { openStore } from "../../store/open.js";
 import type { Store } from "../../store/types.js";
-import { createScheduler, type Scheduler, type UsageSource } from "../scheduler.js";
+import { createScheduler } from "../scheduler.js";
+import type { Scheduler, UsageSource } from "../types.js";
 
 const team = {
   policies: {

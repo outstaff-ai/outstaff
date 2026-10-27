@@ -3,6 +3,6 @@ export {
   USAGE_SUBJECT,
   createUsageTracker,
   usageGroupOf,
-  type UsageTracker,
-  type UsageTrackerOptions,
 } from "./usage.js";
+
+export type { UsageTracker, UsageTrackerOptions } from "./types.js";

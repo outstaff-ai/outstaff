@@ -1,15 +1,5 @@
 import { isMap, isScalar, isSeq, parseDocument, type Document, type YAMLSeq } from "yaml";
-
-/** What `ost hire` writes for one person. Optional fields are left out of the file when absent. */
-export type NewPerson = {
-  handle: string;
-  name: string;
-  pronouns: string;
-  role: string;
-  model?: string;
-  repos: Record<string, "read" | "write">;
-  avatar?: { seed: string } | { url: string };
-};
+import type { NewPerson, Removal } from "./types.js";
 
 const OPTIONS = { lineWidth: 0, flowCollectionPadding: false } as const;
 
@@ -51,16 +41,6 @@ export function addPerson(yaml: string, person: NewPerson): string {
 
   return doc.toString(OPTIONS);
 }
-
-export type Removal = {
-  yaml: string;
-
-  /** Usage groups that listed the person: the members before, and after (null when the group was dropped). */
-  usage: { before: string[]; after: string[] | null }[];
-
-  /** Other places that still mention the handle, as dotted paths; left as they are. */
-  references: string[];
-};
 
 function findStrings(value: unknown, needle: string, path: string[], out: string[]): void {
   if (value === needle) {

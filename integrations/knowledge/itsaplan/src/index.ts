@@ -9,7 +9,10 @@ import {
 import { createItsaplanKnowledge } from "./knowledge.js";
 
 export { createItsaplanKnowledge } from "./knowledge.js";
-export { docToMd, findRange, mdToDoc, plainText, type PmNode } from "./markdown.js";
+export { docToMd } from "./doc-to-md.js";
+export { mdToDoc } from "./markdown.js";
+export { findRange, plainText } from "./text-range.js";
+export type { PmNode } from "./types.js";
 
 export const itsaplanKnowledge = defineAdapter({
   port: "knowledge",

@@ -14,19 +14,19 @@ import {
   loadCatalog,
   loadTeamConfig,
   type Logger,
-  type SecretSource,
 } from "@outstaff/core";
 import { systemClock } from "./clock.js";
-import { createHealthServer, type HealthServer } from "./health.js";
-import { createOffice, type CreateOfficeInput, type Office } from "./office.js";
+import { createHealthServer } from "./health.js";
+import { createOffice } from "./office.js";
+import type { CreateOfficeInput, Office } from "./office.types.js";
 import { openStore } from "./store/index.js";
+import type { LogLevel, RunningOffice, StartDeps } from "./types.js";
 
 export const DEFAULT_STORE_URL = "sqlite:///var/lib/outstaff/office.db";
 
 type Env = Record<string, string | undefined>;
 
-const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
-export type LogLevel = (typeof LOG_LEVELS)[number];
+export const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
 
 /** `OUTSTAFF_LOG_LEVEL`: the lowest level written. Defaults to `info`, which hides debug. */
 export function logLevel(env: Env): LogLevel {
@@ -106,19 +106,6 @@ function loadRoles(
   }
 
   return { roles };
-}
-
-export interface RunningOffice {
-  office: Office;
-  health: HealthServer;
-  stop(): Promise<void>;
-}
-
-export interface StartDeps {
-  registry?: AdapterRegistry;
-  secrets?: SecretSource;
-  logger?: Logger;
-  stockCatalogDir?: string;
 }
 
 /**

@@ -1,7 +1,5 @@
 import { execFile } from "node:child_process";
-
-/** Runs git with the given arguments and resolves to its stdout. Rejects with git's message when it fails. */
-export type RunGit = (args: string[], opts?: { cwd?: string }) => Promise<string>;
+import type { RunGit } from "./types.js";
 
 export const runGit: RunGit = (args, opts = {}) =>
   new Promise((resolve, reject) => {

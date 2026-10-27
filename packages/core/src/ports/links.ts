@@ -1,4 +1,4 @@
-import type { RepoRef } from "./repo.js";
+import type { RepoRef } from "./types.js";
 
 /** Absolute URLs for addressable things. Each port fills in the parts it owns. */
 export interface Links {

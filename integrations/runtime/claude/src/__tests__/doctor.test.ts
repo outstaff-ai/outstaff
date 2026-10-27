@@ -1,7 +1,8 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { claudeAgentSdk } from "../adapter.js";
-import { probeSubprocessSandbox, type SandboxProbe } from "../sandbox.js";
+import { probeSubprocessSandbox } from "../sandbox.js";
+import type { SandboxProbe } from "../types.js";
 
 vi.mock("../sandbox.js", () => ({ probeSubprocessSandbox: vi.fn<() => SandboxProbe>() }));
 const probe = vi.mocked(probeSubprocessSandbox);

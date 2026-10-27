@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { readAcmeTeam } from "../../../core/src/testing/fixtures.js";
-import type { Context } from "../define.js";
+import type { Context } from "../types.js";
 import { run } from "../program.js";
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-eject-")));

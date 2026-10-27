@@ -7,8 +7,8 @@ import {
   expectPortError,
   requireCapability,
   requireSeed,
-  type ContractSetupFn,
 } from "./harness.js";
+import type { ContractSetupFn } from "./types.js";
 
 export function knowledgeContract(
   name: string,

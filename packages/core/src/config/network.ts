@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
 import { customIssue } from "./issues.js";
+import type { AdbGrant, HttpGrant, Network, NetworkGrants } from "./types.js";
 
 const d = (description: string) => ({ description });
 
@@ -128,10 +129,6 @@ export const networkSchema = z
     ),
   );
 
-export type Network = z.output<typeof networkSchema>;
-export type HttpGrant = NonNullable<Network["http"]>[number];
-export type AdbGrant = NonNullable<Network["adb"]>[number];
-
 export const roleOverridesSchema = z
   .strictObject({
     network: networkSchema
@@ -139,12 +136,6 @@ export const roleOverridesSchema = z
       .meta(d("Network grants every person with this role gets, merged with their own.")),
   })
   .meta(d("Settings for everyone who plays this role."));
-
-/** What a person may reach after role and person grants are merged. */
-export interface NetworkGrants {
-  http: HttpGrant[];
-  adb: AdbGrant[];
-}
 
 /**
  * The grants of a person: those of their role, then of the roles they extend, then their own. A later grant with

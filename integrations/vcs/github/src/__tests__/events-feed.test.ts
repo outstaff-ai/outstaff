@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { toVcsEvent, type RestEvent } from "../mapping.js";
+import type { RestEvent } from "../api.types.js";
+import { toVcsEvent } from "../mapping.js";
 
 // Trimmed from real payloads of the repository events feed (not webhooks), with names replaced.
 const fixture = (name: string): RestEvent =>

@@ -3,8 +3,6 @@ import { join } from "node:path";
 import { defineCommand } from "../define.js";
 import {
   baseFile,
-  mergeThreeWay,
-  openTeam,
   tryIndex,
   setCatalogVersion,
   sha256,
@@ -12,6 +10,8 @@ import {
   writeFileDeep,
   writeIndex,
 } from "../ejected.js";
+import { mergeThreeWay } from "../merge.js";
+import { openTeam } from "../open-team.js";
 
 type Outcome = "unchanged" | "updated" | "merged" | "conflict" | "deleted-upstream" | "reverted";
 

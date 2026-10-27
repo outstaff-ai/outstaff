@@ -1,4 +1,4 @@
-export * from "./types.js";
+export { DEFAULT_NEEDS_HUMAN_LABEL, WORKFLOW_EVENT_TYPES } from "./constants.js";
 export {
   TEMPLATE_VARIABLES,
   BUILTIN_TEMPLATES,
@@ -7,18 +7,8 @@ export {
   templatePlaceholders,
 } from "./template.js";
 
-export { createStatusMap, type WorkflowStatusMap } from "./status-map.js";
-export {
-  conditionSchema,
-  actionSchema,
-  ruleSchema,
-  ruleInputSchema,
-  type Condition,
-  type Action,
-  type Rule,
-  type RuleInput,
-} from "./rules.js";
-
+export { createStatusMap } from "./status-map.js";
+export { conditionSchema, actionSchema, ruleSchema, ruleInputSchema } from "./rules.js";
 export {
   PRESET_MOVES_TICKETS,
   WORKFLOW_PRESETS,
@@ -35,11 +25,27 @@ export {
 } from "./resolve.js";
 
 export { describeEffect } from "./describe.js";
-export {
-  evaluateWorkflow,
-  explainWorkflow,
-  type RuleExplanation,
-  type WorkflowExplanation,
-} from "./evaluate.js";
-
-export { createStaticWorkflowState, type StaticWorkflowData, type StaticTicket } from "./state.js";
+export { evaluateWorkflow, explainWorkflow } from "./evaluate.js";
+export { createStaticWorkflowState } from "./state.js";
+export type {
+  ActorKind,
+  Effect,
+  EffectTarget,
+  PrRef,
+  PrVerdict,
+  Priority,
+  WorkflowEvent,
+  WorkflowEventType,
+  WorkflowOptions,
+  WorkflowPr,
+  WorkflowState,
+  WorkflowStatusMap,
+  Condition,
+  Action,
+  Rule,
+  RuleInput,
+  RuleExplanation,
+  WorkflowExplanation,
+  StaticWorkflowData,
+  StaticTicket,
+} from "./types.js";

@@ -24,17 +24,17 @@ import {
   type Offer,
   type OfficeConnection,
 } from "../../office-client/index.js";
-import {
-  FakeSocket,
-  createManualClock,
-  type ManualClientClock,
-} from "../../office-client/testing.js";
+import { FakeSocket, createManualClock } from "../../office-client/testing.js";
+import type { ManualClientClock } from "../../office-client/types.js";
 import { fakeEnv } from "../../verbs/testing.js";
 import type { Workspaces } from "../../repos/index.js";
 import { JOURNAL_PROMPT } from "../journal.js";
-import type { ChatRelay } from "../chat.js";
-import { createWorkLoop, linksIn, type WorkLoop } from "../loop.js";
-import { createUsageReporter, type UsageReporter } from "../usage.js";
+import type { ChatRelay } from "../chat.types.js";
+import { createWorkLoop } from "../loop.js";
+import { linksIn } from "../links.js";
+import type { WorkLoop } from "../loop.types.js";
+import { createUsageReporter } from "../usage.js";
+import type { UsageReporter } from "../types.js";
 
 /** An office that acknowledges everything and says a question is still open. */
 class OfficeSocket extends FakeSocket {

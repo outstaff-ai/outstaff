@@ -1,7 +1,8 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
-import { manualClock, type ManualClock } from "../../clock.js";
+import { manualClock } from "../../clock.js";
+import type { ManualClock } from "../../types.js";
 import { createScheduler } from "../../scheduler/scheduler.js";
 import { openStore } from "../../store/index.js";
 import type { Store, WorkItem } from "../../store/types.js";

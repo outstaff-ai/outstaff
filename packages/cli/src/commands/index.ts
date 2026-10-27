@@ -1,4 +1,4 @@
-import type { CommandDef } from "../define.js";
+import type { CommandDef } from "../types.js";
 import { build } from "./build.js";
 import { diff } from "./diff.js";
 import { doctor } from "./doctor.js";

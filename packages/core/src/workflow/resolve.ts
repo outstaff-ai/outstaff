@@ -1,9 +1,9 @@
-import type { TeamConfig } from "../config/schema.js";
+import type { TeamConfig } from "../config/types.js";
 import { POLICY_SWITCHES, policyOn, policyValue } from "../policies/switches.js";
 import { presetRules, type WorkflowPreset } from "./presets.js";
-import type { Rule, RuleInput } from "./rules.js";
-import { createStatusMap, type WorkflowStatusMap } from "./status-map.js";
-import { DEFAULT_NEEDS_HUMAN_LABEL, type WorkflowOptions } from "./types.js";
+import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
+import { createStatusMap } from "./status-map.js";
+import type { Rule, RuleInput, WorkflowOptions, WorkflowStatusMap } from "./types.js";
 
 /**
  * Preset order first; a client rule with a preset rule's id replaces it in place,

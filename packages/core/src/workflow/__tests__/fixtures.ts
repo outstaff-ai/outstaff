@@ -1,6 +1,6 @@
-import type { CanonicalStatus } from "../../ports/status.js";
-import { createStaticWorkflowState, type StaticTicket } from "../state.js";
-import type { PrRef, WorkflowEvent, WorkflowPr } from "../types.js";
+import type { CanonicalStatus } from "../../ports/types.js";
+import { createStaticWorkflowState } from "../state.js";
+import type { PrRef, StaticTicket, WorkflowEvent, WorkflowPr } from "../types.js";
 
 export const repo = { owner: "acme", name: "app" };
 export const ref = (number: number): PrRef => ({ repo, number });

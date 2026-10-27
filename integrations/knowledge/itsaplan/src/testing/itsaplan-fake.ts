@@ -1,57 +1,26 @@
 import type { Doc } from "@outstaff/core";
 import type { KnowledgeSeed } from "@outstaff/core/contracts";
-import { findRange, mdToDoc, type PmNode } from "../markdown.js";
-import {
-  createItsaplanFake as createTrackerFake,
-  type FakeOptions,
-  type ItsaplanFake as TrackerFake,
-} from "../../../../tracker/itsaplan/src/testing/itsaplan-fake.js";
+import { mdToDoc } from "../markdown.js";
+import { findRange } from "../text-range.js";
+import { createItsaplanFake as createTrackerFake } from "../../../../tracker/itsaplan/src/testing/itsaplan-fake.js";
+import type { FakeOptions } from "../../../../tracker/itsaplan/src/testing/types.js";
+import type { ApiDoc, ApiDocSummary } from "../types.js";
+import type { ItsaplanFake, StoredDoc, StoredDocComment } from "./types.js";
 
 // The tracker package's stand-in for the Its a Plan REST API, plus the document routes the knowledge adapter uses.
 
-interface DocRow {
-  id: number;
-  parentId: number | null;
-  title: string;
-  metadata: Record<string, unknown>;
-  version: number;
-  content: string;
-  contentJson: PmNode | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface DocComment {
-  id: string;
-  documentId: number;
-  parentId: string | null;
-  authorId: string;
-  authorName: string;
-  body: string;
-  quote: string | null;
-  from: number | null;
-  to: number | null;
-  resolvedAt: string | null;
-  createdAt: string;
-}
-
-export type ItsaplanFake = TrackerFake & {
-  state: TrackerFake["state"] & { docs: DocRow[]; docComments: DocComment[] };
-  knowledgeSeed: KnowledgeSeed;
-};
-
 export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
   let commentCounter = 0;
-  const docs: DocRow[] = [];
-  const docComments: DocComment[] = [];
+  const docs: StoredDoc[] = [];
+  const docComments: StoredDocComment[] = [];
   let docId = 0;
 
-  const docSummary = (d: DocRow) => {
+  const docSummary = (d: StoredDoc): ApiDocSummary => {
     const { content: _c, contentJson: _j, ...rest } = d;
     return rest;
   };
 
-  const docFull = (d: DocRow) => ({
+  const docFull = (d: StoredDoc): ApiDoc => ({
     ...docSummary(d),
     content: d.content,
     contentJson: d.contentJson,
@@ -76,8 +45,8 @@ export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
         method: "POST",
         path: "/projects/:p/documents",
         handler: (r) => {
-          const b = r.json as Partial<DocRow>;
-          const row: DocRow = {
+          const b = r.json as Partial<StoredDoc>;
+          const row: StoredDoc = {
             id: ++docId,
             parentId: b.parentId ?? null,
             title: b.title ?? "Untitled",
@@ -114,7 +83,7 @@ export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
             return err(404, "document not found");
           }
 
-          const b = r.json as Partial<DocRow>;
+          const b = r.json as Partial<StoredDoc>;
           if (Number(b.version) !== d.version) {
             return err(409, "The page changed; read it again.", "version_conflict");
           }
@@ -172,7 +141,7 @@ export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
             return err(404, "comment not found");
           }
 
-          const row: DocComment = {
+          const row: StoredDocComment = {
             id: `c-${++commentCounter}`,
             documentId: d.id,
             parentId: b.parentId ?? null,
@@ -215,7 +184,7 @@ export function createItsaplanFake(opts: FakeOptions = {}): ItsaplanFake {
   const knowledgeSeed: KnowledgeSeed = {
     async doc(d) {
       const mdDoc = mdToDoc(d.body);
-      const row: DocRow = {
+      const row: StoredDoc = {
         id: ++docId,
         parentId: null,
         title: d.title,

@@ -1,7 +1,7 @@
 export { claudeAgentSdk } from "./adapter.js";
-export { agentSdkOptions, type AgentSdkOptions } from "./options.js";
-export { createAgentSdkRuntime, type AgentSdkRuntimeConfig } from "./runtime.js";
+export { agentSdkOptions } from "./options.js";
+export { createAgentSdkRuntime } from "./runtime.js";
 export { parseUsage } from "./messages.js";
-export type { QueryFn } from "./types.js";
+export type { AgentSdkOptions, AgentSdkRuntimeConfig, QueryFn, SandboxProbe } from "./types.js";
 export { workdirFiles } from "./layout.js";
-export { probeSubprocessSandbox, type SandboxProbe } from "./sandbox.js";
+export { probeSubprocessSandbox } from "./sandbox.js";

@@ -1,29 +1,7 @@
 import { PortError, type RepoRef } from "@outstaff/core";
 import type { GithubHttp } from "./http.js";
+import type { AppCredentials, InstallationToken, TokenScope } from "./types.js";
 import { signAppJwt } from "./jwt.js";
-
-export interface AppCredentials {
-  appId: string;
-  privateKey: string;
-  installationId?: string;
-  slug?: string;
-}
-
-export interface InstallationToken {
-  token: string;
-  expiresAt: string;
-}
-
-export interface TokenScope {
-  repositories?: string[];
-  permissions?: Record<string, "read" | "write">;
-
-  /**
-   * Permissions to add only when the installation has been granted them. Asking GitHub for a permission the
-   * installation lacks makes it refuse the token, so these are checked against the installation first.
-   */
-  optionalPermissions?: Record<string, "read" | "write">;
-}
 
 /** How long a read of an installation's granted permissions is reused. */
 const PERMISSIONS_TTL_MS = 10 * 60_000;

@@ -9,7 +9,7 @@ import type {
   WorkflowEvent,
   WorkflowState,
 } from "@outstaff/core";
-import type { Clock } from "../clock.js";
+import type { Clock } from "../types.js";
 import type { IntakeMeta } from "../intake/index.js";
 import type { Store } from "../store/index.js";
 
@@ -175,3 +175,8 @@ export interface WorkState extends WorkflowState {
   /** The documents whose comments are worth reading: those of tickets not finished, and recent ones without. Most recently active first. */
   openDocs(limit: number): DocRecord[];
 }
+
+/** What linked a pull request to a ticket. */
+export type TicketSource = "branch" | "title" | "closing keyword" | "ticket_link";
+
+export type TicketCandidate = { key: string; source: TicketSource };

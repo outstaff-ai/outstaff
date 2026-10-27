@@ -16,5 +16,3 @@ export const agentSdkOptions = z.strictObject({
    */
   sandbox: z.enum(["off", "bubblewrap"]).default("off"),
 });
-
-export type AgentSdkOptions = z.infer<typeof agentSdkOptions>;

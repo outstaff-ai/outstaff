@@ -1,27 +1,6 @@
 import { readFileSync } from "node:fs";
 import { PortError } from "./errors.js";
-
-export interface SecretSpec {
-  key: string;
-  description: string;
-
-  /** Where to get it; shown by `ost setup`. */
-  where: string;
-
-  /** `ost setup --derive` can compute it. */
-  derivable?: boolean;
-
-  /** The adapter works without it (for example when another credential is supplied instead). */
-  optional?: boolean;
-
-  /** The condition that makes it needed, when the adapter asks for it only for some people; shown in the contract table. */
-  when?: string;
-}
-
-export interface SecretSource {
-  get(key: string): string | undefined;
-  require(key: string): string;
-}
+import type { SecretSource } from "./types.js";
 
 const SECRET_KEY = /^[A-Za-z0-9_]+$/;
 

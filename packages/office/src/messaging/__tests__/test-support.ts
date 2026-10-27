@@ -1,11 +1,13 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
 import { manualClock } from "../../clock.js";
-import { ProtocolError, type Offer, type WorkSource } from "../../protocol/source.js";
+import { ProtocolError } from "../../protocol/errors.js";
+import type { Offer, WorkSource } from "../../protocol/source.types.js";
 import { createScheduler } from "../../scheduler/scheduler.js";
 import { openStore } from "../../store/index.js";
 import type { Store, WorkItem } from "../../store/types.js";
-import { createMessaging, type MessagingOptions } from "../messaging.js";
+import { createMessaging } from "../messaging.js";
+import type { MessagingOptions } from "../types.js";
 import { readRoster } from "../roster.js";
 
 const person = (handle: string, role: string) => ({ handle, name: handle.toUpperCase(), role });

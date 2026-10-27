@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { defineCommand, type Context } from "../define.js";
+import { defineCommand } from "../define.js";
+import type { Context } from "../types.js";
 
 /** Exact version of the catalog release this CLI ships with. */
 export const catalogVersion = (): string => {

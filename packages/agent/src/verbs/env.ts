@@ -1,30 +1,5 @@
-import {
-  PortError,
-  networkGrants,
-  originOf,
-  silentLogger,
-  type AdapterRegistry,
-  type Logger,
-  type PortName,
-  type SecretSource,
-  type TeamConfig,
-} from "@outstaff/core";
-import type { OfficeClient } from "./office.js";
-import type { AgentEnv } from "./types.js";
-
-export interface CreateAgentEnvOptions {
-  team: TeamConfig;
-
-  /** Handle of the person this process runs as. */
-  person: string;
-  registry: AdapterRegistry;
-  secrets: SecretSource;
-  office?: OfficeClient;
-
-  log?: Logger;
-  fetch?: typeof fetch;
-  now?: () => Date;
-}
+import { PortError, networkGrants, originOf, silentLogger, type PortName } from "@outstaff/core";
+import type { AgentEnv, CreateAgentEnvOptions } from "./types.js";
 
 const PORTS = ["tracker", "knowledge", "vcs", "chat"] as const satisfies readonly PortName[];
 

@@ -1,9 +1,10 @@
 import { PortError, silentLogger, type AdapterContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { buildFetch } from "../client.js";
+import { eventType } from "../events.js";
+import { buildFetch } from "../fetch.js";
 import { errorCode, ItsaplanHttp } from "../http.js";
 import { knowledgeOptions, resolveConnection, trackerOptions, deriveApiUrl } from "../options.js";
-import { createItsaplanTracker, eventType } from "../tracker.js";
+import { createItsaplanTracker } from "../tracker.js";
 import { secretMap, team } from "../testing/harness.js";
 import { API_KEY, createStubFetch } from "../testing/http-stub.js";
 import { createItsaplanFake } from "../testing/itsaplan-fake.js";

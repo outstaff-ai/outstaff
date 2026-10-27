@@ -1,4 +1,5 @@
-export { createWorkState, formatCurrentWork } from "./workstate.js";
+export { createWorkState } from "./workstate.js";
+export { formatCurrentWork } from "./derive.js";
 export { ticketCandidates } from "./infer.js";
 export type {
   CiState,

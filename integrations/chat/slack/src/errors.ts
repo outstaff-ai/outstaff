@@ -47,3 +47,12 @@ export function toPortError(error: unknown): PortError {
 export function slackErrorName(error: unknown): string | undefined {
   return (error as { data?: { error?: string } } | undefined)?.data?.error;
 }
+
+/** Run a Slack call, turning what it throws into a PortError. */
+export async function callSlack<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    throw toPortError(error);
+  }
+}

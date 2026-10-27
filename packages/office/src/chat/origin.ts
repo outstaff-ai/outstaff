@@ -1,5 +1,6 @@
 import type { ChatOrigin } from "@outstaff/protocol";
 import type { Store } from "../store/types.js";
+import type { ChatOriginRecord } from "./types.js";
 
 /** Subject types that keep chat state in the store; none of them needs a migration. */
 export const CHAT_ORIGIN_SUBJECT = "chat_origin";
@@ -11,29 +12,6 @@ export const CHAT_MESSAGE_SUBJECT = "chat_message";
  * `<person>:<ticket>`; the ticket is assigned back to the agent when its work starts.
  */
 export const ATTACH_REASSIGN_SUBJECT = "attach_reassign";
-
-export interface ChatOriginRecord extends ChatOrigin {
-  /**
-   * Other threads linked to the item, because a request from them was attached to it. Each gets the item's result,
-   * besides the thread in `channel` and `thread`.
-   */
-  also?: ChatOrigin[];
-
-  /** The request waits last until the requester says where it goes. */
-  awaitingPlacement: boolean;
-
-  /** The message that started the session, for the office's own use (it is not offered to the agent). */
-  text?: string;
-
-  /** For a chat session: the requests it has filed so far (normalized), so the same one is not filed twice. */
-  requests?: string[];
-
-  /** For a chat session: the work item it filed last for the message. The thread belongs to that item from then on. */
-  filed?: string;
-
-  /** What was already reported to the requester, so a retry does not post again. */
-  claimed: string[];
-}
 
 export const threadKey = (channel: string, thread: string) => `${channel}:${thread}`;
 

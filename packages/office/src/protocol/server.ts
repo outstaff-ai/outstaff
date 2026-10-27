@@ -1,93 +1,25 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { silentLogger, type Logger } from "@outstaff/core";
+import { silentLogger } from "@outstaff/core";
 import {
-  PROTOCOL_VERSION,
   decode,
   encode,
   type ErrorCode,
   type Message,
-  type MessageOf,
   type MessageType,
   type PayloadOf,
 } from "@outstaff/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
-import type { Clock } from "../clock.js";
-import type { AgentAuth } from "./auth.js";
-import {
-  ProtocolError,
-  type ChatDesk,
-  type DocLinks,
-  type Messaging,
-  type TicketPrs,
-  type WorkSource,
-} from "./source.js";
-
-export const CLOSE_AUTH = 4401;
-export const CLOSE_VERSION = 4426;
-export const CLOSE_REPLACED = 4409;
-
-export interface ProtocolServerOptions {
-  source: WorkSource;
-  messaging?: Messaging;
-
-  /** Receives the usage windows agents report. Without it a report is refused as unsupported. */
-  usage?: { report(person: string, windows: PayloadOf<"usage">["windows"]): Promise<void> };
-  chat?: ChatDesk;
-
-  /** Answers `ticket_prs`. Without it the request is refused as unsupported. */
-  tickets?: TicketPrs;
-
-  /** Takes `doc_link`. Without it the request is refused as unsupported. */
-  docs?: DocLinks;
-  auth: AgentAuth;
-  clock: Clock;
-  logger?: Logger;
-
-  /** 0 picks a free port. */
-  port: number;
-  host?: string;
-
-  /** Agents must send a message at least this often. Default 15000. */
-  heartbeatMs?: number;
-
-  /** How long a new connection may stay silent before `hello`. Default 10000. */
-  helloTimeoutMs?: number;
-
-  /** How often the queues of connected people are checked for new work. Default 5000. */
-  pollMs?: number;
-  officeVersion?: string;
-}
-
-export interface ProtocolServer {
-  start(): Promise<void>;
-  stop(): Promise<void>;
-  port(): number;
-
-  /** Handles of the people with a live, authenticated connection. */
-  connected(): string[];
-
-  /** Tells the server that work may be waiting for a person; the scheduler calls this after enqueueing. */
-  notify(person: string): void;
-
-  /** Sends the person's queued reports to its agent now, if it is connected; otherwise the next `welcome` carries them. */
-  reports(person: string): void;
-}
-
-interface Connection {
-  ws: WebSocket;
-  person: string | undefined;
-
-  /** Offers already sent on this connection, so a poll does not repeat them. */
-  offered: Set<string>;
-  queue: Promise<void>;
-  cancelTimer: (() => void) | undefined;
-}
+import { CLOSE_AUTH } from "./constants.js";
+import { ProtocolError } from "./errors.js";
+import { handleHello } from "./hello.js";
+import { handleRequest } from "./requests.js";
+import type { Connection, HelloContext, ProtocolServer, ProtocolServerOptions } from "./types.js";
 
 const MAX_FRAME = 1024 * 1024;
 
 export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServer {
-  const { source, auth, clock } = opts;
+  const { source, clock } = opts;
   const log = opts.logger ?? silentLogger;
   const heartbeatMs = opts.heartbeatMs ?? 15_000;
   const helloTimeoutMs = opts.helloTimeoutMs ?? 10_000;
@@ -179,228 +111,7 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       });
   }
 
-  function desk(): ChatDesk {
-    if (!opts.chat) {
-      throw new ProtocolError("unsupported", "This office does not take chat requests.");
-    }
-
-    return opts.chat;
-  }
-
-  async function handleRequest(c: Connection, person: string, m: Message) {
-    const reply = <T extends MessageType>(type: T, payload: PayloadOf<T>) =>
-      send(c, type, payload, m.id);
-
-    switch (m.type) {
-      case "ping":
-        return reply("pong", {});
-      case "pong":
-        return;
-      case "heartbeat":
-        await source.heartbeat(person, m.payload.workItemId);
-        return reply("ack", {});
-      case "accept":
-        await source.accept(person, m.payload.workItemId);
-        return reply("ack", {});
-      case "decline":
-        await source.decline(person, m.payload.workItemId, m.payload.reason);
-        c.offered.delete(m.payload.workItemId);
-        return reply("ack", {});
-      case "progress":
-        await source.progress(person, m.payload.workItemId, m.payload.text);
-        return reply("ack", {});
-      case "usage":
-        if (!opts.usage) {
-          throw new ProtocolError("unsupported", "This office does not take usage reports.");
-        }
-
-        await opts.usage.report(person, m.payload.windows);
-        return reply("ack", {});
-      case "session":
-        await source.setSession(person, m.payload.workItemId, m.payload.sessionId);
-        return reply("ack", {});
-      case "journal":
-        await source.journal(person, m.payload.workItemId, m.payload.text);
-        return reply("ack", {});
-      case "handback": {
-        const { workItemId, ...result } = m.payload;
-        await source.handBack(person, workItemId, result);
-        await opts.messaging?.onHandBack?.(workItemId, result.status);
-        reply("ack", {});
-        return deliver(person);
-      }
-
-      case "fail":
-        await source.fail(person, m.payload.workItemId, m.payload.reason);
-        reply("ack", {});
-        return deliver(person);
-      case "ask": {
-        if (!opts.messaging) {
-          throw new ProtocolError("unsupported", "This office does not route questions.");
-        }
-
-        return reply("ask_result", await opts.messaging.ask(person, m.payload));
-      }
-
-      case "answer": {
-        if (!opts.messaging) {
-          throw new ProtocolError("unsupported", "This office does not route questions.");
-        }
-
-        await opts.messaging.answer(person, m.payload.questionId, m.payload.answer);
-        return reply("ack", {});
-      }
-
-      case "roster":
-        return reply(
-          "roster_result",
-          opts.messaging?.roster
-            ? await opts.messaging.roster()
-            : { members: await source.roster() },
-        );
-      case "work_list":
-        return reply("work_list_result", {
-          items: await source.list(
-            person,
-            m.payload.workItemId === undefined ? {} : { workItemId: m.payload.workItemId },
-          ),
-        });
-      case "work_move":
-        return reply("work_move_result", {
-          item: await source.move(person, m.payload.workItemId, m.payload.status),
-        });
-      case "work_place":
-        return reply("work_move_result", {
-          item: await source.place(
-            person,
-            m.payload.workItemId,
-            m.payload.position,
-            m.payload.relativeTo,
-          ),
-        });
-      case "chat_message":
-        return reply("chat_message_result", await desk().message(person, m.payload));
-      case "chat_report":
-        return reply(
-          "chat_report_result",
-          await desk().report(person, m.payload.workItemId, m.payload.kind),
-        );
-      case "work_link":
-        return reply(
-          "work_link_result",
-          await desk().linkTicket(
-            person,
-            m.payload.workItemId,
-            m.payload.ticket,
-            m.payload.request,
-          ),
-        );
-      case "work_check":
-        await desk().checkFiling(person, m.payload.workItemId, m.payload.request);
-        return reply("ack", {});
-      case "work_queue":
-        return reply(
-          "work_queue_result",
-          await desk().queueWork(person, m.payload.workItemId, {
-            title: m.payload.title,
-            body: m.payload.body,
-          }),
-        );
-      case "work_attach":
-        return reply(
-          "work_attach_result",
-          await desk().attachWork(person, m.payload.workItemId, {
-            target: m.payload.target,
-            confirmed: m.payload.confirmed,
-            ...(m.payload.request ? { request: m.payload.request } : {}),
-          }),
-        );
-      case "report_posted":
-        await desk().posted(person, m.payload.workItemId, m.payload.id);
-        return reply("ack", {});
-      case "doc_link": {
-        if (!opts.docs) {
-          throw new ProtocolError("unsupported", "This office does not track documents.");
-        }
-
-        await opts.docs.link(person, m.payload.workItemId, m.payload.doc);
-        return reply("ack", {});
-      }
-
-      case "current_work":
-        return reply("current_work_result", { text: await desk().currentWork(person) });
-      case "ticket_prs": {
-        if (!opts.tickets) {
-          throw new ProtocolError(
-            "unsupported",
-            "This office does not track tickets and pull requests.",
-          );
-        }
-
-        return reply("ticket_prs_result", await opts.tickets.forDraft(m.payload));
-      }
-
-      default:
-        throw new ProtocolError("invalid", `Agents do not send "${m.type}".`);
-    }
-  }
-
-  async function handleHello(c: Connection, m: MessageOf<"hello">) {
-    const { person, token, protocolVersion } = m.payload;
-    if (protocolVersion !== PROTOCOL_VERSION) {
-      sendError(
-        c,
-        "version_mismatch",
-        `Protocol version ${protocolVersion} is not supported; this office speaks ${PROTOCOL_VERSION}.`,
-        m.id,
-      );
-
-      c.ws.close(CLOSE_VERSION, "version mismatch");
-      return;
-    }
-
-    if (!(await auth.verify(person, token))) {
-      log.warn("agent authentication failed", { person });
-      sendError(c, "auth_failed", "Unknown person or wrong token.", m.id);
-      c.ws.close(CLOSE_AUTH, "authentication failed");
-      return;
-    }
-
-    if (c.ws.readyState !== c.ws.OPEN) {
-      return;
-    }
-
-    const old = conns.get(person);
-    c.person = person;
-    conns.set(person, c);
-    if (old) {
-      sendError(old, "replaced", "Another connection for this person took over.");
-      old.ws.close(CLOSE_REPLACED, "replaced");
-    }
-
-    armIdle(c, heartbeatMs * 3);
-    const outstanding = await source.outstanding(person);
-    // Reports the agent was offline for are handed to it here, once; it posts them as itself.
-    const reports = await opts.chat?.queued(person).catch((err: unknown) => {
-      log.warn("could not collect the queued reports of an agent", { person, error: String(err) });
-      return [];
-    });
-
-    send(
-      c,
-      "welcome",
-      {
-        protocolVersion: PROTOCOL_VERSION,
-        heartbeatMs,
-        resume: outstanding.filter((o) => o.accepted).map((o) => o.offer.workItem.id),
-        ...(reports?.length ? { reports } : {}),
-      },
-      m.id,
-    );
-
-    log.info("agent connected", { person });
-    deliver(person);
-  }
+  const ctx: HelloContext = { opts, send, deliver, conns, heartbeatMs, log, sendError, armIdle };
 
   async function onFrame(c: Connection, raw: string) {
     const decoded = decode(raw);
@@ -418,7 +129,7 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       }
 
       c.cancelTimer?.();
-      await handleHello(c, m);
+      await handleHello(ctx, c, m);
       return;
     }
 
@@ -428,7 +139,7 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
         throw new ProtocolError("invalid", "Already authenticated.");
       }
 
-      await handleRequest(c, c.person, m);
+      await handleRequest(ctx, c, c.person, m);
     } catch (err) {
       if (err instanceof ProtocolError) {
         sendError(c, err.code, err.message, m.id);

@@ -1,27 +1,11 @@
 import { createHash } from "node:crypto";
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs";
-import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { formatIssue, type ConfigSource, type TeamConfig } from "@outstaff/core";
-import { stockCatalogDir } from "./catalogs.js";
-import type { Context, GlobalOptions } from "./define.js";
-import { loadTeam } from "./load.js";
+import type { TeamConfig } from "@outstaff/core";
+import type { Context, EjectedIndex, EjectedRecord } from "./types.js";
 
 /** Folders of a catalog that clients can eject. */
 export const EJECTABLE = ["roles", "process", "references", "templates", "toolsets"] as const;
-
-export type EjectedRecord = { version: string; sha256: string };
-export type EjectedIndex = Record<string, EjectedRecord>;
 
 export const RECORD_FILE = ".ejected.json";
 export const BASE_DIR = ".base";
@@ -181,96 +165,6 @@ export function writeFileDeep(file: string, content: string): void {
 
 export const baseFile = (dir: string, path: string): string => join(dir, BASE_DIR, path);
 
-/** Conflict markers left in a file by `ost upgrade`. */
-export const hasConflictMarkers = (text: string): boolean =>
-  /^<{7}( |$)/m.test(text) && /^>{7}( |$)/m.test(text);
-
-export type MergeResult = { text: string; conflicts: number };
-
-/** Three-way merge with `git merge-file`; conflicts use standard markers. */
-export function mergeThreeWay(ours: string, base: string, theirs: string): MergeResult {
-  const tmp = mkdtempSync(join(tmpdir(), "ost-merge-"));
-  try {
-    const files = {
-      ours: join(tmp, "client"),
-      base: join(tmp, "base"),
-      theirs: join(tmp, "stock"),
-    };
-
-    writeFileSync(files.ours, ours);
-    writeFileSync(files.base, base);
-    writeFileSync(files.theirs, theirs);
-    const r = spawnSync(
-      "git",
-      [
-        "merge-file",
-        "-p",
-        "-L",
-        "client",
-        "-L",
-        "base",
-        "-L",
-        "stock",
-        files.ours,
-        files.base,
-        files.theirs,
-      ],
-      { encoding: "utf8" },
-    );
-
-    if (r.error) {
-      throw new Error(`Cannot run git: ${r.error.message}`);
-    }
-
-    if (r.status === null || r.status < 0 || r.status > 127) {
-      throw new Error(`git merge-file failed: ${r.stderr.trim()}`);
-    }
-
-    return { text: r.stdout, conflicts: r.status };
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
-}
-
-/** Unified diff of two texts, headed `a/<path>` and `b/<path>`; empty when equal. */
-export function unifiedDiff(path: string, before: string, after: string): string {
-  if (before === after) {
-    return "";
-  }
-
-  const tmp = mkdtempSync(join(tmpdir(), "ost-diff-"));
-  try {
-    writeFileDeep(join(tmp, "a", path), before);
-    writeFileDeep(join(tmp, "b", path), after);
-    const r = spawnSync(
-      "git",
-      [
-        "-c",
-        "core.quotepath=off",
-        "diff",
-        "--no-index",
-        "--no-color",
-        "--no-prefix",
-        "--no-ext-diff",
-        `a/${path}`,
-        `b/${path}`,
-      ],
-      { cwd: tmp, encoding: "utf8" },
-    );
-
-    if (r.error) {
-      throw new Error(`Cannot run git: ${r.error.message}`);
-    }
-
-    // Drop the "diff --git" and "index" lines; keep from "---" on.
-    const lines = r.stdout.split("\n");
-    const start = lines.findIndex((l) => l.startsWith("--- "));
-    return start < 0 ? r.stdout : lines.slice(start).join("\n");
-  } finally {
-    rmSync(tmp, { recursive: true, force: true });
-  }
-}
-
 /** Sets `catalog.version` in team.yaml text, keeping quotes and comments. Returns undefined if not found. */
 export function setCatalogVersion(yaml: string, version: string): string | undefined {
   const lines = yaml.split("\n");
@@ -294,43 +188,4 @@ export function setCatalogVersion(yaml: string, version: string): string | undef
   }
 
   return undefined;
-}
-
-export type OpenedTeam = {
-  config: TeamConfig;
-  source: ConfigSource;
-
-  /** Absolute path of the ejected catalog directory. */
-  dir: string;
-  stockDir: string;
-};
-
-/** Loads the team and locates the ejected catalog; prints the errors and returns an exit code on failure. */
-export async function openTeam(
-  ctx: Context,
-  options: GlobalOptions,
-): Promise<{ ok: true; team: OpenedTeam } | { ok: false; code: number }> {
-  const loaded = await loadTeam(ctx, options);
-  if (!loaded.ok) {
-    for (const i of loaded.issues) {
-      ctx.err(`error    ${formatIssue(i)}\n`);
-    }
-
-    return { ok: false, code: 1 };
-  }
-
-  if (loaded.source.kind !== "file") {
-    ctx.err("error    This command edits files, so --team must be a local path, not a git URL.\n");
-    return { ok: false, code: 1 };
-  }
-
-  return {
-    ok: true,
-    team: {
-      config: loaded.config,
-      source: loaded.source,
-      dir: ejectedDir(loaded.source.dir, loaded.config),
-      stockDir: stockCatalogDir(ctx),
-    },
-  };
 }

@@ -1,10 +1,4 @@
-export type Cancel = () => void;
-
-/** Time source for every office component, injected so tests are deterministic. */
-export interface Clock {
-  now(): Date;
-  setTimeout(fn: () => void, ms: number): Cancel;
-}
+import type { Clock, ManualClock } from "./types.js";
 
 export const systemClock: Clock = {
   now: () => new Date(),
@@ -13,12 +7,6 @@ export const systemClock: Clock = {
     return () => clearTimeout(handle);
   },
 };
-
-export interface ManualClock extends Clock {
-  /** Moves time forward, firing due timers in order (timers they schedule included). */
-  advance(ms: number): void;
-  pending(): number;
-}
 
 export function manualClock(start = "2030-01-01T00:00:00.000Z"): ManualClock {
   let t = Date.parse(start);

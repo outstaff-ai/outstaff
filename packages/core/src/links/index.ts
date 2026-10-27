@@ -1,7 +1,2 @@
-export {
-  createTicketLinker,
-  ticketProjectKeys,
-  type TicketLinker,
-  type TicketLinkerOptions,
-  type TicketSurface,
-} from "./tickets.js";
+export { createTicketLinker, ticketProjectKeys } from "./tickets.js";
+export type { TicketLinker, TicketLinkerOptions, TicketSurface } from "./types.js";

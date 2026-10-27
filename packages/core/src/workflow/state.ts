@@ -1,32 +1,5 @@
-import type { RepoRef } from "../ports/repo.js";
-import type { CanonicalStatus } from "../ports/status.js";
-import type { PrRef, WorkflowPr, WorkflowState } from "./types.js";
-
-export interface StaticTicket {
-  status: CanonicalStatus;
-  assignee?: { id: string; kind: "human" | "agent" };
-  lastWorker?: string;
-  requester?: string;
-  labels?: string[];
-
-  /** The agent's latest work on the ticket ended as a hand-back as done. */
-  handedBack?: boolean;
-}
-
-export interface StaticWorkflowData {
-  tickets?: Record<string, StaticTicket>;
-  prs?: WorkflowPr[];
-
-  /** Pull request number -> ticket key (same repo assumed per entry's `ref.repo`). */
-  links?: Record<number, string>;
-  roles?: Record<string, string>;
-
-  /** The repositories' default branch; `main` when unset. */
-  defaultBranch?: string;
-
-  /** Document id -> handle of the agent who wrote it. */
-  docs?: Record<string, string>;
-}
+import type { RepoRef } from "../ports/types.js";
+import type { PrRef, StaticWorkflowData, WorkflowState } from "./types.js";
 
 const k = (r: PrRef) => `${r.repo.owner}/${r.repo.name}#${r.number}`;
 

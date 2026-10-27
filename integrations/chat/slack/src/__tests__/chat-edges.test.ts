@@ -2,7 +2,7 @@ import { PortError, silentLogger, type AdapterContext, type ChatMessage } from "
 import { describe, expect, it } from "vitest";
 import { createSlackChat } from "../chat.js";
 import type { SlackEvent, SlackMessage } from "../api.js";
-import type { SlackOptions } from "../options.js";
+import type { SlackOptions } from "../types.js";
 import { secretMap, slackWith, teamWith } from "../testing/harness.js";
 import { BOT_USER, createFakeSlack, slackError } from "../testing/slack-fake.js";
 

@@ -1,63 +1,21 @@
 import { WebClient } from "@slack/web-api";
-import {
-  PortError,
-  type AdapterContext,
-  type AgentProfile,
-  type Chat,
-  type ChatFile,
-  type ChatMessage,
-} from "@outstaff/core";
-import type {
-  SlackEvent,
-  SlackFile,
-  SlackMessage,
-  SlackPage,
-  SlackSocket,
-  SlackWeb,
-} from "./api.js";
-import { slackErrorName, toPortError } from "./errors.js";
+import { PortError, type AdapterContext, type Chat, type ChatMessage } from "@outstaff/core";
+import type { SlackEvent, SlackMessage, SlackWeb } from "./api.js";
+import { callSlack, slackErrorName, toPortError } from "./errors.js";
+import { downloadSlackFile, filesOf } from "./files.js";
+import { readPages } from "./history.js";
+import { createHome } from "./home.js";
 import { splitMrkdwn, toMrkdwn } from "./mrkdwn.js";
-import type { SlackOptions } from "./options.js";
-import { homeView } from "./profile.js";
 import { createSocketModeSocket } from "./socket.js";
 import { createTrust } from "./trust.js";
+import type { SlackDeps, SlackOptions } from "./types.js";
 
 const REACTIONS = { eyes: "eyes", done: "white_check_mark", error: "x" } as const;
 const SEEN_LIMIT = 500;
-
-/** A held profile is shown as it is for this long after it was published; then the agent is asked again. */
-const PROFILE_FRESH_MS = 60_000;
-const ZONE_TTL_MS = 10 * 60_000;
 const PAGE = 200;
-
-/** Replace the web or socket client; tests inject fakes, production builds the real ones from secrets. */
-export interface SlackDeps {
-  web?: SlackWeb;
-  socket?: SlackSocket;
-}
 
 /** Message subtypes that are a person's own content; edits, deletes, joins and bot messages are not requests. */
 const CONTENT_SUBTYPES = new Set(["file_share", "thread_broadcast"]);
-
-/** Files are served from slack.com hosts only; the bot token is never sent anywhere else. */
-const isSlackHost = (host: string) => host === "slack.com" || host.endsWith(".slack.com");
-
-const filesOf = (files: SlackFile[] | undefined): ChatFile[] =>
-  (files ?? []).flatMap((f) => {
-    const url = f.url_private_download ?? f.url_private;
-    // A file Slack no longer serves (deleted, over the workspace's limit) has no URL.
-    return f.id && url
-      ? [
-          {
-            id: f.id,
-            name: f.name ?? f.title ?? f.id,
-            mimetype: f.mimetype ?? "application/octet-stream",
-            size: f.size ?? 0,
-            url,
-          },
-        ]
-      : [];
-  });
 
 const isoOf = (ts: string) => new Date(Number(ts) * 1000).toISOString();
 
@@ -87,9 +45,6 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
   let handler: ((m: ChatMessage) => Promise<void>) | undefined;
   const seen = new Set<string>();
   const direct = new Map<string, string>();
-  const profiles = new Map<string, { profile: AgentProfile; at: number }>();
-  const zones = new Map<string, { tz?: string; at: number }>();
-  let profileSource: ((userId: string) => Promise<AgentProfile | undefined>) | undefined;
 
   const trust = createTrust({
     web,
@@ -99,17 +54,11 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     log: ctx.log,
   });
 
-  const call = async <T>(fn: () => Promise<T>): Promise<T> => {
-    try {
-      return await fn();
-    } catch (error) {
-      throw toPortError(error);
-    }
-  };
+  const home = createHome({ ctx, web, trust });
 
   const ensureBotUserId = async () => {
     if (!botUserId) {
-      botUserId = (await call(() => web.auth.test())).user_id;
+      botUserId = (await callSlack(() => web.auth.test())).user_id;
     }
 
     return botUserId;
@@ -169,27 +118,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
   const onEvent = async (e: SlackEvent) => {
     try {
       if (e.type === "app_home_opened" && e.tab === "home" && e.user) {
-        let held = profiles.get(e.user);
-        const stale = !held || ctx.now().getTime() - held.at >= PROFILE_FRESH_MS;
-        // Only trusted people see the work; a profile held for a person was published for them.
-        if (profileSource && stale && (held || (await trust.resolve(e.user)).trusted)) {
-          try {
-            const fresh = await profileSource(e.user);
-            if (fresh) {
-              held = { profile: structuredClone(fresh), at: ctx.now().getTime() };
-              profiles.set(e.user, held);
-            }
-          } catch (error) {
-            ctx.log.warn("could not refresh the profile; showing the one held", {
-              error: String(error),
-            });
-          }
-        }
-
-        if (held) {
-          await publish(e.user, held.profile);
-        }
-
+        await home.opened(e.user);
         return;
       }
 
@@ -227,47 +156,6 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     }
   };
 
-  /** The viewer's timezone from Slack, cached with the other lookups; unknown when the lookup fails. */
-  const zoneOf = async (userId: string) => {
-    const now = ctx.now().getTime();
-    const hit = zones.get(userId);
-    if (hit && now - hit.at < ZONE_TTL_MS) {
-      return hit.tz;
-    }
-
-    let tz: string | undefined;
-    try {
-      tz = (await web.users.info({ user: userId })).user?.tz || undefined;
-    } catch {
-      // Times show in UTC.
-    }
-
-    zones.set(userId, { ...(tz ? { tz } : {}), at: now });
-    return tz;
-  };
-
-  const publish = async (userId: string, profile: AgentProfile) => {
-    const tz = profile.lastActiveAt ? await zoneOf(userId) : undefined;
-    await call(() => web.views.publish({ user_id: userId, view: homeView(profile, tz) }));
-  };
-
-  const pages = async (
-    fetchPage: (cursor?: string) => Promise<SlackPage>,
-    limit: number,
-    newestFirst: boolean,
-  ) => {
-    const out: SlackMessage[] = [];
-    let cursor: string | undefined;
-    do {
-      const page = await call(() => fetchPage(cursor));
-      out.push(...(page.messages ?? []));
-      cursor = page.response_metadata?.next_cursor || undefined;
-      // History pages run newest first, so enough of them is enough; thread pages run oldest first and need all.
-    } while (cursor && (!newestFirst || out.length < limit));
-
-    return newestFirst ? out.slice(0, limit).toReversed() : out.slice(-limit);
-  };
-
   return {
     async start(onMessage) {
       if (office) {
@@ -284,7 +172,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
       }
 
       socket.onEvent(onEvent);
-      await call(() => socket!.start());
+      await callSlack(() => socket!.start());
     },
 
     async stop() {
@@ -296,7 +184,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
       let first: string | undefined;
       for (const text of splitMrkdwn(toMrkdwn(markdown))) {
         const thread = opts.thread ?? first;
-        const sent = await call(() =>
+        const sent = await callSlack(() =>
           web.chat.postMessage({
             channel,
             text,
@@ -329,7 +217,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     async history(channel, opts) {
       await ensureBotUserId();
       const raw = opts.thread
-        ? await pages(
+        ? await readPages(
             (cursor) =>
               web.conversations.replies({
                 channel,
@@ -340,7 +228,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
             opts.limit,
             false,
           )
-        : await pages(
+        : await readPages(
             (cursor) =>
               web.conversations.history({
                 channel,
@@ -355,45 +243,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     },
 
     async download(file) {
-      let url: URL;
-      try {
-        url = new URL(file.url);
-      } catch {
-        throw new PortError("invalid", `File ${file.id} has no valid download address.`);
-      }
-
-      if (url.protocol !== "https:" || !isSlackHost(url.hostname)) {
-        throw new PortError("invalid", `File ${file.id} is not hosted by Slack.`);
-      }
-
-      let res: Response;
-      try {
-        res = await ctx.fetch(url, { headers: { authorization: `Bearer ${token}` } });
-      } catch (error) {
-        throw new PortError("unavailable", `Slack could not be reached for file ${file.id}.`, {
-          cause: error,
-        });
-      }
-
-      if (!res.ok) {
-        throw new PortError(
-          res.status === 401 || res.status === 403 ? "forbidden" : "unavailable",
-          `Slack refused file ${file.id}: ${res.status}.`,
-        );
-      }
-
-      // Without the files:read scope Slack answers 200 with a sign-in page instead of the file.
-      if (
-        res.headers.get("content-type")?.startsWith("text/html") &&
-        !file.mimetype.startsWith("text/html")
-      ) {
-        throw new PortError(
-          "forbidden",
-          "Slack sent a web page instead of the file: the app needs the files:read scope.",
-        );
-      }
-
-      return new Uint8Array(await res.arrayBuffer());
+      return downloadSlackFile(ctx.fetch, token, file);
     },
 
     async openDirect(userId) {
@@ -402,7 +252,7 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
         return known;
       }
 
-      const opened = await call(() => web.conversations.open({ users: userId }));
+      const opened = await callSlack(() => web.conversations.open({ users: userId }));
       const id = opened.channel?.id;
       if (!id) {
         throw new PortError("unavailable", "Slack did not return a direct message channel.");
@@ -413,12 +263,11 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     },
 
     async setAgentProfile(userId, profile) {
-      profiles.set(userId, { profile: structuredClone(profile), at: ctx.now().getTime() });
-      await publish(userId, profile);
+      await home.set(userId, profile);
     },
 
     onProfileRequest(source) {
-      profileSource = source;
+      home.onRequest(source);
     },
   };
 }

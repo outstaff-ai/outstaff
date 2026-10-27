@@ -1,6 +1,6 @@
 import { PortError } from "@outstaff/core";
 import { z } from "zod";
-import { defineVerb, result } from "./types.js";
+import { defineVerb, result } from "./define.js";
 
 export const me = defineVerb({
   name: "me",

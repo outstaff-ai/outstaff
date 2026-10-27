@@ -1,12 +1,7 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
 import { MEMBER_ID } from "./identities.js";
 import type { SlackUser, SlackWeb } from "./api.js";
-
-export interface Sender {
-  bot: boolean;
-  trusted: boolean;
-  name?: string;
-}
+import type { Sender } from "./types.js";
 
 const TTL_MS = 10 * 60_000;
 

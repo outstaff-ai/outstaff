@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { defineCommand } from "../define.js";
-import { openTeam } from "../ejected.js";
+import { openTeam } from "../open-team.js";
 import { projectRoot, secretsLocation, shown } from "../project.js";
 import { removePerson } from "../teamfile.js";
 import { validate } from "./validate.js";

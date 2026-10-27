@@ -1,6 +1,6 @@
-import type { Options, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { buildPolicy, type Policy } from "@outstaff/core";
-import type { QueryFn } from "./types.js";
+import type { Call, QueryFn } from "./types.js";
 
 const layout = {
   home: "/home/agent",
@@ -55,11 +55,6 @@ export const rateLimit = () =>
       },
     },
   });
-
-export interface Call {
-  prompt: string;
-  options: Options;
-}
 
 /** A fake `query` that records its calls and plays the messages `script` returns. */
 export function fakeQuery(script: (call: Call) => AsyncIterable<SDKMessage> | SDKMessage[]): {

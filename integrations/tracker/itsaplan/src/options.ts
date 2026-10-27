@@ -1,5 +1,6 @@
 import { PortError, type AdapterContext } from "@outstaff/core";
 import { z } from "zod";
+import type { Connection, KnowledgeOptions, TrackerOptions } from "./types.js";
 
 const connection = {
   url: z.url().describe("Web address of the instance, used for links."),
@@ -60,13 +61,6 @@ export const knowledgeOptions = z.strictObject({
   issue_comment_url: connection.issue_comment_url,
   doc_comment_url: connection.doc_comment_url,
 });
-
-export type TrackerOptions = z.output<typeof trackerOptions>;
-export type KnowledgeOptions = z.output<typeof knowledgeOptions>;
-
-export interface Connection extends TrackerOptions {
-  api_url: string;
-}
 
 export function deriveApiUrl(url: string): string {
   const u = new URL(url);

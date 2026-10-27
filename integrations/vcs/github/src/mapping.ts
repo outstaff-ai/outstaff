@@ -1,22 +1,5 @@
 import type { Check, PullRequest, RepoRef, VcsEvent, VcsPermission } from "@outstaff/core";
-
-export interface RestPull {
-  number: number;
-  node_id?: string;
-  title: string;
-  body: string | null;
-  user: { login: string } | null;
-  head: { ref: string; sha: string };
-  base: { ref: string };
-  state: "open" | "closed";
-  merged?: boolean;
-  merged_at?: string | null;
-  draft?: boolean;
-  requested_reviewers?: { login: string }[] | null;
-  mergeable?: boolean | null;
-  mergeable_state?: string;
-  updated_at: string;
-}
+import type { RestCheckRun, RestEvent, RestPull } from "./api.types.js";
 
 const BOT_SUFFIX = "[bot]";
 
@@ -73,17 +56,6 @@ export function toPullRequest(
   };
 }
 
-export interface RestCheckRun {
-  id?: number;
-  app?: { slug?: string } | null;
-  output?: { title?: string | null; summary?: string | null } | null;
-  name: string;
-  status: string;
-  conclusion: string | null;
-  html_url?: string | null;
-  details_url?: string | null;
-}
-
 export function checkRunStatus(run: RestCheckRun): Check["status"] {
   if (run.status !== "completed") {
     return "pending";
@@ -124,14 +96,6 @@ export function permissionLevel(value: string): VcsPermission {
     default:
       return "none";
   }
-}
-
-export interface RestEvent {
-  id: string;
-  type: string;
-  actor?: { login: string } | null;
-  created_at: string;
-  payload: Record<string, any>; // oxlint-disable-line no-explicit-any
 }
 
 /** Normalises one repo event; returns undefined for anything the office does not act on. */

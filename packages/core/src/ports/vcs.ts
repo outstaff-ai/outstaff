@@ -1,6 +1,6 @@
 import type { EventPage } from "./events.js";
 import type { Links } from "./links.js";
-import type { RepoRef } from "./repo.js";
+import type { RepoRef } from "./types.js";
 
 export interface PullRequest {
   repo: RepoRef;

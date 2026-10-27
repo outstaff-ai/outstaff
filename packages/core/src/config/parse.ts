@@ -1,7 +1,6 @@
-import { teamConfigSchema, type TeamConfig } from "./schema.js";
-import { toConfigIssues, type ConfigIssue } from "./issues.js";
-
-export type ParseResult = { ok: true; config: TeamConfig } | { ok: false; issues: ConfigIssue[] };
+import { teamConfigSchema } from "./schema.js";
+import { toConfigIssues } from "./issues.js";
+import type { ParseResult } from "./types.js";
 
 export function parseTeamConfig(value: unknown): ParseResult {
   const result = teamConfigSchema.safeParse(value);

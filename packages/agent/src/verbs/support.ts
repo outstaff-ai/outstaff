@@ -9,7 +9,7 @@ import {
   type Tracker,
   type Vcs,
 } from "@outstaff/core";
-import type { Filed, OfficeClient } from "./office.js";
+import type { Filed, OfficeClient } from "./office.types.js";
 import type { AgentEnv } from "./types.js";
 
 /** The one formatter outgoing text goes through: ticket keys linked, links on the tracker's or knowledge host guarded. */

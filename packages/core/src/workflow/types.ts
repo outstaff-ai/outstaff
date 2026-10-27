@@ -1,24 +1,8 @@
-import type { TeamConfig } from "../config/schema.js";
-import type { RepoRef } from "../ports/repo.js";
-import type { CanonicalStatus } from "../ports/status.js";
-
-export const WORKFLOW_EVENT_TYPES = [
-  "pr.opened",
-  "pr.merged",
-  "pr.closed",
-  "pr.review_submitted",
-  "pr.comment",
-  "pr.conflicted",
-  "pr.ci_failed",
-  "ticket.assigned",
-  "ticket.moved",
-  "ticket.commented",
-  "ticket.created",
-  "doc.commented",
-  "agent.handed_back",
-  "agent.asked",
-  "schedule.cron",
-] as const;
+import type { TeamConfig } from "../config/types.js";
+import type { CanonicalStatus, RepoRef } from "../ports/types.js";
+import type { WORKFLOW_EVENT_TYPES } from "./constants.js";
+import type { WorkflowPreset } from "./presets.js";
+import type { HAND_BACK_STATUSES } from "./rules.js";
 
 export type WorkflowEventType = (typeof WORKFLOW_EVENT_TYPES)[number];
 
@@ -139,4 +123,107 @@ export interface WorkflowOptions {
   fallbackRequester?: string;
 }
 
-export const DEFAULT_NEEDS_HUMAN_LABEL = "needs-human";
+export type Condition =
+  | { all: Condition[] }
+  | { any: Condition[] }
+  | { not: Condition }
+  | { ticket_status: CanonicalStatus[] }
+  | { moved_to: CanonicalStatus[] }
+  | { actor_kind: "human" | "agent" | "automation" }
+  | { assignee_kind: "human" | "agent" | "none" }
+  | { has_label: string }
+  | { pr_author_kind: "human" | "agent" | "bot" }
+  | { approver: boolean }
+  | { pr_draft: boolean }
+  | { pr_open: boolean }
+  | { pr_merged: boolean }
+  | { pr_base_default: boolean }
+  | { has_body: boolean }
+  | { agent_mentioned: boolean }
+  | { review_state: string[] }
+  | { hand_back_status: HandBackStatus[] }
+  | { hand_back_kind: string[] }
+  | { pr_approved: boolean }
+  | { ticket_prs_all_closed: boolean }
+  | { ticket_prs_open: boolean }
+  | { ticket_prs_several: boolean }
+  | { ticket_handed_back: boolean };
+
+export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
+
+export type Action =
+  | { move: CanonicalStatus }
+  | { assign: string }
+  | { comment: string | { template: string; on?: "ticket" | "pr" } }
+  | { schedule: { person: string; kind: string; priority: "low" | "normal" | "high" } };
+
+export type Rule = {
+  id: string;
+  on: WorkflowEventType | WorkflowEventType[];
+  if?: Condition | undefined;
+  do: Action[];
+  disabled?: boolean | undefined;
+};
+
+export type RuleInput = Rule | { id: string; disabled: true };
+
+export interface StaticTicket {
+  status: CanonicalStatus;
+  assignee?: { id: string; kind: "human" | "agent" };
+  lastWorker?: string;
+  requester?: string;
+  labels?: string[];
+
+  /** The agent's latest work on the ticket ended as a hand-back as done. */
+  handedBack?: boolean;
+}
+
+export interface StaticWorkflowData {
+  tickets?: Record<string, StaticTicket>;
+  prs?: WorkflowPr[];
+
+  /** Pull request number -> ticket key (same repo assumed per entry's `ref.repo`). */
+  links?: Record<number, string>;
+  roles?: Record<string, string>;
+
+  /** The repositories' default branch; `main` when unset. */
+  defaultBranch?: string;
+
+  /** Document id -> handle of the agent who wrote it. */
+  docs?: Record<string, string>;
+}
+
+export interface WorkflowStatusMap {
+  /** The tracker's name for a canonical status. */
+  toTracker(status: CanonicalStatus): string;
+
+  /** Canonical status for a tracker name (case-insensitive), or undefined if unmapped. */
+  toCanonical(name: string): CanonicalStatus | undefined;
+}
+
+export interface WorkflowConfigShape {
+  preset: WorkflowPreset;
+  statuses?: Partial<Record<string, string>> | undefined;
+  rules?: unknown[] | undefined;
+  templates?: Record<string, string> | undefined;
+}
+
+export interface RuleExplanation {
+  id: string;
+  matched: boolean;
+
+  /** Why the rule did or did not fire. */
+  reason: string;
+  effects: Effect[];
+
+  /** Actions that matched but produced nothing, with the reason. */
+  skipped: string[];
+}
+
+export interface WorkflowExplanation {
+  event: WorkflowEvent;
+  rules: RuleExplanation[];
+
+  /** Final ordered, deduplicated effects. */
+  effects: Effect[];
+}

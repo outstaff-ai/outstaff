@@ -1,14 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { defineCommand } from "../define.js";
-import {
-  EJECTABLE,
-  badCatalogPath,
-  baseFile,
-  openTeam,
-  tryIndex,
-  unifiedDiff,
-} from "../ejected.js";
+import { EJECTABLE, badCatalogPath, baseFile, tryIndex } from "../ejected.js";
+import { unifiedDiff } from "../merge.js";
+import { openTeam } from "../open-team.js";
 
 export const diff = defineCommand({
   name: "diff",

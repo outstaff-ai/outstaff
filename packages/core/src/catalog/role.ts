@@ -42,5 +42,3 @@ export const roleSchema = z
       .meta(d("File names inside the role directory.")),
   })
   .meta(d("A catalog role (roles/<role>/role.yaml)."));
-
-export type Role = z.output<typeof roleSchema>;

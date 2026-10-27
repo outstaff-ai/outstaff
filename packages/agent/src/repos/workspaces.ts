@@ -1,22 +1,9 @@
 import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { parseRepoUrl, silentLogger, type Layout, type Logger } from "@outstaff/core";
+import { parseRepoUrl, silentLogger } from "@outstaff/core";
 import type { Offer } from "../office-client/index.js";
-import type { ClonedRepo } from "./clone.js";
-import { runGit, type RunGit } from "./git.js";
-
-/** The places one work item works in. */
-export interface Workspace {
-  repo: string;
-  worktree: string;
-
-  /** The branch checked out. Undefined while HEAD is detached: new work starts that way and the agent creates its branch. */
-  branch: string | undefined;
-  scratch: string;
-
-  /** Convention files found in the worktree, relative to it, plus the `instructions` files team.yaml lists that exist. */
-  conventionFiles: string[];
-}
+import type { ClonedRepo, Workspaces, WorkspacesOptions } from "./types.js";
+import { runGit } from "./git.js";
 
 /** Where a repository states how work is done in it. */
 export const CONVENTION_FILES = [
@@ -38,14 +25,6 @@ export function findConventionFiles(worktree: string, instructions: readonly str
   };
 
   return [...new Set([...CONVENTION_FILES, ...instructions])].filter(isFile);
-}
-
-export interface Workspaces {
-  /** Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when no repo fits. */
-  prepare(offer: Offer): Promise<Workspace | undefined>;
-
-  /** Removes the item's worktree and scratch directory. The branch stays, so unmerged commits are not lost. */
-  release(workItemId: string): Promise<void>;
 }
 
 /** Path-safe form of an item id. */
@@ -108,13 +87,6 @@ export function repoForItem(offer: Offer, repos: ClonedRepo[]): ClonedRepo | und
 
   const writable = repos.filter((r) => r.access === "write");
   return writable.find((r) => r.kind === "primary") ?? writable[0];
-}
-
-export interface WorkspacesOptions {
-  layout: Pick<Layout, "worktreesDir" | "scratchDir">;
-  repos: ClonedRepo[];
-  git?: RunGit;
-  log?: Logger;
 }
 
 export function createWorkspaces(opts: WorkspacesOptions): Workspaces {

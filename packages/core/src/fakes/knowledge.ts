@@ -1,18 +1,8 @@
-import type { KnowledgeSeed } from "../contracts/seeds.js";
 import { PortError } from "../ports/index.js";
 import type { Doc, DocComment, DocEvent, Knowledge } from "../ports/index.js";
 import { mentionData } from "../mentions.js";
+import type { FakeKnowledge, FakeKnowledgeOptions } from "./types.js";
 import { steppingClock } from "./util.js";
-
-export interface FakeKnowledgeOptions {
-  baseUrl?: string;
-  author?: string;
-  now?: () => Date;
-}
-
-export interface FakeKnowledge extends Knowledge {
-  seed: KnowledgeSeed;
-}
 
 export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowledge {
   const base = (opts.baseUrl ?? "https://docs.acme.example").replace(/\/+$/, "");
@@ -49,7 +39,7 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
 
   const addComment = (
     docId: string,
-    c: { body: string; anchorText?: string; parentId?: string },
+    c: Parameters<Knowledge["comment"]>[1] & { parentId?: string },
   ): DocComment => {
     const created: DocComment = {
       id: `c${++commentCounter}`,

@@ -1,11 +1,8 @@
-import type { Capability } from "../capabilities.js";
-import type { AdapterPort } from "../config/adapters.js";
-import type { ConfigWarning } from "../config/validate.js";
-import type { TeamConfig } from "../config/schema.js";
+import type { Capability } from "../types.js";
+import type { AdapterPort, ConfigWarning, TeamConfig } from "../config/types.js";
 import type { CommandRule, Profile } from "../permissions/types.js";
 import type { ZodType } from "zod";
-import type { Logger } from "./logger.js";
-import type { SecretSource, SecretSpec } from "./secrets.js";
+import type { Logger, SecretSource, SecretSpec } from "./types.js";
 
 export type PortName = AdapterPort;
 

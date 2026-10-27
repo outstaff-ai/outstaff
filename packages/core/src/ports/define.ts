@@ -1,24 +1,9 @@
 import { registerAdapterOptions } from "../config/adapters.js";
-import type { AdapterInfo, IdentityValidator } from "../config/validate.js";
+import type { AdapterInfo, IdentityValidator, TeamConfig } from "../config/types.js";
 import type { RulePack } from "../permissions/types.js";
-import type { TeamConfig } from "../config/schema.js";
 import type { AdapterDefinition, PortName } from "./adapter.js";
 import { PortError } from "./errors.js";
-import type { Avatars } from "./avatars.js";
-import type { Chat } from "./chat.js";
-import type { Knowledge } from "./knowledge.js";
-import type { Runtime } from "./runtime.js";
-import type { Tracker } from "./tracker.js";
-import type { Vcs } from "./vcs.js";
-
-export interface PortImpls {
-  tracker: Tracker;
-  knowledge: Knowledge;
-  vcs: Vcs;
-  chat: Chat;
-  runtime: Runtime;
-  avatars: Avatars;
-}
+import type { PortImpls } from "./types.js";
 
 /** Identity helper that types the definition and registers its option schema for config validation. */
 export function defineAdapter<P extends PortName, Options, Impl extends PortImpls[P]>(

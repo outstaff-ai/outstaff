@@ -1,5 +1,4 @@
 import type {
-  ActorKind,
   TeamConfig,
   DocEvent,
   TrackerEvent,
@@ -7,14 +6,7 @@ import type {
   WorkflowEvent,
   WorkflowEventType,
 } from "@outstaff/core";
-
-export interface Actor {
-  kind: ActorKind;
-  id: string;
-
-  /** Only meaningful for humans. */
-  trusted: boolean;
-}
+import type { Actor } from "./types.js";
 
 const VCS_TYPES: Partial<Record<VcsEvent["type"], WorkflowEventType>> = {
   "pr.opened": "pr.opened",

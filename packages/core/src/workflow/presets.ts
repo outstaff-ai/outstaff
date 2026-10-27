@@ -1,5 +1,5 @@
-import type { CanonicalStatus } from "../ports/status.js";
-import type { Condition, Rule } from "./rules.js";
+import type { CanonicalStatus } from "../ports/types.js";
+import type { Condition, Rule } from "./types.js";
 
 const UNFINISHED: CanonicalStatus[] = ["backlog", "ready", "active", "review", "blocked"];
 const OPEN: Rule["if"] = { ticket_status: ["backlog", "ready", "active", "blocked"] };

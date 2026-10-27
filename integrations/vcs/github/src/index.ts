@@ -6,8 +6,9 @@ import { deriveGithub, githubSetupGuide } from "./setup.js";
 import { githubOptions } from "./options.js";
 import { createGithubVcs } from "./vcs.js";
 
-export { createGithubVcs, type GithubDeps } from "./vcs.js";
-export { githubOptions, type GithubOptions } from "./options.js";
+export { createGithubVcs } from "./vcs.js";
+export { githubOptions } from "./options.js";
+export type { GithubDeps, GithubOptions } from "./types.js";
 export { githubCommandRules } from "./permissions.js";
 export { signAppJwt } from "./jwt.js";
 

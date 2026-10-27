@@ -4,12 +4,14 @@ import { createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import type { FakeTracker, FakeVcs } from "@outstaff/core/fakes";
 import { PortError, type PrRef, type WorkflowEvent } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { manualClock, type ManualClock } from "../../clock.js";
+import { manualClock } from "../../clock.js";
+import type { ManualClock } from "../../types.js";
 import { createIntake } from "../../intake/index.js";
 import { REPO, teamConfig } from "../../intake/test-support.js";
 import { openStore } from "../../store/open.js";
 import type { Store } from "../../store/types.js";
-import { createWorkState, formatCurrentWork } from "../workstate.js";
+import { formatCurrentWork } from "../derive.js";
+import { createWorkState } from "../workstate.js";
 import type { WorkState, WorkstateMeta } from "../types.js";
 
 const SAM = "acme-sam[bot]";

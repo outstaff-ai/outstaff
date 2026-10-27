@@ -1,3 +1,5 @@
+import type { EffectiveTool, Logger } from "@outstaff/core";
+
 /** How one declared tool fared at start. */
 export interface ToolStatus {
   name: string;
@@ -21,3 +23,18 @@ export type MiseRunner = (
   args: string[],
   opts: { cwd: string; env: NodeJS.ProcessEnv },
 ) => Promise<MiseResult>;
+
+export interface InstallToolsOptions {
+  tools: EffectiveTool[];
+  home: string;
+  env?: NodeJS.ProcessEnv;
+  mise?: MiseRunner;
+  log?: Logger;
+}
+
+export interface InstallToolsResult {
+  statuses: ToolStatus[];
+
+  /** Where mise puts its shims; put it on PATH for the runtime's child processes. */
+  shimsDir: string;
+}

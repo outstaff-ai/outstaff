@@ -1,4 +1,14 @@
 import type { WorkItem, WorkItemTrigger } from "../store/types.js";
+import type {
+  LoopGuardVerdict,
+  MoveTarget,
+  QueuePlacement,
+  RetryPolicy,
+  RunBlock,
+  StaleVerdict,
+  UsageThresholds,
+  UsageWindow,
+} from "./policy.types.js";
 
 // Pure scheduling policy. Nothing here touches the store or the clock.
 
@@ -41,14 +51,6 @@ export function compareQueue(a: Orderable, b: Orderable): number {
 
 export function orderQueue<T extends Orderable>(items: readonly T[]): T[] {
   return items.toSorted(compareQueue);
-}
-
-export type MoveTarget = { before: string } | { after: string } | { last: true };
-
-export interface QueuePlacement {
-  id: string;
-  priority: number;
-  position: number;
 }
 
 /**
@@ -101,11 +103,6 @@ export function planMove(
   return result.map((i, n) => ({ id: i.id, priority: i.priority, position: n + 1 }));
 }
 
-export interface LoopGuardVerdict {
-  tripped: boolean;
-  reason?: string;
-}
-
 /** Only agent- and automation-triggered runs are limited; humans never are. */
 export function isLoopGuarded(trigger: WorkItemTrigger): boolean {
   return trigger === "agent" || trigger === "automation";
@@ -124,26 +121,6 @@ export function loopGuardVerdict(
     tripped: true,
     reason: `Loop guard: ${runsInWindow} ${trigger}-triggered runs in the last hour (limit ${maxRunsPerHour}). Blocked until a human unblocks it.`,
   };
-}
-
-export interface UsageWindow {
-  /** For example "5h" or "7d". */
-  name: string;
-
-  /** Fraction of the limit used, 0..1. */
-  utilization: number;
-}
-
-export interface UsageThresholds {
-  defer_scheduled_at: number;
-  pause_automatic_at: number;
-}
-
-export type RunBlockCode = "paused_team" | "paused_person" | "usage_defer" | "usage_pause";
-
-export interface RunBlock {
-  code: RunBlockCode;
-  reason: string;
 }
 
 export function peakWindow<T extends UsageWindow>(windows: readonly T[]): T | undefined {
@@ -190,8 +167,6 @@ export function usageVerdict(
   return null;
 }
 
-export type StaleVerdict = "ok" | "retry" | "block";
-
 /**
  * An active item with no heartbeat for `staleMs` is retried once; if its last
  * run already ended stale (`trailingStaleRuns` > 0) it is blocked instead.
@@ -226,12 +201,6 @@ export function trailingStale(outcomes: readonly (string | null)[]): number {
   }
 
   return n;
-}
-
-export interface RetryPolicy {
-  base_minutes: number;
-  cap_minutes: number;
-  max_failures: number;
 }
 
 export const DEFAULT_RETRY: RetryPolicy = { base_minutes: 1, cap_minutes: 30, max_failures: 3 };

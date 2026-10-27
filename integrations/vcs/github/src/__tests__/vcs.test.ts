@@ -18,7 +18,7 @@ import {
   ownSecrets,
 } from "../testing/harness.js";
 import { testKey } from "../testing/keys.js";
-import type { Route } from "../testing/http-stub.js";
+import type { Route } from "../testing/types.js";
 
 const pull = (over: Record<string, unknown> = {}) => ({
   number: 1,

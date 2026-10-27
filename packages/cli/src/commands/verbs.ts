@@ -18,7 +18,8 @@ import {
   formatIssue,
 } from "@outstaff/core";
 import { githubVcs } from "@outstaff/integration.vcs.github";
-import { defineCommand, type CommandDef, type Context, type GlobalOptions } from "../define.js";
+import { defineCommand } from "../define.js";
+import type { CommandDef, Context, GlobalOptions } from "../types.js";
 import { loadTeam } from "../load.js";
 
 export const groupSummaries: Record<string, string> = {

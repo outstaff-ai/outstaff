@@ -6,7 +6,7 @@ import type {
   Tracker,
   WorkflowEvent,
 } from "@outstaff/core";
-import type { Clock } from "../clock.js";
+import type { Clock } from "../types.js";
 import type { IntakeMeta } from "../intake/index.js";
 import type { Scheduler } from "../scheduler/index.js";
 import type { Store, WorkItem } from "../store/index.js";

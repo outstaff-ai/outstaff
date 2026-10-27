@@ -15,3 +15,8 @@ export * from "./engine/index.js";
 export * from "./office.js";
 export * from "./work-source.js";
 export * from "./health.js";
+export * from "./item-refs.js";
+export * from "./item-summary.js";
+export type * from "./office.types.js";
+export type * from "./work-source.types.js";
+export type { Cancel, Clock, HealthServer, ManualClock } from "./types.js";

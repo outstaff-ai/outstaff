@@ -1,5 +1,5 @@
-import type { Link } from "@outstaff/protocol";
 import type { Store } from "../store/types.js";
+import type { PendingReport, ReportQueue } from "./types.js";
 
 /**
  * Reports to a requester that an agent had not posted when its item ended, kept per person until the agent
@@ -7,36 +7,11 @@ import type { Store } from "../store/types.js";
  */
 export const PENDING_REPORT_SUBJECT = "pending_report";
 
-export interface PendingReport {
-  itemId: string;
-
-  /** The claim key of the ending, so a retried hand-back does not queue it twice. */
-  key: string;
-  kind: "result" | "blocked";
-  summary: string;
-  links: Link[];
-  at: string;
-}
-
 interface Book {
   queue: PendingReport[];
 
   /** The ending reported last for each item, whether the agent posted it itself or collected it from here. */
   reported: Record<string, string>;
-}
-
-export interface ReportQueue {
-  /** Queues the report unless that ending was reported or is queued already. */
-  add(person: string, report: PendingReport): Promise<void>;
-
-  /** What waits for the person, oldest first. */
-  list(person: string): Promise<PendingReport[]>;
-
-  /** Whether that ending was reported already (posted by the agent, or handed to it). */
-  done(person: string, itemId: string, key: string): Promise<boolean>;
-
-  /** The agent posted (or was handed) the ending of the item: it is not queued any more and never queued again. */
-  settle(person: string, itemId: string, key: string): Promise<void>;
 }
 
 export function createReportQueue(store: Pick<Store, "getSubject" | "upsertSubject">): ReportQueue {

@@ -1,9 +1,6 @@
-import { messageSchema, type ErrorCode, type Message } from "./schemas.js";
+import { messageSchema } from "./schemas/message.js";
+import type { DecodeResult, Message } from "./types.js";
 import { MESSAGE_META } from "./meta.js";
-
-export type DecodeResult =
-  | { ok: true; message: Message }
-  | { ok: false; code: ErrorCode; message: string; id?: string };
 
 const MAX_ID = 200;
 

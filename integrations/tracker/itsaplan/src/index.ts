@@ -5,19 +5,15 @@ import { deriveItsaplan, itsaplanSetupGuide } from "./setup.js";
 import { trackerOptions } from "./options.js";
 import { createItsaplanTracker } from "./tracker.js";
 
-export { createItsaplanTracker, eventType } from "./tracker.js";
-export {
-  knowledgeOptions,
-  resolveConnection,
-  trackerOptions,
-  type KnowledgeOptions,
-  type TrackerOptions,
-} from "./options.js";
+export { createItsaplanTracker } from "./tracker.js";
+export { eventType } from "./events.js";
+export { knowledgeOptions, resolveConnection, trackerOptions } from "./options.js";
+export type { ClientDeps, KnowledgeOptions, TrackerOptions } from "./types.js";
 
 export { ItsaplanHttp } from "./http.js";
 
 // The knowledge adapter (@outstaff/integration.knowledge.itsaplan) shares the client, cursor, setup and doctor.
-export { createClient, type ClientDeps, type Itsaplan } from "./client.js";
+export { createClient, type Itsaplan } from "./client.js";
 export { OVERLAP_MS, parseCursor } from "./cursor.js";
 export { doctorItsaplan } from "./doctor.js";
 export { deriveItsaplan, itsaplanSetupGuide } from "./setup.js";

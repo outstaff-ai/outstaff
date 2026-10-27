@@ -8,8 +8,8 @@ import {
   prependChangelog,
   releaseNotes,
   setPackageVersion,
-  type Commit,
 } from "../release-lib.ts";
+import type { Commit } from "../release.types.ts";
 
 let counter = 0;
 function commit(message: string): Commit {

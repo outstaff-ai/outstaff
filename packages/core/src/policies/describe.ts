@@ -1,30 +1,8 @@
-import type { TeamConfig } from "../config/schema.js";
+import type { TeamConfig } from "../config/types.js";
 import { presetRules } from "../workflow/presets.js";
 import type { ResolvedWorkflow } from "../workflow/resolve.js";
-import {
-  POLICY_SWITCHES,
-  blockedNotify,
-  policyValue,
-  type PolicySwitch,
-  type PolicyValue,
-} from "./switches.js";
-
-/**
- * Where an effective value comes from: the built-in default, the team file, the workflow preset (which has no
- * such rule), or an explicit entry of `workflow.rules`, which wins over a switch.
- */
-export type PolicySource = "default" | "team.yaml" | "preset" | "workflow.rules";
-
-export interface PolicyReport {
-  switch: PolicySwitch;
-
-  /** What happens now. */
-  value: PolicyValue;
-  source: PolicySource;
-
-  /** Why the value differs from what `policies` says, if it does. */
-  note?: string;
-}
+import { POLICY_SWITCHES, blockedNotify, policyValue } from "./switches.js";
+import type { PolicyReport } from "./types.js";
 
 const has = (raw: unknown, path: string): boolean => {
   let node = raw;

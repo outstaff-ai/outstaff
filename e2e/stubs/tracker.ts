@@ -1,74 +1,46 @@
+import type {
+  ApiActivityItem,
+  ApiAssignee,
+  ApiAttachment,
+  ApiColumn,
+  ApiIssue,
+  ApiLabel,
+  ApiProject,
+  Page,
+} from "../../integrations/tracker/itsaplan/src/api.types.ts";
+import type { ApiDoc, ApiDocComment } from "../../integrations/knowledge/itsaplan/src/types.ts";
 import type { Req, Route } from "./http.ts";
 
 /** The parts of the Its a Plan REST API the tracker adapter uses: project setup, issues, comments, the activity feed and documents. */
 
-interface Column {
-  id: number;
-  projectId: number;
-  name: string;
-  stateType: string;
-  position: number;
-}
+type StoredColumn = Required<ApiColumn>;
 
-interface Issue {
-  id: number;
-  sequenceNumber: number;
-  identifier: string;
-  title: string;
-  description: string;
-  columnId: number;
-  assigneeUserId: string | null;
-  labelIds: number[];
-  parentId?: number | null;
-  createdAt: string;
-  updatedAt: string;
-}
+type StoredLabel = Required<ApiLabel>;
 
-interface Activity {
-  id: number;
-  issueId: number;
-  issueSequence: number;
-  issueTitle: string;
-  kind: "comment" | "history";
-  replyToId: number | null;
-  actorUserId: string;
-  actorName: string;
-  body: string | null;
-  action: string | null;
-  payload: Record<string, unknown>;
-  createdAt: string;
-}
+type StoredIssue = ApiIssue &
+  Required<Pick<ApiIssue, "assigneeUserId" | "labelIds" | "createdAt">> & { description: string };
 
-interface Doc {
-  id: number;
-  parentId: number | null;
-  title: string;
-  content: string;
-  contentJson: unknown;
-  metadata: Record<string, unknown>;
-  version: number;
-  createdAt: string;
-  updatedAt: string;
-}
+type StoredActivity = ApiActivityItem &
+  Required<
+    Pick<
+      ApiActivityItem,
+      "replyToId" | "actorUserId" | "actorName" | "body" | "action" | "issueTitle" | "payload"
+    >
+  >;
 
-interface DocComment {
-  id: string;
-  documentId: number;
-  parentId: string | null;
-  authorId: string;
-  authorName: string;
-  body: string;
-  quote: string;
-  resolvedAt: string | null;
-  createdAt: string;
-}
+type StoredDoc = ApiDoc &
+  Required<Pick<ApiDoc, "parentId" | "createdAt" | "content" | "contentJson">> & {
+    metadata: NonNullable<ApiDoc["metadata"]>;
+  };
 
-export interface Member {
-  userId: string;
-  name: string;
-  username: string;
-  kind: "member" | "agent";
-}
+/** The stub always knows the author, a member. */
+type StoredDocComment = ApiDocComment &
+  Required<
+    Pick<ApiDocComment, "documentId" | "parentId" | "authorName" | "quote" | "resolvedAt">
+  > & { authorId: string };
+
+/** A project member; the stub always knows the username. */
+export type StoredMember = Required<ApiAssignee> & { username: string };
 
 export interface TrackerOptions {
   projectKey: string;
@@ -76,7 +48,7 @@ export interface TrackerOptions {
 
   /** Status names; they match `workflow.statuses` of the team file. */
   columns: { name: string; stateType: string }[];
-  members: Member[];
+  members: StoredMember[];
 
   /** API key to the userId it acts as. An unknown key is refused. */
   keys: Record<string, string>;
@@ -94,7 +66,7 @@ const page = <T extends { id: number; createdAt: string }>(
   all: T[],
   query: URLSearchParams,
   newestFirst: boolean,
-) => {
+): Page<T> => {
   const limit = Math.min(Number(query.get("limit") ?? 25), 100);
   const cursor = query.get("cursor") ? (JSON.parse(query.get("cursor")!) as { id: number }) : null;
 
@@ -117,23 +89,23 @@ export function createTracker(opts: TrackerOptions) {
   let tick = 0;
   // Strictly increasing, so the feed's order is the order things happened in.
   const clock = () => new Date(Date.now() + ++tick).toISOString();
-  const columns: Column[] = opts.columns.map((c, i) => ({
+  const columns: StoredColumn[] = opts.columns.map((c, i) => ({
     id: 10 + i,
     projectId: 1,
     position: i,
     ...c,
   }));
 
-  const labels: { id: number; projectId: number; name: string }[] = [];
-  const issues: Issue[] = [];
+  const labels: StoredLabel[] = [];
+  const issues: StoredIssue[] = [];
 
   /** Relations the agents made between tickets (`POST /issues/:id/links`). */
   const related: { from: string; to: string; kind: string }[] = [];
-  const activity: Activity[] = [];
+  const activity: StoredActivity[] = [];
 
   /** Documents of the knowledge base and the comment threads on them (they are not in the activity feed). */
-  const docs: Doc[] = [];
-  const docComments: DocComment[] = [];
+  const docs: StoredDoc[] = [];
+  const docComments: StoredDocComment[] = [];
 
   /** Files attached to tickets, and the public ids a download was served for. */
   const attachments: { issueId: number; name: string; mimetype: string; data: Buffer }[] = [];
@@ -149,14 +121,14 @@ export function createTracker(opts: TrackerOptions) {
   const isProject = (p: string) => p === key || p === ref;
   const issueBySeq = (seq: string) => issues.find((i) => i.sequenceNumber === Number(seq));
   const issueById = (id: string) => issues.find((i) => i.id === Number(id));
-  const touch = (i: Issue) => void (i.updatedAt = clock());
+  const touch = (i: StoredIssue) => void (i.updatedAt = clock());
 
   const log = (
-    issue: Issue,
+    issue: StoredIssue,
     actorId: string,
-    entry: Pick<Activity, "kind" | "action" | "body" | "payload">,
-  ): Activity => {
-    const row: Activity = {
+    entry: Pick<StoredActivity, "kind" | "action" | "body" | "payload">,
+  ): StoredActivity => {
+    const row: StoredActivity = {
       id: ++activityId,
       issueId: issue.id,
       issueSequence: issue.sequenceNumber,
@@ -181,9 +153,9 @@ export function createTracker(opts: TrackerOptions) {
       assigneeUserId?: string;
       parentId?: number;
     },
-  ): Issue => {
+  ): StoredIssue => {
     const seq = issues.length + 1;
-    const issue: Issue = {
+    const issue: StoredIssue = {
       id: 1000 + seq,
       sequenceNumber: seq,
       identifier: `${key}-${seq}`,
@@ -202,7 +174,7 @@ export function createTracker(opts: TrackerOptions) {
     return issue;
   };
 
-  const move = (issue: Issue, actorId: string, columnId: number) => {
+  const move = (issue: StoredIssue, actorId: string, columnId: number) => {
     if (columnId === issue.columnId) {
       return;
     }
@@ -217,7 +189,7 @@ export function createTracker(opts: TrackerOptions) {
     });
   };
 
-  const assign = (issue: Issue, actorId: string, userId: string | null) => {
+  const assign = (issue: StoredIssue, actorId: string, userId: string | null) => {
     issue.assigneeUserId = userId;
     log(issue, actorId, { kind: "history", action: "assignee", body: null, payload: {} });
   };
@@ -225,7 +197,7 @@ export function createTracker(opts: TrackerOptions) {
   const actorOf = (r: Req): string | undefined => opts.keys[String(r.headers["x-api-key"] ?? "")];
   const denied = err(401, "Unknown API key.", "unauthorized");
 
-  const summary = ({ description: _d, ...rest }: Issue) => rest;
+  const summary = ({ description: _d, ...rest }: StoredIssue) => rest;
 
   /** Every route needs a known key; the handler gets the member it acts as. */
   const as =
@@ -236,7 +208,7 @@ export function createTracker(opts: TrackerOptions) {
     };
 
   const docById = (id: string) => docs.find((d) => d.id === Number(id));
-  const docFull = (d: Doc) => ({ ...d, ownerUserId: null, archivedAt: null });
+  const docFull = (d: StoredDoc) => ({ ...d, ownerUserId: null, archivedAt: null });
   const commentOn = (
     docId: number,
     who: string,
@@ -244,7 +216,7 @@ export function createTracker(opts: TrackerOptions) {
     quote: string,
     parentId?: string,
   ) => {
-    const row: DocComment = {
+    const row: StoredDocComment = {
       id: `c-${docComments.length + 1}`,
       documentId: docId,
       parentId: parentId ?? null,
@@ -272,7 +244,7 @@ export function createTracker(opts: TrackerOptions) {
       path: `${base}/projects/:p/documents`,
       handler: as((r) => {
         const now = clock();
-        const doc: Doc = {
+        const doc: StoredDoc = {
           id: docs.length + 1,
           parentId: r.json.parentId ?? null,
           title: r.json.title,
@@ -381,7 +353,7 @@ export function createTracker(opts: TrackerOptions) {
       path: `${base}/projects/:p`,
       handler: as((r) =>
         isProject(r.params["p"]!)
-          ? {
+          ? ({
               project: {
                 id: 1,
                 teamId: 1,
@@ -394,7 +366,7 @@ export function createTracker(opts: TrackerOptions) {
               columns,
               labels,
               assignees: opts.members,
-            }
+            } satisfies ApiProject)
           : err(404, "project not found"),
       ),
     },
@@ -462,7 +434,7 @@ export function createTracker(opts: TrackerOptions) {
           return err(404, "issue not found");
         }
 
-        const b = r.json as Partial<Issue>;
+        const b = r.json as Partial<StoredIssue>;
         if (b.columnId !== undefined) {
           move(issue, who, b.columnId);
         }
@@ -529,7 +501,10 @@ export function createTracker(opts: TrackerOptions) {
         touch(issue);
         return {
           status: 201,
-          body: { publicId: `pub-${attachments.length}`, filename: file.name },
+          body: {
+            publicId: `pub-${attachments.length}`,
+            filename: file.name,
+          } satisfies ApiAttachment,
         };
       }),
     },
@@ -545,7 +520,7 @@ export function createTracker(opts: TrackerOptions) {
         return attachments
           .map((a, i) => ({ a, publicId: `pub-${i + 1}` }))
           .filter(({ a }) => a.issueId === issue.id)
-          .map(({ a, publicId }) => ({
+          .map(({ a, publicId }): ApiAttachment => ({
             publicId,
             filename: a.name,
             mimeType: a.mimetype,

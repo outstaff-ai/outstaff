@@ -1,50 +1,10 @@
-import {
-  silentLogger,
-  type AgentProfile,
-  type Chat,
-  type Logger,
-  type TeamConfig,
-  type Tracker,
-} from "@outstaff/core";
+import { silentLogger, type AgentProfile } from "@outstaff/core";
 import { formatWorkGroups, groupWork, type WorkGroup } from "@outstaff/protocol";
-import type { OfficeClient } from "../verbs/office.js";
-
-/** What the profile publisher uses of the office connection. */
-export type ProfileOffice = Pick<OfficeClient, "work">;
+import type { ProfilePublisherOptions, ProfilePublisher } from "./types.js";
 
 /** How to talk to the agent, as #264 behaves: questions are answered right away, work is filed or joined. */
 export const PROFILE_HINT =
   "**Talk to me here.** Ask a question and I answer right away. Ask for work and I turn it into a ticket, or add it to work I already have.";
-
-export interface ProfilePublisherOptions {
-  chat: Required<Pick<Chat, "setAgentProfile">> & Pick<Chat, "onProfileRequest">;
-  office: ProfileOffice;
-  team: TeamConfig;
-
-  /** Who the agent is, for the top of the profile. */
-  who: { name: string; role: string; description?: string; model?: string };
-  tracker?: Pick<Tracker, "links">;
-  log?: Logger;
-  now?: () => number;
-
-  /** Quiet time after a change before the profile is published, so a burst of changes publishes once. Default 2000. */
-  debounceMs?: number;
-
-  /** Longest time between two publications while working. Default 300000 (5 minutes). */
-  refreshEveryMs?: number;
-}
-
-export interface ProfilePublisher {
-  /** Publishes the profile for each trusted human now, and keeps it up to date until `stop`. */
-  start(): Promise<void>;
-
-  /** The work or the status changed: publishes once the changes have settled. */
-  changed(): void;
-  stop(): void;
-
-  /** The profile as it is now. */
-  build(): Promise<AgentProfile>;
-}
 
 const reason = (e: unknown) => (e instanceof Error ? e.message : String(e));
 

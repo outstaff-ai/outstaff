@@ -5,19 +5,13 @@ import {
   CatalogError,
   loadCatalog,
   type Capability,
-  type Catalog,
   type CatalogIssue,
   type LocatedIssue,
   type Profile,
   type RoleNeeds,
   type TeamConfig,
 } from "@outstaff/core";
-import type { Context } from "./define.js";
-
-export type TeamCatalogs = { stock: Catalog; ejected?: Catalog };
-export type CatalogsResult =
-  | { ok: true; catalogs: TeamCatalogs }
-  | { ok: false; issues: CatalogIssue[] };
+import type { CatalogsResult, Context, TeamCatalogs } from "./types.js";
 
 /** Root of the installed `@outstaff/catalog` package. */
 export const stockCatalogDir = (ctx: Context): string =>

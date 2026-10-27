@@ -1,12 +1,4 @@
-/** Why a question could not be routed; `message` is shown to the asker as is. */
-export type Route =
-  | { ok: true; handle: string }
-  | { ok: false; code: "invalid" | "not_found"; message: string };
-
-export interface RoutablePerson {
-  handle: string;
-  role: string;
-}
+import type { Route, RoutablePerson } from "./types.js";
 
 /**
  * Picks who answers. A handle matches exactly and wins over a role of the same name. A role goes to the least busy

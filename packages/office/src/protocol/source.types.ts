@@ -2,7 +2,6 @@ import type {
   QueuedReport,
   AnswerState,
   Attached,
-  ErrorCode,
   Filed,
   Human,
   Link,
@@ -12,17 +11,6 @@ import type {
 } from "@outstaff/protocol";
 
 export type Offer = PayloadOf<"offer">;
-
-/** Thrown by a source to answer a request with a specific error code. */
-export class ProtocolError extends Error {
-  readonly code: ErrorCode;
-
-  constructor(code: ErrorCode, message: string) {
-    super(message);
-    this.name = "ProtocolError";
-    this.code = code;
-  }
-}
 
 /**
  * What the protocol server needs from the scheduler and store. The server keeps no state that must survive a

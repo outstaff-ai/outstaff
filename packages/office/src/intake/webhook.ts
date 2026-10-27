@@ -1,18 +1,8 @@
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import { PortError, type Logger } from "@outstaff/core";
+import type { WebhookParser, WebhookServer } from "./types.js";
 
 export const MAX_WEBHOOK_BYTES = 1_000_000;
-
-/** Verifies and parses one delivery. Throws `PortError` (`forbidden`, `invalid`, `unsupported`). */
-export type WebhookParser = (
-  headers: Record<string, string | undefined>,
-  body: string,
-) => Promise<void>;
-
-export interface WebhookServer {
-  listen(): Promise<{ host: string; port: number }>;
-  close(): Promise<void>;
-}
 
 const STATUS: Record<string, number> = {
   forbidden: 401,

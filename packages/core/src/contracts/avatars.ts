@@ -1,6 +1,7 @@
 import { expect, it } from "vitest";
 import type { Avatars } from "../ports/index.js";
-import { contractSuite, requireCapability, type ContractSetupFn } from "./harness.js";
+import { contractSuite, requireCapability } from "./harness.js";
+import type { ContractSetupFn } from "./types.js";
 
 export function avatarsContract(
   name: string,

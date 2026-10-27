@@ -1,7 +1,8 @@
 import { PortError, maskSecrets } from "@outstaff/core";
 import { z } from "zod";
 import { readInputFile } from "./files.js";
-import { defineVerb, result, type AgentEnv, type NetworkAccess } from "./types.js";
+import { defineVerb, result } from "./define.js";
+import type { AgentEnv, NetworkAccess } from "./types.js";
 
 const TIMEOUT_MS = 30_000;
 const MAX_BODY = 200_000;

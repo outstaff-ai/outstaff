@@ -8,5 +8,3 @@ export const githubOptions = z.strictObject({
   webUrl: z.url().default("https://github.com").describe("Web root used for links."),
   graphqlUrl: z.url().optional().describe("GraphQL endpoint; derived from apiUrl when omitted."),
 });
-
-export type GithubOptions = z.output<typeof githubOptions>;

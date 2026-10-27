@@ -1,31 +1,6 @@
-import type { RuntimeSeed } from "../contracts/seeds.js";
-import { evaluate, type ToolCall } from "../permissions/index.js";
-import type { RunRequest, Runtime, RuntimeEvent, UsageEvent } from "../ports/index.js";
-
-export type FakeRunStep =
-  | { type: "text"; text: string }
-
-  /** The call is judged against the request's policy with `evaluate()`; the decision lands in the emitted event. */
-  | { type: "tool_call"; tool: string; call: ToolCall }
-  | UsageEvent
-  | {
-      type: "finish";
-      ok?: boolean;
-      text?: string;
-      error?: string;
-      costUsd?: number;
-      sessionLost?: boolean;
-    };
-
-export interface FakeRuntime extends Runtime {
-  seed: RuntimeSeed;
-
-  /** Queue steps for the next run. Runs with nothing queued say "ok". */
-  enqueue(steps: FakeRunStep[]): void;
-  requests: RunRequest[];
-  usage: UsageEvent;
-  probeUsage(): Promise<UsageEvent>;
-}
+import { evaluate } from "../permissions/index.js";
+import type { RunRequest, RuntimeEvent, UsageEvent } from "../ports/index.js";
+import type { FakeRunStep, FakeRuntime } from "./types.js";
 
 export function createFakeRuntime(): FakeRuntime {
   const queue: FakeRunStep[][] = [];

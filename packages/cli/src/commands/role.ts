@@ -1,7 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { defineCommand } from "../define.js";
-import { openTeam, writeFileDeep } from "../ejected.js";
+import { writeFileDeep } from "../ejected.js";
+import { openTeam } from "../open-team.js";
 
 const TOOLSETS = ["base", "code", "infra"] as const;
 const PROFILES = ["readonly", "docs", "code", "infra"] as const;

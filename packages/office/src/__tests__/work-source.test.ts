@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TeamConfig } from "@outstaff/core";
-import { manualClock, type ManualClock } from "../clock.js";
+import { manualClock } from "../clock.js";
+import type { ManualClock } from "../types.js";
 import { createScheduler } from "../scheduler/index.js";
-import type { BlockNotice } from "../scheduler/scheduler.js";
+import type { BlockNotice } from "../scheduler/types.js";
 import { openStore } from "../store/open.js";
 import type { Store } from "../store/types.js";
 import { schedulerWorkSource } from "../work-source.js";

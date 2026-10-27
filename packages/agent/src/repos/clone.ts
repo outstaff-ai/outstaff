@@ -1,55 +1,12 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import {
-  parseRepoUrl,
-  repoGrant,
-  silentLogger,
-  type GitMode,
-  type Profile,
-  type Logger,
-  type RepoRef,
-  type TeamConfig,
-  type Vcs,
-} from "@outstaff/core";
+import { parseRepoUrl, repoGrant, silentLogger, type GitMode, type RepoRef } from "@outstaff/core";
 import { cappedAccess } from "./access.js";
-import { runGit, type RunGit } from "./git.js";
+import { runGit } from "./git.js";
+import type { ClonedRepo, SyncRepositoriesOptions } from "./types.js";
 
 /** Default credential helper of every clone. The `!` makes git run it as a shell command. */
 export const CREDENTIAL_HELPER = "!ost git-credential";
-
-export interface ClonedRepo {
-  /** The repo's short name in team.yaml. */
-  name: string;
-  dir: string;
-  ref: Required<RepoRef>;
-  defaultBranch: string;
-  access: GitMode;
-  kind: string;
-
-  /** Extra files from team.yaml `repos[].instructions` that the agent reads first. */
-  instructions: string[];
-
-  /** Ticket labels from team.yaml `repos[].tracker.labels` that mean work belongs in this repo. */
-  trackerLabels: string[];
-}
-
-export interface SyncRepositoriesOptions {
-  team: TeamConfig;
-  person: string;
-  vcs: Vcs;
-
-  /** The person's role profile; it caps the access a write grant gives. */
-  profile: Profile;
-  reposDir: string;
-  git?: RunGit;
-  log?: Logger;
-
-  /** Where to clone from; default `https://<host>/<owner>/<name>.git`. */
-  remoteUrl?: (repo: Required<RepoRef>) => string;
-
-  /** The git credential helper command; default {@link CREDENTIAL_HELPER}. */
-  helper?: string;
-}
 
 const shellQuote = (s: string) => `'${s.replaceAll("'", `'\\''`)}'`;
 

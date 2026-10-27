@@ -1,4 +1,5 @@
 import { compileTicketLink, TICKET_KEY as KEY } from "@outstaff/core";
+import type { TicketCandidate } from "./types.js";
 
 // The closing keywords GitHub uses; a bare mention or a softer verb (`Refs`) links nothing.
 const CLOSING = new RegExp(
@@ -7,11 +8,6 @@ const CLOSING = new RegExp(
 );
 
 const ANY_KEY = new RegExp(`\\b(${KEY})\\b`, "g");
-
-/** What linked a pull request to a ticket. */
-export type TicketSource = "branch" | "title" | "closing keyword" | "ticket_link";
-
-export type TicketCandidate = { key: string; source: TicketSource };
 
 function all(re: RegExp, text: string): string[] {
   return [...text.matchAll(re)].map((m) => m[1]!.toUpperCase());

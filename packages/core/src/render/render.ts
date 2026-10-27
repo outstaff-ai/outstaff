@@ -1,46 +1,16 @@
-import type { Capability } from "../capabilities.js";
+import type { Capability } from "../types.js";
 import { CAPABILITY_PORT } from "../capabilities.js";
-import { CATALOG_CODES, CatalogError, type CatalogIssue } from "../catalog/codes.js";
+import { CATALOG_CODES, CatalogError } from "../catalog/codes.js";
 import { buildContext } from "../catalog/context.js";
-import type { Catalog, CatalogDoc, CatalogRole } from "../catalog/load.js";
 import { render } from "../catalog/template.js";
-import type { TeamConfig } from "../config/schema.js";
+import type { Catalog, CatalogDoc, CatalogIssue, CatalogRole } from "../catalog/types.js";
 import { withSkillFrontMatter } from "./frontmatter.js";
-
-export type RenderWarning = { code: string; message: string };
-
-export type RenderedWorkdir = {
-  /** Relative path (forward slashes) to text; keys are sorted. */
-  files: Map<string, string>;
-  role: string;
-
-  /** Extra roles whose skills were rendered, in render order. */
-  extends: string[];
-
-  /** The role's permission profile; the runtime adapter compiles it. */
-  profile: CatalogRole["permissions"];
-  warnings: RenderWarning[];
-};
-
-export type RenderPersonOptions = {
-  team: TeamConfig;
-  handle: string;
-  catalog: Catalog;
-
-  /** Client's `.outstaff/catalog/`; same-named roles and documents replace stock ones. */
-  ejected?: Catalog;
-
-  /**
-   * Absolute directory the files are written to. When set, every `process/`, `references/` and `templates/`
-   * document path in the text becomes absolute below it, since agents run in other directories.
-   */
-  workdir?: string;
-
-  /** URL templates for the `links` placeholders. */
-  links?: Record<string, string>;
-};
-
-export type RenderTeamOptions = Omit<RenderPersonOptions, "handle">;
+import type {
+  RenderedWorkdir,
+  RenderPersonOptions,
+  RenderTeamOptions,
+  RenderWarning,
+} from "./types.js";
 
 /** Rendered output by path: rendered text, or the issues that rendering it raised. */
 type RoleCache = Map<string, string | CatalogIssue[]>;

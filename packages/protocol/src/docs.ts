@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { MESSAGE_META } from "./meta.js";
-import { ERROR_CODES, PROTOCOL_VERSION, messageSchema, type MessageType } from "./schemas.js";
+import { ERROR_CODES, PROTOCOL_VERSION } from "./constants.js";
+import { messageSchema } from "./schemas/message.js";
+import type { MessageType } from "./types.js";
 
 interface JsonSchema {
   type?: string | string[];

@@ -9,7 +9,8 @@ import { z } from "zod";
 import { createOfficeConnection } from "../../office-client/index.js";
 import { FakeSocket } from "../../office-client/testing.js";
 import { withGlobalConfig } from "../../tools/testing.js";
-import { StartupError, prepareAgent } from "../startup.js";
+import { StartupError } from "../startup-error.js";
+import { prepareAgent } from "../startup.js";
 
 const stockCatalogDir = fileURLToPath(new URL("../../../../catalog", import.meta.url));
 

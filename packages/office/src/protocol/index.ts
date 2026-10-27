@@ -1,19 +1,14 @@
-export { agentAuthFromSecrets, agentTokenKey, createAgentAuth, type AgentAuth } from "./auth.js";
-export {
-  CLOSE_AUTH,
-  CLOSE_REPLACED,
-  CLOSE_VERSION,
-  createProtocolServer,
-  type ProtocolServer,
-  type ProtocolServerOptions,
-} from "./server.js";
+export { agentAuthFromSecrets, agentTokenKey, createAgentAuth } from "./auth.js";
+export { CLOSE_AUTH, CLOSE_REPLACED, CLOSE_VERSION } from "./constants.js";
+export { ProtocolError } from "./errors.js";
+export { createProtocolServer } from "./server.js";
+export type {
+  ChatDesk,
+  DocLinks,
+  Messaging,
+  Offer,
+  TicketPrs,
+  WorkSource,
+} from "./source.types.js";
 
-export {
-  ProtocolError,
-  type ChatDesk,
-  type DocLinks,
-  type Messaging,
-  type Offer,
-  type TicketPrs,
-  type WorkSource,
-} from "./source.js";
+export type { AgentAuth, ProtocolServer, ProtocolServerOptions } from "./types.js";

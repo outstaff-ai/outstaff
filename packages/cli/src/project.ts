@@ -1,6 +1,6 @@
 import { basename, dirname, join, relative, resolve } from "node:path";
 import type { ConfigSource } from "@outstaff/core";
-import type { Context, GlobalOptions } from "./define.js";
+import type { Context, GlobalOptions, SecretsLocation } from "./types.js";
 
 /** The project the team file belongs to: the parent of `.outstaff/`, else the directory holding the team file. A team fetched from git is not written to, so the current directory stands in. */
 export function projectRoot(ctx: Context, source: ConfigSource): string {
@@ -10,14 +10,6 @@ export function projectRoot(ctx: Context, source: ConfigSource): string {
 
   return basename(source.dir) === ".outstaff" ? dirname(source.dir) : source.dir;
 }
-
-export type SecretsLocation = {
-  /** Where the files of this scope are read and written. */
-  dir: string;
-
-  /** What belongs in `.gitignore`: the secrets directory as a whole. */
-  ignoreDir: string;
-};
 
 /**
  * `--secrets-dir`, then OUTSTAFF_SECRETS_DIR, name one directory holding the files of a scope, as in a container.

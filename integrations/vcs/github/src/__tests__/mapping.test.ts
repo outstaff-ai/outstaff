@@ -10,9 +10,8 @@ import {
   stripBot,
   toPullRequest,
   toVcsEvent,
-  type RestEvent,
-  type RestPull,
 } from "../mapping.js";
+import type { RestEvent, RestPull } from "../api.types.js";
 
 const REPO = { owner: "acme", name: "app" };
 

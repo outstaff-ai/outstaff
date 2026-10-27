@@ -1,12 +1,5 @@
 import { PortError } from "@outstaff/core";
-
-export interface BackoffOptions {
-  /** First retry delay after an `unavailable` failure. Default 1000. */
-  baseMs: number;
-
-  /** Cap for exponential growth and for an adapter-provided `retryAfterMs`. Default 300000. */
-  maxMs: number;
-}
+import type { BackoffOptions } from "./types.js";
 
 export const DEFAULT_BACKOFF: BackoffOptions = { baseMs: 1000, maxMs: 300_000 };
 

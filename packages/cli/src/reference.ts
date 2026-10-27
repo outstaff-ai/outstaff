@@ -1,5 +1,6 @@
 import { commands } from "./commands/index.js";
-import { GLOBAL_OPTIONS, type CommandDef, type OptionDef } from "./define.js";
+import { GLOBAL_OPTIONS } from "./define.js";
+import type { CommandDef, OptionDef } from "./types.js";
 
 const path = (c: CommandDef) => (c.group ? `${c.group} ${c.name}` : c.name);
 

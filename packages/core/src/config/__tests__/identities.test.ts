@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { vcsAgentLogins } from "../identities.js";
-import type { TeamConfig } from "../schema.js";
+import type { TeamConfig } from "../types.js";
 
 const team = (people: unknown[], vcs: unknown = { adapter: "github" }) =>
   ({ people, integrations: { vcs } }) as unknown as TeamConfig;

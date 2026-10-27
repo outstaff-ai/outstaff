@@ -1,42 +1,16 @@
-import {
-  silentLogger,
-  type Chat,
-  type Logger,
-  type TeamConfig,
-  type Tracker,
-} from "@outstaff/core";
+import { silentLogger } from "@outstaff/core";
 import type { AnswerState } from "@outstaff/protocol";
-import { ProtocolError, type Messaging } from "../protocol/source.js";
-import type { Scheduler } from "../scheduler/scheduler.js";
-import type { Store, WorkItem } from "../store/types.js";
+import { ProtocolError } from "../protocol/errors.js";
+import type { Messaging } from "../protocol/source.types.js";
+import type { WorkItem } from "../store/types.js";
 import { mirror } from "./mirror.js";
-import { loadByPerson, readRoster, type RosterOptions } from "./roster.js";
+import { loadByPerson, readRoster } from "./roster.js";
 import { routeQuestion } from "./routing.js";
+import type { MessagingOptions } from "./types.js";
 
 export const QUESTION_KIND = "question";
 export const CONVERSATION_SUBJECT = "conversation";
 export const DEFAULT_MAX_DEPTH = 3;
-
-export interface MessagingOptions {
-  store: Store;
-  scheduler: Pick<Scheduler, "enqueue">;
-  team: Pick<TeamConfig, "people" | "humans" | "office">;
-  logger?: Logger;
-  chat?: Chat;
-  tracker?: Tracker;
-
-  /** Channel for mirroring; defaults to `office.channel` of team.yaml. */
-  channel?: string;
-  roles?: RosterOptions["roles"];
-  humans?: RosterOptions["humans"];
-  usage?: RosterOptions["usage"];
-
-  /** Questions asked while answering questions, at most this deep. Default 3. */
-  maxDepth?: number;
-
-  /** Called after work was queued for a person, so the protocol server can offer it at once. */
-  notify?: (person: string) => void;
-}
 
 const firstLine = (text: string, max = 80) => {
   const line = text.split("\n", 1)[0]!.trim();

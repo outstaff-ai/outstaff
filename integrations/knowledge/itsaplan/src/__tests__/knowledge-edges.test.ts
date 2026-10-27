@@ -2,11 +2,8 @@ import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { knowledgeOptions } from "@outstaff/integration.tracker.itsaplan";
 import { describe, expect, it } from "vitest";
 import { secretMap, team } from "../../../../tracker/itsaplan/src/testing/harness.js";
-import {
-  API_KEY,
-  createStubFetch,
-  type Route,
-} from "../../../../tracker/itsaplan/src/testing/http-stub.js";
+import { API_KEY, createStubFetch } from "../../../../tracker/itsaplan/src/testing/http-stub.js";
+import type { Route } from "../../../../tracker/itsaplan/src/testing/types.js";
 import { itsaplanKnowledge } from "../index.js";
 import { createItsaplanKnowledge } from "../knowledge.js";
 import { mdToDoc } from "../markdown.js";

@@ -233,3 +233,14 @@ export interface Store {
 
   close(): Promise<void>;
 }
+
+export interface OpenStoreOptions {
+  /** Run pending migrations on open. Default true. */
+  migrate?: boolean;
+
+  /** Postgres only: keep tables in this schema (created if missing). */
+  schema?: string;
+
+  /** Clock override, for tests. */
+  now?: () => Date;
+}

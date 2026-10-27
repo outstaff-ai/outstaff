@@ -1,15 +1,7 @@
-import {
-  parseRepoUrl,
-  repoGrant,
-  type Profile,
-  type RepoRef,
-  type TeamConfig,
-  type Vcs,
-} from "@outstaff/core";
+import { parseRepoUrl, repoGrant, type RepoRef, type TeamConfig } from "@outstaff/core";
 
 import { cappedAccess } from "./access.js";
-
-export type CredentialOperation = "get" | "store" | "erase";
+import type { CredentialOperation, CredentialHelperOptions, CredentialHelper } from "./types.js";
 
 export const isCredentialOperation = (s: string): s is CredentialOperation =>
   s === "get" || s === "store" || s === "erase";
@@ -54,22 +46,6 @@ export function repoForRequest(
     const ref = parseRepoUrl(r.url);
     return ref.host === host.toLowerCase() && `${ref.owner}/${ref.name}`.toLowerCase() === want;
   });
-}
-
-export interface CredentialHelperOptions {
-  team: Pick<TeamConfig, "repos" | "people">;
-
-  /** Handle of the person the container runs as. */
-  person: string;
-  vcs: Vcs;
-
-  /** The person's role profile; it caps the access a write grant gives. */
-  profile: Profile;
-}
-
-export interface CredentialHelper {
-  /** Output for git on stdout. Empty when the request is not for a repo the person has a grant on. */
-  run(operation: CredentialOperation, input: string): Promise<string>;
 }
 
 /**

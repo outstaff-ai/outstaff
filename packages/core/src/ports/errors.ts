@@ -1,3 +1,5 @@
+import type { PortErrorCode } from "./types.js";
+
 export const PORT_ERROR_CODES = [
   "not_found",
   "forbidden",
@@ -7,8 +9,6 @@ export const PORT_ERROR_CODES = [
   "invalid",
   "unsupported",
 ] as const;
-
-export type PortErrorCode = (typeof PORT_ERROR_CODES)[number];
 
 /** Adapters map platform errors to this; callers never see platform types. */
 export class PortError extends Error {

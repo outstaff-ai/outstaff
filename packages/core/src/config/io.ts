@@ -5,19 +5,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 
+import type { ConfigFs, GitClient } from "./types.js";
+
 const run = promisify(execFile);
-
-export interface ConfigFs {
-  readFile(path: string): Promise<string>;
-
-  /** Returns null when the path does not exist. */
-  kind(path: string): Promise<"file" | "dir" | null>;
-}
-
-export interface GitClient {
-  /** Make `dir` a checkout of `url` at `ref` (the default branch when omitted), shallow. */
-  sync(args: { url: string; ref?: string; dir: string }): Promise<void>;
-}
 
 export const nodeFs: ConfigFs = {
   readFile: (path) => readFile(path, "utf8"),

@@ -1,32 +1,5 @@
 import { expect } from "vitest";
-
-export interface StubRequest {
-  method: string;
-  path: string;
-  query: URLSearchParams;
-  headers: Headers;
-  params: Record<string, string>;
-  json: any; // oxlint-disable-line no-explicit-any
-}
-
-export interface StubReply {
-  status?: number;
-  headers?: Record<string, string>;
-  body?: unknown;
-
-  /** A non-JSON body, served as plain text. */
-  text?: string;
-}
-
-export type Handler = (req: StubRequest) => StubReply | unknown;
-
-export interface Route {
-  method: string;
-
-  /** `:name` segments capture a decoded path segment; `*` matches the rest. */
-  path: string;
-  handler: Handler;
-}
+import type { Route, StubReply, StubRequest } from "./types.js";
 
 const compile = (pattern: string): ((path: string) => Record<string, string> | undefined) => {
   const parts = pattern.split("/");

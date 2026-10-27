@@ -1,11 +1,6 @@
 import type { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
-
-export type ConfigIssue = {
-  path: (string | number)[];
-  code: string;
-  message: string;
-};
+import type { ConfigIssue } from "./types.js";
 
 const BY_ZOD_CODE: Record<string, string> = {
   invalid_type: CONFIG_CODES.invalidType,

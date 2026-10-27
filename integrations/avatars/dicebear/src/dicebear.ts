@@ -1,6 +1,6 @@
 import { createAvatar } from "@dicebear/core";
 import type { Avatars } from "@outstaff/core";
-import type { DicebearOptions } from "./options.js";
+import type { DicebearOptions } from "./types.js";
 import { STYLES } from "./styles.js";
 
 /** Renders locally; no network. The same seed, style and background always give the same SVG. */
