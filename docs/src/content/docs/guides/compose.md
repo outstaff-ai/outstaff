@@ -21,7 +21,7 @@ Every container runs with a read-only root filesystem, `cap_drop: [ALL]`, `no-ne
 
 You need Docker with Compose v2.24 or newer, the team file of your own team, and the credentials of each person (the accounts and apps are created by hand; `ost setup` prints the steps and writes a template that says where every value comes from).
 
-1. **Team file.** The example mounts `examples/acme/.outstaff` at `/team`. For your team, set `OUTSTAFF_TEAM_DIR` to the folder that holds your `team.yaml`.
+1. **Team file.** The example mounts `examples/acme/.outstaff` at `/team` in the office, the only container that reads it; each agent receives the team config from the office when it connects. For your team, set `OUTSTAFF_TEAM_DIR` to the folder that holds your `team.yaml`. After you change it, `docker compose restart office`: the agents reconnect and render their working files again from the new team once their running work is done.
 2. **People.** One agent service per person in `team.yaml`. Copy a service block, rename it, and add its secrets and volume. Remove the services of people you do not have.
 3. **Secrets.** One file per secret under `examples/compose/secrets/`, listed in the README in that folder. The [Secrets guide](/guides/secrets/) shows how to fill the folder from 1Password or SOPS.
 4. **Password.** `cp .env.example .env` and set `POSTGRES_PASSWORD`.

@@ -802,6 +802,29 @@ describe("work loop", () => {
     await conn.stop();
   });
 
+  it("lets the running item finish on drain, takes no new one and ends the run", async () => {
+    await connect();
+    const { runtime, requests, release } = blockingRuntime();
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("progress").length === 1);
+
+    const drained = loop.drain();
+    // Offered after the drain: not accepted, so the office offers it again to the next connection.
+    socket.offerWith("w2");
+    await tick();
+    release();
+    await drained;
+    await running;
+    expect(requests[0]?.signal?.aborted).toBe(false);
+    expect(sentOf("handback")[0]?.payload).toMatchObject({ workItemId: "w1", status: "done" });
+    expect(sentOf("accept").map((m) => (m.payload as { workItemId: string }).workItemId)).toEqual([
+      "w1",
+    ]);
+
+    await conn.stop();
+  });
+
   it("hands back as waiting when the agent asked a question that is still open", async () => {
     await connect();
     const runtime: Runtime = {

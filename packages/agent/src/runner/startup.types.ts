@@ -19,7 +19,10 @@ import type { WorkLoop } from "./loop.types.js";
 import type { UsageReporter } from "./types.js";
 
 export interface StartupOptions {
-  /** The container environment: OUTSTAFF_PERSON, OUTSTAFF_OFFICE_URL and the team location variables. */
+  /**
+   * The container environment: OUTSTAFF_PERSON, OUTSTAFF_OFFICE_URL and the agent's secrets. The team comes from the
+   * office; startup sets OUTSTAFF_TEAM_FILE here to a copy of it for the agent's child processes, so pass `process.env`.
+   */
   env: NodeJS.ProcessEnv;
 
   /** The agent's home directory; the working files render into `<home>/work`. */
@@ -28,8 +31,10 @@ export interface StartupOptions {
 
   /** Root of the installed stock catalog package. */
   stockCatalogDir: string;
+
+  /** The folder the team's ejected catalog (`catalog.path`) is relative to. Default `/opt/outstaff/team/.outstaff`. */
+  teamDir?: string;
   agentVersion: string;
-  cwd?: string;
 
   /** Defaults to `envSecretSource(env)`. */
   secrets?: SecretSource;
@@ -89,7 +94,7 @@ export interface StartupContext {
   secrets: SecretSource;
   team: TeamConfig;
 
-  /** The directory the team config was loaded from. */
+  /** The folder the ejected catalog is relative to (see `StartupOptions.teamDir`). */
   teamDir: string;
   me: TeamConfig["people"][number];
   log: Logger;

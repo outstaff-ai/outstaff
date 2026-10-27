@@ -6,4 +6,5 @@ export type {
   Offer,
   OfficeConnection,
   OfficeConnectionOptions,
+  Team,
 } from "./types.js";

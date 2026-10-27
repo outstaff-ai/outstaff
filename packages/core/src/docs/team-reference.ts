@@ -38,6 +38,8 @@ export function renderTeamYamlReference(example: string): string {
     "",
     "Paths use `[]` for list items and `<key>` for a map entry whose key you choose.",
     "",
+    "Only the office loads this file. Each agent receives it from the office when it connects, whole, so it holds no secrets: fields such as `people[].network.http[].token` name a secret, and each container reads the value from its own secrets.",
+    "",
     "## Example",
     "",
     'A complete file for the synthetic team "acme".',

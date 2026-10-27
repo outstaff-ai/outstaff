@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
 import { createAgentAuth } from "#/protocol/auth.js";
 import { createProtocolServer } from "#/protocol/server.js";
-import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
+import { createFakeSource, fakeTeam, type FakeSource } from "@outstaff/testing.office";
 import type { ProtocolServer } from "#/protocol/types.js";
 
 const until = async (cond: () => boolean) => {
@@ -26,6 +26,7 @@ describe("the agent work loop against the real protocol server", () => {
     source = createFakeSource();
     server = createProtocolServer({
       source,
+      team: fakeTeam(),
       auth: createAgentAuth({ sam: "sam-token" }),
       clock: manualClock(),
       port: 0,

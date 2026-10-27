@@ -1,5 +1,12 @@
 import { PROTOCOL_VERSION, encode, type Message, type PayloadOf } from "@outstaff/protocol";
-import type { ClientSocket, ManualClientClock } from "#/office-client/types.js";
+import { parseYaml } from "@outstaff/core";
+import { createOfficeConnection } from "#/office-client/client.js";
+import type {
+  ClientSocket,
+  ManualClientClock,
+  OfficeConnection,
+  Team,
+} from "#/office-client/types.js";
 
 export function createManualClock(): ManualClientClock {
   let now = Date.parse("2030-01-01T00:00:00.000Z");
@@ -92,12 +99,13 @@ export class FakeSocket implements ClientSocket {
     return m;
   }
 
-  /** Answers the hello like the office would. */
+  /** Answers the hello like the office would. Without a `team`, an empty one stands in for tests that do not read it. */
   welcome(
     opts: {
       heartbeatMs?: number;
       resume?: string[];
       reports?: PayloadOf<"welcome">["reports"];
+      team?: PayloadOf<"welcome">["team"];
     } = {},
   ) {
     const hello = this.sentOf("hello")[0];
@@ -109,6 +117,7 @@ export class FakeSocket implements ClientSocket {
         protocolVersion: PROTOCOL_VERSION,
         heartbeatMs: opts.heartbeatMs ?? 1000,
         resume: opts.resume ?? [],
+        team: opts.team ?? {},
         ...(opts.reports ? { reports: opts.reports } : {}),
       },
     });
@@ -132,4 +141,40 @@ export class FakeSocket implements ClientSocket {
       ),
     );
   }
+}
+
+/**
+ * A connection to a scripted office that welcomes the agent with the team in `yaml` each time it connects, as the
+ * office does. `setTeam` changes what the next welcome brings; `sockets` are the connections made so far.
+ */
+export function officeWithTeam(yaml: string, person = "sam") {
+  let team = parseYaml(yaml).value as Team;
+  const sockets: FakeSocket[] = [];
+  const connect = (): OfficeConnection =>
+    createOfficeConnection({
+      url: "ws://office.test/agent",
+      person,
+      token: "t",
+      agentVersion: "test",
+      backoff: { baseMs: 1, maxMs: 1 },
+      socket: () => {
+        const s = new FakeSocket();
+        sockets.push(s);
+        // After the client has put its listeners on the socket.
+        queueMicrotask(() => {
+          s.open();
+          s.welcome({ team });
+        });
+
+        return s;
+      },
+    });
+
+  return {
+    connect,
+    sockets,
+    setTeam(next: string) {
+      team = parseYaml(next).value as Team;
+    },
+  };
 }

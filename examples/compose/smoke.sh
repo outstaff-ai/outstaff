@@ -80,8 +80,16 @@ fi
 sed -i.bak 's/runtime: { adapter: claude-agent-sdk }/runtime: { adapter: claude-agent-sdk, sandbox: bubblewrap }/' "$work/team/team.yaml"
 grep -q 'sandbox: bubblewrap' "$work/team/team.yaml" || fail "could not turn the sandbox on in the smoke team"
 files+=(-f "$here/compose.sandbox.yaml")
+# Only the office reads the team file, so it restarts with the change; sam is recreated for the sandbox's container
+# settings and takes the new team from the office. Its own log says when it connected with it.
+compose up -d --no-deps --force-recreate --wait --wait-timeout 180 office || fail "the office did not come back healthy"
 compose up -d --no-deps --force-recreate sam
-await_sam 2 || fail "the agent with sandbox: bubblewrap never showed up in the office log"
+for _ in $(seq 1 45); do
+  compose logs --no-color sam 2>&1 | grep -q ' info connected$' && break
+  [ "$(compose ps --status running --services | grep -cx sam)" = 1 ] || break
+  sleep 2
+done
+compose logs --no-color sam 2>&1 | grep -q ' info connected$' || fail "the agent with sandbox: bubblewrap never connected"
 echo "ok   sam: connected with sandbox: bubblewrap"
 
 # The agent started, so the runtime's start-up probe passed; run it once more to show what it found.

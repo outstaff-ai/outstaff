@@ -68,6 +68,8 @@ RUN ost build
 
 `ost build` validates the team, loads the stock and ejected catalogs, rejects files that still contain conflict markers, and renders every person strictly. Any error stops the build with a non-zero exit code, and a summary is printed on success. Keep the image tag equal to `catalog.version`.
 
+The agent reads the ejected catalog from `/opt/outstaff/team/.outstaff` in its image, at `catalog.path`. It takes the team config itself from the office when it connects, so the `team.yaml` copied with it is only for `ost build`; a change to the team file needs no new agent image, only an office restart.
+
 ## Custom roles
 
 You can add roles the stock catalog does not have. A custom role lives next to your ejected files in `.outstaff/catalog/roles/<role>/`, but it is not an ejected copy of anything: there is no stock original, so nothing is recorded in `.ejected.json`, `ost diff` has nothing to compare, and `ost upgrade` never touches it.

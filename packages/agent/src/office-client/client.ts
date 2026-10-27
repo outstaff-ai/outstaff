@@ -15,6 +15,7 @@ import { officeMethods } from "./methods.js";
 import { createOfferQueue } from "./offers.js";
 import { createRequests } from "./requests.js";
 import type {
+  Team,
   ClientClock,
   ClientSocket,
   ConnectionState,
@@ -59,6 +60,10 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   let resumeIds: string[] = [];
   let reportHandler: ((reports: QueuedReport[]) => void) | undefined;
   let heldReports: QueuedReport[] = [];
+  let team: Team | undefined;
+  let teamHandler: ((team: Team) => void) | undefined;
+  // A change that came before anyone listened; handed to the handler when it is set.
+  let heldTeam: Team | undefined;
   // A work item and chat sessions run at once; each is kept alive by a heartbeat of its own.
   const activeItems = new Set<string>();
   let cancelBackoff: (() => void) | undefined;
@@ -115,6 +120,14 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     }, heartbeatMs);
   }
 
+  function teamChanged(next: Team) {
+    if (teamHandler) {
+      teamHandler(next);
+    } else {
+      heldTeam = next;
+    }
+  }
+
   function welcomed(welcome: PayloadOf<"welcome">) {
     attempt = 0;
     state = "connected";
@@ -124,7 +137,13 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     }
 
     scheduleBeat(welcome.heartbeatMs);
+    const previous = team;
+    team = welcome.team;
     settleWaiters();
+    // The office sends its team on every welcome; a reconnect after the office restarted can bring a new one.
+    if (previous && JSON.stringify(previous) !== JSON.stringify(team)) {
+      teamChanged(team);
+    }
   }
 
   /** An error that answers no request: a fatal one means the office refuses this agent. */
@@ -242,6 +261,16 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     state: () => state,
     rejection: () => rejected,
     resume: () => [...resumeIds],
+    teamConfig: () => team,
+    onTeamConfigChange(handler) {
+      teamHandler = handler;
+      if (heldTeam) {
+        const held = heldTeam;
+        heldTeam = undefined;
+        handler(held);
+      }
+    },
+
     onReports(handler) {
       reportHandler = handler;
       if (heldReports.length) {

@@ -15,7 +15,7 @@ import { githubVcs } from "@outstaff/integration.vcs.github";
 import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE, testKey } from "@outstaff/testing.core";
 import { createAgentAuth, createProtocolServer, systemClock } from "@outstaff/office";
-import { createFakeSource } from "@outstaff/testing.office";
+import { createFakeSource, fakeTeam } from "@outstaff/testing.office";
 import type { AnyDef } from "#/commands/types.js";
 import type { Context } from "#/types.js";
 import { run } from "#/program.js";
@@ -525,6 +525,7 @@ describe("ost doctor office reachability", () => {
   async function office() {
     const server = createProtocolServer({
       source: createFakeSource([]),
+      team: fakeTeam(),
       auth: createAgentAuth({ mira: token }),
       clock: systemClock,
       port: 0,

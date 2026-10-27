@@ -13,7 +13,7 @@ patches:
       - { op: replace, path: /metadata/name, value: outstaff-agent-mira }
       - { op: replace, path: /spec/template/spec/containers/0/env/0/value, value: mira }
       - { op: replace, path: /spec/template/spec/volumes/0/secret/secretName, value: outstaff-agent-mira }
-      - { op: replace, path: /spec/template/spec/volumes/2/persistentVolumeClaim/claimName, value: mira-home }
+      - { op: replace, path: /spec/template/spec/volumes/1/persistentVolumeClaim/claimName, value: mira-home }
   - target: { kind: PersistentVolumeClaim }
     patch: |-
       - { op: replace, path: /metadata/name, value: mira-home }

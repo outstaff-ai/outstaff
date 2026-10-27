@@ -1,13 +1,18 @@
-import { cpSync, mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { AdapterRegistry, defineAdapter, evaluate, repoAccess } from "@outstaff/core";
+import {
+  AdapterRegistry,
+  defineAdapter,
+  evaluate,
+  loadTeamConfig,
+  repoAccess,
+} from "@outstaff/core";
 import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fakes";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createOfficeConnection } from "#/office-client/index.js";
-import { FakeSocket, createManualClock } from "#/office-client/__tests__/testing.js";
+import { createManualClock, officeWithTeam } from "#/office-client/__tests__/testing.js";
 import { withGlobalConfig } from "#/tools/mise-current.js";
 import { StartupError } from "#/runner/startup-error.js";
 import { prepareAgent } from "#/runner/startup.js";
@@ -69,22 +74,13 @@ policies:`,
 
 function setup(extra: Record<string, string> = {}, team = TEAM) {
   const dir = mkdtempSync(join(tmpdir(), "ost-agent-"));
-  mkdirSync(join(dir, "team", ".outstaff"), { recursive: true });
-  writeFileSync(join(dir, "team", ".outstaff", "team.yaml"), team);
   const home = join(dir, "home");
-  const connection = createOfficeConnection({
-    url: "ws://office.test/agent",
-    person: "sam",
-    token: "t",
-    agentVersion: "test",
-    socket: () => new FakeSocket(),
-  });
+  const connection = officeWithTeam(team, extra["OUTSTAFF_PERSON"] ?? "sam").connect();
 
   const options = {
     env: {
       OUTSTAFF_PERSON: "sam",
       OUTSTAFF_OFFICE_URL: "ws://office.test/agent",
-      OUTSTAFF_TEAM_FILE: join(dir, "team"),
       OUTSTAFF_SECRETS_DIR: join(dir, "none"),
       OUTSTAFF_AGENT_TOKEN: "tok",
       ...extra,
@@ -220,6 +216,8 @@ people:`,
       return ids.map((workItemId) => ({ workItemId, state: "done" as const }));
     };
 
+    // The office is connected: answer the journal note of a done item at once instead of waiting for the office.
+    options.connection.journal = async () => {};
     const agent = await prepareAgent({ ...options, clock, sweepEveryMs: 1000 });
     agent.sweeper.start();
     await vi.waitFor(() => expect(asked).toHaveLength(1));
@@ -423,6 +421,44 @@ people:`,
     });
 
     expect(agent.tools.map((t) => [t.name, t.version])).toEqual([["python", "3.13.9"]]);
+  });
+
+  it("takes the ejected catalog from the team folder of the image, not from the office", async () => {
+    const teamDir = mkdtempSync(join(tmpdir(), "team-"));
+    const role = join(teamDir, "catalog", "roles", "auditor");
+    mkdirSync(role, { recursive: true });
+    writeFileSync(
+      join(role, "role.yaml"),
+      "name: auditor\ntitle: Auditor\nsummary: Checks the books.\ntoolset: base\npermissions: readonly\n",
+    );
+
+    writeFileSync(join(role, "SKILL.md"), "# Auditor of {{ team.name }}\n");
+    const { home, options } = setup({}, TEAM.replace("role: developer", "role: auditor"));
+    const agent = await prepareAgent({ ...options, teamDir });
+    expect(readFileSync(join(home, "work/.agent/skills/auditor/SKILL.md"), "utf8")).toContain(
+      "# Auditor of acme",
+    );
+
+    expect(agent.systemPrompt).toContain("the Auditor");
+  });
+
+  it("writes the team from the office for its child processes and points OUTSTAFF_TEAM_FILE at it", async () => {
+    const { home, options } = setup();
+    await prepareAgent({ ...options, teamDir: "/opt/acme/.outstaff" });
+    const file = join(home, ".config/outstaff/team.json");
+    expect((options.env as NodeJS.ProcessEnv)["OUTSTAFF_TEAM_FILE"]).toBe(file);
+
+    // What `ost git-credential` and the `ost` verbs load.
+    const loaded = await loadTeamConfig({ env: options.env });
+    expect(loaded.ok && loaded.config.people.map((p) => p.handle)).toEqual(["sam"]);
+    expect(loaded.ok && loaded.config.catalog.path).toBe("/opt/acme/.outstaff/catalog");
+  });
+
+  it("refuses a team from the office that does not validate", async () => {
+    const { options } = setup({}, "version: 1\nteam: { name: acme }\n");
+    await expect(prepareAgent(options)).rejects.toThrow(
+      /^The team config from the office is invalid:\n(.|\n)*catalog/,
+    );
   });
 
   it("does not run mise when no tool is declared", async () => {

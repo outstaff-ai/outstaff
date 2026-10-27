@@ -74,6 +74,9 @@ export interface WorkLoop {
    */
   run(): Promise<void>;
 
+  /** Takes no new items, lets the running ones finish, and ends `run`. */
+  drain(): Promise<void>;
+
   /** Interrupts the running item, hands it back as interrupted, and ends `run`. */
   stop(): Promise<void>;
 }

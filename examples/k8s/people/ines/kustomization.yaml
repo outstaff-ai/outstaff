@@ -13,7 +13,7 @@ patches:
       - { op: replace, path: /metadata/name, value: outstaff-agent-ines }
       - { op: replace, path: /spec/template/spec/containers/0/env/0/value, value: ines }
       - { op: replace, path: /spec/template/spec/volumes/0/secret/secretName, value: outstaff-agent-ines }
-      - { op: replace, path: /spec/template/spec/volumes/2/persistentVolumeClaim/claimName, value: ines-home }
+      - { op: replace, path: /spec/template/spec/volumes/1/persistentVolumeClaim/claimName, value: ines-home }
   - target: { kind: PersistentVolumeClaim }
     patch: |-
       - { op: replace, path: /metadata/name, value: ines-home }

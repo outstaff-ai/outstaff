@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,8 +12,7 @@ import {
 import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createOfficeConnection } from "#/office-client/index.js";
-import { FakeSocket } from "#/office-client/__tests__/testing.js";
+import { officeWithTeam } from "#/office-client/__tests__/testing.js";
 import { withGlobalConfig } from "#/tools/mise-current.js";
 import { installedRuntimes } from "#/runner/runtime-select.js";
 import { prepareAgent } from "#/runner/startup.js";
@@ -68,8 +67,6 @@ function stubRuntime(name: string, capabilities: Capability[], created: Created[
 
 function setup(person: string) {
   const dir = mkdtempSync(join(tmpdir(), "ost-runtime-"));
-  mkdirSync(join(dir, "team", ".outstaff"), { recursive: true });
-  writeFileSync(join(dir, "team", ".outstaff", "team.yaml"), TEAM);
   const home = join(dir, "home");
   const created: Created[] = [];
   const registry = new AdapterRegistry();
@@ -99,7 +96,6 @@ function setup(person: string) {
     env: {
       OUTSTAFF_PERSON: person,
       OUTSTAFF_OFFICE_URL: "ws://office.test/agent",
-      OUTSTAFF_TEAM_FILE: join(dir, "team"),
       OUTSTAFF_SECRETS_DIR: join(dir, "none"),
       OUTSTAFF_AGENT_TOKEN: "tok",
     },
@@ -108,13 +104,7 @@ function setup(person: string) {
     stockCatalogDir,
     agentVersion: "test",
     log,
-    connection: createOfficeConnection({
-      url: "ws://office.test/agent",
-      person,
-      token: "t",
-      agentVersion: "test",
-      socket: () => new FakeSocket(),
-    }),
+    connection: officeWithTeam(TEAM, person).connect(),
     tools: {
       mise: withGlobalConfig(async () => ({ code: 0, stdout: "", stderr: "" })),
       addToPath: () => {},

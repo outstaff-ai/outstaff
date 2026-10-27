@@ -56,6 +56,7 @@ export async function handleHello(
     {
       protocolVersion: PROTOCOL_VERSION,
       heartbeatMs,
+      team: opts.team,
       resume: outstanding.filter((o) => o.accepted).map((o) => o.offer.workItem.id),
       ...(reports?.length ? { reports } : {}),
     },

@@ -1,5 +1,5 @@
 /** Bumped on any incompatible change to the messages below. Both sides must match exactly. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 export const WORK_STATUSES = [
   "queued",

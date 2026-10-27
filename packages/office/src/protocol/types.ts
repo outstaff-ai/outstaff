@@ -1,4 +1,4 @@
-import type { Logger } from "@outstaff/core";
+import type { Logger, TeamConfig } from "@outstaff/core";
 import type { ErrorCode, MessageType, PayloadOf } from "@outstaff/protocol";
 import type { WebSocket } from "ws";
 import type { Clock } from "#/types.js";
@@ -12,6 +12,9 @@ export interface AgentAuth {
 
 export interface ProtocolServerOptions {
   source: WorkSource;
+
+  /** The team config each agent receives in its `welcome`; agents mount no team file of their own. */
+  team: TeamConfig;
   messaging?: Messaging;
 
   /** Receives the usage windows agents report. Without it a report is refused as unsupported. */

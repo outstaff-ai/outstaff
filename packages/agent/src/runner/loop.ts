@@ -3,6 +3,7 @@ import type { Offer } from "#/office-client/index.js";
 import { acknowledgeFeedback } from "./reactions.js";
 import { createSessionManager } from "./sessions.js";
 import type { WorkLoopOptions, WorkLoop } from "./loop.types.js";
+import { until } from "./offers-until.js";
 import { reason } from "./reason.js";
 import { CHAT_KIND, createWorker } from "./work.js";
 
@@ -11,6 +12,10 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   const sessions = opts.sessions ?? createSessionManager(opts.office, log);
   const work = createWorker({ opts, log, sessions });
   let stopping = false;
+  let draining = false;
+  let end!: () => void;
+  const ended = new Promise<void>((resolve) => (end = resolve));
+  const closed = () => stopping || draining;
   const running = new Map<string, AbortController>();
   const inFlight = new Set<Promise<void>>();
   let workLane: Promise<void> = Promise.resolve();
@@ -94,8 +99,8 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   return {
     async run() {
       await releaseResumed();
-      for await (const offer of opts.office.offers()) {
-        if (stopping) {
+      for await (const offer of until(opts.office.offers(), ended)) {
+        if (closed()) {
           // Not accepted, so the office offers it again later.
           break;
         }
@@ -105,7 +110,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
           track(handle(offer));
         } else {
           // One work item at a time, in the order they came.
-          workLane = workLane.then(() => (stopping ? undefined : handle(offer)));
+          workLane = workLane.then(() => (closed() ? undefined : handle(offer)));
           track(workLane);
         }
       }
@@ -113,8 +118,15 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       await Promise.all(inFlight);
     },
 
+    async drain() {
+      draining = true;
+      end();
+      await Promise.all(inFlight);
+    },
+
     async stop() {
       stopping = true;
+      end();
       for (const abort of running.values()) {
         abort.abort();
       }

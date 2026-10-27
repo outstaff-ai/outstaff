@@ -353,16 +353,16 @@ The office acts under its own name on every system it uses, named `<team>-outsta
 
 ### Environment
 
-| Variable                                         | Meaning                                                                                                              |
-| ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| `OUTSTAFF_TEAM_FILE`                             | Path to team.yaml (or the folder holding it). Alternatively `OUTSTAFF_TEAM_REPO` and `OUTSTAFF_TEAM_REF`.            |
-| `OUTSTAFF_STORE_URL`                             | `postgres://user:pass@host/db`, `sqlite:///var/lib/outstaff/office.db` (the default) or `sqlite::memory:` for tests. |
-| `OUTSTAFF_AGENT_PORT`                            | Port agents connect to, path `/agent`. Default 8080.                                                                 |
-| `OUTSTAFF_WEBHOOK_PORT`                          | Port of the webhook receiver when `office.events` is `webhook`. Default 8082.                                        |
-| `OUTSTAFF_HEALTH_PORT`                           | Port of the health endpoints. Default 8081.                                                                          |
-| `OUTSTAFF_AGENT_TOKEN_<HANDLE>`                  | One token per person, as a secret.                                                                                   |
-| `OUTSTAFF_SECRETS_DIR`                           | Directory of secret files, default `/run/secrets/outstaff`; the environment is the fallback.                         |
-| Adapter secrets (for example `GH_OFFICE_APP_ID`) | Whatever the configured adapters declare for the office scope.                                                       |
+| Variable                                         | Meaning                                                                                                                                                                                                |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `OUTSTAFF_TEAM_FILE`                             | Path to team.yaml (or the folder holding it). Alternatively `OUTSTAFF_TEAM_REPO` and `OUTSTAFF_TEAM_REF`. Only the office reads it; it sends the validated team config to each agent in the `welcome`. |
+| `OUTSTAFF_STORE_URL`                             | `postgres://user:pass@host/db`, `sqlite:///var/lib/outstaff/office.db` (the default) or `sqlite::memory:` for tests.                                                                                   |
+| `OUTSTAFF_AGENT_PORT`                            | Port agents connect to, path `/agent`. Default 8080.                                                                                                                                                   |
+| `OUTSTAFF_WEBHOOK_PORT`                          | Port of the webhook receiver when `office.events` is `webhook`. Default 8082.                                                                                                                          |
+| `OUTSTAFF_HEALTH_PORT`                           | Port of the health endpoints. Default 8081.                                                                                                                                                            |
+| `OUTSTAFF_AGENT_TOKEN_<HANDLE>`                  | One token per person, as a secret.                                                                                                                                                                     |
+| `OUTSTAFF_SECRETS_DIR`                           | Directory of secret files, default `/run/secrets/outstaff`; the environment is the fallback.                                                                                                           |
+| Adapter secrets (for example `GH_OFFICE_APP_ID`) | Whatever the configured adapters declare for the office scope.                                                                                                                                         |
 
 The SQLite file's folder is created when missing; mount a volume there. Use Postgres to run the office on a platform without persistent disks. Migrations run on start.
 

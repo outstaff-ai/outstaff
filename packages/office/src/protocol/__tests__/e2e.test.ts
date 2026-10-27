@@ -11,7 +11,7 @@ import { manualClock } from "#/clock.js";
 import { createAgentAuth } from "#/protocol/auth.js";
 import { createProtocolServer } from "#/protocol/server.js";
 import type { Messaging } from "#/protocol/source.types.js";
-import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
+import { createFakeSource, fakeTeam, type FakeSource } from "@outstaff/testing.office";
 import type { ProtocolServer } from "#/protocol/types.js";
 
 // Only the people matter to the office verbs.
@@ -44,6 +44,7 @@ describe("office verbs through the real client and server", () => {
     const clock = manualClock();
     server = createProtocolServer({
       source,
+      team: fakeTeam(),
       messaging,
       auth: createAgentAuth({ ada: "ada-token" }),
       clock,

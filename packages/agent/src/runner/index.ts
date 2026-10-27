@@ -15,6 +15,8 @@ export type { UsageReporter, UsageReporterOptions, UsageThresholds } from "./typ
 export { loadToolsets } from "./catalogs.js";
 export { StartupError } from "./startup-error.js";
 export { prepareAgent } from "./startup.js";
+export { createAgentRunner } from "./run.js";
+export type { AgentRunner } from "./run.types.js";
 export type { PreparedAgent, StartupOptions } from "./startup.types.js";
 
 export { agentRegistry } from "./registry.js";
