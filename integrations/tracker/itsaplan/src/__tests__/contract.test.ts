@@ -4,9 +4,7 @@ import { itsaplanTracker } from "../index.js";
 import { trackerOptions } from "../options.js";
 import type { TrackerOptions } from "../types.js";
 import { createItsaplanTracker } from "../tracker.js";
-import { secretMap, team } from "../testing/harness.js";
-import { API_KEY } from "../testing/http-stub.js";
-import { createItsaplanFake } from "../testing/itsaplan-fake.js";
+import { API_KEY, createItsaplanFake, secretMap, team } from "@outstaff/testing.itsaplan";
 
 const base = {
   secrets: secretMap({ ITSAPLAN_API_KEY: API_KEY }),

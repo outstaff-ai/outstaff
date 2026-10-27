@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { acmeTeam } from "../../verbs/testing.js";
+import { acmeTeam } from "@outstaff/testing.agent";
 import { buildIdentityPrompt } from "../identity.js";
 
 describe("identity prompt", () => {

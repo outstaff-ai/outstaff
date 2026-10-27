@@ -1,9 +1,7 @@
 import { silentLogger } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { itsaplanTracker } from "../index.js";
-import { secretMap, team } from "../testing/harness.js";
-import { API_KEY } from "../testing/http-stub.js";
-import { createItsaplanFake } from "../testing/itsaplan-fake.js";
+import { API_KEY, createItsaplanFake, secretMap, team } from "@outstaff/testing.itsaplan";
 
 describe("itsaplanTracker", () => {
   it("creates a tracker that talks to the configured instance with the member's key", async () => {

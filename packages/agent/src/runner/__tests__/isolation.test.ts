@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createOfficeConnection } from "../../office-client/index.js";
 import { FakeSocket, createManualClock } from "../../office-client/testing.js";
 import type { Workspaces } from "../../repos/index.js";
-import { fakeEnv } from "../../verbs/testing.js";
+import { fakeEnv } from "@outstaff/testing.agent";
 import { JOURNAL_PROMPT } from "../journal.js";
 import { createWorkLoop } from "../loop.js";
 

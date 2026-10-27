@@ -2,9 +2,15 @@ import { vcsContract } from "@outstaff/core/contracts";
 import { silentLogger } from "@outstaff/core";
 import { githubVcs } from "../index.js";
 import { createGithubVcs } from "../vcs.js";
-import { createGithubFake, OFFICE_APP, OWN_APP } from "../testing/github-fake.js";
-import { ORIGIN, secretMap, team } from "../testing/harness.js";
-import { testKey } from "../testing/keys.js";
+import {
+  createGithubFake,
+  OFFICE_APP,
+  ORIGIN,
+  OWN_APP,
+  secretMap,
+  team,
+} from "@outstaff/testing.github";
+import { testKey } from "@outstaff/testing.core";
 import { githubOptions } from "../options.js";
 
 // An agent container for "sam": its own App plus the read-only office App.

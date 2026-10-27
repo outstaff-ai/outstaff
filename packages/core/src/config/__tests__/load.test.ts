@@ -10,7 +10,7 @@ import {
   readAcmeTeam,
   UNKNOWN_REPO_GRANT_TEAM,
   YAML_SYNTAX_ERROR_TEAM,
-} from "../../testing/fixtures.js";
+} from "@outstaff/testing.core";
 import { formatIssue, loadTeamConfig } from "../load.js";
 import type { LoadResult } from "../types.js";
 

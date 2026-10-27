@@ -1,4 +1,8 @@
-import type { RestIssueComment, RestReview, RestReviewComment } from "../../api.types.js";
+import type {
+  RestIssueComment,
+  RestReview,
+  RestReviewComment,
+} from "@outstaff/integration.vcs.github";
 import { actorOf } from "./requests.js";
 import type { FakeState, Route } from "../types.js";
 

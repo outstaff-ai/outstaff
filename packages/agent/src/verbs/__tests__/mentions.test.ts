@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PortError } from "@outstaff/core";
 import { mentionGuard } from "../mentions.js";
-import { acmeTeam } from "../testing.js";
+import { acmeTeam } from "@outstaff/testing.agent";
 
 const guard = mentionGuard(acmeTeam());
 const apply = (s: string) => guard.apply(s);

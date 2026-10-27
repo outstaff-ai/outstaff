@@ -7,8 +7,8 @@ import { createAgentAuth, agentAuthFromSecrets, agentTokenKey } from "../auth.js
 import { createProtocolServer } from "../server.js";
 import { ProtocolError } from "../errors.js";
 import type { ChatDesk, Messaging } from "../source.types.js";
-import { createFakeSource } from "../testing.js";
-import type { FakeSource, ProtocolServer } from "../types.js";
+import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
+import type { ProtocolServer } from "../types.js";
 
 class Agent {
   readonly inbox: Message[] = [];

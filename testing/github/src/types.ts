@@ -7,7 +7,7 @@ import type {
   RestReview,
   RestReviewComment,
   ThreadNode,
-} from "../api.types.js";
+} from "@outstaff/integration.vcs.github";
 
 export interface StubRequest {
   method: string;

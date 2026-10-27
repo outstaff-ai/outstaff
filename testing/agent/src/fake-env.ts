@@ -1,12 +1,11 @@
 import { parseTeamConfig, parseYaml, type TeamConfig } from "@outstaff/core";
 import { createFakeKnowledge, createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { readFileSync } from "node:fs";
-import { createFakeOffice } from "./office.js";
-import type { AgentEnv } from "./types.js";
+import { createFakeOffice, type AgentEnv } from "@outstaff/agent";
 
 export const acmeTeam = (): TeamConfig => {
   const text = readFileSync(
-    new URL("../../../../examples/acme/.outstaff/team.yaml", import.meta.url),
+    new URL("../../../examples/acme/.outstaff/team.yaml", import.meta.url),
     "utf8",
   );
 

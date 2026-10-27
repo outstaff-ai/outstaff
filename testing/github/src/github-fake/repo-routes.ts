@@ -1,4 +1,4 @@
-import type { RestCheckRun } from "../../api.types.js";
+import type { RestCheckRun } from "@outstaff/integration.vcs.github";
 import { LOG_ORIGIN } from "./requests.js";
 import type { FakeState, Route } from "../types.js";
 

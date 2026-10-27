@@ -2,8 +2,10 @@ import type { Doc } from "@outstaff/core";
 import type { KnowledgeSeed } from "@outstaff/core/contracts";
 import { mdToDoc } from "../markdown.js";
 import { findRange } from "../text-range.js";
-import { createItsaplanFake as createTrackerFake } from "../../../../tracker/itsaplan/src/testing/itsaplan-fake.js";
-import type { FakeOptions } from "../../../../tracker/itsaplan/src/testing/types.js";
+import {
+  createItsaplanFake as createTrackerFake,
+  type FakeOptions,
+} from "@outstaff/testing.itsaplan";
 import type { ApiDoc, ApiDocSummary } from "../types.js";
 import type { ItsaplanFake, NewDocComment, StoredDoc, StoredDocComment } from "./types.js";
 

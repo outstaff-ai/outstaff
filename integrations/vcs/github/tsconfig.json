@@ -6,7 +6,9 @@
     "paths": {
       "@outstaff/core": ["../../../packages/core/src/index.ts"],
       "@outstaff/core/contracts": ["../../../packages/core/src/contracts/index.ts"],
-      "@outstaff/core/fakes": ["../../../packages/core/src/fakes/index.ts"]
+      "@outstaff/core/fakes": ["../../../packages/core/src/fakes/index.ts"],
+      "@outstaff/integration.vcs.github": ["./src/index.ts"],
+      "@outstaff/testing.github": ["../../../testing/github/src/index.ts"]
     }
   },
   "include": ["src"]

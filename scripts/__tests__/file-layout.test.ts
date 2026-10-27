@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain ESM script without types
-import { exemption, exportKinds, isSource, layoutProblems, MAX_LINES } from "../file-layout.mjs";
+import {
+  crossPackageImports,
+  exemption,
+  exportKinds,
+  isSource,
+  layoutProblems,
+  MAX_LINES,
+  relativeSpecifiers,
+} from "../file-layout.mjs";
 
 describe("file layout", () => {
   it("covers TypeScript source but not tests or declarations", () => {
@@ -58,5 +66,44 @@ describe("file layout", () => {
     expect(problems[1]).toMatch(
       /^packages\/core\/src\/mixed\.ts: exports types and runtime values/,
     );
+  });
+
+  it("finds every form of relative specifier", () => {
+    const source = [
+      'import { a } from "./a.js";',
+      'import type { B } from "../b.js";',
+      'export * from "./c.js";',
+      'import "./d.js";',
+      'const e = await import("./e.js");',
+      'vi.mock("../f.js");',
+      'import { g } from "@outstaff/core";',
+    ].join("\n");
+
+    expect(relativeSpecifiers(source)).toEqual([
+      "./a.js",
+      "../b.js",
+      "./c.js",
+      "./d.js",
+      "./e.js",
+      "../f.js",
+    ]);
+  });
+
+  it("flags relative imports that leave their package", () => {
+    const files: Record<string, string> = {
+      "packages/cli/package.json": "{}",
+      "packages/core/package.json": "{}",
+      "packages/cli/src/a.ts":
+        'import { b } from "./b.js";\nimport { c } from "../../core/src/c.js";\n',
+      "packages/cli/scripts/gen.ts": 'import { a } from "../src/a.js";\n',
+      "e2e/stub.ts": 'import type { C } from "../packages/core/src/c.ts";\n',
+    };
+
+    const problems = crossPackageImports(Object.keys(files), (file: string) => files[file]);
+
+    expect(problems).toEqual([
+      "packages/cli/src/a.ts: ../../core/src/c.js leaves the package; import it by package name",
+      "e2e/stub.ts: ../packages/core/src/c.ts leaves the package; import it by package name",
+    ]);
   });
 });
