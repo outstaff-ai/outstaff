@@ -1,4 +1,13 @@
 export { decodeLinkMessage, encodeLinkMessage } from "./codec.js";
+export {
+  comparisonSchema,
+  comparisonSummarySchema,
+  DIFFERENCE_KINDS,
+  differenceSchema,
+  engineSchema,
+  outcomeSchema,
+} from "./comparison.js";
+
 export { renderLinkReference } from "./docs.js";
 export {
   itemSchema,

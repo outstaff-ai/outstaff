@@ -1,6 +1,6 @@
 import type { Resolved, TemplateError } from "@outstaff/core";
 import { prLabel } from "../log.js";
-import type { ActOp, Decision, WakeSubject } from "./decisions.types.js";
+import type { ActOp, ActTarget, Decision, WakeSubject } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import { feedbackFor } from "./feedback.js";
 import { nextReadyTicket } from "./idle.js";
@@ -40,29 +40,38 @@ function eventSubject(event: PipelineEvent): WakeSubject | undefined {
     : undefined;
 }
 
+/** The subject of a wake: the event's, or for an idle pull the agent's oldest ready ticket. */
+function wakeSubject(
+  spec: WakeSpec,
+  person: string,
+  input: DecideInput,
+): Resolved<{ subject: WakeSubject; next?: string | undefined }> {
+  if (spec.subject !== "next_ready_ticket") {
+    const subject = eventSubject(input.event);
+    return subject
+      ? { value: { subject } }
+      : { skip: "the event has no ticket, pull request, document or chat thread" };
+  }
+
+  const next = nextReadyTicket(input.state.readyTickets(person))?.key;
+  return next
+    ? { value: { subject: { type: "ticket", ref: next }, next } }
+    : { skip: `no ready ticket is assigned to ${person}` };
+}
+
 function wake(policy: Policy, spec: WakeSpec, input: DecideInput): Decision {
-  const { event, ctx, state, opts } = input;
   const drop = (reason: string): Decision => ({ type: "drop", policy: policy.id, reason });
-  const person = resolveSpec(spec.person, ctx, opts);
+  const person = resolveSpec(spec.person, input.ctx, input.opts);
   if ("skip" in person) {
     return drop(`no one to wake: ${person.skip}`);
   }
 
-  let subject = eventSubject(event);
-  let next: string | undefined;
-  if (spec.subject === "next_ready_ticket") {
-    next = nextReadyTicket(state.readyTickets(person.value))?.key;
-    subject = next ? { type: "ticket", ref: next } : undefined;
-    if (!next) {
-      return drop(`no ready ticket is assigned to ${person.value}`);
-    }
+  const target = wakeSubject(spec, person.value, input);
+  if ("skip" in target) {
+    return drop(target.skip);
   }
 
-  if (!subject) {
-    return drop("the event has no ticket, pull request, document or chat thread");
-  }
-
-  const vars = instructionVariables(ctx, { person: person.value, ...(next ? { next } : {}) });
+  const vars = instructionVariables(input.ctx, { person: person.value, next: target.value.next });
   const instruction = render(policy.instruction ?? "", vars);
   if ("skip" in instruction) {
     return drop(`the instruction cannot be rendered: ${instruction.skip}`);
@@ -74,59 +83,85 @@ function wake(policy: Policy, spec: WakeSpec, input: DecideInput): Decision {
     person: person.value,
     kind: spec.kind,
     instruction: instruction.value,
-    feedback: feedbackFor(event),
-    subject,
+    feedback: feedbackFor(input.event),
+    subject: target.value.subject,
   };
 }
 
-function op(spec: OpSpec, as: string, input: DecideInput): Resolved<ActOp> {
-  const { ctx, opts } = input;
-  const ticket = ctx.ticket;
-  if ("comment" in spec) {
-    const doc = ctx.event.subject.doc;
-    const on = ticket ? { ticket } : doc ? { doc } : undefined;
-    if (!on) {
-      return { skip: "comment: the event has no ticket or document" };
-    }
+type Op<K extends string> = Extract<OpSpec, Record<K, unknown>>;
 
-    const body = render(spec.comment, instructionVariables(ctx, { person: as }));
-    return "skip" in body
-      ? { skip: `comment: ${body.skip}` }
-      : { value: { op: "comment", on, body: body.value } };
+function commentOp(spec: Op<"comment">, as: string, { ctx }: DecideInput): Resolved<ActOp> {
+  const doc = ctx.event.subject.doc;
+  const on = ctx.ticket ? { ticket: ctx.ticket } : doc ? { doc } : undefined;
+  if (!on) {
+    return { skip: "comment: the event has no ticket or document" };
   }
 
+  const body = render(spec.comment, instructionVariables(ctx, { person: as }));
+  return "skip" in body
+    ? { skip: `comment: ${body.skip}` }
+    : { value: { op: "comment", on, body: body.value } };
+}
+
+function moveOp(spec: Op<"move">, ticket: string, { ctx }: DecideInput): Resolved<ActOp> {
+  return ctx.state.ticketStatus(ticket) === spec.move
+    ? { skip: `move: ${ticket} is already ${spec.move}` }
+    : { value: { op: "move", ticket, to: spec.move } };
+}
+
+/** Who an assignment goes to: the acting agent, else the requester or the team's first human. */
+function assignee(
+  spec: Op<"assign">,
+  as: string,
+  ticket: string,
+  input: DecideInput,
+): ActTarget | undefined {
+  if (spec.assign === "self") {
+    return { kind: "agent", id: as };
+  }
+
+  const human = input.ctx.state.requester(ticket) ?? input.opts.fallbackRequester;
+  return human ? { kind: "human", id: human } : undefined;
+}
+
+function assignOp(
+  spec: Op<"assign">,
+  as: string,
+  ticket: string,
+  input: DecideInput,
+): Resolved<ActOp> {
+  const to = assignee(spec, as, ticket, input);
+  if (!to) {
+    return { skip: `assign: ${ticket} has no known requester and the team lists no human` };
+  }
+
+  return input.ctx.state.assignee(ticket)?.id === to.id
+    ? { skip: `assign: ${ticket} is already assigned to ${to.id}` }
+    : { value: { op: "assign", ticket, to } };
+}
+
+function parentOp(ticket: string, { ctx }: DecideInput): Resolved<ActOp> {
+  const parent = ctx.event.data["parent"];
+  return typeof parent === "string" && parent !== ""
+    ? { value: { op: "set_parent", ticket, parent } }
+    : { skip: "set_parent: the event names no parent ticket" };
+}
+
+function op(spec: OpSpec, as: string, input: DecideInput): Resolved<ActOp> {
+  if ("comment" in spec) {
+    return commentOp(spec, as, input);
+  }
+
+  const ticket = input.ctx.ticket;
   if (!ticket) {
     return { skip: `${Object.keys(spec)[0]}: the event has no linked ticket` };
   }
 
   if ("move" in spec) {
-    return ctx.state.ticketStatus(ticket) === spec.move
-      ? { skip: `move: ${ticket} is already ${spec.move}` }
-      : { value: { op: "move", ticket, to: spec.move } };
+    return moveOp(spec, ticket, input);
   }
 
-  if ("assign" in spec) {
-    const human = ctx.state.requester(ticket) ?? opts.fallbackRequester;
-    const to =
-      spec.assign === "self"
-        ? { kind: "agent" as const, id: as }
-        : human
-          ? { kind: "human" as const, id: human }
-          : undefined;
-
-    if (!to) {
-      return { skip: `assign: ${ticket} has no known requester and the team lists no human` };
-    }
-
-    return ctx.state.assignee(ticket)?.id === to.id
-      ? { skip: `assign: ${ticket} is already assigned to ${to.id}` }
-      : { value: { op: "assign", ticket, to } };
-  }
-
-  const parent = ctx.event.data["parent"];
-  return typeof parent === "string" && parent !== ""
-    ? { value: { op: "set_parent", ticket, parent } }
-    : { skip: "set_parent: the event names no parent ticket" };
+  return "assign" in spec ? assignOp(spec, as, ticket, input) : parentOp(ticket, input);
 }
 
 /** The changes an act makes, and why each other one is not needed. */

@@ -1,5 +1,6 @@
 import { createStaticWorkflowState } from "@outstaff/core";
 import { coalesceWakes } from "../coalesce.js";
+import { compareOutcomes } from "../compare/compare.js";
 import type { PendingWake } from "../coalesce.types.js";
 import { evaluatePipeline } from "../evaluate.js";
 import type { PipelineEvent } from "../events.types.js";
@@ -23,8 +24,23 @@ const stateOf = (world: ReplayWorld): PipelineState => ({
   readyTickets: (person) => world.ready?.[person] ?? [],
 });
 
-const sameKeys = (a: Side, b: Side) =>
-  JSON.stringify(a.keys.toSorted()) === JSON.stringify(b.keys.toSorted());
+const same = (a: Side, b: Side) => compareOutcomes(a.outcomes, b.outcomes).agree;
+
+/** Why a row's note is wrong, if it is: missing for a difference, present without one, or of no known kind. */
+function noteProblem(agree: boolean, note: string | undefined): string | undefined {
+  if (note === undefined) {
+    return agree ? undefined : "the two sides decide differently and there is no note";
+  }
+
+  if (agree) {
+    return "has a note, but both sides decide the same";
+  }
+
+  return NOTE.test(note) ? undefined : 'a note starts with "intended fix: " or "regression: "';
+}
+
+const NOT_TODAY: Side = { shown: ["(not raised today)"], outcomes: [] };
+const NOT_PIPELINE: Side = { shown: ["(not raised)"], outcomes: [] };
 
 /**
  * Runs every event of the scenarios through today's engine rules and through the pipeline, side by side. A merge step
@@ -33,6 +49,17 @@ const sameKeys = (a: Side, b: Side) =>
 export function runReplay(scenarios: readonly ReplayScenario[], setup: ReplaySetup): ReplayResult {
   const problems: string[] = [];
   const wakes: PendingWake[] = [];
+  const pipelineOf = (event: PipelineEvent, state: PipelineState): Side => {
+    const trace = evaluatePipeline(event, state, setup.policies, setup.pipelineOptions);
+    for (const d of trace.decisions) {
+      if (d.type === "wake") {
+        wakes.push({ wake: d, eventId: event.id, at: event.at });
+      }
+    }
+
+    return pipelineSide(trace);
+  };
+
   const judge = (
     event: PipelineEvent,
     world: ReplayWorld,
@@ -40,28 +67,12 @@ export function runReplay(scenarios: readonly ReplayScenario[], setup: ReplaySet
     note: string | undefined,
   ): ReplayRow => {
     const state = stateOf(world);
-    const today = on.today
-      ? todaySide(event, state, setup)
-      : { shown: ["(not raised today)"], keys: [] };
-
-    let pipeline: Side = { shown: ["(not raised)"], keys: [] };
-    if (on.pipeline) {
-      const trace = evaluatePipeline(event, state, setup.policies, setup.pipelineOptions);
-      pipeline = pipelineSide(trace);
-      for (const d of trace.decisions) {
-        if (d.type === "wake") {
-          wakes.push({ wake: d, eventId: event.id, at: event.at });
-        }
-      }
-    }
-
-    const same = sameKeys(today, pipeline);
-    if (!same && note === undefined) {
-      problems.push(`${event.id}: the two sides decide differently and there is no note`);
-    } else if (same && note !== undefined) {
-      problems.push(`${event.id}: has a note, but both sides decide the same`);
-    } else if (note !== undefined && !NOTE.test(note)) {
-      problems.push(`${event.id}: a note starts with "intended fix: " or "regression: "`);
+    const today = on.today ? todaySide(event, state, setup) : NOT_TODAY;
+    const pipeline = on.pipeline ? pipelineOf(event, state) : NOT_PIPELINE;
+    const agree = same(today, pipeline);
+    const problem = noteProblem(agree, note);
+    if (problem) {
+      problems.push(`${event.id}: ${problem}`);
     }
 
     return {
@@ -69,7 +80,7 @@ export function runReplay(scenarios: readonly ReplayScenario[], setup: ReplaySet
       derived: on.derived,
       today: today.shown,
       pipeline: pipeline.shown,
-      same,
+      same: agree,
       note,
     };
   };

@@ -1,4 +1,5 @@
 import type { Logger, TeamConfig, WorkflowEvent, WorkflowState } from "@outstaff/core";
+import type { EffectOutcome } from "../engine/types.js";
 import type { Clock } from "../types.js";
 import type { Trace, TraceStore } from "./trace.types.js";
 
@@ -12,11 +13,23 @@ export interface ShadowOptions {
   logger: Logger;
 }
 
-/** Runs office events through the pipeline and records only the trace: nothing is scheduled or changed. */
-export interface ShadowPipeline {
+/** Judges office events with the pipeline. */
+export interface PipelineRunner {
   /** Never throws: a failure is logged, so the office's own handling is never held up. */
   handle(
     event: WorkflowEvent,
     meta: { source: string; externalId: string },
+  ): Promise<Trace | undefined>;
+}
+
+/** Runs office events through the pipeline and records only the trace: nothing is scheduled or changed. */
+export interface ShadowPipeline extends PipelineRunner {
+  /**
+   * Adds to the event's trace what the engine applied for it, and how that compares with the pipeline's decisions.
+   * Never throws.
+   */
+  engineDid(
+    meta: { source: string; externalId: string },
+    outcomes: readonly EffectOutcome[],
   ): Promise<Trace | undefined>;
 }

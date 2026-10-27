@@ -1,4 +1,5 @@
 export { coalesceWakes } from "./coalesce.js";
+export * from "./compare/index.js";
 export { configurePipeline } from "./configure.js";
 export { DEFAULT_POLICIES } from "./defaults.js";
 export { deriveAfterMerge } from "./derive.js";

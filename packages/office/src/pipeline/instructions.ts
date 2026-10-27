@@ -34,22 +34,33 @@ const isCause = (v: unknown): v is MergeCause =>
 
 const number = (pr: PrRef) => String(pr.number);
 
+/** The variables that name the merge behind a derived event; empty for any other event. */
+function causeVariables(data: Record<string, unknown>): Record<string, string> {
+  const cause = data["cause"];
+  if (!isCause(cause)) {
+    return { cause: "", "cause.number": "", "cause.title": "" };
+  }
+
+  return {
+    cause: ` after #${number(cause.pr)} (${cause.title}) merged`,
+    "cause.number": number(cause.pr),
+    "cause.title": cause.title,
+  };
+}
+
 /** Every instruction variable for an event, unavailable ones empty. */
 export function instructionVariables(
   ctx: EvaluationContext,
-  extra: { person?: string; next?: string },
+  extra: { person?: string | undefined; next?: string | undefined },
 ): Record<string, string> {
   const { event } = ctx;
-  const cause = isCause(event.data["cause"]) ? event.data["cause"] : undefined;
   const title = event.data["title"];
   return {
     ...templateVariables(ctx),
     person: extra.person ?? "",
     "doc.title": typeof title === "string" ? title : (event.subject.doc ?? ""),
     "pr.problem": PROBLEMS[event.type] ?? "",
-    cause: cause ? ` after #${number(cause.pr)} (${cause.title}) merged` : "",
-    "cause.number": cause ? number(cause.pr) : "",
-    "cause.title": cause?.title ?? "",
+    ...causeVariables(event.data),
     "next.ticket": extra.next ?? "",
   };
 }

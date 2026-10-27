@@ -1,4 +1,5 @@
 import type { Rule, StaticWorkflowData, WorkflowOptions } from "@outstaff/core";
+import type { Outcome } from "../compare/compare.types.js";
 import type { PipelineEvent } from "../events.types.js";
 import type { Policy } from "../policy.types.js";
 import type { PipelineOptions, ReadyTicket } from "../state.types.js";
@@ -79,6 +80,6 @@ export interface Side {
   /** What it does, for people: identity and detail. */
   shown: string[];
 
-  /** What is compared: the wakes and tracker changes, whoever makes them. */
-  keys: string[];
+  /** What is compared: the wakes and tracker changes. */
+  outcomes: Outcome[];
 }

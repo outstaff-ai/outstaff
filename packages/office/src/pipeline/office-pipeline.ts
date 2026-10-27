@@ -4,35 +4,43 @@ import type { OfficePipeline, OfficePipelineOptions } from "./office-pipeline.ty
 import { createShadowPipeline } from "./shadow.js";
 import { createStoreTraceStore } from "./store-traces.js";
 
-/** Proposed (decision 0016): the event pipeline beside the engine, off unless `office.pipeline` says otherwise. */
-export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipeline {
-  const { team, store, clock, logger } = opts;
-  const mode = team.office?.pipeline ?? "off";
-  const traces = createStoreTraceStore(store);
-  if (mode === "off") {
-    return { mode, traces, route: (_event, _meta, engine) => engine() };
-  }
+type Traces = OfficePipeline["traces"];
 
-  if (mode === "shadow") {
-    const runner = createShadowPipeline({ team, state: opts.workState, traces, clock, logger });
-    return {
-      mode,
-      runner,
-      traces,
-      async route(event, meta, engine) {
-        await runner.handle(event, meta);
-        return engine();
-      },
-    };
-  }
+function shadow(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
+  const { team, clock, logger } = opts;
+  const runner = createShadowPipeline({ team, state: opts.workState, traces, clock, logger });
+  return {
+    mode: "shadow",
+    runner,
+    traces,
+    async route(event, meta, engine) {
+      await runner.handle(event, meta);
+      const outcomes = await engine();
+      await runner.engineDid(meta, outcomes);
+      return outcomes;
+    },
+  };
+}
 
+function live(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
   const executor = createOfficeActExecutor({
-    team,
+    team: opts.team,
     tracker: opts.ports.tracker,
     knowledge: opts.ports.knowledge,
     traces,
   });
 
   const runner = createLivePipeline({ ...opts, executor, traces });
-  return { mode, runner, traces, route: (event, meta) => runner.handle(event, meta) };
+  return { mode: "live", runner, traces, route: (event, meta) => runner.handle(event, meta) };
+}
+
+/** Proposed (decision 0016): the event pipeline beside the engine, off unless `office.pipeline` says otherwise. */
+export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipeline {
+  const traces = createStoreTraceStore(opts.store);
+  const mode = opts.team.office?.pipeline ?? "off";
+  if (mode === "off") {
+    return { mode, traces, route: (_event, _meta, engine) => engine() };
+  }
+
+  return mode === "shadow" ? shadow(opts, traces) : live(opts, traces);
 }

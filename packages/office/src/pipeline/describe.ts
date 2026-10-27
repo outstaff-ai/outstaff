@@ -1,4 +1,5 @@
 import { subjectLabel } from "../log.js";
+import { formatEngine } from "./compare/describe.js";
 import type { ActOp, Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { Trace } from "./trace.types.js";
@@ -39,44 +40,44 @@ export function describeDecision(d: Decision): string {
   }
 }
 
+/** The policies that listen to the event, each with why it matched or not and what it decided. */
+function policyLines(judged: Trace["policies"]): string[] {
+  if (judged.length === 0) {
+    return [];
+  }
+
+  return [
+    "Policies:",
+    ...judged.flatMap((p) => [
+      `  ${p.matched ? "matched" : "no     "}  ${p.policy}: ${p.reason}`,
+      ...(p.failed ? [`           failing condition: ${JSON.stringify(p.failed)}`] : []),
+      ...p.decisions.map((d) => `           -> ${describeDecision(d)}`),
+    ]),
+    "",
+  ];
+}
+
+const decisionLines = (decisions: Trace["decisions"]): string[] =>
+  decisions.flatMap((d) => [
+    `  ${describeDecision(d)}`,
+    ...(d.type === "wake" ? [`    instruction: ${d.instruction}`] : []),
+  ]);
+
 /** A trace as text: the event, each policy that listens to it with why it matched or not, and the decisions. */
 export function formatTrace(trace: Trace): string {
   const { event } = trace;
-  const lines = [
+  const deaf = trace.policies.filter((p) => !p.matched && p.reason.startsWith("listens to "));
+  const judged = trace.policies.filter((p) => !deaf.includes(p));
+  return [
     `${event.type} on ${subjectOf(event)} by ${event.actor.kind} ${event.actor.id} at ${event.at}`,
     `event ${event.id}`,
     "",
-  ];
-
-  const deaf = trace.policies.filter((p) => !p.matched && p.reason.startsWith("listens to "));
-  const judged = trace.policies.filter((p) => !deaf.includes(p));
-  if (judged.length > 0) {
-    lines.push("Policies:");
-    for (const p of judged) {
-      lines.push(`  ${p.matched ? "matched" : "no     "}  ${p.policy}: ${p.reason}`);
-      if (p.failed) {
-        lines.push(`           failing condition: ${JSON.stringify(p.failed)}`);
-      }
-
-      for (const d of p.decisions) {
-        lines.push(`           -> ${describeDecision(d)}`);
-      }
-    }
-
-    lines.push("");
-  }
-
-  if (deaf.length > 0) {
-    lines.push(`Not listening to ${event.type}: ${deaf.map((p) => p.policy).join(", ")}`, "");
-  }
-
-  lines.push("Decisions:");
-  for (const d of trace.decisions) {
-    lines.push(`  ${describeDecision(d)}`);
-    if (d.type === "wake") {
-      lines.push(`    instruction: ${d.instruction}`);
-    }
-  }
-
-  return lines.join("\n");
+    ...policyLines(judged),
+    ...(deaf.length > 0
+      ? [`Not listening to ${event.type}: ${deaf.map((p) => p.policy).join(", ")}`, ""]
+      : []),
+    "Decisions:",
+    ...decisionLines(trace.decisions),
+    ...(trace.engine ? ["", ...formatEngine(trace.engine, trace.comparison)] : []),
+  ].join("\n");
 }

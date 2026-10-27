@@ -172,6 +172,16 @@ describe("the office link", () => {
       result: { items: [{ id: item.id }] },
     });
 
+    expect(await dash.request({ method: "compare" })).toMatchObject({
+      result: { events: 2, compared: 0, agree: 0, differ: 0, differing: [] },
+    });
+
+    expect(
+      await dash.request({ method: "compare", params: { since: "2026-10-05T09:01:00.000Z" } }),
+    ).toMatchObject({
+      result: { since: "2026-10-05T09:01:00.000Z", events: 1 },
+    });
+
     expect(await dash.request({ method: "item", params: { id: "nope" } })).toMatchObject({
       error: { code: "not_found", message: "No work item nope." },
     });

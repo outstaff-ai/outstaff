@@ -9,6 +9,43 @@ export const derivedId = (type: string, pr: PrSnapshot, merged: PrSnapshot): str
 export const sameRepo = (a: PrSnapshot, b: PrSnapshot): boolean =>
   a.ref.repo.owner === b.ref.repo.owner && a.ref.repo.name === b.ref.repo.name;
 
+/** The open pull requests of the merged one's repository, other than it: the ones a merge can change something under. */
+const affected = (change: MergeChange): PrSnapshot[] =>
+  change.after.filter(
+    (pr) =>
+      pr.state === "open" &&
+      sameRepo(pr, change.merged) &&
+      prLabel(pr.ref) !== prLabel(change.merged.ref),
+  );
+
+const conflicting = (pr: PrSnapshot | undefined) => pr?.mergeable === "conflicting";
+
+/** Stacked on the merged branch: its base is gone. */
+const stackedOnMerged = (pr: PrSnapshot, change: MergeChange): MergeDerivedType | undefined =>
+  pr.baseRef === change.merged.headRef ? "pr.base_merged" : undefined;
+
+/** Targets the branch the merge went into: its base moved, so it conflicts with the new base or is behind it. */
+function sameBase(pr: PrSnapshot, change: MergeChange): MergeDerivedType | undefined {
+  if (pr.baseRef !== change.merged.baseRef) {
+    return undefined;
+  }
+
+  if (conflicting(pr)) {
+    return "pr.conflicted";
+  }
+
+  return change.requiresUpToDate ? "pr.behind_base" : undefined;
+}
+
+/** Targets another branch: only a change into conflicting is news. */
+const otherBase = (pr: PrSnapshot, change: MergeChange): MergeDerivedType | undefined => {
+  const was = change.before.find((p) => prLabel(p.ref) === prLabel(pr.ref));
+  return conflicting(pr) && !conflicting(was) ? "pr.conflicted" : undefined;
+};
+
+/** Tried in order: the first relation that applies decides. */
+const RELATIONS = [stackedOnMerged, sameBase, otherBase];
+
 /**
  * What a merge changed under each other open pull request of its repository, whoever authored or merged them:
  * - `pr.base_merged` when the pull request was stacked on the merged branch;
@@ -22,37 +59,20 @@ export const sameRepo = (a: PrSnapshot, b: PrSnapshot): boolean =>
  */
 export function deriveAfterMerge(change: MergeChange): PipelineEvent[] {
   const { merged, at } = change;
-  const before = new Map(change.before.map((p) => [prLabel(p.ref), p]));
   const cause = { pr: merged.ref, title: merged.title, url: merged.url };
-  const events: PipelineEvent[] = [];
-  const raise = (type: MergeDerivedType, pr: PrSnapshot) =>
-    events.push({
-      id: derivedId(type, pr, merged),
-      type,
-      at,
-      subject: { pr: pr.ref, ...(pr.ticket ? { ticket: pr.ticket } : {}) },
-      actor: { kind: "automation", id: "office" },
-      data: { cause, base: pr.baseRef },
-    });
-
-  for (const pr of change.after) {
-    if (pr.state !== "open" || !sameRepo(pr, merged) || prLabel(pr.ref) === prLabel(merged.ref)) {
-      continue;
-    }
-
-    const conflicting = pr.mergeable === "conflicting";
-    if (pr.baseRef === merged.headRef) {
-      raise("pr.base_merged", pr);
-    } else if (pr.baseRef === merged.baseRef) {
-      if (conflicting) {
-        raise("pr.conflicted", pr);
-      } else if (change.requiresUpToDate) {
-        raise("pr.behind_base", pr);
-      }
-    } else if (conflicting && before.get(prLabel(pr.ref))?.mergeable !== "conflicting") {
-      raise("pr.conflicted", pr);
-    }
-  }
-
-  return events;
+  return affected(change).flatMap((pr): PipelineEvent[] => {
+    const type = RELATIONS.map((relation) => relation(pr, change)).find((t) => t !== undefined);
+    return type
+      ? [
+          {
+            id: derivedId(type, pr, merged),
+            type,
+            at,
+            subject: { pr: pr.ref, ...(pr.ticket ? { ticket: pr.ticket } : {}) },
+            actor: { kind: "automation", id: "office" },
+            data: { cause, base: pr.baseRef },
+          },
+        ]
+      : [];
+  });
 }

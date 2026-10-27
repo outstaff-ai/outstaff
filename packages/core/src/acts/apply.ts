@@ -8,38 +8,59 @@ const need = <T>(port: T | undefined, what: string): T => {
   return port;
 };
 
-async function one(
-  op: ActOp,
+type Member = (target: ActTarget) => Promise<string>;
+type Make<K extends ActOp["op"]> = (
+  op: Extract<ActOp, { op: K }>,
   ports: ActPorts,
-  member: (target: ActTarget) => Promise<string>,
-): Promise<string> {
+  member: Member,
+) => Promise<string>;
+
+const move: Make<"move"> = async (op, ports) => {
+  await need(ports.tracker, "tracker").transition(op.ticket, op.to);
+  return `moved ${op.ticket} to ${op.to}`;
+};
+
+const assign: Make<"assign"> = async (op, ports, member) => {
+  const tracker = need(ports.tracker, "tracker");
+  if (!op.to) {
+    await tracker.assign(op.ticket, null);
+    return `unassigned ${op.ticket}`;
+  }
+
+  await tracker.assign(op.ticket, await member(op.to));
+  return `assigned ${op.ticket} to ${op.to.id}`;
+};
+
+const comment: Make<"comment"> = async (op, ports) => {
+  if ("ticket" in op.on) {
+    await need(ports.tracker, "tracker").comment(op.on.ticket, op.body);
+    return `commented on ${op.on.ticket}`;
+  }
+
+  await need(ports.knowledge, "knowledge base").comment(op.on.doc, { body: op.body });
+  return `commented on doc ${op.on.doc}`;
+};
+
+const setParent: Make<"set_parent"> = async (op, ports) => {
+  const tracker = need(ports.tracker, "tracker");
+  if (!tracker.setParent) {
+    throw new Error("the tracker has no parent field (tracker.parents)");
+  }
+
+  await tracker.setParent(op.ticket, op.parent);
+  return `set the parent of ${op.ticket} to ${op.parent}`;
+};
+
+function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
   switch (op.op) {
     case "move":
-      await need(ports.tracker, "tracker").transition(op.ticket, op.to);
-      return `moved ${op.ticket} to ${op.to}`;
-    case "assign": {
-      const tracker = need(ports.tracker, "tracker");
-      await tracker.assign(op.ticket, op.to ? await member(op.to) : null);
-      return op.to ? `assigned ${op.ticket} to ${op.to.id}` : `unassigned ${op.ticket}`;
-    }
-
+      return move(op, ports, member);
+    case "assign":
+      return assign(op, ports, member);
     case "comment":
-      if ("ticket" in op.on) {
-        await need(ports.tracker, "tracker").comment(op.on.ticket, op.body);
-        return `commented on ${op.on.ticket}`;
-      }
-
-      await need(ports.knowledge, "knowledge base").comment(op.on.doc, { body: op.body });
-      return `commented on doc ${op.on.doc}`;
-    case "set_parent": {
-      const tracker = need(ports.tracker, "tracker");
-      if (!tracker.setParent) {
-        throw new Error("the tracker has no parent field (tracker.parents)");
-      }
-
-      await tracker.setParent(op.ticket, op.parent);
-      return `set the parent of ${op.ticket} to ${op.parent}`;
-    }
+      return comment(op, ports, member);
+    case "set_parent":
+      return setParent(op, ports, member);
   }
 }
 

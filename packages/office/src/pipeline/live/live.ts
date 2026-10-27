@@ -1,7 +1,7 @@
 import { configurePipeline } from "../configure.js";
 import { evaluatePipeline } from "../evaluate.js";
 import { toPipelineEvent } from "../from-workflow.js";
-import type { ShadowPipeline } from "../shadow.types.js";
+import type { PipelineRunner } from "../shadow.types.js";
 import type { PipelineState } from "../state.types.js";
 import type { LiveOptions } from "./live.types.js";
 import { enqueueWake } from "./wake.js";
@@ -11,7 +11,7 @@ import { enqueueWake } from "./wake.js";
  * are queued and its acts carried out. Errors propagate, so intake delivers the event again; the trace, the queue
  * and the acts are all idempotent per event.
  */
-export function createLivePipeline(opts: LiveOptions): ShadowPipeline {
+export function createLivePipeline(opts: LiveOptions): PipelineRunner {
   const { traces, clock, logger, executor } = opts;
   const { policies, options, issues } = configurePipeline(opts.team);
   for (const issue of issues) {

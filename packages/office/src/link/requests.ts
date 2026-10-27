@@ -1,5 +1,6 @@
 import type { LinkErrorCode, LinkRequest, LinkResponse } from "@outstaff/protocol";
 import type { Trace } from "../pipeline/trace.types.js";
+import { compareRange } from "../pipeline/compare/summary.js";
 import { findEvents } from "./events.js";
 import { findItem } from "./item.js";
 import { findItems } from "./items.js";
@@ -7,19 +8,31 @@ import type { OfficeLinkOptions } from "./link.types.js";
 import { listPeople } from "./people.js";
 import { present } from "./present.js";
 
+/** The office store's traces, as the comparison reads them. */
+const storeTraces = (store: OfficeLinkOptions["store"]) => ({
+  list: async (q?: { before?: string; limit?: number }) =>
+    (await store.listTraces(q)).map((r) => r.data as Trace),
+});
+
 const error = (id: string, code: LinkErrorCode, message: string): LinkResponse => ({
   id,
   error: { code, message },
 });
 
+type Params<M extends LinkRequest["method"]> = Extract<LinkRequest, { method: M }>["params"];
+
+const people = async (opts: OfficeLinkOptions, id: string): Promise<LinkResponse> => ({
+  id,
+  result: { at: opts.clock.now().toISOString(), people: await listPeople(opts) },
+});
+
 async function events(
   opts: OfficeLinkOptions,
   id: string,
-  params: Parameters<typeof findEvents>[1],
-) {
-  const found = await findEvents(opts.store, params);
-  const result = { ...found, events: found.events.map((t) => present(t, opts.links)) };
-  return { id, result } satisfies LinkResponse;
+  params: Params<"events">,
+): Promise<LinkResponse> {
+  const found = await findEvents(opts.store, params ?? {});
+  return { id, result: { ...found, events: found.events.map((t) => present(t, opts.links)) } };
 }
 
 async function event(opts: OfficeLinkOptions, id: string, eventId: string): Promise<LinkResponse> {
@@ -29,6 +42,24 @@ async function event(opts: OfficeLinkOptions, id: string, eventId: string): Prom
     : error(id, "not_found", `No trace for event ${eventId}.`);
 }
 
+const items = async (
+  opts: OfficeLinkOptions,
+  id: string,
+  params: Params<"items">,
+): Promise<LinkResponse> => ({
+  id,
+  result: await findItems(opts.store, params ?? {}),
+});
+
+const compare = async (
+  opts: OfficeLinkOptions,
+  id: string,
+  params: Params<"compare">,
+): Promise<LinkResponse> => ({
+  id,
+  result: await compareRange(storeTraces(opts.store), params ?? {}),
+});
+
 async function item(opts: OfficeLinkOptions, id: string, itemId: string): Promise<LinkResponse> {
   const found = await findItem(opts.store, itemId);
   return found
@@ -36,19 +67,18 @@ async function item(opts: OfficeLinkOptions, id: string, itemId: string): Promis
     : error(id, "not_found", `No work item ${itemId}.`);
 }
 
-async function dispatch(opts: OfficeLinkOptions, r: LinkRequest): Promise<LinkResponse> {
+function dispatch(opts: OfficeLinkOptions, r: LinkRequest): Promise<LinkResponse> {
   switch (r.method) {
     case "people":
-      return {
-        id: r.id,
-        result: { at: opts.clock.now().toISOString(), people: await listPeople(opts) },
-      };
+      return people(opts, r.id);
     case "events":
-      return events(opts, r.id, r.params ?? {});
+      return events(opts, r.id, r.params);
     case "event":
       return event(opts, r.id, r.params.id);
     case "items":
-      return { id: r.id, result: await findItems(opts.store, r.params ?? {}) };
+      return items(opts, r.id, r.params);
+    case "compare":
+      return compare(opts, r.id, r.params);
     case "item":
       return item(opts, r.id, r.params.id);
   }
