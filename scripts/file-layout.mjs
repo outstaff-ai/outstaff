@@ -184,7 +184,7 @@ export function climbingImports(files, read) {
 const INTEGRATION = /^integrations\/[^/]+\/[^/]+$/;
 const ALLOWED = /^@outstaff\/(core|protocol|integration\.shared\.[^/]+)(\/|$)/;
 const TEST_KIT = /^@outstaff\/testing\.[^/]+(\/|$)/;
-const TEST_FILE = /(^|\/)(__tests__|testing)\/|(^|\/)testing\.ts$/;
+const TEST_FILE = /(^|\/)__tests__\//;
 const DEPENDENCY_FIELDS = [
   "dependencies",
   "devDependencies",

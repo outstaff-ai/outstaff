@@ -2,7 +2,7 @@ import { createFakeTracker, createFakeVcs, type FakeTracker } from "@outstaff/co
 import type { Logger } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
-import { teamConfig } from "#/intake/test-support.js";
+import { teamConfig } from "#/intake/__tests__/test-support.js";
 import { createIdlePull } from "#/office-idle.js";
 import type { IdlePullOptions } from "#/office-idle.types.js";
 import { createOfficePipeline } from "#/pipeline/office-pipeline.js";

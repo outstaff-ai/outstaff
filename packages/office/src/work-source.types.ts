@@ -1,8 +1,9 @@
-import type { Tracker, TeamConfig, Vcs } from "@outstaff/core";
+import type { Logger, Tracker, TeamConfig, Vcs } from "@outstaff/core";
 import type { Link } from "@outstaff/protocol";
 import type { RosterOptions } from "./messaging/index.js";
 import type { BlockNotice, Scheduler } from "./scheduler/index.js";
 import type { Store, WorkItem } from "./store/types.js";
+import type { TraceStore } from "./pipeline/trace.types.js";
 
 export interface HandBackResult {
   summary: string;
@@ -13,9 +14,15 @@ export interface HandBackResult {
 export interface WorkSourceOptions {
   scheduler: Scheduler;
   store: Store;
-  team: Pick<TeamConfig, "people" | "humans">;
+  team: Pick<TeamConfig, "people" | "humans"> & Partial<Pick<TeamConfig, "pipeline">>;
   ports?: { tracker?: Tracker; vcs?: Vcs };
   roles?: RosterOptions["roles"];
+
+  /** Where the event pipeline keeps its traces; what each wake's bundle carried is added to them. */
+  traces?: Pick<TraceStore, "get" | "record">;
+
+  /** Where a wake whose context could not be built is reported. */
+  logger?: Pick<Logger, "warn">;
 
   /** Called after the item left `active` because of a hand-back, so the workflow can react (move the ticket, notify). */
   onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;

@@ -14,6 +14,15 @@ import type {
   inlineCommentSchema,
   offerContextSchema,
 } from "./schemas/feedback.js";
+import type {
+  contextChatSchema,
+  contextDocSchema,
+  contextNoteSchema,
+  contextPrSchema,
+  contextTicketSchema,
+  contextWhySchema,
+  wakeContextSchema,
+} from "./schemas/context.js";
 import type { doctorCheckSchema } from "./schemas/doctor.js";
 import type { messageSchema } from "./schemas/message.js";
 import type {
@@ -44,6 +53,13 @@ export type InlineComment = z.infer<typeof inlineCommentSchema>;
 export type Feedback = z.infer<typeof feedbackSchema>;
 export type ConversationEntry = z.infer<typeof conversationEntrySchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
+export type WakeContext = z.infer<typeof wakeContextSchema>;
+export type ContextWhy = z.infer<typeof contextWhySchema>;
+export type ContextNote = z.infer<typeof contextNoteSchema>;
+export type ContextTicket = z.infer<typeof contextTicketSchema>;
+export type ContextPr = z.infer<typeof contextPrSchema>;
+export type ContextDoc = z.infer<typeof contextDocSchema>;
+export type ContextChat = z.infer<typeof contextChatSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;
 export type WorkState = z.infer<typeof workStateSchema>;
 export type Filed = z.infer<typeof filedSchema>;

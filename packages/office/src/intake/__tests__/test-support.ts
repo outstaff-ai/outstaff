@@ -3,8 +3,8 @@ import type { Member, RepoRef, TeamConfig, WorkflowEvent } from "@outstaff/core"
 import { createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { manualClock } from "#/clock.js";
 import { openStore } from "#/store/index.js";
-import { createIntake } from "./intake.js";
-import type { IntakeMeta, IntakeOptions } from "./types.js";
+import { createIntake } from "#/intake/intake.js";
+import type { IntakeMeta, IntakeOptions } from "#/intake/types.js";
 
 export const REPO: RepoRef = { host: "git.acme.example", owner: "acme", name: "app" };
 

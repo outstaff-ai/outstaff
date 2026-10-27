@@ -12,7 +12,7 @@ import {
 import type { Message } from "@outstaff/protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import { createOfficeConnection } from "#/office-client/index.js";
-import { FakeSocket, createManualClock } from "#/office-client/testing.js";
+import { FakeSocket, createManualClock } from "#/office-client/__tests__/testing.js";
 import type { Workspaces } from "#/repos/index.js";
 import { fakeEnv } from "@outstaff/testing.agent";
 import { JOURNAL_PROMPT } from "#/runner/journal.js";

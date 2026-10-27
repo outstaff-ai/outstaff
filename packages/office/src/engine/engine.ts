@@ -20,6 +20,7 @@ import {
   undeliveredFeedback,
 } from "./feedback.js";
 import { clip, prLabel, subjectLabel } from "#/log.js";
+import { triggerRefs } from "#/refs/index.js";
 import { PRIORITY, priorityFor } from "#/scheduler/index.js";
 import type { WorkItem, WorkItemTrigger } from "#/store/index.js";
 import type { Feedback } from "@outstaff/protocol";
@@ -305,7 +306,10 @@ export function createEngine(opts: EngineOptions): Engine {
     e: Extract<Effect, { type: "schedule" }>,
     event: WorkflowEvent,
     plan: Plan,
+    ref: string,
   ): Promise<string> => {
+    // What woke the work: everything the event is about, recorded on the item with the event as the source.
+    const refs = triggerRefs(event.subject, ref, workState.prSubject);
     if (!team.people.some((p) => p.handle === e.person)) {
       throw new Skip(`${e.person} is not a person on the team`);
     }
@@ -356,6 +360,7 @@ export function createEngine(opts: EngineOptions): Engine {
         const feedback = feedbackOf(event);
         if (feedback) {
           await addFeedback(store, dup.id, feedback);
+          await store.addItemRefs(dup.id, refs);
           throw new Attached(
             dup.status === "queued"
               ? `attached to work item ${dup.id} (${dup.kind}, queued)`
@@ -422,6 +427,8 @@ export function createEngine(opts: EngineOptions): Engine {
       priority: priorityNumber(trigger, e.kind, e.priority),
       ...(related ? { parentId: related.id } : {}),
       ...(subject ? { subject } : {}),
+      source: ref,
+      refs,
     });
 
     if (feedback) {
@@ -431,10 +438,15 @@ export function createEngine(opts: EngineOptions): Engine {
     return `queued work item ${item.id} for ${e.person}`;
   };
 
-  const apply = async (e: Effect, event: WorkflowEvent, plan: Plan): Promise<string> => {
+  const apply = async (
+    e: Effect,
+    event: WorkflowEvent,
+    plan: Plan,
+    ref: string,
+  ): Promise<string> => {
     switch (e.type) {
       case "schedule":
-        return schedule(e, event, plan);
+        return schedule(e, event, plan, ref);
       case "move":
         if (!tracker) {
           throw new Skip("no tracker is configured");
@@ -548,7 +560,12 @@ export function createEngine(opts: EngineOptions): Engine {
       let outcome: EffectOutcome;
       let attached = false;
       try {
-        outcome = { effect, status: "applied", note: await apply(effect, event, plan), at: now() };
+        outcome = {
+          effect,
+          status: "applied",
+          note: await apply(effect, event, plan, ref),
+          at: now(),
+        };
       } catch (error) {
         if (error instanceof Attached) {
           outcome = { effect, status: "applied", note: error.message, at: now() };
@@ -620,6 +637,8 @@ export function createEngine(opts: EngineOptions): Engine {
       ...(item.subject ? { subject: item.subject } : {}),
       // Stored before the item can be offered: an offer without its feedback or origin would never be repeated.
       init: async (created) => {
+        // The round goes on with what the earlier one referred to.
+        await store.addItemRefs(created.id, await store.listItemRefs(itemId));
         for (const feedback of late) {
           await addFeedback(store, created.id, feedback);
         }

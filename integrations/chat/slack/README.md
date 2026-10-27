@@ -114,4 +114,4 @@ Errors map to port errors: `message_not_found`, `channel_not_found`, `user_not_f
 
 ## Testing
 
-`createSlackChat(ctx, { web, socket })` takes injectable clients. Tests drive a stateful fake Slack (`src/testing/slack-fake.ts`) through the chat contract kit, plus formatting goldens, splitting and trust cases. The live test (`src/__tests__/live.test.ts`) is skipped unless `OUTSTAFF_TEST_SLACK_USER` is set with `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`.
+`createSlackChat(ctx, { web, socket })` takes injectable clients. Tests drive a stateful fake Slack (`src/__tests__/support/slack-fake.ts`) through the chat contract kit, plus formatting goldens, splitting and trust cases. The live test (`src/__tests__/live.test.ts`) is skipped unless `OUTSTAFF_TEST_SLACK_USER` is set with `SLACK_BOT_TOKEN` and `SLACK_APP_TOKEN`.

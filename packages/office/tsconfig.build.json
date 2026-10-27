@@ -6,10 +6,5 @@
     "outDir": "dist",
     "customConditions": []
   },
-  "exclude": [
-    "src/**/__tests__/**",
-    "src/**/contract.ts",
-    "src/**/test-support.ts",
-    "src/**/testing.ts"
-  ]
+  "exclude": ["src/**/__tests__/**", "src/contract.ts"]
 }

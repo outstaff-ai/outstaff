@@ -1,4 +1,4 @@
-import type { Tracker, Vcs } from "@outstaff/core";
+import type { TeamConfig, Tracker, Vcs } from "@outstaff/core";
 import type { Ref } from "@outstaff/protocol";
 import type { ChatOriginRecord } from "./chat/types.js";
 import { publicOrigin, readOrigin } from "./chat/origin.js";
@@ -7,7 +7,9 @@ import { deliverFeedback, readFeedback } from "./engine/feedback.js";
 import { itemRefs } from "./item-refs.js";
 import type { Offer } from "./protocol/index.js";
 import { INTERRUPTED } from "./scheduler/index.js";
+import { contextLimits } from "./pipeline/context/index.js";
 import type { Store, WorkItem } from "./store/types.js";
+import { wakeContextOf, type WakeContextOptions } from "./wake-context/index.js";
 
 const sameRef = (a: Ref, b: Ref) => a.type === b.type && a.ref === b.ref;
 
@@ -30,9 +32,20 @@ function offeredItem(item: WorkItem, origin: ChatOriginRecord | undefined): Offe
   };
 }
 
-/** Builds the offer of an item: the item itself with its origin, journal, subjects, feedback and conversation. */
-export function offerBuilder(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs }) {
+/**
+ * Builds the offer of an item: the item itself with its origin, journal, subjects, feedback, conversation, and the
+ * context bundle of what the office knows around it.
+ */
+export function offerBuilder(
+  store: Store,
+  ports?: { tracker?: Tracker; vcs?: Vcs },
+  opts: Omit<WakeContextOptions, "limits"> & { team?: Pick<TeamConfig, "pipeline"> } = {},
+) {
   const { subjectsOf } = itemRefs(store, ports);
+  const wakeOf = wakeContextOf(
+    { store, tracker: ports?.tracker, vcs: ports?.vcs },
+    { ...opts, limits: contextLimits(opts.team ?? {}) },
+  );
 
   // A chat session answering in the thread of running work sees that work: its ticket, pull request and journal.
   const aboutOf = async (origin: ChatOriginRecord | undefined) =>
@@ -65,6 +78,7 @@ export function offerBuilder(store: Store, ports?: { tracker?: Tracker; vcs?: Vc
     const conversation = await previousConversation(store, ports?.vcs, item, feedback);
     const interrupted = await interruptedBefore(item.id);
     const journal = await journalOf(item, about);
+    const wake = await wakeOf(item, fresh);
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       ...(interrupted ? { interrupted } : {}),
@@ -75,6 +89,7 @@ export function offerBuilder(store: Store, ports?: { tracker?: Tracker; vcs?: Vc
         links: linksOf(subjects),
         ...(feedback.length > 0 ? { feedback } : {}),
         ...(conversation.length > 0 ? { conversation } : {}),
+        ...(wake ? { wake } : {}),
       },
     };
   };

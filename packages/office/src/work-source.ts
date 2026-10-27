@@ -63,7 +63,12 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       accepted: false,
     };
 
-  const offerOf = offerBuilder(store, opts.ports);
+  const offerOf = offerBuilder(store, opts.ports, {
+    team: opts.team,
+    ...(opts.traces ? { traces: opts.traces } : {}),
+    ...(opts.logger ? { logger: opts.logger } : {}),
+  });
+
   const summaryOf = (item: WorkItem, current?: string) => summarizeItem(store, item, current);
 
   return {

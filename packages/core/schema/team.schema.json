@@ -1468,10 +1468,47 @@
             }
           },
           "additionalProperties": false
+        },
+        "context": {
+          "type": "object",
+          "properties": {
+            "comments": {
+              "description": "The latest comments of each ticket handed over. Default 5.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "messages": {
+              "description": "The latest messages of each chat thread handed over. Default 10.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "threads": {
+              "description": "The unresolved review threads of each pull request handed over. Default 5.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
+            "items": {
+              "description": "How many tickets, pull requests, documents and chat threads one wake carries at most, the closest to what woke the agent first. Default 8.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "body_chars": {
+              "description": "Longer descriptions, comments and messages are cut to this many characters; the link has the rest. Default 1500.",
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 20000
+            }
+          },
+          "additionalProperties": false,
+          "description": "The context bundle every wake carries: the tickets, pull requests and chat threads the work is linked to, with their recent comments, threads and messages."
         }
       },
       "additionalProperties": false,
-      "description": "Proposed (decision 0016): the event pipeline's policies. Read only by the office's shadow mode (office.pipeline: shadow), which records what the pipeline would decide and changes nothing."
+      "description": "Proposed (decision 0016): the event pipeline's policies, read in the office's shadow and live modes (office.pipeline), and the context every wake carries, in every mode."
     },
     "link": {
       "type": "object",

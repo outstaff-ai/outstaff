@@ -155,4 +155,55 @@ describe("formatTrace", () => {
       ].join("\n"),
     );
   });
+
+  it("says what each wake's bundle carried, item by item", () => {
+    const limits = { comments: 5, messages: 10, threads: 5, items: 2, bodyChars: 1500 };
+    const trace: Trace = {
+      event: event("pr.comment", { id: "vcs:1", subject: { ticket: "ACME-1" } }),
+      policies: [],
+      decisions: [],
+      context: {
+        "item-1": {
+          itemId: "item-1",
+          omitted: 1,
+          limits,
+          entries: [
+            {
+              type: "pr",
+              ref: "acme/app#12",
+              url: "https://git.acme.example/acme/app/pull/12",
+              why: { role: "subject", source: "vcs:1" },
+              shown: 1,
+              left: 2,
+            },
+            {
+              type: "chat_thread",
+              ref: "D1:1",
+              why: { role: "linked", source: "chat thread of work item item-0" },
+              shown: 3,
+              left: 0,
+            },
+          ],
+        },
+        "item-2": {
+          itemId: "item-2",
+          omitted: 0,
+          limits,
+          entries: [{ type: "doc", ref: "doc-1", why: { role: "created", source: "doc_link" } }],
+        },
+      },
+    };
+
+    expect(formatTrace(trace).split("\n").slice(-7)).toEqual([
+      "",
+      "Context handed over:",
+      "  work item item-1: 2 linked, 1 left out by pipeline.context.items",
+      "    pr acme/app#12 (subject: vcs:1, 1 shown, 2 left out) https://git.acme.example/acme/app/pull/12",
+      "    chat_thread D1:1 (linked: chat thread of work item item-0, 3 shown)",
+      "  work item item-2: 1 linked",
+      "    doc doc-1 (created: doc_link)",
+    ]);
+
+    expect(formatTrace({ ...trace, context: {} })).not.toContain("Context handed over");
+  });
 });

@@ -60,3 +60,11 @@ export interface Candidate {
   title: string;
   ticketKey?: string | undefined;
 }
+
+/** One message of a chat thread as the office received it. The text is data from its author. */
+export interface ChatLogEntry {
+  messageId: string;
+  author: { id: string; name?: string | undefined };
+  at: string;
+  text: string;
+}

@@ -10,4 +10,4 @@ export type {
   ToolStatus,
 } from "./types.js";
 
-export { withGlobalConfig } from "./testing.js";
+export { withGlobalConfig } from "./mise-current.js";

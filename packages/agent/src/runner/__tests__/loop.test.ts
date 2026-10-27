@@ -24,7 +24,7 @@ import {
   type Offer,
   type OfficeConnection,
 } from "#/office-client/index.js";
-import { FakeSocket, createManualClock } from "#/office-client/testing.js";
+import { FakeSocket, createManualClock } from "#/office-client/__tests__/testing.js";
 import type { ManualClientClock } from "#/office-client/types.js";
 import { fakeEnv } from "@outstaff/testing.agent";
 import type { Workspaces } from "#/repos/index.js";

@@ -1,6 +1,6 @@
 import type { TeamConfig } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { REPO, teamConfig } from "#/intake/test-support.js";
+import { REPO, teamConfig } from "#/intake/__tests__/test-support.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
 // The switches under `policies` that turn preset workflow rules off: the behaviour does not happen.

@@ -1,7 +1,7 @@
 import { PortError } from "@outstaff/core";
 import type { Vcs, VcsEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { REPO, setup } from "#/intake/test-support.js";
+import { REPO, setup } from "./test-support.js";
 
 const delivery: VcsEvent = {
   externalId: "delivery-1",

@@ -72,6 +72,17 @@ export interface LinksTable {
   to_type: string;
   to_ref: string;
   relation: string;
+  created_at: string | null;
+}
+
+export interface WorkItemRefsTable {
+  work_item_id: string;
+  ref_type: string;
+  ref: string;
+  url: string | null;
+  role: string;
+  source: string;
+  added_at: string;
 }
 
 export interface SubjectsTable {
@@ -138,6 +149,7 @@ export interface Database {
   pauses: PausesTable;
   pipeline_traces: PipelineTracesTable;
   doctor_checks: DoctorChecksTable;
+  work_item_refs: WorkItemRefsTable;
 }
 
 export type Db = Kysely<Database>;

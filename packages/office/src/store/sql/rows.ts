@@ -40,6 +40,7 @@ export const toLink = (r: Selectable<Database["links"]>): Link => ({
   from: { type: r.from_type, ref: r.from_ref },
   to: { type: r.to_type, ref: r.to_ref },
   relation: r.relation,
+  createdAt: r.created_at,
 });
 
 export const toConversation = (r: Selectable<Database["conversations"]>): Conversation => ({

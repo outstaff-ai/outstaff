@@ -3,7 +3,7 @@ import type { Vcs } from "@outstaff/core";
 import { describe, expect, it, vi } from "vitest";
 import { openStore } from "#/store/index.js";
 import { backoffDelay, DEFAULT_BACKOFF } from "#/intake/backoff.js";
-import { human, REPO, setup } from "#/intake/test-support.js";
+import { human, REPO, setup } from "./test-support.js";
 
 const pr = { title: "Add search" };
 

@@ -50,6 +50,7 @@ export function linkQueries({
           to_type: to.type,
           to_ref: to.ref,
           relation,
+          created_at: stamp(),
         })
         .onConflict((oc) => oc.doNothing())
         .execute();

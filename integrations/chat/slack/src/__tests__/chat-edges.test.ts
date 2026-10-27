@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createSlackChat } from "#/chat.js";
 import type { SlackEvent, SlackMessage } from "#/api.js";
 import type { SlackOptions } from "#/types.js";
-import { secretMap, slackWith, teamWith } from "#/testing/harness.js";
-import { BOT_USER, createFakeSlack, slackError } from "#/testing/slack-fake.js";
+import { secretMap, slackWith, teamWith } from "./support/harness.js";
+import { BOT_USER, createFakeSlack, slackError } from "./support/slack-fake.js";
 
 async function started(now?: () => Date, onWarn?: (m: string) => void) {
   const s = slackWith(teamWith(), onWarn, now);

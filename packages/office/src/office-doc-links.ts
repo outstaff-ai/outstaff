@@ -27,6 +27,10 @@ export function officeDocLinks(deps: {
       const ticket = await ticketOf(item);
 
       await workState.linkDoc({ ...doc, author: person, ...(ticket ? { ticket } : {}) });
+      await store.addItemRefs(item.id, [
+        { type: "doc", ref: doc.id, url: doc.url, role: "created", source: "doc_link" },
+      ]);
+
       log.info(`doc ${doc.id} linked to ${ticket ?? "no ticket"} for ${person}`, {
         person,
         doc: doc.id,

@@ -1,7 +1,7 @@
 import { PortError } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { slackErrorName, toPortError } from "#/errors.js";
-import { slackError } from "#/testing/slack-fake.js";
+import { slackError } from "./support/slack-fake.js";
 
 describe("toPortError", () => {
   it("passes a port error through untouched", () => {

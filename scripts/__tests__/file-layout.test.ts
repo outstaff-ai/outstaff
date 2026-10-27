@@ -152,6 +152,8 @@ describe("file layout", () => {
         'import { b } from "@outstaff/integration.shared.acme";\nimport { c } from "@outstaff/protocol";\n',
       "integrations/tracker/acme/src/__tests__/a.test.ts":
         'import { f } from "@outstaff/testing.acme";\n',
+      "integrations/tracker/acme/src/testing/kit.ts":
+        'import { f } from "@outstaff/testing.acme";\n',
       "integrations/knowledge/acme/src/k.ts":
         'import { t } from "@outstaff/integration.tracker.acme";\nimport { f } from "@outstaff/testing.acme";\n',
     };
@@ -159,6 +161,7 @@ describe("file layout", () => {
     const problems = integrationDependencies(Object.keys(files), (file: string) => files[file]);
 
     expect(problems.map((p) => p.split(";")[0])).toEqual([
+      "integrations/tracker/acme/src/testing/kit.ts: imports @outstaff/testing.acme",
       "integrations/knowledge/acme/package.json: dependencies names @outstaff/integration.tracker.acme",
       "integrations/knowledge/acme/package.json: dependencies names @outstaff/testing.acme",
       "integrations/knowledge/acme/src/k.ts: imports @outstaff/integration.tracker.acme",

@@ -35,7 +35,9 @@ import {
   threadsOf,
   withThread,
 } from "./origin.js";
+import { appendChatLog } from "./log.js";
 import { createReportQueue } from "./pending.js";
+import { chatRefsOf, messageMentions, messageRefs, messageSource, workRefsOf } from "./refs.js";
 import { parsePlacement, placeQueued } from "./placement.js";
 import type { ChatOriginRecord, ParsedPlacement } from "./types.js";
 
@@ -170,6 +172,12 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       trigger: "human",
       subject: { type: "chat", ref: threadKey(m.channel, thread) },
       ...(follow ? { parentId: follow.item.id } : {}),
+      source: messageSource(m),
+      refs: [
+        ...messageRefs(m, "trigger"),
+        ...(await messageMentions(store, m)),
+        ...(about ? await workRefsOf(store, about.id, `chat_thread:${about.id}`) : []),
+      ],
     });
 
     // A session that answered in this thread before goes on with its conversation.
@@ -254,6 +262,9 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       request: string;
       subject: { type: string; ref: string };
       note: string;
+
+      /** The verb that filed it. */
+      source: string;
     },
   ): Promise<Filed> {
     const { session, origin } = await sessionOf(person, sessionId, spec.request);
@@ -269,6 +280,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       subject: spec.subject,
       parentId: session.id,
       placement: all.length > 0 ? "last" : "next",
+      source: spec.source,
+      refs: await chatRefsOf(store, session.id, "trigger", spec.source),
     });
 
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, {
@@ -473,8 +486,10 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
     };
 
     // The attached work keeps its place: nothing is asked about it, and an active round is not interrupted.
+    const chatRefs = await chatRefsOf(store, session.id, "attached", "work_attach");
     let item = live[0];
     if (item) {
+      await store.addItemRefs(item.id, chatRefs);
       await store.appendJournal(item.id, who, `In chat: ${message}`);
       if (item.status === "blocked") {
         item = (await scheduler.retry(item.id, { by: who, signal: "chat reply" })) ?? item;
@@ -494,6 +509,8 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         trigger: "human",
         subject,
         parentId: session.id,
+        source: "work_attach",
+        refs: chatRefs,
         // Before the item can be offered, so the offer carries its feedback and origin.
         init: async (created) => {
           await addFeedback(store, created.id, feedback);
@@ -522,6 +539,23 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       filed: item.id,
       requests: [...(origin.requests ?? []), requestKey(`attach ${request.target}`)],
     });
+
+    await store.addItemRefs(session.id, [
+      ...(key
+        ? [{ type: "ticket" as const, ref: key, role: "attached" as const, source: "work_attach" }]
+        : []),
+      ...(pr
+        ? [
+            {
+              type: "pr" as const,
+              ref: subject.ref,
+              url: pr.url,
+              role: "attached" as const,
+              source: "work_attach",
+            },
+          ]
+        : []),
+    ]);
 
     await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
       itemId: item.id,
@@ -666,6 +700,11 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       m.author.name ?? m.author.id,
       `In the chat thread: ${withFiles(m)}`,
     );
+
+    await store.addItemRefs(item.id, [
+      ...messageRefs(m, "attached"),
+      ...(await messageMentions(store, m)),
+    ]);
 
     // The running work does not see the reply, so a chat session beside it answers at once.
     if (item.status === "active") {
@@ -867,6 +906,13 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         return { ...seen, repeated: true };
       }
 
+      await appendChatLog(store, threadKey(m.channel, m.thread ?? m.messageId), {
+        messageId: m.messageId,
+        author: m.author,
+        at: (clock?.now() ?? new Date()).toISOString(),
+        text: withFiles(m),
+      });
+
       const result = await handle(person, m);
       await store.upsertSubject(CHAT_MESSAGE_SUBJECT, key, result);
       return result;
@@ -927,9 +973,14 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         request,
         subject: { type: "ticket", ref: ticket },
         note: `Tracked in ${ticket}.`,
+        source: "work_link",
       });
 
       const url = opts.tracker?.links.issue(ticket);
+      await store.addItemRefs(workItemId, [
+        { type: "ticket", ref: ticket, url, role: "created", source: "work_link" },
+      ]);
+
       return { ...filed, ...(url ? { url } : {}) };
     },
 
@@ -942,6 +993,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         request: request.title,
         subject: { type: "chat", ref: workItemId },
         note: request.body,
+        source: "work_queue",
       });
     },
 
