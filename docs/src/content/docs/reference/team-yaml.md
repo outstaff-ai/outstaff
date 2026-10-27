@@ -1833,6 +1833,14 @@ Move a ticket to active when a work item about it starts (assigned, ticket comme
 - Optional
 - Default: `true`
 
+### policies.pull_ready
+
+Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
 ### policies.conflicts
 
 Merge conflicts between pull requests.

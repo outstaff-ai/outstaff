@@ -118,6 +118,7 @@ const control: Route[] = [
         r.json.description ?? "",
         r.json.status ?? "Ready",
         r.json.assignee,
+        r.json.as,
       ),
     }),
   },

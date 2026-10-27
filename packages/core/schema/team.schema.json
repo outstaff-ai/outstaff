@@ -1626,6 +1626,11 @@
           },
           "additionalProperties": false
         },
+        "pull_ready": {
+          "default": true,
+          "description": "Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.",
+          "type": "boolean"
+        },
         "conflicts": {
           "default": {
             "follow_up": true

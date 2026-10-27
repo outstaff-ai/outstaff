@@ -71,7 +71,7 @@ How to read it:
 
 | # | Event | Today | Pipeline | Note |
 | - | - | - | - | - |
-| 31 | `agent.idle` no subject by sam | (no such event today) | wake sam (assigned): _You have nothing queued. Start ACME-161, the ready ticket assigned to you the longest._ | intended fix: an idle agent starts its oldest ready ticket (ACME-161); today self-assigned work waits for someone else to act |
+| 31 | `agent.idle` no subject by sam | (no such event today) | wake sam (assigned): _You have nothing queued. Start ACME-161, the next ready ticket assigned to you. Work on it the way the repository asks._ | intended fix: an idle agent starts its next ready ticket (ACME-161); the engine's rules never see agent.idle, the scheduler's idle pull starts it instead |
 | 32 | `agent.idle` no subject by noor | (no such event today) | (drop: no ready ticket is assigned to noor) | same |
 
 ## Hand-backs: blocked, done and waiting

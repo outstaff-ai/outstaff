@@ -4,6 +4,7 @@ import type { PrRecord, TicketRecord } from "./types.js";
 import type { PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
 import { docOpen, isTerminal, openPrs } from "./derive.js";
 import { docNode, prNode, ROOT, ticketNode } from "./links.js";
+import { addPickup } from "./ready.js";
 
 type Latest = Map<string, { at: string; person: string; done: boolean }>;
 
@@ -46,10 +47,22 @@ const trackerIds = (team: TeamConfig) =>
 /** Rebuilds the records: from the store on open, and from the ports on a rescan. */
 export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
   const { store, vcs, tracker, team, clock, retentionMs, repos, prs, tickets, docs } = core;
-  const { workers, handedBack, prSubject } = core;
+  const { workers, handedBack, pickups, prSubject } = core;
   const { refreshPr, refreshTicket, saveTicket, toTicket } = ops;
+  const refreshPickups = (items: WorkItem[]) => {
+    pickups.clear();
+    for (const item of items) {
+      const key = ticketOf(item, prs);
+      if (key) {
+        addPickup(pickups, item, key);
+      }
+    }
+  };
+
   const refreshWorkers = async () => {
-    const latest = latestWork(await store.listItems(), prs);
+    const items = await store.listItems();
+    refreshPickups(items);
+    const latest = latestWork(items, prs);
     workers.clear();
     handedBack.clear();
     for (const [key, v] of latest) {

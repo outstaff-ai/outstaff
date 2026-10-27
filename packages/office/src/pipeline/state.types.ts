@@ -1,19 +1,13 @@
 import type { EvaluationContext, WorkflowOptions, WorkflowState } from "@outstaff/core";
+import type { ReadyTicket } from "../workstate/index.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { Policy } from "./policy.types.js";
 
-/** A ready ticket assigned to a person, with when it entered ready. */
-export interface ReadyTicket {
-  key: string;
-  title?: string | undefined;
-
-  /** When the ticket entered ready (ISO-8601). */
-  readyAt: string;
-}
+export type { ReadyTicket } from "../workstate/index.js";
 
 /** The world a policy is judged against: the workflow rules' state plus what the pipeline adds. */
 export interface PipelineState extends WorkflowState {
-  /** Ready tickets assigned to the agent, in any order. */
+  /** Ready tickets assigned to the agent that it has not picked up yet, in any order. */
   readyTickets(person: string): ReadyTicket[];
 }
 

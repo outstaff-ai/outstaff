@@ -124,10 +124,11 @@ describe("the office with the event pipeline live", () => {
     conn = agent();
     await conn.whenConnected();
 
+    // In backlog: a ready ticket created for sam would be pulled at once, before Ada's assignment is judged.
     const issue = await tracker.createIssue({
       title: "Search",
       body: "",
-      status: "ready",
+      status: "backlog",
       assignee: sam.id,
     });
 

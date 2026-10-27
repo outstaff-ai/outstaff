@@ -44,12 +44,21 @@ const assigned = {
   data: {},
 };
 
+const idle = {
+  id: "office:idle:sam:2026-10-05T09:00:00.000Z",
+  type: "agent.idle" as const,
+  at: "2026-10-05T09:00:00.000Z",
+  subject: {},
+  actor: { kind: "agent" as const, id: "sam" },
+  data: {},
+};
+
 async function make(office: Record<string, unknown>) {
   store = await openStore("sqlite::memory:");
   return createOfficePipeline({
     team: team(office),
     store,
-    workState: createStaticWorkflowState({}) as never,
+    workState: { ...createStaticWorkflowState({}), readyTickets: () => [] } as never,
     scheduler: { enqueue: () => Promise.reject(new Error("not in this test")) },
     ports: {},
     clock: manualClock(),
@@ -101,5 +110,29 @@ describe("createOfficePipeline", () => {
 
     expect(engine).toBe(false);
     expect(await live.traces.get("t:2")).toBeDefined();
+  });
+
+  it("leaves an idle agent to the scheduler's pull when off, traces it first in shadow mode", async () => {
+    const off = await make({});
+    expect(await off.idle(idle, async () => "pulled")).toBe("pulled");
+    expect(await off.traces.list()).toEqual([]);
+
+    const shadow = await make({ pipeline: "shadow" });
+    const order: string[] = [];
+    await shadow.idle(idle, async () => {
+      order.push((await shadow.traces.get(idle.id)) ? "traced, then pulled" : "pulled first");
+    });
+
+    expect(order).toEqual(["traced, then pulled"]);
+  });
+
+  it("judges an idle agent without the scheduler's pull when live", async () => {
+    const live = await make({ pipeline: "live" });
+    let pulled = false;
+    await live.idle(idle, async () => (pulled = true));
+    expect(pulled).toBe(false);
+    expect((await live.traces.get(idle.id))?.decisions).toEqual([
+      { type: "drop", policy: "idle_pulls_next", reason: "no ready ticket is assigned to sam" },
+    ]);
   });
 });

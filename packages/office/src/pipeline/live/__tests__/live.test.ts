@@ -69,6 +69,8 @@ async function setup(extra: { pipeline?: unknown; logger?: Logger } = {}) {
     }),
     prSubject: (pr: { number: number }) => `github.com/acme-example/shop#${pr.number}`,
     ticket: (key: string) => (key === "ACME-1" ? { title: "Search page" } : undefined),
+    readyTickets: (person: string) =>
+      person === "sam" ? [{ key: "ACME-1", readyAt: "2026-10-05T07:00:00.000Z" }] : [],
   };
 
   const opts: LiveOptions = {
@@ -147,20 +149,37 @@ describe("createLivePipeline", () => {
     ).toBeUndefined();
   });
 
-  it("decides no idle pull yet, since the work state does not know when tickets became ready", async () => {
+  it("wakes an idle agent with its next ready ticket, as automatic work, or drops", async () => {
     const { opts } = await setup();
-    const trace = await createLivePipeline(opts).handle(
-      {
-        ...assigned,
-        type: "agent.idle" as never,
-        subject: {},
-        actor: { kind: "agent", id: "sam" },
-      },
-      { source: "office", externalId: "idle-1" },
-    );
+    const live = createLivePipeline(opts);
+    const idle = (person: string) => ({
+      id: `office:idle:${person}:2026-10-05T09:00:00.000Z`,
+      type: "agent.idle" as const,
+      at: "2026-10-05T09:00:00.000Z",
+      subject: {},
+      actor: { kind: "agent" as const, id: person },
+      data: {},
+    });
 
-    expect(trace?.decisions).toEqual([
-      { type: "drop", policy: "idle_pulls_next", reason: "no ready ticket is assigned to sam" },
+    const trace = await live.judge(idle("sam"));
+    expect(trace?.decisions).toMatchObject([
+      { type: "wake", policy: "idle_pulls_next", subject: { type: "ticket", ref: "ACME-1" } },
+    ]);
+
+    const [item] = await store!.listItems({ person: "sam" });
+    expect(item).toMatchObject({
+      kind: "assigned",
+      trigger: "automation",
+      title: "assigned: ACME-1 Search page",
+      subject: { type: "ticket", ref: "ACME-1" },
+    });
+
+    expect((await live.judge(idle("mira")))?.decisions).toEqual([
+      {
+        type: "drop",
+        policy: "idle_pulls_next",
+        reason: "no one to wake: mira (actor) is not an agent on the team",
+      },
     ]);
   });
 

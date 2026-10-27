@@ -381,6 +381,7 @@ policies.hand_back.blocked_notify    pm           default
 policies.hand_back.fallback          first_human  team.yaml
 policies.tickets.prs_per_ticket      one          team.yaml
 policies.tickets.start_moves_active  true         team.yaml
+policies.pull_ready                  true         default
 policies.merge.on_approval           false        default
 policies.conflicts.follow_up         true         team.yaml
 policies.retry.on_signal             true         team.yaml

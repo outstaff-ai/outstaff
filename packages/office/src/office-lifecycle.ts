@@ -26,9 +26,12 @@ export function officeLifecycle(deps: {
   inFlight: Set<Promise<unknown>>;
   notify: (person: string) => void;
   onBlocked: (b: BlockNotice) => Promise<void>;
+
+  /** After each tick of the scheduler's housekeeping; never throws. */
+  onTick?: () => Promise<unknown>;
 }): Pick<Office, "start" | "stop" | "health"> {
   const { team, link, store, log, intake, workState, scheduler, protocol } = deps;
-  const { inFlight, notify, onBlocked } = deps;
+  const { inFlight, notify, onBlocked, onTick } = deps;
 
   let state: State = "created";
   let stopping: Promise<void> | undefined;
@@ -92,6 +95,8 @@ export function officeLifecycle(deps: {
             log.warn("work item blocked", { item: b.item.id, code: b.code, reason: b.reason });
             void onBlocked(b);
           }
+
+          void onTick?.();
         });
 
         up.scheduler = true;

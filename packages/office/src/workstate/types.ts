@@ -20,6 +20,12 @@ export interface TicketRecord {
   title: string;
   url?: string;
   status?: CanonicalStatus;
+
+  /** When the ticket entered its current status (ISO-8601), from the tracker's event or its last update. */
+  statusSince?: string;
+
+  /** The tracker's priority, when its adapter has one: 1 is the most urgent. */
+  priority?: number;
   assignee?: { id: string; kind: "human" | "agent" };
   labels: string[];
 
@@ -32,6 +38,18 @@ export interface TicketRecord {
   /** When the tracker answered that the ticket does not exist. It is not refreshed again unless an event names it. */
   goneAt?: string;
   updatedAt: string;
+}
+
+/** A ready ticket assigned to an agent, with when it entered ready. */
+export interface ReadyTicket {
+  key: string;
+  title?: string | undefined;
+
+  /** When the ticket entered ready (ISO-8601). */
+  readyAt: string;
+
+  /** The tracker's priority, when it has one: 1 is the most urgent. */
+  priority?: number | undefined;
 }
 
 /** A knowledge document an agent wrote for a ticket (or in a chat request), kept so comments on it reach the agent. */
@@ -140,6 +158,13 @@ export interface WorkState extends WorkflowState {
   /** Re-reads who last worked on each ticket from the work item history. */
   refreshWorkers(): Promise<void>;
   currentWork(person: string): CurrentWork;
+
+  /**
+   * The tickets the agent could start next: assigned to it, in the ready status, and not worked on by it since they
+   * entered ready (no item of its on the ticket is queued, running, waiting or blocked, and none started after). As of
+   * the last `refreshWorkers`.
+   */
+  readyTickets(person: string): ReadyTicket[];
 
   /** Rescans on the clock every `refreshIntervalMs`, because CI results arrive without an event. */
   start(): Promise<void>;

@@ -47,6 +47,12 @@ describe("configurePipeline", () => {
     expect(byId(on.policies, "approval_to_merge_after_feedback")).toMatchObject({ enabled: true });
   });
 
+  it("follows policies.pull_ready for the idle pull", () => {
+    expect(byId(configurePipeline(team()).policies, "idle_pulls_next").enabled).toBe(true);
+    const off = configurePipeline(team({ policies: { pull_ready: false } }));
+    expect(byId(off.policies, "idle_pulls_next").enabled).toBe(false);
+  });
+
   it("turns policies on and off, narrows them and replaces wake instructions", () => {
     const { policies, issues } = configurePipeline(
       team({

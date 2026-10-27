@@ -137,6 +137,7 @@ describe("parseTeamConfig", () => {
       },
       hand_back: { reassign: "requester", blocked_notify: "pm", fallback: "first_human" },
       tickets: { prs_per_ticket: "one", start_moves_active: true },
+      pull_ready: true,
       conflicts: { follow_up: true },
       merge: { on_approval: false, approvers: ["humans"] },
       retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },

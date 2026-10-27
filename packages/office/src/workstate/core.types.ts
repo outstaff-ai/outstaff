@@ -13,6 +13,15 @@ import type { Store } from "../store/index.js";
 import type { Clock } from "../types.js";
 import type { DocRecord, PrRecord, TicketRecord, WorkstateHandler } from "./types.js";
 
+/** A person's work items on one ticket: whether one is still open, and when the latest was created. */
+export interface Pickup {
+  /** An item is queued, running, waiting or blocked. */
+  open: boolean;
+
+  /** When the latest item was created (ISO-8601). */
+  at: string;
+}
+
 /** A synthetic event the work state recorded and still has to deliver. */
 export interface Fresh {
   event: WorkflowEvent;
@@ -50,6 +59,9 @@ export interface WorkstateCore {
   /** Tickets whose latest work item ended as a hand-back as done. */
   handedBack: Set<string>;
 
+  /** Each person's work on each ticket, by `pickupKey`. */
+  pickups: Map<string, Pickup>;
+
   /** Keys that looked like tickets but that the tracker does not know. */
   notTickets: Set<string>;
   handlers: WorkstateHandler[];
@@ -62,7 +74,9 @@ export interface WorkstateCore {
 
 export interface TicketOps {
   saveTicket(rec: TicketRecord): Promise<void>;
-  toTicket(issue: Issue, prev?: TicketRecord): TicketRecord;
+
+  /** A changed status counts from when the event says the change happened, else the ticket's last update. */
+  toTicket(issue: Issue, prev?: TicketRecord, event?: WorkflowEvent): TicketRecord;
   refreshTicket(key: string, event?: WorkflowEvent): Promise<void>;
 
   /** Whether the key is a ticket the tracker has, reading it once if it is not known yet. */

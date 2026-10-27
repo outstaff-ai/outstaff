@@ -8,7 +8,7 @@ export async function handleHello(
   c: Connection,
   m: MessageOf<"hello">,
 ): Promise<void> {
-  const { opts, conns, heartbeatMs, log, send, sendError, armIdle, deliver } = ctx;
+  const { opts, conns, heartbeatMs, log, send, sendError, armIdle, connected } = ctx;
   const { source, auth } = opts;
   const { person, token, protocolVersion } = m.payload;
   if (protocolVersion !== PROTOCOL_VERSION) {
@@ -63,5 +63,5 @@ export async function handleHello(
   );
 
   log.info("agent connected", { person });
-  deliver(person);
+  connected(person);
 }

@@ -206,16 +206,21 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
   },
   {
     id: "idle_pulls_next",
-    summary: "An agent with nothing queued or running is woken with its oldest ready ticket.",
+    summary:
+      "An agent with nothing queued or running is woken with its next ready ticket: the highest tracker priority, then the one ready the longest (policies.pull_ready).",
     on: ["agent.idle"],
     decide: { wake: { person: "actor", kind: "assigned", subject: "next_ready_ticket" } },
     instruction:
-      "You have nothing queued. Start {{next.ticket}}, the ready ticket assigned to you the longest.",
+      "You have nothing queued. Start {{next.ticket}}, the next ready ticket assigned to you. Work on it the way the repository asks.",
   },
 ];
 
-/** Policies that exist only while `policies.merge.on_approval` is on, as the workflow rules do. */
-export const MERGE_ON_APPROVAL_POLICIES: ReadonlySet<string> = new Set([
-  "approval_to_merge",
-  "approval_to_merge_after_feedback",
-]);
+/**
+ * Policies that are on only while a `policies` switch is: merging on approval, as the workflow rules do, and the idle
+ * pull, as the scheduler does with the pipeline off.
+ */
+export const POLICY_SWITCH_OF: Readonly<Record<string, string>> = {
+  approval_to_merge: "merge.on_approval",
+  approval_to_merge_after_feedback: "merge.on_approval",
+  idle_pulls_next: "pull_ready",
+};

@@ -582,25 +582,37 @@ export function createTracker(opts: TrackerOptions) {
 
   const human = opts.members.find((m) => m.username === opts.human)!.userId;
   const nameOf = (id: string | null) => (id ? member(id).username : null);
+  const memberNamed = (username: string) => {
+    const m = opts.members.find((x) => x.username === username);
+    if (!m) {
+      throw new Error(`No member ${username}.`);
+    }
+
+    return m;
+  };
+
   return {
     routes,
 
-    /** A person creates a ticket in a column (by status name). */
-    /** With `assignee`, the ticket is created already assigned: one `created` item, no `assignee` item. */
-    createTicket(title: string, description: string, status: string, assignee?: string) {
+    /**
+     * A person creates a ticket in a column (by status name). With `assignee`, the ticket is created already
+     * assigned: one `created` item, no `assignee` item. `actor` (a username) creates it as someone else than the
+     * human, for example an agent assigning itself a piece of its own work.
+     */
+    createTicket(
+      title: string,
+      description: string,
+      status: string,
+      assignee?: string,
+      actor?: string,
+    ) {
       const col = columnNamed(status);
       if (!col) {
         throw new Error(`No column ${status}.`);
       }
 
-      const who =
-        assignee === undefined ? undefined : opts.members.find((m) => m.username === assignee);
-
-      if (assignee !== undefined && !who) {
-        throw new Error(`No member ${assignee}.`);
-      }
-
-      return create(human, {
+      const who = assignee === undefined ? undefined : memberNamed(assignee);
+      return create(actor === undefined ? human : memberNamed(actor).userId, {
         title,
         description,
         columnId: col.id,

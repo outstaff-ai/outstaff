@@ -11,7 +11,9 @@ export const WAKE_SUBJECT = "pipeline_wake";
 export const ITEM_EVENTS_SUBJECT = "pipeline_item_events";
 const LIVE = new Set(["queued", "active"]);
 
-const triggerOf = (event: PipelineEvent): WorkItemTrigger => event.actor.kind;
+/** An idle agent's pull is the office's own doing: automatic work, like the scheduler's. */
+const triggerOf = (event: PipelineEvent): WorkItemTrigger =>
+  event.type === "agent.idle" ? "automation" : event.actor.kind;
 
 /** The work item subject of a wake: the work state's key for a pull request, else the ticket or document. */
 function itemSubject(event: PipelineEvent, wake: Wake, opts: LiveOptions) {

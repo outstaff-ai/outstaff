@@ -19,6 +19,9 @@ export interface Issue {
   labels: string[];
   url: string;
   updatedAt: string;
+
+  /** The tracker's priority, when it has one: 1 is the most urgent, and a larger number is less urgent. */
+  priority?: number;
 }
 
 export interface Comment {

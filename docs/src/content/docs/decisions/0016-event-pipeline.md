@@ -40,7 +40,7 @@ The default set:
 | `ticket.moved` to active by a human                                    | wake the assignee                                                     |
 | `doc.commented` by a human                                             | wake the agent mentioned, else the document's author                  |
 | `agent.handed_back` as done, or as blocked                             | act for the agent: the status move and the hand-back to the requester |
-| `agent.idle`                                                           | wake the agent with its ready ticket that entered ready first         |
+| `agent.idle`                                                           | wake the agent with its next ready ticket: by priority, then age      |
 
 Branch and merge practice (one pull request per ticket, stacking, merge method) is left to each repository's own rules and instructions.
 
@@ -74,4 +74,6 @@ The second part adds, still off by default:
 
 A third part makes shadow mode measurable: each shadow trace also records what the engine applied for the same event and how the two compare (the same comparison the replay uses), `ost explain --compare` sums that up over a period, and the office link answers the same summary (`compare`) and filters the events that differ.
 
-Not yet: chat as an event, raising `agent.idle` and knowing when a ticket entered ready (#349), reading whether the code host requires up-to-date branches (#348), wiring the merge-derived events and time-window coalescing into the work state and scheduler, and the policies that would replace the engine's item hooks. Shadow and live mode see the work state's own `pr.conflicted` and `pr.ci_failed` only.
+A fourth part raises `agent.idle`: the work state records when each ticket entered its status and the tracker's priority, and the office raises the event for an agent with nothing queued or running and a ready ticket to start (when a ticket change gives it a ready ticket, after a hand-back, on the scheduler's tick, when the agent connects). With the pipeline off the scheduler pulls the ticket itself (`policies.pull_ready`); in shadow mode the decision is traced first; live, the `idle_pulls_next` policy decides it.
+
+Not yet: chat as an event, reading whether the code host requires up-to-date branches (#348), wiring the merge-derived events and time-window coalescing into the work state and scheduler, and the policies that would replace the engine's item hooks. Shadow and live mode see the work state's own `pr.conflicted` and `pr.ci_failed` only.

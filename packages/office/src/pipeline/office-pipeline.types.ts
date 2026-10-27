@@ -4,6 +4,7 @@ import type { Clock } from "../types.js";
 import type { Scheduler } from "../scheduler/index.js";
 import type { Store } from "../store/types.js";
 import type { WorkState } from "../workstate/index.js";
+import type { PipelineEvent } from "./events.types.js";
 import type { PipelineRunner } from "./shadow.types.js";
 import type { TraceStore } from "./trace.types.js";
 
@@ -35,4 +36,10 @@ export interface OfficePipeline {
     meta: { source: string; externalId: string },
     engine: () => Promise<EffectOutcome[]>,
   ): Promise<unknown>;
+
+  /**
+   * Has an idle agent's `agent.idle` judged: `pull` (the scheduler's own idle pull) alone when off; traced and then
+   * `pull` in shadow mode; by the pipeline alone when live.
+   */
+  idle(event: PipelineEvent, pull: () => Promise<unknown>): Promise<unknown>;
 }

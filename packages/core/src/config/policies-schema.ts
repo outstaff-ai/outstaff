@@ -23,6 +23,14 @@ export const policiesSchema = z
     feedback: feedbackSchema,
     hand_back: handBackSchema,
     tickets: ticketsSchema,
+    pull_ready: z
+      .boolean()
+      .default(true)
+      .meta(
+        d(
+          "Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.",
+        ),
+      ),
     conflicts: z
       .strictObject({
         follow_up: z

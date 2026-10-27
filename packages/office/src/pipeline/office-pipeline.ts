@@ -19,6 +19,10 @@ function shadow(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
       await runner.engineDid(meta, outcomes);
       return outcomes;
     },
+    async idle(event, pull) {
+      await runner.judge(event);
+      return pull();
+    },
   };
 }
 
@@ -31,7 +35,13 @@ function live(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
   });
 
   const runner = createLivePipeline({ ...opts, executor, traces });
-  return { mode: "live", runner, traces, route: (event, meta) => runner.handle(event, meta) };
+  return {
+    mode: "live",
+    runner,
+    traces,
+    route: (event, meta) => runner.handle(event, meta),
+    idle: (event) => runner.judge(event),
+  };
 }
 
 /** Proposed (decision 0016): the event pipeline beside the engine, off unless `office.pipeline` says otherwise. */
@@ -39,7 +49,12 @@ export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipelin
   const traces = createStoreTraceStore(opts.store);
   const mode = opts.team.office?.pipeline ?? "off";
   if (mode === "off") {
-    return { mode, traces, route: (_event, _meta, engine) => engine() };
+    return {
+      mode,
+      traces,
+      route: (_event, _meta, engine) => engine(),
+      idle: (_event, pull) => pull(),
+    };
   }
 
   return mode === "shadow" ? shadow(opts, traces) : live(opts, traces);

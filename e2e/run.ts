@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, and a mention of the agent on a blocked ticket held by a human makes the ticket the agent's. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
 //
 //   node e2e/run.ts
@@ -1327,6 +1327,28 @@ async function main() {
 
   step(
     `repository: ${unsure} names no repository and sam can write to two -> asked in the ticket, no pull request`,
+  );
+
+  // ---- 10c. idle pull (policies.pull_ready): a ticket the agent assigned to itself starts nothing by itself (the
+  // agent caused the event); with nothing queued, the office starts it as soon as the poll brings the assignment. It names no repository, so the
+  // round only asks, as above, and opens no pull request.
+  const { key: own } = await stub("POST", "/_test/tickets", {
+    title: "Require a linear history",
+    description: "which repo: unclear",
+    assignee: "sam",
+    as: "sam",
+  });
+
+  const pulled = await until(`${own}, assigned to sam by sam, started by the office`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === own);
+    return t.status === "In Progress" && t.comments.some((c: Json) => c.body.includes(own))
+      ? t
+      : undefined;
+  });
+
+  assertEq(pulled.moves[0]?.from, "Ready", "the round started on the ticket while it was ready");
+  step(
+    `idle pull: ${own}, self-assigned in Ready -> the office started it at once while sam was idle`,
   );
 
   // ---- 11. a reply in the thread of a done item continues its ticket instead of filing a duplicate
