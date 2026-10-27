@@ -1,17 +1,17 @@
 import { mkdirSync, writeFileSync } from "node:fs";
-import type { SetupStep } from "@outstaff/core";
+import { secretSections, type SetupStep } from "@outstaff/core";
 import { join, relative } from "node:path";
 import { loadCatalogs, roleProfile } from "#/catalogs.js";
 import { shown } from "#/project.js";
 import type { Context } from "#/types.js";
-import { renderEnvExample, sections } from "#/commands/setup-template.js";
+import { renderEnvExample } from "#/commands/setup-template.js";
 import { renderGuide } from "./guide.js";
 import type { Configured, SetupGuide, SetupPlan } from "./types.js";
 
 /** Writes `<envFile>.example` listing every secret of the scope; returns the file and its keys. */
 function writeEnvExample(ctx: Context, plan: SetupPlan): { file: string; keys: string[] } {
   const { config, scope, target, person, out, envFile } = plan;
-  const list = sections(
+  const list = secretSections(
     config,
     plan.found.map((f) => f.def),
     scope,

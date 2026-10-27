@@ -12,6 +12,8 @@ export * from "./chat/index.js";
 
 export * from "./engine/index.js";
 export * from "./pipeline/index.js";
+export { createOfficeDoctor } from "./doctor/index.js";
+export type { OfficeDoctor, OfficeDoctorOptions } from "./doctor/index.js";
 
 export * from "./office.js";
 export * from "./work-source.js";

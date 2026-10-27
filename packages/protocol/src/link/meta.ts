@@ -29,6 +29,11 @@ export const LINK_MESSAGE_META: Record<LinkMessageType, LinkMessageMeta> = {
     summary: "An event the pipeline judged, as soon as the office records its trace.",
   },
   item: { from: "office", summary: "A work item was queued or its status changed." },
+  health: {
+    from: "office",
+    summary:
+      "The doctor checks, as the `health` method gives them. Sent when the welcome comes and whenever a check is added, removed or changes, not when a run only confirms them.",
+  },
   ping: { from: "both", summary: "Checks that the other side is there; answer with `pong`." },
   pong: { from: "both", summary: "Answers `ping`." },
 };
@@ -44,4 +49,6 @@ export const LINK_METHOD_META: Record<LinkMethod, string> = {
   compare:
     "How the engine and the pipeline compare over the events in a range, as `ost explain --compare` sums it up: totals, differences by kind and by policy, and the events that differ. Only events traced in shadow mode are compared.",
   item: "One work item with its runs, the end of its journal and the traces of the events that queued or joined it. `not_found` when there is no such item.",
+  health:
+    "The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at` and on demand, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.",
 };

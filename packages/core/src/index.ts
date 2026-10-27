@@ -61,3 +61,4 @@ export * from "./policies/index.js";
 export * from "./links/index.js";
 export { mentionData, parseMentions } from "./mentions.js";
 export * from "./acts/index.js";
+export * from "./doctor/index.js";

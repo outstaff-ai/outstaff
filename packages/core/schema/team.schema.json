@@ -730,7 +730,7 @@
       "additionalProperties": false
     },
     "office": {
-      "description": "Office event intake settings.",
+      "description": "Office settings: event intake, the pipeline and the doctor checks.",
       "type": "object",
       "properties": {
         "events": {
@@ -768,6 +768,34 @@
             "shadow",
             "live"
           ]
+        },
+        "doctor": {
+          "description": "When the office runs the doctor checks itself, and which it leaves out.",
+          "type": "object",
+          "properties": {
+            "daily_at": {
+              "default": "06:00",
+              "description": "Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start and on demand.",
+              "type": "string",
+              "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "skip": {
+              "description": "Ports (for example chat) whose adapter's live checks the office does not run, for a provider the office cannot or should not call. Their secrets are still checked; `ost doctor` still runs them.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "chat",
+                  "vcs",
+                  "runtime",
+                  "tracker",
+                  "knowledge",
+                  "avatars"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

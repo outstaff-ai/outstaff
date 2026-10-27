@@ -17,6 +17,7 @@ export {
   traceSchema,
 } from "./entities.js";
 
+export { healthCheckSchema, healthSchema } from "./health.js";
 export { LINK_MESSAGE_META, LINK_METHOD_META } from "./meta.js";
 export {
   LINK_VERSION,

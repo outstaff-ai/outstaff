@@ -436,6 +436,9 @@ importers:
       '@outstaff/integration.vcs.github':
         specifier: workspace:*
         version: link:../../integrations/vcs/github
+      '@outstaff/protocol':
+        specifier: workspace:*
+        version: link:../protocol
       commander:
         specifier: 15.0.0
         version: 15.0.0

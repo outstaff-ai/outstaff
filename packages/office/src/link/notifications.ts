@@ -7,13 +7,14 @@ import { present } from "./present.js";
 const BATCH = 100;
 
 /**
- * What the office tells a connected service without being asked: the people when they change, each trace as it is
- * recorded, and items that were queued or changed status. It looks for changes rather than being told of them, so
- * nothing else in the office changes for it.
+ * What the office tells a connected service without being asked: the people and the doctor checks when they change,
+ * each trace as it is recorded, and items that were queued or changed status. It looks for changes rather than being
+ * told of them, so nothing else in the office changes for it.
  */
 export function createNotifier(opts: OfficeLinkOptions, send: (m: LinkMessage) => void): Notifier {
   const { store, clock } = opts;
   let people: string | undefined;
+  let health: string | undefined;
   let cursor: TraceCursor = { sent: new Set() };
   let items = new Map<string, string>();
 
@@ -23,6 +24,16 @@ export function createNotifier(opts: OfficeLinkOptions, send: (m: LinkMessage) =
     if (always || json !== people) {
       people = json;
       send({ type: "people", payload: { at: clock.now().toISOString(), people: list } });
+    }
+  };
+
+  /** Only a change counts: not the time of the answer, of the run, or of a check last seen. */
+  const sendHealth = async (always: boolean) => {
+    const now = await opts.doctor.health();
+    const json = JSON.stringify(now.checks.map(({ lastSeen: _seen, ...c }) => c));
+    if (always || json !== health) {
+      health = json;
+      send({ type: "health", payload: now });
     }
   };
 
@@ -36,10 +47,12 @@ export function createNotifier(opts: OfficeLinkOptions, send: (m: LinkMessage) =
       cursor = { from, sent: new Set(already.map((t) => t.ref)) };
       items = new Map([...(await statuses())].map(([id, i]) => [id, i.status]));
       await sendPeople(true);
+      await sendHealth(true);
     },
 
     async look() {
       await sendPeople(false);
+      await sendHealth(false);
       for (;;) {
         const next = await nextTraces(store, cursor, BATCH);
         cursor = next.cursor;

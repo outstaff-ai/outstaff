@@ -5,6 +5,7 @@ import { conversationDelivery } from "./0004_conversation_delivery.js";
 import { failureBackoff } from "./0005_failure_backoff.js";
 import { pipelineTraces } from "./0006_pipeline_traces.js";
 import { pipelineTracesRecorded } from "./0007_pipeline_traces_recorded.js";
+import { doctorChecks } from "./0008_doctor_checks.js";
 import { queueOrderAndPauses } from "./0003_queue_order_and_pauses.js";
 
 export const migrationProvider: MigrationProvider = {
@@ -17,6 +18,7 @@ export const migrationProvider: MigrationProvider = {
       "0005_failure_backoff": failureBackoff,
       "0006_pipeline_traces": pipelineTraces,
       "0007_pipeline_traces_recorded": pipelineTracesRecorded,
+      "0008_doctor_checks": doctorChecks,
     };
   },
 };

@@ -1,11 +1,12 @@
 import { silentLogger, type WorkflowEvent } from "@outstaff/core";
-import type { Human } from "@outstaff/protocol";
 import { createChatDesk } from "./chat/index.js";
 import { createEngine, type EngineMeta } from "./engine/index.js";
 import { createIntake } from "./intake/index.js";
 import { createMessaging, type RoleInfo } from "./messaging/index.js";
 import { officeDocLinks } from "./office-doc-links.js";
+import { doctorForOffice } from "./office-doctor.js";
 import { createHandedBack } from "./office-handback.js";
+import { trackerHumans } from "./office-humans.js";
 import { createIdlePull } from "./office-idle.js";
 import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
@@ -23,6 +24,7 @@ import { createUsageTracker } from "./usage/index.js";
 import { createScheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
 import { defined } from "./defined.js";
+import { inFlightTracker } from "./in-flight.js";
 import { itemRefs } from "./item-refs.js";
 import { notifyingScheduler } from "./office-scheduler.js";
 import { schedulerWorkSource } from "./work-source.js";
@@ -113,16 +115,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ports: tracker,
   });
 
-  const inFlight = new Set<Promise<unknown>>();
-  const track = <T>(p: Promise<T>): Promise<T> => {
-    inFlight.add(p);
-    void p.then(
-      () => inFlight.delete(p),
-      () => inFlight.delete(p),
-    );
-
-    return p;
-  };
+  const { inFlight, track } = inFlightTracker();
 
   // Proposed (decision 0016): the event pipeline beside the engine, off unless `office.pipeline` turns it on. In shadow
   // mode it judges each event before the engine applies anything, so both judge the same state: after the engine it
@@ -149,20 +142,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
   const roles = roleInfo(input.catalog);
 
-  // Without a humans: list the trusted ones are repo writers and chat members, which the ports cannot list;
-  // the tracker's human members are the trusted ones intake already accepts.
-  const humans = async (): Promise<Human[]> => {
-    try {
-      return (
-        (await ports.tracker?.members())
-          ?.filter((m) => m.kind === "human")
-          .map((m) => ({ name: m.name })) ?? []
-      );
-    } catch (error) {
-      log.warn("could not list humans", { error: String(error) });
-      return [];
-    }
-  };
+  const humans = trackerHumans(ports, log);
 
   const handedBack = createHandedBack({ store, workState, judge, log });
   const idle = createIdlePull({ ...pipelineOptions, pipeline: officePipeline });
@@ -236,8 +216,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       ),
   });
 
+  const doctor = doctorForOffice(input, log);
   server = createProtocolServer({
     source,
+    doctor,
     messaging,
     usage,
     chat: chatDesk,
@@ -260,9 +242,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   const protocol = server;
-  const link = createLinkForOffice({ input, ports, protocol, log });
+  const link = createLinkForOffice({ input, ports, protocol, doctor, log });
   const lifecycle = officeLifecycle({
     link,
+    doctor,
     team,
     store,
     log,
@@ -277,7 +260,18 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   return {
-    parts: { intake, workState, engine, scheduler, usage, server: protocol, ports, pipeline, link },
+    parts: {
+      intake,
+      workState,
+      engine,
+      scheduler,
+      usage,
+      server: protocol,
+      ports,
+      pipeline,
+      link,
+      doctor,
+    },
     ...lifecycle,
     agentPort: () => protocol.port(),
   };

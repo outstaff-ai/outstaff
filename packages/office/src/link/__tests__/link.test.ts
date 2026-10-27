@@ -5,6 +5,7 @@ import { manualClock } from "#/clock.js";
 import type { ManualClock } from "#/types.js";
 import { openStore, type Store } from "#/store/index.js";
 import { ITEM_EVENTS_SUBJECT } from "#/pipeline/live/wake.js";
+import { presentHealth } from "#/doctor/index.js";
 import { createOfficeLink } from "#/link/client.js";
 import type { OfficeLink, OfficeLinkOptions } from "#/link/link.types.js";
 import { FakeService, until } from "./service.js";
@@ -19,6 +20,7 @@ describe("the office link", () => {
   let link: OfficeLink;
   let online: string[];
   let warned: string[];
+  let runs: number;
 
   const start = (extra: Partial<OfficeLinkOptions> = {}, defaults = false) => {
     const base = {
@@ -32,6 +34,12 @@ describe("the office link", () => {
       },
       identity: { team: "acme", version: "1.2.3", pipelineMode: "shadow" as const },
       connected: () => online,
+      doctor: {
+        run: async () => {
+          runs += 1;
+        },
+        health: async () => presentHealth(await store.listDoctorChecks(), undefined, clock.now()),
+      },
       clock,
       logger: { ...silentLogger, warn: (m: string) => void warned.push(m) } as Logger,
     };
@@ -66,6 +74,7 @@ describe("the office link", () => {
     await dash.ready();
     online = ["sam"];
     warned = [];
+    runs = 0;
   });
 
   afterEach(async () => {
@@ -189,6 +198,49 @@ describe("the office link", () => {
     for (const raw of dash.raw) {
       expect(linkMessageSchema.safeParse(JSON.parse(raw)).success).toBe(true);
     }
+  });
+
+  it("answers health, runs the checks on request and notifies a changed check only", async () => {
+    await store.recordDoctorRun("office", [
+      { name: "Slack token", status: "fail", detail: "Revoked.", fix: "Reinstall the app." },
+    ]);
+
+    start();
+    await connected();
+    await until(() => dash.of("health").length === 1);
+    expect(dash.of("health")[0]!.payload).toMatchObject({
+      summary: { ok: 0, warn: 0, fail: 1 },
+      lastRun: null,
+      checks: [{ scope: "office", name: "Slack token", status: "fail", fix: "Reinstall the app." }],
+    });
+
+    expect(await dash.request({ method: "health" })).toMatchObject({
+      result: { checks: [{ name: "Slack token" }] },
+    });
+
+    expect(runs).toBe(0);
+    expect(await dash.request({ method: "health", params: { run: true } })).toMatchObject({
+      result: { summary: { fail: 1 } },
+    });
+
+    expect(runs).toBe(1);
+
+    // Seen again with the same status: no notification. Passing now: one.
+    clock.advance(1);
+    await store.recordDoctorRun("office", [
+      { name: "Slack token", status: "fail", detail: "Revoked.", fix: "Reinstall the app." },
+    ]);
+
+    clock.advance(1000);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(dash.of("health")).toHaveLength(1);
+    await store.recordDoctorRun("office", [
+      { name: "Slack token", status: "ok", detail: "Valid." },
+    ]);
+
+    clock.advance(1000);
+    await until(() => dash.of("health").length === 2);
+    expect(dash.of("health")[1]!.payload.summary).toEqual({ ok: 1, warn: 0, fail: 0 });
   });
 
   it("answers an unknown method, bad params, a failure and a request that takes too long with an error", async () => {

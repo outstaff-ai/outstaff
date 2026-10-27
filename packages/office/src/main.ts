@@ -160,6 +160,7 @@ export async function startOffice(
         options: {
           agentPort: port(env, "OUTSTAFF_AGENT_PORT", 8080),
           webhookPort: port(env, "OUTSTAFF_WEBHOOK_PORT", 8082),
+          ...(env["OUTSTAFF_SECRETS_DIR"] ? { secretsDir: env["OUTSTAFF_SECRETS_DIR"] } : {}),
         },
       }),
     () => store.close(),

@@ -123,7 +123,7 @@ The agent's own directories are all below `$HOME`, so mount that writable if you
 | Container | Port                             | Purpose                                                                                                                                                                                                                 |
 | --------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | office    | `8080` (`OUTSTAFF_AGENT_PORT`)   | Agent connections, WebSocket on `/agent`. Reachable by the agents only; do not publish it.                                                                                                                              |
-| office    | `8081` (`OUTSTAFF_HEALTH_PORT`)  | `GET /healthz` and `GET /readyz`. For the platform's probes only.                                                                                                                                                       |
+| office    | `8081` (`OUTSTAFF_HEALTH_PORT`)  | `GET /healthz` and `GET /readyz` for the platform's probes, and `/doctor` for `ost doctor --via-office`. Do not publish it.                                                                                             |
 | office    | `8082` (`OUTSTAFF_WEBHOOK_PORT`) | `POST /webhooks/vcs` and `POST /webhooks/tracker`, only when the team receives webhooks. This is the one port that may need to be reachable from the code host and the tracker. Every request is verified by signature. |
 | agent     | none                             | Agents connect out to the office and listen on nothing.                                                                                                                                                                 |
 
@@ -133,6 +133,7 @@ The office answers on the health port with JSON such as `{ "ok": true, "state": 
 
 - `GET /healthz` is liveness: 200 while the office is starting or running with its parts up (store, agent connection, work state, intake, scheduler), 503 once a part fails or the office is stopping. Let the platform restart the container on 503.
 - `GET /readyz` is readiness: 200 only while the office is running. Send traffic when it is 200.
+- `GET /doctor` answers with the stored [doctor checks](/guides/doctor/#the-office-runs-the-checks-itself); `POST /doctor` runs the office's checks first. A failing check never changes `/healthz` or `/readyz`.
 
 The liveness endpoint answers while the office starts, so a slow first rescan is not mistaken for a hang; give the startup probe a generous window.
 

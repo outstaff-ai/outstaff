@@ -2,6 +2,7 @@ import { z } from "zod";
 import { comparisonSummarySchema } from "./comparison.js";
 import { itemSchema, itemSummarySchema, personSchema, traceSchema } from "./entities.js";
 import { time } from "./fields.js";
+import { healthSchema } from "./health.js";
 
 /** Version of the office link; the office sends it as the `Outstaff-Link-Version` header. */
 export const LINK_VERSION = 1;
@@ -102,6 +103,20 @@ export const requestSchema = z.discriminatedUnion("method", [
     method: z.literal("item"),
     params: z.strictObject({ id: z.string().min(1).describe("The work item's id.") }),
   }),
+  z.strictObject({
+    id: requestId,
+    method: z.literal("health"),
+    params: z
+      .strictObject({
+        run: z
+          .boolean()
+          .optional()
+          .describe(
+            "Run the office's checks now and answer with the result. A run that outlasts the request is answered with `timeout`; the `health` notification carries its result.",
+          ),
+      })
+      .optional(),
+  }),
 ]);
 
 const results = {
@@ -126,6 +141,7 @@ const results = {
       .array(traceSchema)
       .describe("The events whose wakes queued or joined the item, oldest first."),
   }),
+  health: healthSchema,
 };
 
 export const responseSchema = z.union([
@@ -138,6 +154,7 @@ export const responseSchema = z.union([
       results.compare,
       results.items,
       results.item,
+      results.health,
     ]),
   }),
   z.strictObject({
@@ -196,6 +213,7 @@ export const linkMessageSchema = z.discriminatedUnion("type", [
       updatedAt: time,
     }),
   ),
+  message("health", results.health),
   message("ping", z.strictObject({})),
   message("pong", z.strictObject({})),
 ]);

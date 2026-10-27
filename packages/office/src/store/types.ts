@@ -1,6 +1,8 @@
+import type { DoctorStore } from "./doctor.types.js";
 import type { ConversationStatus, WorkItemStatus, WorkItemTrigger } from "./schema.js";
 
 export type { ConversationStatus, WorkItemStatus, WorkItemTrigger };
+export type { NewDoctorCheck, StoredDoctorCheck } from "./doctor.types.js";
 
 export interface NewEvent {
   source: string;
@@ -169,7 +171,7 @@ export interface TraceQuery {
   limit?: number;
 }
 
-export interface Store {
+export interface Store extends DoctorStore {
   readonly dialect: "postgres" | "sqlite";
 
   getCursor(source: string, key: string): Promise<string | undefined>;

@@ -183,6 +183,12 @@ export const MESSAGE_META = {
       "Tells the office that the caller wrote a document for the ticket of a work item, so comments people leave on the document reach the caller as work.",
     replies: ["ack", "error"],
   },
+  doctor_report: {
+    from: "agent",
+    summary:
+      "Reports the checks only the agent's own container can make, run once at start: its declared tools installed, its granted services and devices answer, and its home volume has room. The office stores them with its own checks.",
+    replies: ["ack", "error"],
+  },
   current_work: {
     from: "agent",
     summary: "Asks for the caller's open tickets and pull requests, as context for a chat session.",

@@ -349,6 +349,37 @@ Result:
 | `traces[].comparison.differences[].policy`   | string                                                                         | no       | The pipeline policy behind the pipeline's side.                                                                                                                                                                                                                                              |
 | `traces[].comparison.differences[].note`     | string                                                                         | no       |                                                                                                                                                                                                                                                                                              |
 
+### `health`
+
+The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at` and on demand, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.
+
+Params:
+
+| Field | Type    | Required | Description                                                                                                                                                       |
+| ----- | ------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `run` | boolean | no       | Run the office's checks now and answer with the result. A run that outlasts the request is answered with `timeout`; the `health` notification carries its result. |
+
+Result:
+
+| Field                | Type                     | Required | Description                                                                                                        |
+| -------------------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `at`                 | string                   | yes      | ISO-8601 time, UTC.                                                                                                |
+| `summary`            | object                   | yes      | How many checks have each status.                                                                                  |
+| `summary.ok`         | integer                  | yes      |                                                                                                                    |
+| `summary.warn`       | integer                  | yes      |                                                                                                                    |
+| `summary.fail`       | integer                  | yes      |                                                                                                                    |
+| `lastRun`            | string or null           | yes      | When the office last ran its own checks; null before the first run ends.                                           |
+| `checks`             | list of objects          | yes      | Every check, failures first, then warnings, then the rest; by scope and name within each.                          |
+| `checks[].name`      | string                   | yes      | What is checked, for example `Tools install`.                                                                      |
+| `checks[].status`    | `ok` or `warn` or `fail` | yes      |                                                                                                                    |
+| `checks[].detail`    | string                   | yes      | What was found, naming the value that is wrong.                                                                    |
+| `checks[].fix`       | string                   | no       | What to change, when the check is not ok.                                                                          |
+| `checks[].key`       | string                   | no       | The secret key the check is about, when it is about one.                                                           |
+| `checks[].adapter`   | string                   | no       | The adapter that made the check, if one did.                                                                       |
+| `checks[].scope`     | string                   | yes      | Whose check it is: `office` for the checks the office runs, else the handle of the person whose agent reported it. |
+| `checks[].firstSeen` | string                   | yes      | When the check first reported this status.                                                                         |
+| `checks[].lastSeen`  | string                   | yes      | When a run last reported the check.                                                                                |
+
 ## Messages
 
 ### `welcome`
@@ -495,6 +526,31 @@ Sent by: the office.
 | `kind`      | string                                                                 | yes      |                     |
 | `status`    | `queued` or `active` or `waiting` or `done` or `blocked` or `canceled` | yes      |                     |
 | `updatedAt` | string                                                                 | yes      | ISO-8601 time, UTC. |
+
+### `health`
+
+The doctor checks, as the `health` method gives them. Sent when the welcome comes and whenever a check is added, removed or changes, not when a run only confirms them.
+
+Sent by: the office.
+
+| Field                | Type                     | Required | Description                                                                                                        |
+| -------------------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `at`                 | string                   | yes      | ISO-8601 time, UTC.                                                                                                |
+| `summary`            | object                   | yes      | How many checks have each status.                                                                                  |
+| `summary.ok`         | integer                  | yes      |                                                                                                                    |
+| `summary.warn`       | integer                  | yes      |                                                                                                                    |
+| `summary.fail`       | integer                  | yes      |                                                                                                                    |
+| `lastRun`            | string or null           | yes      | When the office last ran its own checks; null before the first run ends.                                           |
+| `checks`             | list of objects          | yes      | Every check, failures first, then warnings, then the rest; by scope and name within each.                          |
+| `checks[].name`      | string                   | yes      | What is checked, for example `Tools install`.                                                                      |
+| `checks[].status`    | `ok` or `warn` or `fail` | yes      |                                                                                                                    |
+| `checks[].detail`    | string                   | yes      | What was found, naming the value that is wrong.                                                                    |
+| `checks[].fix`       | string                   | no       | What to change, when the check is not ok.                                                                          |
+| `checks[].key`       | string                   | no       | The secret key the check is about, when it is about one.                                                           |
+| `checks[].adapter`   | string                   | no       | The adapter that made the check, if one did.                                                                       |
+| `checks[].scope`     | string                   | yes      | Whose check it is: `office` for the checks the office runs, else the handle of the person whose agent reported it. |
+| `checks[].firstSeen` | string                   | yes      | When the check first reported this status.                                                                         |
+| `checks[].lastSeen`  | string                   | yes      | When a run last reported the check.                                                                                |
 
 ### `ping`
 

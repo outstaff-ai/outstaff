@@ -6,6 +6,7 @@ import {
   StartupError,
   agentRegistry,
   prepareAgent,
+  reportAgentChecks,
   runMise,
   withGlobalConfig,
 } from "@outstaff/agent";
@@ -70,6 +71,7 @@ try {
   await agent.connection.whenConnected();
   log.info("connected");
   agent.usage.start();
+  void reportAgentChecks(agent, process.env, process.env["HOME"] ?? homedir(), log);
   await agent.chat?.start().catch((e: unknown) => {
     log.error("chat requests are off: the chat connection failed", { error: String(e) });
   });

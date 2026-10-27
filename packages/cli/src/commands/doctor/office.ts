@@ -4,17 +4,23 @@ import type { Context } from "#/types.js";
 
 const OFFICE_TIMEOUT_MS = 5_000;
 
-/** Health is served on its own port, so it is probed at `OUTSTAFF_OFFICE_HEALTH_URL` or else at the office URL's origin. */
-function healthUrl(env: Record<string, string | undefined>, officeUrl: string): string {
+/** Health is served on its own port: at `OUTSTAFF_OFFICE_HEALTH_URL`, or else at the office URL's origin. Throws on a bad URL. */
+export function officeHealthBase(
+  env: Record<string, string | undefined>,
+  officeUrl: string,
+): string {
   const given = env["OUTSTAFF_OFFICE_HEALTH_URL"];
   if (given) {
-    return `${given.replace(/\/+$/, "")}/healthz`;
+    return given.replace(/\/+$/, "");
   }
 
   const u = new URL(officeUrl);
   u.protocol = u.protocol === "wss:" ? "https:" : "http:";
-  return `${u.origin}/healthz`;
+  return u.origin;
 }
+
+const healthUrl = (env: Record<string, string | undefined>, officeUrl: string) =>
+  `${officeHealthBase(env, officeUrl)}/healthz`;
 
 type Rejection = NonNullable<ReturnType<OfficeConnection["rejection"]>>;
 

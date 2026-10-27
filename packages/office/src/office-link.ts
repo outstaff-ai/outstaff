@@ -1,5 +1,10 @@
 import type { PrRef } from "@outstaff/core";
-import { createOfficeLink, type OfficeLink, type SubjectLinks } from "./link/index.js";
+import {
+  createOfficeLink,
+  type OfficeLink,
+  type OfficeLinkOptions,
+  type SubjectLinks,
+} from "./link/index.js";
 import type { ComponentHealth, CreateOfficeInput } from "./office.types.js";
 import type { ProtocolServer } from "./protocol/index.js";
 import type { OfficePorts } from "./types.js";
@@ -29,9 +34,10 @@ export function createLinkForOffice(deps: {
   input: CreateOfficeInput;
   ports: OfficePorts;
   protocol: ProtocolServer;
+  doctor: OfficeLinkOptions["doctor"];
   log: Logger;
 }): OfficeLink | undefined {
-  const { input, ports, protocol, log } = deps;
+  const { input, ports, protocol, doctor, log } = deps;
   const { team, store, clock } = input;
   const token = input.secrets.get(LINK_TOKEN);
   if (!team.link || !token) {
@@ -49,6 +55,7 @@ export function createLinkForOffice(deps: {
       version: input.options?.officeVersion ?? "unknown",
       pipelineMode: team.office?.pipeline ?? "off",
     },
+    doctor,
     connected: () => protocol.connected(),
     clock,
     logger: log,

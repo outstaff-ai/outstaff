@@ -1,4 +1,5 @@
 import type { Store } from "./types.js";
+import { doctorQueries } from "./sql/doctor.js";
 import { conversationQueries } from "./sql/conversations.js";
 import { eventQueries } from "./sql/events.js";
 import { guardQueries } from "./sql/guards.js";
@@ -19,6 +20,7 @@ export function createSqlStore(internals: StoreInternals): Store {
     ...guardQueries(internals),
     ...conversationQueries(internals),
     ...traceQueries(internals),
+    ...doctorQueries(internals),
 
     async close() {
       await db.destroy();

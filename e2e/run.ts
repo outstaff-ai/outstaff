@@ -265,7 +265,11 @@ workflow:
     blocked: Blocked
     done: Done
     canceled: Canceled
-office: { events: poll, poll_interval_seconds: 10 }
+office:
+  events: poll
+  poll_interval_seconds: 10
+  # Slack has dummy tokens and no stand-in, so the office's doctor does not call it.
+  doctor: { skip: [chat] }
 policies:
   # Only this approver's approval merges: the other steps approve nothing, and a human here changes none of them.
   merge: { on_approval: true, approvers: [human:merge-approver] }

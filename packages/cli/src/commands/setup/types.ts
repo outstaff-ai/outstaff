@@ -1,11 +1,8 @@
-import type { SecretSource, SetupStep, TeamConfig } from "@outstaff/core";
+import type { ConfiguredAdapter, SecretSource, SetupStep, TeamConfig } from "@outstaff/core";
 import type { Context } from "#/types.js";
-import type { AnyDef, Scope } from "#/commands/types.js";
+import type { Scope } from "#/commands/types.js";
 
-export interface Configured {
-  def: AnyDef;
-  options: unknown;
-}
+export type Configured = ConfiguredAdapter;
 
 export interface DeriveReport {
   written: string[];
