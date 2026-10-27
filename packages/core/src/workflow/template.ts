@@ -83,5 +83,7 @@ export const BUILTIN_TEMPLATES: Readonly<Record<string, string>> = {
     "{{stack}}",
     "",
     "Rebase from the bottom up. After each push, retarget the next pull request onto the one below it if its base was merged.",
+    "",
+    "Keep the description of each pull request current: after the push it must still describe what the branch does now. If the approach changed, comment on the pull request with what changed, which merge caused it and why.",
   ].join("\n"),
 };

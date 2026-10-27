@@ -316,6 +316,8 @@ Use a stack when a change depends on another that is not merged yet.
 
 Resolve conflicts the way the repository's conventions say. If they say nothing, rebase onto the base rather than merging the base in. If the conflict changes the meaning of the work, say so in the pull request.
 
+After a rebase, or any push to an open pull request, the description must still describe what the branch does now. Rewrite whatever no longer holds: the approach, the files, how to roll it out or test it. When the approach changed, not just a mechanical conflict, comment on the pull request with what changed, which merge caused it and why, and mention it in your hand-back.
+
 === references/memory.md ===
 # Memory
 

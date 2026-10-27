@@ -15,5 +15,7 @@ modes:
     when: A release should go out and a human approved it.
   - name: runbook
     when: A procedure is missing, wrong or was just used for the first time.
+  - name: rebase
+    when: A branch has a conflict or its parent in a stack merged.
   - name: investigate
     when: Something is broken in a running environment.

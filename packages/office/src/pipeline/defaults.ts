@@ -107,7 +107,7 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
     when: AGENT_PR_OPEN,
     decide: { wake: { person: "author", kind: "rebase" } },
     instruction:
-      "Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push.",
+      "Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why.",
   },
   {
     id: "ci_failed_to_author",
