@@ -23,6 +23,8 @@ const AT = "2026-10-05T10:00:00.000Z";
 const types = (events: ReturnType<typeof deriveAfterMerge>) =>
   events.map((e) => `${e.type} #${e.subject.pr!.number}`);
 
+const UP_TO_DATE = { branch: "main", upToDate: true };
+
 describe("deriveAfterMerge", () => {
   it("raises an event for every open pull request the merge changed something under, naming the merge", () => {
     const after = [
@@ -41,7 +43,7 @@ describe("deriveAfterMerge", () => {
       snap(56, { baseRef: "branch-y", mergeable: "conflicting" }),
     ];
 
-    const events = deriveAfterMerge({ merged, before, after, requiresUpToDate: true, at: AT });
+    const events = deriveAfterMerge({ merged, before, after, requirements: UP_TO_DATE, at: AT });
     expect(types(events)).toEqual([
       "pr.conflicted #51",
       "pr.conflicted #52",
@@ -69,16 +71,27 @@ describe("deriveAfterMerge", () => {
     expect(events[1]!.subject).toEqual({ pr: prRef(52) });
   });
 
-  it("raises no behind-base event when the repository does not require up-to-date branches", () => {
+  it("raises no behind-base event unless the host requires branches into that base to be up to date", () => {
     const events = deriveAfterMerge({
       merged,
       before: [],
       after: [merged, snap(53)],
-      requiresUpToDate: false,
+      requirements: { branch: "main", upToDate: false },
       at: AT,
     });
 
     expect(events).toEqual([]);
+
+    // The requirement read is for the default branch; a merge into another base says nothing about it.
+    const elsewhere = deriveAfterMerge({
+      merged,
+      before: [],
+      after: [merged, snap(53)],
+      requirements: { branch: "trunk", upToDate: true },
+      at: AT,
+    });
+
+    expect(elsewhere).toEqual([]);
   });
 
   it("leaves closed pull requests and other repositories alone", () => {
@@ -98,7 +111,7 @@ describe("deriveAfterMerge", () => {
         merged,
         before: [],
         after: [other, closed, named],
-        requiresUpToDate: true,
+        requirements: UP_TO_DATE,
         at: AT,
       }),
     ).toEqual([]);

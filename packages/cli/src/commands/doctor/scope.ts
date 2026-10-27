@@ -10,6 +10,7 @@ import {
 import { roleProfile } from "#/catalogs.js";
 import type { Context, TeamCatalogs } from "#/types.js";
 import type { Scope } from "#/commands/types.js";
+import { mergeGateFindings } from "./merge-gate.js";
 import { officeChecks } from "./office.js";
 import { toolChecks } from "./tools.js";
 import type { ScopeReport, ScopeTarget } from "./types.js";
@@ -56,11 +57,12 @@ export async function checkScope(
   const person = scope === "person" ? team.people.find((p) => p.handle === handle) : undefined;
   const secrets = envSecretSource(ctx.env, dir);
   const target: ScopeTarget = { team, handle, scope, person, catalogs, dir, secrets };
+  const adapters = configuredAdapters(team, registry, scope, person);
   const checks = await scopeChecks({
     team,
     scope,
     ...(person ? { person } : {}),
-    adapters: configuredAdapters(team, registry, scope, person),
+    adapters,
     secrets,
     dir,
     handle,
@@ -71,6 +73,10 @@ export async function checkScope(
     },
     extra: await placeChecks(ctx, target),
   });
+
+  if (scope === "office") {
+    checks.push(...(await mergeGateFindings(ctx, team, adapters.found, secrets)));
+  }
 
   return { scope: handle, checks };
 }

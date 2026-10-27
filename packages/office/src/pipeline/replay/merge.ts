@@ -51,7 +51,7 @@ export function derivedEvents(step: ReplayStep): Derived[] {
     merged,
     before,
     after,
-    requiresUpToDate: merge.requiresUpToDate ?? false,
+    requirements: merge.requirements ?? { branch: merged.baseRef, upToDate: false },
     at: step.event.at,
   });
 

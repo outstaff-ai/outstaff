@@ -11,7 +11,7 @@ import type {
 } from "./types.js";
 import { adapterKey } from "./validate-capabilities.js";
 import { personErrors, personWarnings } from "./validate-people.js";
-import { idleSwitches, mergesWithoutChecks } from "./validate-policies.js";
+import { idleSwitches } from "./validate-policies.js";
 import { runtimeReport } from "./validate-runtime.js";
 import type { TeamCheck } from "./validate.types.js";
 import { WARNING_CODES } from "./warning-codes.js";
@@ -38,7 +38,6 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
     warnings: [
       ...config.people.flatMap((person, i) => personWarnings(c, person, i)),
       ...idleSwitches(c),
-      ...mergesWithoutChecks(config),
       ...defaultTrust(config),
       ...identityWarnings(c),
       ...runtimes.warnings,

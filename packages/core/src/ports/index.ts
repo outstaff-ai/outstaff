@@ -47,9 +47,6 @@ export type {
   CheckLog,
   CheckLogStep,
   ConversationEntry,
-  MergeMethod,
-  MergeOptions,
-  MergeResult,
   PullRequestReview,
   PullRequestReviewState,
   NewPullRequest,
@@ -66,6 +63,14 @@ export type {
   VcsEvent,
   VcsPermission,
 } from "./vcs.js";
+
+export type {
+  BranchRule,
+  MergeMethod,
+  MergeOptions,
+  MergeRequirements,
+  MergeResult,
+} from "./vcs-merge.js";
 
 export { splitAtLines } from "./split-lines.js";
 export type { Chat, ChatFile, ChatMessage, AgentProfile } from "./chat.js";

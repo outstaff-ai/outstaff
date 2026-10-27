@@ -21,6 +21,9 @@ export interface OfficeDoctorOptions {
   clock: Clock;
   logger: Logger;
 
+  /** Checks of the office's own ports to add to each run, such as the code host's merge rules. Default none. */
+  extraChecks?: () => Promise<DoctorCheck[]>;
+
   /** What the adapters' checks call the providers with. Default the global fetch. */
   fetch?: typeof fetch;
 

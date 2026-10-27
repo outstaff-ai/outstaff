@@ -1,6 +1,7 @@
 import type { RepoRef } from "@outstaff/core";
 import { createStubFetch } from "./http-stub.js";
 import { authRoutes } from "./github-fake/auth-routes.js";
+import { branchRoutes } from "./github-fake/branch-routes.js";
 import { commentRoutes } from "./github-fake/comment-routes.js";
 import { graphqlRoute } from "./github-fake/graphql-route.js";
 import { pullRoutes } from "./github-fake/pull-routes.js";
@@ -20,6 +21,7 @@ export function createGithubFake(repo: RepoRef = { owner: "acme", name: "app" })
     ...pullRoutes(s),
     ...commentRoutes(s),
     ...repoRoutes(s),
+    ...branchRoutes(s),
     graphqlRoute(s),
   ]);
 

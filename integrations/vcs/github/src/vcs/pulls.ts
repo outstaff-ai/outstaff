@@ -6,7 +6,7 @@ import {
   type Vcs,
 } from "@outstaff/core";
 import { toPullRequest } from "#/mapping.js";
-import type { RestPull } from "#/api.types.js";
+import type { RestPull, RestRepo } from "#/api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 
@@ -156,11 +156,7 @@ export function pullOperations(c: GithubContext): Pick<Vcs, PullOperations> {
     async mergeOptions(repo, base): Promise<MergeOptions> {
       const token = await apiToken(repo);
       const [info, queue] = await Promise.all([
-        http.request<{ allow_merge_commit?: boolean; allow_squash_merge?: boolean }>(
-          "GET",
-          repoPath(repo),
-          { token },
-        ),
+        http.request<RestRepo>("GET", repoPath(repo), { token }),
         http.graphql<{ repository: { mergeQueue: { id: string } | null } | null }>(
           token,
           MERGE_QUEUE_QUERY,

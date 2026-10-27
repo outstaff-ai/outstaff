@@ -9,6 +9,10 @@ export const derivedId = (type: string, pr: PrSnapshot, merged: PrSnapshot): str
 export const sameRepo = (a: PrSnapshot, b: PrSnapshot): boolean =>
   a.ref.repo.owner === b.ref.repo.owner && a.ref.repo.name === b.ref.repo.name;
 
+/** The code host requires the pull request's branch to be up to date with its base before it merges. */
+const mustBeUpToDate = ({ requirements }: MergeChange, pr: PrSnapshot): boolean =>
+  requirements.upToDate && pr.baseRef === requirements.branch;
+
 /** The open pull requests of the merged one's repository, other than it: the ones a merge can change something under. */
 const affected = (change: MergeChange): PrSnapshot[] =>
   change.after.filter(
@@ -34,7 +38,7 @@ function sameBase(pr: PrSnapshot, change: MergeChange): MergeDerivedType | undef
     return "pr.conflicted";
   }
 
-  return change.requiresUpToDate ? "pr.behind_base" : undefined;
+  return mustBeUpToDate(change, pr) ? "pr.behind_base" : undefined;
 }
 
 /** Targets another branch: only a change into conflicting is news. */
@@ -51,8 +55,8 @@ const RELATIONS = [stackedOnMerged, sameBase, otherBase];
  * - `pr.base_merged` when the pull request was stacked on the merged branch;
  * - `pr.conflicted` when its base received the merge and it now conflicts, even if it conflicted before, because the
  *   base it conflicts with is new; or when it turned conflicting while its base did not change;
- * - `pr.behind_base` when its base received the merge, it does not conflict, and the repository requires branches to
- *   be up to date.
+ * - `pr.behind_base` when its base received the merge, it does not conflict, and the code host requires branches into
+ *   that base to be up to date (`requirements`, read through the vcs port).
  *
  * The work state keeps no base commit, so "its base received the merge" means the pull request targets the branch the
  * merged one targeted. Each event names the merge as `data.cause`.

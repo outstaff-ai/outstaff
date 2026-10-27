@@ -11,6 +11,5 @@ export const WARNING_CODES = {
   identityVcsNotBotLogin: "identities.vcs_not_bot_login",
   identityTrackerEmpty: "identities.tracker_empty",
   policyCapabilityMissing: "policies.capability_missing",
-  policyMergeWithoutChecks: "policies.merge_without_checks",
   peopleRuntimeWithoutUsage: "people.runtime_without_usage",
 } as const;

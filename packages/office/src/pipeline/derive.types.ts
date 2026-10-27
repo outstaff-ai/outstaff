@@ -1,3 +1,4 @@
+import type { MergeRequirements } from "@outstaff/core";
 import type { PrRecord } from "#/workstate/index.js";
 
 /** What deriving needs of a pull request in the work state. */
@@ -14,8 +15,11 @@ export interface MergeChange {
   before: readonly PrSnapshot[];
   after: readonly PrSnapshot[];
 
-  /** The repository requires a branch to be up to date with its base before it merges (read from the code host). */
-  requiresUpToDate: boolean;
+  /**
+   * What the code host requires before a pull request merges into the repository's default branch, as the vcs port's
+   * `mergeRequirements` reads it. Only its up-to-date requirement is used, for pull requests into that branch.
+   */
+  requirements: Pick<MergeRequirements, "branch" | "upToDate">;
 
   /** When the merge happened (ISO-8601). */
   at: string;

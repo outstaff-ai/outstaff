@@ -3,12 +3,14 @@ import { BareRepo } from "./git.ts";
 import type { Req, Route } from "./http.ts";
 import type {
   RequiredChecksData,
+  RestBranch,
   RestCheckRun,
   RestEvent,
   RestIssueComment,
   RestPull,
   RestReview,
   RestReviewComment,
+  RestRule,
   ThreadNode,
   ThreadsData,
 } from "@outstaff/integration.vcs.github";
@@ -481,6 +483,14 @@ export function createGithub(opts: GithubOptions) {
         allow_squash_merge: true,
       }),
     },
+    // The repository's ruleset requires one approval and the ci check; there is no classic protection.
+    ...branchRules(`${API}/repos/${full}`, [
+      { type: "pull_request", parameters: { required_approving_review_count: 1 } },
+      {
+        type: "required_status_checks",
+        parameters: { required_status_checks: [{ context: "ci" }] },
+      },
+    ]),
     ...(["merge", "merge-async"] as const).map((kind): Route => ({
       method: "PUT",
       path: `${pulls}/:n/${kind}`,
@@ -761,6 +771,7 @@ export function createGithub(opts: GithubOptions) {
       const base = `${API}/repos/${r.owner}/${r.name}`;
       return [
         { method: "GET", path: base, handler: () => ({ default_branch: "main" }) },
+        ...branchRules(base, []),
         { method: "GET", path: `${base}/pulls`, handler: () => [] },
         {
           method: "GET",
@@ -907,4 +918,20 @@ export function createGithub(opts: GithubOptions) {
       };
     },
   };
+}
+
+/** The default branch's protection summary (unprotected) and the rules its rulesets add. */
+function branchRules(base: string, rules: RestRule[]): Route[] {
+  return [
+    {
+      method: "GET",
+      path: `${base}/branches/:branch`,
+      handler: (r): RestBranch => ({
+        name: r.params["branch"]!,
+        protected: false,
+        protection: { enabled: false },
+      }),
+    },
+    { method: "GET", path: `${base}/rules/branches/:branch`, handler: () => rules },
+  ];
 }

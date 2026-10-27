@@ -52,3 +52,12 @@ export interface ScopeChecksInput {
   /** Checks of the host (office reachability, tools, network) to report after the secrets, before the adapters'. */
   extra?: DoctorCheck[];
 }
+
+/** A repo of the team file. */
+export type RepoEntry = TeamConfig["repos"][number];
+
+/** What a repo's merge gate leaves open: the risk to agents' pull requests and the fix. */
+export interface MergeGateGap {
+  risk: string;
+  fix: string;
+}

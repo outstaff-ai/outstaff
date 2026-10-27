@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expectPortError, requireCapability, requireSeed } from "./harness.js";
 import type { VcsCases } from "./types.js";
 
-/** Review state, required checks, merge options and merging. */
+/** Review state, required checks, merge options and requirements, and merging. */
 export function vcsMergingCases({ get, repoOf }: VcsCases): void {
   describe("merging", () => {
     const setupMerge = async (t: Parameters<typeof requireSeed>[0], level: "write" | "read") => {
@@ -58,6 +58,27 @@ export function vcsMergingCases({ get, repoOf }: VcsCases): void {
       expect(await s.subject.mergeOptions!(repo, pr.base.ref)).toEqual({
         queue: true,
         methods: [],
+      });
+    });
+
+    it("reads the default branch's merge requirements, adding up every rule", async (t) => {
+      const { s, repo, pr } = await setupMerge(t, "write");
+      const protect = requireSeed(t, s.seed, "protectBranch");
+      expect(await s.subject.mergeRequirements!(repo)).toEqual({
+        branch: pr.base.ref,
+        requiredChecks: [],
+        requiredApprovals: 0,
+        upToDate: false,
+      });
+
+      await protect(repo, { requiredChecks: ["ci"], requiredApprovals: 1 });
+      await protect(repo, { requiredChecks: ["ci", "lint"], requiredApprovals: 2, upToDate: true });
+      const read = await s.subject.mergeRequirements!(repo);
+      expect({ ...read, requiredChecks: read.requiredChecks.toSorted() }).toEqual({
+        branch: pr.base.ref,
+        requiredChecks: ["ci", "lint"],
+        requiredApprovals: 2,
+        upToDate: true,
       });
     });
 

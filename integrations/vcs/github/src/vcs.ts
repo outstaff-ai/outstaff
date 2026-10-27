@@ -6,6 +6,7 @@ import { conversationOperations } from "./vcs/conversation.js";
 import { eventOperations } from "./vcs/events.js";
 import { identityOperations } from "./vcs/identity.js";
 import { pullOperations } from "./vcs/pulls.js";
+import { requirementOperations } from "./vcs/requirements.js";
 import { reviewOperations } from "./vcs/reviews.js";
 
 export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: GithubDeps = {}): Vcs {
@@ -14,6 +15,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     links: c.links,
     ...identityOperations(c),
     ...pullOperations(c),
+    ...requirementOperations(c),
     ...checkOperations(c),
     ...reviewOperations(c),
     ...conversationOperations(c),

@@ -85,7 +85,12 @@ export const unrelatedConflict: ReplayScenario = {
       merge: {
         before: { 52: "conflicting" },
         after: { 51: "conflicting", 52: "conflicting", 54: "conflicting" },
-        requiresUpToDate: true,
+        requirements: {
+          branch: "main",
+          requiredChecks: ["ci"],
+          requiredApprovals: 1,
+          upToDate: true,
+        },
         notes: {
           "derived:pr.conflicted:acme-example/shop#51:after:acme-example/shop#50":
             "intended fix: sam is woken and told #50 caused it; reassigning and moving ACME-131 is left to sam, and nothing is commented",

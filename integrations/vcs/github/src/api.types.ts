@@ -133,3 +133,39 @@ export interface RestReview {
   commit_id?: string | null;
   html_url: string;
 }
+
+/** The parts of `GET /repos/{owner}/{repo}` the adapter reads. */
+export interface RestRepo {
+  default_branch: string;
+  allow_merge_commit?: boolean;
+  allow_squash_merge?: boolean;
+}
+
+/** Required status checks of classic branch protection. */
+export interface RestRequiredStatusChecks {
+  strict?: boolean;
+  contexts: string[];
+}
+
+/** `GET /repos/{owner}/{repo}/branches/{branch}`: readable with Contents: read, so only a summary of protection. */
+export interface RestBranch {
+  name: string;
+  protected: boolean;
+  protection?: { enabled?: boolean; required_status_checks?: RestRequiredStatusChecks };
+}
+
+/** `GET /repos/{owner}/{repo}/branches/{branch}/protection`, which needs Administration: read. */
+export interface RestBranchProtection {
+  required_status_checks?: RestRequiredStatusChecks | null;
+  required_pull_request_reviews?: { required_approving_review_count?: number } | null;
+}
+
+/** One rule of `GET /repos/{owner}/{repo}/rules/branches/{branch}`: what the rulesets that apply to a branch ask. */
+export interface RestRule {
+  type: string;
+  parameters?: {
+    required_approving_review_count?: number;
+    required_status_checks?: { context: string }[];
+    strict_required_status_checks_policy?: boolean;
+  };
+}
