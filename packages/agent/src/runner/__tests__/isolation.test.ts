@@ -186,6 +186,7 @@ describe("isolation between work items", () => {
     const loop = createWorkLoop({
       office: conn,
       runtime,
+      runtimeName: "claude",
       env: { ...env, office: conn },
       systemPrompt: "IDENTITY",
       policy,
@@ -321,6 +322,7 @@ describe("memory", () => {
     const loop = createWorkLoop({
       office: conn,
       runtime,
+      runtimeName: "claude",
       env: { ...env, office: conn },
       systemPrompt: "IDENTITY",
       policy,

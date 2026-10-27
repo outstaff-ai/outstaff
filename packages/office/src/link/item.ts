@@ -46,6 +46,8 @@ export async function findItem(
         finishedAt: r.finishedAt,
         outcome: r.outcome,
         error: r.error,
+        runtime: r.runtime,
+        model: r.model,
       })),
       journal: {
         entries: journal.length,

@@ -97,7 +97,16 @@ const ITEM = {
     policy: "approval_to_merge_after_feedback",
     eventId: "workstate:handed_back:w1:r1",
   },
-  runs: [{ startedAt: "2026-10-05T09:00:30.000Z", finishedAt: null, outcome: null, error: null }],
+  runs: [
+    {
+      startedAt: "2026-10-05T09:00:30.000Z",
+      finishedAt: null,
+      outcome: null,
+      error: null,
+      runtime: "claude",
+      model: null,
+    },
+  ],
   journal: {
     entries: 1,
     latest: [{ at: "2026-10-05T09:00:00.000Z", author: "office", text: "Merge it." }],

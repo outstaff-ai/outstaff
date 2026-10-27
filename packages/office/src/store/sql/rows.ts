@@ -33,6 +33,8 @@ export const toRun = (r: Selectable<Database["runs"]>): Run => ({
   outcome: r.outcome,
   error: r.error,
   usage: r.usage === null ? null : (JSON.parse(r.usage) as unknown),
+  runtime: r.runtime,
+  model: r.model,
 });
 
 export const toLink = (r: Selectable<Database["links"]>): Link => ({

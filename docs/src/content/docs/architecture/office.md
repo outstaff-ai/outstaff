@@ -129,6 +129,10 @@ The office raises the `agent.idle` event only when the agent has a ready ticket 
 
 A run of an agent- or automation-triggered item is counted when it starts. When an item already had `policies.agent_loop_guard.max_runs_per_item_per_hour` runs in the last hour, it is blocked instead of started, and the reason is returned to the caller (and written to the item's journal) so the workflow engine can comment. `tick()` also blocks queued items that tripped the guard. Human-triggered and scheduled runs are never limited.
 
+### Which runtime ran it
+
+A run records the runtime adapter and the model that ran it (`runs.runtime`, `runs.model`; both stay empty for a run the agent never accepted and for runs from before the columns). The agent reports them: `accept` carries the adapter and the model the person is configured with, and `session` carries the concrete model id the runtime reports when it starts, which replaces the configured one, so an item run on the runtime's default shows the model that was used. The office link shows them on each of an item's `runs` and on the `current` item of a person, and usage can be grouped by them from the run records.
+
 ### Failed runs
 
 When an agent reports that a run failed, `fail(itemId, error)` ends the run as `failed`, counts a consecutive failure on the item, and puts it back in the queue with `not_before = now + min(base * 2^(n-1), cap)`. The defaults are 1 minute and 30 minutes (so 1, 2, 4, 8, 16, 30, 30 ...) and come from `policies.retry` (`base_minutes`, `cap_minutes`, `max_failures`). `next` skips an item whose `not_before` is still in the future, so the person's other queued items run meanwhile, and `markActive` refuses it with `backoff`. The count and `not_before` are columns of the work item, so a restart keeps them; nothing is a timer in memory. Every `tick()` clears the `not_before` that ran out and the office tells the agent there is work again.

@@ -23,6 +23,9 @@ export interface WorkLoopOptions {
   office: WorkConnection;
   runtime: Runtime;
 
+  /** The name of the runtime adapter, reported to the office with each accepted item. */
+  runtimeName: string;
+
   /** The ports and identity the verbs use. Its `office` is wrapped to see whether the agent asked something. */
   env: AgentEnv;
   systemPrompt: string;

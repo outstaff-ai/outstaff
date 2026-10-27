@@ -78,6 +78,14 @@ describe("mapMessage", () => {
       { type: "started", sessionId: "s1" },
     ]);
 
+    expect(map({ type: "system", subtype: "init", session_id: "s1", model: "opus-4" })).toEqual([
+      { type: "started", sessionId: "s1", model: "opus-4" },
+    ]);
+
+    expect(map({ type: "system", subtype: "init", session_id: "s1", model: "" })).toEqual([
+      { type: "started", sessionId: "s1" },
+    ]);
+
     expect(map({ type: "system", subtype: "init" })).toEqual([]);
     expect(map({ type: "system", subtype: "other", session_id: "s1" })).toEqual([]);
   });

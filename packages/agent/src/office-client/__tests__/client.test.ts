@@ -166,7 +166,7 @@ describe("office connection", () => {
 
   it("sends heartbeats with the active item and reconnects when the office goes quiet", async () => {
     await connectUp({ heartbeatMs: 1000 });
-    const accept = conn.accept("w1");
+    const accept = conn.accept("w1", { runtime: "claude", model: "opus" });
     current().reply(current().last(), "ack");
     await accept;
 
@@ -333,7 +333,7 @@ describe("office connection", () => {
 
     it("turns error replies into port errors", async () => {
       await connectUp();
-      const p = conn.accept("nope");
+      const p = conn.accept("nope", { runtime: "claude" });
       current().reply(current().last(), "error", {
         code: "unknown_item",
         message: "No such item.",

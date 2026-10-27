@@ -102,13 +102,14 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       return offerOf(started.item);
     },
 
-    async accept(person, id) {
+    async accept(person, id, on) {
       const item = await own(person, id);
       if (item.status !== "active") {
         throw new ProtocolError("invalid", `Work item ${id} is ${item.status}, not offered.`);
       }
 
       await store.upsertSubject(OFFER_SUBJECT, id, { accepted: true });
+      await store.tagRun(id, on);
     },
 
     async decline(person, id, reason) {
@@ -138,9 +139,12 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       await scheduler.heartbeat(id);
     },
 
-    async setSession(person, id, sessionId) {
+    async setSession(person, id, sessionId, model) {
       await own(person, id);
       await store.updateItem(id, { sessionId });
+      if (model) {
+        await store.tagRun(id, { model });
+      }
     },
 
     async journal(person, id, text) {

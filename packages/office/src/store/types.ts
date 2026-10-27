@@ -1,9 +1,11 @@
+import type { Run, RunRuntime } from "./runs.types.js";
 import type { DoctorStore } from "./doctor.types.js";
 import type { ItemRefStore, NewItemRef } from "./refs.types.js";
 import type { ConversationStatus, WorkItemStatus, WorkItemTrigger } from "./schema.js";
 
 export type { ConversationStatus, WorkItemStatus, WorkItemTrigger };
 export type { NewDoctorCheck, StoredDoctorCheck } from "./doctor.types.js";
+export type { Run, RunRuntime } from "./runs.types.js";
 export type { ItemRef, ItemRefRole, ItemRefType, NewItemRef } from "./refs.types.js";
 
 export interface NewEvent {
@@ -76,16 +78,6 @@ export interface WorkItemPatch {
   sessionId?: string | null;
   workspace?: string | null;
   subject?: { type: string; ref: string };
-}
-
-export interface Run {
-  id: string;
-  workItemId: string;
-  startedAt: string;
-  finishedAt: string | null;
-  outcome: string | null;
-  error: string | null;
-  usage: unknown;
 }
 
 export interface JournalEntry {
@@ -223,6 +215,9 @@ export interface Store extends DoctorStore, ItemRefStore {
     result: { outcome: string; error?: string; usage?: unknown },
   ): Promise<void>;
   listRuns(workItemId: string): Promise<Run[]>;
+
+  /** Records the runtime and model on the item's open run; does nothing when the item has none. */
+  tagRun(workItemId: string, tags: RunRuntime): Promise<void>;
 
   appendJournal(workItemId: string, author: string, text: string): Promise<JournalEntry>;
   readJournal(workItemId: string): Promise<JournalEntry[]>;

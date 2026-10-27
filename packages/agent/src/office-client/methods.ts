@@ -16,14 +16,15 @@ const compact = <T extends object>(o: T): T =>
 /** The office's API over a connection's requests; `activeItems` are the items kept alive by a heartbeat. */
 export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>): OfficeMethods {
   return {
-    async accept(workItemId) {
-      await ack("accept", { workItemId });
+    async accept(workItemId, on) {
+      await ack("accept", { workItemId, ...on });
       activeItems.add(workItemId);
     },
 
     decline: (workItemId, reason) => ack("decline", { workItemId, reason }),
     progress: (workItemId, text) => ack("progress", { workItemId, text }),
-    session: (workItemId, sessionId) => ack("session", { workItemId, sessionId }),
+    session: (workItemId, sessionId, model) =>
+      ack("session", { workItemId, sessionId, ...(model ? { model } : {}) }),
     journal: (workItemId, text) => ack("journal", { workItemId, text }),
     async handBack(workItemId, result) {
       await ack("handback", { workItemId, ...result, links: result.links ?? [] });

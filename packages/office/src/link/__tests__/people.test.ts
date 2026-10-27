@@ -32,6 +32,7 @@ describe("listPeople", () => {
 
     await store.activateItem(active.id);
     const run = await store.startRun(active.id);
+    await store.tagRun(active.id, { runtime: "claude", model: "opus" });
     const later = await store.enqueue({
       person: "sam",
       kind: "review_feedback",
@@ -94,6 +95,8 @@ describe("listPeople", () => {
           ...item(active, {}),
           subject: { type: "ticket", ref: "ACME-1" },
           startedAt: run.startedAt,
+          runtime: "claude",
+          model: "opus",
           lastHeartbeat: expect.any(String),
         },
         queue: [
@@ -118,7 +121,12 @@ describe("listPeople", () => {
         role: "developer",
         connected: false,
         counts: { queued: 0, running: 1 },
-        current: item(busy, { startedAt: null, lastHeartbeat: expect.any(String) }),
+        current: item(busy, {
+          startedAt: null,
+          runtime: null,
+          model: null,
+          lastHeartbeat: expect.any(String),
+        }),
         queue: [],
       },
       {

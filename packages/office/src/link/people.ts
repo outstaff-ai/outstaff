@@ -38,10 +38,12 @@ async function currentOf(deps: Deps, active: WorkItem | undefined): Promise<Link
     return null;
   }
 
-  const runs = await deps.store.listRuns(active.id);
+  const run = (await deps.store.listRuns(active.id)).at(-1);
   return {
     ...view(active),
-    startedAt: runs.at(-1)?.startedAt ?? null,
+    startedAt: run?.startedAt ?? null,
+    runtime: run?.runtime ?? null,
+    model: run?.model ?? null,
     // A heartbeat touches the item, so its last change is the latest sign of life.
     lastHeartbeat: active.updatedAt,
   };

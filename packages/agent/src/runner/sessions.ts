@@ -32,14 +32,14 @@ export function createSessionManager(
       return key.startsWith("thread:") ? known.get(key) : undefined;
     },
 
-    async started(workItemId, sessionId) {
+    async started(workItemId, sessionId, model) {
       const key = keyOfItem.get(workItemId) ?? `item:${workItemId}`;
-      if (known.get(key) === sessionId) {
+      if (known.get(key) === sessionId && !model) {
         return;
       }
 
       try {
-        await store.session(workItemId, sessionId);
+        await store.session(workItemId, sessionId, model);
         known.set(key, sessionId);
       } catch (e) {
         // The run goes on; the next round starts a new session from the journal if this one is lost.

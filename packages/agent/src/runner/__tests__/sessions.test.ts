@@ -27,13 +27,15 @@ const offer = (id: string, extra: { sessionId?: string; thread?: string } = {}):
 
 function setup() {
   const stored: [string, string][] = [];
+  const models: (string | undefined)[] = [];
   const manager = createSessionManager({
-    async session(id, sessionId) {
+    async session(id, sessionId, model) {
       stored.push([id, sessionId]);
+      models.push(model);
     },
   });
 
-  return { manager, stored };
+  return { manager, stored, models };
 }
 
 describe("sessions", () => {
@@ -49,6 +51,20 @@ describe("sessions", () => {
     await manager.started("w1", "s1");
     expect(stored).toEqual([["w1", "s1"]]);
     expect(manager.resumeFor(offer("w1", { sessionId: "s1" }))).toBe("s1");
+  });
+
+  it("sends the model the runtime reports in every round, though the session is known", async () => {
+    const { manager, stored, models } = setup();
+    manager.resumeFor(offer("w1", { sessionId: "s1" }));
+    await manager.started("w1", "s1");
+    await manager.started("w1", "s1", "opus-4");
+    await manager.started("w1", "s1", "opus-4");
+    expect(stored).toEqual([
+      ["w1", "s1"],
+      ["w1", "s1"],
+    ]);
+
+    expect(models).toEqual(["opus-4", "opus-4"]);
   });
 
   it("never gives an item the session of another item", async () => {

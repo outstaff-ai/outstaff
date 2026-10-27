@@ -38,7 +38,13 @@ export type UsageEvent = {
 };
 
 export type RuntimeEvent =
-  | { type: "started"; sessionId: string }
+  | {
+      type: "started";
+      sessionId: string;
+
+      /** The concrete model the session runs, when the runtime tells (also when it picked its default). */
+      model?: string;
+    }
   | { type: "text"; text: string }
   | { type: "tool_call"; tool: string; input: unknown; decision: Decision }
   | UsageEvent

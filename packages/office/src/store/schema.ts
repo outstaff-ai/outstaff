@@ -55,6 +55,8 @@ export interface RunsTable {
   outcome: string | null;
   error: string | null;
   usage: string | null;
+  runtime: string | null;
+  model: string | null;
 }
 
 export interface JournalTable {

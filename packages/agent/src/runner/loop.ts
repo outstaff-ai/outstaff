@@ -32,7 +32,10 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   /** Takes the offer; an offer the office would not give us is dropped. */
   async function accepted(id: string): Promise<boolean> {
     try {
-      await opts.office.accept(id);
+      await opts.office.accept(id, {
+        runtime: opts.runtimeName,
+        ...(opts.model ? { model: opts.model } : {}),
+      });
 
       return true;
     } catch (e) {

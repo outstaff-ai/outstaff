@@ -141,7 +141,7 @@ describe("the office with the event pipeline live", () => {
       `${issue.key} is assigned to you. Work on it the way the repository asks.`,
     );
 
-    await conn.accept(item.id);
+    await conn.accept(item.id, { runtime: "claude" });
     await conn.handBack(item.id, { summary: "Built it.", status: "done" });
     await until(async () => (await tracker.getIssue(issue.key)).status.canonical === "review");
 

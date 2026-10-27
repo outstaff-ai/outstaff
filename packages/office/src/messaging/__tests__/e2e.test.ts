@@ -96,7 +96,7 @@ describe("agent-to-agent questions through the real server and client", () => {
 
     server.notify("sam");
     const own = await next(sam);
-    await sam.accept(own.workItem.id);
+    await sam.accept(own.workItem.id, { runtime: "claude" });
 
     const verb = findVerb("ask")!;
     const asked = await runVerb(
@@ -122,7 +122,7 @@ describe("agent-to-agent questions through the real server and client", () => {
     const text = offer.context.journal.map((j) => j.text).join("\n");
     expect(text).toContain("Which queue should orders use?");
     const questionId = /ost answer (\S+) "/.exec(text)![1]!;
-    await mira.accept(offer.workItem.id);
+    await mira.accept(offer.workItem.id, { runtime: "claude" });
     expect(text).toContain("from sam (developer)");
     expect(text).toContain("is working on: Build the cart");
     expect(text).toContain(`ost answer ${questionId}`);
@@ -223,11 +223,11 @@ describe("an answer that arrives while the asker is still running", () => {
       const own = await sam.offers()[Symbol.asyncIterator]().next();
       const id = own.value!.workItem.id;
       expect(id).toBe(item.id);
-      await sam.accept(id);
+      await sam.accept(id, { runtime: "claude" });
       const asked = await sam.ask({ to: "mira", question: "Which queue?", workItemId: id });
 
       const offer = (await mira.offers()[Symbol.asyncIterator]().next()).value!;
-      await mira.accept(offer.workItem.id);
+      await mira.accept(offer.workItem.id, { runtime: "claude" });
       // The answer comes while sam is still working.
       await mira.answer(asked.id, "The fast one.");
       expect((await h.store.getItem(id))?.status).toBe("active");
