@@ -100,6 +100,9 @@ export interface OfficeConnection extends OfficeClient {
 
   /** Reports the runtime's usage windows; the office keeps the latest. */
   usage(windows: PayloadOf<"usage">["windows"]): Promise<void>;
+
+  /** Reports the checks the agent ran at start; the office stores them with its own. */
+  doctorReport(checks: PayloadOf<"doctor_report">["checks"]): Promise<void>;
   answer(questionId: string, answer: string): Promise<void>;
 }
 

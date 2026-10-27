@@ -1,4 +1,5 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
+import type { OfficeDoctor } from "./doctor/index.js";
 import type { Intake } from "./intake/index.js";
 import type { OfficeLink } from "./link/index.js";
 import { linkHealth } from "./office-link.js";
@@ -17,6 +18,7 @@ type State = OfficeHealth["state"];
 export function officeLifecycle(deps: {
   team: Pick<TeamConfig, "team">;
   link: OfficeLink | undefined;
+  doctor: Pick<OfficeDoctor, "start" | "stop" | "component">;
   store: Store;
   log: Logger;
   intake: Intake;
@@ -30,7 +32,7 @@ export function officeLifecycle(deps: {
   /** After each tick of the scheduler's housekeeping; never throws. */
   onTick?: () => Promise<unknown>;
 }): Pick<Office, "start" | "stop" | "health"> {
-  const { team, link, store, log, intake, workState, scheduler, protocol } = deps;
+  const { team, link, doctor, store, log, intake, workState, scheduler, protocol } = deps;
   const { inFlight, notify, onBlocked, onTick } = deps;
 
   let state: State = "created";
@@ -58,6 +60,7 @@ export function officeLifecycle(deps: {
 
     Object.assign(up, { server: false, workState: false, intake: false, scheduler: false });
     await link?.stop();
+    await doctor.stop();
     await store.close();
     state = "stopped";
   };
@@ -103,6 +106,8 @@ export function officeLifecycle(deps: {
         link?.start();
         state = "running";
         log.info("office started", { team: team.team.name, agentPort: protocol.port() });
+        // After the office is running, so slow providers do not hold up readiness; stopping waits for it.
+        doctor.start();
       } catch (error) {
         await stop();
         throw error;
@@ -124,6 +129,8 @@ export function officeLifecycle(deps: {
         ...(link ? { link: linkHealth(link) } : {}),
       };
 
+      // Visible, never fatal: a failing check is for people to fix, not a reason to restart the office.
+      components["doctor"] = await doctor.component();
       try {
         await store.listPauses();
         components["store"] = { ok: state !== "stopped", detail: store.dialect };

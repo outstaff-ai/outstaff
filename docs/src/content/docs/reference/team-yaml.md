@@ -843,7 +843,7 @@ Address pattern for agents, for example "{handle}@acme.example".
 
 ## office
 
-Office event intake settings.
+Office settings: event intake, the pipeline and the doctor checks.
 
 - Type: `object`
 - Optional
@@ -891,6 +891,36 @@ Proposed (decision 0016): shadow runs every event through the event pipeline as 
 - Type: `string`
 - Optional
 - Allowed values: `off`, `shadow`, `live`
+
+### office.doctor
+
+When the office runs the doctor checks itself, and which it leaves out.
+
+- Type: `object`
+- Optional
+
+#### office.doctor.daily_at
+
+Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start and on demand.
+
+- Type: `string`
+- Optional
+- Default: `06:00`
+- Must match `^([01]\d|2[0-3]):[0-5]\d$`
+
+#### office.doctor.skip
+
+Ports (for example chat) whose adapter's live checks the office does not run, for a provider the office cannot or should not call. Their secrets are still checked; `ost doctor` still runs them.
+
+- Type: `list of string`
+- Optional
+- Allowed values: `chat`, `vcs`, `runtime`, `tracker`, `knowledge`, `avatars`
+
+#### office.doctor.skip[]
+
+- Type: `string`
+- Optional
+- Allowed values: `chat`, `vcs`, `runtime`, `tracker`, `knowledge`, `avatars`
 
 ## tools
 

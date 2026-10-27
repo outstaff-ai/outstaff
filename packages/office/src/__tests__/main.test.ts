@@ -48,13 +48,22 @@ describe("startOffice", () => {
   };
 
   it("starts from the environment, answers the probes and stops", async () => {
-    running = await startOffice(env(), deps);
+    running = await startOffice(env({ OUTSTAFF_SECRETS_DIR: "/nonexistent" }), deps);
     const base = `http://127.0.0.1:${running.health.port()}`;
     const live = await fetch(`${base}/healthz`);
     expect(live.status).toBe(200);
     expect(await live.json()).toMatchObject({ ok: true, state: "running" });
     expect((await fetch(`${base}/readyz`)).status).toBe(200);
     expect((await fetch(`${base}/nope`)).status).toBe(404);
+    const ran = await fetch(`${base}/doctor`, { method: "POST" });
+    expect(ran.status).toBe(200);
+    expect(await ran.json()).toMatchObject({
+      lastRun: expect.any(String),
+      checks: [{ scope: "office", name: "OUTSTAFF_AGENT_TOKEN_SAM present", status: "ok" }],
+    });
+
+    expect((await fetch(`${base}/doctor`)).status).toBe(200);
+    expect((await fetch(`${base}/doctor`, { method: "DELETE" })).status).toBe(404);
 
     await running.office.stop();
     expect((await fetch(`${base}/healthz`)).status).toBe(503);

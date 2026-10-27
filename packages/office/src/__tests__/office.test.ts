@@ -329,10 +329,37 @@ describe("createOffice", () => {
     expect(roster.text).toContain("Dana");
   });
 
+  it("runs the doctor checks at start and keeps the ones an agent reports", async () => {
+    await vi.waitFor(() => expect(office.parts.doctor.lastRun()).toBeDefined());
+    const sam = connect("sam");
+    await sam.whenConnected();
+    await sam.doctorReport([
+      { name: "Tool jq installs", status: "fail", detail: "jq@9 does not exist.", fix: "Fix it." },
+    ]);
+
+    const health = await office.parts.doctor.health();
+    expect(health.checks[0]).toMatchObject({
+      scope: "sam",
+      name: "Tool jq installs",
+      status: "fail",
+    });
+
+    expect(health.checks.map((c) => [c.scope, c.name])).toContainEqual([
+      "office",
+      "OUTSTAFF_AGENT_TOKEN_SAM present",
+    ]);
+
+    expect((await office.health()).components["doctor"]).toEqual({
+      ok: true,
+      detail: `${health.summary.ok} ok, ${health.summary.warn} warn, 1 fail`,
+    });
+  });
+
   it("reports health and stops cleanly", async () => {
     const health = await office.health();
     expect(health).toMatchObject({ ok: true, state: "running" });
     expect(Object.keys(health.components).toSorted()).toEqual([
+      "doctor",
       "intake",
       "protocol",
       "scheduler",

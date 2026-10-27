@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ERROR_CODES } from "#/constants.js";
+import { doctorCheckSchema } from "#/schemas/doctor.js";
 import { empty, itemId, message } from "#/schemas/fields.js";
 
 export const otherMessages = [
@@ -12,6 +13,15 @@ export const otherMessages = [
         title: z.string().max(500).describe("Title of the document."),
         url: z.string().min(1).describe("Absolute URL of the document."),
       }),
+    }),
+  ),
+  message(
+    "doctor_report",
+    z.strictObject({
+      checks: z
+        .array(doctorCheckSchema)
+        .max(500)
+        .describe("Every check the agent ran at start; replaces its earlier report."),
     }),
   ),
   message("current_work", empty),

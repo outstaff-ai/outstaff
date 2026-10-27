@@ -350,6 +350,12 @@ The SQLite file's folder is created when missing; mount a volume there. Use Post
 
 Both answer with JSON: `{ "ok": true, "state": "running", "components": { "store": { "ok": true, "detail": "sqlite" }, … } }`. The same data is available in code as `office.health()`.
 
+The `doctor` component sums up the doctor checks and is always `ok`. The same port answers `GET /doctor` with the stored doctor checks and `POST /doctor` by running the office's checks first, for `ost doctor --via-office`.
+
+### Doctor checks
+
+The office runs the [doctor checks](/guides/doctor/#the-office-runs-the-checks-itself) of its own scope (its secrets, including each person's agent token, and each configured adapter's live checks) once it is running, every day at `office.doctor.daily_at` in the container's time zone, and on demand. A run in progress is joined, not repeated. Each agent runs its own checks (tools installed, services and devices reachable, home volume space) when it starts and sends them with `doctor_report`. The store keeps one row per scope and check with its status, message, fix, first seen and last seen; a run replaces its scope's rows, keeping the first-seen time of a check whose status did not change. Results go to the logs, the `doctor` health component, `/doctor` on the health port and the office link; the office never posts them.
+
 ### Logs
 
 One JSON object per line on standard output, with `time`, `level` and `message`. `OUTSTAFF_LOG_LEVEL` sets the lowest level written (`debug`, `info`, `warn` or `error`; default `info`). See [What the logs say](#what-the-logs-say) for which lines appear at which level.

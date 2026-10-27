@@ -1,5 +1,6 @@
 import type { Logger, PrRef, TeamConfig } from "@outstaff/core";
 import type { LinkPayloadOf } from "@outstaff/protocol";
+import type { OfficeDoctor } from "#/doctor/index.js";
 import type { Store, WorkItemStatus } from "#/store/types.js";
 import type { Clock } from "#/types.js";
 
@@ -29,6 +30,9 @@ export interface OfficeLinkOptions {
 
   /** Who this office is, for the `hello` after the service's welcome. */
   identity: LinkPayloadOf<"hello">["office"];
+
+  /** The doctor checks, for the `health` method and notification. */
+  doctor: Pick<OfficeDoctor, "run" | "health">;
 
   /** Handles of the people whose agent is connected now. */
   connected(): string[];

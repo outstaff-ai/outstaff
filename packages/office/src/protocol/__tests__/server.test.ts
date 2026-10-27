@@ -502,6 +502,12 @@ describe("protocol server", () => {
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
 
+    it("says doctor_report is unsupported without a doctor", async () => {
+      const a = await login("ada", tokens.ada);
+      a.send("doctor_report", { checks: [] });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+
     it("says doc_link is unsupported without a document desk", async () => {
       const a = await login("ada", tokens.ada);
       a.send("doc_link", { workItemId: "w1", doc: { id: "d1", title: "T", url: "https://x/d1" } });
@@ -541,6 +547,38 @@ describe("protocol server with a document desk", () => {
 
     a.send("doc_link", { workItemId: "other", doc });
     expect((await a.next("error")).payload).toMatchObject({ code: "unknown_item" });
+    a.ws.terminate();
+    await server.stop();
+  });
+});
+
+describe("protocol server with a doctor", () => {
+  it("passes the checks an agent reports and the caller to the doctor", async () => {
+    const reported: unknown[] = [];
+    const server = createProtocolServer({
+      source: createFakeSource(),
+      doctor: {
+        async report(person, checks) {
+          reported.push({ person, checks });
+        },
+      },
+      auth: createAgentAuth(tokens),
+      clock: manualClock(),
+      port: 0,
+      host: "127.0.0.1",
+    });
+
+    await server.start();
+    const a = await Agent.connect(server.port());
+    await a.hello("ada", tokens.ada);
+    await a.next("welcome");
+    const checks = [
+      { name: "Tools install", status: "ok" as const, detail: "jq@1.7.1 installed." },
+    ];
+
+    a.send("doctor_report", { checks });
+    expect(await a.next("ack")).toBeDefined();
+    expect(reported).toEqual([{ person: "ada", checks }]);
     a.ws.terminate();
     await server.stop();
   });

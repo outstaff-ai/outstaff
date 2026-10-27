@@ -1,4 +1,5 @@
 import type { AdapterRegistry, Logger, SecretSource, TeamConfig } from "@outstaff/core";
+import type { OfficeDoctor } from "./doctor/index.js";
 import type { Engine } from "./engine/index.js";
 import type { Intake } from "./intake/index.js";
 import type { ProtocolServer } from "./protocol/index.js";
@@ -30,6 +31,9 @@ export interface OfficeOptions {
   /** Minutes after which a usage report counts as unknown. Default 30. */
   usageStaleAfterMinutes?: number;
   officeVersion?: string;
+
+  /** Where the office's secret files are, for the doctor's file mode checks. Default /run/secrets/outstaff. */
+  secretsDir?: string;
 }
 
 export interface CreateOfficeInput {
@@ -39,6 +43,9 @@ export interface CreateOfficeInput {
   store: Store;
   clock: Clock;
   logger?: Logger;
+
+  /** What the doctor's adapter checks call the providers with. Default the global fetch (tests only). */
+  fetch?: typeof fetch;
 
   /** The merged catalog (stock plus ejected); only the role titles and summaries are read. */
   catalog?: { roles: Record<string, { title: string; summary: string }> };
@@ -82,5 +89,8 @@ export interface Office {
 
     /** The office link to a monitoring or management service (`link.url` and `OUTSTAFF_LINK_TOKEN`); absent without them. */
     link?: OfficeLink | undefined;
+
+    /** The doctor checks: run at start, daily and on demand, and reported by the agents. */
+    doctor: OfficeDoctor;
   };
 }

@@ -35,6 +35,7 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
     },
 
     usage: (windows) => ack("usage", { windows }),
+    doctorReport: (checks) => ack("doctor_report", { checks }),
     answer: (questionId, answer) => ack("answer", { questionId, answer }),
 
     async place(workItemId, placement) {

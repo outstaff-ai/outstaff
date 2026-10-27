@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe } from "vitest";
+import { doctorCases } from "./contract/doctor.js";
 import { eventCases } from "./contract/events.js";
 import { orderingCases } from "./contract/ordering.js";
 import { pauseCases } from "./contract/pauses.js";
@@ -40,5 +41,6 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
     orderingCases(ctx);
     pauseCases(ctx);
     traceCases(ctx);
+    doctorCases(ctx);
   });
 }

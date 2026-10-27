@@ -727,6 +727,22 @@ Sent by: agent. Answered by: `ack`, `error`.
 | `doc.title`  | string | yes      | Title of the document.                    |
 | `doc.url`    | string | yes      | Absolute URL of the document.             |
 
+### `doctor_report`
+
+Reports the checks only the agent's own container can make, run once at start: its declared tools installed, its granted services and devices answer, and its home volume has room. The office stores them with its own checks.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field              | Type                     | Required | Description                                                      |
+| ------------------ | ------------------------ | -------- | ---------------------------------------------------------------- |
+| `checks`           | list of objects          | yes      | Every check the agent ran at start; replaces its earlier report. |
+| `checks[].name`    | string                   | yes      | What is checked, for example `Tools install`.                    |
+| `checks[].status`  | `ok` or `warn` or `fail` | yes      |                                                                  |
+| `checks[].detail`  | string                   | yes      | What was found, naming the value that is wrong.                  |
+| `checks[].fix`     | string                   | no       | What to change, when the check is not ok.                        |
+| `checks[].key`     | string                   | no       | The secret key the check is about, when it is about one.         |
+| `checks[].adapter` | string                   | no       | The adapter that made the check, if one did.                     |
+
 ### `current_work`
 
 Asks for the caller's open tickets and pull requests, as context for a chat session.

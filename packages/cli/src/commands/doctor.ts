@@ -13,6 +13,7 @@ import { projectRoot, secretsLocation } from "#/project.js";
 import type { Context, GlobalOptions, Loaded } from "#/types.js";
 import { printJson, printText, summarize } from "./doctor/render.js";
 import { checkScope } from "./doctor/scope.js";
+import { doctorViaOffice } from "./doctor/via-office.js";
 import type { ScopeReport } from "./doctor/types.js";
 import { shippedRegistry } from "./setup/registry.js";
 
@@ -79,7 +80,7 @@ async function checkScopes(
   return reports;
 }
 
-export const doctor = defineCommand<{ secretsDir?: string }>({
+export const doctor = defineCommand<{ secretsDir?: string; viaOffice?: boolean }>({
   name: "doctor",
   summary: "Verify the secrets and the setup of the office and of each person.",
   description:
@@ -91,18 +92,28 @@ export const doctor = defineCommand<{ secretsDir?: string }>({
       description:
         "Directory of secret files, used for every scope checked. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle|office> next to the team file.",
     },
+    {
+      flags: "--via-office",
+      description:
+        "Ask the running office instead: it runs its own checks now and answers with every stored check, its own and the ones each agent reported when it started. It is reached at OUTSTAFF_OFFICE_HEALTH_URL (the office's health port, for example http://office:8081), else at the origin of OUTSTAFF_OFFICE_URL. With a handle or office, only that scope's checks.",
+    },
   ],
   examples: [
     "ost doctor",
     "ost doctor sam --secrets-dir ./secrets-sam",
     "ost doctor office --json",
+    "OUTSTAFF_OFFICE_HEALTH_URL=http://localhost:8081 ost doctor --via-office",
   ],
   exitCodes: [
     "0: no check failed (warnings are allowed)",
-    "1: a check failed, the team file has errors, or the person is unknown",
+    "1: a check failed, the team file has errors, the person is unknown, or (with --via-office) the office did not answer",
   ],
   async run(ctx, options, args) {
     const target = args[0];
+    if (options.viaOffice) {
+      return doctorViaOffice(ctx, options.json, target);
+    }
+
     const loaded = await loadTeam(ctx, options);
     if (!loaded.ok) {
       printIssues(ctx, loaded.issues);

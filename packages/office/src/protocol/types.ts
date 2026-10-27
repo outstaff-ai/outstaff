@@ -18,6 +18,9 @@ export interface ProtocolServerOptions {
   usage?: { report(person: string, windows: PayloadOf<"usage">["windows"]): Promise<void> };
   chat?: ChatDesk;
 
+  /** Takes the checks agents report at start (`doctor_report`). Without it a report is refused as unsupported. */
+  doctor?: { report(person: string, checks: PayloadOf<"doctor_report">["checks"]): Promise<void> };
+
   /** Answers `ticket_prs`. Without it the request is refused as unsupported. */
   tickets?: TicketPrs;
 

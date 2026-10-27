@@ -1,4 +1,4 @@
-import type { LinkErrorCode, LinkRequest, LinkResponse } from "@outstaff/protocol";
+import type { LinkErrorCode, LinkMethod, LinkRequest, LinkResponse } from "@outstaff/protocol";
 import type { Trace } from "#/pipeline/trace.types.js";
 import { compareRange } from "#/pipeline/compare/summary.js";
 import { findEvents } from "./events.js";
@@ -67,22 +67,33 @@ async function item(opts: OfficeLinkOptions, id: string, itemId: string): Promis
     : error(id, "not_found", `No work item ${itemId}.`);
 }
 
-function dispatch(opts: OfficeLinkOptions, r: LinkRequest): Promise<LinkResponse> {
-  switch (r.method) {
-    case "people":
-      return people(opts, r.id);
-    case "events":
-      return events(opts, r.id, r.params);
-    case "event":
-      return event(opts, r.id, r.params.id);
-    case "items":
-      return items(opts, r.id, r.params);
-    case "compare":
-      return compare(opts, r.id, r.params);
-    case "item":
-      return item(opts, r.id, r.params.id);
+async function health(opts: OfficeLinkOptions, id: string, run: boolean): Promise<LinkResponse> {
+  if (run) {
+    await opts.doctor.run();
   }
+
+  return { id, result: await opts.doctor.health() };
 }
+
+type Handler<M extends LinkMethod> = (
+  opts: OfficeLinkOptions,
+  r: Extract<LinkRequest, { method: M }>,
+) => Promise<LinkResponse>;
+
+/** How each method is answered. */
+const HANDLERS: { [M in LinkMethod]: Handler<M> } = {
+  people: (opts, r) => people(opts, r.id),
+  events: (opts, r) => events(opts, r.id, r.params),
+  event: (opts, r) => event(opts, r.id, r.params.id),
+  items: (opts, r) => items(opts, r.id, r.params),
+  compare: (opts, r) => compare(opts, r.id, r.params),
+  item: (opts, r) => item(opts, r.id, r.params.id),
+  health: (opts, r) => health(opts, r.id, r.params?.run === true),
+};
+
+// A method is matched to its own request by the table, which the compiler cannot follow through the lookup.
+const dispatch = (opts: OfficeLinkOptions, r: LinkRequest) =>
+  (HANDLERS[r.method] as Handler<LinkMethod>)(opts, r as never);
 
 /** Answers one request of the service. Never throws: a failure is an error response. */
 export async function answer(opts: OfficeLinkOptions, r: LinkRequest): Promise<LinkResponse> {

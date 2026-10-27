@@ -78,6 +78,7 @@ describe("office link wiring", () => {
         input: { ...input(t, token), ...(officeVersion ? { options: { officeVersion } } : {}) },
         ports: vcsOnly(),
         protocol,
+        doctor: { run: async () => {}, health: async () => ({}) as never },
         log: { debug() {}, info() {}, warn() {}, error() {} } as never,
       });
 

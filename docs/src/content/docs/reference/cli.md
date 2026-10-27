@@ -360,11 +360,12 @@ ost doctor [handle|office] [options]
 | Option | Description |
 | --- | --- |
 | `--secrets-dir <dir>` | Directory of secret files, used for every scope checked. Defaults to OUTSTAFF_SECRETS_DIR, then .outstaff/secrets/<handle|office> next to the team file. |
+| `--via-office` | Ask the running office instead: it runs its own checks now and answers with every stored check, its own and the ones each agent reported when it started. It is reached at OUTSTAFF_OFFICE_HEALTH_URL (the office's health port, for example http://office:8081), else at the origin of OUTSTAFF_OFFICE_URL. With a handle or office, only that scope's checks. |
 
 Exit codes:
 
 - 0: no check failed (warnings are allowed)
-- 1: a check failed, the team file has errors, or the person is unknown
+- 1: a check failed, the team file has errors, the person is unknown, or (with --via-office) the office did not answer
 
 Examples:
 
@@ -372,6 +373,7 @@ Examples:
 ost doctor
 ost doctor sam --secrets-dir ./secrets-sam
 ost doctor office --json
+OUTSTAFF_OFFICE_HEALTH_URL=http://localhost:8081 ost doctor --via-office
 ```
 
 ## ost policies

@@ -7,6 +7,7 @@ import type {
   scheduledBySchema,
   traceSchema,
 } from "./entities.js";
+import type { healthCheckSchema, healthSchema } from "./health.js";
 import type {
   LINK_ERROR_CODES,
   linkMessageSchema,
@@ -28,6 +29,8 @@ export type LinkTrace = z.infer<typeof traceSchema>;
 export type LinkItem = z.infer<typeof itemSchema>;
 export type ScheduledBy = z.infer<typeof scheduledBySchema>;
 export type LinkItemSummary = z.infer<typeof itemSummarySchema>;
+export type LinkHealth = z.infer<typeof healthSchema>;
+export type LinkHealthCheck = z.infer<typeof healthCheckSchema>;
 export type LinkSource = LinkTrace["event"]["source"];
 
 export interface LinkMessageMeta {

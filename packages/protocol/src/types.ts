@@ -14,6 +14,7 @@ import type {
   inlineCommentSchema,
   offerContextSchema,
 } from "./schemas/feedback.js";
+import type { doctorCheckSchema } from "./schemas/doctor.js";
 import type { messageSchema } from "./schemas/message.js";
 import type {
   answerStateSchema,
@@ -49,6 +50,7 @@ export type ChatFile = z.infer<typeof chatFileSchema>;
 export type Human = z.infer<typeof humanSchema>;
 export type Member = z.infer<typeof memberSchema>;
 export type AnswerState = z.infer<typeof answerStateSchema>;
+export type DoctorCheckReport = z.infer<typeof doctorCheckSchema>;
 
 export interface MessageMeta {
   /** Who sends it. */

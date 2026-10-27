@@ -113,6 +113,18 @@ export interface PipelineTracesTable {
   recorded_at: string;
 }
 
+export interface DoctorChecksTable {
+  scope: string;
+  name: string;
+  status: "ok" | "warn" | "fail";
+  detail: string;
+  fix: string | null;
+  key: string | null;
+  adapter: string | null;
+  first_seen: string;
+  last_seen: string;
+}
+
 export interface Database {
   cursors: CursorsTable;
   events: EventsTable;
@@ -125,6 +137,7 @@ export interface Database {
   conversations: ConversationsTable;
   pauses: PausesTable;
   pipeline_traces: PipelineTracesTable;
+  doctor_checks: DoctorChecksTable;
 }
 
 export type Db = Kysely<Database>;

@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Logger } from "@outstaff/core";
+import { reportAgentChecks } from "./doctor/index.js";
 import { StartupError, agentRegistry, prepareAgent } from "./runner/index.js";
 
 const write = (level: string) => (message: string, data?: Record<string, unknown>) =>
@@ -62,6 +63,7 @@ try {
   await agent.connection.whenConnected();
   log.info("connected");
   agent.usage.start();
+  void reportAgentChecks(agent, process.env, process.env["HOME"] ?? homedir(), log);
   await agent.chat?.start().catch((e: unknown) => {
     log.error("chat requests are off: the chat connection failed", { error: String(e) });
   });

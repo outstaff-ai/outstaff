@@ -3,6 +3,7 @@ import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
 import { toolsSchema } from "#/permissions/schema.js";
 import { customIssue } from "./issues.js";
+import { ADAPTER_PORTS } from "./adapters.js";
 import { integrationsSchema } from "./integrations-schema.js";
 import { roleOverridesSchema } from "./network.js";
 import { humanSchema, peopleSchema } from "./people-schema.js";
@@ -109,9 +110,31 @@ export const teamConfigSchema = z
               "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.",
             ),
           ),
+        doctor: z
+          .strictObject({
+            daily_at: z
+              .string()
+              .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use a time of day as HH:MM, for example 06:00.")
+              .default("06:00")
+              .meta(
+                d(
+                  "Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start and on demand.",
+                ),
+              ),
+            skip: z
+              .array(z.enum(ADAPTER_PORTS))
+              .optional()
+              .meta(
+                d(
+                  "Ports (for example chat) whose adapter's live checks the office does not run, for a provider the office cannot or should not call. Their secrets are still checked; `ost doctor` still runs them.",
+                ),
+              ),
+          })
+          .optional()
+          .meta(d("When the office runs the doctor checks itself, and which it leaves out.")),
       })
       .optional()
-      .meta(d("Office event intake settings.")),
+      .meta(d("Office settings: event intake, the pipeline and the doctor checks.")),
     tools: toolsSchema
       .optional()
       .meta(d("Tools every agent of the team installs at start, with the commands they may run.")),
