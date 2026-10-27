@@ -1,4 +1,4 @@
-import type { SetupStep } from "@outstaff/core";
+import type { SetupStep, TeamConfig } from "@outstaff/core";
 import type { NewPerson } from "../../types.js";
 
 export type SetupJson = {
@@ -32,3 +32,18 @@ export type ChosenPerson = {
   seed: string;
   isUrl: boolean;
 };
+
+/** A person written to the team file, with where `ost hire` puts the rest. */
+export type Hired = {
+  chosen: ChosenPerson;
+  config: TeamConfig;
+
+  /** The team file. */
+  file: string;
+
+  /** The project directory `.outstaff/people/<handle>/` goes into. */
+  out: string;
+  secretsDir: string;
+};
+
+export type PlacedAvatar = { avatarFile: string | null; notes: string[] };

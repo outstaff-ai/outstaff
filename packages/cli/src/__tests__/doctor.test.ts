@@ -330,47 +330,51 @@ describe("ost doctor with the shipped adapters", () => {
       ),
     };
 
-    return (async (url: string | URL, init?: RequestInit) => {
-      const u = new URL(String(url));
-      const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
-      if (u.host === "slack.com") {
-        const office =
-          new Headers(init?.headers).get("authorization") === "Bearer xoxb-fake-office";
+    const json = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status });
+    const slack = (init?: RequestInit) => {
+      const office = new Headers(init?.headers).get("authorization") === "Bearer xoxb-fake-office";
+      return json(
+        opts.slackOk === false
+          ? { ok: false, error: "invalid_auth" }
+          : { ok: true, user_id: office ? "U0OFFICE" : "U0MIRA005" },
+      );
+    };
 
-        return json(
-          opts.slackOk === false
-            ? { ok: false, error: "invalid_auth" }
-            : { ok: true, user_id: office ? "U0OFFICE" : "U0MIRA005" },
-        );
-      }
+    const tracker = (u: URL) =>
+      u.pathname.startsWith("/projects/")
+        ? json({ project: { key: "SHOP", ref: "acme.SHOP", teamRef: "acme" } })
+        : json({ id: 5, username: "mira.okafor" });
 
-      if (u.host === "api.tracker.acme.example") {
-        if (u.pathname.startsWith("/projects/")) {
-          return json({ project: { key: "SHOP", ref: "acme.SHOP", teamRef: "acme" } });
-        }
-
-        return json({ id: 5, username: "mira.okafor" });
-      }
-
+    const appOf = (init?: RequestInit) => {
       const bearer = String((init!.headers as Record<string, string>)["authorization"]).slice(7);
-      const iss = bearer.startsWith("tok-")
+      return bearer.startsWith("tok-")
         ? bearer.slice(4)
         : (JSON.parse(Buffer.from(bearer.split(".")[1]!, "base64url").toString()).iss as string);
+    };
 
+    const githubApi = (u: URL, init?: RequestInit) => {
+      const iss = appOf(init);
       const a = apps[iss]!;
-      if (u.pathname === "/app") {
-        return json({ slug: a.app.slug });
-      }
+      const routes: Record<string, () => Response> = {
+        "/app": () => json({ slug: a.app.slug }),
+        "/installation/repositories": () =>
+          json({ repositories: a.repos.map((full_name) => ({ full_name })) }),
+      };
 
       if (u.pathname.endsWith("/access_tokens")) {
         return json({ token: `tok-${iss}` }, 201);
       }
 
-      if (u.pathname === "/installation/repositories") {
-        return json({ repositories: a.repos.map((full_name) => ({ full_name })) });
+      return (routes[u.pathname] ?? (() => json(a.installation)))();
+    };
+
+    return (async (url: string | URL, init?: RequestInit) => {
+      const u = new URL(String(url));
+      if (u.host === "slack.com") {
+        return slack(init);
       }
 
-      return json(a.installation);
+      return u.host === "api.tracker.acme.example" ? tracker(u) : githubApi(u, init);
     }) as typeof fetch;
   }
 

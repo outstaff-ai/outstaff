@@ -73,6 +73,17 @@ export function requireMergeVcs(vcs: Vcs): MergeVcs {
   return vcs as MergeVcs;
 }
 
+/** What an allowed approver's latest review says about the current head. */
+type Verdict = "approved" | "stale" | "changes";
+
+/** Whether a login may approve this team's merges (`policies.merge.approvers`). */
+type AllowedApprover = (login: string) => Promise<boolean>;
+
+const MERGEABLE_PROBLEMS: Partial<Record<PullRequest["mergeable"], string>> = {
+  conflicting: "it conflicts with its base branch",
+  unknown: "the host has not worked out whether it is mergeable yet",
+};
+
 /**
  * Every condition for merging the caller's own pull request, checked here and not by the model: it is the
  * caller's, open, not a draft, mergeable; an allowed approver approved its current head and no allowed approver
@@ -84,10 +95,23 @@ export async function checkMergeable(
   repo: RepoRef,
   pr: PullRequest,
 ): Promise<string[]> {
-  const problems: string[] = [];
   const approvers = env.team.policies?.merge.approvers ?? ["humans"];
-  const own = env.team.people.find((p) => p.handle === env.person)?.identities?.vcs;
-  if (!own || stripBot(pr.author.login) !== stripBot(own)) {
+  const allowed: AllowedApprover = async (login) =>
+    isApprover(approvers, await candidateOf(env, vcs, repo, login), env.team, (role) =>
+      personForRole(env, role),
+    );
+
+  return [
+    ...pullRequestProblems(env, pr),
+    ...(await reviewProblems(vcs, repo, pr, allowed, approvers)),
+    ...checksProblems(await vcs.requiredChecks(repo, pr.number)),
+  ];
+}
+
+/** Why the pull request itself cannot be merged: not the caller's, not open, a draft, or not mergeable. */
+function pullRequestProblems(env: AgentEnv, pr: PullRequest): string[] {
+  const problems: string[] = [];
+  if (!isOwnPullRequest(env, pr)) {
     problems.push(
       `it is not your pull request (authored by ${pr.author.login}); only its author merges it`,
     );
@@ -101,67 +125,93 @@ export async function checkMergeable(
     problems.push("it is a draft");
   }
 
-  if (pr.mergeable === "conflicting") {
-    problems.push("it conflicts with its base branch");
-  } else if (pr.mergeable === "unknown") {
-    problems.push("the host has not worked out whether it is mergeable yet");
-  }
+  const mergeable = MERGEABLE_PROBLEMS[pr.mergeable];
+  return mergeable ? [...problems, mergeable] : problems;
+}
 
-  const allowed = async (login: string) =>
-    isApprover(approvers, await candidateOf(env, vcs, repo, login), env.team, (role) =>
-      personForRole(env, role),
-    );
+function isOwnPullRequest(env: AgentEnv, pr: PullRequest): boolean {
+  const own = env.team.people.find((p) => p.handle === env.person)?.identities?.vcs;
+  return !!own && stripBot(pr.author.login) === stripBot(own);
+}
 
+/** Why the reviews do not allow a merge: changes requested, a review pending, or no approval of the head. */
+async function reviewProblems(
+  vcs: MergeVcs,
+  repo: RepoRef,
+  pr: PullRequest,
+  allowed: AllowedApprover,
+  approvers: string[],
+): Promise<string[]> {
   const state = await vcs.reviewState(repo, pr.number);
-  const approved: string[] = [];
-  const stale: string[] = [];
-  const changes: string[] = [];
-  for (const review of latestVerdicts(state.reviews).values()) {
-    if (review.state === "dismissed" || !(await allowed(review.author))) {
-      continue;
-    }
-
-    if (review.state === "changes_requested") {
-      changes.push(review.author);
-    } else if (review.commitSha !== undefined && review.commitSha !== pr.head.sha) {
-      stale.push(review.author);
-    } else {
-      approved.push(review.author);
-    }
-  }
-
-  if (changes.length > 0) {
-    problems.push(`${changes.join(", ")} requested changes and has not approved since`);
-  }
-
-  const pending: string[] = [];
-  for (const login of state.requestedReviewers) {
-    if (await allowed(login)) {
-      pending.push(login);
-    }
+  const verdicts = await allowedVerdicts(state.reviews, allowed, pr.head.sha);
+  const pending = await allowedLogins(state.requestedReviewers, allowed);
+  const problems: string[] = [];
+  if (verdicts.changes.length > 0) {
+    problems.push(`${verdicts.changes.join(", ")} requested changes and has not approved since`);
   }
 
   if (pending.length > 0) {
     problems.push(`a review is still pending from ${pending.join(", ")}`);
   }
 
-  if (approved.length === 0) {
+  if (verdicts.approved.length === 0) {
     problems.push(
-      stale.length > 0
-        ? `${stale.join(", ")} approved an earlier commit, not the current head; ask for a new approval`
+      verdicts.stale.length > 0
+        ? `${verdicts.stale.join(", ")} approved an earlier commit, not the current head; ask for a new approval`
         : `no allowed approver (policies.merge.approvers: ${approvers.join(", ")}) has an approving review`,
     );
   }
 
-  const required = await vcs.requiredChecks(repo, pr.number);
-  const notPassed = required.filter((c) => c.status !== "success" && c.status !== "neutral");
-  if (notPassed.length > 0) {
-    problems.push(
-      `required checks have not passed: ${notPassed.map((c) => `${c.name} (${c.status})`).join(", ")}`,
-    );
+  return problems;
+}
+
+/** The reviewers whose latest verdict counts, grouped by what it says; dismissed reviews and non-approvers drop out. */
+async function allowedVerdicts(
+  reviews: PullRequestReview[],
+  allowed: AllowedApprover,
+  headSha: string,
+): Promise<Record<Verdict, string[]>> {
+  const byVerdict: Record<Verdict, string[]> = { approved: [], stale: [], changes: [] };
+  for (const review of latestVerdicts(reviews).values()) {
+    if (review.state === "dismissed" || !(await allowed(review.author))) {
+      continue;
+    }
+
+    byVerdict[verdictOf(review, headSha)].push(review.author);
   }
 
-  return problems;
+  return byVerdict;
+}
+
+function verdictOf(review: PullRequestReview, headSha: string): Verdict {
+  if (review.state === "changes_requested") {
+    return "changes";
+  }
+
+  return review.commitSha !== undefined && review.commitSha !== headSha ? "stale" : "approved";
+}
+
+/** The logins that are allowed approvers, in order, asked one at a time. */
+async function allowedLogins(logins: string[], allowed: AllowedApprover): Promise<string[]> {
+  const kept: string[] = [];
+  for (const login of logins) {
+    if (await allowed(login)) {
+      kept.push(login);
+    }
+  }
+
+  return kept;
+}
+
+function checksProblems(required: Awaited<ReturnType<MergeVcs["requiredChecks"]>>): string[] {
+  const notPassed = required.filter((c) => c.status !== "success" && c.status !== "neutral");
+  if (notPassed.length === 0) {
+    return [];
+  }
+
+  return [
+    `required checks have not passed: ${notPassed.map((c) => `${c.name} (${c.status})`).join(", ")}`,
+  ];
 }
 
 /**

@@ -1,5 +1,25 @@
 import { execFile } from "node:child_process";
+import { join } from "node:path";
+import type { EffectiveTool } from "@outstaff/core";
 import type { MiseResult, MiseRunner } from "./types.js";
+
+/** The mise key of a tool: its explicit source, else its name (mise's registry). */
+export const miseKey = (t: EffectiveTool) => t.source ?? t.name;
+
+/** Where mise keeps its installs and shims. */
+export const dataDirOf = (home: string, env: NodeJS.ProcessEnv) =>
+  env["MISE_DATA_DIR"] ?? join(home, ".local/share/mise");
+
+/** The reason mise gave, without its progress bars, version footer and hints. */
+export const lastLine = (r: { stderr: string; stdout: string }) => {
+  const lines = `${r.stderr}\n${r.stdout}`
+    .split("\n")
+    .map((l) => l.replace(/^mise (ERROR|WARN)\s+/, "").trim())
+    .filter((l) => l && !/█|^Version:|^Run with|^hint:|^deprecated/.test(l));
+
+  const failed = lines.filter((l) => /failed|error|not found|not installed/i.test(l));
+  return (failed.length ? failed : lines).slice(0, 2).join(" ") || "no output";
+};
 
 /** The real `mise` binary on PATH, with a generous timeout because the first install downloads toolchains. */
 export const runMise: MiseRunner = (args, opts) =>

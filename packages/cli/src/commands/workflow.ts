@@ -7,6 +7,7 @@ import {
   switchOfRule,
   WORKFLOW_EVENT_TYPES,
   type StaticWorkflowData,
+  type TeamConfig,
   type WorkflowEvent,
   type WorkflowEventType,
 } from "@outstaff/core";
@@ -24,21 +25,31 @@ function parseJson(text: string, what: string): unknown {
   }
 }
 
-function parseEvent(text: string): WorkflowEvent {
-  const raw = parseJson(text, "The event");
-  if (!isRecord(raw) || !WORKFLOW_EVENT_TYPES.includes(raw["type"] as WorkflowEventType)) {
-    throw new Error(`The event needs a "type", one of: ${WORKFLOW_EVENT_TYPES.join(", ")}.`);
-  }
+const ACTOR_KINDS = ["human", "agent", "automation"];
 
+const isEventType = (v: unknown): v is WorkflowEventType =>
+  WORKFLOW_EVENT_TYPES.includes(v as WorkflowEventType);
+
+const isActor = (v: unknown): v is Record<string, unknown> =>
+  isRecord(v) && ACTOR_KINDS.includes(String(v["kind"])) && typeof v["id"] === "string";
+
+/** The event's actor; a human at the CLI when it has none. */
+function parseActor(raw: Record<string, unknown>): Record<string, unknown> {
   const actor = raw["actor"] ?? { kind: "human", id: "cli" };
-  if (
-    !isRecord(actor) ||
-    !["human", "agent", "automation"].includes(String(actor["kind"])) ||
-    typeof actor["id"] !== "string"
-  ) {
+  if (!isActor(actor)) {
     throw new Error('"actor" must be {"kind": "human" | "agent" | "automation", "id": string}.');
   }
 
+  return actor;
+}
+
+function parseEvent(text: string): WorkflowEvent {
+  const raw = parseJson(text, "The event");
+  if (!isRecord(raw) || !isEventType(raw["type"])) {
+    throw new Error(`The event needs a "type", one of: ${WORKFLOW_EVENT_TYPES.join(", ")}.`);
+  }
+
+  const actor = parseActor(raw);
   const subject = raw["subject"] ?? {};
   const data = raw["data"] ?? {};
   if (!isRecord(subject) || !isRecord(data)) {
@@ -46,17 +57,101 @@ function parseEvent(text: string): WorkflowEvent {
   }
 
   return {
-    type: raw["type"] as WorkflowEventType,
+    type: raw["type"],
     subject,
     actor,
     data,
   } as WorkflowEvent;
 }
 
+/** The --state snapshot; an empty world when it is not given. */
+function parseState(text: string | undefined): StaticWorkflowData {
+  const state = text === undefined ? {} : parseJson(text, "--state");
+  if (!isRecord(state)) {
+    throw new Error("--state must be a JSON object.");
+  }
+
+  return state as StaticWorkflowData;
+}
+
 const switchOf = (id: string) => {
   const sw = switchOfRule(id);
   return sw ? `policies.${sw.path}` : undefined;
 };
+
+type Explained = {
+  explanation: ReturnType<typeof explainWorkflow>;
+  switchedOff: { rule: string; switch: string; effect: string }[];
+};
+
+type RuleResult = Explained["explanation"]["rules"][number];
+
+/** Runs the team's workflow against the event and snapshot, and lists the rules a policy switched off for it. */
+function explainEvent(
+  config: TeamConfig,
+  event: WorkflowEvent,
+  data: StaticWorkflowData,
+): Explained {
+  const workflow = resolveWorkflow(config.workflow, config.humans, config.policies);
+  const explanation = explainWorkflow(
+    event,
+    createStaticWorkflowState(data),
+    workflow.rules,
+    workflow.options,
+  );
+
+  const switchedOff = workflow.switched
+    .filter((s) => [s.on].flat().includes(event.type))
+    .map((s) => ({
+      rule: s.rule,
+      switch: `policies.${s.switch}`,
+      effect: s.effect,
+    }));
+
+  return { explanation, switchedOff };
+}
+
+function explainedJson({ explanation, switchedOff }: Explained): string {
+  return `${JSON.stringify(
+    {
+      ...explanation,
+      rules: explanation.rules.map((r) => {
+        const sw = switchOf(r.id);
+        return sw ? { ...r, switch: sw } : r;
+      }),
+      switchedOff,
+    },
+    null,
+    2,
+  )}\n`;
+}
+
+/** One rule: whether it matched and why, its switch, and what it would do or skipped. */
+function ruleLines(r: RuleResult): string[] {
+  const sw = switchOf(r.id);
+  return [
+    `${r.matched ? "match  " : "no match"}  ${r.id}: ${r.reason}`,
+    ...(sw ? [`           switch ${sw}`] : []),
+    ...r.effects.map((e) => `           ${describeEffect(e)}`),
+    ...r.skipped.map((s) => `           skipped ${s}`),
+  ];
+}
+
+function explainedText({ explanation, switchedOff }: Explained): string {
+  const effects = explanation.effects.map((e) => `  ${describeEffect(e)}`);
+  return [
+    `Event ${explanation.event.type}`,
+    "",
+    ...explanation.rules.flatMap(ruleLines),
+    ...switchedOff.map(
+      (s) =>
+        `${s.effect === "removed" ? "off     " : "edited  "}  ${s.rule}: ${s.effect} by ${s.switch}`,
+    ),
+    "",
+    "Effects",
+    ...(effects.length === 0 ? ["  none"] : effects),
+  ].join("\n");
+}
 
 export const explain = defineCommand<{ state?: string }>({
   name: "explain",
@@ -94,90 +189,14 @@ export const explain = defineCommand<{ state?: string }>({
     let data: StaticWorkflowData;
     try {
       event = parseEvent(args[0] ?? "");
-      const state = options.state === undefined ? {} : parseJson(options.state, "--state");
-      if (!isRecord(state)) {
-        throw new Error("--state must be a JSON object.");
-      }
-
-      data = state as StaticWorkflowData;
+      data = parseState(options.state);
     } catch (error) {
       ctx.err(`error    ${(error as Error).message}\n`);
       return 1;
     }
 
-    const workflow = resolveWorkflow(
-      loaded.config.workflow,
-      loaded.config.humans,
-      loaded.config.policies,
-    );
-
-    const explanation = explainWorkflow(
-      event,
-      createStaticWorkflowState(data),
-      workflow.rules,
-      workflow.options,
-    );
-
-    const switchedOff = workflow.switched
-      .filter((s) => [s.on].flat().includes(event.type))
-      .map((s) => ({
-        rule: s.rule,
-        switch: `policies.${s.switch}`,
-        effect: s.effect,
-      }));
-
-    if (options.json) {
-      ctx.out(
-        `${JSON.stringify(
-          {
-            ...explanation,
-            rules: explanation.rules.map((r) => {
-              const sw = switchOf(r.id);
-              return sw ? { ...r, switch: sw } : r;
-            }),
-            switchedOff,
-          },
-          null,
-          2,
-        )}\n`,
-      );
-
-      return 0;
-    }
-
-    const out: string[] = [`Event ${explanation.event.type}`, ""];
-    for (const r of explanation.rules) {
-      const sw = switchOf(r.id);
-      out.push(`${r.matched ? "match  " : "no match"}  ${r.id}: ${r.reason}`);
-      if (sw) {
-        out.push(`           switch ${sw}`);
-      }
-
-      for (const e of r.effects) {
-        out.push(`           ${describeEffect(e)}`);
-      }
-
-      for (const s of r.skipped) {
-        out.push(`           skipped ${s}`);
-      }
-    }
-
-    for (const s of switchedOff) {
-      out.push(
-        `${s.effect === "removed" ? "off     " : "edited  "}  ${s.rule}: ${s.effect} by ${s.switch}`,
-      );
-    }
-
-    out.push("", "Effects");
-    if (explanation.effects.length === 0) {
-      out.push("  none");
-    }
-
-    for (const e of explanation.effects) {
-      out.push(`  ${describeEffect(e)}`);
-    }
-
-    ctx.out(`${out.join("\n")}\n`);
+    const explained = explainEvent(loaded.config, event, data);
+    ctx.out(options.json ? explainedJson(explained) : `${explainedText(explained)}\n`);
     return 0;
   },
 });

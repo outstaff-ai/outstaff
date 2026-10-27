@@ -12,6 +12,72 @@ import {
   writeIndex,
 } from "../ejected.js";
 import { openTeam } from "../open-team.js";
+import type { Context, EjectedIndex } from "../types.js";
+
+/** The stock files the targets name; undefined (after printing why) when a target matches nothing. */
+function filesFor(ctx: Context, stockDir: string, targets: string[]): string[] | undefined {
+  const files: string[] = [];
+  for (const target of targets) {
+    const found = resolveTarget(stockDir, target);
+    if (!found) {
+      ctx.err(
+        `error    No stock role, process, reference, template or toolset matches "${target}".\n`,
+      );
+
+      return undefined;
+    }
+
+    files.push(...found);
+  }
+
+  return files;
+}
+
+/** Prints every file that is already ejected; true when there was one. */
+function reportExisting(ctx: Context, dir: string, files: string[]): boolean {
+  const existing = files.filter((f) => existsSync(join(dir, f)));
+  for (const f of existing) {
+    ctx.err(`error    ${f} already exists; pass --force to overwrite it.\n`);
+  }
+
+  return existing.length > 0;
+}
+
+/** Copies each stock file and its base into the ejected catalog and records it in the index. */
+function copyFiles(
+  stockDir: string,
+  dir: string,
+  files: string[],
+  index: EjectedIndex,
+  version: string,
+): void {
+  for (const f of files) {
+    const text = readFileSync(join(stockDir, f), "utf8");
+    writeFileDeep(join(dir, f), text);
+    writeFileDeep(baseFile(dir, f), text);
+    index[f] = { version, sha256: sha256(text) };
+  }
+}
+
+function printEjected(
+  ctx: Context,
+  json: boolean,
+  ejected: { version: string; dir: string; files: string[] },
+): void {
+  if (json) {
+    ctx.out(`${JSON.stringify(ejected, null, 2)}\n`);
+    return;
+  }
+
+  const { version, dir, files } = ejected;
+  for (const f of files) {
+    ctx.out(`ejected  ${f}\n`);
+  }
+
+  ctx.out(
+    `Ejected ${files.length} file${files.length === 1 ? "" : "s"} (catalog ${version}) to ${dir}\n`,
+  );
+}
 
 export const eject = defineCommand({
   name: "eject",
@@ -54,30 +120,12 @@ export const eject = defineCommand({
     }
 
     const { dir, stockDir } = opened.team;
-    const files: string[] = [];
-    if (all) {
-      files.push(...allStockFiles(stockDir));
-    } else {
-      for (const target of args) {
-        const found = resolveTarget(stockDir, target);
-        if (!found) {
-          ctx.err(
-            `error    No stock role, process, reference, template or toolset matches "${target}".\n`,
-          );
-
-          return 1;
-        }
-
-        files.push(...found);
-      }
+    const files = all ? allStockFiles(stockDir) : filesFor(ctx, stockDir, args);
+    if (!files) {
+      return 1;
     }
 
-    const existing = files.filter((f) => existsSync(join(dir, f)));
-    if (existing.length && !force) {
-      for (const f of existing) {
-        ctx.err(`error    ${f} already exists; pass --force to overwrite it.\n`);
-      }
-
+    if (!force && reportExisting(ctx, dir, files)) {
       return 1;
     }
 
@@ -87,25 +135,9 @@ export const eject = defineCommand({
       return 1;
     }
 
-    for (const f of files) {
-      const text = readFileSync(join(stockDir, f), "utf8");
-      writeFileDeep(join(dir, f), text);
-      writeFileDeep(baseFile(dir, f), text);
-      index[f] = { version, sha256: sha256(text) };
-    }
-
+    copyFiles(stockDir, dir, files, index, version);
     writeIndex(dir, index);
-    if (options.json) {
-      ctx.out(`${JSON.stringify({ version, dir, files }, null, 2)}\n`);
-    } else {
-      for (const f of files) {
-        ctx.out(`ejected  ${f}\n`);
-      }
-
-      ctx.out(
-        `Ejected ${files.length} file${files.length === 1 ? "" : "s"} (catalog ${version}) to ${dir}\n`,
-      );
-    }
+    printEjected(ctx, options.json === true, { version, dir, files });
 
     return 0;
   },

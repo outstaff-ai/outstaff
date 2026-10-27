@@ -5,6 +5,25 @@ import { defineVerb, result } from "./define.js";
 import { repoOrWorktree } from "./worktree.js";
 import { body, bodyFile, commentsOf, number, repo, textOf } from "./pr-write-support.js";
 
+/** The verdict each review flag stands for. */
+const VERDICT_FLAGS = [
+  ["approve", "approve"],
+  ["requestChanges", "request_changes"],
+  ["comment", "comment"],
+] as const satisfies readonly (readonly [string, ReviewVerdict])[];
+
+type VerdictFlags = Partial<Record<(typeof VERDICT_FLAGS)[number][0], boolean | undefined>>;
+
+/** The one verdict the flags pick; none or several is refused. */
+function chosenVerdict(input: VerdictFlags): ReviewVerdict {
+  const chosen = VERDICT_FLAGS.filter(([flag]) => input[flag]).map(([, verdict]) => verdict);
+  if (chosen.length !== 1) {
+    throw new PortError("invalid", "Pass exactly one of approve, request-changes or comment.");
+  }
+
+  return chosen[0]!;
+}
+
 export const prReview = defineVerb({
   name: "pr.review",
   summary: "Submit a review: approve, request changes or comment.",
@@ -31,38 +50,29 @@ export const prReview = defineVerb({
     "ost pr review 42 --request-changes --body-file .scratch/review.md --comment-file .scratch/inline.json",
   ],
   async run(env, input, ctx) {
-    const verdicts: ReviewVerdict[] = [
-      ...(input.approve ? (["approve"] as const) : []),
-      ...(input.requestChanges ? (["request_changes"] as const) : []),
-      ...(input.comment ? (["comment"] as const) : []),
-    ];
-
-    if (verdicts.length !== 1) {
-      throw new PortError("invalid", "Pass exactly one of approve, request-changes or comment.");
-    }
-
-    const comments = commentsOf(env, ctx, input.commentFile);
+    const verdict = chosenVerdict(input);
+    const comments = commentsOf(env, ctx, input.commentFile) ?? [];
     const text = textOf(env, ctx, input, false) ?? "";
-    if (verdicts[0] !== "approve" && !text.trim() && !comments?.length) {
+    if (verdict !== "approve" && !text.trim() && comments.length === 0) {
       throw new PortError("invalid", "A review that is not an approval needs a body or comments.");
     }
 
     const vcs = requireVcs(env);
     const ref = await repoOrWorktree(env, ctx, input.repo);
     await vcs.submitReview(ref, input.number, {
-      verdict: verdicts[0]!,
+      verdict,
       body: text,
-      ...(comments?.length ? { comments } : {}),
+      ...(comments.length ? { comments } : {}),
     });
 
     const url = vcs.links.pr(ref, input.number);
-    const label = verdicts[0]!.replace("_", " ");
+    const inline = comments.length ? `, ${comments.length} inline` : "";
     return result(
       [
-        `Submitted a review (${label}${comments?.length ? `, ${comments.length} inline` : ""}) on ${repoLabel(ref)}#${input.number}.`,
+        `Submitted a review (${verdict.replace("_", " ")}${inline}) on ${repoLabel(ref)}#${input.number}.`,
         url,
       ],
-      { verdict: verdicts[0], comments: comments?.length ?? 0 },
+      { verdict, comments: comments.length },
       [url],
     );
   },

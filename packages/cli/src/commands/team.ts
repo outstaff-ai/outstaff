@@ -1,10 +1,106 @@
-import { formatIssue, validateTeam } from "@outstaff/core";
+import { formatIssue, validateTeam, type LocatedIssue, type TeamConfig } from "@outstaff/core";
 import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
 import { defineCommand } from "../define.js";
 import { issueJson, loadTeam } from "../load.js";
 import { table } from "../table.js";
+import type { Context, Loaded } from "../types.js";
 
 const DEFAULT_TRUST = "default rule: repo writers and full chat-workspace members";
+
+type LoadedTeam = Extract<Loaded, { ok: true }>;
+
+/** A table indented under its section heading. */
+const indented = (header: string[], rows: string[][]): string[] =>
+  table(header, rows)
+    .split("\n")
+    .map((l) => `  ${l}`);
+
+const pairs = (record: Record<string, string | undefined>): string =>
+  Object.entries(record)
+    .map(([k, v]) => `${k}:${v}`)
+    .join(", ");
+
+function headerLines({ team }: TeamConfig): string[] {
+  const title = `Team: ${team.name}${team.product ? ` (${team.product})` : ""}`;
+  return team.description ? [title, team.description] : [title];
+}
+
+function humansLines({ humans }: TeamConfig): string[] {
+  if (humans === undefined) {
+    return [`  Not listed; ${DEFAULT_TRUST}.`];
+  }
+
+  return indented(
+    ["NAME", "IDENTITIES"],
+    humans.map((h) => [h.name, pairs(h.identities)]),
+  );
+}
+
+const reposLines = ({ repos }: TeamConfig): string[] =>
+  indented(
+    ["NAME", "KIND", "URL", "BRANCH"],
+    repos.map((r) => [r.name, r.kind, r.url, r.default_branch]),
+  );
+
+function peopleLines({ people }: TeamConfig): string[] {
+  if (people.length === 0) {
+    return ["  None yet. Add one with `ost hire`."];
+  }
+
+  return indented(
+    ["HANDLE", "NAME", "ROLE", "MODEL", "GRANTS"],
+    people.map((p) => [
+      p.handle,
+      p.name,
+      [p.role, ...(p.extends ?? [])].join("+"),
+      p.model ?? "default",
+      pairs(p.repos) || "none",
+    ]),
+  );
+}
+
+const integrationsLines = ({ integrations }: TeamConfig): string[] =>
+  indented(
+    ["PORT", "ADAPTER"],
+    Object.entries(integrations).map(([port, ref]) => [port, ref?.adapter ?? ""]),
+  );
+
+/** The team as text: a header, then one section per part of the config. */
+const teamText = (config: TeamConfig): string =>
+  [
+    ...headerLines(config),
+    "",
+    "Humans",
+    ...humansLines(config),
+    "",
+    "Repos",
+    ...reposLines(config),
+    "",
+    "People",
+    ...peopleLines(config),
+    "",
+    "Integrations",
+    ...integrationsLines(config),
+  ].join("\n");
+
+/** Catalog errors, or the team's validation errors against the merged catalog. */
+function problemsOf(ctx: Context, loaded: LoadedTeam): LocatedIssue[] {
+  const found = loadCatalogs(ctx, loaded.config, loaded.source.dir);
+  if (!found.ok) {
+    return found.issues.map(catalogIssue);
+  }
+
+  return validateTeam(loaded.config, {
+    roles: roleRegistry(found.catalogs),
+    adapters: new Map(),
+  }).errors.map(loaded.locate);
+}
+
+function teamJson(loaded: LoadedTeam, problems: LocatedIssue[]): string {
+  const { config } = loaded;
+  const { humans, repos, people, integrations } = config;
+  return `${JSON.stringify({ file: loaded.source.file, team: config.team, humans: humans ?? null, repos, people, integrations, ...(problems.length ? { errors: problems.map(issueJson) } : {}) }, null, 2)}\n`;
+}
 
 export const team = defineCommand({
   name: "team",
@@ -27,94 +123,14 @@ export const team = defineCommand({
       return 1;
     }
 
-    const { config } = loaded;
-    const found = loadCatalogs(ctx, config, loaded.source.dir);
-    const problems = found.ok
-      ? validateTeam(config, {
-          roles: roleRegistry(found.catalogs),
-          adapters: new Map(),
-        }).errors.map(loaded.locate)
-      : found.issues.map(catalogIssue);
-
+    const problems = problemsOf(ctx, loaded);
     if (options.json) {
-      const { humans, repos, people, integrations } = config;
-      ctx.out(
-        `${JSON.stringify({ file: loaded.source.file, team: config.team, humans: humans ?? null, repos, people, integrations, ...(problems.length ? { errors: problems.map(issueJson) } : {}) }, null, 2)}\n`,
-      );
-
-      return problems.length === 0 ? 0 : 1;
-    }
-
-    const out: string[] = [];
-    out.push(`Team: ${config.team.name}${config.team.product ? ` (${config.team.product})` : ""}`);
-    if (config.team.description) {
-      out.push(config.team.description);
-    }
-
-    out.push("", "Humans");
-    if (config.humans === undefined) {
-      out.push(`  Not listed; ${DEFAULT_TRUST}.`);
+      ctx.out(teamJson(loaded, problems));
     } else {
-      out.push(
-        ...table(
-          ["NAME", "IDENTITIES"],
-          config.humans.map((h) => [
-            h.name,
-            Object.entries(h.identities)
-              .map(([k, v]) => `${k}:${v}`)
-              .join(", "),
-          ]),
-        )
-          .split("\n")
-          .map((l) => `  ${l}`),
-      );
-    }
-
-    out.push("", "Repos");
-    out.push(
-      ...table(
-        ["NAME", "KIND", "URL", "BRANCH"],
-        config.repos.map((r) => [r.name, r.kind, r.url, r.default_branch]),
-      )
-        .split("\n")
-        .map((l) => `  ${l}`),
-    );
-
-    out.push("", "People");
-    if (config.people.length === 0) {
-      out.push("  None yet. Add one with `ost hire`.");
-    } else {
-      out.push(
-        ...table(
-          ["HANDLE", "NAME", "ROLE", "MODEL", "GRANTS"],
-          config.people.map((p) => [
-            p.handle,
-            p.name,
-            [p.role, ...(p.extends ?? [])].join("+"),
-            p.model ?? "default",
-            Object.entries(p.repos)
-              .map(([k, v]) => `${k}:${v}`)
-              .join(", ") || "none",
-          ]),
-        )
-          .split("\n")
-          .map((l) => `  ${l}`),
-      );
-    }
-
-    out.push("", "Integrations");
-    out.push(
-      ...table(
-        ["PORT", "ADAPTER"],
-        Object.entries(config.integrations).map(([port, ref]) => [port, ref?.adapter ?? ""]),
-      )
-        .split("\n")
-        .map((l) => `  ${l}`),
-    );
-
-    ctx.out(`${out.join("\n")}\n`);
-    for (const p of problems) {
-      ctx.err(`error    ${formatIssue(p)}\n`);
+      ctx.out(`${teamText(loaded.config)}\n`);
+      for (const p of problems) {
+        ctx.err(`error    ${formatIssue(p)}\n`);
+      }
     }
 
     return problems.length === 0 ? 0 : 1;

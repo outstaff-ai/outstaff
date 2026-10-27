@@ -30,6 +30,14 @@ export function findConventionFiles(worktree: string, instructions: readonly str
 /** Path-safe form of an item id. */
 export const safeId = (id: string) => id.replaceAll(/[^\w.-]/g, "-").replace(/^\.+/, "_");
 
+/** Item kinds that always start from the default branch. */
+const STARTS_AFRESH = new Set<string>(["merged_feedback", "doc_feedback"]);
+
+type Subject = Offer["context"]["subjects"][number];
+
+const isOpenOwnPr = (s: Subject) =>
+  s.type === "pr" && s.own === true && s.state === "open" && Boolean(s.headRef);
+
 /**
  * The branch an item continues on instead of a new one: the head of the open pull request the person opened that the
  * item is about, either as its subject or as the only such pull request of its ticket. Undefined means new work, which
@@ -37,19 +45,17 @@ export const safeId = (id: string) => id.replaceAll(/[^\w.-]/g, "-").replace(/^\
  */
 export function headBranchOf(offer: Offer): string | undefined {
   const { workItem: item, context } = offer;
-  if (item.kind === "merged_feedback" || item.kind === "doc_feedback") {
+  const subject = item.subject;
+  if (STARTS_AFRESH.has(item.kind) || !subject) {
     return undefined;
   }
 
-  const open = context.subjects.filter(
-    (s) => s.type === "pr" && s.own === true && s.state === "open" && s.headRef,
-  );
-
-  if (item.subject?.type === "pr") {
-    return open.find((s) => s.ref === item.subject!.ref)?.headRef;
+  const open = context.subjects.filter(isOpenOwnPr);
+  if (subject.type === "pr") {
+    return open.find((s) => s.ref === subject.ref)?.headRef;
   }
 
-  if (item.subject?.type === "ticket" && open.length === 1) {
+  if (subject.type === "ticket" && open.length === 1) {
     return open[0]!.headRef;
   }
 

@@ -16,6 +16,14 @@ export const placementQuestion = (hasPm: boolean, describe: Describe, work: Work
   ].join("\n");
 };
 
+/** The answer when the office could not tell where the filed work goes. */
+const unclearReply = (hasPm: boolean, describe: Describe, work: WorkSummary[]) =>
+  [
+    "I did not get where this goes. Say next, last or after one of these (by number)" +
+      (hasPm ? ", or ask me to check with the PM:" : ":"),
+    ...describe(work),
+  ].join("\n");
+
 /** What the agent answers a trusted human's message with, given what the office made of it. */
 export function replyFor(
   r: ChatMessageResult,
@@ -33,11 +41,7 @@ export function replyFor(
     case "asked_pm":
       return "I asked the PM to prioritize it. It waits at the end of my queue until you tell me where it goes.";
     case "unclear":
-      return [
-        "I did not get where this goes. Say next, last or after one of these (by number)" +
-          (hasPm ? ", or ask me to check with the PM:" : ":"),
-        ...describe(r.work),
-      ].join("\n");
+      return unclearReply(hasPm, describe, r.work);
     case "joined":
       return undefined;
   }

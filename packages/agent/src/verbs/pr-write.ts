@@ -93,6 +93,26 @@ export const prOpen = defineVerb({
   },
 });
 
+/** The draft state `draft` or `ready` asks for, if either; both at once is refused. */
+function draftChange(input: { draft?: boolean | undefined; ready?: boolean | undefined }) {
+  if (input.draft && input.ready) {
+    throw new PortError("invalid", "Pass either draft or ready, not both.");
+  }
+
+  if (input.draft) {
+    return true;
+  }
+
+  return input.ready ? false : undefined;
+}
+
+/** The fields of `changes` that are set; the rest stay as they are. */
+function definedOnly<T extends object>(changes: T): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(changes).filter(([, v]) => v !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
+}
+
 export const prUpdate = defineVerb({
   name: "pr.update",
   summary: "Change the title, body, base or draft state of a pull request.",
@@ -114,30 +134,16 @@ export const prUpdate = defineVerb({
     "ost pr update 42 --body-file .scratch/pr.md --ready",
   ],
   async run(env, input, ctx) {
-    if (input.draft && input.ready) {
-      throw new PortError("invalid", "Pass either draft or ready, not both.");
-    }
-
+    const draft = draftChange(input);
     const text = textOf(env, ctx, input, false);
-    const draft = input.draft ? true : input.ready ? false : undefined;
-    if (
-      input.title === undefined &&
-      text === undefined &&
-      input.base === undefined &&
-      draft === undefined
-    ) {
+    const changes = definedOnly({ title: input.title, body: text, base: input.base, draft });
+    if (Object.keys(changes).length === 0) {
       throw new PortError("invalid", "Nothing to update: pass title, body, base, draft or ready.");
     }
 
     const vcs = requireVcs(env);
     const ref = await repoOrWorktree(env, ctx, input.repo);
-    const pr = await vcs.updatePullRequest(ref, input.number, {
-      ...(input.title === undefined ? {} : { title: input.title }),
-      ...(text === undefined ? {} : { body: text }),
-      ...(input.base === undefined ? {} : { base: input.base }),
-      ...(draft === undefined ? {} : { draft }),
-    });
-
+    const pr = await vcs.updatePullRequest(ref, input.number, changes);
     const url = vcs.links.pr(ref, input.number);
     return result(
       [

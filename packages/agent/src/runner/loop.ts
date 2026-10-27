@@ -29,22 +29,22 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     }
   }
 
-  async function handle(offer: Offer) {
-    const id = offer.workItem.id;
-    const abort = new AbortController();
-    running.set(id, abort);
+  /** Takes the offer; an offer the office would not give us is dropped. */
+  async function accepted(id: string): Promise<boolean> {
     try {
       await opts.office.accept(id);
+
+      return true;
     } catch (e) {
       log.warn("could not accept an offer", { workItemId: id, error: reason(e) });
-      running.delete(id);
-      return;
-    }
 
-    if (stopping) {
-      abort.abort();
+      return false;
     }
+  }
 
+  /** Runs an accepted item to its hand-back; a failure is reported to the office. */
+  async function runAccepted(offer: Offer, abort: AbortController) {
+    const id = offer.workItem.id;
     opts.profile?.changed();
     opts.usage?.setBusy(true);
     try {
@@ -64,6 +64,23 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       // Handed back or failed: the status is idle now, or the next item.
       opts.profile?.changed();
     }
+  }
+
+  async function handle(offer: Offer) {
+    const id = offer.workItem.id;
+    const abort = new AbortController();
+    running.set(id, abort);
+    if (!(await accepted(id))) {
+      running.delete(id);
+
+      return;
+    }
+
+    if (stopping) {
+      abort.abort();
+    }
+
+    await runAccepted(offer, abort);
   }
 
   const track = (p: Promise<void>) => {

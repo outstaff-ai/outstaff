@@ -48,71 +48,87 @@ const walk = (root: string, rel: string): string[] => {
 export const allStockFiles = (stockDir: string): string[] =>
   EJECTABLE.flatMap((d) => walk(stockDir, d));
 
+type FileMatch = (file: string) => boolean;
+
+const roleFiles =
+  (name: string): FileMatch =>
+  (f) =>
+    f.startsWith(`roles/${name}/`);
+
+const markdownFile =
+  (folder: string) =>
+  (name: string): FileMatch => {
+    const base = name.replace(/\.md$/, "");
+    return (f) => f === `${folder}/${base}.md`;
+  };
+
+const toolsetFile = (name: string): FileMatch => {
+  const base = name.replace(/\.ya?ml$/, "");
+  return (f) => f === `toolsets/${base}.yaml` || f === `toolsets/${base}.yml`;
+};
+
+/** How `<folder>/<name>` picks stock files, per ejectable folder. */
+const TARGET_MATCHES = new Map<string, (name: string) => FileMatch>([
+  ["roles", roleFiles],
+  ["process", markdownFile("process")],
+  ["references", markdownFile("references")],
+  ["templates", markdownFile("templates")],
+  ["toolsets", toolsetFile],
+]);
+
+/** The stock files an eject target names; a bare name is a role. */
+function targetMatch(target: string): FileMatch | undefined {
+  const [head = "", ...rest] = target.split("/");
+  const name = rest.join("/");
+  return name ? TARGET_MATCHES.get(head)?.(name) : roleFiles(target);
+}
+
 /**
  * Resolves an eject target to stock file paths: a role name (or `roles/<name>`),
  * `process/<x>`, `references/<x>`, `templates/<x>` or `toolsets/<x>`.
  * Returns undefined when nothing matches.
  */
 export function resolveTarget(stockDir: string, target: string): string[] | undefined {
-  const clean = target.replace(/\/+$/, "");
-  const [head, ...rest] = clean.split("/");
-  const name = rest.join("/");
   const all = allStockFiles(stockDir);
-  const pick = (pred: (f: string) => boolean) => {
-    const files = all.filter(pred);
-    return files.length ? files : undefined;
-  };
+  const match = targetMatch(target.replace(/\/+$/, ""));
+  const files = match ? all.filter(match) : [];
+  return files.length ? files : undefined;
+}
 
-  if (head === "roles" && name) {
-    return pick((f) => f.startsWith(`roles/${name}/`));
-  }
+const isRelativePosix = (path: string) =>
+  path !== "" && !path.startsWith("/") && !path.includes("\\") && !/^[A-Za-z]:/.test(path);
 
-  if (head && ["process", "references", "templates"].includes(head) && name) {
-    const base = name.replace(/\.md$/, "");
-    return pick((f) => f === `${head}/${base}.md`);
-  }
+const hasDotOrEmptySegment = (parts: string[]) =>
+  parts.some((s) => s === ".." || s === "." || s === "");
 
-  if (head === "toolsets" && name) {
-    const base = name.replace(/\.ya?ml$/, "");
-    return pick((f) => f === `toolsets/${base}.yaml` || f === `toolsets/${base}.yml`);
-  }
+const isEjectableFile = (parts: string[]) =>
+  parts.length >= 2 && (EJECTABLE as readonly string[]).includes(parts[0] ?? "");
 
-  if (!name) {
-    return pick((f) => f.startsWith(`roles/${clean}/`));
-  }
-
-  return undefined;
+function escapes(dir: string, path: string): boolean {
+  const rel = relative(resolve(dir), resolve(dir, path));
+  return rel.startsWith("..") || isAbsolute(rel);
 }
 
 /** Why `path` cannot be an ejected file, or undefined when it can. */
 export function badCatalogPath(dir: string, path: string): string | undefined {
-  if (path === "" || path.startsWith("/") || path.includes("\\") || /^[A-Za-z]:/.test(path)) {
+  if (!isRelativePosix(path)) {
     return "must be a relative POSIX path";
   }
 
   const parts = path.split("/");
-  if (parts.some((s) => s === ".." || s === "." || s === "")) {
+  if (hasDotOrEmptySegment(parts)) {
     return "must not contain empty, . or .. segments";
   }
 
-  if (parts.length < 2 || !(EJECTABLE as readonly string[]).includes(parts[0] ?? "")) {
+  if (!isEjectableFile(parts)) {
     return `must start with one of ${EJECTABLE.join(", ")} and name a file`;
   }
 
-  const rel = relative(resolve(dir), resolve(dir, path));
-  if (rel.startsWith("..") || isAbsolute(rel)) {
-    return "resolves outside the ejected catalog";
-  }
-
-  return undefined;
+  return escapes(dir, path) ? "resolves outside the ejected catalog" : undefined;
 }
 
-export function readIndex(dir: string): EjectedIndex {
-  const file = join(dir, RECORD_FILE);
-  if (!existsSync(file)) {
-    return {};
-  }
-
+/** The record file's content, which must be a JSON object. */
+function readIndexObject(file: string): object {
   let index: unknown;
   try {
     index = JSON.parse(readFileSync(file, "utf8"));
@@ -124,16 +140,30 @@ export function readIndex(dir: string): EjectedIndex {
     throw new Error(`${file} must be a JSON object.`);
   }
 
-  for (const [path, record] of Object.entries(index)) {
-    const bad = badCatalogPath(dir, path);
-    if (bad) {
-      throw new Error(`${file}: invalid entry "${path}": ${bad}.`);
-    }
+  return index;
+}
 
-    const r = record as Partial<EjectedRecord> | null;
-    if (typeof r?.version !== "string" || typeof r.sha256 !== "string") {
-      throw new Error(`${file}: entry "${path}" needs a version and a sha256.`);
-    }
+function checkEntry(dir: string, file: string, path: string, record: unknown): void {
+  const bad = badCatalogPath(dir, path);
+  if (bad) {
+    throw new Error(`${file}: invalid entry "${path}": ${bad}.`);
+  }
+
+  const r = record as Partial<EjectedRecord> | null;
+  if (typeof r?.version !== "string" || typeof r.sha256 !== "string") {
+    throw new Error(`${file}: entry "${path}" needs a version and a sha256.`);
+  }
+}
+
+export function readIndex(dir: string): EjectedIndex {
+  const file = join(dir, RECORD_FILE);
+  if (!existsSync(file)) {
+    return {};
+  }
+
+  const index = readIndexObject(file);
+  for (const [path, record] of Object.entries(index)) {
+    checkEntry(dir, file, path, record);
   }
 
   return index as EjectedIndex;
