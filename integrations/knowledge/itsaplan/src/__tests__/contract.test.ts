@@ -3,9 +3,9 @@ import { knowledgeContract } from "@outstaff/core/contracts";
 import { knowledgeOptions } from "#/index.js";
 import type { KnowledgeOptions } from "#/types.js";
 import { API_KEY, secretMap, team } from "@outstaff/testing.itsaplan";
+import { createItsaplanFake } from "./fake.js";
 import { itsaplanKnowledge } from "#/index.js";
 import { createItsaplanKnowledge } from "#/knowledge.js";
-import { createItsaplanFake } from "#/testing/itsaplan-fake.js";
 
 const base = {
   secrets: secretMap({ ITSAPLAN_API_KEY: API_KEY }),

@@ -13,17 +13,14 @@ export {
 
 export { createStubFetch } from "./http-stub.js";
 export { OFFICE_APP, OWN_APP, createGithubFake } from "./github-fake.js";
+export type { Clock, Handler, Route, StubReply, StubRequest } from "./types.js";
 export type {
-  Clock,
-  Handler,
-  Route,
   StoredCheckRun,
   StoredIssueComment,
   StoredPull,
+  StoredReaction,
   StoredReview,
   StoredReviewComment,
   StoredThread,
   StoredThreadComment,
-  StubReply,
-  StubRequest,
-} from "./types.js";
+} from "./stand-in/types.js";

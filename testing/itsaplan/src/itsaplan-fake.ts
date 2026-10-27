@@ -1,48 +1,88 @@
-import type { Member } from "@outstaff/core";
-import type { TrackerSeed } from "@outstaff/core/contracts";
-import { fakeRoutes } from "./fake-routes.js";
-import { createFakeState, err } from "./fake-state.js";
-import { API_ORIGIN, createStubFetch } from "./http-stub.js";
-import type { FakeOptions, FakeShared, Route } from "./types.js";
+import type { Doc, Member } from "@outstaff/core";
+import type { KnowledgeSeed, TrackerSeed } from "@outstaff/core/contracts";
+import { createStubFetch } from "./http-stub.js";
+import { createItsaplanStandIn, err } from "./stand-in/index.js";
+import type { ItsaplanStore, StoredDoc } from "./stand-in/index.js";
+import type { FakeOptions, Markdown, Route } from "./types.js";
 
-// A stateful stand-in for the parts of the Its a Plan REST API the tracker adapter uses, shaped after its OpenAPI
-// document. The adapters talk to it over the injected fetch, so the contract kits run the real client code. The
-// knowledge package adds the document routes through `extend`.
+// The Its a Plan stand-in in process: served through the stub fetch, with the seeds of the contract kits and an
+// issue and a document the actor may not read. With `markdown` (the knowledge adapter's own conversion), seeded
+// documents get their editor JSON and comments get Its a Plan's checks on quotes.
 
-export function createItsaplanFake(
-  opts: FakeOptions = {},
-  extend: (shared: FakeShared) => Route[] = () => [],
-) {
-  const state = createFakeState(opts);
-  const { key, ref, clock, columns, labels, assignees, issues, activity, attachments, actor } =
-    state;
+const forbidden: Route[] = [
+  {
+    method: "GET",
+    path: "/projects/:p/issues/403",
+    handler: () => err(403, "You cannot read this issue.", "forbidden"),
+  },
+  {
+    method: "GET",
+    path: "/projects/:p/documents/403",
+    handler: () => err(403, "You cannot read this document.", "forbidden"),
+  },
+];
 
-  const routes = fakeRoutes(state);
+const trackerSeed = (s: ItsaplanStore): TrackerSeed => ({
+  async member(m) {
+    const userId = `u-${s.members.length + 1}`;
+    s.members.push({ userId, name: m.name, username: m.name.toLowerCase(), kind: "member" });
+    return { id: userId, name: m.name, kind: m.kind ?? "human" } satisfies Member;
+  },
+  forbiddenCall: () => Promise.reject(new Error("bound by the test")),
+});
 
-  const stub = createStubFetch([...routes, ...extend({ clock, err, actor })], API_ORIGIN);
+const knowledgeSeed = (s: ItsaplanStore, markdown: Markdown | undefined): KnowledgeSeed => ({
+  async doc(d) {
+    const row: StoredDoc = {
+      id: ++s.counters.doc,
+      parentId: null,
+      title: d.title,
+      metadata: { path: d.path },
+      version: 1,
+      content: d.body,
+      contentJson: markdown?.toDoc(d.body) ?? null,
+      createdAt: s.now(),
+      updatedAt: s.now(),
+    };
 
-  const trackerSeed: TrackerSeed = {
-    async member(m) {
-      const userId = `u-${assignees.length + 1}`;
-      assignees.push({
-        userId,
-        name: m.name,
-        username: m.name.toLowerCase(),
-        kind: "member",
-      });
+    s.docs.push(row);
+    return {
+      id: String(row.id),
+      path: d.path,
+      title: d.title,
+      body: d.body,
+      url: "",
+      version: "1",
+      updatedAt: row.updatedAt,
+    } satisfies Doc;
+  },
+});
 
-      return { id: userId, name: m.name, kind: m.kind ?? "human" } satisfies Member;
-    },
-    forbiddenCall: () => Promise.reject(new Error("bound by the test")),
-  };
+export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
+  const { store, routes } = createItsaplanStandIn({
+    ...opts,
+    documents: markdown ? { quoteRange: markdown.quoteRange } : {},
+  });
 
+  const stub = createStubFetch([...forbidden, ...routes]);
+  const { issues, activity, columns, labels, members, attachments, docs, docComments } = store;
   return {
     fetch: stub.fetch,
     calls: stub.calls,
     called: stub.called,
-    state: { issues, activity, columns, labels, assignees, attachments },
-    trackerSeed,
-    project: { key, ref },
-    clock,
+    state: {
+      issues,
+      activity,
+      columns,
+      labels,
+      assignees: members,
+      attachments,
+      docs,
+      docComments,
+    },
+    trackerSeed: trackerSeed(store),
+    knowledgeSeed: knowledgeSeed(store, markdown),
+    project: { key: store.key, ref: store.ref },
+    clock: store.now,
   };
 }

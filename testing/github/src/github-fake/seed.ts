@@ -1,74 +1,102 @@
+import type { PullRequest } from "@outstaff/core";
 import type { NewSeedPullRequest, VcsSeed } from "@outstaff/core/contracts";
-import type { FakeState, FakeVcsRef, StoredPull } from "#/types.js";
+import { addComment, submitReview } from "#/stand-in/conversation.js";
+import { closePull, emit, headSha, nextSeq, prPayload, pullUrl, touch } from "#/stand-in/model.js";
+import type { GithubStore, MemoryRepo, StoredPull } from "#/stand-in/types.js";
+import type { FakeVcsRef } from "#/types.js";
+import { seedCheck } from "./checks.js";
 
-/** The login a seeded author has on the host: an agent acts through its App's bot. */
-const seedLogin = (author: NewSeedPullRequest["author"]): string =>
+const need = (s: GithubStore, n: number): StoredPull => {
+  const pr = s.prs.get(n);
+  if (!pr) {
+    throw Object.assign(new Error("not found"), { notFound: true });
+  }
+
+  return pr;
+};
+
+/** The pull request as the port reports it. */
+const domain = async (s: GithubStore, pr: StoredPull): Promise<PullRequest> => ({
+  repo: s.repo,
+  number: pr.number,
+  title: pr.title,
+  body: pr.body,
+  url: pullUrl(s, pr.number),
+  author: { login: pr.login, kind: pr.login.endsWith("[bot]") ? "agent" : "human" },
+  head: { ref: pr.head.ref, sha: await headSha(s, pr) },
+  base: pr.base,
+  state: pr.merged ? "merged" : pr.state,
+  draft: pr.draft,
+  mergeable: "unknown",
+  updatedAt: pr.updatedAt,
+});
+
+const loginOf = ({ author }: NewSeedPullRequest) =>
   (author?.login ?? "sam") + (author?.kind === "agent" ? "[bot]" : "");
 
-/** Seeds the fake the way the contract suite drives a host: pull requests, pushes, reviews, checks and more. */
-export function createSeed(s: FakeState, vcsRef: FakeVcsRef): VcsSeed {
-  const { repo, counters: n, prs, checks, jobs, threads, reactions, issueComments, perms } = s;
-  const { emit, need, domain, touch, prPayload, submitReview, clockIso } = s;
-  const nextSha = () => (++n.sha).toString(16).padStart(40, "0");
-  const seedHead = (head: NewSeedPullRequest["head"], number: number) => ({
-    ref: head?.ref ?? `feat/${number}`,
-    sha: head?.sha ?? nextSha(),
-  });
+/** A seeded pull request's branches: the head gets its commit and its mergeability script. */
+function branchesOf(git: MemoryRepo, p: NewSeedPullRequest, number: number) {
+  const ref = p.head?.ref ?? `feat/${number}`;
+  git.script(ref, p.mergeable ?? ["clean"]);
+  return { head: { ref, sha: git.commit(ref, p.head?.sha) }, base: { ref: p.base?.ref ?? "main" } };
+}
 
+async function open(s: GithubStore, git: MemoryRepo, p: NewSeedPullRequest) {
+  const number = s.prs.size + 1;
+  const login = loginOf(p);
+  const pr: StoredPull = {
+    number,
+    title: p.title,
+    body: p.body ?? "",
+    login,
+    ...branchesOf(git, p, number),
+    state: "open",
+    merged: false,
+    draft: p.draft ?? false,
+    forcePushes: 0,
+    updatedAt: s.now(),
+  };
+
+  s.prs.set(number, pr);
+  emit(s, "PullRequestEvent", login, await prPayload(s, pr, "opened"));
+  return domain(s, pr);
+}
+
+/** Seeds the stand-in the way the contract suite drives a host: pull requests, pushes, reviews, checks and more. */
+export function createSeed(s: GithubStore, git: MemoryRepo, vcsRef: FakeVcsRef): VcsSeed {
+  const { repo } = s;
   return {
     repo,
     selfLogin: "sam",
-    async pullRequest(_repo, p: NewSeedPullRequest) {
-      const number = prs.size + 1;
-      const login = seedLogin(p.author);
-      const pr: StoredPull = {
-        number,
-        title: p.title,
-        body: p.body ?? "",
-        login,
-        head: seedHead(p.head, number),
-        base: { ref: p.base?.ref ?? "main" },
-        state: "open",
-        merged: false,
-        draft: p.draft ?? false,
-        mergeable: p.mergeable ?? ["clean"],
-        updatedAt: clockIso(),
-      };
-
-      prs.set(number, pr);
-      emit("PullRequestEvent", login, prPayload(pr, "opened"));
-      return domain(pr);
-    },
+    pullRequest: async (_repo, p) => open(s, git, p),
     async push(_repo, number, actor) {
-      const pr = need(number);
-      pr.head = { ...pr.head, sha: nextSha() };
-      touch(pr);
-      emit("PullRequestEvent", actor, prPayload(pr, "synchronize"));
-      return domain(pr);
+      const pr = need(s, number);
+      pr.head = { ...pr.head, sha: git.commit(pr.head.ref) };
+      touch(s, pr);
+      emit(s, "PullRequestEvent", actor, await prPayload(s, pr, "synchronize"));
+      return domain(s, pr);
     },
     async merge(_repo, number, actor) {
-      const pr = need(number);
-      Object.assign(pr, { state: "closed", merged: true });
-      touch(pr);
-      emit("PullRequestEvent", actor, prPayload(pr, "closed"));
-      return domain(pr);
+      const pr = need(s, number);
+      await closePull(s, pr, actor, true);
+      return domain(s, pr);
     },
     async close(_repo, number, actor) {
-      const pr = need(number);
-      pr.state = "closed";
-      touch(pr);
-      emit("PullRequestEvent", actor, prPayload(pr, "closed"));
-      return domain(pr);
+      const pr = need(s, number);
+      await closePull(s, pr, actor, false);
+      return domain(s, pr);
     },
     async review(_repo, number, actor, state, body = "", comments = []) {
-      return String(submitReview(number, actor, state.toUpperCase(), body, comments));
+      return String(
+        await submitReview(s, need(s, number), actor, state.toUpperCase(), body, comments),
+      );
     },
     async requestReview(_repo, number, login) {
-      const pr = need(number);
+      const pr = need(s, number);
       pr.requested = (pr.requested ?? new Set()).add(login);
     },
     async requireCheck(_repo, number, name) {
-      const pr = need(number);
+      const pr = need(s, number);
       pr.required = (pr.required ?? new Set()).add(name);
     },
     async mergeSettings(_repo, o) {
@@ -101,27 +129,16 @@ export function createSeed(s: FakeState, vcsRef: FakeVcsRef): VcsSeed {
         },
       );
     },
-    async comment(_repo, number, actor, body) {
-      const id = ++n.commentCounter;
-      issueComments.set(id, { prNumber: number, author: actor, body, at: clockIso() });
-      emit("IssueCommentEvent", actor, {
-        action: "created",
-        issue: { number, pull_request: {} },
-        comment: { id, body },
-      });
-
-      return String(id);
-    },
+    comment: async (_repo, number, actor, body) =>
+      String(addComment(s, need(s, number), actor, body)),
     async reactions(_repo, target) {
-      const kind = target.kind === "conversation_comment" ? "issues" : "pulls";
-      return [...(reactions.get(`${kind}:${target.id}`) ?? [])].map((r) => {
-        const [user, reaction] = r.split(":") as [string, string];
-        return { user, reaction };
-      });
+      return s.reactions
+        .filter((r) => r.kind === target.kind && String(r.commentId) === String(target.id))
+        .map((r) => ({ user: r.user, reaction: r.content }));
     },
     async thread(_repo, number, t) {
-      const id = `PRRT_${++n.thread}`;
-      threads.set(id, {
+      const id = `PRRT_${++s.counters.thread}`;
+      s.threads.set(id, {
         id,
         prNumber: number,
         resolved: false,
@@ -129,56 +146,17 @@ export function createSeed(s: FakeState, vcsRef: FakeVcsRef): VcsSeed {
         line: t.line,
         comments: t.comments.map((c, i) => ({
           id: `${id}_c${i}`,
-          databaseId: ++n.commentCounter,
+          databaseId: ++s.counters.comment,
+          seq: nextSeq(s),
           ...c,
         })),
       });
 
       return id;
     },
-    async check(_repo, shaValue, c) {
-      const list = checks.get(shaValue) ?? [];
-      const conclusion =
-        c.status === "success"
-          ? "success"
-          : c.status === "failure"
-            ? "failure"
-            : c.status === "neutral"
-              ? "neutral"
-              : null;
-
-      const id = ++n.checkId;
-      list.push({
-        id,
-        name: c.name,
-        status: c.status === "pending" ? "in_progress" : "completed",
-        conclusion,
-        ...(c.log ? { job: true } : {}),
-      });
-
-      if (c.log) {
-        jobs.set(id, {
-          steps: c.log.steps.map((st) => ({
-            name: st.name,
-            conclusion: st.failed ? "failure" : "success",
-          })),
-          log: c.log.steps
-            .flatMap((st, i) => [
-              `2026-01-01T00:00:0${i}.0000000Z ##[group]${st.name}`,
-              `2026-01-01T00:00:0${i}.0000000Z ##[endgroup]`,
-              ...st.lines.map((l) => `2026-01-01T00:00:0${i}.1000000Z ${l}`),
-              ...(st.failed
-                ? [`2026-01-01T00:00:0${i}.2000000Z ##[error]Process completed with exit code 1.`]
-                : []),
-            ])
-            .join("\n"),
-        });
-      }
-
-      checks.set(shaValue, list);
-    },
+    check: async (_repo, sha, c) => seedCheck(s, sha, c),
     async permission(_repo, login, level) {
-      perms.set(login, level);
+      s.perms.set(login, level);
     },
     forbiddenCall: () => vcsRef.getPullRequest({ owner: repo.owner, name: "private" }, 1),
   };

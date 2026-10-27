@@ -9,5 +9,5 @@
     "declarationMap": false,
     "customConditions": []
   },
-  "include": ["*.ts", "stubs"]
+  "include": ["*.ts"]
 }

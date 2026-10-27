@@ -1,23 +1,39 @@
 {
   "name": "@outstaff/testing.itsaplan",
   "version": "0.0.0",
-  "description": "The Its a Plan stand-in for tests: an in-memory fake of its REST API, a stub fetch and a harness, shared by the tracker and knowledge adapters' tests. Private: never packed or published.",
+  "description": "The Its a Plan stand-in: one implementation of the tracker and document REST API, served in process to the tracker and knowledge adapters' tests (with a stub fetch, seeds and a harness) and over HTTP to the end-to-end stubs. Private: never packed or published.",
   "license": "Apache-2.0",
   "private": true,
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/index.ts",
-      "default": "./src/index.ts"
+      "@outstaff/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./stand-in": {
+      "@outstaff/source": "./src/stand-in/index.ts",
+      "types": "./dist/stand-in/index.d.ts",
+      "default": "./dist/stand-in/index.js"
     }
   },
   "imports": {
-    "#/*": "./src/*"
+    "#/*": {
+      "@outstaff/source": "./src/*",
+      "default": "./dist/*"
+    }
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
+    "@outstaff/testing.http": "workspace:*"
+  },
+  "devDependencies": {
     "@outstaff/core": "workspace:*",
     "@outstaff/integration.shared.itsaplan": "workspace:*",
     "vitest": "5.0.5"
