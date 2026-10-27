@@ -1,6 +1,7 @@
 import type { NewSeedPullRequest, VcsSeed } from "#/contracts/seeds.js";
 import { PortError } from "#/ports/index.js";
 import type { PullRequest, ReviewInlineComment, ReviewThread } from "#/ports/index.js";
+import { settleAutoMerge } from "./vcs-auto-merge.js";
 import type { FakeVcsState, StoredPr } from "./vcs.types.js";
 
 /** The seed of a fake vcs: puts pull requests, reviews, checks and grants in place as a test needs them. */
@@ -132,6 +133,7 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
       }
 
       emit("pr.review_submitted", repo, number, actor, { state, body, reviewId });
+      settleAutoMerge(st, repo, s);
       return reviewId;
     },
     async requestReview(repo, number, login) {

@@ -54,6 +54,19 @@ function setDraft(s: FakeState, r: StubRequest): unknown {
   return { data: { pullRequest: { id: variables["id"], isDraft: pr?.draft ?? false } } };
 }
 
+function enableAutoMerge(s: FakeState, r: StubRequest): unknown {
+  const { id, method } = r.json.variables;
+  const pr = s.prs.get(Number(String(id).slice("PR_".length)));
+  if (!pr || pr.state !== "open" || pr.draft) {
+    return {
+      errors: [{ message: "Pull request is not in the correct state to enable auto-merge" }],
+    };
+  }
+
+  pr.auto_merge = { merge_method: String(method).toLowerCase() };
+  return { data: { enablePullRequestAutoMerge: { pullRequest: { id } } } };
+}
+
 function rollupNodes(s: FakeState, pr: StoredPull | undefined): RollupContext[] {
   if (!pr) {
     return [];
@@ -117,10 +130,11 @@ const OPERATIONS: [(query: string) => boolean, Operation][] = [
   ],
   [(q) => q.includes("statusCheckRollup"), statusCheckRollup],
   [(q) => q.includes("mergeQueue("), mergeQueue],
+  [(q) => q.includes("enablePullRequestAutoMerge"), enableAutoMerge],
   [(q) => q.startsWith("mutation"), resolveThread],
 ];
 
-/** The GraphQL endpoint: review threads, replies, draft state, required checks, the merge queue and resolving. */
+/** The GraphQL endpoint: review threads, replies, draft state, required checks, the merge queue, auto-merge and resolving. */
 export function graphqlRoute(s: FakeState): Route {
   return {
     method: "POST",

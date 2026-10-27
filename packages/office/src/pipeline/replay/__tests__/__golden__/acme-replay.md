@@ -19,7 +19,7 @@ How to read it:
 | 1 | `pr.opened` acme-example/shop#41 by sam | move ACME-123 to review (as the office) | move ACME-123 to review (for sam) | same |
 | 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (as the office) | move ACME-124 to review (for sam) | same |
 | 3 | `pr.merged` acme-example/shop#43 by ada-admin | - | (drop: no policy matched) | same |
-| 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merge) | wake sam (merge): _Your pull request #41 (Search API) is approved. Merge it the way the repository asks._ | same |
+| 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | - | (drop: no policy matched) | same |
 | 5 | `pr.merged` acme-example/shop#41 by sam | move ACME-123 to done (as the office) | move ACME-123 to done (for sam) | same |
 | 6 | derived `pr.base_merged` acme-example/shop#42 after #41 | (not raised today) | wake sam (rebase): _Your pull request #42 (Search page) is stacked on a branch that was just merged after #41 (Search API) merged. Bring it up to date with `sam/acme-123` the way the repository asks, and push._ | intended fix: sam hears at once that #42's base merged, naming #41; today nothing happens until #42 conflicts |
 
@@ -43,7 +43,7 @@ How to read it:
 | 15 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback) | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ | same |
 | 16 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback)<br>assign ACME-140 to agent sam (as the office)<br>move ACME-140 to active (as the office) | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ | regression: nothing moves ACME-140 back to active or gives it back to sam; the plan makes ticket moves explicit act policies with the act path (phase 2), not in this set |
 | 17 | `pr.review_submitted` acme-example/shop#60 by outside-contributor | (ignored) | (drop: the event comes from someone who is not trusted: recorded, never acted on) | same |
-| 18 | `agent.handed_back` acme-example/shop#60 by sam | wake sam (merge)<br>move ACME-140 to review (as the office)<br>assign ACME-140 to human ada.admin (as the office) | wake sam (merge): _You answered the comments on the approved pull request #60 (Wishlist). Merge it the way the repository asks._<br>move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam) | same |
+| 18 | `agent.handed_back` acme-example/shop#60 by sam | move ACME-140 to review (as the office)<br>assign ACME-140 to human ada.admin (as the office) | move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam) | same |
 
 ## Tickets assigned and moved, by a human and by the agent itself
 
@@ -118,6 +118,6 @@ How to read it:
 
 ## Coalescing
 
-The pipeline's 21 wakes become 19 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 19 wakes become 17 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

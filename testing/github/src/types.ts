@@ -46,7 +46,10 @@ export interface Clock {
 }
 
 /** A pull request in the GitHub fake: the REST fields it serves, in camelCase, plus what the seed sets. */
-export type StoredPull = Pick<RestPull, "number" | "title" | "head" | "base" | "state"> &
+export type StoredPull = Pick<
+  RestPull,
+  "number" | "title" | "head" | "base" | "state" | "auto_merge"
+> &
   Required<Pick<RestPull, "merged" | "draft">> & {
     body: NonNullable<RestPull["body"]>;
     login: NonNullable<RestPull["user"]>["login"];

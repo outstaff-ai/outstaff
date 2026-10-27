@@ -30,11 +30,10 @@ const byId = <T extends { id: string }>(policies: T[], id: string): T =>
   policies.find((p) => p.id === id)!;
 
 describe("configurePipeline", () => {
-  it("keeps the defaults in order, with merging on approval off unless the team turns it on", () => {
+  it("keeps the defaults in order, all on", () => {
     const { policies, options, issues } = configurePipeline(team());
     expect(policies.map((p) => p.id)).toEqual(DEFAULT_POLICIES.map((p) => p.id));
-    expect(byId(policies, "approval_to_merge")).toMatchObject({ enabled: false });
-    expect(byId(policies, "review_to_author")).toMatchObject({ enabled: true });
+    expect(policies.every((p) => p.enabled)).toBe(true);
     expect(options).toMatchObject({
       people: ["sam"],
       fallbackRequester: "ada.admin",
@@ -42,9 +41,6 @@ describe("configurePipeline", () => {
     });
 
     expect(issues).toEqual([]);
-
-    const on = configurePipeline(team({ policies: { merge: { on_approval: true } } }));
-    expect(byId(on.policies, "approval_to_merge_after_feedback")).toMatchObject({ enabled: true });
   });
 
   it("follows policies.pull_ready for the idle pull", () => {
@@ -59,7 +55,6 @@ describe("configurePipeline", () => {
         pipeline: {
           policies: {
             chat_to_addressed: { enabled: false },
-            approval_to_merge: { enabled: true },
             review_to_author: {
               instruction: "Answer {{actor.id}} on #{{pr.number}}.",
               when: { not: { has_label: "$needs_human" } },
@@ -72,7 +67,6 @@ describe("configurePipeline", () => {
 
     expect(issues).toEqual([]);
     expect(byId(policies, "chat_to_addressed")).toMatchObject({ enabled: false });
-    expect(byId(policies, "approval_to_merge")).toMatchObject({ enabled: true });
     const review = byId(policies, "review_to_author");
     expect(review).toMatchObject({
       instruction: "Answer {{actor.id}} on #{{pr.number}}.",

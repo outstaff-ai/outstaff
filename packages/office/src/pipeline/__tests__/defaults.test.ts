@@ -116,28 +116,6 @@ describe("default policies", () => {
     });
   });
 
-  it("approval_to_merge: an allowed approver's bare approval wakes the author to merge", () => {
-    const bare = onPr("pr.review_submitted", { state: "approved", body: "" });
-    expect(judge("approval_to_merge", bare, prWorld())).toEqual([
-      "wake sam (merge) on pr acme-example/shop#9",
-    ]);
-
-    const noted = onPr("pr.review_submitted", { state: "approved", body: "One nit." });
-    expect(judge("approval_to_merge", noted, prWorld())).toEqual({ failed: { has_body: false } });
-  });
-
-  it("approval_to_merge_after_feedback: the author's done round on an approved pull request", () => {
-    const back = onPr("agent.handed_back", { status: "done", kind: "review_feedback" }, SAM);
-    const verdicts = [{ actor: "ada-admin", kind: "human" as const, state: "approved" as const }];
-    expect(judge("approval_to_merge_after_feedback", back, prWorld({ verdicts }))).toEqual([
-      "wake sam (merge) on pr acme-example/shop#9",
-    ]);
-
-    expect(judge("approval_to_merge_after_feedback", back, prWorld())).toEqual({
-      failed: { pr_approved: true },
-    });
-  });
-
   it("merged_closes_ticket: as the author, unless the merge was into another branch or another pull request is open", () => {
     const merged = onPr("pr.merged");
     expect(judge("merged_closes_ticket", merged, prWorld({ state: "merged" }))).toEqual([

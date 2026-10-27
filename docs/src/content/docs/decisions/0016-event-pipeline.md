@@ -26,21 +26,20 @@ Intake, the work state, the store and the scheduler work well and stay.
 
 The default set:
 
-| Event                                                                  | Decision                                                              |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `chat.message` from a human                                            | wake the agent it was written to (`chat`)                             |
-| a human's review or comment on an agent's pull request                 | wake the author (`review_feedback`, or `merged_feedback` once merged) |
-| an allowed approver's bare approval, with `policies.merge.on_approval` | wake the author to merge                                              |
-| `pr.merged` into the default branch, no other pull request of it open  | act for the author: ticket to done                                    |
-| `pr.conflicted`, `pr.behind_base`, `pr.base_merged` on an agent's PR   | wake the author (`rebase`), naming the merge that caused it           |
-| `pr.ci_failed` on an agent's pull request                              | wake the author (`ci_failed`)                                         |
-| `pr.opened`, not a draft                                               | act for the author: ticket to review                                  |
-| `ticket.assigned` or `ticket.created` to an agent, by anyone but it    | wake the assignee (`assigned`)                                        |
-| `ticket.commented` by a human                                          | wake the agent mentioned, else the assignee                           |
-| `ticket.moved` to active by a human                                    | wake the assignee                                                     |
-| `doc.commented` by a human                                             | wake the agent mentioned, else the document's author                  |
-| `agent.handed_back` as done, or as blocked                             | act for the agent: the status move and the hand-back to the requester |
-| `agent.idle`                                                           | wake the agent with its next ready ticket: by priority, then age      |
+| Event                                                                 | Decision                                                              |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `chat.message` from a human                                           | wake the agent it was written to (`chat`)                             |
+| a human's review or comment on an agent's pull request                | wake the author (`review_feedback`, or `merged_feedback` once merged) |
+| `pr.merged` into the default branch, no other pull request of it open | act for the author: ticket to done                                    |
+| `pr.conflicted`, `pr.behind_base`, `pr.base_merged` on an agent's PR  | wake the author (`rebase`), naming the merge that caused it           |
+| `pr.ci_failed` on an agent's pull request                             | wake the author (`ci_failed`)                                         |
+| `pr.opened`, not a draft                                              | act for the author: ticket to review                                  |
+| `ticket.assigned` or `ticket.created` to an agent, by anyone but it   | wake the assignee (`assigned`)                                        |
+| `ticket.commented` by a human                                         | wake the agent mentioned, else the assignee                           |
+| `ticket.moved` to active by a human                                   | wake the assignee                                                     |
+| `doc.commented` by a human                                            | wake the agent mentioned, else the document's author                  |
+| `agent.handed_back` as done, or as blocked                            | act for the agent: the status move and the hand-back to the requester |
+| `agent.idle`                                                          | wake the agent with its next ready ticket: by priority, then age      |
 
 Branch and merge practice (one pull request per ticket, stacking, merge method) is left to each repository's own rules and instructions.
 
@@ -56,7 +55,7 @@ These were decided while reviewing the proof of concept.
 
 - **The office acts as itself.** An `act` is made with the office's own tracker account, on behalf of the agent it names, with a comment saying so. One narrowly scoped account is simpler than giving every agent's credentials to a process that makes changes for it, nothing has to be distributed or kept in step, and it works when agents run nowhere between items (cloud agents that scale to zero). Making changes with each agent's identity, from a daemon in the agent's pod or through a credential broker, stays possible later behind the same executor interface.
 - **The office's write scope is tracker coordination metadata only:** a ticket's status, assignment, labels, parent link and comments that say whom a change was for. On the code host the office is strictly read-only: it writes no labels, comments or anything else there. Status lives in the tracker, and the office never messages people.
-- **The office never merges.** An agent marking a pull request ready enables the platform's auto-merge or merge queue; the repository's rules decide when it merges, and the office only observes `pr.merged`.
+- **The office never merges.** An agent marking a pull request ready enables the platform's auto-merge or merge queue, in the same run and with its own identity (`policies.merge.on_approval` now means agents may do so); the repository's rules decide when it merges, with the repository's merge method, and the office only observes `pr.merged`. An approval wakes nobody to merge: the approval-triggered merge wake is gone, so no model run is spent on an administrative step. On GitHub merge permission comes with `contents: write`, which also allows pushing to any branch, so no office identity ever holds it and the office App stays read-only. A cancelled auto-merge (new commits, a conflict, failing CI) reaches the author through the conflict and CI policies.
 
 ## Status of the proof of concept
 

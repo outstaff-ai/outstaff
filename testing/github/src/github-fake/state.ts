@@ -96,6 +96,7 @@ export function createFakeState(repo: RepoRef): FakeState {
       draft: pr.draft,
       requested_reviewers: [...(pr.requested ?? [])].map((login) => ({ login })),
       updated_at: pr.updatedAt,
+      auto_merge: pr.auto_merge ?? null,
       ...(pr.state === "open" ? (REST_MERGEABLE.get(next) ?? UNKNOWN) : UNKNOWN),
     };
   };

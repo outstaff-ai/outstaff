@@ -45,6 +45,9 @@ type StoredPull = Pick<RestPull, "number" | "title" | "state"> &
 
     /** Taken into the merge queue by `merge-async`; the stub then merges it as the host's queue would. */
     queued?: boolean;
+
+    /** Auto-merge is on: an approval puts it in the merge queue, as the repository's ruleset requires one. */
+    autoMerge?: boolean;
   };
 
 type StoredThread = Omit<FakeStoredThread, "comments"> & {
@@ -197,6 +200,7 @@ export function createGithub(opts: GithubOptions) {
       updated_at: pr.updatedAt,
       mergeable: open ? clean : null,
       mergeable_state: open ? (clean ? "clean" : "dirty") : "unknown",
+      auto_merge: pr.autoMerge ? { merge_method: "merge" } : null,
     };
   };
 
@@ -301,6 +305,11 @@ export function createGithub(opts: GithubOptions) {
       },
     });
 
+    // The host's auto-merge: the approval meets the ruleset, so the pull request joins the merge queue.
+    if (review.state === "APPROVED" && pr.autoMerge && pr.state === "open") {
+      enqueueMerge(pr, { merge_action: "merge_queue" }, pr.login);
+    }
+
     return id;
   }
 
@@ -388,6 +397,21 @@ export function createGithub(opts: GithubOptions) {
     };
   };
 
+  /** The repository's ruleset requires one approving review. */
+  const approved = (pr: StoredPull) =>
+    [...reviews.values()].some((r) => r.prNumber === pr.number && r.state === "APPROVED");
+
+  /** Turns on auto-merge as the bot that asks; the approval then queues the pull request. */
+  const enableAutoMerge = (variables: Json) => {
+    const pr = need(String(variables["id"]).slice("PR_".length));
+    if (!pr || pr.state !== "open" || pr.draft) {
+      return { data: null, errors: [{ message: "Pull request is not in a state for auto-merge" }] };
+    }
+
+    pr.autoMerge = true;
+    return { data: { enablePullRequestAutoMerge: { pullRequest: { id: variables["id"] } } } };
+  };
+
   /** The GraphQL operations the adapter sends, matched on the query text in order; the rest read a thread. */
   const graphqlOps: [
     (query: string) => boolean,
@@ -401,6 +425,7 @@ export function createGithub(opts: GithubOptions) {
       (q) => q.includes("mergeQueue("),
       () => ({ data: { repository: { mergeQueue: { id: "MQ_1" } } } }),
     ],
+    [(q) => q.includes("enablePullRequestAutoMerge"), enableAutoMerge],
     [(q) => q.startsWith("mutation"), resolveThread],
   ];
 
@@ -415,6 +440,10 @@ export function createGithub(opts: GithubOptions) {
   const enqueueMerge = (pr: StoredPull, json: Json, actor: string) => {
     if (json["merge_action"] !== "merge_queue") {
       return { status: 422, body: { message: "merge_action must be merge_queue" } };
+    }
+
+    if (!approved(pr)) {
+      return { status: 405, body: { message: "The ruleset requires an approving review first." } };
     }
 
     pr.queued = true;
@@ -904,6 +933,7 @@ export function createGithub(opts: GithubOptions) {
               head: r.head,
               state: p.merged ? "merged" : p.state,
               queued: p.queued === true,
+              autoMerge: p.autoMerge === true,
               mergeable: r.mergeable,
               forcePushes: p.forcePushes,
               commits: await repo.ahead(p.base, p.head),

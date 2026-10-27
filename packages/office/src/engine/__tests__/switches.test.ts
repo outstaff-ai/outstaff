@@ -133,7 +133,7 @@ describe("policies.hand_back", () => {
 });
 
 describe("policies.merge.on_approval", () => {
-  const approved = async (policies: Record<string, unknown>, approver = "dana") => {
+  const approved = async (policies: Record<string, unknown>) => {
     h = await harness({ team: team(policies) });
     await h.human("Dana");
     const key = await ticket("review");
@@ -144,99 +144,21 @@ describe("policies.merge.on_approval", () => {
     });
 
     await h.poll();
-    await h.vcs.seed.review(REPO, pr.number, approver, "approved", "");
+    await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "");
     await h.poll();
     return { key, pr };
   };
 
-  it("is off by default: an approval schedules nothing", async () => {
+  it("an approval schedules nothing, on or off: the host merges", async () => {
     await approved({});
     expect(await h.items()).toEqual([]);
-  });
 
-  it("schedules a merge item for the author on an allowed approver's approval, and the merge closes the ticket", async () => {
     const { key, pr } = await approved({ merge: { on_approval: true } });
-    const [item] = await h.items("sam");
-    expect(item).toMatchObject({
-      kind: "merge",
-      trigger: "human",
-      subject: { type: "pr", ref: h.ws.prSubject({ repo: REPO, number: pr.number }) },
-    });
+    expect(await h.items()).toEqual([]);
 
+    // The host's auto-merge merges; the office only sees it and moves the ticket.
     await h.vcs.seed.merge(REPO, pr.number, SAM);
     await h.poll();
     expect(await status(key)).toBe("done");
-  });
-
-  const handBack = (pr: { number: number }, status = "done") =>
-    h.deliver({
-      type: "agent.handed_back",
-      subject: { pr: { repo: REPO, number: pr.number } },
-      actor: sam,
-      data: { kind: "review_feedback", status },
-    });
-
-  const kinds = async () => (await h.items("sam")).map((i) => i.kind);
-
-  it("an approval that carries comments schedules only the review round; the merge follows its hand-back", async () => {
-    h = await harness({ team: team({ merge: { on_approval: true } }) });
-    await h.human("Dana");
-    const key = await ticket("review");
-    const pr = await h.vcs.seed.pullRequest(REPO, {
-      title: "Search",
-      head: { ref: `sam/${key.toLowerCase()}` },
-      author: { login: SAM, kind: "agent" },
-    });
-
-    await h.poll();
-    await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "Fine, but rename the flag.");
-    await h.poll();
-    expect(await kinds()).toEqual(["review_feedback"]);
-
-    await handBack(pr, "waiting");
-    expect(await kinds()).toEqual(["review_feedback"]);
-
-    await handBack(pr);
-    expect((await kinds()).toSorted()).toEqual(["merge", "review_feedback"]);
-  });
-
-  it("does not merge after the round when the reviewer asked for changes since", async () => {
-    h = await harness({ team: team({ merge: { on_approval: true } }) });
-    await h.human("Dana");
-    const key = await ticket("review");
-    const pr = await h.vcs.seed.pullRequest(REPO, {
-      title: "Search",
-      head: { ref: `sam/${key.toLowerCase()}` },
-      author: { login: SAM, kind: "agent" },
-    });
-
-    await h.poll();
-    await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "ok, one thing");
-    await h.vcs.seed.review(REPO, pr.number, "dana", "changes_requested", "no, more");
-    await h.poll();
-    await handBack(pr);
-    expect(await kinds()).not.toContain("merge");
-  });
-
-  it("does not merge after the round when the switch is off", async () => {
-    h = await harness({ team: team({}) });
-    await h.human("Dana");
-    const key = await ticket("review");
-    const pr = await h.vcs.seed.pullRequest(REPO, {
-      title: "Search",
-      head: { ref: `sam/${key.toLowerCase()}` },
-      author: { login: SAM, kind: "agent" },
-    });
-
-    await h.poll();
-    await h.vcs.seed.review(REPO, pr.number, "dana", "approved", "ok, one thing");
-    await h.poll();
-    await handBack(pr);
-    expect(await kinds()).toEqual(["review_feedback"]);
-  });
-
-  it("schedules nothing for a disallowed approver", async () => {
-    await approved({ merge: { on_approval: true, approvers: ["human:someone-else"] } });
-    expect(await h.items()).toEqual([]);
   });
 });

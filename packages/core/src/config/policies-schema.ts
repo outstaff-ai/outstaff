@@ -94,7 +94,7 @@ export const policiesSchema = z
           .default(false)
           .meta(
             d(
-              "Let an agent merge its own pull request, with ost pr merge, when an allowed approver approves it. Off by default: without it the verb refuses and nothing is scheduled. Adds the preset rules approved-merge and approved-merge-after-feedback. Needs a vcs adapter with vcs.merge. It never bypasses branch protection or rulesets; the code host stays the final gate.",
+              "Let agents turn on the code host's auto-merge on their pull requests. When an agent marks a pull request ready for review (or opens it ready), the verb also turns on auto-merge, or adds it to the merge queue where the repository has one; the repository's rules (required approvals and checks) then decide when it merges, with the repository's merge method. No agent run and no office identity merges. Also allows ost pr merge. Off by default: nothing is turned on and people merge. Needs a vcs adapter with vcs.merge.",
             ),
           ),
         approvers: z
@@ -103,7 +103,7 @@ export const policiesSchema = z
           .default(["humans"])
           .meta(
             d(
-              "Who may approve a merge: humans (the people in humans, or anyone with write access when humans is omitted), human:<id> (one human, by vcs identity), role:<role> (the agent playing a catalog role) or a handle (an agent, or a human by vcs login). Default humans.",
+              "Who may approve a merge with ost pr merge: humans (the people in humans, or anyone with write access when humans is omitted), human:<id> (one human, by vcs identity), role:<role> (the agent playing a catalog role) or a handle (an agent, or a human by vcs login). Default humans.",
             ),
           ),
         method: z
@@ -111,7 +111,7 @@ export const policiesSchema = z
           .optional()
           .meta(
             d(
-              "How the pull request is merged: queue (the host's merge queue), merge or squash. When omitted, outstaff uses what the repository has: its merge queue, else a method its settings allow.",
+              "How ost pr merge merges: queue (the host's merge queue), merge or squash. Auto-merge always uses the repository's own method. When omitted, outstaff uses what the repository has: its merge queue, else a method its settings allow.",
             ),
           ),
         repos: z
@@ -120,12 +120,16 @@ export const policiesSchema = z
           .optional()
           .meta(
             d(
-              "Names of the repos (from repos) whose pull requests may be merged this way. Default: every repo an agent can write to.",
+              "Names of the repos (from repos) whose pull requests agents may set to merge. Default: every repo an agent can write to.",
             ),
           ),
       })
       .default({ on_approval: false, approvers: ["humans"] })
-      .meta(d("Merging an agent's pull request when an allowed approver approves it (opt-in).")),
+      .meta(
+        d(
+          "Merging agents' pull requests through the code host's auto-merge or merge queue, gated by the repository's own rules (opt-in).",
+        ),
+      ),
     messages: z
       .strictObject({
         max_lines: z
