@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { renderTeamYamlReference, renderValidationCodes } from "../team-reference.js";
+import { renderTeamYamlReference, renderValidationCodes } from "#/docs/team-reference.js";
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), "utf8");
 const example = read("../../../../../examples/acme/.outstaff/team.yaml");

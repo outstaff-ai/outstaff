@@ -15,8 +15,8 @@ import type {
 import type { OfficeClient } from "./office.types.js";
 
 import type { z } from "zod";
-import type { Attachment } from "../runner/types.js";
-import type { ToolStatus } from "../tools/types.js";
+import type { Attachment } from "#/runner/types.js";
+import type { ToolStatus } from "#/tools/types.js";
 
 /** What every verb returns; `text` already contains every URL in `links`. */
 export interface VerbResult {

@@ -1,5 +1,5 @@
 import type { RunRequest } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import type { ItemEnv } from "./loop.types.js";
 
 /** How a round of the runtime ended. */

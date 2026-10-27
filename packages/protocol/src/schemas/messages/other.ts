@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ERROR_CODES } from "../../constants.js";
-import { empty, itemId, message } from "../fields.js";
+import { ERROR_CODES } from "#/constants.js";
+import { empty, itemId, message } from "#/schemas/fields.js";
 
 export const otherMessages = [
   message(

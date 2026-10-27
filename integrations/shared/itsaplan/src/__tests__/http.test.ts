@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ItsaplanHttp } from "../http.js";
-import { Pacer } from "../pacing.js";
-import type { Clock } from "../types.js";
+import { ItsaplanHttp } from "#/http.js";
+import { Pacer } from "#/pacing.js";
+import type { Clock } from "#/types.js";
 
 const clock: Clock = { now: () => 1_000_000, sleep: async () => {} };
 

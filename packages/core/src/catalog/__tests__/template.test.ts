@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { CatalogError } from "../codes.js";
-import { render } from "../template.js";
+import { CatalogError } from "#/catalog/codes.js";
+import { render } from "#/catalog/template.js";
 
 const ctx = {
   team: { name: "acme", empty: "", none: null },

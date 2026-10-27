@@ -1,7 +1,7 @@
 import type { WorkflowEvent } from "@outstaff/core";
-import { clip } from "../log.js";
-import type { StoredEvent } from "../store/types.js";
-import type { Cancel } from "../types.js";
+import { clip } from "#/log.js";
+import type { StoredEvent } from "#/store/types.js";
+import type { Cancel } from "#/types.js";
 import { backoffDelay } from "./backoff.js";
 import type {
   Delivery,

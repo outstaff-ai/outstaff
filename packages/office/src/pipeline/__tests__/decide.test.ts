@@ -1,9 +1,9 @@
 import { createEvaluationContext } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { decide } from "../decide.js";
-import type { PipelineEvent } from "../events.types.js";
-import type { DecideSpec, Policy } from "../policy.types.js";
-import type { PipelineOptions } from "../state.types.js";
+import { decide } from "#/pipeline/decide.js";
+import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { DecideSpec, Policy } from "#/pipeline/policy.types.js";
+import type { PipelineOptions } from "#/pipeline/state.types.js";
 import { event, OPTS, pr, prRef, stateOf, type World } from "./support.js";
 
 const policy = (spec: DecideSpec, instruction?: string): Policy => ({

@@ -1,6 +1,6 @@
-import { PortError, type CanonicalStatus } from "../ports/index.js";
-import type { Comment, Issue, Member, NewIssue, TrackerEvent } from "../ports/index.js";
-import { mentionData } from "../mentions.js";
+import { PortError, type CanonicalStatus } from "#/ports/index.js";
+import type { Comment, Issue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
+import { mentionData } from "#/mentions.js";
 import type { FakeTracker, FakeTrackerOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
 

@@ -1,5 +1,5 @@
-import type { TeamConfig } from "../config/types.js";
-import { POLICY_SWITCHES, policyOn, policyValue } from "../policies/switches.js";
+import type { TeamConfig } from "#/config/types.js";
+import { POLICY_SWITCHES, policyOn, policyValue } from "#/policies/switches.js";
 import { presetRules, type WorkflowPreset } from "./presets.js";
 import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
 import { createStatusMap } from "./status-map.js";

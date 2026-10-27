@@ -1,5 +1,5 @@
-import { evaluate } from "../permissions/index.js";
-import type { RunRequest, RuntimeEvent, UsageEvent } from "../ports/index.js";
+import { evaluate } from "#/permissions/index.js";
+import type { RunRequest, RuntimeEvent, UsageEvent } from "#/ports/index.js";
 import type { FakeRunStep, FakeRuntime } from "./types.js";
 
 export function createFakeRuntime(): FakeRuntime {

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import type { Context, GlobalOptions } from "../../types.js";
-import { validate } from "../validate.js";
+import type { Context, GlobalOptions } from "#/types.js";
+import { validate } from "#/commands/validate.js";
 import { renderAvatar } from "./avatar.js";
 import { capture, parseJson } from "./capture.js";
 import { nextStepsOf, renderNextSteps } from "./next-steps.js";

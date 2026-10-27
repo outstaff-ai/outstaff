@@ -4,12 +4,12 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createFakeOffice } from "../../verbs/office.js";
-import type { ChatMessageResult, FakeOffice } from "../../verbs/office.types.js";
-import type { Offer } from "../../office-client/index.js";
-import { createChatRelay } from "../chat.js";
-import { REPLY_SAFETY_LINES } from "../chat-text.js";
-import type { ChatRelay } from "../chat.types.js";
+import { createFakeOffice } from "#/verbs/office.js";
+import type { ChatMessageResult, FakeOffice } from "#/verbs/office.types.js";
+import type { Offer } from "#/office-client/index.js";
+import { createChatRelay } from "#/runner/chat.js";
+import { REPLY_SAFETY_LINES } from "#/runner/chat-text.js";
+import type { ChatRelay } from "#/runner/chat.types.js";
 
 function team(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({

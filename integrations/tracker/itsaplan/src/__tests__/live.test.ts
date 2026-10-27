@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { envSecretSource, silentLogger, type TeamConfig } from "@outstaff/core";
 import { trackerContract } from "@outstaff/core/contracts";
-import { itsaplanTracker } from "../index.js";
+import { itsaplanTracker } from "#/index.js";
 
 // Runs against a real instance and a scratch project. Set OUTSTAFF_TEST_ITSAPLAN_URL (web address),
 // OUTSTAFF_TEST_ITSAPLAN_PROJECT (project key or team.KEY) and ITSAPLAN_API_KEY (a member of that project);

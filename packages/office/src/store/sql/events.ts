@@ -1,4 +1,4 @@
-import type { Store, NewEvent } from "../types.js";
+import type { Store, NewEvent } from "#/store/types.js";
 import { iso, newId } from "./ids.js";
 import type { StoreInternals } from "./types.js";
 

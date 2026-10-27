@@ -8,7 +8,7 @@ import {
   registerAdapterOptions,
   validateAdapterOptions,
   type TeamConfigInput,
-} from "../../index.js";
+} from "#/index.js";
 
 const valid = (): TeamConfigInput => ({
   version: 1,

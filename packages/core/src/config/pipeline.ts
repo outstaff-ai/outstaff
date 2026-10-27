@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { conditionSchema } from "../workflow/rules.js";
+import { conditionSchema } from "#/workflow/rules.js";
 
 const d = (description: string) => ({ description });
 

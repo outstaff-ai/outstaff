@@ -6,7 +6,7 @@ import type {
   Tracker,
   WorkflowEvent,
 } from "@outstaff/core";
-import type { WorkItem } from "../store/index.js";
+import type { WorkItem } from "#/store/index.js";
 import type { TicketOps, WorkstateCore } from "./core.types.js";
 import { notFound } from "./derive.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";

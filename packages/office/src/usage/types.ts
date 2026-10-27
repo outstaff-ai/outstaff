@@ -1,8 +1,8 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
 import type { MemberUsage, UsageWindowReport } from "@outstaff/protocol";
-import type { UsageSource } from "../scheduler/types.js";
-import type { Store } from "../store/types.js";
-import type { Clock } from "../types.js";
+import type { UsageSource } from "#/scheduler/types.js";
+import type { Store } from "#/store/types.js";
+import type { Clock } from "#/types.js";
 
 export interface UsageTrackerOptions {
   store: Pick<Store, "upsertSubject" | "getSubject">;

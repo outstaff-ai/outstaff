@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import { CONFIG_CODES } from "../config/codes.js";
-import { customIssue } from "../config/issues.js";
+import { CONFIG_CODES } from "#/config/codes.js";
+import { customIssue } from "#/config/issues.js";
 import type { ToolDeclaration } from "./types.js";
 
 const isMap = (v: unknown): v is Record<string, unknown> =>

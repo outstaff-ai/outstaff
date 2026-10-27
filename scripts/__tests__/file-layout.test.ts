@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error plain ESM script without types
 import {
+  climbingImports,
   crossPackageImports,
   integrationDependencies,
   exemption,
@@ -9,6 +10,7 @@ import {
   layoutProblems,
   MAX_LINES,
   relativeSpecifiers,
+  workspaceCycles,
 } from "../file-layout.mjs";
 
 describe("file layout", () => {
@@ -108,6 +110,27 @@ describe("file layout", () => {
     ]);
   });
 
+  it("flags imports in src that climb out of their folder, tests included", () => {
+    const files: Record<string, string> = {
+      "packages/cli/src/commands/a.ts":
+        'import { b } from "./b.js";\nimport { c } from "#/config/c.js";\nimport { d } from "../d.js";\n',
+      "packages/cli/src/commands/__tests__/a.test.ts":
+        'import { a } from "../a.js";\nvi.mock("../../d.js");\nimport { e } from "#/commands/a.js";\n',
+      "integrations/vcs/acme/src/a.ts": 'import pkg from "../package.json";\n',
+      "packages/cli/scripts/gen.ts": 'import { a } from "../src/commands/a.js";\n',
+      "packages/cli/dist/commands/a.js": 'import { d } from "../d.js";\n',
+    };
+
+    const problems = climbingImports(Object.keys(files), (file: string) => files[file]);
+
+    expect(problems).toEqual([
+      "packages/cli/src/commands/a.ts: ../d.js climbs out of its folder; import it as #/d.js",
+      "packages/cli/src/commands/__tests__/a.test.ts: ../a.js climbs out of its folder; import it as #/commands/a.js",
+      "packages/cli/src/commands/__tests__/a.test.ts: ../../d.js climbs out of its folder; import it as #/d.js",
+      "integrations/vcs/acme/src/a.ts: ../package.json climbs out of its folder; import it as #/…",
+    ]);
+  });
+
   it("lets an integration depend only on core, protocol and shared packages", () => {
     const pkg = (name: string, deps: Record<string, string>, dev: Record<string, string> = {}) =>
       JSON.stringify({ name, dependencies: deps, devDependencies: dev });
@@ -140,6 +163,72 @@ describe("file layout", () => {
       "integrations/knowledge/acme/package.json: dependencies names @outstaff/testing.acme",
       "integrations/knowledge/acme/src/k.ts: imports @outstaff/integration.tracker.acme",
       "integrations/knowledge/acme/src/k.ts: imports @outstaff/testing.acme",
+    ]);
+  });
+
+  it("allows only a package and the private test kit its tests use to depend on each other", () => {
+    const manifest = (name: string, fields: Record<string, string[]>, isPrivate = false) =>
+      JSON.stringify({
+        name,
+        ...(isPrivate ? { private: true } : {}),
+        ...Object.fromEntries(
+          Object.entries(fields).map(([field, names]) => [
+            field,
+            Object.fromEntries(names.map((n) => [n, "workspace:*"])),
+          ]),
+        ),
+      });
+
+    const files: Record<string, string> = {
+      "packages/core/package.json": manifest("@outstaff/core", {}),
+      "integrations/vcs/acme/package.json": manifest("@outstaff/integration.vcs.acme", {
+        dependencies: ["@outstaff/core"],
+        devDependencies: ["@outstaff/testing.acme"],
+      }),
+      "testing/acme/package.json": manifest(
+        "@outstaff/testing.acme",
+        { dependencies: ["@outstaff/integration.vcs.acme", "@outstaff/core"] },
+        true,
+      ),
+      "node_modules/x/package.json": manifest("x", { dependencies: ["x"] }),
+    };
+
+    const read = (file: string) => files[file];
+
+    expect(workspaceCycles(Object.keys(files), read)).toEqual([]);
+
+    // A kit that is not private, or a runtime dependency on the kit, makes it a real cycle.
+    const cases: [string, string][] = [
+      [
+        "testing/acme/package.json",
+        manifest("@outstaff/testing.acme", { dependencies: ["@outstaff/integration.vcs.acme"] }),
+      ],
+      [
+        "integrations/vcs/acme/package.json",
+        manifest("@outstaff/integration.vcs.acme", { dependencies: ["@outstaff/testing.acme"] }),
+      ],
+    ];
+
+    for (const [file, text] of cases) {
+      expect(
+        workspaceCycles(Object.keys(files), (f: string) => (f === file ? text : files[f])),
+      ).toEqual([
+        expect.stringMatching(
+          /^workspace dependency cycle: (@outstaff\/integration\.vcs\.acme -> @outstaff\/testing\.acme -> @outstaff\/integration\.vcs\.acme|@outstaff\/testing\.acme -> @outstaff\/integration\.vcs\.acme -> @outstaff\/testing\.acme);/,
+        ),
+      ]);
+    }
+
+    // Two packages that are not kits.
+    const loop = {
+      ...files,
+      "packages/core/package.json": manifest("@outstaff/core", {
+        devDependencies: ["@outstaff/integration.vcs.acme"],
+      }),
+    };
+
+    expect(workspaceCycles(Object.keys(loop), (f: string) => loop[f])).toEqual([
+      "workspace dependency cycle: @outstaff/core -> @outstaff/integration.vcs.acme -> @outstaff/core; only a package and the private test kit (testing/*) its tests use may depend on each other",
     ]);
   });
 });

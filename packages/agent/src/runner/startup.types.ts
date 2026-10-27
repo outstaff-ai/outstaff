@@ -8,10 +8,10 @@ import type {
   SecretSource,
   TeamConfig,
 } from "@outstaff/core";
-import type { OfficeConnection } from "../office-client/index.js";
-import type { ClonedRepo, SyncRepositoriesOptions } from "../repos/index.js";
-import type { MiseRunner, ToolStatus } from "../tools/index.js";
-import type { AgentEnv } from "../verbs/types.js";
+import type { OfficeConnection } from "#/office-client/index.js";
+import type { ClonedRepo, SyncRepositoriesOptions } from "#/repos/index.js";
+import type { MiseRunner, ToolStatus } from "#/tools/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 import type { ChatRelay } from "./chat.types.js";
 import type { ProfilePublisher } from "./types.js";
 import type { WorkLoop } from "./loop.types.js";

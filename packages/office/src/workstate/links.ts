@@ -1,4 +1,4 @@
-import type { Ref, Store } from "../store/index.js";
+import type { Ref, Store } from "#/store/index.js";
 
 export const ROOT: Ref = { type: "workstate", ref: "index" };
 export const prNode = (key: string): Ref => ({ type: "pr", ref: key });

@@ -1,6 +1,6 @@
 import type { RestCheckRun } from "@outstaff/integration.vcs.github";
 import { LOG_ORIGIN } from "./requests.js";
-import type { FakeState, Route } from "../types.js";
+import type { FakeState, Route } from "#/types.js";
 
 /** A pull request and its diff, checks, job logs, statuses, permissions and the event feed. */
 export function repoRoutes(s: FakeState): Route[] {

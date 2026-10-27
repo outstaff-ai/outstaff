@@ -1,7 +1,7 @@
 import type { TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { REPO, teamConfig } from "../../intake/test-support.js";
-import { readFeedback } from "../feedback.js";
+import { REPO, teamConfig } from "#/intake/test-support.js";
+import { readFeedback } from "#/engine/feedback.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
 // Stacked pull requests and blocked retries: a merge into another pull request's branch is not the ticket's end, a

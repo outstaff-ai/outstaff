@@ -1,7 +1,7 @@
 import { describePolicies, formatIssue, resolveWorkflow } from "@outstaff/core";
-import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
-import { table } from "../table.js";
+import { defineCommand } from "#/define.js";
+import { loadTeam } from "#/load.js";
+import { table } from "#/table.js";
 
 export const policies = defineCommand({
   name: "policies",

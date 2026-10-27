@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { createMemoryTraceStore } from "../../memory-traces.js";
-import type { Trace } from "../../trace.types.js";
-import type { Comparison } from "../compare.types.js";
-import { describeDifference, describeOutcome, formatEngine, formatSummary } from "../describe.js";
-import { compareRange, summarize } from "../summary.js";
+import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
+import type { Trace } from "#/pipeline/trace.types.js";
+import type { Comparison } from "#/pipeline/compare/compare.types.js";
+import {
+  describeDifference,
+  describeOutcome,
+  formatEngine,
+  formatSummary,
+} from "#/pipeline/compare/describe.js";
+import { compareRange, summarize } from "#/pipeline/compare/summary.js";
 
 const differ: Comparison = {
   agree: false,

@@ -1,5 +1,5 @@
 import type { WorkSummary } from "@outstaff/protocol";
-import type { ChatMessageResult } from "../verbs/office.types.js";
+import type { ChatMessageResult } from "#/verbs/office.types.js";
 
 type Describe = (work: WorkSummary[]) => string[];
 

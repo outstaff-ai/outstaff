@@ -1,5 +1,5 @@
 import { policyOn, silentLogger } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import { acknowledgeFeedback } from "./reactions.js";
 import { createSessionManager } from "./sessions.js";
 import type { WorkLoopOptions, WorkLoop } from "./loop.types.js";

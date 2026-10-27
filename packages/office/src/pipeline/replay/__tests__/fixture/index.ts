@@ -1,4 +1,4 @@
-import type { ReplayScenario } from "../../replay.types.js";
+import type { ReplayScenario } from "#/pipeline/replay/replay.types.js";
 import { ciFailure, otherPrEvents, reviewRound } from "./reviews.js";
 import { stackedMerge, unrelatedConflict } from "./merges.js";
 import { chat, docComments, handBacks, idle } from "./office.js";

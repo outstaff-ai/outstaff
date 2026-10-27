@@ -1,10 +1,10 @@
 import { createFakeTracker } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
-import type { Act } from "../../decisions.types.js";
-import { createMemoryTraceStore } from "../../memory-traces.js";
-import type { Trace } from "../../trace.types.js";
-import { createOfficeActExecutor } from "../office-executor.js";
-import { actId, recordActResult } from "../results.js";
+import type { Act } from "#/pipeline/decisions.types.js";
+import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
+import type { Trace } from "#/pipeline/trace.types.js";
+import { createOfficeActExecutor } from "#/pipeline/act/office-executor.js";
+import { actId, recordActResult } from "#/pipeline/act/results.js";
 
 const act = (ticket = "ACME-1", note?: string): Act => ({
   type: "act",

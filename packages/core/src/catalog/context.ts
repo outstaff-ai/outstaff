@@ -1,5 +1,5 @@
-import type { TeamConfig } from "../config/types.js";
-import { policyOn, policyValue } from "../policies/switches.js";
+import type { TeamConfig } from "#/config/types.js";
+import { policyOn, policyValue } from "#/policies/switches.js";
 import type {
   CatalogContext,
   ContextExtras,

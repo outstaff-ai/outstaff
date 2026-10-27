@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { clearAdapterOptions, validateAdapterOptions } from "../../config/adapters.js";
-import { parseTeamConfig } from "../../config/parse.js";
-import { validateTeam } from "../../config/validate.js";
-import { buildPolicy, evaluate } from "../../permissions/index.js";
-import { createFakeAdapterRegistry } from "../../fakes/index.js";
+import { clearAdapterOptions, validateAdapterOptions } from "#/config/adapters.js";
+import { parseTeamConfig } from "#/config/parse.js";
+import { validateTeam } from "#/config/validate.js";
+import { buildPolicy, evaluate } from "#/permissions/index.js";
+import { createFakeAdapterRegistry } from "#/fakes/index.js";
 import {
   AdapterRegistry,
   defineAdapter,
@@ -13,7 +13,7 @@ import {
   maskSecrets,
   scrubEnv,
   splitAtLines,
-} from "../index.js";
+} from "#/ports/index.js";
 
 afterEach(() => clearAdapterOptions());
 

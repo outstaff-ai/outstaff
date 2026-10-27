@@ -1,5 +1,5 @@
-import type { TeamConfig } from "../config/types.js";
-import type { Tracker } from "../ports/tracker.js";
+import type { TeamConfig } from "#/config/types.js";
+import type { Tracker } from "#/ports/tracker.js";
 import type { ActTarget } from "./types.js";
 
 /**

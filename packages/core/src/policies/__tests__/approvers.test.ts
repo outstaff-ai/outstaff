@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isApprover } from "../approvers.js";
+import { isApprover } from "#/policies/approvers.js";
 
 const humans = [
   { name: "Ada", identities: { vcs: "ada-gh", tracker: "ada.admin" } },

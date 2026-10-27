@@ -1,6 +1,6 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { trackerOptions } from "../index.js";
+import { trackerOptions } from "#/index.js";
 import {
   API_KEY,
   createStubFetch,
@@ -9,8 +9,8 @@ import {
   type StubRequest,
   team,
 } from "@outstaff/testing.itsaplan";
-import { eventType } from "../events.js";
-import { createItsaplanTracker } from "../tracker.js";
+import { eventType } from "#/events.js";
+import { createItsaplanTracker } from "#/tracker.js";
 
 const setup = () => ({
   project: { id: 1, key: "SHOP", ref: "acme.SHOP", name: "Shop", teamRef: "acme" },

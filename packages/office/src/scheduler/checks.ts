@@ -1,4 +1,4 @@
-import type { Run, WorkItem } from "../store/types.js";
+import type { Run, WorkItem } from "#/store/types.js";
 import type { Checks, ChecksOptions } from "./checks.types.js";
 import {
   CHAT_KIND,

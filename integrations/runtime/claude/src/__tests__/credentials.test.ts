@@ -5,9 +5,9 @@ import { query as sdkQuery } from "@anthropic-ai/claude-agent-sdk";
 import type { RunRequest, RuntimeEvent } from "@outstaff/core";
 import { sampleRunRequest } from "@outstaff/core/contracts";
 import { afterEach, describe, expect, it } from "vitest";
-import { agentSdkOptions } from "../options.js";
-import { createAgentSdkRuntime } from "../runtime.js";
-import { codePolicy, fakeQuery, init, result } from "../testing.js";
+import { agentSdkOptions } from "#/options.js";
+import { createAgentSdkRuntime } from "#/runtime.js";
+import { codePolicy, fakeQuery, init, result } from "#/testing.js";
 
 const bubblewrap = agentSdkOptions.parse({ sandbox: "bubblewrap" });
 const req = (o: Partial<RunRequest> = {}): RunRequest =>

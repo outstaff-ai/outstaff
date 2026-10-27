@@ -14,11 +14,11 @@ import {
   createFakeVcs,
 } from "@outstaff/core/fakes";
 import { afterEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { createOffice } from "../../office.js";
-import type { Office } from "../../office.types.js";
-import { openStore, type Store } from "../../store/index.js";
-import type { Trace } from "../trace.types.js";
+import { manualClock } from "#/clock.js";
+import { createOffice } from "#/office.js";
+import type { Office } from "#/office.types.js";
+import { openStore, type Store } from "#/store/index.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 
 const REPO: RepoRef = { host: "git.acme.example", owner: "acme", name: "app" };
 const SAM_LOGIN = "acme-sam[bot]";

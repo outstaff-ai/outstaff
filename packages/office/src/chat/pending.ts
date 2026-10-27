@@ -1,4 +1,4 @@
-import type { Store } from "../store/types.js";
+import type { Store } from "#/store/types.js";
 import type { PendingReport, ReportQueue } from "./types.js";
 
 /**

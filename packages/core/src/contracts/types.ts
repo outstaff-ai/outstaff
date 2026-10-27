@@ -1,6 +1,6 @@
 import type { TestContext } from "vitest";
-import type { Capability } from "../types.js";
-import type { RepoRef, Vcs } from "../ports/index.js";
+import type { Capability } from "#/types.js";
+import type { RepoRef, Vcs } from "#/ports/index.js";
 import type { VcsSeed } from "./seeds.js";
 
 /** What an adapter's test hands to a contract kit. */

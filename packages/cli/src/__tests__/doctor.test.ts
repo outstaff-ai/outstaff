@@ -15,9 +15,9 @@ import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE, testKey } from "@outstaff/testing.core";
 import { createAgentAuth, createProtocolServer, systemClock } from "@outstaff/office";
 import { createFakeSource } from "@outstaff/testing.office";
-import type { AnyDef } from "../commands/types.js";
-import type { Context } from "../types.js";
-import { run } from "../program.js";
+import type { AnyDef } from "#/commands/types.js";
+import type { Context } from "#/types.js";
+import { run } from "#/program.js";
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-doctor-")));
 let n = 0;

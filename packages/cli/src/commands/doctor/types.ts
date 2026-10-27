@@ -1,6 +1,6 @@
 import type { DoctorCheck, SecretSource, TeamConfig } from "@outstaff/core";
-import type { TeamCatalogs } from "../../types.js";
-import type { Scope } from "../types.js";
+import type { TeamCatalogs } from "#/types.js";
+import type { Scope } from "#/commands/types.js";
 
 export type Status = DoctorCheck["status"];
 

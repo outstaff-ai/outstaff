@@ -1,5 +1,5 @@
-import { PortError } from "../ports/index.js";
-import type { CheckLog, ReviewThread } from "../ports/index.js";
+import { PortError } from "#/ports/index.js";
+import type { CheckLog, ReviewThread } from "#/ports/index.js";
 import type { FakeVcsState, VcsReads } from "./vcs.types.js";
 
 /** What a fake vcs answers: credentials, pull requests, checks, threads, the conversation and events. */

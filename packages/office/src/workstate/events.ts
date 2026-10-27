@@ -1,5 +1,5 @@
 import type { PrRef, PrVerdict, WorkflowEvent } from "@outstaff/core";
-import { awaitsReview } from "../engine/feedback.js";
+import { awaitsReview } from "#/engine/feedback.js";
 import type {
   DocOps,
   Fresh,

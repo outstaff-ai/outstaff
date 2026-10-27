@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect } from "vitest";
 import type { TestContext } from "vitest";
-import type { Capability } from "../types.js";
-import { PortError, type PortErrorCode } from "../ports/index.js";
+import type { Capability } from "#/types.js";
+import { PortError, type PortErrorCode } from "#/ports/index.js";
 import type { ContractSetup, ContractSetupFn } from "./types.js";
 
 /** Fresh subject per test. `define` receives a getter for the current setup. */

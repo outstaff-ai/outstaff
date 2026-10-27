@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { evaluatePipeline } from "../evaluate.js";
-import type { Policy } from "../policy.types.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
+import type { Policy } from "#/pipeline/policy.types.js";
 import { event, OPTS, stateOf } from "./support.js";
 
 const wakeAssignee: Policy = {

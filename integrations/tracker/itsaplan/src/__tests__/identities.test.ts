@@ -1,6 +1,6 @@
 import { WARNING_CODES, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { validateItsaplanIdentities } from "../identities.js";
+import { validateItsaplanIdentities } from "#/identities.js";
 
 const team = (human: string, person?: string) =>
   ({

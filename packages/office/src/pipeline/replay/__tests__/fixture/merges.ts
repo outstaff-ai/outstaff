@@ -1,4 +1,4 @@
-import type { ReplayScenario } from "../../replay.types.js";
+import type { ReplayScenario } from "#/pipeline/replay/replay.types.js";
 import { approved, at, ev, pr, ticket } from "./build.js";
 
 const searchApi = pr(41, "Search API", { by: "sam", head: "sam/acme-123" });

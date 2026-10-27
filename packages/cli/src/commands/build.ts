@@ -8,12 +8,12 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { join } from "node:path";
-import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
-import { defineCommand } from "../define.js";
-import { tryIndex } from "../ejected.js";
-import { hasConflictMarkers } from "../merge.js";
-import { loadTeam } from "../load.js";
-import type { Context, Loaded, TeamCatalogs } from "../types.js";
+import { catalogIssue, loadCatalogs, roleRegistry } from "#/catalogs.js";
+import { defineCommand } from "#/define.js";
+import { tryIndex } from "#/ejected.js";
+import { hasConflictMarkers } from "#/merge.js";
+import { loadTeam } from "#/load.js";
+import type { Context, Loaded, TeamCatalogs } from "#/types.js";
 
 type LoadedTeam = Extract<Loaded, { ok: true }>;
 type RenderCounts = { failed: boolean; people: number; files: number };

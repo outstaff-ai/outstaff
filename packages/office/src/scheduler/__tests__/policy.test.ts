@@ -12,7 +12,7 @@ import {
   staleVerdict,
   trailingStale,
   usageVerdict,
-} from "../policy.js";
+} from "#/scheduler/policy.js";
 
 const th = { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 };
 const q = (

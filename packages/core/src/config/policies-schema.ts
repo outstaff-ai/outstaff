@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { teamCommandsSchema } from "../permissions/schema.js";
+import { teamCommandsSchema } from "#/permissions/schema.js";
 import { CONFIG_CODES } from "./codes.js";
 import { customIssue } from "./issues.js";
 import {

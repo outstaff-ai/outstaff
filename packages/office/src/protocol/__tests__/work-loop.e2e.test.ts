@@ -2,11 +2,11 @@ import { createOfficeConnection, createWorkLoop, type AgentEnv } from "@outstaff
 import { buildPolicy, type TeamConfig } from "@outstaff/core";
 import { createFakeRuntime } from "@outstaff/core/fakes";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { createAgentAuth } from "../auth.js";
-import { createProtocolServer } from "../server.js";
+import { manualClock } from "#/clock.js";
+import { createAgentAuth } from "#/protocol/auth.js";
+import { createProtocolServer } from "#/protocol/server.js";
 import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
-import type { ProtocolServer } from "../types.js";
+import type { ProtocolServer } from "#/protocol/types.js";
 
 const until = async (cond: () => boolean) => {
   for (let i = 0; i < 400 && !cond(); i++) {

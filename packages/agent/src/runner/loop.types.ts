@@ -1,7 +1,7 @@
 import type { Logger, Policy, Runtime, TeamConfig, ToolKind } from "@outstaff/core";
-import type { OfficeConnection } from "../office-client/index.js";
-import type { ClonedRepo, Workspaces } from "../repos/index.js";
-import type { AgentEnv } from "../verbs/types.js";
+import type { OfficeConnection } from "#/office-client/index.js";
+import type { ClonedRepo, Workspaces } from "#/repos/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 import type { ChatRelay } from "./chat.types.js";
 import type { ProfilePublisher, SessionManager, UsageReporter } from "./types.js";
 

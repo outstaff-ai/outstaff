@@ -5,9 +5,9 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { openStore, type Store } from "../../store/index.js";
-import { createOfficePipeline } from "../office-pipeline.js";
+import { manualClock } from "#/clock.js";
+import { openStore, type Store } from "#/store/index.js";
+import { createOfficePipeline } from "#/pipeline/office-pipeline.js";
 
 function team(office: Record<string, unknown>): TeamConfig {
   const r = parseTeamConfig({

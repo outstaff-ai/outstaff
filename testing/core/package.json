@@ -11,6 +11,9 @@
       "default": "./src/index.ts"
     }
   },
+  "imports": {
+    "#/*": "./src/*"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json"
   }

@@ -2,8 +2,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { renderReplayReport } from "../report.js";
-import { runReplay } from "../replay.js";
+import { renderReplayReport } from "#/pipeline/replay/report.js";
+import { runReplay } from "#/pipeline/replay/replay.js";
 import { acmeSetup } from "./acme.js";
 import { ACME_REPLAY } from "./fixture/index.js";
 

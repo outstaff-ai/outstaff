@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Knowledge } from "../ports/index.js";
+import type { Knowledge } from "#/ports/index.js";
 import type { KnowledgeSeed } from "./seeds.js";
 import {
   contractSuite,

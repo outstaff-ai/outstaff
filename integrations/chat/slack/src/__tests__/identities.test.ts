@@ -1,6 +1,6 @@
 import { WARNING_CODES, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { validateSlackIdentities } from "../identities.js";
+import { validateSlackIdentities } from "#/identities.js";
 
 const team = (humans: string[], agent?: string) =>
   ({

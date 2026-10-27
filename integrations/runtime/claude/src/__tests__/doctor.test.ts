@@ -1,10 +1,10 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claudeAgentSdk } from "../adapter.js";
-import { probeSubprocessSandbox } from "../sandbox.js";
-import type { SandboxProbe } from "../types.js";
+import { claudeAgentSdk } from "#/adapter.js";
+import { probeSubprocessSandbox } from "#/sandbox.js";
+import type { SandboxProbe } from "#/types.js";
 
-vi.mock("../sandbox.js", () => ({ probeSubprocessSandbox: vi.fn<() => SandboxProbe>() }));
+vi.mock("#/sandbox.js", () => ({ probeSubprocessSandbox: vi.fn<() => SandboxProbe>() }));
 const probe = vi.mocked(probeSubprocessSandbox);
 const realPlatform = process.platform;
 const onPlatform = (p: NodeJS.Platform) => Object.defineProperty(process, "platform", { value: p });

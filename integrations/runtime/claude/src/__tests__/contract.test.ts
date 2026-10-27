@@ -1,9 +1,9 @@
 import { runtimeContract } from "@outstaff/core/contracts";
 import { describe, expect, it } from "vitest";
-import { claudeAgentSdk } from "../adapter.js";
-import { agentSdkOptions } from "../options.js";
-import { createAgentSdkRuntime } from "../runtime.js";
-import { assistant, fakeQuery, init, rateLimit, result } from "../testing.js";
+import { claudeAgentSdk } from "#/adapter.js";
+import { agentSdkOptions } from "#/options.js";
+import { createAgentSdkRuntime } from "#/runtime.js";
+import { assistant, fakeQuery, init, rateLimit, result } from "#/testing.js";
 
 runtimeContract("claude-agent-sdk (mocked query)", async () => {
   const scripts: string[] = [];

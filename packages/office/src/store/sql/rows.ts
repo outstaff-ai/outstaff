@@ -1,6 +1,6 @@
 import type { Selectable } from "kysely";
-import type { Database } from "../schema.js";
-import type { Conversation, Link, Run, WorkItem } from "../types.js";
+import type { Database } from "#/store/schema.js";
+import type { Conversation, Link, Run, WorkItem } from "#/store/types.js";
 
 export const toItem = (r: Selectable<Database["work_items"]>): WorkItem => ({
   id: r.id,

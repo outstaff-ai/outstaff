@@ -1,13 +1,13 @@
 import { createFakeTracker, createFakeVcs, type FakeTracker } from "@outstaff/core/fakes";
 import type { Tracker, WorkflowEvent } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { teamConfig } from "../../intake/test-support.js";
-import { openStore } from "../../store/open.js";
-import type { Store } from "../../store/types.js";
-import type { ManualClock } from "../../types.js";
-import type { WorkState } from "../types.js";
-import { createWorkState } from "../workstate.js";
+import { manualClock } from "#/clock.js";
+import { teamConfig } from "#/intake/test-support.js";
+import { openStore } from "#/store/open.js";
+import type { Store } from "#/store/types.js";
+import type { ManualClock } from "#/types.js";
+import type { WorkState } from "#/workstate/types.js";
+import { createWorkState } from "#/workstate/workstate.js";
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
 const meta = { source: "tracker" as const, externalId: "e", trusted: true };

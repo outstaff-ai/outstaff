@@ -8,10 +8,10 @@ import {
   installTools,
   renderGlobalMiseToml,
   renderMiseToml,
-} from "../install.js";
-import { verifyTools } from "../verify.js";
-import { withGlobalConfig } from "../testing.js";
-import type { MiseRunner } from "../types.js";
+} from "#/tools/install.js";
+import { verifyTools } from "#/tools/verify.js";
+import { withGlobalConfig } from "#/tools/testing.js";
+import type { MiseRunner } from "#/tools/types.js";
 
 const tools = (version = "1.31.3") =>
   effectiveTools({

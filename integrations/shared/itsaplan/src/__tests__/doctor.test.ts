@@ -1,6 +1,6 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { doctorItsaplan } from "../doctor.js";
+import { doctorItsaplan } from "#/doctor.js";
 
 const team = {
   team: { name: "acme" },

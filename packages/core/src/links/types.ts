@@ -1,5 +1,5 @@
-import type { Knowledge } from "../ports/knowledge.js";
-import type { Tracker } from "../ports/tracker.js";
+import type { Knowledge } from "#/ports/knowledge.js";
+import type { Tracker } from "#/ports/tracker.js";
 
 /**
  * Where the text goes. "chat" and "tracker" surfaces do not link by themselves, so bare keys are linked. On the

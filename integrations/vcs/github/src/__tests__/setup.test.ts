@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { testKey } from "@outstaff/testing.core";
-import { deriveGithub } from "../setup.js";
-import { githubSetupGuide } from "../setup-guide.js";
+import { deriveGithub } from "#/setup.js";
+import { githubSetupGuide } from "#/setup-guide.js";
 
 const team = {
   team: { name: "acme" },

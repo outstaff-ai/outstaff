@@ -1,6 +1,6 @@
-import { fromDecisions } from "../compare/outcomes.js";
-import { describeOp } from "../describe.js";
-import type { Trace } from "../trace.types.js";
+import { fromDecisions } from "#/pipeline/compare/outcomes.js";
+import { describeOp } from "#/pipeline/describe.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 import type { Side } from "./replay.types.js";
 
 /** The pipeline's decisions as shown and as compared; drops are shown but never compared. */

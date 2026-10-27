@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BWRAP_PROBE_ARGS, probeSubprocessSandbox } from "../sandbox.js";
-import type { ProbeResult, ProbeSpawn } from "../types.js";
+import { BWRAP_PROBE_ARGS, probeSubprocessSandbox } from "#/sandbox.js";
+import type { ProbeResult, ProbeSpawn } from "#/types.js";
 
 /** A spawn that answers `bwrap <probe args>` with `probe` and every version check with success. */
 function spawnWith(probe: ProbeResult, missing?: string) {

@@ -1,7 +1,7 @@
 import type { DoctorCheck } from "@outstaff/core";
-import { roleProfile } from "../../catalogs.js";
-import type { Context } from "../../types.js";
-import type { Configured } from "../setup/types.js";
+import { roleProfile } from "#/catalogs.js";
+import type { Context } from "#/types.js";
+import type { Configured } from "#/commands/setup/types.js";
 import { fail } from "./check.js";
 import type { ScopeReport, ScopeTarget } from "./types.js";
 

@@ -1,4 +1,4 @@
-import { composeSnippet, k8sKustomization } from "../../hire-snippets.js";
+import { composeSnippet, k8sKustomization } from "#/hire-snippets.js";
 
 /** What is left to do by hand after `ost hire`. */
 export function nextStepsOf(handle: string, keys: string[]) {

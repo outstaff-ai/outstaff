@@ -1,4 +1,4 @@
-import type { ReplayScenario, ReplayWorld } from "../../replay.types.js";
+import type { ReplayScenario, ReplayWorld } from "#/pipeline/replay/replay.types.js";
 import { at, ev, ROLES, ticket } from "./build.js";
 
 const board: ReplayWorld = {

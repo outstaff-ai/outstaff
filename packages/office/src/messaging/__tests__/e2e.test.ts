@@ -6,11 +6,11 @@ import {
   type OfficeConnection,
 } from "@outstaff/agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createAgentAuth } from "../../protocol/auth.js";
-import { createProtocolServer } from "../../protocol/server.js";
-import type { ProtocolServer } from "../../protocol/types.js";
+import { createAgentAuth } from "#/protocol/auth.js";
+import { createProtocolServer } from "#/protocol/server.js";
+import type { ProtocolServer } from "#/protocol/types.js";
 import { harness, storeSource } from "./test-support.js";
-import { createMessaging } from "../messaging.js";
+import { createMessaging } from "#/messaging/messaging.js";
 
 type Harness = Awaited<ReturnType<typeof harness>>;
 

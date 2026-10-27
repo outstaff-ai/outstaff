@@ -1,5 +1,5 @@
 import type { JournalLine, Link, OfferContext, OfferedWorkItem } from "@outstaff/protocol";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import { attachmentLines } from "./attachments.js";
 import { conversationLines, feedbackLines } from "./prompt-feedback.js";
 import { originLines } from "./prompt-origin.js";

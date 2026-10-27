@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Chat, ChatMessage } from "../ports/index.js";
+import type { Chat, ChatMessage } from "#/ports/index.js";
 import type { ChatSeed } from "./seeds.js";
 import { contractSuite, expectPortError, requireCapability, requireSeed } from "./harness.js";
 import type { ContractSetupFn } from "./types.js";

@@ -1,6 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it } from "vitest";
-import { mapMessage, parseUsage } from "../messages.js";
+import { mapMessage, parseUsage } from "#/messages.js";
 
 const msg = (x: unknown) => x as SDKMessage;
 const map = (x: unknown, signal?: AbortSignal) => mapMessage(msg(x), { lastText: "" }, signal);

@@ -1,6 +1,6 @@
 import type { LinkErrorCode, LinkRequest, LinkResponse } from "@outstaff/protocol";
-import type { Trace } from "../pipeline/trace.types.js";
-import { compareRange } from "../pipeline/compare/summary.js";
+import type { Trace } from "#/pipeline/trace.types.js";
+import { compareRange } from "#/pipeline/compare/summary.js";
 import { findEvents } from "./events.js";
 import { findItem } from "./item.js";
 import { findItems } from "./items.js";

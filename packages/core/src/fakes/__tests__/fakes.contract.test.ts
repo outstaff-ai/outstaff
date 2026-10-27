@@ -5,7 +5,7 @@ import {
   runtimeContract,
   trackerContract,
   vcsContract,
-} from "../../contracts/index.js";
+} from "#/contracts/index.js";
 import {
   createFakeAvatars,
   createFakeChat,
@@ -13,7 +13,7 @@ import {
   createFakeRuntime,
   createFakeTracker,
   createFakeVcs,
-} from "../index.js";
+} from "#/fakes/index.js";
 
 trackerContract("fake", async () => {
   const subject = createFakeTracker();

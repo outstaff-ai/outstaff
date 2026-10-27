@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { toConfigIssues } from "../config/issues.js";
-import { parseYaml } from "../config/locate.js";
+import { toConfigIssues } from "#/config/issues.js";
+import { parseYaml } from "#/config/locate.js";
 import { CATALOG_CODES } from "./codes.js";
 import type { Loading } from "./loading.js";
 import { roleSchema } from "./role.js";

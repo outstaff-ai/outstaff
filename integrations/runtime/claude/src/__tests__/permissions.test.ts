@@ -1,7 +1,7 @@
 import { buildPolicy } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import type { Decision } from "@outstaff/core";
-import { decide, permissionHook, toToolCall } from "../permissions.js";
+import { decide, permissionHook, toToolCall } from "#/permissions.js";
 
 const layout = {
   home: "/home/agent",

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { actOpSchema } from "../acts.js";
-import { feedbackSchema } from "../schemas/index.js";
+import { actOpSchema } from "#/acts.js";
+import { feedbackSchema } from "#/schemas/index.js";
 import { comparisonSchema, engineSchema } from "./comparison.js";
 import { time } from "./fields.js";
 

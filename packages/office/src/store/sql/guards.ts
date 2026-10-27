@@ -1,4 +1,4 @@
-import type { Store, Pause } from "../types.js";
+import type { Store, Pause } from "#/store/types.js";
 import { iso } from "./ids.js";
 import type { StoreInternals } from "./types.js";
 

@@ -1,4 +1,4 @@
-import type { ActTarget } from "../decisions.types.js";
+import type { ActTarget } from "#/pipeline/decisions.types.js";
 
 /**
  * What one side did about an event, in a shape both sides share: the engine's effects and the pipeline's decisions

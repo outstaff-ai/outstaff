@@ -12,9 +12,9 @@ import {
   type Profile,
   type RulePack,
   type ToolCall,
-} from "../../index.js";
+} from "#/index.js";
 import { parse } from "yaml";
-import { parseTeamConfig } from "../../config/parse.js";
+import { parseTeamConfig } from "#/config/parse.js";
 
 const layout: Layout = {
   home: "/home/agent",

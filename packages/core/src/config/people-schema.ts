@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { toolsSchema } from "../permissions/schema.js";
+import { toolsSchema } from "#/permissions/schema.js";
 import { networkSchema } from "./network.js";
 import { d, SLUG } from "./schema-meta.js";
 

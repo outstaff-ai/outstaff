@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { CONFIG_CODES } from "../config/codes.js";
-import { customIssue } from "../config/issues.js";
+import { CONFIG_CODES } from "#/config/codes.js";
+import { customIssue } from "#/config/issues.js";
 import { PROFILES } from "./constants.js";
 import { checkOptions } from "./tool-options.js";
 

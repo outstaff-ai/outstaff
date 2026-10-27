@@ -1,5 +1,5 @@
 import { PortError, type RepoRef } from "@outstaff/core";
-import { runGit } from "../repos/git.js";
+import { runGit } from "#/repos/git.js";
 import { resolveRepo } from "./support.js";
 import type { AgentEnv, VerbContext } from "./types.js";
 

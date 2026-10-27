@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseRepoUrl, envSecretSource, silentLogger, type TeamConfig } from "@outstaff/core";
 import { vcsContract } from "@outstaff/core/contracts";
-import { githubVcs } from "../index.js";
+import { githubVcs } from "#/index.js";
 
 // Runs against a scratch repository with real Apps. Set OUTSTAFF_TEST_GITHUB_REPO (github.com/owner/name)
 // plus GH_OFFICE_APP_ID and GH_OFFICE_APP_PRIVATE_KEY (or _FILE) for the read-only office App installed on it.

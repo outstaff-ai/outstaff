@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { feedbackFor } from "../feedback.js";
+import { feedbackFor } from "#/pipeline/feedback.js";
 import { event } from "./support.js";
 
 describe("feedbackFor", () => {

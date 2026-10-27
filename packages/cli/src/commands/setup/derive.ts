@@ -11,8 +11,8 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { envSecretSource, type SecretSource, type TeamConfig } from "@outstaff/core";
-import type { Context } from "../../types.js";
-import type { Scope } from "../types.js";
+import type { Context } from "#/types.js";
+import type { Scope } from "#/commands/types.js";
 import type { Configured, DeriveReport, DeriveRun } from "./types.js";
 
 /** Prefixes of the GitHub App key sets, whose downloaded `<slug>.<date>.private-key.pem` can be picked up. */

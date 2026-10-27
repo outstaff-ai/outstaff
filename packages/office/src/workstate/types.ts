@@ -9,9 +9,9 @@ import type {
   WorkflowEvent,
   WorkflowState,
 } from "@outstaff/core";
-import type { Clock } from "../types.js";
-import type { IntakeMeta } from "../intake/index.js";
-import type { Store } from "../store/index.js";
+import type { Clock } from "#/types.js";
+import type { IntakeMeta } from "#/intake/index.js";
+import type { Store } from "#/store/index.js";
 
 export type CiState = "none" | "pending" | "success" | "failure";
 

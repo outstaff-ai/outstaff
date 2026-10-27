@@ -1,6 +1,6 @@
 import { createFakeChat } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
-import { ProtocolError } from "../../protocol/errors.js";
+import { ProtocolError } from "#/protocol/errors.js";
 import { harness } from "./test-support.js";
 
 const rejection = async (p: Promise<unknown>) => {
@@ -357,7 +357,7 @@ describe("mirroring", () => {
 
   it("reads the channel from office.channel in team.yaml", async () => {
     const h = await harness({ office: { channel: "C-team" } });
-    const messaging = (await import("../messaging.js")).createMessaging({
+    const messaging = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
       scheduler: h.scheduler,
       team: h.team,
@@ -372,7 +372,7 @@ describe("mirroring", () => {
   it("comments on the ticket when there is no channel", async () => {
     const h = await harness();
     const issue = await h.tracker.createIssue({ title: "Cart", body: "" });
-    const m = (await import("../messaging.js")).createMessaging({
+    const m = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
       scheduler: h.scheduler,
       team: h.team,
@@ -404,7 +404,7 @@ describe("mirroring", () => {
     const h = await harness();
     const issue = await h.tracker.createIssue({ title: "Cart", body: "" });
     const failing = { ...h.chat, post: () => Promise.reject(new Error("down")) };
-    const m = (await import("../messaging.js")).createMessaging({
+    const m = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
       scheduler: h.scheduler,
       team: h.team,
@@ -417,7 +417,7 @@ describe("mirroring", () => {
     await m.ask("sam", { to: "mira", question: "Q?", workItemId: item.id });
     expect(await h.tracker.listComments(issue.key)).toHaveLength(1);
     const brokenTracker = { ...h.tracker, comment: () => Promise.reject(new Error("down")) };
-    const m2 = (await import("../messaging.js")).createMessaging({
+    const m2 = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
       scheduler: h.scheduler,
       team: h.team,

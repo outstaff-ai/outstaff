@@ -1,5 +1,5 @@
 import { PortError, type RepoRef, type Vcs } from "@outstaff/core";
-import { permissionLevel } from "../mapping.js";
+import { permissionLevel } from "#/mapping.js";
 import { OPTIONAL_WRITE, PERMISSIONS, ownAppToken, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 

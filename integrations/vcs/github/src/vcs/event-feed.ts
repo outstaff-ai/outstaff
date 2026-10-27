@@ -1,8 +1,8 @@
 import type { RepoRef, UnmappedEvent } from "@outstaff/core";
-import { nextLink } from "../http.js";
-import type { HttpResult } from "../types.js";
-import { toVcsEvent } from "../event-mapping.js";
-import type { Cursor, RestEvent } from "../api.types.js";
+import { nextLink } from "#/http.js";
+import type { HttpResult } from "#/types.js";
+import { toVcsEvent } from "#/event-mapping.js";
+import type { Cursor, RestEvent } from "#/api.types.js";
 import { repoPath } from "./context.js";
 import type { FeedPosition, FoundEvent, GithubContext, RepoPoll } from "./types.js";
 

@@ -1,8 +1,8 @@
 import { homedir } from "node:os";
 import { loadToolsets, runMise, verifyTools } from "@outstaff/agent";
 import { effectiveTools, renderPerson, type DoctorCheck, type TeamConfig } from "@outstaff/core";
-import { stockCatalogDir } from "../../catalogs.js";
-import type { Context, TeamCatalogs } from "../../types.js";
+import { stockCatalogDir } from "#/catalogs.js";
+import type { Context, TeamCatalogs } from "#/types.js";
 import { plural } from "./check.js";
 import type { Status } from "./types.js";
 

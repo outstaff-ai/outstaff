@@ -1,4 +1,4 @@
-import type { Db } from "../schema.js";
+import type { Db } from "#/store/schema.js";
 
 export interface StoreInternals {
   db: Db;

@@ -5,10 +5,10 @@ import {
   type WorkflowEvent,
   type WorkflowState,
 } from "@outstaff/core";
-import { awaitsReview } from "../../engine/feedback.js";
-import type { PipelineEvent } from "../events.types.js";
-import type { Outcome } from "../compare/compare.types.js";
-import { fromEffect, KIND_ALIASES } from "../compare/outcomes.js";
+import { awaitsReview } from "#/engine/feedback.js";
+import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { Outcome } from "#/pipeline/compare/compare.types.js";
+import { fromEffect, KIND_ALIASES } from "#/pipeline/compare/outcomes.js";
 import type { ReplaySetup, Side } from "./replay.types.js";
 
 const TODAY_TYPES: ReadonlySet<string> = new Set(WORKFLOW_EVENT_TYPES);

@@ -1,9 +1,9 @@
 import type { Knowledge, Logger, TeamConfig, Tracker, WorkflowEvent } from "@outstaff/core";
-import type { EffectOutcome } from "../engine/types.js";
-import type { Clock } from "../types.js";
-import type { Scheduler } from "../scheduler/index.js";
-import type { Store } from "../store/types.js";
-import type { WorkState } from "../workstate/index.js";
+import type { EffectOutcome } from "#/engine/types.js";
+import type { Clock } from "#/types.js";
+import type { Scheduler } from "#/scheduler/index.js";
+import type { Store } from "#/store/types.js";
+import type { WorkState } from "#/workstate/index.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { PipelineRunner } from "./shadow.types.js";
 import type { TraceStore } from "./trace.types.js";

@@ -1,4 +1,4 @@
-import type { PrRecord } from "../workstate/index.js";
+import type { PrRecord } from "#/workstate/index.js";
 
 /** What deriving needs of a pull request in the work state. */
 export type PrSnapshot = Pick<

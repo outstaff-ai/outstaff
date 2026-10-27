@@ -7,8 +7,8 @@ import type {
   QueuedReport,
   WorkSummary,
 } from "@outstaff/protocol";
-import type { Offer } from "../office-client/index.js";
-import type { ChatReportKind, OfficeClient } from "../verbs/office.types.js";
+import type { Offer } from "#/office-client/index.js";
+import type { ChatReportKind, OfficeClient } from "#/verbs/office.types.js";
 import type { Attachment, ProfilePublisher } from "./types.js";
 
 /** What the relay uses of the office connection. */

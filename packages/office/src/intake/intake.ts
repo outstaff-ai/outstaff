@@ -9,7 +9,7 @@ import { pollSources, webhookParsers } from "./sources.js";
 import { createTrust } from "./trust.js";
 import type { BackoffOptions, Intake, IntakeOptions, WebhookServer } from "./types.js";
 import { createWebhookServer } from "./webhook.js";
-import { defined } from "../defined.js";
+import { defined } from "#/defined.js";
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_STALE_POLL_MINUTES = 10;

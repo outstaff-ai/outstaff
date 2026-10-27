@@ -1,6 +1,6 @@
 import { ADAPTER_PORTS } from "./adapters.js";
 import { CONFIG_CODES } from "./codes.js";
-import type { Capability } from "../types.js";
+import type { Capability } from "#/types.js";
 import type {
   ConfigIssue,
   ConfigWarning,

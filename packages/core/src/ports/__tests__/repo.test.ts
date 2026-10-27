@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { PortError } from "../errors.js";
-import { parseRepoUrl } from "../repo.js";
+import { PortError } from "#/ports/errors.js";
+import { parseRepoUrl } from "#/ports/repo.js";
 
 describe("parseRepoUrl", () => {
   it.each([

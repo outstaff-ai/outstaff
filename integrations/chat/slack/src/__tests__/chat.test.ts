@@ -1,11 +1,11 @@
 import type { ChatMessage } from "@outstaff/core";
 import { PortError } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { slackChat } from "../index.js";
-import { createSlackChat } from "../chat.js";
+import { slackChat } from "#/index.js";
+import { createSlackChat } from "#/chat.js";
 import { silentLogger } from "@outstaff/core";
-import { secretMap, slackWith, teamWith } from "../testing/harness.js";
-import { BOT_USER, slackError } from "../testing/slack-fake.js";
+import { secretMap, slackWith, teamWith } from "#/testing/harness.js";
+import { BOT_USER, slackError } from "#/testing/slack-fake.js";
 
 async function started(humans?: string[]) {
   const s = slackWith(teamWith(humans));

@@ -1,5 +1,5 @@
-import type { Offer } from "../office-client/index.js";
-import { headBranchOf, type ClonedRepo, type Workspace } from "../repos/index.js";
+import type { Offer } from "#/office-client/index.js";
+import { headBranchOf, type ClonedRepo, type Workspace } from "#/repos/index.js";
 import type { DocPath, WorkPromptOptions } from "./prompt.types.js";
 
 function repoLine(r: ClonedRepo): string {

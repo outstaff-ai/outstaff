@@ -1,5 +1,5 @@
 import { PortError, type UnmappedEvent, type Vcs } from "@outstaff/core";
-import type { Cursor } from "../api.types.js";
+import type { Cursor } from "#/api.types.js";
 import { feedPosition, pollRepo } from "./event-feed.js";
 import type { FoundEvent, GithubContext } from "./types.js";
 

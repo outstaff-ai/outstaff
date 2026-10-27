@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextReadyTicket } from "../idle.js";
+import { nextReadyTicket } from "#/pipeline/idle.js";
 
 describe("nextReadyTicket", () => {
   it("picks the ticket that entered ready first, by time only", () => {

@@ -1,5 +1,5 @@
 import type { LinkSource, LinkTrace } from "@outstaff/protocol";
-import type { Trace } from "../pipeline/trace.types.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 import type { SubjectLinks } from "./link.types.js";
 
 const SOURCES: Record<string, LinkSource> = {

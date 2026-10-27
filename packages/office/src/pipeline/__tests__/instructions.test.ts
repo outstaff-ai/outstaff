@@ -4,7 +4,7 @@ import {
   instructionProblem,
   instructionVariables,
   renderInstruction,
-} from "../instructions.js";
+} from "#/pipeline/instructions.js";
 import { ctxOf, event, pr, prRef } from "./support.js";
 
 describe("instruction variables", () => {

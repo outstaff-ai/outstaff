@@ -1,10 +1,10 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import type { SetupStep } from "@outstaff/core";
 import { join, relative } from "node:path";
-import { loadCatalogs, roleProfile } from "../../catalogs.js";
-import { shown } from "../../project.js";
-import type { Context } from "../../types.js";
-import { renderEnvExample, sections } from "../setup-template.js";
+import { loadCatalogs, roleProfile } from "#/catalogs.js";
+import { shown } from "#/project.js";
+import type { Context } from "#/types.js";
+import { renderEnvExample, sections } from "#/commands/setup-template.js";
 import { renderGuide } from "./guide.js";
 import type { Configured, SetupGuide, SetupPlan } from "./types.js";
 

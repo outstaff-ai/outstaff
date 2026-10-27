@@ -1,6 +1,6 @@
 import type { Logger, TeamConfig, WorkflowEvent } from "@outstaff/core";
-import type { EffectOutcome } from "../engine/types.js";
-import type { Clock } from "../types.js";
+import type { EffectOutcome } from "#/engine/types.js";
+import type { Clock } from "#/types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { PipelineState } from "./state.types.js";
 import type { Trace, TraceStore } from "./trace.types.js";

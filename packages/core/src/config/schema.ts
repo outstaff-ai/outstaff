@@ -1,7 +1,7 @@
 import { valid } from "semver";
 import { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
-import { toolsSchema } from "../permissions/schema.js";
+import { toolsSchema } from "#/permissions/schema.js";
 import { customIssue } from "./issues.js";
 import { integrationsSchema } from "./integrations-schema.js";
 import { roleOverridesSchema } from "./network.js";
@@ -12,7 +12,7 @@ import { d, slug, SLUG } from "./schema-meta.js";
 import { workflowSchema } from "./workflow-schema.js";
 import { linkSchema } from "./link.js";
 import { pipelineSchema } from "./pipeline.js";
-import { checkWorkflowConfig } from "../workflow/validate.js";
+import { checkWorkflowConfig } from "#/workflow/validate.js";
 
 const GRANT_KEY = /^(\*|kind:(primary|baseline|infra|other)|[a-z][a-z0-9-]*)$/;
 

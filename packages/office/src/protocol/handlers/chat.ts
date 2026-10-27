@@ -1,6 +1,6 @@
-import type { ChatDesk } from "../source.types.js";
-import { ProtocolError } from "../errors.js";
-import type { ProtocolServerOptions, RequestHandlers } from "../types.js";
+import type { ChatDesk } from "#/protocol/source.types.js";
+import { ProtocolError } from "#/protocol/errors.js";
+import type { ProtocolServerOptions, RequestHandlers } from "#/protocol/types.js";
 
 function desk(opts: ProtocolServerOptions): ChatDesk {
   if (!opts.chat) {

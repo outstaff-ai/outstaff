@@ -1,8 +1,8 @@
 import type { Rule, StaticWorkflowData, WorkflowOptions } from "@outstaff/core";
-import type { Outcome } from "../compare/compare.types.js";
-import type { PipelineEvent } from "../events.types.js";
-import type { Policy } from "../policy.types.js";
-import type { PipelineOptions, ReadyTicket } from "../state.types.js";
+import type { Outcome } from "#/pipeline/compare/compare.types.js";
+import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { Policy } from "#/pipeline/policy.types.js";
+import type { PipelineOptions, ReadyTicket } from "#/pipeline/state.types.js";
 
 /** The world after an event: the workflow rules' static state plus the agents' ready tickets. */
 export interface ReplayWorld extends StaticWorkflowData {

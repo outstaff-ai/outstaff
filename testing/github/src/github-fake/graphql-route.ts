@@ -3,7 +3,7 @@ import type {
   RollupContext,
   ThreadsData,
 } from "@outstaff/integration.vcs.github";
-import type { FakeState, Route, StoredPull, StubRequest } from "../types.js";
+import type { FakeState, Route, StoredPull, StubRequest } from "#/types.js";
 import { actorOf, toNode } from "./requests.js";
 
 type Operation = (s: FakeState, r: StubRequest) => unknown;

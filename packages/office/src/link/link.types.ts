@@ -1,7 +1,7 @@
 import type { Logger, PrRef, TeamConfig } from "@outstaff/core";
 import type { LinkPayloadOf } from "@outstaff/protocol";
-import type { Store, WorkItemStatus } from "../store/types.js";
-import type { Clock } from "../types.js";
+import type { Store, WorkItemStatus } from "#/store/types.js";
+import type { Clock } from "#/types.js";
 
 export type LinkStore = Pick<
   Store,

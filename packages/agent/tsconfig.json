@@ -2,11 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "types": ["node"],
-    "noEmit": true,
-    "paths": {
-      "@outstaff/agent": ["./src/index.ts"],
-      "@outstaff/testing.agent": ["../../testing/agent/src/index.ts"]
-    }
+    "noEmit": true
   },
   "include": ["src"]
 }

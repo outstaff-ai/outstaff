@@ -1,6 +1,6 @@
-import { WAKE_SUBJECT } from "../pipeline/live/wake.js";
-import type { WakeReason } from "../pipeline/live/live.types.js";
-import type { WorkItem } from "../store/types.js";
+import { WAKE_SUBJECT } from "#/pipeline/live/wake.js";
+import type { WakeReason } from "#/pipeline/live/live.types.js";
+import type { WorkItem } from "#/store/types.js";
 import type { LinkPerson, ScheduledBy } from "@outstaff/protocol";
 import type { OfficeLinkOptions } from "./link.types.js";
 

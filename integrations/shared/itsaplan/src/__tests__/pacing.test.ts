@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { ItsaplanHttp } from "../http.js";
-import { Pacer } from "../pacing.js";
-import type { Clock } from "../types.js";
+import { ItsaplanHttp } from "#/http.js";
+import { Pacer } from "#/pacing.js";
+import type { Clock } from "#/types.js";
 
 /** Virtual time: sleeping moves the clock, nothing really waits. */
 function virtualClock(): Clock & { at: () => number } {

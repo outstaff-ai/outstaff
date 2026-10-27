@@ -1,4 +1,4 @@
-import type { TeamConfig } from "../config/types.js";
+import type { TeamConfig } from "#/config/types.js";
 import type { ApproverCandidate } from "./types.js";
 
 const same = (a: string | undefined, b: string) =>

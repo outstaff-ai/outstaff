@@ -7,7 +7,7 @@ import type {
   PayloadOf,
   QueuedReport,
 } from "@outstaff/protocol";
-import type { OfficeClient } from "../verbs/office.types.js";
+import type { OfficeClient } from "#/verbs/office.types.js";
 
 export type Offer = PayloadOf<"offer">;
 

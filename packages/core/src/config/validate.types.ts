@@ -1,4 +1,4 @@
-import type { Capability } from "../types.js";
+import type { Capability } from "#/types.js";
 import type { TeamConfig, ValidationContext } from "./types.js";
 
 /** A team being validated, with what is known about its adapters and catalog. */

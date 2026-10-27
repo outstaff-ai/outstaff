@@ -1,5 +1,5 @@
-import { defineCommand } from "../define.js";
-import type { Context } from "../types.js";
+import { defineCommand } from "#/define.js";
+import type { Context } from "#/types.js";
 
 /**
  * `@outstaff/office` is an optional peer of the CLI: the agent image ships the CLI without it, so its database drivers

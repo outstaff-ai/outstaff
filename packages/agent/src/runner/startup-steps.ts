@@ -19,7 +19,7 @@ import {
   type Policy,
 } from "@outstaff/core";
 import type { StartupOptions } from "./startup.types.js";
-import { installTools, type ToolStatus } from "../tools/index.js";
+import { installTools, type ToolStatus } from "#/tools/index.js";
 import { StartupError } from "./startup-error.js";
 
 /** The runtime starts its children with the process environment, so the shims go on this process's PATH. */

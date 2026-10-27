@@ -1,10 +1,10 @@
 import type { EventEmitter } from "node:events";
 import { silentLogger, type ChatMessage } from "@outstaff/core";
 import { describe, expect, it, vi } from "vitest";
-import { createSlackChat } from "../chat.js";
-import { createSocketModeSocket } from "../socket.js";
-import { createFakeSlack } from "../testing/slack-fake.js";
-import { secretMap } from "../testing/harness.js";
+import { createSlackChat } from "#/chat.js";
+import { createSocketModeSocket } from "#/socket.js";
+import { createFakeSlack } from "#/testing/slack-fake.js";
+import { secretMap } from "#/testing/harness.js";
 
 interface Client extends EventEmitter {
   options: { appToken: string };

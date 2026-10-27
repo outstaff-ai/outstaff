@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MEMBER_STATUSES } from "../constants.js";
+import { MEMBER_STATUSES } from "#/constants.js";
 
 export const usageWindowSchema = z.strictObject({
   name: z.string().min(1).max(50).describe("Which limit, for example five_hour or seven_day."),

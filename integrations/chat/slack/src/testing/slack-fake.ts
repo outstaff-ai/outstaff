@@ -1,6 +1,6 @@
 import type { ChatSeed, InboundMessage } from "@outstaff/core/contracts";
 import type { ChatMessage } from "@outstaff/core";
-import type { SlackEvent, SlackFile, SlackMessage, SlackUser, SlackWeb } from "../api.js";
+import type { SlackEvent, SlackFile, SlackMessage, SlackUser, SlackWeb } from "#/api.js";
 import type { FakeSlack } from "./types.js";
 
 export const BOT_USER = "U-bot";

@@ -1,7 +1,7 @@
 import type { Logger } from "@outstaff/core";
 import type { ErrorCode, MessageType, PayloadOf } from "@outstaff/protocol";
 import type { WebSocket } from "ws";
-import type { Clock } from "../types.js";
+import type { Clock } from "#/types.js";
 import type { ChatDesk, DocLinks, Messaging, TicketPrs, WorkSource } from "./source.types.js";
 
 export interface AgentAuth {

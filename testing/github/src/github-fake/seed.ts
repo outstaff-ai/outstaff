@@ -1,5 +1,5 @@
 import type { NewSeedPullRequest, VcsSeed } from "@outstaff/core/contracts";
-import type { FakeState, FakeVcsRef, StoredPull } from "../types.js";
+import type { FakeState, FakeVcsRef, StoredPull } from "#/types.js";
 
 /** The login a seeded author has on the host: an agent acts through its App's bot. */
 const seedLogin = (author: NewSeedPullRequest["author"]): string =>

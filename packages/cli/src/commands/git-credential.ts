@@ -11,10 +11,10 @@ import {
   type Profile,
   type TeamConfig,
 } from "@outstaff/core";
-import { loadCatalogs } from "../catalogs.js";
-import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
-import type { Context, GlobalOptions, TeamCatalogs } from "../types.js";
+import { loadCatalogs } from "#/catalogs.js";
+import { defineCommand } from "#/define.js";
+import { loadTeam } from "#/load.js";
+import type { Context, GlobalOptions, TeamCatalogs } from "#/types.js";
 import { Failure, defaultRegistry } from "./verbs.js";
 
 type CredentialHelper = ReturnType<typeof createCredentialHelper>;

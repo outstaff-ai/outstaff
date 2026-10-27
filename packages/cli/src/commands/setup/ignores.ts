@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { isAbsolute, relative } from "node:path";
-import type { SecretsLocation } from "../../types.js";
+import type { SecretsLocation } from "#/types.js";
 
 /** git's own answer, so every ignore rule and nesting is honoured. Not a repository: nothing can be committed, so nothing to check. */
 function isIgnored(dir: string, path: string): boolean {

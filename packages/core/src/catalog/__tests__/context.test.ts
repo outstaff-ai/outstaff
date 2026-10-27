@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseTeamConfig } from "../../config/parse.js";
+import { parseTeamConfig } from "#/config/parse.js";
 import { readAcmeTeam } from "@outstaff/testing.core";
 import { parse } from "yaml";
-import { buildContext } from "../context.js";
-import { render } from "../template.js";
+import { buildContext } from "#/catalog/context.js";
+import { render } from "#/catalog/template.js";
 
 const acme = (() => {
   const r = parseTeamConfig(parse(readAcmeTeam()));

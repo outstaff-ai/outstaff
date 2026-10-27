@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { defineCommand } from "../define.js";
-import { EJECTABLE, badCatalogPath, baseFile, tryIndex } from "../ejected.js";
-import { unifiedDiff } from "../merge.js";
-import { openTeam } from "../open-team.js";
-import type { Context } from "../types.js";
+import { defineCommand } from "#/define.js";
+import { EJECTABLE, badCatalogPath, baseFile, tryIndex } from "#/ejected.js";
+import { unifiedDiff } from "#/merge.js";
+import { openTeam } from "#/open-team.js";
+import type { Context } from "#/types.js";
 
 type Change = { path: string; status: "modified" | "deleted"; diff: string };
 

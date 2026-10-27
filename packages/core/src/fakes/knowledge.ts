@@ -1,6 +1,6 @@
-import { PortError } from "../ports/index.js";
-import type { Doc, DocComment, DocEvent, Knowledge } from "../ports/index.js";
-import { mentionData } from "../mentions.js";
+import { PortError } from "#/ports/index.js";
+import type { Doc, DocComment, DocEvent, Knowledge } from "#/ports/index.js";
+import { mentionData } from "#/mentions.js";
 import type { FakeKnowledge, FakeKnowledgeOptions } from "./types.js";
 import { steppingClock } from "./util.js";
 

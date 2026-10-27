@@ -1,6 +1,6 @@
-import type { Context, GlobalOptions } from "../../types.js";
-import { setup } from "../setup.js";
-import { renderGuide } from "../setup/guide.js";
+import type { Context, GlobalOptions } from "#/types.js";
+import { setup } from "#/commands/setup.js";
+import { renderGuide } from "#/commands/setup/guide.js";
 import { capture, parseJson } from "./capture.js";
 import type { HireOptions, SetupJson } from "./types.js";
 

@@ -1,6 +1,6 @@
-import type { Knowledge } from "../ports/knowledge.js";
-import type { CanonicalStatus } from "../ports/types.js";
-import type { Tracker } from "../ports/tracker.js";
+import type { Knowledge } from "#/ports/knowledge.js";
+import type { CanonicalStatus } from "#/ports/types.js";
+import type { Tracker } from "#/ports/tracker.js";
 
 /** Who an act assigns a ticket to: an agent by handle, a human by the tracker identity the team file gives. */
 export type ActTarget = { kind: "agent" | "human"; id: string };

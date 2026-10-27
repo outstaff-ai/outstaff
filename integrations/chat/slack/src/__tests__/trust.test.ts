@@ -1,7 +1,7 @@
 import { silentLogger, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import type { SlackUser, SlackWeb } from "../api.js";
-import { createTrust } from "../trust.js";
+import type { SlackUser, SlackWeb } from "#/api.js";
+import { createTrust } from "#/trust.js";
 
 const web = (users: Record<string, SlackUser | undefined>, calls: string[] = []): SlackWeb =>
   ({

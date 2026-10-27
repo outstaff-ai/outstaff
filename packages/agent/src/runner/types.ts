@@ -7,8 +7,8 @@ import type {
   Tracker,
   UsageEvent,
 } from "@outstaff/core";
-import type { ClientClock, Offer } from "../office-client/index.js";
-import type { OfficeClient } from "../verbs/office.types.js";
+import type { ClientClock, Offer } from "#/office-client/index.js";
+import type { OfficeClient } from "#/verbs/office.types.js";
 
 /** A file a person shared in chat: where it is on disk, or why it is not. All of it is data from that person. */
 export interface Attachment {

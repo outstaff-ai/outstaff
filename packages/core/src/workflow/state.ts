@@ -1,4 +1,4 @@
-import type { RepoRef } from "../ports/types.js";
+import type { RepoRef } from "#/ports/types.js";
 import type { PrRef, StaticWorkflowData, WorkflowState } from "./types.js";
 
 const k = (r: PrRef) => `${r.repo.owner}/${r.repo.name}#${r.number}`;

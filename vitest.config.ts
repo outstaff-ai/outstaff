@@ -1,48 +1,8 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
-const core = (path: string) => fileURLToPath(new URL(`packages/core/src/${path}`, import.meta.url));
-
-// Adapter packages test against the source of core, so tests and typecheck run without a prior build.
-const coreAlias = [
-  { find: /^@outstaff\/core\/contracts$/, replacement: core("contracts/index.ts") },
-  { find: /^@outstaff\/core\/fakes$/, replacement: core("fakes/index.ts") },
-  { find: /^@outstaff\/core$/, replacement: core("index.ts") },
-  {
-    find: /^@outstaff\/protocol$/,
-    replacement: fileURLToPath(new URL("packages/protocol/src/index.ts", import.meta.url)),
-  },
-  {
-    find: /^@outstaff\/office$/,
-    replacement: fileURLToPath(new URL("packages/office/src/index.ts", import.meta.url)),
-  },
-  // Private test kits (testing/*), from source. An adapter's own tests reach its kit through this alias only: the
-  // kit depends on the adapter, so a dependency back would be a cycle.
-  ...["core", "github", "itsaplan", "office", "agent"].map((kit) => ({
-    find: new RegExp(`^@outstaff/testing\\.${kit}$`),
-    replacement: fileURLToPath(new URL(`testing/${kit}/src/index.ts`, import.meta.url)),
-  })),
-  {
-    find: /^@outstaff\/agent$/,
-    replacement: fileURLToPath(new URL("packages/agent/src/index.ts", import.meta.url)),
-  },
-  {
-    find: /^@outstaff\/integration\.vcs\.github$/,
-    replacement: fileURLToPath(new URL("integrations/vcs/github/src/index.ts", import.meta.url)),
-  },
-  {
-    find: /^@outstaff\/integration\.shared\.itsaplan$/,
-    replacement: fileURLToPath(
-      new URL("integrations/shared/itsaplan/src/index.ts", import.meta.url),
-    ),
-  },
-  {
-    find: /^@outstaff\/integration\.tracker\.itsaplan$/,
-    replacement: fileURLToPath(
-      new URL("integrations/tracker/itsaplan/src/index.ts", import.meta.url),
-    ),
-  },
-];
+// Tests run on the TypeScript sources, without a build: workspace packages (exports) and `#/` imports resolve through
+// their "@outstaff/source" condition. A custom list replaces Vite's default for the server, so the rest repeats it.
+const conditions = ["@outstaff/source", "module", "node", "development|production"];
 
 // The event pipeline proof of concept (decision 0016) is held to the same rule as the integrations.
 const EVENT_PIPELINE = [
@@ -82,8 +42,7 @@ export default defineConfig({
     },
     projects: [
       ...packages.map((pkg) => ({
-        // Packages import each other as compiled libs; tests use the sources so they need no build first.
-        resolve: { alias: coreAlias },
+        ssr: { resolve: { conditions } },
         test: {
           name: pkg,
           root: `packages/${pkg}`,
@@ -94,7 +53,7 @@ export default defineConfig({
         },
       })),
       ...integrations.map((dir) => ({
-        resolve: { alias: coreAlias },
+        ssr: { resolve: { conditions } },
         test: {
           name: `integration.${dir.replace("/", ".")}`,
           root: `integrations/${dir}`,
@@ -103,7 +62,7 @@ export default defineConfig({
       })),
       // The scripted runtime of the end-to-end test reads the agent's prompt, so it tests against the agent's source.
       {
-        resolve: { alias: coreAlias },
+        ssr: { resolve: { conditions } },
         test: { name: "e2e", root: "e2e", include: ["**/src/**/__tests__/**/*.test.ts"] },
       },
       { test: { name: "scripts", root: "scripts", include: ["__tests__/*.test.ts"] } },

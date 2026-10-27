@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Tracker } from "../ports/index.js";
+import type { Tracker } from "#/ports/index.js";
 import type { TrackerSeed } from "./seeds.js";
 import {
   contractSuite,

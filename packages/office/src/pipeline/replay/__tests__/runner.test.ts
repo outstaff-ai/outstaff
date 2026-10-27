@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { renderReplayReport } from "../report.js";
-import { effectKey } from "../today.js";
-import { runReplay } from "../replay.js";
-import type { ReplayScenario, ReplayStep } from "../replay.types.js";
+import { renderReplayReport } from "#/pipeline/replay/report.js";
+import { effectKey } from "#/pipeline/replay/today.js";
+import { runReplay } from "#/pipeline/replay/replay.js";
+import type { ReplayScenario, ReplayStep } from "#/pipeline/replay/replay.types.js";
 import { acmeSetup } from "./acme.js";
 import { at, ev, pr, ticket } from "./fixture/build.js";
 

@@ -1,4 +1,4 @@
-import type { ClonedRepo, Workspace } from "../repos/index.js";
+import type { ClonedRepo, Workspace } from "#/repos/index.js";
 import type { Attachment } from "./types.js";
 
 /** What the runner knows of a run besides the offer, for its user prompt. */

@@ -6,11 +6,11 @@ import {
   renderToDir,
 } from "@outstaff/core";
 import { isAbsolute, resolve } from "node:path";
-import { loadCatalogs } from "../catalogs.js";
-import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
-import { table } from "../table.js";
-import type { Context } from "../types.js";
+import { loadCatalogs } from "#/catalogs.js";
+import { defineCommand } from "#/define.js";
+import { loadTeam } from "#/load.js";
+import { table } from "#/table.js";
+import type { Context } from "#/types.js";
 
 const size = (text: string) => Buffer.byteLength(text);
 

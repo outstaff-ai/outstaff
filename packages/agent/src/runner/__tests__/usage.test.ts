@@ -1,9 +1,9 @@
 import type { UsageEvent } from "@outstaff/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createManualClock } from "../../office-client/testing.js";
-import type { ManualClientClock } from "../../office-client/types.js";
-import { createUsageReporter } from "../usage.js";
-import type { UsageReporter } from "../types.js";
+import { createManualClock } from "#/office-client/testing.js";
+import type { ManualClientClock } from "#/office-client/types.js";
+import { createUsageReporter } from "#/runner/usage.js";
+import type { UsageReporter } from "#/runner/types.js";
 
 const event = (utilization: number): UsageEvent => ({
   type: "usage",

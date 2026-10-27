@@ -1,4 +1,4 @@
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import type { ChatContextDeps } from "./chat.types.js";
 import { reason } from "./reason.js";
 import type { ChatMessage } from "@outstaff/core";

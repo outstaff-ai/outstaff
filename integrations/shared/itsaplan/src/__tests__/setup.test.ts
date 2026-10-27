@@ -1,6 +1,6 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { deriveItsaplan, itsaplanSetupGuide } from "../setup.js";
+import { deriveItsaplan, itsaplanSetupGuide } from "#/setup.js";
 
 const team = (email?: string) =>
   ({

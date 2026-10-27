@@ -5,10 +5,10 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { createMemoryTraceStore } from "../memory-traces.js";
-import { createShadowPipeline } from "../shadow.js";
-import type { TraceStore } from "../trace.types.js";
+import { manualClock } from "#/clock.js";
+import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
+import { createShadowPipeline } from "#/pipeline/shadow.js";
+import type { TraceStore } from "#/pipeline/trace.types.js";
 
 function team(pipeline?: unknown): TeamConfig {
   const r = parseTeamConfig({

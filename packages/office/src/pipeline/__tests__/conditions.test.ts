@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateCondition } from "../conditions.js";
+import { evaluateCondition } from "#/pipeline/conditions.js";
 import { ctxOf, event, pr, prRef } from "./support.js";
 
 const assigned = {

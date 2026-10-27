@@ -1,12 +1,6 @@
 import type { TeamConfig } from "@outstaff/core";
-import {
-  generateName,
-  HANDLE,
-  baseHandle,
-  uniqueHandle,
-  RESERVED_HANDLES,
-} from "../../hire-names.js";
-import type { Context, GlobalOptions, NewPerson } from "../../types.js";
+import { generateName, HANDLE, baseHandle, uniqueHandle, RESERVED_HANDLES } from "#/hire-names.js";
+import type { Context, GlobalOptions, NewPerson } from "#/types.js";
 import { defaultGrants, formatGrants, parseGrants } from "./grants.js";
 import type { ChosenPerson, Grants, HireOptions } from "./types.js";
 

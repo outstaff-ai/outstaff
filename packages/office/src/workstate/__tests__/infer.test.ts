@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ticketCandidates } from "../infer.js";
+import { ticketCandidates } from "#/workstate/infer.js";
 
 const keys = (pr: { headRef: string; title: string; body?: string }) =>
   ticketCandidates(pr).map((c) => c.key);

@@ -11,7 +11,7 @@ import {
   type Tracker,
   type WorkflowEvent,
 } from "@outstaff/core";
-import { ATTACH_REASSIGN_SUBJECT, CHAT_ORIGIN_SUBJECT, readOrigin } from "../chat/origin.js";
+import { ATTACH_REASSIGN_SUBJECT, CHAT_ORIGIN_SUBJECT, readOrigin } from "#/chat/origin.js";
 import {
   addFeedback,
   awaitsReview,
@@ -19,9 +19,9 @@ import {
   FOLLOW_UP_SUBJECT,
   undeliveredFeedback,
 } from "./feedback.js";
-import { clip, prLabel, subjectLabel } from "../log.js";
-import { PRIORITY, priorityFor } from "../scheduler/index.js";
-import type { WorkItem, WorkItemTrigger } from "../store/index.js";
+import { clip, prLabel, subjectLabel } from "#/log.js";
+import { PRIORITY, priorityFor } from "#/scheduler/index.js";
+import type { WorkItem, WorkItemTrigger } from "#/store/index.js";
 import type { Feedback } from "@outstaff/protocol";
 import type { EffectOutcome, Engine, EngineMeta, EngineOptions } from "./types.js";
 

@@ -1,5 +1,5 @@
 import type { ZodType } from "zod";
-import type { Decision, Policy, ToolKind } from "../permissions/index.js";
+import type { Decision, Policy, ToolKind } from "#/permissions/index.js";
 
 /** An `ost` verb exposed to the agent. */
 export interface RuntimeTool {

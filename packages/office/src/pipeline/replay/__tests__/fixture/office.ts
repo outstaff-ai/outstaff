@@ -1,4 +1,4 @@
-import type { ReplayScenario } from "../../replay.types.js";
+import type { ReplayScenario } from "#/pipeline/replay/replay.types.js";
 import { at, ev, ROLES, ticket } from "./build.js";
 
 export const idle: ReplayScenario = {

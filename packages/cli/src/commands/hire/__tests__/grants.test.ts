@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TeamConfig } from "@outstaff/core";
-import { parseGrants } from "../grants.js";
+import { parseGrants } from "#/commands/hire/grants.js";
 
 const config = { repos: [{ name: "shop" }, { name: "infra" }] } as unknown as TeamConfig;
 

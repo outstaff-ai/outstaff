@@ -1,12 +1,12 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { claudeAgentSdk } from "../adapter.js";
-import { createAgentSdkRuntime } from "../runtime.js";
-import { probeSubprocessSandbox } from "../sandbox.js";
-import type { SandboxProbe } from "../types.js";
+import { claudeAgentSdk } from "#/adapter.js";
+import { createAgentSdkRuntime } from "#/runtime.js";
+import { probeSubprocessSandbox } from "#/sandbox.js";
+import type { SandboxProbe } from "#/types.js";
 
-vi.mock("../sandbox.js", () => ({ probeSubprocessSandbox: vi.fn<() => SandboxProbe>() }));
-vi.mock("../runtime.js", () => ({
+vi.mock("#/sandbox.js", () => ({ probeSubprocessSandbox: vi.fn<() => SandboxProbe>() }));
+vi.mock("#/runtime.js", () => ({
   createAgentSdkRuntime: vi.fn<typeof createAgentSdkRuntime>(() => ({}) as never),
 }));
 

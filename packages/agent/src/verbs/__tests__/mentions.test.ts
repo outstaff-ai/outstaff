@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { PortError } from "@outstaff/core";
-import { mentionGuard } from "../mentions.js";
+import { mentionGuard } from "#/verbs/mentions.js";
 import { acmeTeam } from "@outstaff/testing.agent";
 
 const guard = mentionGuard(acmeTeam());

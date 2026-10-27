@@ -8,7 +8,7 @@ import type {
   RepoRef,
   Check,
   VcsPermission,
-} from "../ports/index.js";
+} from "#/ports/index.js";
 
 // Seeds let a contract kit create the data it needs. A fake seeds in memory; an env-gated real adapter
 // seeds through the platform API and may leave out what it cannot do (the kit then skips those cases).

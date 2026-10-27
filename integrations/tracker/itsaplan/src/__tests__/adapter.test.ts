@@ -1,6 +1,6 @@
 import { PortError, silentLogger, type AdapterContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { eventType } from "../events.js";
+import { eventType } from "#/events.js";
 import {
   buildFetch,
   deriveApiUrl,
@@ -9,8 +9,8 @@ import {
   optionalConnectionOptions as knowledgeOptions,
   resolveConnection,
 } from "@outstaff/integration.shared.itsaplan";
-import { trackerOptions } from "../index.js";
-import { createItsaplanTracker } from "../tracker.js";
+import { trackerOptions } from "#/index.js";
+import { createItsaplanTracker } from "#/tracker.js";
 import {
   API_KEY,
   createItsaplanFake,

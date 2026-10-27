@@ -4,8 +4,8 @@ import type {
   RuntimeSeed,
   TrackerSeed,
   VcsSeed,
-} from "../contracts/seeds.js";
-import type { ToolCall } from "../permissions/index.js";
+} from "#/contracts/seeds.js";
+import type { ToolCall } from "#/permissions/index.js";
 import type {
   AgentProfile,
   Chat,
@@ -19,7 +19,7 @@ import type {
   Tracker,
   UsageEvent,
   Vcs,
-} from "../ports/index.js";
+} from "#/ports/index.js";
 
 export interface FakeChatOptions {
   /** Posts longer than this are split at line breaks, as a real adapter does. Default 4000. */

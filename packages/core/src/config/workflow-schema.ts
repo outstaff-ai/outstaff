@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ruleInputSchema } from "../workflow/rules.js";
+import { ruleInputSchema } from "#/workflow/rules.js";
 import { d } from "./schema-meta.js";
 
 const STATUSES = ["backlog", "ready", "active", "review", "blocked", "done", "canceled"] as const;

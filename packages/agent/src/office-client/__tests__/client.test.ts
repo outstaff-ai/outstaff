@@ -1,8 +1,8 @@
 import { PROTOCOL_VERSION } from "@outstaff/protocol";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createOfficeConnection } from "../client.js";
-import type { OfficeConnection, ManualClientClock } from "../types.js";
-import { FakeSocket, createManualClock } from "../testing.js";
+import { createOfficeConnection } from "#/office-client/client.js";
+import type { OfficeConnection, ManualClientClock } from "#/office-client/types.js";
+import { FakeSocket, createManualClock } from "#/office-client/testing.js";
 
 describe("office connection", () => {
   let clock: ManualClientClock;

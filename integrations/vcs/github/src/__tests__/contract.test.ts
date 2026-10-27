@@ -1,7 +1,7 @@
 import { vcsContract } from "@outstaff/core/contracts";
 import { silentLogger } from "@outstaff/core";
-import { githubVcs } from "../index.js";
-import { createGithubVcs } from "../vcs.js";
+import { githubVcs } from "#/index.js";
+import { createGithubVcs } from "#/vcs.js";
 import {
   createGithubFake,
   OFFICE_APP,
@@ -11,7 +11,7 @@ import {
   team,
 } from "@outstaff/testing.github";
 import { testKey } from "@outstaff/testing.core";
-import { githubOptions } from "../options.js";
+import { githubOptions } from "#/options.js";
 
 // An agent container for "sam": its own App plus the read-only office App.
 const secrets = {

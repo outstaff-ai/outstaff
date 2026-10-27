@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { Offer } from "../../office-client/index.js";
-import { createSessionManager, sessionKey } from "../sessions.js";
+import type { Offer } from "#/office-client/index.js";
+import { createSessionManager, sessionKey } from "#/runner/sessions.js";
 
 const offer = (id: string, extra: { sessionId?: string; thread?: string } = {}): Offer => ({
   workItem: {

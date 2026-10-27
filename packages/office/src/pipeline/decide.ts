@@ -1,5 +1,5 @@
 import type { Resolved, TemplateError } from "@outstaff/core";
-import { prLabel } from "../log.js";
+import { prLabel } from "#/log.js";
 import type { ActOp, ActTarget, Decision, WakeSubject } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import { feedbackFor } from "./feedback.js";

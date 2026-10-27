@@ -1,5 +1,5 @@
 import type { ChatOrigin } from "@outstaff/protocol";
-import type { Store } from "../store/types.js";
+import type { Store } from "#/store/types.js";
 import type { ChatOriginRecord } from "./types.js";
 
 /** Subject types that keep chat state in the store; none of them needs a migration. */

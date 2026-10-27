@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const spawnSync = vi.hoisted(() => vi.fn<(command: string, args: readonly string[]) => unknown>());
 vi.mock("node:child_process", () => ({ spawnSync }));
-const { probeSubprocessSandbox } = await import("../sandbox.js");
+const { probeSubprocessSandbox } = await import("#/sandbox.js");
 
 beforeEach(() => spawnSync.mockReset());
 

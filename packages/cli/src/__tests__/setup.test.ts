@@ -13,9 +13,9 @@ import { join } from "node:path";
 import { AdapterRegistry } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE } from "@outstaff/testing.core";
-import type { Context } from "../types.js";
-import { run } from "../program.js";
-import type { AnyDef } from "../commands/types.js";
+import type { Context } from "#/types.js";
+import { run } from "#/program.js";
+import type { AnyDef } from "#/commands/types.js";
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-setup-")));
 let n = 0;

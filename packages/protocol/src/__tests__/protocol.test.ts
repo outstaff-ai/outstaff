@@ -7,7 +7,7 @@ import {
   encode,
   messageSchema,
   renderProtocolReference,
-} from "../index.js";
+} from "#/index.js";
 
 const types = messageSchema.options.map((o) => o.shape.type.value);
 

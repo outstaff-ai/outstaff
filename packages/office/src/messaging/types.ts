@@ -1,7 +1,7 @@
 import type { Chat, Logger, TeamConfig, Tracker } from "@outstaff/core";
 import type { Human, Member, MemberUsage } from "@outstaff/protocol";
-import type { Scheduler } from "../scheduler/types.js";
-import type { Store } from "../store/types.js";
+import type { Scheduler } from "#/scheduler/types.js";
+import type { Store } from "#/store/types.js";
 
 export interface MessagingOptions {
   store: Store;

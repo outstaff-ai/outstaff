@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { sampleRunRequest } from "../../contracts/index.js";
-import { CAPABILITIES } from "../../capabilities.js";
-import type { RuntimeEvent } from "../../ports/index.js";
+import { sampleRunRequest } from "#/contracts/index.js";
+import { CAPABILITIES } from "#/capabilities.js";
+import type { RuntimeEvent } from "#/ports/index.js";
 import {
   createFakeAdapterRegistry,
   createFakeChat,
   createFakeRuntime,
   createFakeTracker,
-} from "../index.js";
+} from "#/fakes/index.js";
 
 describe("fake runtime", () => {
   it("judges scripted tool calls with the request policy and records requests", async () => {

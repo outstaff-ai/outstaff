@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseRepoUrl, silentLogger } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import type { ClonedRepo, Workspaces, WorkspacesOptions } from "./types.js";
 import { runGit } from "./git.js";
 

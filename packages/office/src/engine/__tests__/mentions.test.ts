@@ -1,7 +1,7 @@
 import type { TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { teamConfig } from "../../intake/test-support.js";
-import { readFeedback } from "../feedback.js";
+import { teamConfig } from "#/intake/test-support.js";
+import { readFeedback } from "#/engine/feedback.js";
 import { harness, type Harness } from "./test-support.js";
 
 // A trusted person mentioning an agent on a ticket or document hands it the work. The events here carry the handles

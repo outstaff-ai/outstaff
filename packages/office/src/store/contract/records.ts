@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { ContractContext } from "../contract.types.js";
+import type { ContractContext } from "#/store/contract.types.js";
 
 /** Runs, the journal, subjects and links. */
 export function recordCases(ctx: ContractContext): void {

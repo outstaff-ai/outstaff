@@ -1,7 +1,7 @@
 import { PortError } from "@outstaff/core";
 import { z } from "zod";
 import { defineVerb, result } from "./define.js";
-import type { ToolStatus } from "../tools/types.js";
+import type { ToolStatus } from "#/tools/types.js";
 import type { AgentEnv, NetworkAccess } from "./types.js";
 
 const toolLine = (t: ToolStatus) =>

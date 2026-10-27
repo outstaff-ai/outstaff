@@ -5,7 +5,7 @@ import type {
   OfficeTeam,
   OfficeTeamMember,
   OfficeWorkItem,
-} from "../verbs/office.types.js";
+} from "#/verbs/office.types.js";
 import type { AckFn, CallFn, OfficeMethods } from "./types.js";
 
 /** Drops keys that are undefined, which the verbs' types do not allow for optional fields. */

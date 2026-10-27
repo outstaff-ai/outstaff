@@ -1,13 +1,13 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { createFakeKnowledge, createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
-import { manualClock } from "../clock.js";
-import type { OfficeLink } from "../link/index.js";
-import { createLinkForOffice, linkHealth, subjectLinks } from "../office-link.js";
-import type { CreateOfficeInput } from "../office.types.js";
-import type { ProtocolServer } from "../protocol/index.js";
-import { openStore } from "../store/index.js";
-import type { OfficePorts } from "../types.js";
+import { manualClock } from "#/clock.js";
+import type { OfficeLink } from "#/link/index.js";
+import { createLinkForOffice, linkHealth, subjectLinks } from "#/office-link.js";
+import type { CreateOfficeInput } from "#/office.types.js";
+import type { ProtocolServer } from "#/protocol/index.js";
+import { openStore } from "#/store/index.js";
+import type { OfficePorts } from "#/types.js";
 
 function team(link?: string, pipeline?: "shadow"): TeamConfig {
   const r = parseTeamConfig({

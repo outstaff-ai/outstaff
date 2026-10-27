@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { compareOutcomes } from "../compare.js";
-import type { Outcome } from "../compare.types.js";
+import { compareOutcomes } from "#/pipeline/compare/compare.js";
+import type { Outcome } from "#/pipeline/compare/compare.types.js";
 
 const wake = (
   person: string,

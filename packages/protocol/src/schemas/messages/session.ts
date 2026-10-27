@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { linkSchema, workItemSchema } from "../common.js";
-import { offerContextSchema } from "../feedback.js";
-import { itemId, message, text } from "../fields.js";
-import { usageWindowSchema } from "../team.js";
-import { queuedReportSchema } from "../work.js";
+import { linkSchema, workItemSchema } from "#/schemas/common.js";
+import { offerContextSchema } from "#/schemas/feedback.js";
+import { itemId, message, text } from "#/schemas/fields.js";
+import { usageWindowSchema } from "#/schemas/team.js";
+import { queuedReportSchema } from "#/schemas/work.js";
 
 export const sessionMessages = [
   message(

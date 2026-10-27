@@ -1,6 +1,6 @@
-import type { Placement, Scheduler } from "../scheduler/types.js";
-import { orderQueue } from "../scheduler/policy.js";
-import type { Store } from "../store/types.js";
+import type { Placement, Scheduler } from "#/scheduler/types.js";
+import { orderQueue } from "#/scheduler/policy.js";
+import type { Store } from "#/store/types.js";
 import type { Candidate, ParsedPlacement } from "./types.js";
 
 const words = (s: string) => s.toLowerCase().replaceAll(/[^a-z0-9#._ -]+/g, " ");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failedStepNames, failedSteps, keyParts } from "../check-log.js";
+import { failedStepNames, failedSteps, keyParts } from "#/check-log.js";
 
 describe("failedStepNames", () => {
   it("keeps failed and timed out steps only", () => {

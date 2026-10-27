@@ -5,9 +5,9 @@ import {
   type ReviewThread,
   type Vcs,
 } from "@outstaff/core";
-import type { AppAuth } from "../auth.js";
-import { stripBot } from "../mapping.js";
-import type { RestPull, RestReviewComment, ThreadNode, ThreadsData } from "../api.types.js";
+import type { AppAuth } from "#/auth.js";
+import { stripBot } from "#/mapping.js";
+import type { RestPull, RestReviewComment, ThreadNode, ThreadsData } from "#/api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 

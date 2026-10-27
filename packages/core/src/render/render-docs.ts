@@ -1,6 +1,6 @@
-import { CatalogError } from "../catalog/codes.js";
-import { render } from "../catalog/template.js";
-import type { CatalogDoc, CatalogIssue, CatalogRole } from "../catalog/types.js";
+import { CatalogError } from "#/catalog/codes.js";
+import { render } from "#/catalog/template.js";
+import type { CatalogDoc, CatalogIssue, CatalogRole } from "#/catalog/types.js";
 import { withSkillFrontMatter } from "./frontmatter.js";
 import type { DocRendering } from "./types.js";
 

@@ -1,5 +1,5 @@
-import { CONFIG_CODES } from "../config/codes.js";
-import type { ConfigIssue } from "../config/types.js";
+import { CONFIG_CODES } from "#/config/codes.js";
+import type { ConfigIssue } from "#/config/types.js";
 import { presetRules } from "./presets.js";
 import {
   BUILTIN_TEMPLATES,

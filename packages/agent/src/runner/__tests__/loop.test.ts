@@ -18,23 +18,23 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Message } from "@outstaff/protocol";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ACKNOWLEDGE_TIMEOUT_MS } from "../reactions.js";
+import { ACKNOWLEDGE_TIMEOUT_MS } from "#/runner/reactions.js";
 import {
   createOfficeConnection,
   type Offer,
   type OfficeConnection,
-} from "../../office-client/index.js";
-import { FakeSocket, createManualClock } from "../../office-client/testing.js";
-import type { ManualClientClock } from "../../office-client/types.js";
+} from "#/office-client/index.js";
+import { FakeSocket, createManualClock } from "#/office-client/testing.js";
+import type { ManualClientClock } from "#/office-client/types.js";
 import { fakeEnv } from "@outstaff/testing.agent";
-import type { Workspaces } from "../../repos/index.js";
-import { JOURNAL_PROMPT } from "../journal.js";
-import type { ChatRelay } from "../chat.types.js";
-import { createWorkLoop } from "../loop.js";
-import { linksIn } from "../links.js";
-import type { WorkLoop } from "../loop.types.js";
-import { createUsageReporter } from "../usage.js";
-import type { UsageReporter } from "../types.js";
+import type { Workspaces } from "#/repos/index.js";
+import { JOURNAL_PROMPT } from "#/runner/journal.js";
+import type { ChatRelay } from "#/runner/chat.types.js";
+import { createWorkLoop } from "#/runner/loop.js";
+import { linksIn } from "#/runner/links.js";
+import type { WorkLoop } from "#/runner/loop.types.js";
+import { createUsageReporter } from "#/runner/usage.js";
+import type { UsageReporter } from "#/runner/types.js";
 
 interface OfferExtras {
   sessionId?: string;

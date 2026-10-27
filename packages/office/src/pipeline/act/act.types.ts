@@ -1,6 +1,6 @@
 import type { Knowledge, TeamConfig, Tracker } from "@outstaff/core";
-import type { Act } from "../decisions.types.js";
-import type { TraceStore } from "../trace.types.js";
+import type { Act } from "#/pipeline/decisions.types.js";
+import type { TraceStore } from "#/pipeline/trace.types.js";
 
 /** Carries out the acts a live pipeline decides, and records each result on the event's trace. */
 export interface ActExecutor {

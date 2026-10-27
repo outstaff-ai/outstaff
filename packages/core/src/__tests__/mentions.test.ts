@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mentionData, parseMentions } from "../mentions.js";
+import { mentionData, parseMentions } from "#/mentions.js";
 
 describe("parseMentions", () => {
   it("reads @names in order, once each, without trailing punctuation", () => {

@@ -1,5 +1,5 @@
 import { policyOn } from "@outstaff/core";
-import type { OfficeConnection } from "../office-client/index.js";
+import type { OfficeConnection } from "#/office-client/index.js";
 import { createChatRelay } from "./chat.js";
 import type { ChatRelay } from "./chat.types.js";
 import { createProfilePublisher } from "./profile.js";

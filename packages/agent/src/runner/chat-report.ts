@@ -1,6 +1,6 @@
 import type { ChatMessage } from "@outstaff/core";
 import { MAX_CHAT_FILES, type Link } from "@outstaff/protocol";
-import type { ChatMessageRequest, ChatReportKind } from "../verbs/office.types.js";
+import type { ChatMessageRequest, ChatReportKind } from "#/verbs/office.types.js";
 import { clip } from "./chat-text.js";
 
 /** How the agent words each kind of report. */

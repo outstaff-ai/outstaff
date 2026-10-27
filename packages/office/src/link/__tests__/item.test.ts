@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ITEM_EVENTS_SUBJECT, WAKE_SUBJECT } from "../../pipeline/live/wake.js";
-import { openStore, type Store } from "../../store/index.js";
-import { findItem } from "../item.js";
+import { ITEM_EVENTS_SUBJECT, WAKE_SUBJECT } from "#/pipeline/live/wake.js";
+import { openStore, type Store } from "#/store/index.js";
+import { findItem } from "#/link/item.js";
 import { record, trace } from "./support.js";
 
 describe("findItem", () => {

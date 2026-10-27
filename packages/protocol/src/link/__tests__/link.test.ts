@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { decodeLinkMessage, encodeLinkMessage } from "../codec.js";
-import { renderLinkReference } from "../docs.js";
-import { LINK_MESSAGE_META, LINK_METHOD_META } from "../meta.js";
-import { linkMessageSchema, requestSchema } from "../schemas.js";
-import type { LinkMessage } from "../types.js";
+import { decodeLinkMessage, encodeLinkMessage } from "#/link/codec.js";
+import { renderLinkReference } from "#/link/docs.js";
+import { LINK_MESSAGE_META, LINK_METHOD_META } from "#/link/meta.js";
+import { linkMessageSchema, requestSchema } from "#/link/schemas.js";
+import type { LinkMessage } from "#/link/types.js";
 
 const TRACE = {
   event: {

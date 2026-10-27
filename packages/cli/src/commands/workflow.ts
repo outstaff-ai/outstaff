@@ -11,8 +11,8 @@ import {
   type WorkflowEvent,
   type WorkflowEventType,
 } from "@outstaff/core";
-import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
+import { defineCommand } from "#/define.js";
+import { loadTeam } from "#/load.js";
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);

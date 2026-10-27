@@ -1,12 +1,12 @@
 import { silentLogger, type Logger } from "@outstaff/core";
 import { linkMessageSchema } from "@outstaff/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import type { ManualClock } from "../../types.js";
-import { openStore, type Store } from "../../store/index.js";
-import { ITEM_EVENTS_SUBJECT } from "../../pipeline/live/wake.js";
-import { createOfficeLink } from "../client.js";
-import type { OfficeLink, OfficeLinkOptions } from "../link.types.js";
+import { manualClock } from "#/clock.js";
+import type { ManualClock } from "#/types.js";
+import { openStore, type Store } from "#/store/index.js";
+import { ITEM_EVENTS_SUBJECT } from "#/pipeline/live/wake.js";
+import { createOfficeLink } from "#/link/client.js";
+import type { OfficeLink, OfficeLinkOptions } from "#/link/link.types.js";
 import { FakeService, until } from "./service.js";
 import { record, trace } from "./support.js";
 

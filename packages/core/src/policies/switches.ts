@@ -1,5 +1,5 @@
-import type { Capability } from "../types.js";
-import type { Condition, Rule } from "../workflow/types.js";
+import type { Capability } from "#/types.js";
+import type { Condition, Rule } from "#/workflow/types.js";
 
 /** A switch holds `true`/`false`, or one of a few named choices; `none` always means off. */
 export type PolicyValue = boolean | string;

@@ -1,5 +1,5 @@
-import { isApprover } from "../policies/approvers.js";
-import type { ApproverCandidate } from "../policies/types.js";
+import { isApprover } from "#/policies/approvers.js";
+import type { ApproverCandidate } from "#/policies/types.js";
 import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
 import type { Check, ConditionChecks, ConditionKey, Ctx } from "./evaluate.types.js";
 import type { Condition, ConditionEvent, WorkflowPr } from "./types.js";

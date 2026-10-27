@@ -1,5 +1,5 @@
-import { PortError } from "../ports/index.js";
-import type { MergeMethod, MergeOptions, PullRequest } from "../ports/index.js";
+import { PortError } from "#/ports/index.js";
+import type { MergeMethod, MergeOptions, PullRequest } from "#/ports/index.js";
 import type { FakeVcsState, StoredPr, VcsWrites } from "./vcs.types.js";
 
 /** What a fake vcs does as its own identity: opens, updates, reviews, merges, replies and reacts. */

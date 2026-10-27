@@ -1,6 +1,6 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { deriveSlack, slackSetupGuide } from "../setup.js";
+import { deriveSlack, slackSetupGuide } from "#/setup.js";
 
 const team = { team: { name: "acme" } } as unknown as TeamConfig;
 const sam = { handle: "sam", name: "Sam", role: "developer" } as never;

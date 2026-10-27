@@ -1,4 +1,4 @@
-import type { Trace, TraceStore } from "../trace.types.js";
+import type { Trace, TraceStore } from "#/pipeline/trace.types.js";
 import type { ComparisonSummary } from "./compare.types.js";
 
 const PAGE = 200;

@@ -1,6 +1,6 @@
 import { silentLogger, type TeamConfig } from "@outstaff/core";
 import type { UsageWindowReport } from "@outstaff/protocol";
-import { peakWindow } from "../scheduler/policy.js";
+import { peakWindow } from "#/scheduler/policy.js";
 import type { UsageTracker, UsageTrackerOptions } from "./types.js";
 
 export const USAGE_SUBJECT = "usage";

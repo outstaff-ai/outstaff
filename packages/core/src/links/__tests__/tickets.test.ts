@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createFakeTracker } from "../../fakes/tracker.js";
-import { createTicketLinker, ticketProjectKeys } from "../tickets.js";
+import { createFakeTracker } from "#/fakes/tracker.js";
+import { createTicketLinker, ticketProjectKeys } from "#/links/tickets.js";
 
 const team = (project?: unknown) =>
   ({
