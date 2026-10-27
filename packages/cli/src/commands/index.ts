@@ -3,6 +3,7 @@ import { build } from "./build.js";
 import { diff } from "./diff.js";
 import { doctor } from "./doctor.js";
 import { eject } from "./eject.js";
+import { explainEvent } from "./explain.js";
 import { gitCredential } from "./git-credential.js";
 import { fire } from "./fire.js";
 import { hire } from "./hire.js";
@@ -35,6 +36,7 @@ export const commands: CommandDef[] = [
   doctor,
   policies,
   explain,
+  explainEvent,
   gitCredential,
   ...verbCommands,
 ];

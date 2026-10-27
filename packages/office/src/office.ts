@@ -11,6 +11,7 @@ import { requesterChat } from "./office-requester.js";
 import { officeTicketPrs } from "./office-ticket-prs.js";
 import type { CreateOfficeInput, Office } from "./office.types.js";
 import { createOfficePorts } from "./ports.js";
+import { createOfficeShadow } from "./pipeline/office-shadow.js";
 import {
   agentAuthFromSecrets,
   createProtocolServer,
@@ -140,14 +141,24 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     return p;
   };
 
+  const { judge, pipeline } = createOfficeShadow({
+    team,
+    workState,
+    store,
+    clock,
+    log,
+    engine,
+    track,
+  });
+
   // At-least-once and in order: the state reflects the event before the engine judges it, and both are idempotent.
   intake.onEvent(async (event, meta) => {
     await track(workState.apply(event, meta));
-    await track(engine.handle(event, meta));
+    await judge(event, meta);
   });
 
   workState.onEvent(async (event, meta) => {
-    await track(engine.handle(event, meta));
+    await judge(event, meta);
   });
 
   const roles = new Map<string, RoleInfo>();
@@ -170,7 +181,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     }
   };
 
-  const handedBack = createHandedBack({ store, workState, engine, log, track });
+  const handedBack = createHandedBack({ store, workState, judge, log });
 
   // An item the scheduler blocked: the PM's `unblock` round when the team routes blocked work there, and the report
   // the blocked agent owes the requester (queued, so the agent posts it as itself). The office posts nothing.
@@ -278,7 +289,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   return {
-    parts: { intake, workState, engine, scheduler, usage, server: protocol, ports },
+    parts: { intake, workState, engine, scheduler, usage, server: protocol, ports, pipeline },
     ...lifecycle,
     agentPort: () => protocol.port(),
   };

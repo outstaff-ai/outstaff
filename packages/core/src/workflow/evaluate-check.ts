@@ -1,10 +1,10 @@
 import { isApprover } from "../policies/approvers.js";
 import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
 import type { Check, Ctx } from "./evaluate.types.js";
-import type { Condition, WorkflowEvent, WorkflowPr } from "./types.js";
+import type { Condition, ConditionEvent, WorkflowPr } from "./types.js";
 
 /** The agents a comment names, first mention first: the handles the office put in `data.mentions`. */
-export const mentionedBy = (event: WorkflowEvent): string[] => {
+export const mentionedBy = (event: ConditionEvent): string[] => {
   const found = event.data["mentions"];
   return Array.isArray(found)
     ? [...new Set(found.filter((m): m is string => typeof m === "string" && m !== ""))]

@@ -146,6 +146,29 @@ export interface Pause {
   pausedAt: string;
 }
 
+/** What the event pipeline decided for one event, and why. `data` is the pipeline's trace, stored as JSON. */
+export interface NewTrace {
+  /** The event's `<source>:<externalId>`. */
+  ref: string;
+  type: string;
+
+  /** When the event happened (ISO-8601); traces are listed by it. */
+  at: string;
+  data: unknown;
+}
+
+export interface StoredTrace extends NewTrace {
+  recordedAt: string;
+}
+
+export interface TraceQuery {
+  /** Only traces of events before this time (ISO-8601): the cursor for the next page. */
+  before?: string;
+
+  /** Default 50. */
+  limit?: number;
+}
+
 export interface Store {
   readonly dialect: "postgres" | "sqlite";
 
@@ -230,6 +253,13 @@ export interface Store {
 
   /** Idempotent. */
   markDelivered(id: string): Promise<void>;
+
+  /** Records the trace of an event; a second trace of the same event replaces the first. */
+  recordTrace(trace: NewTrace): Promise<void>;
+  getTrace(ref: string): Promise<StoredTrace | undefined>;
+
+  /** Newest event first. */
+  listTraces(query?: TraceQuery): Promise<StoredTrace[]>;
 
   close(): Promise<void>;
 }

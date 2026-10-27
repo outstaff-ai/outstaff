@@ -5,6 +5,7 @@ import { guardQueries } from "./sql/guards.js";
 import { itemQueries } from "./sql/items.js";
 import { linkQueries } from "./sql/links.js";
 import { runQueries } from "./sql/runs.js";
+import { traceQueries } from "./sql/traces.js";
 import type { StoreInternals } from "./sql/types.js";
 
 export function createSqlStore(internals: StoreInternals): Store {
@@ -17,6 +18,7 @@ export function createSqlStore(internals: StoreInternals): Store {
     ...linkQueries(internals),
     ...guardQueries(internals),
     ...conversationQueries(internals),
+    ...traceQueries(internals),
 
     async close() {
       await db.destroy();

@@ -4,6 +4,7 @@ import type { Intake } from "./intake/index.js";
 import type { ProtocolServer } from "./protocol/index.js";
 import type { Scheduler } from "./scheduler/index.js";
 import type { Store } from "./store/types.js";
+import type { ShadowPipeline } from "./pipeline/index.js";
 import type { Clock, OfficePorts } from "./types.js";
 import type { UsageTracker } from "./usage/index.js";
 import type { WorkState } from "./workstate/index.js";
@@ -74,5 +75,8 @@ export interface Office {
     usage: UsageTracker;
     server: ProtocolServer;
     ports: OfficePorts;
+
+    /** The event pipeline in shadow mode (`office.pipeline: shadow`); absent when it is off. */
+    pipeline?: ShadowPipeline | undefined;
   };
 }

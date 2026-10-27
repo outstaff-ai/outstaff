@@ -34,7 +34,8 @@ function key(ref: PrRef): string {
   return `${repoName(ref.repo)}#${ref.number}`;
 }
 
-function variables(ctx: Ctx): Record<string, string> {
+/** The template variables of an event (TEMPLATE_VARIABLES), every one present. */
+export function variables(ctx: Ctx): Record<string, string> {
   const pr = ctx.pr;
   const stack = pr ? stackOf(pr, ctx.state) : [];
   const ticketPrs = ctx.ticket
@@ -113,7 +114,8 @@ function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {
   return agentId ? { value: { kind: "agent", id: agentId } } : { skip: `no agent plays ${spec}` };
 }
 
-function person(spec: string, ctx: Ctx): Resolved<string> {
+/** The agent a schedule's `person` names (`author`, `assignee`, `mentioned`, `role:<role>` ...), or why there is none. */
+export function person(spec: string, ctx: Ctx): Resolved<string> {
   if (spec === "doc_author") {
     const doc = ctx.event.subject.doc;
     const author = doc ? ctx.state.docAuthor(doc) : undefined;

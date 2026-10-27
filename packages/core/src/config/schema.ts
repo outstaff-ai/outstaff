@@ -10,6 +10,7 @@ import { policiesSchema } from "./policies-schema.js";
 import { repoSchema } from "./repo-schema.js";
 import { d, slug, SLUG } from "./schema-meta.js";
 import { workflowSchema } from "./workflow-schema.js";
+import { pipelineSchema } from "./pipeline.js";
 import { checkWorkflowConfig } from "../workflow/validate.js";
 
 const GRANT_KEY = /^(\*|kind:(primary|baseline|infra|other)|[a-z][a-z0-9-]*)$/;
@@ -99,6 +100,14 @@ export const teamConfigSchema = z
               "Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.",
             ),
           ),
+        pipeline: z
+          .enum(["off", "shadow"])
+          .optional()
+          .meta(
+            d(
+              "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`. Default off.",
+            ),
+          ),
       })
       .optional()
       .meta(d("Office event intake settings.")),
@@ -113,6 +122,7 @@ export const teamConfigSchema = z
       .optional()
       .meta(d("Settings per catalog role, for everyone who plays it.")),
     workflow: workflowSchema.optional(),
+    pipeline: pipelineSchema.optional(),
     policies: policiesSchema.optional(),
   })
   .superRefine((cfg, ctx) => {

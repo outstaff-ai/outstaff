@@ -25,7 +25,16 @@ export {
 } from "./resolve.js";
 
 export { describeEffect } from "./describe.js";
-export { evaluateWorkflow, explainWorkflow } from "./evaluate.js";
+export {
+  checkCondition,
+  createEvaluationContext,
+  evaluateWorkflow,
+  explainWorkflow,
+  resolvePerson,
+  templateVariables,
+} from "./evaluate.js";
+
+export type { Resolved } from "./evaluate.types.js";
 export { createStaticWorkflowState } from "./state.js";
 export type {
   ActorKind,
@@ -48,4 +57,7 @@ export type {
   WorkflowExplanation,
   StaticWorkflowData,
   StaticTicket,
+  ConditionEvent,
+  EvaluationContext,
+  ConditionCheck,
 } from "./types.js";

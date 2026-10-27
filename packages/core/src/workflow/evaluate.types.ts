@@ -1,13 +1,7 @@
-import type { WorkflowEvent, WorkflowOptions, WorkflowPr, WorkflowState } from "./types.js";
+import type { ConditionCheck, EvaluationContext } from "./types.js";
 
-export interface Ctx {
-  event: WorkflowEvent;
-  state: WorkflowState;
-  opts: WorkflowOptions;
-  ticket: string | undefined;
-  pr: WorkflowPr | undefined;
-}
+export type Ctx = EvaluationContext;
 
-export type Check = { ok: boolean; detail: string };
+export type Check = ConditionCheck;
 
 export type Resolved<T> = { value: T } | { skip: string };

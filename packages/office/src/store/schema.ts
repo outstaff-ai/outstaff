@@ -105,6 +105,14 @@ export interface PausesTable {
   paused_at: string;
 }
 
+export interface PipelineTracesTable {
+  ref: string;
+  type: string;
+  at: string;
+  data: string;
+  recorded_at: string;
+}
+
 export interface Database {
   cursors: CursorsTable;
   events: EventsTable;
@@ -116,6 +124,7 @@ export interface Database {
   loop_guard: LoopGuardTable;
   conversations: ConversationsTable;
   pauses: PausesTable;
+  pipeline_traces: PipelineTracesTable;
 }
 
 export type Db = Kysely<Database>;

@@ -1,4 +1,4 @@
-import type { WorkflowEvent } from "@outstaff/core";
+import type { ConditionEvent } from "@outstaff/core";
 import type { Feedback } from "@outstaff/protocol";
 import type { Store } from "../store/types.js";
 
@@ -15,7 +15,7 @@ export const DELIVERED_SUBJECT = "work_feedback_delivered";
 export const FOLLOW_UP_SUBJECT = "work_feedback_followup";
 
 /** The review or comment a pull request, ticket or document event carries; nothing for other events. */
-export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
+export function feedbackOf(event: ConditionEvent): Feedback | undefined {
   const text = (key: string) => {
     const v = event.data[key];
     return typeof v === "string" && v !== "" ? v : undefined;
@@ -88,7 +88,7 @@ export function feedbackOf(event: WorkflowEvent): Feedback | undefined {
  * An inline comment of a review, announced by the host while the review is still pending. Nobody else can see it
  * yet; the submitted review brings it along, so it neither schedules work nor changes the work state.
  */
-export function awaitsReview(event: WorkflowEvent): boolean {
+export function awaitsReview(event: ConditionEvent): boolean {
   return (
     event.type === "pr.comment" &&
     event.data["kind"] === "review_comment" &&
