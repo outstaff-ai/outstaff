@@ -1,6 +1,6 @@
 import type { DeriveContext, SecretSource, SetupContext, SetupStep } from "@outstaff/core";
 import { ItsaplanHttp } from "./http.js";
-import { knowledgeOptions, resolveConnection } from "./options.js";
+import { optionalConnectionOptions, resolveConnection } from "./options.js";
 
 function address(ctx: SetupContext): string {
   const pattern = ctx.team.email?.pattern;
@@ -41,7 +41,7 @@ export async function deriveItsaplan(
     return {};
   }
 
-  const conn = resolveConnection(ctx, knowledgeOptions.parse(ctx.options ?? {}));
+  const conn = resolveConnection(ctx, optionalConnectionOptions.parse(ctx.options ?? {}));
   const http = new ItsaplanHttp({
     fetch: ctx.fetch,
     apiUrl: conn.api_url,

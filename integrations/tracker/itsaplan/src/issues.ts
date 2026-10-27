@@ -1,13 +1,19 @@
 import { PortError, type Issue, type Member } from "@outstaff/core";
-import type { Itsaplan } from "./client.js";
-import type { ApiFeedItem, ApiIssue, ApiProject, Page } from "./types.js";
+import type {
+  ApiFeedItem,
+  ApiIssue,
+  ApiProject,
+  Itsaplan,
+  Page,
+} from "@outstaff/integration.shared.itsaplan";
+import type { Statuses } from "./types.js";
 
 const KEY = /^(?:([A-Za-z0-9_]+)-)?(\d+)$/;
 const HYDRATE_CONCURRENCY = 5;
 export const FEED_PAGE = 100;
 
 /** Reading and writing issues through the client: the shapes the tracker methods share. */
-export function issueHelpers(api: Itsaplan) {
+export function issueHelpers(api: Itsaplan, statuses: Statuses) {
   const toIssue = (raw: ApiIssue, setup: ApiProject): Issue => {
     const assignee = raw.assigneeUserId ? api.member(setup, raw.assigneeUserId) : undefined;
     return {
@@ -15,7 +21,7 @@ export function issueHelpers(api: Itsaplan) {
       id: String(raw.id),
       title: raw.title,
       body: raw.description ?? "",
-      status: api.status(setup, raw.columnId),
+      status: statuses.status(setup, raw.columnId),
       ...(assignee ? { assignee } : {}),
       labels: (raw.labelIds ?? [])
         .map((id) => setup.labels.find((l) => l.id === id)?.name)

@@ -2,7 +2,9 @@
 // Source files stay small and keep types apart from implementations. Fails on a source file over
 // MAX_LINES lines, and on a non-index file that exports both a type (or interface) and a runtime
 // value. Shared types go in a folder's `types.ts`, a larger contract in `<name>.types.ts`. Also fails
-// on a relative import that leaves its workspace package: another package is imported by name.
+// on a relative import that leaves its workspace package: another package is imported by name. And an
+// integration (`integrations/<port>/<vendor>`) depends only on core, protocol and `integrations/shared/*`:
+// never on another adapter, so two adapters of one vendor share code through a shared package.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
@@ -155,6 +157,70 @@ export function crossPackageImports(files, read) {
   return problems;
 }
 
+const INTEGRATION = /^integrations\/[^/]+\/[^/]+$/;
+const ALLOWED = /^@outstaff\/(core|protocol|integration\.shared\.[^/]+)(\/|$)/;
+const TEST_KIT = /^@outstaff\/testing\.[^/]+(\/|$)/;
+const TEST_FILE = /(^|\/)(__tests__|testing)\/|(^|\/)testing\.ts$/;
+const DEPENDENCY_FIELDS = [
+  "dependencies",
+  "devDependencies",
+  "peerDependencies",
+  "optionalDependencies",
+];
+
+/** Whether an integration may name this workspace package: test kits only from tests and devDependencies. */
+const mayUse = (name, own, test) =>
+  name === own ||
+  ALLOWED.test(name) ||
+  (test && TEST_KIT.test(name)) ||
+  !name.startsWith("@outstaff/");
+
+/** Returns where an integration depends on another adapter (or anything but core, protocol and shared packages). */
+export function integrationDependencies(files, read) {
+  const problems = [];
+  for (const dir of files.filter((f) => f.endsWith("/package.json")).map(dirname)) {
+    if (!INTEGRATION.test(dir)) {
+      continue;
+    }
+
+    const pkg = JSON.parse(read(`${dir}/package.json`));
+    problems.push(...dependenciesOf(dir, pkg), ...importsOf(files, read, dir, pkg.name));
+  }
+
+  return problems;
+}
+
+function dependenciesOf(dir, pkg) {
+  return DEPENDENCY_FIELDS.flatMap((field) =>
+    Object.keys(pkg[field] ?? {})
+      .filter((name) => !mayUse(name, pkg.name, field === "devDependencies"))
+      .map(
+        (name) =>
+          `${dir}/package.json: ${field} names ${name}; an integration depends only on core, protocol and integrations/shared/*`,
+      ),
+  );
+}
+
+function importsOf(files, read, dir, own) {
+  const problems = [];
+  for (const file of files.filter((f) => f.startsWith(`${dir}/`) && CODE.test(f))) {
+    if (/(^|\/)(node_modules|dist)\//.test(file)) {
+      continue;
+    }
+
+    const test = TEST_FILE.test(file.slice(dir.length + 1));
+    for (const spec of [...read(file).matchAll(SPECIFIER)].map((m) => m[1])) {
+      if (!mayUse(spec, own, test)) {
+        problems.push(
+          `${file}: imports ${spec}; an integration depends only on core, protocol and integrations/shared/*`,
+        );
+      }
+    }
+  }
+
+  return problems;
+}
+
 function main() {
   // Untracked files count too, so a split is checked before it is staged.
   const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
@@ -164,7 +230,12 @@ function main() {
     .filter((file) => file && existsSync(file));
 
   const read = (file) => readFileSync(file, "utf8");
-  const problems = [...layoutProblems(files, read), ...crossPackageImports(files, read)];
+  const problems = [
+    ...layoutProblems(files, read),
+    ...crossPackageImports(files, read),
+    ...integrationDependencies(files, read),
+  ];
+
   for (const problem of problems) {
     console.error(problem);
   }

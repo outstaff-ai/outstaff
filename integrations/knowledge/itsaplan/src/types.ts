@@ -1,46 +1,12 @@
-import type { Itsaplan } from "@outstaff/integration.tracker.itsaplan";
+import type {
+  ApiDoc,
+  ApiDocComment,
+  ApiDocSummary,
+  Itsaplan,
+  OptionalConnectionOptions,
+} from "@outstaff/integration.shared.itsaplan";
 
-export interface Mark {
-  type: string;
-  attrs?: Record<string, unknown>;
-}
-
-export interface PmNode {
-  type: string;
-  attrs?: Record<string, unknown>;
-  content?: PmNode[];
-  marks?: Mark[];
-  text?: string;
-}
-
-export interface ApiDocSummary {
-  id: number;
-  parentId?: number | null;
-  title: string;
-  metadata?: { path?: string } | null;
-  version: number;
-  createdAt?: string;
-  updatedAt: string;
-}
-
-export interface ApiDoc extends ApiDocSummary {
-  content?: string | null;
-  contentJson?: PmNode | null;
-}
-
-export interface ApiDocComment {
-  id: string;
-  documentId?: number;
-  parentId?: string | null;
-  authorId?: string | null;
-  authorName?: string | null;
-  body: string;
-  quote?: string | null;
-  from?: number | null;
-  to?: number | null;
-  resolvedAt?: string | null;
-  createdAt: string;
-}
+export type KnowledgeOptions = OptionalConnectionOptions;
 
 export interface Tree {
   items: ApiDocSummary[];

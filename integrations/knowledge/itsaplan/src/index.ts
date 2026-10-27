@@ -4,17 +4,18 @@ import {
   doctorItsaplan,
   itsaplanSecrets,
   itsaplanSetupGuide,
-  knowledgeOptions,
-} from "@outstaff/integration.tracker.itsaplan";
+  optionalConnectionOptions,
+} from "@outstaff/integration.shared.itsaplan";
 import { createItsaplanKnowledge } from "./knowledge.js";
 
 export { createItsaplanKnowledge } from "./knowledge.js";
 export { docToMd } from "./doc-to-md.js";
 export { mdToDoc } from "./markdown.js";
 export { findRange, plainText } from "./text-range.js";
-export type { PmNode } from "./types.js";
-// The REST shapes the adapter reads, for the Its a Plan stand-ins used in tests.
-export type { ApiDoc, ApiDocComment, ApiDocSummary } from "./types.js";
+export type { KnowledgeOptions } from "./types.js";
+
+/** The knowledge adapter's options: every one is optional and falls back to an Its a Plan tracker integration. */
+export const knowledgeOptions = optionalConnectionOptions;
 
 export const itsaplanKnowledge = defineAdapter({
   port: "knowledge",

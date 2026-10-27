@@ -4,7 +4,7 @@ import type {
   ApiColumn,
   ApiIssue,
   ApiLabel,
-} from "@outstaff/integration.tracker.itsaplan";
+} from "@outstaff/integration.shared.itsaplan";
 import type { createFakeState } from "./fake-state.js";
 import type { createItsaplanFake } from "./itsaplan-fake.js";
 

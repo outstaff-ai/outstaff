@@ -1,6 +1,6 @@
 import type { KnowledgeSeed } from "@outstaff/core/contracts";
 import type { ItsaplanFake as TrackerFake } from "@outstaff/testing.itsaplan";
-import type { ApiDoc, ApiDocComment } from "../types.js";
+import type { ApiDoc, ApiDocComment } from "@outstaff/integration.shared.itsaplan";
 
 /** A document as the fake stores it: the full form, with the fields the API may leave out always set. */
 export type StoredDoc = ApiDoc &

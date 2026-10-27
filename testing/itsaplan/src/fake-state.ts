@@ -1,5 +1,5 @@
 import type { StubReply } from "./types.js";
-import type { Page } from "@outstaff/integration.tracker.itsaplan";
+import type { Page } from "@outstaff/integration.shared.itsaplan";
 import type {
   FakeOptions,
   StoredActivity,

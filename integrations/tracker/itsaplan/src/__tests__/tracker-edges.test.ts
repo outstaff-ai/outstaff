@@ -1,6 +1,6 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { trackerOptions } from "../options.js";
+import { trackerOptions } from "../index.js";
 import {
   API_KEY,
   createStubFetch,

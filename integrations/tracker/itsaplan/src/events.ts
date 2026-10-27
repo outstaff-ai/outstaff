@@ -1,8 +1,16 @@
 import { mentionData, type EventPage, type Member, type TrackerEvent } from "@outstaff/core";
-import type { Itsaplan } from "./client.js";
-import { nextCursor, OVERLAP_MS, parseCursor } from "./cursor.js";
+import {
+  nextCursor,
+  OVERLAP_MS,
+  parseCursor,
+  type ApiActivityItem,
+  type ApiFeedItem,
+  type ApiProject,
+  type EventCursor,
+  type Itsaplan,
+  type Page,
+} from "@outstaff/integration.shared.itsaplan";
 import { FEED_PAGE } from "./issues.js";
-import type { ApiActivityItem, ApiFeedItem, ApiProject, EventCursor, Page } from "./types.js";
 
 const EVENT_PAGES = 20;
 

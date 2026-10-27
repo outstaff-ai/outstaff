@@ -1,7 +1,7 @@
 // Markdown bullet, ordered and task lists (nested by indentation) to editor JSON.
 
 import { paragraph, text } from "./markdown-inline.js";
-import type { PmNode } from "./types.js";
+import type { PmNode } from "@outstaff/integration.shared.itsaplan";
 
 export const LIST = /^(\s*)([-*+]|\d+\.)\s+(.*)$/;
 const TASK = /^\[( |x|X)\]\s+(.*)$/;

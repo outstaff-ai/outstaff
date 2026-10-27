@@ -1,23 +1,14 @@
-import {
-  PortError,
-  type AdapterContext,
-  type Logger,
-  type CanonicalStatus,
-  type Member,
-  type StatusMap,
-} from "@outstaff/core";
+import { PortError, type AdapterContext, type Logger, type Member } from "@outstaff/core";
 import { buildFetch } from "./fetch.js";
 import { ItsaplanHttp } from "./http.js";
 import { resolveConnection } from "./options.js";
-import { columnFor, DEFAULT_NAMES, statusOf } from "./statuses.js";
 import type {
   ApiAssignee,
-  ApiColumn,
   ApiProject,
   ClientDeps,
   Connection,
-  KnowledgeOptions,
-  TrackerOptions,
+  ConnectionOptions,
+  OptionalConnectionOptions,
 } from "./types.js";
 
 const SETUP_TTL_MS = 30_000;
@@ -26,10 +17,9 @@ const SETUP_TTL_MS = 30_000;
 const WORKSPACE_RETRY_MS = 5_000;
 const WORKSPACE_RETRY_MAX_MS = 300_000;
 
-/** The typed client both adapters share: HTTP, the project's setup (columns, labels, members) and links. */
+/** The typed client both Its a Plan adapters share: HTTP, the project's setup (columns, labels, members) and links. */
 export class Itsaplan {
   private setup: { at: number; value: ApiProject } | undefined;
-  readonly statusMap: StatusMap;
 
   /** The team's segment in web URLs (`teamRef` of the project); resolved on first use, never at start. */
   workspace: string | undefined;
@@ -41,10 +31,7 @@ export class Itsaplan {
     readonly http: ItsaplanHttp,
     readonly conn: Connection,
     private readonly ctx: Pick<AdapterContext<unknown>, "team" | "now"> & { log?: Logger },
-  ) {
-    const configured = ctx.team?.workflow?.statuses ?? {};
-    this.statusMap = { ...DEFAULT_NAMES, ...configured };
-  }
+  ) {}
 
   get projectPath(): string {
     return `/projects/${encodeURIComponent(this.conn.project)}`;
@@ -64,15 +51,6 @@ export class Itsaplan {
 
   invalidate(): void {
     this.setup = undefined;
-  }
-
-  /** The column for a canonical status: the mapped name, else the first column of the matching kind. */
-  column(setup: ApiProject, status: CanonicalStatus): ApiColumn {
-    return columnFor(this.statusMap, setup, status);
-  }
-
-  status(setup: ApiProject, columnId: number): { name: string; canonical?: CanonicalStatus } {
-    return statusOf(this.statusMap, setup, columnId);
   }
 
   member(
@@ -236,7 +214,7 @@ export class Itsaplan {
 }
 
 export async function createClient(
-  ctx: AdapterContext<TrackerOptions | KnowledgeOptions>,
+  ctx: AdapterContext<ConnectionOptions | OptionalConnectionOptions>,
   deps: ClientDeps = {},
 ): Promise<Itsaplan> {
   const conn = resolveConnection(ctx, ctx.options);

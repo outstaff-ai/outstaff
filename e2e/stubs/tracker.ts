@@ -7,8 +7,9 @@ import type {
   ApiLabel,
   ApiProject,
   Page,
-} from "@outstaff/integration.tracker.itsaplan";
-import type { ApiDoc, ApiDocComment } from "@outstaff/integration.knowledge.itsaplan";
+  ApiDoc,
+  ApiDocComment,
+} from "@outstaff/integration.shared.itsaplan";
 import type { Req, Route } from "./http.ts";
 
 /** The parts of the Its a Plan REST API the tracker adapter uses: project setup, issues, comments, the activity feed and documents. */

@@ -1,6 +1,6 @@
 import { PortError, type AdapterContext } from "@outstaff/core";
 import { z } from "zod";
-import type { Connection, KnowledgeOptions, TrackerOptions } from "./types.js";
+import type { Connection, ConnectionOptions, OptionalConnectionOptions } from "./types.js";
 
 const connection = {
   url: z.url().describe("Web address of the instance, used for links."),
@@ -47,10 +47,11 @@ const connection = {
     ),
 };
 
-export const trackerOptions = z.strictObject(connection);
+/** The options of an Its a Plan integration: the instance, the project and the link templates. */
+export const connectionOptions = z.strictObject(connection);
 
 /** Every option is optional here: it falls back to the tracker integration when that is Its a Plan too. */
-export const knowledgeOptions = z.strictObject({
+export const optionalConnectionOptions = z.strictObject({
   url: connection.url.optional(),
   api_url: connection.api_url,
   project: connection.project.optional(),
@@ -87,20 +88,20 @@ function itsaplanTracker(
 /** The connection options a knowledge adapter may take from an Its a Plan tracker; none when they do not parse. */
 function trackerDefaults(ctx: Pick<AdapterContext<unknown>, "team">) {
   const tracker = itsaplanTracker(ctx);
-  const parsed = tracker ? trackerOptions.partial().safeParse(tracker) : undefined;
+  const parsed = tracker ? connectionOptions.partial().safeParse(tracker) : undefined;
   return parsed?.success ? parsed.data : {};
 }
 
 /** The options a knowledge adapter runs with: its own, completed from the tracker integration when that is Its a Plan. */
 export function resolveConnection(
   ctx: Pick<AdapterContext<unknown>, "team">,
-  own: KnowledgeOptions | TrackerOptions,
+  own: OptionalConnectionOptions | ConnectionOptions,
 ): Connection {
   const base = trackerDefaults(ctx);
   const merged = {
     ...base,
     ...Object.fromEntries(Object.entries(own).filter(([, v]) => v !== undefined)),
-  } as Partial<TrackerOptions>;
+  } as Partial<ConnectionOptions>;
 
   if (!merged.url || !merged.project) {
     throw new PortError(

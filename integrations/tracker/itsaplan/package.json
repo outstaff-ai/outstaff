@@ -29,8 +29,7 @@
   },
   "dependencies": {
     "@outstaff/core": "workspace:*",
-    "zod": "4.6.7",
-    "undici": "8.12.3"
+    "@outstaff/integration.shared.itsaplan": "workspace:*"
   },
   "devDependencies": {
     "vitest": "5.0.5"

@@ -9,14 +9,20 @@ import {
   createClient,
   type ClientDeps,
   type Itsaplan,
-  type KnowledgeOptions,
-} from "@outstaff/integration.tracker.itsaplan";
+} from "@outstaff/integration.shared.itsaplan";
+import type { KnowledgeOptions } from "./types.js";
 import { commentId, parseCommentId } from "./comment-ids.js";
 import { find, pathOf, segments } from "./doc-tree.js";
 import { readDocEvents } from "./events.js";
 import { mdToDoc } from "./markdown.js";
 import { findRange, plainText } from "./text-range.js";
-import type { ApiDoc, ApiDocComment, ApiDocSummary, PmNode, Tree } from "./types.js";
+import type {
+  ApiDoc,
+  ApiDocComment,
+  ApiDocSummary,
+  PmNode,
+} from "@outstaff/integration.shared.itsaplan";
+import type { Tree } from "./types.js";
 
 const NUMERIC = /^\d+$/;
 const QUOTE_FALLBACK = 80;

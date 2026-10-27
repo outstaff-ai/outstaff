@@ -4,9 +4,9 @@
 // Supported: headings, paragraphs, bullet/ordered/task lists (nested), blockquotes, fenced code, horizontal rules,
 // tables, hard breaks, bold, italic, strike, inline code and links. Anything else degrades to plain text.
 
+import type { PmNode } from "@outstaff/integration.shared.itsaplan";
 import { inline, paragraph, text } from "./markdown-inline.js";
 import { LIST, parseList } from "./markdown-list.js";
-import type { PmNode } from "./types.js";
 
 /** A parsed block and the line after it. */
 type Parsed = [PmNode, number];

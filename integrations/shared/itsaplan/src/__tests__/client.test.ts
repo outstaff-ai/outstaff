@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Itsaplan } from "../client.js";
 import { buildFetch } from "../fetch.js";
 import type { ItsaplanHttp } from "../http.js";
-import { resolveConnection, trackerOptions } from "../options.js";
+import { connectionOptions, resolveConnection } from "../options.js";
 import type { ApiProject } from "../types.js";
 
 // The default TLS fetch loads undici on demand; the double records what it is asked to do instead of connecting.
@@ -31,7 +31,7 @@ vi.mock("undici", () => ({
 const connect = (over: Record<string, unknown> = {}) =>
   resolveConnection(
     { team: { integrations: {} } as unknown as TeamConfig },
-    trackerOptions.parse({ url: "https://tracker.acme.example/", project: "SHOP", ...over }),
+    connectionOptions.parse({ url: "https://tracker.acme.example/", project: "SHOP", ...over }),
   );
 
 const project = (over: Partial<ApiProject> = {}): ApiProject => ({
@@ -91,46 +91,6 @@ describe("custom CA through undici", () => {
     await expect(
       buildFetch(fetch, connect({ ca_file: join(tmpdir(), "itsaplan-missing", "ca.pem") })),
     ).rejects.toMatchObject({ code: "invalid" });
-  });
-});
-
-describe("columns", () => {
-  const client = (team?: unknown) =>
-    new Itsaplan(stubHttp(() => project()).http, connect(), {
-      team: teamOf(team),
-      now: () => new Date(0),
-    });
-
-  it("falls back to the first column of the kind by position, counting a missing position as 0", () => {
-    const columns = [
-      { id: 1, name: "Later", stateType: "started" },
-      { id: 2, name: "Second", stateType: "started", position: 2 },
-      { id: 3, name: "Unplaced", stateType: "started" },
-      { id: 4, name: "First", stateType: "started", position: -1 },
-    ];
-
-    expect(client().column(project({ columns }), "active").name).toBe("First");
-  });
-
-  it("uses the default name of a status the team file maps to nothing", () => {
-    const api = client({ workflow: { statuses: { active: undefined } } });
-    const columns = [{ id: 1, name: "ACTIVE", stateType: "backlog" }];
-    expect(api.column(project({ columns }), "active").id).toBe(1);
-  });
-
-  it("names a column id the project does not have by the id, without a status", () => {
-    expect(client().status(project(), 99)).toEqual({ name: "99" });
-  });
-
-  it("gives a column of an unknown kind and name no canonical status", () => {
-    const columns = [{ id: 5, name: "Parking lot", stateType: "paused" }];
-    expect(client().status(project({ columns }), 5)).toEqual({ name: "Parking lot" });
-  });
-
-  it("reads a configured status name before the column kind", () => {
-    const api = client({ workflow: { statuses: { review: "QA" } } });
-    const columns = [{ id: 6, name: "qa", stateType: "started" }];
-    expect(api.status(project({ columns }), 6)).toEqual({ name: "qa", canonical: "review" });
   });
 });
 
