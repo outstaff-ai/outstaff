@@ -156,6 +156,39 @@ describe("formatTrace", () => {
     );
   });
 
+  it("names the item each wake queued, or was folded into with that item's events", () => {
+    const wake = {
+      type: "wake" as const,
+      policy: "chat_to_addressed",
+      person: "sam",
+      kind: "chat",
+      instruction: "Answer.",
+      feedback: [],
+      subject: { type: "chat" as const, ref: "D-1" },
+    };
+
+    const trace: Trace = {
+      event: event("chat.message", { id: "chat:sam:D-1:3", subject: { chat: { channel: "D-1" } } }),
+      policies: [],
+      decisions: [
+        wake,
+        { ...wake, itemId: "w-1" },
+        { ...wake, itemId: "w-1", folded: ["chat:sam:D-1:1", "chat:sam:D-1:3"] },
+      ],
+    };
+
+    expect(formatTrace(trace).split("\n").slice(4)).toEqual([
+      "  wake sam (chat) on chat D-1",
+      "    instruction: Answer.",
+      "  wake sam (chat) on chat D-1",
+      "    instruction: Answer.",
+      "    queued work item w-1",
+      "  wake sam (chat) on chat D-1",
+      "    instruction: Answer.",
+      "    folded into work item w-1, with the events chat:sam:D-1:1, chat:sam:D-1:3",
+    ]);
+  });
+
   it("says what each wake's bundle carried, item by item", () => {
     const limits = { comments: 5, messages: 10, threads: 5, items: 2, bodyChars: 1500 };
     const trace: Trace = {

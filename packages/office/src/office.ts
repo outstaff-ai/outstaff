@@ -3,6 +3,7 @@ import { createChatDesk } from "./chat/index.js";
 import { createEngine, type EngineMeta } from "./engine/index.js";
 import { createIntake } from "./intake/index.js";
 import { createMessaging, type RoleInfo } from "./messaging/index.js";
+import { createChatEntry } from "./office-chat.js";
 import { officeDocLinks } from "./office-doc-links.js";
 import { doctorForOffice } from "./office-doctor.js";
 import { createHandedBack } from "./office-handback.js";
@@ -90,18 +91,19 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ...defined({ staleAfterMinutes: o.usageStaleAfterMinutes }),
   });
 
+  // The protocol server is created last but must be told about new work, so the callback looks it up late.
+  let server: ProtocolServer | undefined;
+  const notify = (person: string) => server?.notify(person);
+
   const baseScheduler = createScheduler({
     store,
     team,
     clock,
     logger: log,
     usage,
+    onReleased: notify,
     ...defined({ staleAfterMinutes: o.staleAfterMinutes }),
   });
-
-  // The protocol server is created last but must be told about new work, so the callback looks it up late.
-  let server: ProtocolServer | undefined;
-  const notify = (person: string) => server?.notify(person);
 
   const scheduler = notifyingScheduler({ scheduler: baseScheduler, store, workState, notify });
 
@@ -130,7 +132,13 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
   // At-least-once and in order: the state reflects the event before the engine judges it, and both are idempotent.
   // A ticket change that gives an agent a ready ticket is checked for an idle pull once the event is judged.
+  // A chat message changes nothing in the work state, and only the pipeline judges it: the chat desk acted already.
   intake.onEvent(async (event, meta) => {
+    if (event.type === "chat.message") {
+      await track(officePipeline.chat(event, meta));
+      return;
+    }
+
     await track(workState.apply(event, meta));
     await judge(event, meta);
     await track(idle.afterEvent(event));
@@ -218,13 +226,22 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       ),
   });
 
+  const chatEntry = createChatEntry({
+    mode: officePipeline.mode,
+    desk: chatDesk,
+    intake,
+    store,
+    clock,
+    logger: log,
+  });
+
   const doctor = doctorForOffice(input, ports.vcs, log);
   server = createProtocolServer({
     source,
     doctor,
     messaging,
     usage,
-    chat: chatDesk,
+    chat: { ...chatDesk, message: chatEntry.message },
     docs: officeDocLinks({ store, workState, log }),
     tickets: officeTicketPrs({ workState, log }),
     onConnected: (person) => void track(idle.check(person)),

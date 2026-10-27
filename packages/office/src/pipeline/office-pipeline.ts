@@ -1,4 +1,5 @@
 import { createOfficeActExecutor } from "./act/office-executor.js";
+import type { EngineRecord } from "./compare/compare.types.js";
 import { createLivePipeline } from "./live/live.js";
 import type { OfficePipeline, OfficePipelineOptions } from "./office-pipeline.types.js";
 import { createShadowPipeline } from "./shadow.js";
@@ -23,6 +24,11 @@ function shadow(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
       await runner.judge(event);
       return pull();
     },
+    async chat(event, meta) {
+      await runner.handle(event, meta);
+      const desk = event.data["desk"] as EngineRecord | undefined;
+      return desk ? runner.compare(meta, () => desk) : undefined;
+    },
   };
 }
 
@@ -41,6 +47,7 @@ function live(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
     traces,
     route: (event, meta) => runner.handle(event, meta),
     idle: (event) => runner.judge(event),
+    chat: (event, meta) => runner.handle(event, meta),
   };
 }
 
@@ -54,6 +61,7 @@ export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipelin
       traces,
       route: (_event, _meta, engine) => engine(),
       idle: (_event, pull) => pull(),
+      chat: async () => undefined,
     };
   }
 

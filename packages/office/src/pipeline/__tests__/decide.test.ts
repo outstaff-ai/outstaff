@@ -81,7 +81,7 @@ describe("decide: wake", () => {
 
     expect(run(addressed, chat("171.2"))).toMatchObject({
       instruction: "",
-      subject: { type: "chat", ref: "D0SAM/171.2" },
+      subject: { type: "chat", ref: "D0SAM:171.2" },
     });
 
     expect(run(addressed, chat())).toMatchObject({ subject: { type: "chat", ref: "D0SAM" } });

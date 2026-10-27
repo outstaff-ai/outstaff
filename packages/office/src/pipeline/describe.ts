@@ -58,10 +58,21 @@ function policyLines(judged: Trace["policies"]): string[] {
   ];
 }
 
+/** A wake's instruction, and the item it queued or was folded into, with that item's events. */
+function wakeLines(d: Extract<Decision, { type: "wake" }>): string[] {
+  const item = d.folded
+    ? [`    folded into work item ${d.itemId}, with the events ${d.folded.join(", ")}`]
+    : d.itemId
+      ? [`    queued work item ${d.itemId}`]
+      : [];
+
+  return [`    instruction: ${d.instruction}`, ...item];
+}
+
 const decisionLines = (decisions: Trace["decisions"]): string[] =>
   decisions.flatMap((d) => [
     `  ${describeDecision(d)}`,
-    ...(d.type === "wake" ? [`    instruction: ${d.instruction}`] : []),
+    ...(d.type === "wake" ? wakeLines(d) : []),
   ]);
 
 function entryLine(e: ManifestEntry): string {

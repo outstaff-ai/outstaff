@@ -8,7 +8,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
 import { readFeedback } from "#/engine/feedback.js";
-import type { EnqueueInput } from "#/scheduler/index.js";
+import { createScheduler, type EnqueueInput } from "#/scheduler/index.js";
 import { openStore, type Store } from "#/store/index.js";
 import type { Act } from "#/pipeline/decisions.types.js";
 import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
@@ -219,7 +219,7 @@ describe("enqueueWake", () => {
   it("keys a pull request by the work state's subject and joins a live item of the same kind", async () => {
     const { opts, store: s } = await setup();
     const queued = await enqueueWake(prWake, onPr(9), opts);
-    expect(queued.joined).toBe(false);
+    expect(queued.folded).toBeUndefined();
     const [item] = await s.listItems({ person: "sam" });
     expect(item).toMatchObject({
       title: "review feedback: PR #9 Wishlist",
@@ -227,14 +227,15 @@ describe("enqueueWake", () => {
     });
 
     expect(queued.itemId).toBe(item!.id);
-    expect(await enqueueWake(prWake, onPr(9), opts)).toEqual({ itemId: item!.id, joined: true });
-    expect(await enqueueWake(prWake, onPr(11), opts)).toEqual({
-      itemId: expect.any(String),
-      joined: false,
+    expect(await enqueueWake(prWake, onPr(9), opts)).toEqual({
+      itemId: item!.id,
+      folded: ["vcs:c-9"],
     });
 
-    expect(await enqueueWake(prWake, { ...onPr(9), id: "vcs:c-other" }, opts)).toMatchObject({
-      joined: true,
+    expect(await enqueueWake(prWake, onPr(11), opts)).toEqual({ itemId: expect.any(String) });
+    expect(await enqueueWake(prWake, { ...onPr(9), id: "vcs:c-other" }, opts)).toEqual({
+      itemId: item!.id,
+      folded: ["vcs:c-9", "vcs:c-other"],
     });
 
     expect((await s.getSubject(ITEM_EVENTS_SUBJECT, item!.id))?.data).toEqual([
@@ -264,6 +265,36 @@ describe("enqueueWake", () => {
       "assigned: ACME-9",
       "doc feedback: doc-7",
       "review feedback: PR #10",
+    ]);
+  });
+
+  it("folds a wake of another kind for the same subject into the held item, with its instruction", async () => {
+    const { opts, store: s } = await setup();
+    const clock = manualClock("2026-10-05T09:00:00.000Z");
+    const scheduler = createScheduler({ store: s, team: opts.team, clock });
+    const withScheduler = { ...opts, scheduler, clock };
+    const first = await enqueueWake(prWake, onPr(9), withScheduler);
+    const ci = {
+      ...prWake,
+      policy: "ci_failed_to_author",
+      kind: "ci_failed",
+      instruction: "Fix the checks.",
+    };
+
+    const second = await enqueueWake(
+      ci,
+      { ...onPr(9), id: "vcs:ci-9", type: "pr.ci_failed", at: "2026-10-05T09:00:30.000Z" },
+      withScheduler,
+    );
+
+    expect(second).toEqual({ itemId: first.itemId, folded: ["vcs:c-9", "vcs:ci-9"] });
+    expect(await s.listItems({ person: "sam" })).toMatchObject([
+      { kind: "review_feedback", notBefore: "2026-10-05T09:01:00.000Z" },
+    ]);
+
+    expect((await s.readJournal(first.itemId)).map((j) => j.text)).toEqual([
+      "Address it.",
+      "Fix the checks.",
     ]);
   });
 });

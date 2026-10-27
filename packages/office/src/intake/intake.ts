@@ -7,7 +7,13 @@ import { agentMentionResolver } from "./normalize.js";
 import { createPoller } from "./poller.js";
 import { pollSources, webhookParsers } from "./sources.js";
 import { createTrust } from "./trust.js";
-import type { BackoffOptions, Intake, IntakeOptions, WebhookServer } from "./types.js";
+import type {
+  BackoffOptions,
+  Intake,
+  IntakeOptions,
+  StoredPayload,
+  WebhookServer,
+} from "./types.js";
 import { createWebhookServer } from "./webhook.js";
 import { defined } from "#/defined.js";
 
@@ -128,6 +134,24 @@ export function createIntake(opts: IntakeOptions): Intake {
       await server?.close();
       server = undefined;
       address = undefined;
+    },
+    async receive(event, meta) {
+      const fresh = await store.recordEvent({
+        source: meta.source,
+        externalId: meta.externalId,
+        type: event.type,
+        payload: {
+          raw: { externalId: meta.externalId, type: event.type },
+          event,
+          trusted: meta.trusted,
+        } satisfies StoredPayload,
+      });
+
+      if (fresh) {
+        void drain();
+      }
+
+      return fresh;
     },
     async pollOnce() {
       for (const source of sources) {

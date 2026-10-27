@@ -45,6 +45,7 @@ export type {
   Priority,
   WorkflowEvent,
   WorkflowEventType,
+  OfficeEventType,
   WorkflowOptions,
   WorkflowPr,
   WorkflowState,

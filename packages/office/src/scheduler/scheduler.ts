@@ -1,9 +1,11 @@
 import { silentLogger } from "@outstaff/core";
 import type { WorkItem } from "#/store/types.js";
+import type { Cancel } from "#/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
 import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
+import { enqueueItem, releaseHold } from "./enqueue.js";
 import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";
-import { CHAT_KIND, DEFAULT_RETRY, isLoopGuarded, orderQueue, priorityFor } from "./policy.js";
+import { CHAT_KIND, DEFAULT_RETRY, isLoopGuarded, orderQueue } from "./policy.js";
 import { runTick } from "./tick.js";
 import type { PauseState, Scheduler, SchedulerOptions, StartResult } from "./types.js";
 
@@ -22,6 +24,12 @@ function limitsOf(team: SchedulerOptions["team"]) {
     retry: { ...DEFAULT_RETRY, ...team.policies?.retry },
   };
 }
+
+/** Why a queued item is not offered yet: the backoff after a failure, or the hold that lets close wakes fold in. */
+const heldUntil = (item: WorkItem) =>
+  item.failures > 0
+    ? `Held back after a failed run until ${item.notBefore}.`
+    : `Held until ${item.notBefore}, so wakes that come close together run as one.`;
 
 export function createScheduler(opts: SchedulerOptions): Scheduler {
   const { store, team, clock } = opts;
@@ -63,6 +71,22 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
   const deps: SchedulerDeps = { store, clock, log, checks, retry, staleMs };
 
+  // An item held for coalescing is released when its window closes; the tick releases it too, after a restart.
+  const holds = new Set<Cancel>();
+  const held = (item: WorkItem) => {
+    const cancel = clock.setTimeout(
+      () => {
+        holds.delete(cancel);
+        exclusive(() => releaseHold(deps, item, opts.onReleased)).catch((err: unknown) =>
+          log.warn("could not release a held work item", { item: item.id, error: String(err) }),
+        );
+      },
+      Date.parse(item.notBefore!) - clock.now().getTime(),
+    );
+
+    holds.add(cancel);
+  };
+
   /** Why the item cannot start now: it is not queued, its person has no room, or it backs off after a failure. */
   const notReady = async (item: WorkItem): Promise<StartResult | undefined> => {
     if (item.status !== "queued") {
@@ -79,11 +103,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     }
 
     return backingOff(item)
-      ? {
-          started: false,
-          reason: "backoff",
-          detail: `Held back after a failed run until ${item.notBefore}.`,
-        }
+      ? { started: false, reason: "backoff", detail: heldUntil(item) }
       : undefined;
   };
 
@@ -105,32 +125,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
   const scheduler: Scheduler = {
     enqueue(input) {
-      return exclusive(async () => {
-        const { placement: chosen, init, ...rest } = input;
-        const placement = chosen;
-        const created = await store.enqueue({
-          ...rest,
-          priority: input.priority ?? priorityFor(input.trigger, input.kind),
-        });
-
-        await init?.(created);
-
-        if (placement !== undefined) {
-          const queue = await queuedOf(created.person);
-          const first = orderQueue(queue).find((i) => i.id !== created.id);
-          if (placement === "next") {
-            if (first) {
-              await applyMove(created.id, { before: first.id });
-            }
-          } else if (placement === "last") {
-            await applyMove(created.id, { last: true });
-          } else {
-            await applyMove(created.id, placement);
-          }
-        }
-
-        return (await store.getItem(created.id)) ?? created;
-      });
+      return exclusive(() => enqueueItem(deps, input, held));
     },
 
     async next(person) {
@@ -250,8 +245,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     },
 
     start(onTick) {
-      scheduler.stop();
-      stopTimer = undefined;
+      stopTick();
       const loop = () => {
         scheduler
           .tick()
@@ -269,13 +263,22 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     },
 
     stop() {
-      running = false;
-      stopTimer?.();
-      stopTimer = undefined;
+      stopTick();
+      for (const cancel of holds) {
+        cancel();
+      }
+
+      holds.clear();
     },
   };
 
   let running = false;
   let stopTimer: (() => void) | undefined;
+  const stopTick = () => {
+    running = false;
+    stopTimer?.();
+    stopTimer = undefined;
+  };
+
   return scheduler;
 }

@@ -6,6 +6,12 @@ import type { HAND_BACK_STATUSES } from "./rules.js";
 
 export type WorkflowEventType = (typeof WORKFLOW_EVENT_TYPES)[number];
 
+/**
+ * Events the office takes in that the workflow rules do not listen to: chat messages, which only the office's event
+ * pipeline judges.
+ */
+export type OfficeEventType = WorkflowEventType | "chat.message";
+
 export type ActorKind = "human" | "agent" | "automation";
 
 export interface PrRef {
@@ -15,8 +21,15 @@ export interface PrRef {
 
 /** A normalized event. The office maps tracker, VCS and agent events onto this shape. */
 export interface WorkflowEvent {
-  type: WorkflowEventType;
-  subject: { ticket?: string; pr?: PrRef; doc?: string };
+  type: OfficeEventType;
+
+  /** `chat` is the conversation a `chat.message` was written in: the channel and, unless it is the whole of a direct message, the thread. */
+  subject: {
+    ticket?: string;
+    pr?: PrRef;
+    doc?: string;
+    chat?: { channel: string; thread?: string | undefined };
+  };
   actor: { kind: ActorKind; id: string };
 
   /**

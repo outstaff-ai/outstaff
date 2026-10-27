@@ -33,7 +33,9 @@ export function createShadowPipeline(opts: ShadowOptions): ShadowPipeline {
       }
     },
 
-    async engineDid(meta, outcomes) {
+    engineDid: (meta, outcomes) => runner.compare(meta, () => engineRecord(outcomes)),
+
+    async compare(meta, record) {
       const id = `${meta.source}:${meta.externalId}`;
       try {
         const trace = await traces.get(id);
@@ -41,7 +43,7 @@ export function createShadowPipeline(opts: ShadowOptions): ShadowPipeline {
           return undefined;
         }
 
-        const engine = engineRecord(outcomes);
+        const engine = record();
         const done = {
           ...trace,
           engine,

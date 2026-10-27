@@ -55,6 +55,8 @@ function team(pipeline: "off" | "shadow" | "live"): TeamConfig {
       tracker: { adapter: "fake" },
     },
     office: { pipeline },
+    // These scenarios are about what a wake carries; coalescing has its own.
+    pipeline: { wake: { coalesce_seconds: 0 } },
   });
 
   if (!result.ok) {
@@ -233,7 +235,11 @@ describe.each(["off", "shadow", "live"] as const)(
       );
 
       // The trace of the review shows what the wake carried; with the pipeline off nothing is traced.
-      const traces = await store.listTraces({ limit: 20 });
+      // Live, the chat message has a trace of its own too, with what its session was handed.
+      const traces = (await store.listTraces({ limit: 20 })).filter(
+        (t) => (t.data as { event: { type: string } }).event.type !== "chat.message",
+      );
+
       const carried = traces.flatMap((t) =>
         Object.values(
           (t.data as { context?: Record<string, ContextManifest> }).context ?? {},

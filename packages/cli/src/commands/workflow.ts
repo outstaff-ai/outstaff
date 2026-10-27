@@ -101,7 +101,7 @@ function explainEvent(
   );
 
   const switchedOff = workflow.switched
-    .filter((s) => [s.on].flat().includes(event.type))
+    .filter((s) => ([s.on].flat() as string[]).includes(event.type))
     .map((s) => ({
       rule: s.rule,
       switch: `policies.${s.switch}`,

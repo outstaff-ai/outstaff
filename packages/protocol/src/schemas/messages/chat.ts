@@ -37,12 +37,14 @@ export const chatMessages = [
     "chat_message_result",
     z.strictObject({
       disposition: z
-        .enum(["started", "limited", "joined", "placed", "asked_pm", "unclear"])
+        .enum(["received", "started", "limited", "joined", "placed", "asked_pm", "unclear"])
         .describe(
-          "What the office did: `started` a chat session for the message, or held it as `limited` until a chat session is free, `joined` an item of the thread, `placed` the item waiting for its place, `asked_pm` to prioritize it, or could not read the answer (`unclear`).",
+          "What the office did: `received` the message as an event its pipeline decides on (`office.pipeline: live`); with the chat desk, `started` a chat session for the message, or held it as `limited` until a chat session is free, `joined` an item of the thread, `placed` the item waiting for its place, `asked_pm` to prioritize it, or could not read the answer (`unclear`).",
         ),
       repeated: z.boolean().describe("True when the office already handled this message."),
-      item: workSummarySchema.describe("The item the message belongs to."),
+      item: workSummarySchema
+        .optional()
+        .describe("The item the message belongs to; absent for `received`, which queues later."),
       links: z
         .array(linkSchema)
         .describe("What the office created for the request, for example the ticket."),

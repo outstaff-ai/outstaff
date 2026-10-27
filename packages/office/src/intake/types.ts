@@ -58,7 +58,8 @@ export interface WebhookServer {
 }
 
 export interface IntakeMeta {
-  source: "vcs" | "tracker" | "knowledge";
+  /** `chat` for a chat message an agent passed on (`receive`); the others are read from the sources. */
+  source: "vcs" | "tracker" | "knowledge" | "chat";
   externalId: string;
 
   /**
@@ -108,6 +109,12 @@ export interface Intake {
   start(): Promise<void>;
   stop(): Promise<void>;
   onEvent(handler: EventHandler): void;
+
+  /**
+   * Records an event the office was handed rather than read, a chat message, and delivers it with the others, in
+   * order and at least once. False when it was recorded already; delivery starts without being waited for.
+   */
+  receive(event: WorkflowEvent, meta: IntakeMeta): Promise<boolean>;
 
   /** Poll mode: run one pass over every source now, outside the timer schedule. */
   pollOnce(): Promise<void>;
@@ -177,7 +184,7 @@ export interface SourcesOptions {
 }
 
 export interface PollSource {
-  name: "vcs" | "tracker" | "knowledge";
+  name: Exclude<IntakeMeta["source"], "chat">;
   poll(): Promise<void>;
 
   /** No webhook exists for it, so it is polled in webhook mode too. */

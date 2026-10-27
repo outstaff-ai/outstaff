@@ -1,5 +1,6 @@
 import type { Resolved, TemplateError } from "@outstaff/core";
 import { prLabel } from "#/log.js";
+import { conversationRef } from "#/refs/index.js";
 import type { ActOp, ActTarget, Decision, WakeSubject } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import { feedbackFor } from "./feedback.js";
@@ -35,9 +36,7 @@ function eventSubject(event: PipelineEvent): WakeSubject | undefined {
     return { type: "doc", ref: doc };
   }
 
-  return chat
-    ? { type: "chat", ref: chat.thread ? `${chat.channel}/${chat.thread}` : chat.channel }
-    : undefined;
+  return chat ? { type: "chat", ref: conversationRef(chat) } : undefined;
 }
 
 /** The subject of a wake: the event's, or for an idle pull the agent's oldest ready ticket. */

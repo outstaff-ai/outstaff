@@ -19,6 +19,10 @@ const EVENT_PIPELINE = [
   "packages/office/src/office-link.ts",
   "packages/protocol/src/link/**/*.ts",
   "packages/core/src/acts/**/*.ts",
+  "packages/office/src/scheduler/enqueue.ts",
+  "packages/office/src/chat/event.ts",
+  "packages/office/src/chat/session.ts",
+  "packages/office/src/office-chat.ts",
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];
