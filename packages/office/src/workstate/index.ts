@@ -6,6 +6,7 @@ export type {
   CurrentWork,
   DocRecord,
   PrRecord,
+  ReadyTicket,
   TicketRecord,
   WorkState,
   WorkstateHandler,

@@ -23,6 +23,9 @@ export interface ProtocolServerOptions {
 
   /** Takes `doc_link`. Without it the request is refused as unsupported. */
   docs?: DocLinks;
+
+  /** Called once an agent's connection is authenticated, before its work is offered. */
+  onConnected?: (person: string) => void;
   auth: AgentAuth;
   clock: Clock;
   logger?: Logger;
@@ -103,4 +106,7 @@ export interface HelloContext extends RequestContext {
   log: Logger;
   sendError(c: Connection, code: ErrorCode, message: string, replyTo?: string): void;
   armIdle(c: Connection, ms: number): void;
+
+  /** The person's connection is authenticated: tell the office, then offer their work. */
+  connected(person: string): void;
 }

@@ -347,7 +347,7 @@ describe("default policies", () => {
     });
   });
 
-  it("idle_pulls_next: an idle agent's oldest ready ticket", () => {
+  it("idle_pulls_next: an idle agent's next ready ticket", () => {
     const idle = event("agent.idle", { actor: SAM });
     const ready = { ready: { sam: [{ key: "ACME-5", readyAt: "2026-10-05T07:00:00.000Z" }] } };
     expect(judge("idle_pulls_next", idle, ready)).toEqual(["wake sam (assigned) on ticket ACME-5"]);

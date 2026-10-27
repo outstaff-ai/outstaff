@@ -6,6 +6,7 @@ import { createIntake } from "./intake/index.js";
 import { createMessaging, type RoleInfo } from "./messaging/index.js";
 import { officeDocLinks } from "./office-doc-links.js";
 import { createHandedBack } from "./office-handback.js";
+import { createIdlePull } from "./office-idle.js";
 import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
 import { officeTicketPrs } from "./office-ticket-prs.js";
@@ -135,9 +136,11 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     track(officePipeline.route(event, meta, () => track(engine.handle(event, meta))));
 
   // At-least-once and in order: the state reflects the event before the engine judges it, and both are idempotent.
+  // A ticket change that gives an agent a ready ticket is checked for an idle pull once the event is judged.
   intake.onEvent(async (event, meta) => {
     await track(workState.apply(event, meta));
     await judge(event, meta);
+    await track(idle.afterEvent(event));
   });
 
   workState.onEvent(async (event, meta) => {
@@ -162,6 +165,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   };
 
   const handedBack = createHandedBack({ store, workState, judge, log });
+  const idle = createIdlePull({ ...pipelineOptions, pipeline: officePipeline });
 
   // An item the scheduler blocked: the PM's `unblock` round when the team routes blocked work there, and the report
   // the blocked agent owes the requester (queued, so the agent posts it as itself). The office posts nothing.
@@ -193,6 +197,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       await handedBack(item);
       await track(engine.settled(item));
       await track(engine.followUp(item.id));
+      await track(idle.check(item.person));
     },
   });
 
@@ -238,6 +243,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     chat: chatDesk,
     docs: officeDocLinks({ store, workState, log }),
     tickets: officeTicketPrs({ workState, log }),
+    onConnected: (person) => void track(idle.check(person)),
     auth: agentAuthFromSecrets(
       input.secrets,
       team.people.map((p) => p.handle),
@@ -267,6 +273,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     inFlight,
     notify,
     onBlocked,
+    onTick: () => track(idle.sweep()),
   });
 
   return {

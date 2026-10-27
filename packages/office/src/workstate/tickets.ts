@@ -10,6 +10,7 @@ import type { WorkItem } from "../store/index.js";
 import type { TicketOps, WorkstateCore } from "./core.types.js";
 import { notFound } from "./derive.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
+import { priorityOf, statusSince } from "./ready.js";
 import type { TicketRecord } from "./types.js";
 
 /** Whom the event names as the human asking for the work: its actor, when that is a trusted human. */
@@ -40,6 +41,12 @@ function pendingOn(item: WorkItem, key: string, prKeys: Set<string>): boolean {
 
   return on.type === "ticket" ? on.ref === key : on.type === "pr" && prKeys.has(on.ref);
 }
+
+/** When the tracker says the event happened, if it says. */
+const eventAt = (event?: WorkflowEvent): string | undefined => {
+  const at = event?.data["at"];
+  return typeof at === "string" && at !== "" ? at : undefined;
+};
 
 /** Ticket records: read from the tracker, saved, and forgotten when the tracker no longer has them. */
 export function createTickets(core: WorkstateCore): TicketOps {
@@ -85,7 +92,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
     );
   };
 
-  const toTicket = (issue: Issue, prev?: TicketRecord): TicketRecord => {
+  const toTicket = (issue: Issue, prev?: TicketRecord, event?: WorkflowEvent): TicketRecord => {
     const status = issue.status.canonical ?? prev?.status;
     const assignee = assigneeOf(issue.assignee);
     return {
@@ -93,6 +100,13 @@ export function createTickets(core: WorkstateCore): TicketOps {
       title: issue.title,
       url: issue.url,
       ...(status ? { status } : {}),
+      ...statusSince(
+        prev,
+        status,
+        eventAt(event) ?? issue.updatedAt,
+        event?.type === "ticket.moved",
+      ),
+      ...priorityOf(issue),
       ...(assignee ? { assignee } : {}),
       labels: [...issue.labels],
       ...keptRequester(prev),
@@ -162,9 +176,14 @@ export function createTickets(core: WorkstateCore): TicketOps {
   };
 
   /** The ticket as the tracker has it; undefined when the tracker no longer has it. */
-  const readTicket = async (from: Tracker, key: string, prev?: TicketRecord) => {
+  const readTicket = async (
+    from: Tracker,
+    key: string,
+    prev?: TicketRecord,
+    event?: WorkflowEvent,
+  ) => {
     try {
-      return toTicket(await from.getIssue(key), prev);
+      return toTicket(await from.getIssue(key), prev, event);
     } catch (error) {
       if (notFound(error)) {
         await forgetTicket(key, prev);
@@ -177,11 +196,15 @@ export function createTickets(core: WorkstateCore): TicketOps {
 
   /** Without a tracker the events are all there is to go on. */
   const fromEvent = (key: string, prev?: TicketRecord, event?: WorkflowEvent): TicketRecord => {
-    const rec = prev ?? { key, title: key, labels: [], updatedAt: clock.now().toISOString() };
+    const now = clock.now().toISOString();
+    const rec = prev ?? { key, title: key, labels: [], updatedAt: now };
     const to = event?.data["to"];
-    return event?.type === "ticket.moved" && typeof to === "string"
-      ? { ...rec, status: to as CanonicalStatus }
-      : rec;
+    if (event?.type !== "ticket.moved" || typeof to !== "string") {
+      return rec;
+    }
+
+    const status = to as CanonicalStatus;
+    return { ...rec, status, ...statusSince(prev, status, eventAt(event) ?? now, true) };
   };
 
   /** The record with the human who created or assigned the ticket as its requester. */
@@ -196,7 +219,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
       return;
     }
 
-    const rec = tracker ? await readTicket(tracker, key, prev) : fromEvent(key, prev, event);
+    const rec = tracker ? await readTicket(tracker, key, prev, event) : fromEvent(key, prev, event);
     if (rec) {
       await saveTicket(withEventRequester(rec, event));
     }

@@ -19,7 +19,7 @@ import {
   createFakeTracker,
   createFakeVcs,
 } from "@outstaff/core/fakes";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { manualClock } from "../clock.js";
 import { createOffice } from "../office.js";
 import type { Office } from "../office.types.js";
@@ -179,6 +179,59 @@ describe("createOffice", () => {
     // A retried hand-back is harmless.
     await sam.handBack(offer.workItem.id, { summary: "again", status: "done" });
     expect(chat.posts).toEqual([]);
+  });
+
+  it("has an idle agent start the ready tickets it assigned to itself: on connect, then after the hand-back", async () => {
+    const self = tracker.as({ id: "u-2", name: "Sam", kind: "agent" });
+    const own = (title: string) =>
+      self.createIssue({ title, body: "", status: "ready", assignee: "u-2" });
+
+    const first = await own("Split: the model");
+    clock.advance(1_000);
+    const second = await own("Split: the view");
+    await office.parts.intake.pollOnce();
+    // Sam caused the assignments, so no rule starts them; the idle pull takes the oldest at once.
+    expect((await store.listItems({ person: "sam" })).map((i) => i.subject?.ref)).toEqual([
+      first.key,
+    ]);
+
+    const sam = connect("sam");
+    const offer = await next(sam);
+    expect(offer.workItem).toMatchObject({
+      kind: "assigned",
+      trigger: "automation",
+      subject: { type: "ticket", ref: first.key },
+    });
+
+    await sam.accept(offer.workItem.id);
+    await sam.handBack(offer.workItem.id, { summary: "Done.", status: "done" });
+    const after = await next(sam);
+    expect(after.workItem.subject).toEqual({ type: "ticket", ref: second.key });
+  });
+
+  it("has an idle agent start a ready ticket on the scheduler's tick once it is free", async () => {
+    // Busy when the ticket arrives, so the event's check pulls nothing.
+    const busy = await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "review",
+      title: "Review from a teammate",
+      trigger: "human",
+    });
+
+    const ticket = await tracker
+      .as({ id: "u-2", name: "Sam", kind: "agent" })
+      .createIssue({ title: "Split: the tests", body: "", status: "ready", assignee: "u-2" });
+
+    await office.parts.intake.pollOnce();
+    expect((await store.listItems({ person: "sam" })).map((i) => i.id)).toEqual([busy.id]);
+
+    // Freed without a hand-back: only the tick checks again.
+    await office.parts.scheduler.finish(busy.id, { outcome: "canceled", status: "canceled" });
+    clock.advance(60_000);
+    await vi.waitFor(async () => {
+      const items = await store.listItems({ person: "sam", status: "queued" });
+      expect(items.map((i) => [i.subject?.ref, i.trigger])).toEqual([[ticket.key, "automation"]]);
+    });
   });
 
   it("offers a conflicted stacked pull request to its author with the rebase recipe", async () => {

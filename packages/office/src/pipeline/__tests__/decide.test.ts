@@ -100,7 +100,7 @@ describe("decide: wake", () => {
     });
   });
 
-  it("wakes an idle agent on its oldest ready ticket, or drops", () => {
+  it("wakes an idle agent on its next ready ticket, or drops", () => {
     const next = policy(
       { wake: { person: "actor", kind: "assigned", subject: "next_ready_ticket" } },
       "Start {{next.ticket}}.",

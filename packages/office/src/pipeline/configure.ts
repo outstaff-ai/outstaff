@@ -1,5 +1,5 @@
 import { policyOn, resolveWorkflow, type TeamConfig } from "@outstaff/core";
-import { DEFAULT_POLICIES, MERGE_ON_APPROVAL_POLICIES } from "./defaults.js";
+import { DEFAULT_POLICIES, POLICY_SWITCH_OF } from "./defaults.js";
 import { instructionProblem } from "./instructions.js";
 import type { Policy } from "./policy.types.js";
 import type { ConfiguredPipeline } from "./state.types.js";
@@ -67,14 +67,13 @@ export function configurePipeline(team: Team): ConfiguredPipeline {
     }
   }
 
-  const mergeOnApproval = policyOn(team.policies, "merge.on_approval");
+  const switchedOn = (id: string) => {
+    const path = POLICY_SWITCH_OF[id];
+    return path === undefined || policyOn(team.policies, path);
+  };
+
   const policies = DEFAULT_POLICIES.map((base) =>
-    applyOverride(
-      base,
-      overrides[base.id],
-      MERGE_ON_APPROVAL_POLICIES.has(base.id) ? mergeOnApproval : true,
-      issues,
-    ),
+    applyOverride(base, overrides[base.id], switchedOn(base.id), issues),
   );
 
   const { options } = resolveWorkflow(team.workflow, team.humans, team.policies);

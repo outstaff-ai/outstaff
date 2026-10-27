@@ -111,7 +111,22 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       });
   }
 
-  const ctx: HelloContext = { opts, send, deliver, conns, heartbeatMs, log, sendError, armIdle };
+  const connected = (person: string) => {
+    opts.onConnected?.(person);
+    deliver(person);
+  };
+
+  const ctx: HelloContext = {
+    opts,
+    send,
+    deliver,
+    connected,
+    conns,
+    heartbeatMs,
+    log,
+    sendError,
+    armIdle,
+  };
 
   async function onFrame(c: Connection, raw: string) {
     const decoded = decode(raw);

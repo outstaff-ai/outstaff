@@ -6,6 +6,7 @@ import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
 import { createPrs } from "./prs.js";
+import { readyTickets } from "./ready.js";
 import { createRequesters } from "./requesters.js";
 import { createRescan } from "./rescan.js";
 import { createTickets } from "./tickets.js";
@@ -56,6 +57,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     docs: new Map(),
     workers: new Map(),
     handedBack: new Set(),
+    pickups: new Map(),
     notTickets: new Set(),
     handlers: [],
     sameRepo,
@@ -214,6 +216,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     },
 
     currentWork: (person) => currentWork(core, person),
+    readyTickets: (person) => readyTickets(core, person),
   };
 
   await load();

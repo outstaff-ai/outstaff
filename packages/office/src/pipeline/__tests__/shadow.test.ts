@@ -45,9 +45,13 @@ const recordingLogger = () => {
   return { lines, logger };
 };
 
-const state = createStaticWorkflowState({
-  tickets: { "ACME-1": { status: "ready", assignee: { id: "sam", kind: "agent" } } },
-});
+const state = {
+  ...createStaticWorkflowState({
+    tickets: { "ACME-1": { status: "ready", assignee: { id: "sam", kind: "agent" } } },
+  }),
+  readyTickets: (person: string) =>
+    person === "sam" ? [{ key: "ACME-1", readyAt: "2026-10-05T07:00:00.000Z" }] : [],
+};
 
 const assigned = {
   type: "ticket.assigned" as const,
@@ -74,7 +78,7 @@ describe("createShadowPipeline", () => {
     expect(lines).toEqual(["debug pipeline (shadow): ticket.assigned tracker:e-1"]);
   });
 
-  it("decides no idle pull, since the work state does not know when tickets became ready", async () => {
+  it("traces the idle pull it would decide, from the work state's ready tickets", async () => {
     const traces = createMemoryTraceStore();
     const shadow = createShadowPipeline({
       team: team(),
@@ -84,16 +88,36 @@ describe("createShadowPipeline", () => {
       logger: recordingLogger().logger,
     });
 
-    const idle = {
-      ...assigned,
-      type: "agent.idle" as never,
-      actor: { kind: "agent" as const, id: "sam" },
-    };
+    const idle = (person: string) => ({
+      id: `office:idle:${person}:2026-10-05T09:00:00.000Z`,
+      type: "agent.idle" as const,
+      at: "2026-10-05T09:00:00.000Z",
+      subject: {},
+      actor: { kind: "agent" as const, id: person },
+      data: {},
+    });
 
+    const trace = await shadow.judge(idle("sam"));
+    expect(trace?.decisions).toMatchObject([
+      {
+        type: "wake",
+        policy: "idle_pulls_next",
+        person: "sam",
+        kind: "assigned",
+        subject: { type: "ticket", ref: "ACME-1" },
+      },
+    ]);
+
+    expect(await traces.get("office:idle:sam:2026-10-05T09:00:00.000Z")).toEqual(trace);
     expect(
-      (await shadow.handle(idle, { source: "office", externalId: "idle-1" }))?.decisions,
+      (await shadow.judge({ ...idle("sam"), actor: { kind: "human", id: "ada.admin" } }))
+        ?.decisions,
     ).toEqual([
-      { type: "drop", policy: "idle_pulls_next", reason: "no ready ticket is assigned to sam" },
+      {
+        type: "drop",
+        policy: "idle_pulls_next",
+        reason: "no one to wake: the event was caused by a human, not an agent",
+      },
     ]);
   });
 

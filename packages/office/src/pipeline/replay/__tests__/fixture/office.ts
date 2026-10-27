@@ -15,7 +15,7 @@ export const idle: ReplayScenario = {
           ],
         },
       },
-      note: "intended fix: an idle agent starts its oldest ready ticket (ACME-161); today self-assigned work waits for someone else to act",
+      note: "intended fix: an idle agent starts its next ready ticket (ACME-161); the engine's rules never see agent.idle, the scheduler's idle pull starts it instead",
     },
     { event: ev("s5-idle-noor", "agent.idle", "noor", {}, at(221)), world: {} },
   ],

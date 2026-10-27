@@ -2,7 +2,6 @@ import { configurePipeline } from "../configure.js";
 import { evaluatePipeline } from "../evaluate.js";
 import { toPipelineEvent } from "../from-workflow.js";
 import type { PipelineRunner } from "../shadow.types.js";
-import type { PipelineState } from "../state.types.js";
 import type { LiveOptions } from "./live.types.js";
 import { enqueueWake } from "./wake.js";
 
@@ -12,22 +11,19 @@ import { enqueueWake } from "./wake.js";
  * and the acts are all idempotent per event.
  */
 export function createLivePipeline(opts: LiveOptions): PipelineRunner {
-  const { traces, clock, logger, executor } = opts;
+  const { traces, clock, logger, executor, workState: state } = opts;
   const { policies, options, issues } = configurePipeline(opts.team);
   for (const issue of issues) {
     logger.warn(`pipeline: ${issue}`);
   }
 
-  // As in shadow mode: the work state does not record when a ticket entered ready yet.
-  const state: PipelineState = { ...opts.workState, readyTickets: () => [] };
-
-  return {
+  const runner: PipelineRunner = {
     async handle(raw, meta) {
       const event = toPipelineEvent(raw, meta, clock.now().toISOString());
-      if (!event) {
-        return undefined;
-      }
+      return event ? runner.judge(event) : undefined;
+    },
 
+    async judge(event) {
       const trace = evaluatePipeline(event, state, policies, options);
       await traces.record(trace);
       let queued = false;
@@ -54,4 +50,6 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
       return trace;
     },
   };
+
+  return runner;
 }

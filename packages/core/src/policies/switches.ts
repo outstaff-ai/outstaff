@@ -208,6 +208,14 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "When a work item about a ticket starts, the office moves the ticket to active if it is in backlog, ready or review, so the board shows the work without the agent having to say so. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and neither does the minimal preset, which never moves tickets. A blocked ticket stays blocked until the agent moves it: a retry that is still blocked leaves it blocked. Work that starts on an open pull request moves a ticket closed early (done) back to active. The agent still keeps the ticket accurate as it goes.",
   },
   {
+    path: "pull_ready",
+    default: true,
+    off: false,
+    kind: "office",
+    behaviour:
+      "When an agent has nothing queued or running (when a ticket is created or assigned to it or moves into ready, after a hand-back, on the scheduler's tick, when it connects), the office starts its next ready ticket: one assigned to it, in the ready status, the highest tracker priority first, then the one that entered ready the longest ago. A ticket in backlog, one assigned to someone else, and one the agent already worked on since it entered ready are never pulled. It counts as automatic work: usage above `usage.pause_automatic_at` stops it, and the loop guard covers each item.",
+  },
+  {
     path: "merge.on_approval",
     default: false,
     off: false,
