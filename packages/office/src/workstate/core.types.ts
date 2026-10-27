@@ -72,6 +72,25 @@ export interface TicketOps {
   withRequester(rec: TicketRecord, requester: string, event: WorkflowEvent): TicketRecord;
 }
 
+/** What is read from the code host about an open pull request beside the pull request itself. */
+export interface PrLive {
+  checks: PrRecord["checks"];
+
+  /** Each check's link and summary, by check name; only failure events carry them. */
+  links: Map<string, { url: string; summary?: string }>;
+  unresolved: number;
+}
+
+/** What a pull request record is built from beside the pull request and the previous record. */
+export interface PrFacts {
+  checks: PrRecord["checks"];
+  unresolved: number;
+  person: string | undefined;
+  ticket: string | undefined;
+  review: string | undefined;
+  verdict: PrVerdict | undefined;
+}
+
 export interface PrOps {
   refreshPr(
     ctx: RefreshCtx,

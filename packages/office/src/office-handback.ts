@@ -5,6 +5,29 @@ import type { PrRecord, WorkState } from "./workstate/index.js";
 
 const handedBackText = (item: WorkItem) => `handed back ${item.id}`;
 
+const HANDED_BACK = new Set(["done", "waiting", "blocked"]);
+
+// Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
+// Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
+const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock"]);
+
+/** What the event is about: the ticket, or the pull request with its ticket. Nothing for other subjects. */
+async function eventSubject(
+  store: Store,
+  subject: NonNullable<WorkItem["subject"]>,
+): Promise<WorkflowEvent["subject"] | undefined> {
+  if (subject.type === "ticket") {
+    return { ticket: subject.ref };
+  }
+
+  if (subject.type !== "pr") {
+    return undefined;
+  }
+
+  const pr = (await store.getSubject("pr", subject.ref))?.data as PrRecord | undefined;
+  return pr ? { pr: pr.ref, ...(pr.ticket ? { ticket: pr.ticket } : {}) } : undefined;
+}
+
 /** What follows an agent's hand-back of an item: an `agent.handed_back` event for its ticket or pull request. */
 export function createHandedBack(deps: {
   store: Store;
@@ -16,27 +39,11 @@ export function createHandedBack(deps: {
 }) {
   const { store, workState, judge, log } = deps;
   return async (item: WorkItem): Promise<void> => {
-    if (
-      (item.status !== "done" && item.status !== "waiting" && item.status !== "blocked") ||
-      !item.subject
-    ) {
+    if (!HANDED_BACK.has(item.status) || !item.subject || NOT_ON_TICKET.has(item.kind)) {
       return;
     }
 
-    // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
-    // Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
-    if (item.kind === "doc_feedback" || item.kind === "asked" || item.kind === "unblock") {
-      return;
-    }
-
-    let subject: WorkflowEvent["subject"] | undefined;
-    if (item.subject.type === "ticket") {
-      subject = { ticket: item.subject.ref };
-    } else if (item.subject.type === "pr") {
-      const pr = (await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined;
-      subject = pr ? { pr: pr.ref, ...(pr.ticket ? { ticket: pr.ticket } : {}) } : undefined;
-    }
-
+    const subject = await eventSubject(store, item.subject);
     if (!subject) {
       return;
     }

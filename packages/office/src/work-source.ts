@@ -1,22 +1,48 @@
 import type { Member } from "@outstaff/protocol";
-import { placeQueued } from "./chat/placement.js";
-import { readOrigin } from "./chat/origin.js";
 import { summarizeItem } from "./item-summary.js";
 import { readRoster } from "./messaging/roster.js";
 import { ProtocolError } from "./protocol/errors.js";
 import type { WorkSource } from "./protocol/source.types.js";
+import type { Scheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
+import { workMoves } from "./work-moves.js";
 import { offerBuilder } from "./work-offer.js";
-import type { WorkSourceOptions } from "./work-source.types.js";
+import type { HandBackResult, WorkSourceOptions } from "./work-source.types.js";
 
 /** Subject type that keeps whether the agent accepted an offered item; it must survive a restart. */
 export const OFFER_SUBJECT = "offer";
 
 const OPEN = new Set(["queued", "active", "waiting", "blocked"]);
 
+/** The states a hand-back that is retried finds the item in, after the first one went through. */
+const HANDED_BACK = new Set(["done", "waiting", "blocked"]);
+
 interface OfferState {
   accepted: boolean;
 }
+
+/** The journal entry of a hand-back: the agent's summary and the links it gave. */
+function handBackNote(result: HandBackResult): string {
+  const links = result.links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`);
+  return [result.summary, ...(links.length > 0 ? ["", "Links:", ...links] : [])].join("\n");
+}
+
+/** Ends the run the way the agent handed it back. */
+async function settle(scheduler: Scheduler, id: string, result: HandBackResult) {
+  if (result.status === "blocked") {
+    return scheduler.block(id, result.summary);
+  }
+
+  if (result.status === "interrupted") {
+    return scheduler.interrupt(id, result.summary);
+  }
+
+  return scheduler.finish(id, { outcome: result.summary, status: result.status });
+}
+
+/** A hand-back the office already took: an interruption, or the item already left `active` for it. */
+const retried = (item: WorkItem, result: HandBackResult) =>
+  result.status === "interrupted" || HANDED_BACK.has(item.status);
 
 /** The protocol's `WorkSource` over the real scheduler and store. All its state is in the store. */
 export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
@@ -120,26 +146,9 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       const item = await own(person, id);
       // A retried hand-back finds the item already finished and only repeats the follow-up.
       if (item.status === "active") {
-        const links = result.links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`);
-        await store.appendJournal(
-          id,
-          person,
-          [result.summary, ...(links.length > 0 ? ["", "Links:", ...links] : [])].join("\n"),
-        );
-
-        if (result.status === "blocked") {
-          await scheduler.block(id, result.summary);
-        } else if (result.status === "interrupted") {
-          await scheduler.interrupt(id, result.summary);
-        } else {
-          await scheduler.finish(id, { outcome: result.summary, status: result.status });
-        }
-      } else if (
-        result.status !== "interrupted" &&
-        item.status !== "done" &&
-        item.status !== "waiting" &&
-        item.status !== "blocked"
-      ) {
+        await store.appendJournal(id, person, handBackNote(result));
+        await settle(scheduler, id, result);
+      } else if (!retried(item, result)) {
         throw new ProtocolError("invalid", `Work item ${id} is ${item.status}, not running.`);
       }
 
@@ -177,88 +186,6 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       return Promise.all(items.map((i) => summaryOf(i, q.workItemId)));
     },
 
-    async place(person, id, position, relativeTo) {
-      const item = await own(person, id);
-      if (item.status !== "queued") {
-        throw new ProtocolError(
-          "invalid",
-          `Work item ${id} is ${item.status}; only queued items can be placed.`,
-        );
-      }
-
-      if ((position === "before" || position === "after") && !relativeTo) {
-        throw new ProtocolError("invalid", `Say which item it goes ${position}.`);
-      }
-
-      try {
-        await placeQueued(
-          { store, scheduler },
-          id,
-          position === "before" || position === "after"
-            ? position === "before"
-              ? { before: relativeTo! }
-              : { after: relativeTo! }
-            : position,
-        );
-      } catch (error) {
-        throw new ProtocolError("invalid", error instanceof Error ? error.message : String(error));
-      }
-
-      const origin = await readOrigin(store, id);
-      if (origin?.awaitingPlacement) {
-        await store.upsertSubject("chat_origin", id, { ...origin, awaitingPlacement: false });
-      }
-
-      await store.appendJournal(
-        id,
-        person,
-        `Placed ${position}${relativeTo ? ` ${relativeTo}` : ""}.`,
-      );
-
-      opts.notify?.(person);
-      return summaryOf((await store.getItem(id)) ?? item, id);
-    },
-
-    async move(person, id, status) {
-      const item = await own(person, id);
-      if (status === "queued") {
-        if (item.status !== "blocked" && item.status !== "waiting") {
-          throw new ProtocolError(
-            "invalid",
-            `Work item ${id} is ${item.status}; it cannot be queued.`,
-          );
-        }
-
-        await store.appendJournal(id, person, "Queued again by the agent.");
-        const updated = await store.updateItem(id, { status: "queued" });
-        opts.notify?.(person);
-        return summaryOf(updated, id);
-      }
-
-      if (status === "blocked") {
-        if (item.status !== "queued" && item.status !== "waiting") {
-          throw new ProtocolError(
-            "invalid",
-            `Work item ${id} is ${item.status}; it cannot be blocked.`,
-          );
-        }
-
-        await scheduler.block(id, `${person} blocked it.`);
-        return summaryOf((await store.getItem(id)) ?? item, id);
-      }
-
-      if (item.status === "done" || item.status === "canceled") {
-        throw new ProtocolError("invalid", `Work item ${id} is already ${item.status}.`);
-      }
-
-      if (item.status === "active") {
-        await scheduler.finish(id, { outcome: `canceled by ${person}`, status: "canceled" });
-      } else {
-        await store.updateItem(id, { status: "canceled" });
-      }
-
-      await store.appendJournal(id, person, "Canceled by the agent.");
-      return summaryOf((await store.getItem(id)) ?? item, id);
-    },
+    ...workMoves(opts, own, summaryOf),
   };
 }

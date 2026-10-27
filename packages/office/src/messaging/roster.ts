@@ -5,6 +5,12 @@ import type { RoleInfo, Roster, RosterOptions } from "./types.js";
 const infoOf = (roles: RosterOptions["roles"], role: string): RoleInfo | undefined =>
   roles instanceof Map ? roles.get(role) : (roles as Record<string, RoleInfo> | undefined)?.[role];
 
+/** The role's title and summary from the catalog; a role the catalog lacks shows its id. */
+const roleFields = (info: RoleInfo | undefined, role: string) => ({
+  title: info?.title ?? role,
+  ...(info ? { summary: info.summary } : {}),
+});
+
 /** Queued plus active items per person, the measure of how busy someone is. */
 export async function loadByPerson(store: Pick<Store, "listItems">): Promise<Map<string, number>> {
   const load = new Map<string, number>();
@@ -41,8 +47,7 @@ export async function readRoster(opts: RosterOptions): Promise<Roster> {
       handle: p.handle,
       name: p.name,
       role: p.role,
-      title: info?.title ?? p.role,
-      ...(info ? { summary: info.summary } : {}),
+      ...roleFields(info, p.role),
       status: item ? "working" : paused ? "paused" : "idle",
       ...(item ? { current: item.title } : {}),
       ...(usage ? { usage } : {}),

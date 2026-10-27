@@ -6,6 +6,9 @@ export const ticketNode = (key: string): Ref => ({ type: "ticket", ref: key });
 export const personNode = (handle: string): Ref => ({ type: "person", ref: handle });
 export const docNode = (id: string): Ref => ({ type: "doc", ref: id });
 
+const sameRef = (a: Ref | undefined, b: Ref | undefined) =>
+  a?.type === b?.type && a?.ref === b?.ref;
+
 /** Moves the `relation` edge of `from` from `prev` to `next`. */
 export async function relink(
   store: Store,
@@ -14,7 +17,7 @@ export async function relink(
   prev?: Ref,
   next?: Ref,
 ): Promise<void> {
-  if (prev?.type === next?.type && prev?.ref === next?.ref) {
+  if (sameRef(prev, next)) {
     return;
   }
 

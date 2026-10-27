@@ -92,17 +92,23 @@ describe("trust classification", () => {
       events.filter((e) => e.event.type === "pr.comment").map((e) => [e.event.actor.id, e]),
     );
 
-    expect(byActor.get("sam")?.event.actor.kind).toBe("agent");
-    expect(byActor.get("noor")?.event.actor.kind).toBe("agent");
+    const of = (id: string) => {
+      const seen = byActor.get(id);
+      expect(seen).toBeDefined();
+      return seen!;
+    };
+
+    expect(of("sam").event.actor.kind).toBe("agent");
+    expect(of("noor").event.actor.kind).toBe("agent");
     // Looking like an agent's login is not enough; only the declared identity counts.
-    expect(byActor.get("team-sam")?.event.actor.kind).toBe("human");
-    expect(byActor.get("team-sam")?.meta.trusted).toBe(false);
-    expect(byActor.get("x-acme-sam[bot]")?.event.actor.kind).toBe("automation");
-    expect(byActor.get("ci-runner[bot]")?.event.actor.kind).toBe("automation");
-    expect(byActor.get("dana")?.meta.trusted).toBe(true);
-    expect(byActor.get("dana")?.event.data["untrusted"]).toBeUndefined();
-    expect(byActor.get("eve")?.event.data["untrusted"]).toBe(true);
-    expect(byActor.get("mallory")?.meta.trusted).toBe(false);
+    expect(of("team-sam").event.actor.kind).toBe("human");
+    expect(of("team-sam").meta.trusted).toBe(false);
+    expect(of("x-acme-sam[bot]").event.actor.kind).toBe("automation");
+    expect(of("ci-runner[bot]").event.actor.kind).toBe("automation");
+    expect(of("dana").meta.trusted).toBe(true);
+    expect(of("dana").event.data["untrusted"]).toBeUndefined();
+    expect(of("eve").event.data["untrusted"]).toBe(true);
+    expect(of("mallory").meta.trusted).toBe(false);
   });
 
   it("flags untrusted humans but still records and delivers them", async () => {

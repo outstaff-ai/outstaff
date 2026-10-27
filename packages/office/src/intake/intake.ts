@@ -9,17 +9,27 @@ import { pollSources, webhookParsers } from "./sources.js";
 import { createTrust } from "./trust.js";
 import type { BackoffOptions, Intake, IntakeOptions, WebhookServer } from "./types.js";
 import { createWebhookServer } from "./webhook.js";
+import { defined } from "../defined.js";
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_STALE_POLL_MINUTES = 10;
 
+/** How often to poll, and how long polling may fail before it is warned about. */
+function pollTiming(opts: IntakeOptions) {
+  const office = opts.team.office;
+  const staleMinutes =
+    opts.stalePollMinutes ?? office?.poll_warn_after_minutes ?? DEFAULT_STALE_POLL_MINUTES;
+
+  return {
+    intervalMs: (office?.poll_interval_seconds ?? 60) * 1000,
+    stalePollMs: staleMinutes * 60_000,
+  };
+}
+
 export function createIntake(opts: IntakeOptions): Intake {
   const { store, ports, team, clock, logger } = opts;
   const mode = team.office?.events ?? "poll";
-  const intervalMs = (team.office?.poll_interval_seconds ?? 60) * 1000;
-  const stalePollMs =
-    (opts.stalePollMinutes ?? team.office?.poll_warn_after_minutes ?? DEFAULT_STALE_POLL_MINUTES) *
-    60_000;
+  const { intervalMs, stalePollMs } = pollTiming(opts);
 
   const backoff: BackoffOptions = { ...DEFAULT_BACKOFF, ...opts.backoff };
   const repos: RepoRef[] = team.repos.map((r) => {
@@ -32,8 +42,7 @@ export function createIntake(opts: IntakeOptions): Intake {
     vcs: ports.vcs,
     team,
     clock,
-    ...(opts.trustTtlMs === undefined ? {} : { ttlMs: opts.trustTtlMs }),
-    ...(opts.resolveAgent ? { resolveAgent: opts.resolveAgent } : {}),
+    ...defined({ ttlMs: opts.trustTtlMs, resolveAgent: opts.resolveAgent }),
   });
 
   // A trusted person's @mention of an agent in a comment; with the switch off nobody is mentioned.
@@ -69,6 +78,23 @@ export function createIntake(opts: IntakeOptions): Intake {
   let server: WebhookServer | undefined;
   let address: { host: string; port: number } | undefined;
 
+  const startWebhook = async () => {
+    const parsers = webhookParsers(ports, ingest);
+    if (Object.keys(parsers).length === 0) {
+      running = false;
+      throw new PortError("unsupported", "Webhook mode needs an adapter with parseWebhook.");
+    }
+
+    server = createWebhookServer({
+      port: opts.webhook?.port ?? 8080,
+      ...defined({ host: opts.webhook?.host }),
+      sources: parsers,
+      logger,
+    });
+
+    address = await server.listen();
+  };
+
   return {
     onEvent(handler) {
       delivery.handlers.push(handler);
@@ -85,28 +111,12 @@ export function createIntake(opts: IntakeOptions): Intake {
       poller.reset(sources);
       await drain(true);
       if (mode === "webhook") {
-        const parsers = webhookParsers(ports, ingest);
-        if (Object.keys(parsers).length === 0) {
-          running = false;
-          throw new PortError("unsupported", "Webhook mode needs an adapter with parseWebhook.");
-        }
-
-        server = createWebhookServer({
-          port: opts.webhook?.port ?? 8080,
-          ...(opts.webhook?.host === undefined ? {} : { host: opts.webhook.host }),
-          sources: parsers,
-          logger,
-        });
-
-        address = await server.listen();
-        for (const source of sources.filter((s) => s.always)) {
-          poller.schedule(source, 0, 0);
-        }
-
-        return;
+        await startWebhook();
       }
 
-      for (const source of sources) {
+      // In webhook mode only the sources without a webhook are polled.
+      const polled = mode === "webhook" ? sources.filter((s) => s.always) : sources;
+      for (const source of polled) {
         poller.schedule(source, 0, 0);
       }
     },

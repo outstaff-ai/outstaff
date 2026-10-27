@@ -1,5 +1,22 @@
 import type { Route, RoutablePerson } from "./types.js";
 
+/** Nobody has the role; `peerless` when only the asker has it. */
+function noOne(to: string, peerless: boolean): Route {
+  return {
+    ok: false,
+    code: "not_found",
+    message: peerless
+      ? `no other ${to} on this team; ask a human`
+      : `no ${to} on this team; ask a human`,
+  };
+}
+
+/** The first of the people with the fewest queued and active items. */
+function leastBusy(people: readonly RoutablePerson[], load: ReadonlyMap<string, number>) {
+  const loadOf = (p: RoutablePerson) => load.get(p.handle) ?? 0;
+  return people.reduce((best, p) => (loadOf(p) < loadOf(best) ? p : best));
+}
+
 /**
  * Picks who answers. A handle matches exactly and wins over a role of the same name. A role goes to the least busy
  * person with it (fewest queued and active items, ties by team order). Asking your own role means a peer, so the
@@ -22,25 +39,10 @@ export function routeQuestion(input: {
     return { ok: true, handle: to };
   }
 
-  const asker = people.find((p) => p.handle === from);
   const candidates = people.filter((p) => p.role === to && p.handle !== from);
   if (candidates.length === 0) {
-    const peerless = asker?.role === to;
-    return {
-      ok: false,
-      code: "not_found",
-      message: peerless
-        ? `no other ${to} on this team; ask a human`
-        : `no ${to} on this team; ask a human`,
-    };
+    return noOne(to, people.find((p) => p.handle === from)?.role === to);
   }
 
-  let best = candidates[0]!;
-  for (const c of candidates) {
-    if ((load.get(c.handle) ?? 0) < (load.get(best.handle) ?? 0)) {
-      best = c;
-    }
-  }
-
-  return { ok: true, handle: best.handle };
+  return { ok: true, handle: leastBusy(candidates, load).handle };
 }

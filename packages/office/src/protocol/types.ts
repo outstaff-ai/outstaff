@@ -80,6 +80,22 @@ export interface RequestContext {
   deliver(person: string): void;
 }
 
+/** One request of an authenticated agent, as its handler sees it. */
+export interface AgentRequest<T extends MessageType> {
+  ctx: RequestContext;
+  c: Connection;
+  person: string;
+  payload: PayloadOf<T>;
+
+  /** Sends the answer to this request. */
+  reply<R extends MessageType>(type: R, payload: PayloadOf<R>): void;
+}
+
+export type RequestHandler<T extends MessageType> = (r: AgentRequest<T>) => Promise<void> | void;
+
+/** The handlers of the requests agents send, by message type. */
+export type RequestHandlers = { [T in MessageType]?: RequestHandler<T> };
+
 /** What the `hello` handshake needs from the server: the request context plus the live connections. */
 export interface HelloContext extends RequestContext {
   conns: Map<string, Connection>;
