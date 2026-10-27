@@ -110,13 +110,20 @@ export async function reach(
   }
 }
 
+const unusableLocation = () =>
+  new PortError("unavailable", "GitHub redirected without a usable location.");
+
 /** Where a redirect points, as long as that is https or the same origin as the request. */
 export function redirectTarget(url: string, location: string | null): string {
+  if (!location) {
+    throw unusableLocation();
+  }
+
   let target: URL;
   try {
-    target = new URL(location ?? "", url);
+    target = new URL(location, url);
   } catch {
-    throw new PortError("unavailable", "GitHub redirected without a usable location.");
+    throw unusableLocation();
   }
 
   if (target.protocol !== "https:" && target.origin !== new URL(url).origin) {

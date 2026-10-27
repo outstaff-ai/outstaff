@@ -10,6 +10,9 @@ import type { Cursor } from "../api.types.js";
 import type { AppAuth } from "../auth.js";
 import type { GithubHttp } from "../http.js";
 
+/** The secret prefix of a GitHub App: this container's own, or the read-only office App. */
+export type AppPrefix = "GH_APP_" | "GH_OFFICE_APP_";
+
 /** What `createGithubContext` builds once per adapter and every group of operations shares. */
 export interface GithubContext {
   http: GithubHttp;
@@ -21,6 +24,7 @@ export interface GithubContext {
   /** The person this container runs as. */
   self: string | undefined;
   sleep: (ms: number) => Promise<void>;
+  now: () => Date;
   links: Vcs["links"];
 
   /** The person's grant on a repo of the team, or undefined when the person or the repo is not in the team. */
@@ -30,6 +34,9 @@ export interface GithubContext {
   /** The read-only office App. */
   office: () => AppAuth;
   apiToken: (repo: RepoRef) => Promise<string>;
+
+  /** The private keys of the Apps whose keys this container holds, inline or from a file, for masking. */
+  appKeys: () => string[];
 
   /** This container's own App, when it has one. */
   own: () => AppAuth | undefined;

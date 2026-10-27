@@ -62,3 +62,9 @@ export function failedSteps(text: string, failed: string[], tail: number): Check
     return { name, lines: kept, omitted: lines.length - kept.length };
   });
 }
+
+/** A PEM key and each line of its body: a log prints a key line by line, so each line is masked too. */
+export function keyParts(pem: string): string[] {
+  const body = pem.split(/\r?\n/).filter((l) => l.trim() !== "" && !l.startsWith("-----"));
+  return [pem, ...body];
+}

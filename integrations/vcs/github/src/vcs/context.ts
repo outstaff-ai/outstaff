@@ -16,7 +16,9 @@ import type {
   InstallationToken,
   TokenScope,
 } from "../types.js";
-import type { GithubContext } from "./types.js";
+import type { AppPrefix, GithubContext } from "./types.js";
+
+const APP_PREFIXES: AppPrefix[] = ["GH_APP_", "GH_OFFICE_APP_"];
 
 export const PERMISSIONS = {
   read: { contents: "read" },
@@ -106,16 +108,23 @@ export function createGithubContext(
       `${web}/${r.owner}/${r.name}/pull/${n}#discussion_${id}`,
   };
 
-  const loadCredentials = (prefix: "GH_APP_" | "GH_OFFICE_APP_"): AppCredentials | undefined => {
+  /** An App's private key, inline (with escaped newlines) or read from a file; undefined when neither is set. */
+  const keyOf = (prefix: AppPrefix): string | undefined => {
+    const inline = secrets.get(`${prefix}PRIVATE_KEY`);
+    const file = secrets.get(`${prefix}PRIVATE_KEY_FILE`);
+    return inline ? inline.replace(/\\n/g, "\n") : file ? readFile(file) : undefined;
+  };
+
+  const appKeys = () => APP_PREFIXES.flatMap((p) => keyOf(p) ?? []);
+
+  const loadCredentials = (prefix: AppPrefix): AppCredentials | undefined => {
     const get = (key: string) => secrets.get(`${prefix}${key}`);
     const appId = get("ID");
     if (!appId) {
       return undefined;
     }
 
-    const inline = get("PRIVATE_KEY");
-    const file = get("PRIVATE_KEY_FILE");
-    const privateKey = inline ? inline.replace(/\\n/g, "\n") : file ? readFile(file) : undefined;
+    const privateKey = keyOf(prefix);
     if (!privateKey) {
       throw new PortError(
         "invalid",
@@ -214,11 +223,13 @@ export function createGithubContext(
     secrets,
     self,
     sleep,
+    now: ctx.now,
     links,
     grantOf,
     isAgentLogin,
     office,
     apiToken,
+    appKeys,
     own,
     botAuthor,
     actingToken,
