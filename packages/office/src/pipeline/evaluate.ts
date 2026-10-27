@@ -1,5 +1,5 @@
 import { createEvaluationContext } from "@outstaff/core";
-import { awaitsReview } from "../engine/feedback.js";
+import { awaitsReview } from "#/engine/feedback.js";
 import { evaluateCondition } from "./conditions.js";
 import { decide } from "./decide.js";
 import type { Decision } from "./decisions.types.js";

@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { TeamConfig } from "@outstaff/core";
 import { createFakeVcs } from "@outstaff/core/fakes";
 import type { Feedback } from "@outstaff/protocol";
-import { manualClock } from "../clock.js";
-import { previousConversation } from "../conversation-context.js";
-import { addFeedback } from "../engine/feedback.js";
-import { createScheduler } from "../scheduler/index.js";
-import { openStore } from "../store/open.js";
-import type { Store } from "../store/types.js";
-import { schedulerWorkSource } from "../work-source.js";
+import { manualClock } from "#/clock.js";
+import { previousConversation } from "#/conversation-context.js";
+import { addFeedback } from "#/engine/feedback.js";
+import { createScheduler } from "#/scheduler/index.js";
+import { openStore } from "#/store/open.js";
+import type { Store } from "#/store/types.js";
+import { schedulerWorkSource } from "#/work-source.js";
 
 const team = {
   people: [],

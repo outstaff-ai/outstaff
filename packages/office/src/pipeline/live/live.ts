@@ -1,7 +1,7 @@
-import { configurePipeline } from "../configure.js";
-import { evaluatePipeline } from "../evaluate.js";
-import { toPipelineEvent } from "../from-workflow.js";
-import type { PipelineRunner } from "../shadow.types.js";
+import { configurePipeline } from "#/pipeline/configure.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
+import { toPipelineEvent } from "#/pipeline/from-workflow.js";
+import type { PipelineRunner } from "#/pipeline/shadow.types.js";
 import type { LiveOptions } from "./live.types.js";
 import { enqueueWake } from "./wake.js";
 

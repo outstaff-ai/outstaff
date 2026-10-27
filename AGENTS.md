@@ -40,6 +40,7 @@ Run lint, typecheck, test and build before opening a PR.
 ## Conventions
 
 - **Code:** TypeScript strict, ESM, no default exports, small modules, tests in a `__tests__` folder inside the folder they test (`__tests__/*.test.ts`, vitest). Comments only where the why is not obvious. Match the existing code.
+- **Imports:** another workspace package by its name; inside a package, `./x.js` for the same folder and `#/path/x.js` (its path under `src`) for anything else, never `../`. Packages resolve to their TypeScript source through an `@outstaff/source` export condition, so tests and typecheck need no build; the build and Node use `dist`. `pnpm check:files` enforces this.
 - **Commits and PRs:** one commit per PR, message `<type>(<scope>): <summary>`. Large changes are split into stacked PRs, each based on the previous one. Do not push to `main` or merge your own PRs.
 - **Docs ship with features:** a change that adds user-facing behaviour adds or updates a page under `docs/src/content/docs/`. The docs build validates internal links.
 - **Releases:** conventional commits drive the version and release notes; all packages share one version. No changeset files.

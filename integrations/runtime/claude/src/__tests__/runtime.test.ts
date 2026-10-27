@@ -6,12 +6,12 @@ import { z } from "zod";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { agentSdkOptions } from "../options.js";
-import { createAgentSdkRuntime } from "../runtime.js";
-import { toSdkTools } from "../tools.js";
-import { parseUsage } from "../messages.js";
-import { assistant, codePolicy, fakeQuery, init, rateLimit, result } from "../testing.js";
-import type { Call } from "../types.js";
+import { agentSdkOptions } from "#/options.js";
+import { createAgentSdkRuntime } from "#/runtime.js";
+import { toSdkTools } from "#/tools.js";
+import { parseUsage } from "#/messages.js";
+import { assistant, codePolicy, fakeQuery, init, rateLimit, result } from "#/testing.js";
+import type { Call } from "#/types.js";
 
 const options = agentSdkOptions.parse({});
 const req = (o: Partial<RunRequest> = {}): RunRequest =>

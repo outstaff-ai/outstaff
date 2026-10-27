@@ -1,4 +1,4 @@
-import type { StoredTrace, Store } from "../types.js";
+import type { StoredTrace, Store } from "#/store/types.js";
 import { iso } from "./ids.js";
 import type { StoreInternals } from "./types.js";
 

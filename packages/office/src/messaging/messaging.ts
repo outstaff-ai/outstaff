@@ -1,8 +1,8 @@
 import { silentLogger } from "@outstaff/core";
 import type { AnswerState } from "@outstaff/protocol";
-import { ProtocolError } from "../protocol/errors.js";
-import type { Messaging } from "../protocol/source.types.js";
-import type { Conversation, WorkItem } from "../store/types.js";
+import { ProtocolError } from "#/protocol/errors.js";
+import type { Messaging } from "#/protocol/source.types.js";
+import type { Conversation, WorkItem } from "#/store/types.js";
 import { mirror } from "./mirror.js";
 import { loadByPerson, readRoster } from "./roster.js";
 import { routeQuestion } from "./routing.js";

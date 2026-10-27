@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CAPABILITIES } from "../capabilities.js";
+import { CAPABILITIES } from "#/capabilities.js";
 
 const d = (description: string) => ({ description });
 const SLUG = /^[a-z][a-z0-9-]*$/;

@@ -1,5 +1,5 @@
 import type { ActOutcome } from "@outstaff/core";
-import type { TraceStore } from "../trace.types.js";
+import type { TraceStore } from "#/pipeline/trace.types.js";
 
 /** Puts an act's result on the trace of the event that decided it. */
 export async function recordActResult(

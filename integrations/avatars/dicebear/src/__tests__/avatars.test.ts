@@ -18,7 +18,7 @@ import {
   directoryOptions,
   urlAvatars,
   urlOptions,
-} from "../index.js";
+} from "#/index.js";
 
 const text = (data: Uint8Array) => new TextDecoder().decode(data);
 const sha = (data: Uint8Array) => createHash("sha256").update(data).digest("hex").slice(0, 16);

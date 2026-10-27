@@ -5,12 +5,12 @@ import {
   type LocatedIssue,
   type TeamConfig,
 } from "@outstaff/core";
-import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
-import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
-import { adapterSecretKeys } from "../secret-keys.js";
-import { projectRoot, secretsLocation } from "../project.js";
-import type { Context, GlobalOptions, Loaded } from "../types.js";
+import { catalogIssue, loadCatalogs, roleRegistry } from "#/catalogs.js";
+import { defineCommand } from "#/define.js";
+import { loadTeam } from "#/load.js";
+import { adapterSecretKeys } from "#/secret-keys.js";
+import { projectRoot, secretsLocation } from "#/project.js";
+import type { Context, GlobalOptions, Loaded } from "#/types.js";
 import { printJson, printText, summarize } from "./doctor/render.js";
 import { checkScope } from "./doctor/scope.js";
 import type { ScopeReport } from "./doctor/types.js";

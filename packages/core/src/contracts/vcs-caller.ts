@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RepoRef } from "../ports/index.js";
+import type { RepoRef } from "#/ports/index.js";
 import { expectPortError, requireCapability, requireSeed } from "./harness.js";
 import type { VcsCases, VcsSetup } from "./types.js";
 

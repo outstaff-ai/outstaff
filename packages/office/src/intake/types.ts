@@ -13,8 +13,8 @@ import type {
   VcsEvent,
   WorkflowEvent,
 } from "@outstaff/core";
-import type { Store } from "../store/index.js";
-import type { Clock } from "../types.js";
+import type { Store } from "#/store/index.js";
+import type { Clock } from "#/types.js";
 
 export interface BackoffOptions {
   /** First retry delay after an `unavailable` failure. Default 1000. */

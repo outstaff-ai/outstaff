@@ -1,4 +1,4 @@
-import { PortError, repoKey } from "../ports/index.js";
+import { PortError, repoKey } from "#/ports/index.js";
 import type {
   Check,
   MergeOptions,
@@ -8,7 +8,7 @@ import type {
   RepoRef,
   VcsEvent,
   VcsPermission,
-} from "../ports/index.js";
+} from "#/ports/index.js";
 import type { FakeVcsOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
 import type { FakeVcsState, StoredPr } from "./vcs.types.js";

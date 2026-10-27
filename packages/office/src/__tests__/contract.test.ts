@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { agentRegistry } from "@outstaff/agent";
 import { describe, expect, it } from "vitest";
-import { applySecretsBlock, renderSecretsBlock, renderSecretsTable } from "../contract.js";
-import { officeRegistry } from "../main.js";
+import { applySecretsBlock, renderSecretsBlock, renderSecretsTable } from "#/contract.js";
+import { officeRegistry } from "#/main.js";
 
 const page = readFileSync(
   new URL("../../../../docs/src/content/docs/reference/container-contract.md", import.meta.url),

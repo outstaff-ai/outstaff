@@ -1,14 +1,14 @@
 import { PROTOCOL_VERSION, type Message } from "@outstaff/protocol";
 import { WebSocket } from "ws";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import type { ManualClock } from "../../types.js";
-import { createAgentAuth, agentAuthFromSecrets, agentTokenKey } from "../auth.js";
-import { createProtocolServer } from "../server.js";
-import { ProtocolError } from "../errors.js";
-import type { ChatDesk, Messaging } from "../source.types.js";
+import { manualClock } from "#/clock.js";
+import type { ManualClock } from "#/types.js";
+import { createAgentAuth, agentAuthFromSecrets, agentTokenKey } from "#/protocol/auth.js";
+import { createProtocolServer } from "#/protocol/server.js";
+import { ProtocolError } from "#/protocol/errors.js";
+import type { ChatDesk, Messaging } from "#/protocol/source.types.js";
 import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
-import type { ProtocolServer } from "../types.js";
+import type { ProtocolServer } from "#/protocol/types.js";
 
 class Agent {
   readonly inbox: Message[] = [];

@@ -1,5 +1,5 @@
-import { CAPABILITY_PORT } from "../capabilities.js";
-import type { Capability } from "../types.js";
+import { CAPABILITY_PORT } from "#/capabilities.js";
+import type { Capability } from "#/types.js";
 import type { ConfigWarning, TeamConfig } from "./types.js";
 import type { TeamCheck } from "./validate.types.js";
 import { WARNING_CODES } from "./warning-codes.js";

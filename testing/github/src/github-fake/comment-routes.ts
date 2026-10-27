@@ -4,7 +4,7 @@ import type {
   RestReviewComment,
 } from "@outstaff/integration.vcs.github";
 import { actorOf } from "./requests.js";
-import type { FakeState, Route } from "../types.js";
+import type { FakeState, Route } from "#/types.js";
 
 /** Reviews, review comments, conversation comments and reactions. */
 export function commentRoutes(s: FakeState): Route[] {

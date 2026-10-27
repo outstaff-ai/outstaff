@@ -8,8 +8,8 @@ import {
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { slackChat } from "@outstaff/integration.chat.slack";
 import { describe, expect, it } from "vitest";
-import { manualClock } from "../clock.js";
-import { createOfficePorts } from "../ports.js";
+import { manualClock } from "#/clock.js";
+import { createOfficePorts } from "#/ports.js";
 
 const team = (office: Record<string, unknown> = { channel: "C0TEAM" }) => {
   const result = parseTeamConfig({

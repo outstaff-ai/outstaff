@@ -12,7 +12,7 @@ import {
   ticketComment,
   withGreeting,
   type Action,
-} from "../scripts.js";
+} from "#/scripts.js";
 
 const ctx = {
   itemId: "w1",

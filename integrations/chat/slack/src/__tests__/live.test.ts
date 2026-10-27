@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { envSecretSource, silentLogger, type TeamConfig } from "@outstaff/core";
-import { slackChat } from "../index.js";
+import { slackChat } from "#/index.js";
 
 // Talks to a real Slack app. Set OUTSTAFF_TEST_SLACK_USER (a member id the app may DM) plus SLACK_BOT_TOKEN and
 // SLACK_APP_TOKEN. It posts to that user's direct channel, replies in the thread, reacts and reads history.

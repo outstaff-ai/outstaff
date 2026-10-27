@@ -1,4 +1,4 @@
-import type { Store, StoredTrace } from "../store/index.js";
+import type { Store, StoredTrace } from "#/store/index.js";
 import type { Trace, TraceStore } from "./trace.types.js";
 
 const toTrace = (s: StoredTrace) => s.data as Trace;

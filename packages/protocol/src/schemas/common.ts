@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_CHAT_FILES } from "../constants.js";
+import { MAX_CHAT_FILES } from "#/constants.js";
 
 export const refSchema = z.strictObject({
   type: z.string().min(1).describe("Kind of subject, for example a ticket or a pull request."),

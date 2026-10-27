@@ -1,5 +1,5 @@
-import { defined } from "../../defined.js";
-import type { RequestHandlers } from "../types.js";
+import { defined } from "#/defined.js";
+import type { RequestHandlers } from "#/protocol/types.js";
 
 /** The work loop: offers taken or declined, progress, and the result handed back. */
 export const workHandlers: RequestHandlers = {

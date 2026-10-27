@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AdapterRegistry, defineAdapter } from "../ports/index.js";
+import { AdapterRegistry, defineAdapter } from "#/ports/index.js";
 import { createFakeAvatars } from "./avatars.js";
 import { createFakeChat } from "./chat.js";
 import { createFakeKnowledge } from "./knowledge.js";

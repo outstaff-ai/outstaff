@@ -1,5 +1,5 @@
 import type { GitMode, Layout, Logger, Profile, RepoRef, TeamConfig, Vcs } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 
 /** Runs git with the given arguments and resolves to its stdout. Rejects with git's message when it fails. */
 export type RunGit = (args: string[], opts?: { cwd?: string }) => Promise<string>;

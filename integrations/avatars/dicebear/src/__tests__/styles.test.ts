@@ -10,7 +10,7 @@ vi.mock("@dicebear/collection", () => ({
   namelessLicenseStyle: { meta: { creator: "Acme Studio", license: {} }, create: () => ({}) },
 }));
 
-const { STYLES, STYLE_IDS } = await import("../styles.js");
+const { STYLES, STYLE_IDS } = await import("#/styles.js");
 
 describe("styles from a collection with incomplete metadata", () => {
   it("names styles in kebab case", () => {

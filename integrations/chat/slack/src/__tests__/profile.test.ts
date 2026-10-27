@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { formatWhen, homeView } from "../profile.js";
+import { formatWhen, homeView } from "#/profile.js";
 
 afterEach(() => vi.restoreAllMocks());
 

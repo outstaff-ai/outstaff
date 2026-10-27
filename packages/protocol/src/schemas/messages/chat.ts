@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { MAX_CHAT_FILES } from "../../constants.js";
-import { chatFileSchema, linkSchema } from "../common.js";
-import { itemId, message, reportWhere } from "../fields.js";
-import { queuedReportSchema, workSummarySchema } from "../work.js";
+import { MAX_CHAT_FILES } from "#/constants.js";
+import { chatFileSchema, linkSchema } from "#/schemas/common.js";
+import { itemId, message, reportWhere } from "#/schemas/fields.js";
+import { queuedReportSchema, workSummarySchema } from "#/schemas/work.js";
 
 export const chatMessages = [
   message(

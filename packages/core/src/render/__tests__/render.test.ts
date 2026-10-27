@@ -12,12 +12,12 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse } from "yaml";
 import { afterAll, describe, expect, it } from "vitest";
-import { loadCatalog } from "../../catalog/load.js";
-import { parseTeamConfig } from "../../config/parse.js";
-import type { TeamConfig } from "../../config/types.js";
+import { loadCatalog } from "#/catalog/load.js";
+import { parseTeamConfig } from "#/config/parse.js";
+import type { TeamConfig } from "#/config/types.js";
 import { EXAMPLE_CATALOG_DIR, readAcmeTeam } from "@outstaff/testing.core";
-import { renderPerson, renderTeam, RenderError } from "../render.js";
-import { renderToDir } from "../write.js";
+import { renderPerson, renderTeam, RenderError } from "#/render/render.js";
+import { renderToDir } from "#/render/write.js";
 
 const CATALOG_PKG = fileURLToPath(new URL("../../../../catalog", import.meta.url));
 const GOLDEN = fileURLToPath(new URL("./__golden__", import.meta.url));

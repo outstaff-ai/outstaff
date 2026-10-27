@@ -1,4 +1,4 @@
-import { fieldRows, payloadSchema, table } from "../docs-format.js";
+import { fieldRows, payloadSchema, table } from "#/docs-format.js";
 import { LINK_MESSAGE_META, LINK_METHOD_META } from "./meta.js";
 import {
   LINK_VERSION,

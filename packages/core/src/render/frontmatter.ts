@@ -1,5 +1,5 @@
 import { parseDocument, stringify } from "yaml";
-import { CATALOG_CODES, CatalogError } from "../catalog/codes.js";
+import { CATALOG_CODES, CatalogError } from "#/catalog/codes.js";
 
 const FRONT_MATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
 

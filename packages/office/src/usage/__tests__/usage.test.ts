@@ -1,11 +1,11 @@
 import { parseTeamConfig, type Logger, type TeamConfig } from "@outstaff/core";
 import { beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import type { ManualClock } from "../../types.js";
-import { createScheduler } from "../../scheduler/index.js";
-import { openStore, type Store } from "../../store/index.js";
-import { createUsageTracker, usageGroupOf } from "../usage.js";
-import type { UsageTracker } from "../types.js";
+import { manualClock } from "#/clock.js";
+import type { ManualClock } from "#/types.js";
+import { createScheduler } from "#/scheduler/index.js";
+import { openStore, type Store } from "#/store/index.js";
+import { createUsageTracker, usageGroupOf } from "#/usage/usage.js";
+import type { UsageTracker } from "#/usage/types.js";
 
 function team(shared?: string[][]): TeamConfig {
   const result = parseTeamConfig({

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { ContractContext } from "../contract.types.js";
+import type { ContractContext } from "#/store/contract.types.js";
 
 /** The loop guard, queue order, activation and failure backoff. */
 export function orderingCases(ctx: ContractContext): void {

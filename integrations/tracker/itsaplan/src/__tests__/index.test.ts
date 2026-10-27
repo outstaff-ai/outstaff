@@ -1,6 +1,6 @@
 import { silentLogger } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { itsaplanTracker } from "../index.js";
+import { itsaplanTracker } from "#/index.js";
 import { API_KEY, createItsaplanFake, secretMap, team } from "@outstaff/testing.itsaplan";
 
 describe("itsaplanTracker", () => {

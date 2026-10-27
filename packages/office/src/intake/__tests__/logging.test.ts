@@ -1,7 +1,7 @@
 import { PortError } from "@outstaff/core";
 import type { Logger, Vcs } from "@outstaff/core";
 import { describe, expect, it, vi } from "vitest";
-import { REPO, setup } from "../test-support.js";
+import { REPO, setup } from "#/intake/test-support.js";
 
 interface Line {
   level: "debug" | "info" | "warn" | "error";

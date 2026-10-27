@@ -6,7 +6,7 @@ import type {
   StoredPull,
   StubReply,
   StubRequest,
-} from "../types.js";
+} from "#/types.js";
 
 /** Whether the request asks for a merge the repository's settings allow. */
 function methodAllowed(s: FakeState, r: StubRequest, queue: boolean): boolean {

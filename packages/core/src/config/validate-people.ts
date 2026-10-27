@@ -1,4 +1,4 @@
-import { repoAccess } from "../permissions/build.js";
+import { repoAccess } from "#/permissions/build.js";
 import { CONFIG_CODES } from "./codes.js";
 import type { ConfigIssue, ConfigWarning, TeamConfig } from "./types.js";
 import { missingCapabilities } from "./validate-capabilities.js";

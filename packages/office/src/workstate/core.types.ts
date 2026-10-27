@@ -9,8 +9,8 @@ import type {
   Vcs,
   WorkflowEvent,
 } from "@outstaff/core";
-import type { Store } from "../store/index.js";
-import type { Clock } from "../types.js";
+import type { Store } from "#/store/index.js";
+import type { Clock } from "#/types.js";
 import type { DocRecord, PrRecord, TicketRecord, WorkstateHandler } from "./types.js";
 
 /** A person's work items on one ticket: whether one is still open, and when the latest was created. */

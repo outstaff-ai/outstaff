@@ -1,6 +1,6 @@
 import { PortError } from "@outstaff/core";
 import type { DocEvent, TrackerEvent, VcsEvent, WorkflowEvent } from "@outstaff/core";
-import { prLabel, subjectLabel } from "../log.js";
+import { prLabel, subjectLabel } from "#/log.js";
 import {
   normalizeDocEvent,
   normalizeTrackerEvent,

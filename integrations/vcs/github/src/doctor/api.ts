@@ -1,5 +1,5 @@
 import type { DeriveContext } from "@outstaff/core";
-import { githubOptions } from "../options.js";
+import { githubOptions } from "#/options.js";
 import type { Reply } from "./types.js";
 
 /** Only the API root matters here; other options are not this check's business, so a stray key does not stop it. */

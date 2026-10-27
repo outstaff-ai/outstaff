@@ -6,15 +6,15 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../../clock.js";
-import { readFeedback } from "../../../engine/feedback.js";
-import type { EnqueueInput } from "../../../scheduler/index.js";
-import { openStore, type Store } from "../../../store/index.js";
-import type { Act } from "../../decisions.types.js";
-import { createMemoryTraceStore } from "../../memory-traces.js";
-import { createLivePipeline } from "../live.js";
-import type { LiveOptions } from "../live.types.js";
-import { enqueueWake, ITEM_EVENTS_SUBJECT, WAKE_SUBJECT } from "../wake.js";
+import { manualClock } from "#/clock.js";
+import { readFeedback } from "#/engine/feedback.js";
+import type { EnqueueInput } from "#/scheduler/index.js";
+import { openStore, type Store } from "#/store/index.js";
+import type { Act } from "#/pipeline/decisions.types.js";
+import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
+import { createLivePipeline } from "#/pipeline/live/live.js";
+import type { LiveOptions } from "#/pipeline/live/live.types.js";
+import { enqueueWake, ITEM_EVENTS_SUBJECT, WAKE_SUBJECT } from "#/pipeline/live/wake.js";
 
 const REPO = { host: "github.com", owner: "acme-example", name: "shop" };
 

@@ -6,7 +6,8 @@
     "allowImportingTsExtensions": true,
     "erasableSyntaxOnly": true,
     "declaration": false,
-    "declarationMap": false
+    "declarationMap": false,
+    "customConditions": []
   },
   "include": ["*.ts", "stubs"]
 }

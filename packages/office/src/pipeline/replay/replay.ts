@@ -1,10 +1,10 @@
 import { createStaticWorkflowState } from "@outstaff/core";
-import { coalesceWakes } from "../coalesce.js";
-import { compareOutcomes } from "../compare/compare.js";
-import type { PendingWake } from "../coalesce.types.js";
-import { evaluatePipeline } from "../evaluate.js";
-import type { PipelineEvent } from "../events.types.js";
-import type { PipelineState } from "../state.types.js";
+import { coalesceWakes } from "#/pipeline/coalesce.js";
+import { compareOutcomes } from "#/pipeline/compare/compare.js";
+import type { PendingWake } from "#/pipeline/coalesce.types.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
+import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { PipelineState } from "#/pipeline/state.types.js";
 import { derivedEvents } from "./merge.js";
 import { pipelineSide } from "./pipeline-side.js";
 import type {

@@ -1,5 +1,5 @@
-import { prLabel } from "../log.js";
-import type { Trace } from "../pipeline/trace.types.js";
+import { prLabel } from "#/log.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 import type { EventFilter, LinkStore } from "./link.types.js";
 
 const PAGE = 200;

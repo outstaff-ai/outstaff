@@ -8,3 +8,7 @@ packages:
 allowBuilds:
   esbuild: true
 savePrefix: ""
+# A package's tests may use a private test kit (testing/*) that depends on the package itself: a devDependency cycle.
+# The kits are source only and have no build, so their tasks can run in any order relative to the package's. This
+# hides every cycle from pnpm, so `pnpm check:files` (scripts/file-layout.mjs) fails on any other cycle.
+ignoreWorkspaceCycles: true

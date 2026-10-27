@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { openStore, type Store } from "../../store/index.js";
-import { createMemoryTraceStore } from "../memory-traces.js";
-import { createStoreTraceStore } from "../store-traces.js";
-import type { Trace, TraceStore } from "../trace.types.js";
+import { openStore, type Store } from "#/store/index.js";
+import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
+import { createStoreTraceStore } from "#/pipeline/store-traces.js";
+import type { Trace, TraceStore } from "#/pipeline/trace.types.js";
 import { event } from "./support.js";
 
 const trace = (id: string, at: string): Trace => ({

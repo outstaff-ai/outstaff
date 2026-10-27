@@ -6,7 +6,7 @@ import {
   type QueuedReport,
   type WorkSummary,
 } from "@outstaff/protocol";
-import type { ChatReportKind } from "../verbs/office.types.js";
+import type { ChatReportKind } from "#/verbs/office.types.js";
 import { saveAttachments } from "./attachments.js";
 import { acknowledgement } from "./chat-acknowledge.js";
 import { fromTrustedHuman, linksToList, officeMessage, reportBody } from "./chat-report.js";

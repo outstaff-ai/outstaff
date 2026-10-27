@@ -1,4 +1,4 @@
-import type { WorkItem } from "../store/types.js";
+import type { WorkItem } from "#/store/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
 import { INTERRUPTED } from "./constants.js";
 import { backoffMs, orderQueue } from "./policy.js";

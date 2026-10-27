@@ -1,6 +1,6 @@
-import type { TeamConfig } from "../config/types.js";
-import { presetRules } from "../workflow/presets.js";
-import type { ResolvedWorkflow } from "../workflow/resolve.js";
+import type { TeamConfig } from "#/config/types.js";
+import { presetRules } from "#/workflow/presets.js";
+import type { ResolvedWorkflow } from "#/workflow/resolve.js";
 import { POLICY_SWITCHES, blockedNotify, policyValue } from "./switches.js";
 import type { PolicySwitch, PolicyValue } from "./switches.js";
 import type { PolicyReport, PolicySource } from "./types.js";

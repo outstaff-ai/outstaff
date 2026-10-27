@@ -1,4 +1,4 @@
-import { PortError, type EventPage } from "../ports/index.js";
+import { PortError, type EventPage } from "#/ports/index.js";
 
 /** A deterministic clock that moves forward one second per call. */
 export function steppingClock(start = "2030-01-01T00:00:00.000Z"): () => Date {

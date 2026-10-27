@@ -4,8 +4,8 @@ import { join } from "node:path";
 import type { RuntimeEvent } from "@outstaff/core";
 import { sampleRunRequest } from "@outstaff/core/contracts";
 import { afterAll, describe, expect, it } from "vitest";
-import { agentSdkOptions } from "../options.js";
-import { createAgentSdkRuntime } from "../runtime.js";
+import { agentSdkOptions } from "#/options.js";
+import { createAgentSdkRuntime } from "#/runtime.js";
 
 // Uses whatever credentials the environment has. Run with OUTSTAFF_TEST_LIVE_SDK=1.
 const live = process.env["OUTSTAFF_TEST_LIVE_SDK"] === "1";

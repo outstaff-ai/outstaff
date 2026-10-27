@@ -1,4 +1,4 @@
-import { subjectLabel } from "../log.js";
+import { subjectLabel } from "#/log.js";
 import { formatEngine } from "./compare/describe.js";
 import type { ActOp, Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";

@@ -11,8 +11,8 @@ import type {
   Vcs,
   VcsEvent,
   VcsPermission,
-} from "../ports/index.js";
-import type { VcsSeed } from "../contracts/seeds.js";
+} from "#/ports/index.js";
+import type { VcsSeed } from "#/contracts/seeds.js";
 import type { EventLog } from "./util.js";
 
 export interface StoredPr {

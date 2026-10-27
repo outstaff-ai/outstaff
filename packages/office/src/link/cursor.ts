@@ -1,4 +1,4 @@
-import type { Trace } from "../pipeline/trace.types.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 import type { OfficeLinkOptions, TraceCursor } from "./link.types.js";
 
 type Item = { recordedAt: string; trace: Trace };

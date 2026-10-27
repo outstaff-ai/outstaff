@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createFakeKnowledge, createFakeTracker } from "../../fakes/index.js";
-import { applyActOps } from "../apply.js";
-import { trackerMemberOf } from "../members.js";
+import { createFakeKnowledge, createFakeTracker } from "#/fakes/index.js";
+import { applyActOps } from "#/acts/apply.js";
+import { trackerMemberOf } from "#/acts/members.js";
 
 const SAM = { id: "u-sam", name: "Sam Duarte", kind: "agent" as const };
 

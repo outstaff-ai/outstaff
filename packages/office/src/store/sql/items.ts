@@ -4,7 +4,7 @@ import type {
   QueueOrderEntry,
   WorkItemPatch,
   WorkItemStatus,
-} from "../types.js";
+} from "#/store/types.js";
 import { iso, newId } from "./ids.js";
 import { toItem } from "./rows.js";
 import type { StoreInternals } from "./types.js";

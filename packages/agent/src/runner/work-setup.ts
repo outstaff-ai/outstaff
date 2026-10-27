@@ -1,8 +1,8 @@
 import type { Policy, RunRequest } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
-import type { Workspace } from "../repos/index.js";
-import { VERBS, createRuntimeTools } from "../verbs/index.js";
-import type { AgentEnv } from "../verbs/types.js";
+import type { Offer } from "#/office-client/index.js";
+import type { Workspace } from "#/repos/index.js";
+import { VERBS, createRuntimeTools } from "#/verbs/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 import { itemEnv, itemFiles } from "./item-env.js";
 import type { WorkerContext, WorkLoopOptions } from "./loop.types.js";
 import { buildWorkPrompt } from "./prompt.js";

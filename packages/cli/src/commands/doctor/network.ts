@@ -4,7 +4,7 @@ import { connect } from "node:net";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { networkGrants, originOf, type DoctorCheck, type TeamConfig } from "@outstaff/core";
-import type { Context } from "../../types.js";
+import type { Context } from "#/types.js";
 import type { Status } from "./types.js";
 
 const PROBE_TIMEOUT_MS = 5_000;

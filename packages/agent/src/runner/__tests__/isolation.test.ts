@@ -11,12 +11,12 @@ import {
 } from "@outstaff/core";
 import type { Message } from "@outstaff/protocol";
 import { afterEach, describe, expect, it } from "vitest";
-import { createOfficeConnection } from "../../office-client/index.js";
-import { FakeSocket, createManualClock } from "../../office-client/testing.js";
-import type { Workspaces } from "../../repos/index.js";
+import { createOfficeConnection } from "#/office-client/index.js";
+import { FakeSocket, createManualClock } from "#/office-client/testing.js";
+import type { Workspaces } from "#/repos/index.js";
 import { fakeEnv } from "@outstaff/testing.agent";
-import { JOURNAL_PROMPT } from "../journal.js";
-import { createWorkLoop } from "../loop.js";
+import { JOURNAL_PROMPT } from "#/runner/journal.js";
+import { createWorkLoop } from "#/runner/loop.js";
 
 /** An office that acknowledges everything and keeps a question open, so an item waits. */
 class OfficeSocket extends FakeSocket {

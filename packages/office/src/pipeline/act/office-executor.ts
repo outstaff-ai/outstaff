@@ -1,5 +1,5 @@
 import { applyActOps, trackerMemberOf, type ActOp } from "@outstaff/core";
-import type { Act } from "../decisions.types.js";
+import type { Act } from "#/pipeline/decisions.types.js";
 import type { ActExecutor, OfficeActExecutorOptions } from "./act.types.js";
 import { actId, recordActResult } from "./results.js";
 

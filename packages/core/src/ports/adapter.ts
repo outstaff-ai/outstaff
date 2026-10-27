@@ -1,6 +1,6 @@
-import type { Capability } from "../types.js";
-import type { AdapterPort, ConfigWarning, TeamConfig } from "../config/types.js";
-import type { CommandRule, Profile } from "../permissions/types.js";
+import type { Capability } from "#/types.js";
+import type { AdapterPort, ConfigWarning, TeamConfig } from "#/config/types.js";
+import type { CommandRule, Profile } from "#/permissions/types.js";
 import type { ZodType } from "zod";
 import type { Logger, SecretSource, SecretSpec } from "./types.js";
 

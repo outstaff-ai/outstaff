@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { onlyArg } from "../args.js";
+import { onlyArg } from "#/commands/args.js";
 
 describe("onlyArg", () => {
   it("returns the single argument", () => {

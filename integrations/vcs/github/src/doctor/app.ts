@@ -1,6 +1,6 @@
 import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
-import { signAppJwt } from "../jwt.js";
-import { privateKey } from "../setup.js";
+import { signAppJwt } from "#/jwt.js";
+import { privateKey } from "#/setup.js";
 import { call } from "./api.js";
 import { bad, ok } from "./findings.js";
 import { permissionChecks } from "./permissions.js";

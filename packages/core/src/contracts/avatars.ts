@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Avatars } from "../ports/index.js";
+import type { Avatars } from "#/ports/index.js";
 import { contractSuite, requireCapability } from "./harness.js";
 import type { ContractSetupFn } from "./types.js";
 

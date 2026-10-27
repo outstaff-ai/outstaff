@@ -1,8 +1,8 @@
-import type { Capability } from "../types.js";
-import { CAPABILITY_PORT } from "../capabilities.js";
-import { CATALOG_CODES, CatalogError } from "../catalog/codes.js";
-import { buildContext } from "../catalog/context.js";
-import type { Catalog, CatalogDoc, CatalogIssue, CatalogRole } from "../catalog/types.js";
+import type { Capability } from "#/types.js";
+import { CAPABILITY_PORT } from "#/capabilities.js";
+import { CATALOG_CODES, CatalogError } from "#/catalog/codes.js";
+import { buildContext } from "#/catalog/context.js";
+import type { Catalog, CatalogDoc, CatalogIssue, CatalogRole } from "#/catalog/types.js";
 import { renderCached } from "./render-docs.js";
 import type {
   DocRendering,

@@ -1,9 +1,9 @@
 import type { Logger } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { REPO, teamConfig } from "../../intake/test-support.js";
-import { schedulerWorkSource } from "../../work-source.js";
-import { readOrigin } from "../../chat/origin.js";
-import { readFeedback } from "../feedback.js";
+import { REPO, teamConfig } from "#/intake/test-support.js";
+import { schedulerWorkSource } from "#/work-source.js";
+import { readOrigin } from "#/chat/origin.js";
+import { readFeedback } from "#/engine/feedback.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
 // Feedback for a pull request whose review round is already queued or running joins that round.

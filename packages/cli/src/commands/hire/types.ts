@@ -1,5 +1,5 @@
 import type { SetupStep, TeamConfig } from "@outstaff/core";
-import type { NewPerson } from "../../types.js";
+import type { NewPerson } from "#/types.js";
 
 export type SetupJson = {
   file: string;

@@ -11,20 +11,20 @@ import {
   type QueuedReport,
   type WorkSummary,
 } from "@outstaff/protocol";
-import type { Clock } from "../types.js";
-import { ProtocolError } from "../protocol/errors.js";
-import type { ChatDesk, Messaging } from "../protocol/source.types.js";
-import { CHAT_KIND, orderQueue } from "../scheduler/policy.js";
-import type { Scheduler } from "../scheduler/types.js";
-import type { Store, WorkItem } from "../store/types.js";
-import { summarizeItem } from "../item-summary.js";
+import type { Clock } from "#/types.js";
+import { ProtocolError } from "#/protocol/errors.js";
+import type { ChatDesk, Messaging } from "#/protocol/source.types.js";
+import { CHAT_KIND, orderQueue } from "#/scheduler/policy.js";
+import type { Scheduler } from "#/scheduler/types.js";
+import type { Store, WorkItem } from "#/store/types.js";
+import { summarizeItem } from "#/item-summary.js";
 import {
   formatCurrentWork,
   type PrRecord,
   type TicketRecord,
   type WorkState,
-} from "../workstate/index.js";
-import { addFeedback } from "../engine/feedback.js";
+} from "#/workstate/index.js";
+import { addFeedback } from "#/engine/feedback.js";
 import {
   CHAT_MESSAGE_SUBJECT,
   ATTACH_REASSIGN_SUBJECT,

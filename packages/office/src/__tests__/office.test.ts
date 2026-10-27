@@ -20,10 +20,10 @@ import {
   createFakeVcs,
 } from "@outstaff/core/fakes";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { manualClock } from "../clock.js";
-import { createOffice } from "../office.js";
-import type { Office } from "../office.types.js";
-import { openStore, type Store } from "../store/index.js";
+import { manualClock } from "#/clock.js";
+import { createOffice } from "#/office.js";
+import type { Office } from "#/office.types.js";
+import { openStore, type Store } from "#/store/index.js";
 
 const REPO: RepoRef = { host: "git.acme.example", owner: "acme", name: "app" };
 const SAM_LOGIN = "acme-sam[bot]";

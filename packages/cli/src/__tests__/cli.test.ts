@@ -9,9 +9,9 @@ import {
   UNKNOWN_REPO_GRANT_TEAM,
   YAML_SYNTAX_ERROR_TEAM,
 } from "@outstaff/testing.core";
-import { renderCliReference } from "../reference.js";
-import type { Context } from "../types.js";
-import { run, version } from "../program.js";
+import { renderCliReference } from "#/reference.js";
+import type { Context } from "#/types.js";
+import { run, version } from "#/program.js";
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), "ost-cli-")));
 let n = 0;

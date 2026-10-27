@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { CANONICAL_STATUSES } from "../ports/status.js";
-import type { CanonicalStatus } from "../ports/types.js";
+import { CANONICAL_STATUSES } from "#/ports/status.js";
+import type { CanonicalStatus } from "#/ports/types.js";
 import { WORKFLOW_EVENT_TYPES } from "./constants.js";
 import type { Action, Condition } from "./types.js";
 

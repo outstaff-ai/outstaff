@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { deriveAfterMerge } from "../derive.js";
-import type { PrSnapshot } from "../derive.types.js";
+import { deriveAfterMerge } from "#/pipeline/derive.js";
+import type { PrSnapshot } from "#/pipeline/derive.types.js";
 import { prRef } from "./support.js";
 
 const snap = (number: number, o: Partial<PrSnapshot> = {}): PrSnapshot => ({

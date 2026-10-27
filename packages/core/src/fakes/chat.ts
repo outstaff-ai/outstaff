@@ -1,6 +1,6 @@
-import type { InboundMessage } from "../contracts/seeds.js";
-import { PortError, splitAtLines } from "../ports/index.js";
-import type { ChatFile, ChatMessage, AgentProfile } from "../ports/index.js";
+import type { InboundMessage } from "#/contracts/seeds.js";
+import { PortError, splitAtLines } from "#/ports/index.js";
+import type { ChatFile, ChatMessage, AgentProfile } from "#/ports/index.js";
 import type { FakeChat, FakeChatOptions } from "./types.js";
 import { steppingClock } from "./util.js";
 

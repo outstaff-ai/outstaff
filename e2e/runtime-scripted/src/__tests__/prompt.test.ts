@@ -1,6 +1,6 @@
 import { buildWorkPrompt, type Offer } from "@outstaff/agent";
 import { describe, expect, it } from "vitest";
-import { parsePrompt } from "../prompt.js";
+import { parsePrompt } from "#/prompt.js";
 
 const offer = (kind: string): Offer =>
   ({

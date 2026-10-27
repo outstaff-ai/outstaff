@@ -5,7 +5,7 @@ import {
   type Avatars,
   type TeamConfig,
 } from "@outstaff/core";
-import type { Context } from "../../types.js";
+import type { Context } from "#/types.js";
 
 /** A fixed set of adapters that render avatars, for teams whose `integrations.avatars` names one. */
 async function avatarRegistry(ctx: Context): Promise<AdapterRegistry> {

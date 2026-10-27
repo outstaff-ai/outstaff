@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parse } from "yaml";
-import { parseTeamConfig } from "../../config/parse.js";
+import { parseTeamConfig } from "#/config/parse.js";
 import {
   buildPolicy,
   effectiveTools,
@@ -9,7 +9,7 @@ import {
   toolsToPacks,
   type Layout,
   type ToolCall,
-} from "../../index.js";
+} from "#/index.js";
 
 const layout: Layout = {
   home: "/home/agent",

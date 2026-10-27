@@ -1,4 +1,4 @@
-import { subjectOf } from "../describe.js";
+import { subjectOf } from "#/pipeline/describe.js";
 import type { ReplayResult, ReplayRow } from "./replay.types.js";
 
 const cell = (lines: string[]) =>

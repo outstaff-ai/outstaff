@@ -1,4 +1,4 @@
-import type { Context, GlobalOptions } from "../../types.js";
+import type { Context, GlobalOptions } from "#/types.js";
 import type { ChosenPerson, HireOptions } from "./types.js";
 
 /** Whether to write the person: --yes, or a confirmation after the summary. Prints why not. */

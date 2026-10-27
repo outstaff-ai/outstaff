@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { openStore, type Store } from "../../store/index.js";
-import { findEvents, SCAN_LIMIT } from "../events.js";
+import { openStore, type Store } from "#/store/index.js";
+import { findEvents, SCAN_LIMIT } from "#/link/events.js";
 import { record, trace } from "./support.js";
 
 const at = (minute: number) => new Date(Date.UTC(2026, 9, 5, 9, minute)).toISOString();

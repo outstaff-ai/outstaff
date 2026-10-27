@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConversationEntry, Feedback } from "@outstaff/protocol";
-import type { Offer } from "../../office-client/index.js";
-import { buildWorkPrompt } from "../prompt.js";
+import type { Offer } from "#/office-client/index.js";
+import { buildWorkPrompt } from "#/runner/prompt.js";
 
 const offer = (feedback?: Feedback | Feedback[], conversation?: ConversationEntry[]): Offer =>
   ({

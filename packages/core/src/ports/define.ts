@@ -1,6 +1,6 @@
-import { registerAdapterOptions } from "../config/adapters.js";
-import type { AdapterInfo, IdentityValidator, TeamConfig } from "../config/types.js";
-import type { RulePack } from "../permissions/types.js";
+import { registerAdapterOptions } from "#/config/adapters.js";
+import type { AdapterInfo, IdentityValidator, TeamConfig } from "#/config/types.js";
+import type { RulePack } from "#/permissions/types.js";
 import type { AdapterDefinition, PortName } from "./adapter.js";
 import { PortError } from "./errors.js";
 import type { PortImpls } from "./types.js";

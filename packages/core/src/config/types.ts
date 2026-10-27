@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type { Capability } from "../types.js";
+import type { Capability } from "#/types.js";
 import type { ADAPTER_PORTS } from "./adapters.js";
 import type { CONFIG_CODES } from "./codes.js";
 import type { networkSchema } from "./network.js";

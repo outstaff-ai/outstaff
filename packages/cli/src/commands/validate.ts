@@ -8,11 +8,11 @@ import {
   type LocatedIssue,
   type TeamConfig,
 } from "@outstaff/core";
-import { adapterSecretKeys } from "../secret-keys.js";
-import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
-import { defineCommand } from "../define.js";
-import { issueJson, loadTeam } from "../load.js";
-import type { Context, Loaded } from "../types.js";
+import { adapterSecretKeys } from "#/secret-keys.js";
+import { catalogIssue, loadCatalogs, roleRegistry } from "#/catalogs.js";
+import { defineCommand } from "#/define.js";
+import { issueJson, loadTeam } from "#/load.js";
+import type { Context, Loaded } from "#/types.js";
 
 /** Importing an adapter package registers its option schema; load only the packages the team uses. */
 const OPTION_SCHEMAS: Record<AdapterPort, () => Promise<unknown>> = {

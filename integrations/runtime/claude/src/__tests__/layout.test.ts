@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { claudeAgentSdk } from "../adapter.js";
-import { renderedSkillNames, workdirFiles } from "../layout.js";
+import { claudeAgentSdk } from "#/adapter.js";
+import { renderedSkillNames, workdirFiles } from "#/layout.js";
 
 describe("workdirFiles", () => {
   it("puts skills where Claude Code loads them and leaves other files alone", () => {

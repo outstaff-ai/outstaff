@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { defineCommand } from "../define.js";
+import { defineCommand } from "#/define.js";
 import {
   baseFile,
   tryIndex,
@@ -9,10 +9,10 @@ import {
   stockVersion,
   writeFileDeep,
   writeIndex,
-} from "../ejected.js";
-import { mergeThreeWay } from "../merge.js";
-import { openTeam } from "../open-team.js";
-import type { Context, EjectedIndex } from "../types.js";
+} from "#/ejected.js";
+import { mergeThreeWay } from "#/merge.js";
+import { openTeam } from "#/open-team.js";
+import type { Context, EjectedIndex } from "#/types.js";
 
 type Outcome = "unchanged" | "updated" | "merged" | "conflict" | "deleted-upstream" | "reverted";
 type FileResult = { path: string; outcome: Outcome };

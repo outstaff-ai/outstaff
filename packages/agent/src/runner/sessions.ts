@@ -1,5 +1,5 @@
 import { silentLogger, type Logger } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import type { SessionStore, SessionManager } from "./types.js";
 
 /**

@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { refSchema } from "../common.js";
-import { empty, itemId, message, text } from "../fields.js";
-import { answerStateSchema, humanSchema, memberSchema } from "../team.js";
-import { filedSchema, workSummarySchema } from "../work.js";
+import { refSchema } from "#/schemas/common.js";
+import { empty, itemId, message, text } from "#/schemas/fields.js";
+import { answerStateSchema, humanSchema, memberSchema } from "#/schemas/team.js";
+import { filedSchema, workSummarySchema } from "#/schemas/work.js";
 
 export const workMessages = [
   message(

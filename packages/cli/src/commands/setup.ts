@@ -1,9 +1,9 @@
 import { join, resolve } from "node:path";
 import { formatIssue, type AdapterRegistry, type TeamConfig } from "@outstaff/core";
-import { defineCommand } from "../define.js";
-import { loadTeam } from "../load.js";
-import { projectRoot, secretsLocation } from "../project.js";
-import type { Context, GlobalOptions, Loaded, SecretsLocation } from "../types.js";
+import { defineCommand } from "#/define.js";
+import { loadTeam } from "#/load.js";
+import { projectRoot, secretsLocation } from "#/project.js";
+import type { Context, GlobalOptions, Loaded, SecretsLocation } from "#/types.js";
 import { runDerive } from "./setup/derive.js";
 import { missingIgnores } from "./setup/ignores.js";
 import { configuredAdapters, shippedRegistry } from "./setup/registry.js";

@@ -1,5 +1,5 @@
 import type { Tracker } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 import { anyBlocked } from "./blocked.js";
 import type { WorkerContext } from "./loop.types.js";
 import type { HandBackStatus, ItemRun } from "./work.types.js";

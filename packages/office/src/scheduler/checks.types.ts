@@ -1,6 +1,6 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
-import type { Run, Store, WorkItem } from "../store/types.js";
-import type { Clock } from "../types.js";
+import type { Run, Store, WorkItem } from "#/store/types.js";
+import type { Clock } from "#/types.js";
 import type { MoveTarget, RetryPolicy, RunBlock, UsageWindow } from "./policy.types.js";
 import type { BlockNotice, UsageSource } from "./types.js";
 

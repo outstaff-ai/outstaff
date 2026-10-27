@@ -1,5 +1,5 @@
-import type { Catalog, CatalogContext, CatalogIssue, CatalogRole } from "../catalog/types.js";
-import type { TeamConfig } from "../config/types.js";
+import type { Catalog, CatalogContext, CatalogIssue, CatalogRole } from "#/catalog/types.js";
+import type { TeamConfig } from "#/config/types.js";
 
 export type RenderWarning = { code: string; message: string };
 

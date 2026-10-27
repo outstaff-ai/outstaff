@@ -3,9 +3,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createStoreTraceStore, openStore, type Trace } from "@outstaff/office";
 import { afterAll, describe, expect, it } from "vitest";
-import type { Context } from "../types.js";
-import { sinceTime } from "../commands/explain.js";
-import { run } from "../program.js";
+import type { Context } from "#/types.js";
+import { sinceTime } from "#/commands/explain.js";
+import { run } from "#/program.js";
 
 const dir = mkdtempSync(join(tmpdir(), "ost-explain-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));

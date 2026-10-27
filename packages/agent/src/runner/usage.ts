@@ -1,5 +1,5 @@
 import { silentLogger, type UsageEvent } from "@outstaff/core";
-import { systemClientClock, type ClientClock } from "../office-client/index.js";
+import { systemClientClock, type ClientClock } from "#/office-client/index.js";
 import type { UsageThresholds, UsageReporterOptions, UsageReporter } from "./types.js";
 
 const DEFAULT_THRESHOLDS: UsageThresholds = { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 };

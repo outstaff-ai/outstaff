@@ -1,5 +1,5 @@
-import { ProtocolError } from "../errors.js";
-import type { RequestHandlers } from "../types.js";
+import { ProtocolError } from "#/protocol/errors.js";
+import type { RequestHandlers } from "#/protocol/types.js";
 
 /** The service, or the `unsupported` refusal when this office runs without it. */
 function required<T>(service: T | undefined, refusal: string): T {

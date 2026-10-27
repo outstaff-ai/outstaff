@@ -1,6 +1,6 @@
-import type { NewSeedPullRequest, VcsSeed } from "../contracts/seeds.js";
-import { PortError } from "../ports/index.js";
-import type { PullRequest, ReviewInlineComment, ReviewThread } from "../ports/index.js";
+import type { NewSeedPullRequest, VcsSeed } from "#/contracts/seeds.js";
+import { PortError } from "#/ports/index.js";
+import type { PullRequest, ReviewInlineComment, ReviewThread } from "#/ports/index.js";
 import type { FakeVcsState, StoredPr } from "./vcs.types.js";
 
 /** The seed of a fake vcs: puts pull requests, reviews, checks and grants in place as a test needs them. */

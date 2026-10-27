@@ -1,6 +1,6 @@
 import type { SecretSource, SetupStep, TeamConfig } from "@outstaff/core";
-import type { Context } from "../../types.js";
-import type { AnyDef, Scope } from "../types.js";
+import type { Context } from "#/types.js";
+import type { AnyDef, Scope } from "#/commands/types.js";
 
 export interface Configured {
   def: AnyDef;

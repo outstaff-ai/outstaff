@@ -1,4 +1,4 @@
-import type { WorkItem } from "../store/types.js";
+import type { WorkItem } from "#/store/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
 import { staleVerdict, trailingStale } from "./policy.js";
 import type { TickResult } from "./types.js";

@@ -1,5 +1,5 @@
 import { silentLogger, type Logger } from "@outstaff/core";
-import type { WorkItem } from "../store/types.js";
+import type { WorkItem } from "#/store/types.js";
 import type { MirrorOptions, MirrorWhere } from "./types.js";
 
 /** Posts to the team channel, if there is one; false when there is none or the post failed. */

@@ -1,5 +1,5 @@
 import type { Human, Member, MemberUsage } from "@outstaff/protocol";
-import type { Store } from "../store/types.js";
+import type { Store } from "#/store/types.js";
 import type { RoleInfo, Roster, RosterOptions } from "./types.js";
 
 const infoOf = (roles: RosterOptions["roles"], role: string): RoleInfo | undefined =>

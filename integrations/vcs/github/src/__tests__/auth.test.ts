@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AppAuth, REFRESH_MARGIN_MS } from "../auth.js";
-import { GithubHttp } from "../http.js";
+import { AppAuth, REFRESH_MARGIN_MS } from "#/auth.js";
+import { GithubHttp } from "#/http.js";
 import {
   clock,
   createStubFetch,
@@ -10,7 +10,7 @@ import {
   type Route,
 } from "@outstaff/testing.github";
 import { testKey } from "@outstaff/testing.core";
-import type { AppCredentials } from "../types.js";
+import type { AppCredentials } from "#/types.js";
 
 function setup(routes: Route[], creds: Partial<AppCredentials> = {}) {
   const c = clock();

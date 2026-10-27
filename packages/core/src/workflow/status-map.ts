@@ -1,5 +1,5 @@
-import { CANONICAL_STATUSES } from "../ports/status.js";
-import type { CanonicalStatus, StatusMap } from "../ports/types.js";
+import { CANONICAL_STATUSES } from "#/ports/status.js";
+import type { CanonicalStatus, StatusMap } from "#/ports/types.js";
 import type { WorkflowStatusMap } from "./types.js";
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

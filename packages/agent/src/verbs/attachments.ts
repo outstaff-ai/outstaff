@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { silentLogger, type Tracker } from "@outstaff/core";
-import { humanSize } from "../runner/attachments.js";
-import type { Attachment } from "../runner/types.js";
+import { humanSize } from "#/runner/attachments.js";
+import type { Attachment } from "#/runner/types.js";
 import type { AgentEnv, Uploaded } from "./types.js";
 
 /** The tracker, when it can take attachments. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nextTraces } from "../cursor.js";
+import { nextTraces } from "#/link/cursor.js";
 
 const row = (ref: string, recordedAt: string) => ({
   ref,

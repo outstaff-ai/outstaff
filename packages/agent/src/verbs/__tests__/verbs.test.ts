@@ -21,8 +21,8 @@ import {
   renderVerbsReference,
   runVerb,
   toolName,
-} from "../index.js";
-import { agentLayout } from "../../runner/layout.js";
+} from "#/verbs/index.js";
+import { agentLayout } from "#/runner/layout.js";
 import { acmeTeam, fakeEnv } from "@outstaff/testing.agent";
 
 const verb = (name: string) => findVerb(name)!;

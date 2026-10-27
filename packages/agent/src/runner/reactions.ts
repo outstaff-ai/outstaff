@@ -5,7 +5,7 @@ import {
   type RepoRef,
   type Vcs,
 } from "@outstaff/core";
-import type { Offer } from "../office-client/index.js";
+import type { Offer } from "#/office-client/index.js";
 
 /** The kinds of work item that carry feedback from people on a pull request. */
 const FEEDBACK_KINDS = new Set(["review_feedback", "merged_feedback"]);

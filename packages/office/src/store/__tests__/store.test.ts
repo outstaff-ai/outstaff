@@ -4,8 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Client } from "pg";
 import { describe, expect, it } from "vitest";
-import { storeContract } from "../contract.js";
-import { openStore } from "../open.js";
+import { storeContract } from "#/store/contract.js";
+import { openStore } from "#/store/open.js";
 
 storeContract("sqlite in-memory", () =>
   // A :memory: database lives and dies with its connection, so losing it is closing it.

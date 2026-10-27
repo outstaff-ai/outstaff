@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { engineRecord, fromDecisions, fromEffect } from "../outcomes.js";
+import { engineRecord, fromDecisions, fromEffect } from "#/pipeline/compare/outcomes.js";
 
 const pr = { repo: { host: "github.com", owner: "acme-example", name: "shop" }, number: 9 };
 

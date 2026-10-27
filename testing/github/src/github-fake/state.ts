@@ -9,7 +9,7 @@ import type {
   StoredReview,
   StoredReviewComment,
   StoredThread,
-} from "../types.js";
+} from "#/types.js";
 
 type RestMergeable = Pick<RestPull, "mergeable" | "mergeable_state">;
 

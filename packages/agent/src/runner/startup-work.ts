@@ -9,10 +9,10 @@ import {
   type RenderedWorkdir,
   type Runtime,
 } from "@outstaff/core";
-import type { OfficeConnection } from "../office-client/index.js";
-import { createWorkspaces, syncRepositories, type ClonedRepo } from "../repos/index.js";
-import type { ToolStatus } from "../tools/index.js";
-import type { AgentEnv } from "../verbs/types.js";
+import type { OfficeConnection } from "#/office-client/index.js";
+import { createWorkspaces, syncRepositories, type ClonedRepo } from "#/repos/index.js";
+import type { ToolStatus } from "#/tools/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 import { createWorkLoop } from "./loop.js";
 import type { WorkLoop } from "./loop.types.js";
 import { installDeclaredTools } from "./startup-steps.js";

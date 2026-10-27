@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { defineCommand } from "../define.js";
+import { defineCommand } from "#/define.js";
 import {
   allStockFiles,
   baseFile,
@@ -10,9 +10,9 @@ import {
   stockVersion,
   writeFileDeep,
   writeIndex,
-} from "../ejected.js";
-import { openTeam } from "../open-team.js";
-import type { Context, EjectedIndex } from "../types.js";
+} from "#/ejected.js";
+import { openTeam } from "#/open-team.js";
+import type { Context, EjectedIndex } from "#/types.js";
 
 /** The stock files the targets name; undefined (after printing why) when a target matches nothing. */
 function filesFor(ctx: Context, stockDir: string, targets: string[]): string[] | undefined {

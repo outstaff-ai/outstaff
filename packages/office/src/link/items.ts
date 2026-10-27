@@ -1,7 +1,7 @@
 import type { LinkItemSummary, LinkResultOf } from "@outstaff/protocol";
-import type { WakeReason } from "../pipeline/live/live.types.js";
-import { WAKE_SUBJECT } from "../pipeline/live/wake.js";
-import type { WorkItem } from "../store/types.js";
+import type { WakeReason } from "#/pipeline/live/live.types.js";
+import { WAKE_SUBJECT } from "#/pipeline/live/wake.js";
+import type { WorkItem } from "#/store/types.js";
 import type { ItemFilter, LinkStore } from "./link.types.js";
 
 /** The pipeline policy and event that queued an item, when the live pipeline did. */

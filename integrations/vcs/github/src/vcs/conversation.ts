@@ -1,5 +1,5 @@
 import type { ConversationEntry, PullRequestReview, Vcs } from "@outstaff/core";
-import type { RestIssueComment, RestPull, RestReview } from "../api.types.js";
+import type { RestIssueComment, RestPull, RestReview } from "#/api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 

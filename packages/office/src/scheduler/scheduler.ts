@@ -1,5 +1,5 @@
 import { silentLogger } from "@outstaff/core";
-import type { WorkItem } from "../store/types.js";
+import type { WorkItem } from "#/store/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
 import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
 import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";

@@ -1,6 +1,6 @@
-import { buildTeamJsonSchema } from "../config/json-schema.js";
-import { documentedCodes } from "../config/documented-codes.js";
-import { WARNING_CODES } from "../config/warning-codes.js";
+import { buildTeamJsonSchema } from "#/config/json-schema.js";
+import { documentedCodes } from "#/config/documented-codes.js";
+import { WARNING_CODES } from "#/config/warning-codes.js";
 import { asSchema, walk } from "./schema-walk.js";
 import type { Schema } from "./types.js";
 

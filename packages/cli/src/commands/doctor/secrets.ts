@@ -1,7 +1,7 @@
 import { statSync } from "node:fs";
 import { join } from "node:path";
 import type { DoctorCheck, SecretSource } from "@outstaff/core";
-import type { sections } from "../setup-template.js";
+import type { sections } from "#/commands/setup-template.js";
 import { fail, plural } from "./check.js";
 
 /** A key whose file may stand in for it; the spec for the alternative itself is then not required. */

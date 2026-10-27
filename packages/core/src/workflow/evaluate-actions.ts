@@ -2,7 +2,7 @@ import { mentionedBy } from "./evaluate-check.js";
 import type { Ctx, Resolved } from "./evaluate.types.js";
 import { BUILTIN_TEMPLATES, renderTemplate, TemplateError } from "./template.js";
 import { variables } from "./template-variables.js";
-import type { CanonicalStatus } from "../ports/types.js";
+import type { CanonicalStatus } from "#/ports/types.js";
 import type { Action, Effect, EffectTarget, PrRef } from "./types.js";
 
 type CommentSpec = Extract<Action, { comment: unknown }>["comment"];

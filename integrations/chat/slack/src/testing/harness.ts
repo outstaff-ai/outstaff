@@ -4,8 +4,8 @@ import {
   type SecretSource,
   type TeamConfig,
 } from "@outstaff/core";
-import { createSlackChat } from "../chat.js";
-import type { SlackOptions } from "../types.js";
+import { createSlackChat } from "#/chat.js";
+import type { SlackOptions } from "#/types.js";
 import { BOT_TOKEN, createFakeSlack } from "./slack-fake.js";
 import type { FakeSlack } from "./types.js";
 

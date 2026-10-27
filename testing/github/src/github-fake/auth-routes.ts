@@ -1,5 +1,5 @@
 import { appOf, installationOf, personOf } from "./requests.js";
-import type { FakeState, Route } from "../types.js";
+import type { FakeState, Route } from "#/types.js";
 
 /** Whether a seeded permission level lets an installation mint the token it asks for. */
 const grants = (level: string, wantsWrite: boolean): boolean =>

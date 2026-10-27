@@ -14,8 +14,15 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@outstaff/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    }
+  },
+  "imports": {
+    "#/*": {
+      "@outstaff/source": "./src/*",
+      "default": "./dist/*"
     }
   },
   "files": [
@@ -25,7 +32,7 @@
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json",
-    "docs:contract": "tsx scripts/gen-contract-docs.ts",
+    "docs:contract": "tsx --conditions=@outstaff/source scripts/gen-contract-docs.ts",
     "prepack": "node ../../scripts/copy-legal.mjs"
   },
   "dependencies": {
@@ -44,6 +51,7 @@
     "@types/pg": "8.23.1",
     "@types/ws": "8.18.2",
     "@outstaff/agent": "workspace:*",
+    "@outstaff/testing.office": "workspace:*",
     "tsx": "4.23.15"
   },
   "bin": {

@@ -1,4 +1,4 @@
-import type { WorkItem, WorkItemTrigger } from "../store/types.js";
+import type { WorkItem, WorkItemTrigger } from "#/store/types.js";
 import type {
   LoopGuardVerdict,
   MoveTarget,

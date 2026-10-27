@@ -14,11 +14,18 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@outstaff/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
     "./toolsets/*": "./toolsets/*",
     "./package.json": "./package.json"
+  },
+  "imports": {
+    "#/*": {
+      "@outstaff/source": "./src/*",
+      "default": "./dist/*"
+    }
   },
   "files": [
     "dist",

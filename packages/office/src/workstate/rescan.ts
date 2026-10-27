@@ -1,5 +1,5 @@
 import type { TeamConfig } from "@outstaff/core";
-import type { Ref, WorkItem } from "../store/index.js";
+import type { Ref, WorkItem } from "#/store/index.js";
 import type { PrRecord, TicketRecord } from "./types.js";
 import type { PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
 import { docOpen, isTerminal, openPrs } from "./derive.js";

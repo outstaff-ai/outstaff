@@ -1,7 +1,7 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { configurePipeline } from "../configure.js";
-import { DEFAULT_POLICIES } from "../defaults.js";
+import { configurePipeline } from "#/pipeline/configure.js";
+import { DEFAULT_POLICIES } from "#/pipeline/defaults.js";
 
 function team(extra: Record<string, unknown> = {}): TeamConfig {
   const r = parseTeamConfig({

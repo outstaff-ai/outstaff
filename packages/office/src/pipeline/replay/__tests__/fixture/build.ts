@@ -1,5 +1,5 @@
 import type { CanonicalStatus, PrRef, PrVerdict, StaticTicket, WorkflowPr } from "@outstaff/core";
-import type { PipelineEvent, PipelineEventType, PipelineSubject } from "../../../events.types.js";
+import type { PipelineEvent, PipelineEventType, PipelineSubject } from "#/pipeline/events.types.js";
 
 /** The acme team's agents (examples/acme). */
 const AGENTS = new Set(["priya", "tomas", "mira", "leo", "sam", "noor", "ines", "kofi"]);

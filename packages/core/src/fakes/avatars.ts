@@ -1,4 +1,4 @@
-import type { Avatars } from "../ports/index.js";
+import type { Avatars } from "#/ports/index.js";
 
 function hash(text: string): number {
   let h = 2166136261;

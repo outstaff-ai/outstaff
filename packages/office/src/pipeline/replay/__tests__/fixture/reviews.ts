@@ -1,4 +1,4 @@
-import type { ReplayScenario, ReplayWorld } from "../../replay.types.js";
+import type { ReplayScenario, ReplayWorld } from "#/pipeline/replay/replay.types.js";
 import { approved, at, ev, pr, ticket } from "./build.js";
 
 const wishlist = pr(60, "Wishlist", { by: "sam", head: "sam/acme-140" });

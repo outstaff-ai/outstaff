@@ -15,10 +15,10 @@ import {
 import { sampleRunRequest } from "@outstaff/core/contracts";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
-import { workdirFiles } from "../layout.js";
-import { agentSdkOptions } from "../options.js";
-import { createAgentSdkRuntime } from "../runtime.js";
-import type { QueryFn } from "../types.js";
+import { workdirFiles } from "#/layout.js";
+import { agentSdkOptions } from "#/options.js";
+import { createAgentSdkRuntime } from "#/runtime.js";
+import type { QueryFn } from "#/types.js";
 
 // Guards against SDK or Claude Code upgrades that change what loads in an unattended run. It runs real sessions with
 // the cheapest model against a workdir rendered the way the agent renders it, so it costs a few cents.

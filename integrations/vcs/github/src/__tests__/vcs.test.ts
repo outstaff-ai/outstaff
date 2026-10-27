@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PortError, silentLogger } from "@outstaff/core";
-import { githubOptions } from "../options.js";
-import { createGithubVcs } from "../vcs.js";
+import { githubOptions } from "#/options.js";
+import { createGithubVcs } from "#/vcs.js";
 import {
   appRoutes,
   build,

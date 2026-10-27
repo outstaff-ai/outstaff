@@ -1,6 +1,6 @@
 import { envSecretSource, type DeriveContext, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { doctorSlack } from "../doctor.js";
+import { doctorSlack } from "#/doctor.js";
 
 const team = { team: { name: "acme" }, repos: [], people: [] } as unknown as TeamConfig;
 const person = (chat?: string) =>

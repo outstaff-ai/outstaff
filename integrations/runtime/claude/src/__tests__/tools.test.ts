@@ -1,7 +1,7 @@
 import { PortError, type RuntimeTool } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { toSdkTools } from "../tools.js";
+import { toSdkTools } from "#/tools.js";
 
 type Handler = (
   args: unknown,

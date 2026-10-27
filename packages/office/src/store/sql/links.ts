@@ -1,4 +1,4 @@
-import type { Store, LinkQuery, Ref, Subject } from "../types.js";
+import type { Store, LinkQuery, Ref, Subject } from "#/store/types.js";
 import { iso, newId } from "./ids.js";
 import { toLink } from "./rows.js";
 import type { StoreInternals } from "./types.js";

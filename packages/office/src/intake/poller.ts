@@ -1,6 +1,6 @@
 import { PortError } from "@outstaff/core";
-import { clip } from "../log.js";
-import type { Cancel } from "../types.js";
+import { clip } from "#/log.js";
+import type { Cancel } from "#/types.js";
 import { backoffDelay } from "./backoff.js";
 import type { PollSource, Poller, PollerOptions } from "./types.js";
 

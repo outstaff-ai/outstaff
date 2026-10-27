@@ -1,4 +1,4 @@
-import type { Store, JournalEntry } from "../types.js";
+import type { Store, JournalEntry } from "#/store/types.js";
 import { iso, newId } from "./ids.js";
 import { toRun } from "./rows.js";
 import type { StoreInternals } from "./types.js";

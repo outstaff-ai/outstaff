@@ -14,8 +14,15 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@outstaff/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    }
+  },
+  "imports": {
+    "#/*": {
+      "@outstaff/source": "./src/*",
+      "default": "./dist/*"
     }
   },
   "files": [
@@ -32,6 +39,7 @@
     "@outstaff/integration.shared.itsaplan": "workspace:*"
   },
   "devDependencies": {
+    "@outstaff/testing.itsaplan": "workspace:*",
     "vitest": "5.0.5"
   }
 }

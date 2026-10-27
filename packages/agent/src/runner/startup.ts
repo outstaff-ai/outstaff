@@ -1,6 +1,6 @@
 import { effectiveTools } from "@outstaff/core";
 import type { StartupOptions, PreparedAgent } from "./startup.types.js";
-import { createAgentEnv } from "../verbs/env.js";
+import { createAgentEnv } from "#/verbs/env.js";
 import { buildIdentityPrompt } from "./identity.js";
 import { agentLayout } from "./layout.js";
 import { loadCatalogs, loadToolsets } from "./catalogs.js";

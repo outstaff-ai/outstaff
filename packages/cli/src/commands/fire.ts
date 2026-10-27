@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import type { TeamConfig } from "@outstaff/core";
-import { defineCommand } from "../define.js";
+import { defineCommand } from "#/define.js";
 import { onlyArg } from "./args.js";
-import { openTeam } from "../open-team.js";
-import { projectRoot, secretsLocation, shown } from "../project.js";
-import { removePerson } from "../teamfile.js";
-import type { Context, GlobalOptions, Removal } from "../types.js";
+import { openTeam } from "#/open-team.js";
+import { projectRoot, secretsLocation, shown } from "#/project.js";
+import { removePerson } from "#/teamfile.js";
+import type { Context, GlobalOptions, Removal } from "#/types.js";
 import { validate } from "./validate.js";
 
 const describe = (u: { before: string[]; after: string[] | null }) =>

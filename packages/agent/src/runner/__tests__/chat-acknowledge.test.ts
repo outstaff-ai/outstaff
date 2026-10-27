@@ -1,7 +1,7 @@
 import type { Filed } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
-import { acknowledgement } from "../chat-acknowledge.js";
-import { linksToList, reportBody } from "../chat-report.js";
+import { acknowledgement } from "#/runner/chat-acknowledge.js";
+import { linksToList, reportBody } from "#/runner/chat-report.js";
 
 const filed = (over: Partial<Filed> = {}) =>
   ({

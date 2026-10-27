@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { githubOptions } from "../options.js";
+import { githubOptions } from "#/options.js";
 
 describe("githubOptions", () => {
   it("rejects the removed appSlugs option", () => {

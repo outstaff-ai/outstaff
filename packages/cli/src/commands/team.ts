@@ -1,9 +1,9 @@
 import { formatIssue, validateTeam, type LocatedIssue, type TeamConfig } from "@outstaff/core";
-import { catalogIssue, loadCatalogs, roleRegistry } from "../catalogs.js";
-import { defineCommand } from "../define.js";
-import { issueJson, loadTeam } from "../load.js";
-import { table } from "../table.js";
-import type { Context, Loaded } from "../types.js";
+import { catalogIssue, loadCatalogs, roleRegistry } from "#/catalogs.js";
+import { defineCommand } from "#/define.js";
+import { issueJson, loadTeam } from "#/load.js";
+import { table } from "#/table.js";
+import type { Context, Loaded } from "#/types.js";
 
 const DEFAULT_TRUST = "default rule: repo writers and full chat-workspace members";
 

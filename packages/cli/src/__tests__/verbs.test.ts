@@ -7,8 +7,8 @@ import { createFakeAdapterRegistry, createFakeVcs } from "@outstaff/core/fakes";
 import { envSecretSource } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { acmeTeam, fakeEnv } from "@outstaff/testing.agent";
-import type { Context } from "../types.js";
-import { run } from "../program.js";
+import type { Context } from "#/types.js";
+import { run } from "#/program.js";
 
 async function ost(args: string[], f = fakeEnv(), env: Record<string, string> = {}, stdin = "") {
   let out = "";

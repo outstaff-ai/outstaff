@@ -1,7 +1,7 @@
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { PortError, evaluate, type Policy } from "@outstaff/core";
-import { safeId } from "../repos/workspaces.js";
+import { safeId } from "#/repos/workspaces.js";
 import type { AgentEnv, VerbContext } from "./types.js";
 
 const MAX_FILE = 1_000_000;

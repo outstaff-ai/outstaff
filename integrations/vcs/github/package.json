@@ -14,8 +14,15 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "@outstaff/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    }
+  },
+  "imports": {
+    "#/*": {
+      "@outstaff/source": "./src/*",
+      "default": "./dist/*"
     }
   },
   "files": [
@@ -33,6 +40,7 @@
   },
   "devDependencies": {
     "@outstaff/testing.core": "workspace:*",
+    "@outstaff/testing.github": "workspace:*",
     "vitest": "5.0.5"
   }
 }

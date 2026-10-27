@@ -1,7 +1,7 @@
 import type { Effect } from "@outstaff/core";
-import type { EffectOutcome } from "../../engine/types.js";
-import { prLabel } from "../../log.js";
-import type { Decision } from "../decisions.types.js";
+import type { EffectOutcome } from "#/engine/types.js";
+import { prLabel } from "#/log.js";
+import type { Decision } from "#/pipeline/decisions.types.js";
 import type { EngineRecord, Outcome } from "./compare.types.js";
 
 /** Kinds the pipeline renamed. */

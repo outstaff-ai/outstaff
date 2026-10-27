@@ -1,7 +1,7 @@
 import { silentLogger, type SecretSpec, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { githubOptions } from "../options.js";
-import { githubVcs } from "../index.js";
+import { githubOptions } from "#/options.js";
+import { githubVcs } from "#/index.js";
 
 const team = {
   team: { name: "acme" },

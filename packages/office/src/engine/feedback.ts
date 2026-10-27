@@ -1,6 +1,6 @@
 import type { ConditionEvent } from "@outstaff/core";
 import type { Feedback } from "@outstaff/protocol";
-import type { Store } from "../store/types.js";
+import type { Store } from "#/store/types.js";
 
 /**
  * The subject type that keeps the feedback of a review round, keyed by work item id: a list, because feedback that

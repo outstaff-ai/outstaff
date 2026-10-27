@@ -1,11 +1,11 @@
 import type { Logger } from "@outstaff/core";
 import type { Filed } from "@outstaff/protocol";
 import type { FiledWhat } from "./chat.types.js";
-import type { Offer } from "../office-client/index.js";
-import type { AgentEnv } from "../verbs/types.js";
+import type { Offer } from "#/office-client/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 import type { Attachment } from "./types.js";
 import { saveTicketFiles } from "./attachments.js";
-import { safeId } from "../repos/workspaces.js";
+import { safeId } from "#/repos/workspaces.js";
 import { join } from "node:path";
 import type { WorkLoopOptions, ItemEnv } from "./loop.types.js";
 import { reason } from "./reason.js";

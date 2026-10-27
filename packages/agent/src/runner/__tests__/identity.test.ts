@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { acmeTeam } from "@outstaff/testing.agent";
-import { buildIdentityPrompt } from "../identity.js";
+import { buildIdentityPrompt } from "#/runner/identity.js";
 
 describe("identity prompt", () => {
   const team = acmeTeam();

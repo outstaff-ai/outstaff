@@ -1,5 +1,5 @@
 import type { ChatSeed, InboundMessage } from "@outstaff/core/contracts";
-import type { SlackEvent, SlackSocket, SlackUser, SlackWeb } from "../api.js";
+import type { SlackEvent, SlackSocket, SlackUser, SlackWeb } from "#/api.js";
 
 export interface FakeSlack {
   web: SlackWeb;

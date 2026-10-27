@@ -5,8 +5,8 @@ import {
   type RepoRef,
   type Vcs,
 } from "@outstaff/core";
-import { toPullRequest } from "../mapping.js";
-import type { RestPull } from "../api.types.js";
+import { toPullRequest } from "#/mapping.js";
+import type { RestPull } from "#/api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 

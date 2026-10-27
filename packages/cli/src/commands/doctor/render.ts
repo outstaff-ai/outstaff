@@ -1,4 +1,4 @@
-import type { Context } from "../../types.js";
+import type { Context } from "#/types.js";
 import { plural } from "./check.js";
 import type { DoctorSummary, ScopeReport, Status } from "./types.js";
 

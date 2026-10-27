@@ -1,4 +1,4 @@
-import { prLabel } from "../log.js";
+import { prLabel } from "#/log.js";
 import type { PrSnapshot, MergeChange } from "./derive.types.js";
 import type { MergeDerivedType, PipelineEvent } from "./events.types.js";
 

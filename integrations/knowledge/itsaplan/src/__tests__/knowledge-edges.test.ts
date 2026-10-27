@@ -1,11 +1,11 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
-import { knowledgeOptions } from "../index.js";
+import { knowledgeOptions } from "#/index.js";
 import { describe, expect, it } from "vitest";
 import { API_KEY, createStubFetch, type Route, secretMap, team } from "@outstaff/testing.itsaplan";
-import { itsaplanKnowledge } from "../index.js";
-import { createItsaplanKnowledge } from "../knowledge.js";
-import { mdToDoc } from "../markdown.js";
-import { createItsaplanFake } from "../testing/itsaplan-fake.js";
+import { itsaplanKnowledge } from "#/index.js";
+import { createItsaplanKnowledge } from "#/knowledge.js";
+import { mdToDoc } from "#/markdown.js";
+import { createItsaplanFake } from "#/testing/itsaplan-fake.js";
 
 const PROJECT = {
   project: { id: 1, key: "SHOP", ref: "acme.SHOP", name: "Shop", teamRef: "acme" },

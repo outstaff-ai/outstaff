@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { parseTeamConfig } from "../../config/parse.js";
-import { buildTeamJsonSchema } from "../../config/json-schema.js";
+import { parseTeamConfig } from "#/config/parse.js";
+import { buildTeamJsonSchema } from "#/config/json-schema.js";
 import { agent, automation, ev, pr, ref, ticket, world } from "./fixtures.js";
-import { presetRules } from "../presets.js";
-import { createStaticWorkflowState } from "../state.js";
-import { mergeRules, resolveWorkflow } from "../resolve.js";
-import { evaluateWorkflow, explainWorkflow } from "../evaluate.js";
-import { ruleInputSchema } from "../rules.js";
-import { createStatusMap } from "../status-map.js";
-import { renderTemplate, TemplateError } from "../template.js";
-import type { Effect, Rule, WorkflowPr } from "../types.js";
+import { presetRules } from "#/workflow/presets.js";
+import { createStaticWorkflowState } from "#/workflow/state.js";
+import { mergeRules, resolveWorkflow } from "#/workflow/resolve.js";
+import { evaluateWorkflow, explainWorkflow } from "#/workflow/evaluate.js";
+import { ruleInputSchema } from "#/workflow/rules.js";
+import { createStatusMap } from "#/workflow/status-map.js";
+import { renderTemplate, TemplateError } from "#/workflow/template.js";
+import type { Effect, Rule, WorkflowPr } from "#/workflow/types.js";
 
 /** The preset as a team gets it by default: approved-merge exists only while policies.merge.on_approval is on. */
 const kanban = presetRules("kanban").filter((r) => !r.id.startsWith("approved-merge"));

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseTeamConfig } from "../../config/parse.js";
-import { resolveWorkflow } from "../../workflow/resolve.js";
-import { describePolicies } from "../describe.js";
-import { POLICY_SWITCHES, blockedNotify, policyOn, policyValue } from "../switches.js";
+import { parseTeamConfig } from "#/config/parse.js";
+import { resolveWorkflow } from "#/workflow/resolve.js";
+import { describePolicies } from "#/policies/describe.js";
+import { POLICY_SWITCHES, blockedNotify, policyOn, policyValue } from "#/policies/switches.js";
 
 const config = (extra: Record<string, unknown> = {}) => {
   const r = parseTeamConfig({

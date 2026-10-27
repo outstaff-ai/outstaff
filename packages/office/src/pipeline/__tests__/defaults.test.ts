@@ -1,9 +1,9 @@
 import type { StaticTicket } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_POLICIES } from "../defaults.js";
-import { describeDecision } from "../describe.js";
-import { evaluatePipeline } from "../evaluate.js";
-import type { PipelineEvent } from "../events.types.js";
+import { DEFAULT_POLICIES } from "#/pipeline/defaults.js";
+import { describeDecision } from "#/pipeline/describe.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
+import type { PipelineEvent } from "#/pipeline/events.types.js";
 import { event, HUMAN_AUTHOR, OPTS, pr, prRef, stateOf, type World } from "./support.js";
 
 const ADA: PipelineEvent["actor"] = { kind: "human", id: "ada-admin" };

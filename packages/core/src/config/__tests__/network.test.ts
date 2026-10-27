@@ -6,7 +6,7 @@ import {
   parseTeamConfig,
   validateTeam,
   type TeamConfigInput,
-} from "../../index.js";
+} from "#/index.js";
 
 const base = (mutate: (c: any) => void = () => {}): TeamConfigInput => {
   const c: any = {

@@ -1,4 +1,4 @@
-import type { Context } from "../../types.js";
+import type { Context } from "#/types.js";
 
 export const capture = (ctx: Context): { ctx: Context; text: () => string } => {
   let out = "";

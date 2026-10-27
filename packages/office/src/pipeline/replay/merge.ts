@@ -1,8 +1,8 @@
 import type { WorkflowPr } from "@outstaff/core";
-import { prLabel } from "../../log.js";
-import { derivedId, deriveAfterMerge, sameRepo } from "../derive.js";
-import type { PrSnapshot } from "../derive.types.js";
-import type { PipelineEvent } from "../events.types.js";
+import { prLabel } from "#/log.js";
+import { derivedId, deriveAfterMerge, sameRepo } from "#/pipeline/derive.js";
+import type { PrSnapshot } from "#/pipeline/derive.types.js";
+import type { PipelineEvent } from "#/pipeline/events.types.js";
 import type { Derived, ReplayStep } from "./replay.types.js";
 
 const snapshots = (step: ReplayStep, mergeable: Record<number, "clean" | "conflicting"> = {}) =>

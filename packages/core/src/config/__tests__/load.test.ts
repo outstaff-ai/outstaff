@@ -11,8 +11,8 @@ import {
   UNKNOWN_REPO_GRANT_TEAM,
   YAML_SYNTAX_ERROR_TEAM,
 } from "@outstaff/testing.core";
-import { formatIssue, loadTeamConfig } from "../load.js";
-import type { LoadResult } from "../types.js";
+import { formatIssue, loadTeamConfig } from "#/config/load.js";
+import type { LoadResult } from "#/config/types.js";
 
 const root = mkdtempSync(join(tmpdir(), "outstaff-load-"));
 afterAll(() => rmSync(root, { recursive: true, force: true }));

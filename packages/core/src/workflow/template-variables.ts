@@ -1,4 +1,4 @@
-import type { RepoRef } from "../ports/types.js";
+import type { RepoRef } from "#/ports/types.js";
 import { livePrs } from "./evaluate-check.js";
 import type { Ctx } from "./evaluate.types.js";
 import type { PrRef, WorkflowPr, WorkflowState } from "./types.js";

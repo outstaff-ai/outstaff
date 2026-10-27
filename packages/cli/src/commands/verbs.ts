@@ -19,9 +19,9 @@ import {
   type TeamConfig,
 } from "@outstaff/core";
 import { githubVcs } from "@outstaff/integration.vcs.github";
-import { defineCommand } from "../define.js";
-import type { CommandDef, Context, GlobalOptions } from "../types.js";
-import { loadTeam } from "../load.js";
+import { defineCommand } from "#/define.js";
+import type { CommandDef, Context, GlobalOptions } from "#/types.js";
+import { loadTeam } from "#/load.js";
 
 export const groupSummaries: Record<string, string> = {
   ticket: "Read and update tickets in the team's tracker.",

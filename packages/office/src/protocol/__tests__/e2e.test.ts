@@ -7,12 +7,12 @@ import {
 } from "@outstaff/agent";
 import type { TeamConfig } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { createAgentAuth } from "../auth.js";
-import { createProtocolServer } from "../server.js";
-import type { Messaging } from "../source.types.js";
+import { manualClock } from "#/clock.js";
+import { createAgentAuth } from "#/protocol/auth.js";
+import { createProtocolServer } from "#/protocol/server.js";
+import type { Messaging } from "#/protocol/source.types.js";
 import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
-import type { ProtocolServer } from "../types.js";
+import type { ProtocolServer } from "#/protocol/types.js";
 
 // Only the people matter to the office verbs.
 const team = { people: [{ handle: "ada" }, { handle: "noor" }] } as unknown as TeamConfig;

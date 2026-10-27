@@ -1,7 +1,7 @@
 import type { TeamConfig } from "@outstaff/core";
 import type { ApiProject } from "@outstaff/integration.shared.itsaplan";
 import { describe, expect, it } from "vitest";
-import { teamStatuses } from "../statuses.js";
+import { teamStatuses } from "#/statuses.js";
 
 const project = (over: Partial<ApiProject> = {}): ApiProject => ({
   project: { id: 1, key: "SHOP", ref: "acme.SHOP", name: "Shop", teamRef: "acme" },

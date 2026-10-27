@@ -1,6 +1,6 @@
 import { createTicketLinker } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { splitMrkdwn, toMrkdwn } from "../mrkdwn.js";
+import { splitMrkdwn, toMrkdwn } from "#/mrkdwn.js";
 
 describe("ticket links in Slack", () => {
   it("converts the formatter's output to Slack links", () => {

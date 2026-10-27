@@ -1,7 +1,7 @@
 import type { TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { teamConfig } from "../../intake/test-support.js";
-import { readFeedback } from "../feedback.js";
+import { teamConfig } from "#/intake/test-support.js";
+import { readFeedback } from "#/engine/feedback.js";
 import { harness, type Harness } from "./test-support.js";
 
 // Comments on tickets and on documents reach the agent: preset rules, the engine and the feedback they carry.

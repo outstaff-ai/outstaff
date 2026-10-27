@@ -10,7 +10,7 @@ import {
   type Policy,
   type Profile,
   type ToolCall,
-} from "../../index.js";
+} from "#/index.js";
 
 const layout: Layout = {
   home: "/home/agent",

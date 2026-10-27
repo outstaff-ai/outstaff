@@ -1,5 +1,5 @@
-import type { Trace } from "../../pipeline/trace.types.js";
-import type { Store } from "../../store/index.js";
+import type { Trace } from "#/pipeline/trace.types.js";
+import type { Store } from "#/store/index.js";
 
 const REPO = { host: "github.com", owner: "acme-example", name: "shop" };
 

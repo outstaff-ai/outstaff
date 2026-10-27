@@ -1,8 +1,8 @@
 import { envSecretSource, type SecretSource, type TeamConfig } from "@outstaff/core";
-import type { Context, TeamCatalogs } from "../../types.js";
-import { sections } from "../setup-template.js";
-import { configuredAdapters, type shippedRegistry } from "../setup/registry.js";
-import type { Scope } from "../types.js";
+import type { Context, TeamCatalogs } from "#/types.js";
+import { sections } from "#/commands/setup-template.js";
+import { configuredAdapters, type shippedRegistry } from "#/commands/setup/registry.js";
+import type { Scope } from "#/commands/types.js";
 import { adapterChecks } from "./adapters.js";
 import { networkChecks } from "./network.js";
 import { officeChecks } from "./office.js";

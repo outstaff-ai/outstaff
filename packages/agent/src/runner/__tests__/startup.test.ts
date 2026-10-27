@@ -6,11 +6,11 @@ import { AdapterRegistry, defineAdapter, evaluate, repoAccess } from "@outstaff/
 import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fakes";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
-import { createOfficeConnection } from "../../office-client/index.js";
-import { FakeSocket } from "../../office-client/testing.js";
-import { withGlobalConfig } from "../../tools/testing.js";
-import { StartupError } from "../startup-error.js";
-import { prepareAgent } from "../startup.js";
+import { createOfficeConnection } from "#/office-client/index.js";
+import { FakeSocket } from "#/office-client/testing.js";
+import { withGlobalConfig } from "#/tools/testing.js";
+import { StartupError } from "#/runner/startup-error.js";
+import { prepareAgent } from "#/runner/startup.js";
 
 const stockCatalogDir = fileURLToPath(new URL("../../../../catalog", import.meta.url));
 

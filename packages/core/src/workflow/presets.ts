@@ -1,4 +1,4 @@
-import type { CanonicalStatus } from "../ports/types.js";
+import type { CanonicalStatus } from "#/ports/types.js";
 import type { Condition, Rule } from "./types.js";
 
 const UNFINISHED: CanonicalStatus[] = ["backlog", "ready", "active", "review", "blocked"];

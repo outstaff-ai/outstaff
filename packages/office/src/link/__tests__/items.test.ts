@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { WAKE_SUBJECT } from "../../pipeline/live/wake.js";
-import { openStore, type Store } from "../../store/index.js";
-import { findItems } from "../items.js";
+import { WAKE_SUBJECT } from "#/pipeline/live/wake.js";
+import { openStore, type Store } from "#/store/index.js";
+import { findItems } from "#/link/items.js";
 
 describe("findItems", () => {
   let store: Store;

@@ -1,6 +1,6 @@
 import { AdapterRegistry, buildPolicy, evaluate, type Decision, type Layout } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { githubVcs } from "../index.js";
+import { githubVcs } from "#/index.js";
 
 const layout: Layout = {
   home: "/home/agent",

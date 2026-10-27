@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { fromStockRole, templateRole, titleOf } from "../files.js";
+import { fromStockRole, templateRole, titleOf } from "#/commands/role/files.js";
 
 const stock = mkdtempSync(join(tmpdir(), "ost-role-files-"));
 mkdirSync(join(stock, "roles", "reviewer"), { recursive: true });

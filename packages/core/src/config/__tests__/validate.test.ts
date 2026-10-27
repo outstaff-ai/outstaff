@@ -5,14 +5,14 @@ import {
   parseTeamConfig,
   validateTeam,
   WARNING_CODES,
-} from "../../index.js";
+} from "#/index.js";
 import type {
   AdapterInfo,
   Capability,
   RoleNeeds,
   TeamConfigInput,
   ValidationContext,
-} from "../../index.js";
+} from "#/index.js";
 
 const adapter = (
   port: AdapterInfo["port"],

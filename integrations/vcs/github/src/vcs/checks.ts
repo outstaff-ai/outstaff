@@ -1,12 +1,12 @@
 import { PortError, maskSecrets, type Check, type RepoRef, type Vcs } from "@outstaff/core";
-import { failedStepNames, failedSteps, keyParts } from "../check-log.js";
-import { actionsJobId, checkRunStatus, checkSummary, commitStatusState } from "../mapping.js";
+import { failedStepNames, failedSteps, keyParts } from "#/check-log.js";
+import { actionsJobId, checkRunStatus, checkSummary, commitStatusState } from "#/mapping.js";
 import type {
   RequiredChecksData,
   RestCheckRun,
   RollupContext,
   RollupContexts,
-} from "../api.types.js";
+} from "#/api.types.js";
 import { repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 

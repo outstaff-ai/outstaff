@@ -2,9 +2,12 @@
 // Source files stay small and keep types apart from implementations. Fails on a source file over
 // MAX_LINES lines, and on a non-index file that exports both a type (or interface) and a runtime
 // value. Shared types go in a folder's `types.ts`, a larger contract in `<name>.types.ts`. Also fails
-// on a relative import that leaves its workspace package: another package is imported by name. And an
+// on a relative import that leaves its workspace package: another package is imported by name. Inside a
+// package's `src`, an import that climbs out of its folder (`../`) uses the package's `#/` alias instead. And an
 // integration (`integrations/<port>/<vendor>`) depends only on core, protocol and `integrations/shared/*`:
-// never on another adapter, so two adapters of one vendor share code through a shared package.
+// never on another adapter, so two adapters of one vendor share code through a shared package. Workspace
+// packages do not depend on each other in a cycle, except a package and the private test kit (`testing/*`)
+// its tests use, which depends back on it; `ignoreWorkspaceCycles` in pnpm-workspace.yaml relies on this.
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, normalize } from "node:path";
@@ -157,6 +160,27 @@ export function crossPackageImports(files, read) {
   return problems;
 }
 
+// The package's `src` folder a path is in: the shortest leading path that ends in a `src` folder.
+const SRC = /^((?:[^/]+\/)*?src)\//;
+
+/** Returns the relative imports inside a `src` folder that climb out of their own folder (`../`): `#/` replaces them. */
+export function climbingImports(files, read) {
+  const problems = [];
+
+  for (const file of files.filter((f) => CODE.test(f) && !/(^|\/)(node_modules|dist)\//.test(f))) {
+    const src = file.match(SRC)?.[1];
+    for (const spec of src ? relativeSpecifiers(read(file)) : []) {
+      if (spec.startsWith("../")) {
+        const target = normalize(join(dirname(file), spec));
+        const alias = target.startsWith(`${src}/`) ? `#/${target.slice(src.length + 1)}` : "#/…";
+        problems.push(`${file}: ${spec} climbs out of its folder; import it as ${alias}`);
+      }
+    }
+  }
+
+  return problems;
+}
+
 const INTEGRATION = /^integrations\/[^/]+\/[^/]+$/;
 const ALLOWED = /^@outstaff\/(core|protocol|integration\.shared\.[^/]+)(\/|$)/;
 const TEST_KIT = /^@outstaff\/testing\.[^/]+(\/|$)/;
@@ -221,6 +245,64 @@ function importsOf(files, read, dir, own) {
   return problems;
 }
 
+const KIT_DIR = /^testing\/[^/]+$/;
+
+/** The workspace packages by name: whether each is a private test kit, and the workspace packages it depends on. */
+function workspaceGraph(files, read) {
+  const manifests = files
+    .filter((f) => f.endsWith("package.json") && !/(^|\/)node_modules\//.test(f))
+    .map((f) => ({ dir: dirname(f), pkg: JSON.parse(read(f)) }))
+    .filter(({ pkg }) => pkg.name);
+
+  const names = new Set(manifests.map(({ pkg }) => pkg.name));
+  const depsOf = (pkg) =>
+    DEPENDENCY_FIELDS.flatMap((field) =>
+      Object.keys(pkg[field] ?? {}).map((name) => ({ name, field })),
+    ).filter(({ name }) => names.has(name));
+
+  return new Map(
+    manifests.map(({ dir, pkg }) => [
+      pkg.name,
+      { kit: KIT_DIR.test(dir) && pkg.private === true, deps: depsOf(pkg) },
+    ]),
+  );
+}
+
+/** Whether a dependency is a package's devDependency on a private test kit that depends back on the package. */
+const isKitEdge = (graph, from, { name, field }) =>
+  field === "devDependencies" &&
+  graph.get(name).kit &&
+  graph.get(name).deps.some((dep) => dep.name === from);
+
+/** Returns the workspace dependency cycles, except a package and the private test kit (testing/*) its tests use. */
+export function workspaceCycles(files, read) {
+  const graph = workspaceGraph(files, read);
+  const edges = new Map(
+    [...graph].map(([name, node]) => [
+      name,
+      node.deps.filter((dep) => !isKitEdge(graph, name, dep)).map((dep) => dep.name),
+    ]),
+  );
+
+  const cycles = new Set();
+  const done = new Set();
+  const visit = (name, path) => {
+    if (path.includes(name)) {
+      cycles.add([...path.slice(path.indexOf(name)), name].join(" -> "));
+    } else if (!done.has(name)) {
+      edges.get(name).forEach((next) => visit(next, [...path, name]));
+      done.add(name);
+    }
+  };
+
+  [...edges.keys()].forEach((name) => visit(name, []));
+
+  return [...cycles].map(
+    (cycle) =>
+      `workspace dependency cycle: ${cycle}; only a package and the private test kit (testing/*) its tests use may depend on each other`,
+  );
+}
+
 function main() {
   // Untracked files count too, so a split is checked before it is staged.
   const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
@@ -233,6 +315,8 @@ function main() {
   const problems = [
     ...layoutProblems(files, read),
     ...crossPackageImports(files, read),
+    ...workspaceCycles(files, read),
+    ...climbingImports(files, read),
     ...integrationDependencies(files, read),
   ];
 

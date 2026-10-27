@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { parseTeamConfig, parseYaml, resolveWorkflow, type TeamConfig } from "@outstaff/core";
-import { configurePipeline } from "../../configure.js";
-import type { ReplaySetup } from "../replay.types.js";
+import { configurePipeline } from "#/pipeline/configure.js";
+import type { ReplaySetup } from "#/pipeline/replay/replay.types.js";
 
 const FILE = new URL("../../../../../../examples/acme/.outstaff/team.yaml", import.meta.url);
 

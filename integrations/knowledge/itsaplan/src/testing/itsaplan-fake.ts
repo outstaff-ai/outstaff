@@ -1,7 +1,7 @@
 import type { Doc } from "@outstaff/core";
 import type { KnowledgeSeed } from "@outstaff/core/contracts";
-import { mdToDoc } from "../markdown.js";
-import { findRange } from "../text-range.js";
+import { mdToDoc } from "#/markdown.js";
+import { findRange } from "#/text-range.js";
 import {
   createItsaplanFake as createTrackerFake,
   type FakeOptions,

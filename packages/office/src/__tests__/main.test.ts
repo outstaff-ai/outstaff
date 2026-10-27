@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { envSecretSource, parseTeamConfig, parseYaml, silentLogger } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { afterEach, describe, expect, it } from "vitest";
-import { jsonLogger, logLevel, officeRegistry, startOffice } from "../main.js";
-import type { RunningOffice } from "../types.js";
+import { jsonLogger, logLevel, officeRegistry, startOffice } from "#/main.js";
+import type { RunningOffice } from "#/types.js";
 
 const TEAM = `
 version: 1

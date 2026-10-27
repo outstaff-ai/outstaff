@@ -1,9 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { defineCommand } from "../define.js";
-import { writeFileDeep } from "../ejected.js";
-import { openTeam } from "../open-team.js";
-import type { Context } from "../types.js";
+import { defineCommand } from "#/define.js";
+import { writeFileDeep } from "#/ejected.js";
+import { openTeam } from "#/open-team.js";
+import type { Context } from "#/types.js";
 import { onlyArg } from "./args.js";
 import { fromStockRole, templateRole, titleOf } from "./role/files.js";
 import type { RoleFiles, RoleOptions } from "./role/types.js";

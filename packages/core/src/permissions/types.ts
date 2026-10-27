@@ -1,6 +1,6 @@
 import type { z } from "zod";
-import type { Capability } from "../types.js";
-import type { TeamConfig } from "../config/types.js";
+import type { Capability } from "#/types.js";
+import type { TeamConfig } from "#/config/types.js";
 import type { PROFILES, TOOL_KINDS } from "./constants.js";
 import type {
   optionValueSchema,

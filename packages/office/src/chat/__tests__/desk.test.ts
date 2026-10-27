@@ -1,16 +1,16 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import { createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import type { ManualClock } from "../../types.js";
-import { createScheduler } from "../../scheduler/scheduler.js";
-import { openStore } from "../../store/index.js";
-import type { Store, WorkItem } from "../../store/types.js";
-import { createChatDesk, type ChatRequests } from "../desk.js";
-import { publicOrigin, readOrigin, threadsOf, withThread } from "../origin.js";
-import type { PrRecord, TicketRecord } from "../../workstate/index.js";
-import { addFeedback, readFeedback } from "../../engine/feedback.js";
-import { parsePlacement } from "../placement.js";
+import { manualClock } from "#/clock.js";
+import type { ManualClock } from "#/types.js";
+import { createScheduler } from "#/scheduler/scheduler.js";
+import { openStore } from "#/store/index.js";
+import type { Store, WorkItem } from "#/store/types.js";
+import { createChatDesk, type ChatRequests } from "#/chat/desk.js";
+import { publicOrigin, readOrigin, threadsOf, withThread } from "#/chat/origin.js";
+import type { PrRecord, TicketRecord } from "#/workstate/index.js";
+import { addFeedback, readFeedback } from "#/engine/feedback.js";
+import { parsePlacement } from "#/chat/placement.js";
 
 function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({

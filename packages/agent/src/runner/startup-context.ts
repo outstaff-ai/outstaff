@@ -1,5 +1,5 @@
 import { envSecretSource, formatIssue, loadTeamConfig, silentLogger } from "@outstaff/core";
-import { createOfficeConnection, type OfficeConnection } from "../office-client/index.js";
+import { createOfficeConnection, type OfficeConnection } from "#/office-client/index.js";
 import { StartupError, present } from "./startup-error.js";
 import type { StartupContext, StartupOptions } from "./startup.types.js";
 

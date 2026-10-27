@@ -7,15 +7,15 @@ import {
   type AdapterContext,
   type RepoRef,
 } from "@outstaff/core";
-import { AppAuth } from "../auth.js";
-import { GithubHttp } from "../http.js";
+import { AppAuth } from "#/auth.js";
+import { GithubHttp } from "#/http.js";
 import type {
   AppCredentials,
   GithubDeps,
   GithubOptions,
   InstallationToken,
   TokenScope,
-} from "../types.js";
+} from "#/types.js";
 import type { AppPrefix, GithubContext } from "./types.js";
 
 const APP_PREFIXES: AppPrefix[] = ["GH_APP_", "GH_OFFICE_APP_"];

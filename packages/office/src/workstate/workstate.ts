@@ -1,6 +1,6 @@
 import { parseRepoUrl, repoKey, vcsAgentLogins } from "@outstaff/core";
 import type { PrRef, RepoRef } from "@outstaff/core";
-import type { Cancel } from "../types.js";
+import type { Cancel } from "#/types.js";
 import type { RefreshCtx, WorkstateCore } from "./core.types.js";
 import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
 import { createDocs } from "./docs.js";

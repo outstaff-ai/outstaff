@@ -1,5 +1,5 @@
 import { AdapterRegistry, type TeamConfig } from "@outstaff/core";
-import type { AnyDef, Scope } from "../types.js";
+import type { AnyDef, Scope } from "#/commands/types.js";
 import type { Configured } from "./types.js";
 
 /** Every adapter this build ships, for guides and derived values; loaded on demand to keep other commands fast. */

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { coalesceWakes } from "../coalesce.js";
-import type { PendingWake } from "../coalesce.types.js";
+import { coalesceWakes } from "#/pipeline/coalesce.js";
+import type { PendingWake } from "#/pipeline/coalesce.types.js";
 
 const wake = (
   eventId: string,

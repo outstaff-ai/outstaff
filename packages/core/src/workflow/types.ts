@@ -1,5 +1,5 @@
-import type { TeamConfig } from "../config/types.js";
-import type { CanonicalStatus, RepoRef } from "../ports/types.js";
+import type { TeamConfig } from "#/config/types.js";
+import type { CanonicalStatus, RepoRef } from "#/ports/types.js";
 import type { WORKFLOW_EVENT_TYPES } from "./constants.js";
 import type { WorkflowPreset } from "./presets.js";
 import type { HAND_BACK_STATUSES } from "./rules.js";

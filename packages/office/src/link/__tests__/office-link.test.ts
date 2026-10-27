@@ -12,10 +12,10 @@ import {
   createFakeVcs,
 } from "@outstaff/core/fakes";
 import { afterEach, describe, expect, it } from "vitest";
-import { manualClock } from "../../clock.js";
-import { createOffice } from "../../office.js";
-import type { Office } from "../../office.types.js";
-import { openStore } from "../../store/index.js";
+import { manualClock } from "#/clock.js";
+import { createOffice } from "#/office.js";
+import type { Office } from "#/office.types.js";
+import { openStore } from "#/store/index.js";
 import { FakeService, until } from "./service.js";
 
 function team(url?: string): TeamConfig {

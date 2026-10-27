@@ -1,6 +1,6 @@
 import type { Link } from "@outstaff/protocol";
-import type { Offer } from "../office-client/index.js";
-import type { ChatReportKind } from "../verbs/office.types.js";
+import type { Offer } from "#/office-client/index.js";
+import type { ChatReportKind } from "#/verbs/office.types.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { WorkerContext } from "./loop.types.js";
 import { linksIn } from "./links.js";

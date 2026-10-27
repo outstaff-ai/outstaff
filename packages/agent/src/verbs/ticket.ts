@@ -1,7 +1,7 @@
 import { CANONICAL_STATUSES, PortError } from "@outstaff/core";
 import { z } from "zod";
 import { basename } from "node:path";
-import { MAX_ATTACHMENT_BYTES, humanSize } from "../runner/attachments.js";
+import { MAX_ATTACHMENT_BYTES, humanSize } from "#/runner/attachments.js";
 import { canAttach, mimetypeOf } from "./attachments.js";
 import { readInputBytes } from "./files.js";
 import { mentionGuard } from "./mentions.js";

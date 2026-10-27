@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { present, sourceOf } from "../present.js";
+import { present, sourceOf } from "#/link/present.js";
 import { trace } from "./support.js";
 
 describe("sourceOf", () => {

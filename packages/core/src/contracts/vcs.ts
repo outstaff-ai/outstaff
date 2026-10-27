@@ -1,4 +1,4 @@
-import type { Vcs } from "../ports/index.js";
+import type { Vcs } from "#/ports/index.js";
 import type { VcsSeed } from "./seeds.js";
 import { contractSuite, requireSeed } from "./harness.js";
 import type { ContractSetupFn } from "./types.js";

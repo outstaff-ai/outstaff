@@ -1,6 +1,6 @@
 import type { WorkflowEvent } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
-import { toPipelineEvent } from "../from-workflow.js";
+import { toPipelineEvent } from "#/pipeline/from-workflow.js";
 
 const NOW = "2026-10-05T12:00:00.000Z";
 const assigned: WorkflowEvent = {

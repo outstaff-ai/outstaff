@@ -1,6 +1,6 @@
 import { createOfficeConnection, type OfficeConnection } from "@outstaff/agent";
 import type { DoctorCheck, SecretSource } from "@outstaff/core";
-import type { Context } from "../../types.js";
+import type { Context } from "#/types.js";
 
 const OFFICE_TIMEOUT_MS = 5_000;
 

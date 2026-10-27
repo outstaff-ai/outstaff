@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { describeDecision, describeOp, formatTrace, subjectOf } from "../describe.js";
-import type { Trace } from "../trace.types.js";
+import { describeDecision, describeOp, formatTrace, subjectOf } from "#/pipeline/describe.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 import { event, prRef } from "./support.js";
 
 describe("describeOp and describeDecision", () => {
