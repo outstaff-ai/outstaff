@@ -103,19 +103,20 @@ function collect(repo: RepoRef, raw: RestEvent[], position: FeedPosition, floor:
 }
 
 /** The time of the newest event read so far; now for a feed that has never had one. */
-function newestAt(raw: RestEvent[], position: FeedPosition): number {
+function newestAt(raw: RestEvent[], position: FeedPosition, now: () => Date): number {
   const times = raw.map((e) => Date.parse(e.created_at)).filter((at) => !Number.isNaN(at));
   const newest = Math.max(position.unknown ? Number.NEGATIVE_INFINITY : position.since, ...times);
   // An empty feed baselines at the current time so the first event after it is not lost.
-  return Number.isFinite(newest) ? newest : Date.now();
+  return Number.isFinite(newest) ? newest : now().getTime();
 }
 
 function nextEntry(
   raw: RestEvent[],
   position: FeedPosition,
   etag: string | undefined,
+  now: () => Date,
 ): Cursor[string] {
-  const stamp = newestAt(raw, position);
+  const stamp = newestAt(raw, position, now);
   const keep = position.unknown ? undefined : position.skip;
   const seen = raw
     .filter((e) => (keep ? keep.has(e.id) : true) && Date.parse(e.created_at) >= stamp - OVERLAP_MS)
@@ -149,5 +150,5 @@ export async function pollRepo(
   const etag = first.headers.get("etag") ?? position.etag;
   const floor = feedFloor(position, first.data);
   const raw = await readOlderPages(c, token, first, floor);
-  return { entry: nextEntry(raw, position, etag), ...collect(repo, raw, position, floor) };
+  return { entry: nextEntry(raw, position, etag, c.now), ...collect(repo, raw, position, floor) };
 }

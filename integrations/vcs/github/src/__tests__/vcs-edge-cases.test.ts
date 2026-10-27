@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   appRoutes,
   build,
+  clock,
   expectPortError,
   officeSecrets,
   ownSecrets,
@@ -121,10 +122,20 @@ describe("credentials of the apps", () => {
 
   const { GH_APP_PRIVATE_KEY: _inline, ...ownWithoutInlineKey } = agent;
 
-  it("reads own and office keys from files without masking them as inline secrets", async () => {
+  it("masks the own App's key read from a file, line by line, with no office App configured", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gh-keys-"));
     const file = join(dir, "own.pem");
     writeFileSync(file, testKey.privateKey);
+    const keyLine = testKey.privateKey.split("\n")[1]!;
+    const {
+      GH_OFFICE_APP_ID: _id,
+      GH_OFFICE_APP_PRIVATE_KEY: _key,
+      ...ownOnly
+    } = {
+      ...ownWithoutInlineKey,
+      GH_APP_PRIVATE_KEY_FILE: file,
+    };
+
     const { vcs } = build(
       agentRoutes([
         get("/repos/acme/app/actions/jobs/42", {
@@ -133,14 +144,16 @@ describe("credentials of the apps", () => {
         {
           method: "GET",
           path: "/repos/acme/app/actions/jobs/42/logs",
-          handler: () => ({ text: "##[group]build\n##[error]boom" }),
+          handler: () => ({ text: `##[group]build\nkey ${keyLine}\n##[error]boom` }),
         },
       ]),
-      { ...ownWithoutInlineKey, GH_APP_PRIVATE_KEY_FILE: file },
+      ownOnly,
     );
 
     const out = await vcs.checkLog!(REPO, "42");
-    expect(out.failedSteps).toEqual([{ name: "build", lines: ["##[error]boom"], omitted: 0 }]);
+    expect(out.failedSteps).toEqual([
+      { name: "build", lines: ["key ***", "##[error]boom"], omitted: 0 },
+    ]);
   });
 });
 
@@ -621,10 +634,8 @@ describe("events edge cases", () => {
     expect(page.events.map((e) => e.externalId)).toEqual(["10", "20", "20", "30"]);
   });
 
-  it("baselines an empty first feed at the current time, without an etag", async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date("2026-02-03T04:05:06Z"));
-    const { vcs } = build([...appRoutes(), feed([])]);
+  it("baselines an empty first feed at the injected clock's time, without an etag", async () => {
+    const { vcs } = build([...appRoutes(), feed([])], undefined, {}, clock("2026-02-03T04:05:06Z"));
     const page = await vcs.events([REPO], "{}");
     expect(JSON.parse(page.cursor)).toEqual({ "acme/app": { since: "2026-02-03T04:05:06.000Z" } });
     expect(page.events).toEqual([]);

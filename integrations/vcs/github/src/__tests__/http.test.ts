@@ -84,10 +84,11 @@ describe("GithubHttp.getRedirected", () => {
     expect(e.message).toContain("usable location");
   });
 
-  it("does not resend the token when the location is missing", async () => {
+  it("refuses a redirect without a location and fetches nothing more", async () => {
     const { http, seen } = client([redirect(), new Response("denied", { status: 401 })]);
-    await expectPortError(http.getRedirected("/logs", "tok"), "unavailable");
-    expect(new Headers(seen[1]!.init?.headers).get("authorization")).toBeNull();
+    const e = await expectPortError(http.getRedirected("/logs", "tok"), "unavailable");
+    expect(e.message).toContain("usable location");
+    expect(seen).toHaveLength(1);
   });
 
   it("maps an unreachable log host to unavailable", async () => {

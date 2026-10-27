@@ -1,5 +1,5 @@
 import { PortError, maskSecrets, type Check, type RepoRef, type Vcs } from "@outstaff/core";
-import { failedStepNames, failedSteps } from "../check-log.js";
+import { failedStepNames, failedSteps, keyParts } from "../check-log.js";
 import { actionsJobId, checkRunStatus, checkSummary, commitStatusState } from "../mapping.js";
 import type {
   RequiredChecksData,
@@ -42,7 +42,7 @@ function requiredCheck(ctx: RollupContext, fallback: string): Check {
 export function checkOperations(
   c: GithubContext,
 ): Pick<Vcs, "checks" | "checkLog" | "requiredChecks"> {
-  const { http, secrets, self, links, apiToken, actingToken } = c;
+  const { http, self, links, apiToken, appKeys, actingToken } = c;
 
   /** One page of the status check rollup of the pull request's head commit; undefined when it has none. */
   async function rollupPage(
@@ -134,10 +134,7 @@ export function checkOperations(
         throw e;
       }
 
-      const known = [
-        token,
-        ...["GH_APP_", "GH_OFFICE_APP_"].map((p) => secrets.get(`${p}PRIVATE_KEY`) ?? ""),
-      ];
+      const known = [token, ...appKeys().flatMap(keyParts)];
 
       const masked = (line: string) => maskSecrets(line, known);
 

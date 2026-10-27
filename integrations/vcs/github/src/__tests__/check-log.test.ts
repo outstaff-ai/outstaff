@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { failedStepNames, failedSteps } from "../check-log.js";
+import { failedStepNames, failedSteps, keyParts } from "../check-log.js";
 
 describe("failedStepNames", () => {
   it("keeps failed and timed out steps only", () => {
@@ -74,5 +74,12 @@ describe("failedSteps", () => {
     const untitled = "##[error]x";
     expect(failedSteps(untitled, ["alpha", "beta"], 10).map((s) => s.name)).toEqual(["alpha"]);
     expect(failedSteps(untitled, [], 10).map((s) => s.name)).toEqual(["log"]);
+  });
+});
+
+describe("keyParts", () => {
+  it("is the key and each line of its body, without the armour or blank lines", () => {
+    const pem = "-----BEGIN PRIVATE KEY-----\r\nAAAA1111\nBBBB2222\n-----END PRIVATE KEY-----\n";
+    expect(keyParts(pem)).toEqual([pem, "AAAA1111", "BBBB2222"]);
   });
 });
