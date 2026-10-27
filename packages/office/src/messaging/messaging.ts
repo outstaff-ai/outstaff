@@ -2,7 +2,7 @@ import { silentLogger } from "@outstaff/core";
 import type { AnswerState } from "@outstaff/protocol";
 import { ProtocolError } from "../protocol/errors.js";
 import type { Messaging } from "../protocol/source.types.js";
-import type { WorkItem } from "../store/types.js";
+import type { Conversation, WorkItem } from "../store/types.js";
 import { mirror } from "./mirror.js";
 import { loadByPerson, readRoster } from "./roster.js";
 import { routeQuestion } from "./routing.js";
@@ -23,6 +23,36 @@ const MIRRORED: Record<string, string> = {
   journal: "the work journal only",
 };
 
+/** The statuses a hand-back leaves the asker in that let it take the answers that came in meanwhile. */
+const RESUMING = new Set<string>(["waiting", "queued", "done"]);
+
+/** What the person asked sees first: the question, who asks it and from which work, and how to answer. */
+function questionBrief(
+  id: string,
+  from: string,
+  role: string,
+  asker: WorkItem,
+  question: string,
+): string {
+  const about = asker.subject ? `\nAbout: ${asker.subject.type} ${asker.subject.ref}` : "";
+  return [
+    `Question ${id} from ${from} (${role}):`,
+    question,
+    "",
+    `${from} is working on: ${asker.title} (work item ${asker.id}).${about}`,
+    `Answer with: ost answer ${id} "<your answer>". ${from} continues with it.`,
+  ].join("\n");
+}
+
+/** The answers that arrived while the asker was working, for its journal. */
+function lateAnswers(pending: Conversation[]): string {
+  const lines = pending.map(
+    (c) => `- ${c.target} on question ${c.id} (${c.question}): ${c.answer ?? ""}`,
+  );
+
+  return `Answers that arrived while you were working:\n${lines.join("\n")}`;
+}
+
 export function createMessaging(
   opts: MessagingOptions,
 ): Required<Pick<Messaging, "ask" | "answer" | "roster" | "onHandBack">> {
@@ -42,6 +72,26 @@ export function createMessaging(
     return MIRRORED[where]!;
   };
 
+  /** The asker's own work item: a question is asked from inside one, so the answer finds its way back. */
+  const askingItem = async (from: string, workItemId: string | undefined): Promise<WorkItem> => {
+    if (!workItemId) {
+      throw new ProtocolError(
+        "invalid",
+        "Ask from inside a work item, so the answer can find its way back.",
+      );
+    }
+
+    const asker = await store.getItem(workItemId);
+    if (!asker || asker.person !== from) {
+      throw new ProtocolError("unknown_item", `No work item ${workItemId} for ${from}.`);
+    }
+
+    return asker;
+  };
+
+  const roleOf = (handle: string) =>
+    opts.team.people.find((p) => p.handle === handle)?.role ?? "unknown role";
+
   const depthOf = async (asker: WorkItem): Promise<number> => {
     if (asker.subject?.type === CONVERSATION_SUBJECT) {
       const parent = await store.getConversation(asker.subject.ref);
@@ -55,18 +105,7 @@ export function createMessaging(
 
   return {
     async ask(from, q): Promise<AnswerState> {
-      if (!q.workItemId) {
-        throw new ProtocolError(
-          "invalid",
-          "Ask from inside a work item, so the answer can find its way back.",
-        );
-      }
-
-      const asker = await store.getItem(q.workItemId);
-      if (!asker || asker.person !== from) {
-        throw new ProtocolError("unknown_item", `No work item ${q.workItemId} for ${from}.`);
-      }
-
+      const asker = await askingItem(from, q.workItemId);
       const route = routeQuestion({
         from,
         to: q.to,
@@ -103,18 +142,10 @@ export function createMessaging(
         subject: { type: CONVERSATION_SUBJECT, ref: conversation.id },
       });
 
-      const role = opts.team.people.find((p) => p.handle === from)?.role ?? "unknown role";
-      const about = asker.subject ? `\nAbout: ${asker.subject.type} ${asker.subject.ref}` : "";
       await store.appendJournal(
         child.id,
         from,
-        [
-          `Question ${conversation.id} from ${from} (${role}):`,
-          q.question,
-          "",
-          `${from} is working on: ${asker.title} (work item ${asker.id}).${about}`,
-          `Answer with: ost answer ${conversation.id} "<your answer>". ${from} continues with it.`,
-        ].join("\n"),
+        questionBrief(conversation.id, from, roleOf(from), asker, q.question),
       );
 
       const where = await mirrorTo(
@@ -177,7 +208,7 @@ export function createMessaging(
     },
 
     async onHandBack(itemId, status) {
-      if (status !== "waiting" && status !== "queued" && status !== "done") {
+      if (!RESUMING.has(status)) {
         return;
       }
 
@@ -187,13 +218,7 @@ export function createMessaging(
         return;
       }
 
-      await store.appendJournal(
-        item.id,
-        "office",
-        `Answers that arrived while you were working:\n${pending
-          .map((c) => `- ${c.target} on question ${c.id} (${c.question}): ${c.answer ?? ""}`)
-          .join("\n")}`,
-      );
+      await store.appendJournal(item.id, "office", lateAnswers(pending));
 
       await resume(item, [...new Set(pending.map((c) => c.target))].join(", "));
       for (const c of pending) {

@@ -108,6 +108,26 @@ function loadRoles(
   return { roles };
 }
 
+/** Runs `step`; when it fails, `undo` runs before the error goes on. */
+async function orUndo<T>(step: () => Promise<T>, undo: () => Promise<void>): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    await undo();
+    throw error;
+  }
+}
+
+/** The store `OUTSTAFF_STORE_URL` names, with the directory of a SQLite file created first. */
+async function openStoreOf(env: Env) {
+  const url = env["OUTSTAFF_STORE_URL"] || DEFAULT_STORE_URL;
+  if (url.startsWith("sqlite://") && url !== "sqlite::memory:") {
+    await mkdir(dirname(url.slice("sqlite://".length)), { recursive: true });
+  }
+
+  return openStore(url);
+}
+
 /**
  * Environment in, running office out.
  *
@@ -126,41 +146,32 @@ export async function startOffice(
     throw new Error(`team.yaml is not valid:\n${loaded.issues.map(formatIssue).join("\n")}`);
   }
 
-  const url = env["OUTSTAFF_STORE_URL"] || DEFAULT_STORE_URL;
-  if (url.startsWith("sqlite://") && url !== "sqlite::memory:") {
-    await mkdir(dirname(url.slice("sqlite://".length)), { recursive: true });
-  }
-
-  const store = await openStore(url);
-  let office: Office;
-  try {
-    office = await createOffice({
-      team: loaded.config,
-      registry: deps.registry ?? officeRegistry(),
-      secrets: deps.secrets ?? envSecretSource(env),
-      store,
-      clock: systemClock,
-      logger: log,
-      catalog: loadRoles(loaded.config, loaded.source.dir, log, deps.stockCatalogDir),
-      options: {
-        agentPort: port(env, "OUTSTAFF_AGENT_PORT", 8080),
-        webhookPort: port(env, "OUTSTAFF_WEBHOOK_PORT", 8082),
-      },
-    });
-  } catch (error) {
-    await store.close();
-    throw error;
-  }
+  const store = await openStoreOf(env);
+  const office: Office = await orUndo(
+    () =>
+      createOffice({
+        team: loaded.config,
+        registry: deps.registry ?? officeRegistry(),
+        secrets: deps.secrets ?? envSecretSource(env),
+        store,
+        clock: systemClock,
+        logger: log,
+        catalog: loadRoles(loaded.config, loaded.source.dir, log, deps.stockCatalogDir),
+        options: {
+          agentPort: port(env, "OUTSTAFF_AGENT_PORT", 8080),
+          webhookPort: port(env, "OUTSTAFF_WEBHOOK_PORT", 8082),
+        },
+      }),
+    () => store.close(),
+  );
 
   const health = createHealthServer(office, port(env, "OUTSTAFF_HEALTH_PORT", 8081));
   // Liveness answers while the office starts, so a slow first rescan is not mistaken for a hang.
   await health.start();
-  try {
-    await office.start();
-  } catch (error) {
-    await health.stop();
-    throw error;
-  }
+  await orUndo(
+    () => office.start(),
+    () => health.stop(),
+  );
 
   return {
     office,

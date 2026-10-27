@@ -1,4 +1,5 @@
 import { silentLogger } from "@outstaff/core";
+import type { WorkItem } from "../store/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
 import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
 import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";
@@ -12,14 +13,23 @@ const DEFAULT_CHAT_SESSIONS = 2;
 // Mirrors the team.yaml defaults for a team that sets no `policies`.
 const DEFAULT_MAX_RUNS_PER_HOUR = 12;
 
+/** The team's limits, with the team.yaml defaults where it sets none. */
+function limitsOf(team: SchedulerOptions["team"]) {
+  return {
+    maxRuns:
+      team.policies?.agent_loop_guard.max_runs_per_item_per_hour ?? DEFAULT_MAX_RUNS_PER_HOUR,
+    chatSessions: team.policies?.chat?.parallel_sessions ?? DEFAULT_CHAT_SESSIONS,
+    retry: { ...DEFAULT_RETRY, ...team.policies?.retry },
+  };
+}
+
 export function createScheduler(opts: SchedulerOptions): Scheduler {
   const { store, team, clock } = opts;
   const log = opts.logger ?? silentLogger;
 
   const staleMs = (opts.staleAfterMinutes ?? 10) * 60_000;
   const tickIntervalMs = opts.tickIntervalMs ?? 60_000;
-  const maxRuns =
-    team.policies?.agent_loop_guard.max_runs_per_item_per_hour ?? DEFAULT_MAX_RUNS_PER_HOUR;
+  const { maxRuns, chatSessions, retry } = limitsOf(team);
 
   // Serializes mutations inside this process; durable state is all in the store.
   let chain: Promise<unknown> = Promise.resolve();
@@ -29,8 +39,6 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     return run;
   };
 
-  const retry = { ...DEFAULT_RETRY, ...team.policies?.retry };
-  const chatSessions = team.policies?.chat?.parallel_sessions ?? DEFAULT_CHAT_SESSIONS;
   const checks = createChecks({
     store,
     team,
@@ -54,6 +62,46 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
   } = checks;
 
   const deps: SchedulerDeps = { store, clock, log, checks, retry, staleMs };
+
+  /** Why the item cannot start now: it is not queued, its person has no room, or it backs off after a failure. */
+  const notReady = async (item: WorkItem): Promise<StartResult | undefined> => {
+    if (item.status !== "queued") {
+      return { started: false, reason: "not_queued", detail: `Item is ${item.status}.` };
+    }
+
+    if (!(await hasRoom(item))) {
+      const detail =
+        item.kind === CHAT_KIND
+          ? `${item.person} already runs ${chatSessions} chat sessions.`
+          : `${item.person} already has an active item.`;
+
+      return { started: false, reason: "busy", detail };
+    }
+
+    return backingOff(item)
+      ? {
+          started: false,
+          reason: "backoff",
+          detail: `Held back after a failed run until ${item.notBefore}.`,
+        }
+      : undefined;
+  };
+
+  /** Why the item is held back: a pause, too little usage left, or the loop guard, which blocks it. */
+  const heldBack = async (item: WorkItem): Promise<StartResult | undefined> => {
+    const held = (await pauseBlock(item.person)) ?? (await usageBlock(item.person, item));
+    if (held) {
+      return { started: false, reason: held.code, detail: held.reason };
+    }
+
+    const tripped = await guardTripped(item);
+    if (!tripped) {
+      return undefined;
+    }
+
+    const blocked = await blockItem(item, tripped, "loop_guard");
+    return { started: false, reason: "loop_guard", detail: tripped, blocked };
+  };
 
   const scheduler: Scheduler = {
     enqueue(input) {
@@ -126,38 +174,9 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
           throw new Error(`unknown work item: ${itemId}`);
         }
 
-        if (item.status !== "queued") {
-          return { started: false, reason: "not_queued", detail: `Item is ${item.status}.` };
-        }
-
-        if (!(await hasRoom(item))) {
-          return {
-            started: false,
-            reason: "busy",
-            detail:
-              item.kind === CHAT_KIND
-                ? `${item.person} already runs ${chatSessions} chat sessions.`
-                : `${item.person} already has an active item.`,
-          };
-        }
-
-        if (backingOff(item)) {
-          return {
-            started: false,
-            reason: "backoff",
-            detail: `Held back after a failed run until ${item.notBefore}.`,
-          };
-        }
-
-        const held = (await pauseBlock(item.person)) ?? (await usageBlock(item.person, item));
-        if (held) {
-          return { started: false, reason: held.code, detail: held.reason };
-        }
-
-        const tripped = await guardTripped(item);
-        if (tripped) {
-          const blocked = await blockItem(item, tripped, "loop_guard");
-          return { started: false, reason: "loop_guard", detail: tripped, blocked };
+        const refused = (await notReady(item)) ?? (await heldBack(item));
+        if (refused) {
+          return refused;
         }
 
         const active = await store.activateItem(itemId);

@@ -1,5 +1,6 @@
 import type { WorkflowEvent } from "@outstaff/core";
 import { clip } from "../log.js";
+import type { StoredEvent } from "../store/types.js";
 import type { Cancel } from "../types.js";
 import { backoffDelay } from "./backoff.js";
 import type {
@@ -31,6 +32,44 @@ export function createDelivery(opts: DeliveryOptions): Delivery {
     return failure;
   };
 
+  const deliverStored = (stored: StoredEvent) => {
+    const { event, trusted } = stored.payload as StoredPayload;
+    return deliver(event, {
+      source: stored.source as IntakeMeta["source"],
+      externalId: stored.externalId,
+      trusted,
+    });
+  };
+
+  /**
+   * A handler failed on the event: after `maxAttempts` it is given up on, before that it holds back the events behind
+   * it until its retry. True when delivery has to stop here.
+   */
+  const failed = async (stored: StoredEvent, failure: unknown): Promise<boolean> => {
+    const attempts = await store.noteEventAttempt(stored.source, stored.externalId);
+    if (attempts >= maxAttempts) {
+      logger.error("giving up on event", {
+        source: stored.source,
+        externalId: stored.externalId,
+        attempts,
+      });
+
+      await store.markProcessed(stored.source, stored.externalId, String(failure));
+      return false;
+    }
+
+    // Later events wait behind this one to keep the order.
+    blocked = true;
+    if (opts.isRunning()) {
+      cancelRetry = clock.setTimeout(
+        () => void drain(true),
+        backoffDelay(failure, attempts, backoff),
+      );
+    }
+
+    return true;
+  };
+
   // At-least-once: events stay unprocessed until every handler returned, and are redelivered in order.
   const drainOnce = async (force: boolean) => {
     // A failed head event waits for its backoff; new events must not trigger an early retry.
@@ -46,40 +85,15 @@ export function createDelivery(opts: DeliveryOptions): Delivery {
     }
 
     for (const stored of await store.listUnprocessed()) {
-      const { event, trusted } = stored.payload as StoredPayload;
-      const failure = await deliver(event, {
-        source: stored.source as IntakeMeta["source"],
-        externalId: stored.externalId,
-        trusted,
-      });
-
+      const failure = await deliverStored(stored);
       if (failure === undefined) {
         await store.markProcessed(stored.source, stored.externalId);
         continue;
       }
 
-      const attempts = await store.noteEventAttempt(stored.source, stored.externalId);
-      if (attempts >= maxAttempts) {
-        logger.error("giving up on event", {
-          source: stored.source,
-          externalId: stored.externalId,
-          attempts,
-        });
-
-        await store.markProcessed(stored.source, stored.externalId, String(failure));
-        continue;
+      if (await failed(stored, failure)) {
+        return;
       }
-
-      // Later events wait behind this one to keep the order.
-      blocked = true;
-      if (opts.isRunning()) {
-        cancelRetry = clock.setTimeout(
-          () => void drain(true),
-          backoffDelay(failure, attempts, backoff),
-        );
-      }
-
-      return;
     }
   };
 

@@ -9,7 +9,7 @@ import { createHandedBack } from "./office-handback.js";
 import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
 import { officeTicketPrs } from "./office-ticket-prs.js";
-import type { CreateOfficeInput, Office } from "./office.types.js";
+import type { CreateOfficeInput, Office, OfficeOptions } from "./office.types.js";
 import { createOfficePorts } from "./ports.js";
 import { createOfficePipeline } from "./pipeline/office-pipeline.js";
 import { createLinkForOffice } from "./office-link.js";
@@ -18,13 +18,27 @@ import {
   createProtocolServer,
   type ProtocolServer,
 } from "./protocol/index.js";
-import { recipeFor } from "./recipes.js";
 import { createUsageTracker } from "./usage/index.js";
-import { createScheduler, type Scheduler } from "./scheduler/index.js";
+import { createScheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
+import { defined } from "./defined.js";
 import { itemRefs } from "./item-refs.js";
+import { notifyingScheduler } from "./office-scheduler.js";
 import { schedulerWorkSource } from "./work-source.js";
 import { createWorkState } from "./workstate/index.js";
+
+function webhookOptions(o: OfficeOptions) {
+  return { webhook: { port: o.webhookPort ?? 8082, ...defined({ host: o.webhookHost }) } };
+}
+
+function roleInfo(catalog: CreateOfficeInput["catalog"]): Map<string, RoleInfo> {
+  const roles = new Map<string, RoleInfo>();
+  for (const [key, role] of Object.entries(catalog?.roles ?? {})) {
+    roles.set(key, { title: role.title, summary: role.summary });
+  }
+
+  return roles;
+}
 
 export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const { team, store, clock } = input;
@@ -38,23 +52,20 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     logger: log,
   });
 
+  const tracker = defined({ tracker: ports.tracker });
   const workState = await createWorkState({
     store,
-    ports: { vcs: ports.vcs, ...(ports.tracker ? { tracker: ports.tracker } : {}) },
+    ports: { vcs: ports.vcs, ...tracker },
     team,
     clock,
     logger: log,
-    ...(o.refreshIntervalMs === undefined ? {} : { refreshIntervalMs: o.refreshIntervalMs }),
+    ...defined({ refreshIntervalMs: o.refreshIntervalMs }),
   });
 
   const webhook = team.office?.events === "webhook";
   const intake = createIntake({
     store,
-    ports: {
-      vcs: ports.vcs,
-      ...(ports.tracker ? { tracker: ports.tracker } : {}),
-      ...(ports.knowledge ? { knowledge: ports.knowledge } : {}),
-    },
+    ports: { vcs: ports.vcs, ...tracker, ...defined({ knowledge: ports.knowledge }) },
     docs: {
       open: (limit) =>
         workState
@@ -64,14 +75,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     team,
     clock,
     logger: log,
-    ...(webhook
-      ? {
-          webhook: {
-            port: o.webhookPort ?? 8082,
-            ...(o.webhookHost === undefined ? {} : { host: o.webhookHost }),
-          },
-        }
-      : {}),
+    ...(webhook ? webhookOptions(o) : {}),
   });
 
   // Agents report their runtime's usage windows over the protocol; the scheduler reads them back from here.
@@ -80,9 +84,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     team,
     clock,
     logger: log,
-    ...(o.usageStaleAfterMinutes === undefined
-      ? {}
-      : { staleAfterMinutes: o.usageStaleAfterMinutes }),
+    ...defined({ staleAfterMinutes: o.usageStaleAfterMinutes }),
   });
 
   const baseScheduler = createScheduler({
@@ -91,35 +93,14 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     clock,
     logger: log,
     usage,
-    ...(o.staleAfterMinutes === undefined ? {} : { staleAfterMinutes: o.staleAfterMinutes }),
+    ...defined({ staleAfterMinutes: o.staleAfterMinutes }),
   });
 
   // The protocol server is created last but must be told about new work, so the callback looks it up late.
   let server: ProtocolServer | undefined;
   const notify = (person: string) => server?.notify(person);
 
-  // Every queued item reaches the scheduler through here: it gets its recipe (if any) and the agent hears of it.
-  const scheduler: Scheduler = {
-    ...baseScheduler,
-    async enqueue(item) {
-      const created = await baseScheduler.enqueue(item);
-      const recipe = await recipeFor(created, store, workState);
-      if (recipe) {
-        await store.appendJournal(created.id, "office", recipe);
-      }
-
-      notify(created.person);
-      return created;
-    },
-    async retry(itemId, request) {
-      const item = await baseScheduler.retry(itemId, request);
-      if (item) {
-        notify(item.person);
-      }
-
-      return item;
-    },
-  };
+  const scheduler = notifyingScheduler({ scheduler: baseScheduler, store, workState, notify });
 
   const engine = createEngine({
     store,
@@ -128,7 +109,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     team,
     clock,
     logger: log,
-    ports: ports.tracker ? { tracker: ports.tracker } : {},
+    ports: tracker,
   });
 
   const inFlight = new Set<Promise<unknown>>();
@@ -163,10 +144,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     await judge(event, meta);
   });
 
-  const roles = new Map<string, RoleInfo>();
-  for (const [key, role] of Object.entries(input.catalog?.roles ?? {})) {
-    roles.set(key, { title: role.title, summary: role.summary });
-  }
+  const roles = roleInfo(input.catalog);
 
   // Without a humans: list the trusted ones are repo writers and chat members, which the ports cannot list;
   // the tracker's human members are the trusted ones intake already accepts.
@@ -200,7 +178,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     scheduler,
     store,
     team,
-    ports: { ...(ports.tracker ? { tracker: ports.tracker } : {}), vcs: ports.vcs },
+    ports: { ...tracker, vcs: ports.vcs },
     roles,
     notify,
     onBlocked,
@@ -227,14 +205,11 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     humans,
     usage: (person) => usage.summary(person),
     notify,
-    ...(ports.chat ? { chat: ports.chat } : {}),
-    ...(ports.tracker ? { tracker: ports.tracker } : {}),
+    ...defined({ chat: ports.chat }),
+    ...tracker,
   });
 
-  const refs = itemRefs(store, {
-    vcs: ports.vcs,
-    ...(ports.tracker ? { tracker: ports.tracker } : {}),
-  });
+  const refs = itemRefs(store, { vcs: ports.vcs, ...tracker });
 
   const chatDesk = createChatDesk({
     store,
@@ -245,7 +220,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     notify,
     push: (person) => server?.reports(person),
     clock,
-    ...(ports.tracker ? { tracker: ports.tracker } : {}),
+    ...tracker,
     // The requester of the item's ticket, else the first human (as the workflow's own fallback does).
     requesterChat: requesterChat({ store, workState, team }),
     linksOf: async (item) =>
@@ -270,10 +245,12 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     clock,
     logger: log,
     port: o.agentPort ?? 8080,
-    ...(o.agentHost === undefined ? {} : { host: o.agentHost }),
-    ...(o.heartbeatMs === undefined ? {} : { heartbeatMs: o.heartbeatMs }),
-    ...(o.pollMs === undefined ? {} : { pollMs: o.pollMs }),
-    ...(o.officeVersion === undefined ? {} : { officeVersion: o.officeVersion }),
+    ...defined({
+      host: o.agentHost,
+      heartbeatMs: o.heartbeatMs,
+      pollMs: o.pollMs,
+      officeVersion: o.officeVersion,
+    }),
   });
 
   const protocol = server;

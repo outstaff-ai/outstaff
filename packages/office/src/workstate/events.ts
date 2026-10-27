@@ -1,4 +1,4 @@
-import type { PrVerdict, WorkflowEvent } from "@outstaff/core";
+import type { PrRef, PrVerdict, WorkflowEvent } from "@outstaff/core";
 import { awaitsReview } from "../engine/feedback.js";
 import type {
   DocOps,
@@ -10,6 +10,29 @@ import type {
   WorkstateCore,
 } from "./core.types.js";
 import { openPrs } from "./derive.js";
+
+const VERDICTS = new Set<string>(["approved", "changes_requested", "dismissed"]);
+
+const isVerdict = (state: string): state is PrVerdict["state"] => VERDICTS.has(state);
+
+/** The state a submitted review leaves on the pull request; a comment-only review leaves none. */
+function reviewOf(event: WorkflowEvent): string | undefined {
+  const state = event.data["state"];
+  return event.type === "pr.review_submitted" && typeof state === "string" && state !== "commented"
+    ? state
+    : undefined;
+}
+
+/** A trusted reviewer's approval or request for changes replaces their earlier verdict. */
+function verdictOf(event: WorkflowEvent, review: string | undefined): PrVerdict | undefined {
+  if (!review || !isVerdict(review)) {
+    return undefined;
+  }
+
+  return event.data["untrusted"] !== true && event.actor.kind !== "automation"
+    ? { actor: event.actor.id, kind: event.actor.kind, state: review }
+    : undefined;
+}
 
 /** Applies events to the records, and delivers the synthetic events that raises. */
 export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & RequesterOps & DocOps) {
@@ -39,79 +62,70 @@ export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & Reque
     }
   };
 
+  const refreshSiblings = async (ctx: RefreshCtx, merged: PrRef) => {
+    for (const other of openPrs(core, merged.repo)) {
+      if (prSubject(other.ref) !== prSubject(merged)) {
+        await refreshPr(ctx, other.ref, { wait: true });
+      }
+    }
+  };
+
+  const onPr = async (ctx: RefreshCtx, event: WorkflowEvent) => {
+    const pr = event.subject.pr;
+    if (!pr) {
+      return;
+    }
+
+    const review = reviewOf(event);
+    const verdict = verdictOf(event, review);
+    await refreshPr(ctx, pr, { ...(review ? { review } : {}), ...(verdict ? { verdict } : {}) });
+    if (event.type === "pr.review_submitted" || event.type === "pr.comment") {
+      await recordFeedbackRequester(event, pr);
+    }
+
+    if (event.type === "pr.merged") {
+      await refreshSiblings(ctx, pr);
+    }
+  };
+
+  const onTicket = async (_ctx: RefreshCtx, event: WorkflowEvent) => {
+    const ticket = event.subject.ticket;
+    if (!ticket) {
+      return;
+    }
+
+    await refreshTicket(ticket, event);
+    if (event.type === "ticket.commented") {
+      await recordCommentRequester(ticket, event);
+    }
+  };
+
+  const onDoc = async (_ctx: RefreshCtx, event: WorkflowEvent) => {
+    if (event.subject.doc) {
+      await touchDoc(event.subject.doc, event);
+    }
+  };
+
+  // Our own synthetic events and the ones for the engine only have no handler.
+  const bySubject: Partial<Record<WorkflowEvent["type"], typeof onPr>> = {
+    "pr.opened": onPr,
+    "pr.comment": onPr,
+    "pr.closed": onPr,
+    "pr.merged": onPr,
+    "pr.review_submitted": onPr,
+    "ticket.created": onTicket,
+    "ticket.assigned": onTicket,
+    "ticket.moved": onTicket,
+    "ticket.commented": onTicket,
+    "doc.commented": onDoc,
+  };
+
   const handle = async (ctx: RefreshCtx, event: WorkflowEvent) => {
     if (awaitsReview(event)) {
       return;
     }
 
-    const pr = event.subject.pr;
-    switch (event.type) {
-      case "pr.opened":
-      case "pr.comment":
-      case "pr.closed":
-      case "pr.merged":
-      case "pr.review_submitted": {
-        if (!pr) {
-          return;
-        }
-
-        const state = event.data["state"];
-        const review =
-          event.type === "pr.review_submitted" && typeof state === "string" && state !== "commented"
-            ? state
-            : undefined;
-
-        // A trusted reviewer's approval or request for changes replaces their earlier verdict.
-        const verdict: PrVerdict | undefined =
-          review &&
-          (review === "approved" || review === "changes_requested" || review === "dismissed") &&
-          event.data["untrusted"] !== true &&
-          event.actor.kind !== "automation"
-            ? { actor: event.actor.id, kind: event.actor.kind, state: review }
-            : undefined;
-
-        await refreshPr(ctx, pr, {
-          ...(review ? { review } : {}),
-          ...(verdict ? { verdict } : {}),
-        });
-
-        if (event.type === "pr.review_submitted" || event.type === "pr.comment") {
-          await recordFeedbackRequester(event, pr);
-        }
-
-        if (event.type === "pr.merged") {
-          for (const other of openPrs(core, pr.repo)) {
-            if (prSubject(other.ref) !== prSubject(pr)) {
-              await refreshPr(ctx, other.ref, { wait: true });
-            }
-          }
-        }
-
-        return;
-      }
-
-      case "ticket.created":
-      case "ticket.assigned":
-      case "ticket.moved":
-      case "ticket.commented":
-        if (event.subject.ticket) {
-          await refreshTicket(event.subject.ticket, event);
-          if (event.type === "ticket.commented") {
-            await recordCommentRequester(event.subject.ticket, event);
-          }
-        }
-
-        return;
-      case "doc.commented":
-        if (event.subject.doc) {
-          await touchDoc(event.subject.doc, event);
-        }
-
-        return;
-      default:
-        // Our own synthetic events and the ones for the engine only.
-        return;
-    }
+    await bySubject[event.type]?.(ctx, event);
   };
 
   return { deliver, handle };

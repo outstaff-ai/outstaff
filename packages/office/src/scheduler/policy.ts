@@ -53,6 +53,31 @@ export function orderQueue<T extends Orderable>(items: readonly T[]): T[] {
   return items.toSorted(compareQueue);
 }
 
+/** Where the moved item goes among the other queued items. */
+function moveIndex(rest: readonly Orderable[], itemId: string, target: MoveTarget): number {
+  if ("last" in target) {
+    return rest.length;
+  }
+
+  const anchorId = "before" in target ? target.before : target.after;
+  if (anchorId === itemId) {
+    throw new Error("cannot move a work item relative to itself");
+  }
+
+  const at = rest.findIndex((i) => i.id === anchorId);
+  if (at < 0) {
+    throw new Error(`work item ${anchorId} is not in the same queue`);
+  }
+
+  return "before" in target ? at : at + 1;
+}
+
+/** The moved item's priority class, kept between the classes of its new neighbours. */
+function clampPriority(priority: number, prev?: Orderable, next?: Orderable): number {
+  const atLeast = prev ? Math.max(priority, prev.priority) : priority;
+  return next ? Math.min(atLeast, next.priority) : atLeast;
+}
+
 /**
  * Plans an explicit move inside one person's queued items. Returns the new
  * priority and position of every item, renumbered 1..n in the new order.
@@ -71,34 +96,8 @@ export function planMove(
   }
 
   const rest = ordered.filter((i) => i.id !== itemId);
-  let index: number;
-  if ("last" in target) {
-    index = rest.length;
-  } else {
-    const anchorId = "before" in target ? target.before : target.after;
-    if (anchorId === itemId) {
-      throw new Error("cannot move a work item relative to itself");
-    }
-
-    const at = rest.findIndex((i) => i.id === anchorId);
-    if (at < 0) {
-      throw new Error(`work item ${anchorId} is not in the same queue`);
-    }
-
-    index = "before" in target ? at : at + 1;
-  }
-
-  const prev = rest[index - 1];
-  const next = rest[index];
-  let priority = moved.priority;
-  if (prev && priority < prev.priority) {
-    priority = prev.priority;
-  }
-
-  if (next && priority > next.priority) {
-    priority = next.priority;
-  }
-
+  const index = moveIndex(rest, itemId, target);
+  const priority = clampPriority(moved.priority, rest[index - 1], rest[index]);
   const result = [...rest.slice(0, index), { ...moved, priority }, ...rest.slice(index)];
   return result.map((i, n) => ({ id: i.id, priority: i.priority, position: n + 1 }));
 }

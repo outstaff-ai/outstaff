@@ -9,6 +9,36 @@ import { iso, newId } from "./ids.js";
 import { toItem } from "./rows.js";
 import type { StoreInternals } from "./types.js";
 
+/** The column of each patch field that is stored as it is. */
+const PATCH_COLUMNS = {
+  status: "status",
+  title: "title",
+  priority: "priority",
+  position: "position",
+  failures: "failures",
+  notBefore: "not_before",
+  sessionId: "session_id",
+  workspace: "workspace",
+} as const;
+
+const subjectColumns = (subject: { type: string; ref: string } | undefined) => ({
+  subject_type: subject?.type ?? null,
+  subject_ref: subject?.ref ?? null,
+});
+
+/** The columns a patch sets: only its fields that are not undefined. */
+function patchColumns(patch: WorkItemPatch): Record<string, unknown> {
+  const set: Record<string, unknown> = {};
+  for (const [field, column] of Object.entries(PATCH_COLUMNS)) {
+    const value = patch[field as keyof typeof PATCH_COLUMNS];
+    if (value !== undefined) {
+      set[column] = value;
+    }
+  }
+
+  return patch.subject === undefined ? set : { ...set, ...subjectColumns(patch.subject) };
+}
+
 /** The store's queries on work items and the queue. */
 export function itemQueries({
   db,
@@ -26,20 +56,22 @@ export function itemQueries({
 > {
   const stamp = () => iso(now());
 
+  /** Behind the person's other queued items. */
+  const nextPosition = async (person: string): Promise<number> => {
+    const top = await db
+      .selectFrom("work_items")
+      .select((eb) => eb.fn.max("position").as("p"))
+      .where("person", "=", person)
+      .where("status", "=", "queued")
+      .executeTakeFirst();
+
+    return top?.p === null || top?.p === undefined ? 1 : Number(top.p) + 1;
+  };
+
   return {
     async enqueue(input: NewWorkItem) {
       const at = now();
-      let position = input.position;
-      if (position === undefined) {
-        const top = await db
-          .selectFrom("work_items")
-          .select((eb) => eb.fn.max("position").as("p"))
-          .where("person", "=", input.person)
-          .where("status", "=", "queued")
-          .executeTakeFirst();
-
-        position = top?.p === null || top?.p === undefined ? 1 : Number(top.p) + 1;
-      }
+      const position = input.position ?? (await nextPosition(input.person));
 
       const row = await db
         .insertInto("work_items")
@@ -50,8 +82,7 @@ export function itemQueries({
           priority: input.priority ?? 100,
           status: "queued",
           parent_id: input.parentId ?? null,
-          subject_type: input.subject?.type ?? null,
-          subject_ref: input.subject?.ref ?? null,
+          ...subjectColumns(input.subject),
           title: input.title,
           session_id: null,
           workspace: null,
@@ -167,44 +198,7 @@ export function itemQueries({
     },
 
     async updateItem(id, patch: WorkItemPatch) {
-      const set: Record<string, unknown> = { updated_at: stamp() };
-      if (patch.status !== undefined) {
-        set["status"] = patch.status;
-      }
-
-      if (patch.title !== undefined) {
-        set["title"] = patch.title;
-      }
-
-      if (patch.priority !== undefined) {
-        set["priority"] = patch.priority;
-      }
-
-      if (patch.position !== undefined) {
-        set["position"] = patch.position;
-      }
-
-      if (patch.failures !== undefined) {
-        set["failures"] = patch.failures;
-      }
-
-      if (patch.notBefore !== undefined) {
-        set["not_before"] = patch.notBefore;
-      }
-
-      if (patch.sessionId !== undefined) {
-        set["session_id"] = patch.sessionId;
-      }
-
-      if (patch.workspace !== undefined) {
-        set["workspace"] = patch.workspace;
-      }
-
-      if (patch.subject !== undefined) {
-        set["subject_type"] = patch.subject.type;
-        set["subject_ref"] = patch.subject.ref;
-      }
-
+      const set = { updated_at: stamp(), ...patchColumns(patch) };
       const row = await db
         .updateTable("work_items")
         .set(set)

@@ -1,35 +1,30 @@
 import { policyOn, type TeamConfig } from "@outstaff/core";
+import { itemTicket } from "./item-ticket.js";
 import type { Store, WorkItem } from "./store/types.js";
-import type { PrRecord, WorkState } from "./workstate/index.js";
+import type { WorkState } from "./workstate/index.js";
+
+type Team = Pick<TeamConfig, "humans" | "policies">;
+
+/** The human who asked for the ticket, by any of their names; without one, the first human if the policy says so. */
+function requesterHuman(team: Team, asked: string | undefined) {
+  if (asked) {
+    return team.humans?.find(
+      (h) => h.identities.tracker === asked || h.identities.vcs === asked || h.name === asked,
+    );
+  }
+
+  return policyOn(team.policies, "hand_back.fallback") ? team.humans?.[0] : undefined;
+}
 
 // The requester of the item's ticket, else the first human (as the workflow's own fallback does).
-export function requesterChat(deps: {
-  store: Store;
-  workState: WorkState;
-  team: Pick<TeamConfig, "humans" | "policies">;
-}) {
+export function requesterChat(deps: { store: Store; workState: WorkState; team: Team }) {
   const { store, workState, team } = deps;
   return async (item: WorkItem): Promise<string | undefined> => {
-    const ticket =
-      item.subject?.type === "ticket"
-        ? item.subject.ref
-        : item.subject?.type === "pr"
-          ? ((await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined)?.ticket
-          : undefined;
-
+    const ticket = await itemTicket(store, item);
     if (!ticket) {
       return undefined;
     }
 
-    const asked = workState.ticket(ticket)?.requester;
-    const human = asked
-      ? team.humans?.find(
-          (h) => h.identities.tracker === asked || h.identities.vcs === asked || h.name === asked,
-        )
-      : policyOn(team.policies, "hand_back.fallback")
-        ? team.humans?.[0]
-        : undefined;
-
-    return human?.identities.chat;
+    return requesterHuman(team, workState.ticket(ticket)?.requester)?.identities.chat;
   };
 }

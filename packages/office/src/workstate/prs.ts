@@ -1,8 +1,9 @@
 import type { PrRef, PrVerdict, PullRequest, RepoRef, WorkflowEvent } from "@outstaff/core";
-import type { PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
-import { ciOf, notFound, openPrs } from "./derive.js";
+import type { PrLive, PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
+import { notFound, openPrs } from "./derive.js";
 import { ticketCandidates } from "./infer.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
+import { ciFailure, keptLive, readLive, toPrRecord } from "./pr-record.js";
 import type { PrRecord } from "./types.js";
 
 const ACTOR = { kind: "automation", id: "workstate" } as const;
@@ -98,91 +99,36 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     }
   };
 
-  const refreshPr = async (
-    ctx: RefreshCtx,
-    ref: PrRef,
-    o: { baseline?: boolean; wait?: boolean; review?: string; verdict?: PrVerdict } = {},
-  ): Promise<void> => {
-    const known = prs.get(prSubject(ref));
-    let pr: PullRequest;
+  const fetchPr = async (ref: PrRef, wait = false): Promise<PullRequest | undefined> => {
     try {
-      pr = await vcs.getPullRequest(ref.repo, ref.number, { waitForMergeable: o.wait ?? false });
+      return await vcs.getPullRequest(ref.repo, ref.number, { waitForMergeable: wait });
     } catch (error) {
       if (notFound(error)) {
         logger.warn("pull request not found", { pr: prSubject(ref) });
-        return;
+        return undefined;
       }
 
       throw error;
     }
+  };
 
-    const key = prSubject({ repo: pr.repo, number: pr.number });
-    const prev = prs.get(key) ?? known;
-    const open = pr.state === "open";
-    let checks = prev?.checks ?? [];
-    let links = new Map<string, { url: string; summary?: string }>();
-    let unresolved = prev?.unresolvedThreads ?? 0;
-    if (open) {
-      const [found, threads] = await Promise.all([
-        vcs.checks(pr.repo, pr.head.sha),
-        vcs.reviewThreads(pr.repo, pr.number),
-      ]);
-
-      checks = found.map((c) => ({ name: c.name, status: c.status }));
-      links = new Map(
-        found.map((c) => [c.name, { url: c.url, ...(c.summary ? { summary: c.summary } : {}) }]),
-      );
-
-      unresolved = threads.filter((t) => !t.resolved).length;
+  /** The events a change of an open pull request raises: it started to conflict, or its CI started to fail. */
+  const raiseEvents = async (
+    ctx: RefreshCtx,
+    rec: PrRecord,
+    prev: PrRecord | undefined,
+    links: PrLive["links"],
+  ) => {
+    if (rec.mergeable === "conflicting" && prev?.mergeable !== "conflicting") {
+      await synthetic(ctx, "pr.conflicted", rec, { base: rec.baseRef });
     }
 
-    const person = vcsPeople.get(pr.author.login.toLowerCase());
-    const review = o.review ?? prev?.review;
-    const verdicts = o.verdict
-      ? [...(prev?.verdicts ?? []).filter((v) => v.actor !== o.verdict!.actor), o.verdict]
-      : prev?.verdicts;
-
-    const ticket = await inferTicket(pr, prev);
-    const rec: PrRecord = {
-      ref: { repo: pr.repo, number: pr.number },
-      title: pr.title,
-      url: pr.url,
-      headRef: pr.head.ref,
-      headSha: pr.head.sha,
-      baseRef: pr.base.ref,
-      draft: pr.draft,
-      state: pr.state,
-      // A finished pull request has no mergeability worth reporting.
-      mergeable: open ? pr.mergeable : (prev?.mergeable ?? pr.mergeable),
-      author: { login: pr.author.login, kind: pr.author.kind, ...(person ? { person } : {}) },
-      checks,
-      ci: ciOf(checks),
-      unresolvedThreads: unresolved,
-      ...(review ? { review } : {}),
-      ...(verdicts?.length ? { verdicts } : {}),
-      ...(ticket ? { ticket } : {}),
-      ...(prev?.stackedOn ? { stackedOn: prev.stackedOn } : {}),
-      updatedAt: clock.now().toISOString(),
-    };
-
-    // A pull request seen for the first time during a rescan sets the baseline instead of raising events.
-    if (open && (prev || !o.baseline)) {
-      if (rec.mergeable === "conflicting" && prev?.mergeable !== "conflicting") {
-        await synthetic(ctx, "pr.conflicted", rec, { base: rec.baseRef });
-      }
-
-      if (rec.ci === "failure" && prev?.ci !== "failure") {
-        const failed = checks.filter((c) => c.status === "failure");
-        await synthetic(ctx, "pr.ci_failed", rec, {
-          failing: failed.map((c) => c.name),
-          checks: failed.map((c) => ({
-            name: c.name,
-            ...links.get(c.name),
-          })),
-        });
-      }
+    if (rec.ci === "failure" && prev?.ci !== "failure") {
+      await synthetic(ctx, "pr.ci_failed", rec, ciFailure(rec.checks, links));
     }
+  };
 
+  const save = async (key: string, rec: PrRecord, prev: PrRecord | undefined) => {
     prs.set(key, rec);
     await store.upsertSubject("pr", key, rec);
     await store.link(ROOT, prNode(key), "tracks");
@@ -199,10 +145,42 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
       prNode(key),
       "authored_by",
       prev?.author.person ? personNode(prev.author.person) : undefined,
-      person ? personNode(person) : undefined,
+      rec.author.person ? personNode(rec.author.person) : undefined,
     );
 
     await restack(rec.ref.repo);
+  };
+
+  const refreshPr = async (
+    ctx: RefreshCtx,
+    ref: PrRef,
+    o: { baseline?: boolean; wait?: boolean; review?: string; verdict?: PrVerdict } = {},
+  ): Promise<void> => {
+    const known = prs.get(prSubject(ref));
+    const pr = await fetchPr(ref, o.wait);
+    if (!pr) {
+      return;
+    }
+
+    const key = prSubject({ repo: pr.repo, number: pr.number });
+    const prev = prs.get(key) ?? known;
+    const open = pr.state === "open";
+    const live = open ? await readLive(vcs, pr) : keptLive(prev);
+    const person = vcsPeople.get(pr.author.login.toLowerCase());
+    const ticket = await inferTicket(pr, prev);
+    const rec = toPrRecord(
+      pr,
+      prev,
+      { ...live, person, ticket, review: o.review, verdict: o.verdict },
+      clock.now().toISOString(),
+    );
+
+    // A pull request seen for the first time during a rescan sets the baseline instead of raising events.
+    if (open && (prev || !o.baseline)) {
+      await raiseEvents(ctx, rec, prev, live.links);
+    }
+
+    await save(key, rec, prev);
   };
 
   return { refreshPr, ticketOfDraft };

@@ -1,4 +1,4 @@
-import type { AdapterRegistry } from "@outstaff/core";
+import type { AdapterRegistry, SecretSpec } from "@outstaff/core";
 
 export const SECRETS_BEGIN = "<!-- contract:secrets:begin (generated, do not edit by hand) -->";
 export const SECRETS_END = "<!-- contract:secrets:end -->";
@@ -74,27 +74,36 @@ function table(header: string[], rows: string[][]): string[] {
   return [line(header), `| ${widths.map((w) => "-".repeat(w)).join(" | ")} |`, ...rows.map(line)];
 }
 
+/** A key is optional, or conditional, only while every side that declares it says so. */
+function requirement(prev: Row | undefined, s: SecretSpec) {
+  return {
+    optional: (prev?.optional ?? true) && (s.optional ?? false),
+    conditional: (prev?.conditional ?? true) && s.when !== undefined,
+  };
+}
+
+/** The row of a key with one more side's declaration of it. */
+function mergeRow(prev: Row | undefined, s: SecretSpec, side: "office" | "agent"): Row {
+  const text = sentence(s.description, s.where, s.when);
+  return {
+    ...prev,
+    key: s.key,
+    container: prev && prev.container !== side ? "both" : side,
+    ...requirement(prev, s),
+    derivable: s.derivable ?? false,
+    visible: AGENT_VISIBLE.has(s.key),
+    text,
+    [side]: text,
+  };
+}
+
 /** The per-secret table, from what each registered adapter declares for the two scopes. */
 export function renderSecretsTable(office: AdapterRegistry, agent: AdapterRegistry): string {
   const found = new Map<string, Row>();
   const note = (registry: AdapterRegistry, scope: "office" | "person") => {
-    for (const def of registry.list()) {
-      for (const s of def.secrets(scope)) {
-        const side = scope === "office" ? "office" : "agent";
-        const prev = found.get(s.key);
-        const text = sentence(s.description, s.where, s.when);
-        found.set(s.key, {
-          ...prev,
-          key: s.key,
-          container: prev && prev.container !== side ? "both" : side,
-          optional: (prev?.optional ?? true) && (s.optional ?? false),
-          conditional: (prev?.conditional ?? true) && s.when !== undefined,
-          derivable: s.derivable ?? false,
-          visible: AGENT_VISIBLE.has(s.key),
-          text,
-          [side]: text,
-        });
-      }
+    const side = scope === "office" ? "office" : "agent";
+    for (const s of registry.list().flatMap((def) => def.secrets(scope))) {
+      found.set(s.key, mergeRow(found.get(s.key), s, side));
     }
   };
 

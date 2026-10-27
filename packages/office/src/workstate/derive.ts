@@ -5,6 +5,9 @@ import type { CiState, CurrentWork, DocRecord, PrRecord } from "./types.js";
 
 export const TERMINAL = new Set(["done", "canceled"]);
 
+export const isTerminal = (status: string | undefined): boolean =>
+  status !== undefined && TERMINAL.has(status);
+
 export const ciOf = (checks: PrRecord["checks"]): CiState => {
   if (checks.length === 0) {
     return "none";
@@ -104,30 +107,29 @@ export function currentWork(core: WorkstateCore, person: string): CurrentWork {
   };
 }
 
+type WorkPr = CurrentWork["prs"][number];
+
+/** What is worth knowing about an open pull request beside its title. */
+function prNotes(p: WorkPr): string[] {
+  return [
+    p.draft ? "draft" : "",
+    `CI ${p.ci}`,
+    p.mergeable === "conflicting" ? "conflicts" : "",
+    p.unresolvedThreads > 0 ? `${p.unresolvedThreads} unresolved threads` : "",
+    p.review ? `review ${p.review}` : "",
+    p.ticket ? `for ${p.ticket}` : "",
+    p.stackedOn ? `stacked on ${p.stackedOn}` : "",
+  ].filter(Boolean);
+}
+
 /** A few lines for the agent's session context. */
 export function formatCurrentWork(work: CurrentWork): string {
   if (work.tickets.length === 0 && work.prs.length === 0) {
     return `${work.person} has no open tickets or pull requests.`;
   }
 
-  const lines: string[] = [];
-  for (const t of work.tickets) {
-    lines.push(`Ticket ${t.key} (${t.status ?? "unknown"}): ${t.title}`);
-  }
-
-  for (const p of work.prs) {
-    const notes = [
-      p.draft ? "draft" : "",
-      `CI ${p.ci}`,
-      p.mergeable === "conflicting" ? "conflicts" : "",
-      p.unresolvedThreads > 0 ? `${p.unresolvedThreads} unresolved threads` : "",
-      p.review ? `review ${p.review}` : "",
-      p.ticket ? `for ${p.ticket}` : "",
-      p.stackedOn ? `stacked on ${p.stackedOn}` : "",
-    ].filter(Boolean);
-
-    lines.push(`PR ${p.ref}: ${p.title} (${notes.join(", ")})`);
-  }
-
-  return lines.join("\n");
+  return [
+    ...work.tickets.map((t) => `Ticket ${t.key} (${t.status ?? "unknown"}): ${t.title}`),
+    ...work.prs.map((p) => `PR ${p.ref}: ${p.title} (${prNotes(p).join(", ")})`),
+  ].join("\n");
 }

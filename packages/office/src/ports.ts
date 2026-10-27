@@ -12,6 +12,7 @@ import {
   type Tracker,
   type Vcs,
 } from "@outstaff/core";
+import { defined } from "./defined.js";
 import type { Clock, OfficePorts } from "./types.js";
 
 interface Input {
@@ -64,6 +65,32 @@ async function create(port: PortName, input: Input) {
   return def.create(ctx);
 }
 
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** The office posts to no person. Its chat app exists only to mirror agent questions to the team channel. */
+async function chatPort(input: Input): Promise<Chat | undefined> {
+  return input.team.office?.channel
+    ? ((await create("chat", input)) as Chat | undefined)
+    : undefined;
+}
+
+/** The knowledge base, unless doc comments are off; one that cannot start costs that feedback and nothing else. */
+async function knowledgePort(input: Input): Promise<Knowledge | undefined> {
+  if (!policyOn(input.team.policies, "feedback.doc_comments")) {
+    return undefined;
+  }
+
+  try {
+    return (await create("knowledge", input)) as Knowledge | undefined;
+  } catch (error) {
+    input.logger.warn(`the office cannot read comments on documents: ${errorText(error)}`, {
+      port: "knowledge",
+    });
+
+    return undefined;
+  }
+}
+
 /**
  * The office-scope ports from team.yaml. Version control is required; the tracker is used when the team configures
  * it, and chat only when `office.channel` names the team channel agent questions are mirrored to. The knowledge base is read for comments on documents, unless `policies.feedback.doc_comments` is
@@ -77,27 +104,7 @@ export async function createOfficePorts(input: Input): Promise<OfficePorts> {
   }
 
   const tracker = (await create("tracker", input)) as Tracker | undefined;
-  // The office posts to no person. Its chat app exists only to mirror agent questions to the team channel.
-  const chat = input.team.office?.channel
-    ? ((await create("chat", input)) as Chat | undefined)
-    : undefined;
-
-  let knowledge: Knowledge | undefined;
-  if (policyOn(input.team.policies, "feedback.doc_comments")) {
-    try {
-      knowledge = (await create("knowledge", input)) as Knowledge | undefined;
-    } catch (error) {
-      input.logger.warn(
-        `the office cannot read comments on documents: ${error instanceof Error ? error.message : String(error)}`,
-        { port: "knowledge" },
-      );
-    }
-  }
-
-  return {
-    vcs,
-    ...(tracker ? { tracker } : {}),
-    ...(chat ? { chat } : {}),
-    ...(knowledge ? { knowledge } : {}),
-  };
+  const chat = await chatPort(input);
+  const knowledge = await knowledgePort(input);
+  return { vcs, ...defined({ tracker, chat, knowledge }) };
 }

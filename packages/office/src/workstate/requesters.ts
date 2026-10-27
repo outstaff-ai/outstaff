@@ -1,7 +1,33 @@
 import type { PrRef, WorkflowEvent } from "@outstaff/core";
 import type { RequesterOps, TicketOps, WorkstateCore } from "./core.types.js";
-import { TERMINAL } from "./derive.js";
+import { isTerminal } from "./derive.js";
 import { trustedHuman } from "./tickets.js";
+import type { PrRecord, TicketRecord } from "./types.js";
+
+/** The ticket states an agent hands a ticket back in. */
+const HANDED_BACK = new Set<string | undefined>(["review", "blocked"]);
+
+const hasText = (v: unknown) => typeof v === "string" && v.trim() !== "";
+
+const hasItems = (v: unknown) => Array.isArray(v) && v.length > 0;
+
+/** A bare approval, with no text and no comments: nothing in it for the agent to act on. */
+const signsOff = (event: WorkflowEvent) =>
+  event.data["state"] === "approved" &&
+  !hasText(event.data["body"]) &&
+  !hasItems(event.data["comments"]);
+
+/** The ticket of an open pull request an agent wrote; feedback on other pull requests goes to no ticket. */
+const agentPrTicket = (rec: PrRecord | undefined) =>
+  rec?.state === "open" && rec.author.kind === "agent" ? rec.ticket : undefined;
+
+/** A comment that mentions an agent hands the ticket to it, so the next hand-back goes to who wrote the comment. */
+const handsOver = (event: WorkflowEvent, ticket: TicketRecord) =>
+  hasItems(event.data["mentions"]) && ticket.status !== undefined && !isTerminal(ticket.status);
+
+/** A ticket handed back to its human assignee. */
+const waitsOnHuman = (ticket: TicketRecord) =>
+  ticket.assignee?.kind === "human" && HANDED_BACK.has(ticket.status);
 
 /** Who a ticket goes back to: the trusted human whose feedback reactivated it. */
 export function createRequesters(core: WorkstateCore, ticketOps: TicketOps): RequesterOps {
@@ -18,24 +44,17 @@ export function createRequesters(core: WorkstateCore, ticketOps: TicketOps): Req
   /** A trusted human's feedback that sends a ticket back to its agent (as `human-feedback-reactivates-ticket` does). */
   const recordFeedbackRequester = async (event: WorkflowEvent, ref: PrRef) => {
     const login = trustedHuman(event);
-    const rec = prs.get(prSubject(ref));
-    const body = event.data["body"];
-    const comments = event.data["comments"];
-    const signOff =
-      event.data["state"] === "approved" &&
-      !(typeof body === "string" && body.trim() !== "") &&
-      !(Array.isArray(comments) && comments.length > 0);
-
-    if (!login || !rec?.ticket || rec.state !== "open" || rec.author.kind !== "agent" || signOff) {
+    const key = agentPrTicket(prs.get(prSubject(ref)));
+    if (!login || !key || signsOff(event)) {
       return;
     }
 
-    if (!(await ensureTicket(rec.ticket))) {
+    if (!(await ensureTicket(key))) {
       return;
     }
 
-    const ticket = tickets.get(rec.ticket)!;
-    if (ticket.status === "review" || ticket.status === "blocked") {
+    const ticket = tickets.get(key)!;
+    if (HANDED_BACK.has(ticket.status)) {
       await saveTicket(withRequester(ticket, trackerIdentity(login), event));
     }
   };
@@ -47,25 +66,13 @@ export function createRequesters(core: WorkstateCore, ticketOps: TicketOps): Req
   const recordCommentRequester = async (key: string, event: WorkflowEvent) => {
     const person = trustedHuman(event);
     const ticket = tickets.get(key);
-    // A comment that mentions an agent hands the ticket to it, so the next hand-back goes to who wrote the comment.
-    const mentions = event.data["mentions"];
-    const handsOver =
-      Array.isArray(mentions) &&
-      mentions.length > 0 &&
-      ticket?.status !== undefined &&
-      !TERMINAL.has(ticket.status);
-
-    if (
-      !person ||
-      !ticket ||
-      (!handsOver &&
-        (ticket.assignee?.kind !== "human" ||
-          (ticket.status !== "review" && ticket.status !== "blocked")))
-    ) {
+    if (!person || !ticket) {
       return;
     }
 
-    await saveTicket(withRequester(ticket, person, event));
+    if (handsOver(event, ticket) || waitsOnHuman(ticket)) {
+      await saveTicket(withRequester(ticket, person, event));
+    }
   };
 
   return { recordFeedbackRequester, recordCommentRequester };

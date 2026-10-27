@@ -1,4 +1,12 @@
-import type { CanonicalStatus, Issue, Member, WorkflowEvent } from "@outstaff/core";
+import type {
+  CanonicalStatus,
+  Issue,
+  Member,
+  TeamConfig,
+  Tracker,
+  WorkflowEvent,
+} from "@outstaff/core";
+import type { WorkItem } from "../store/index.js";
 import type { TicketOps, WorkstateCore } from "./core.types.js";
 import { notFound } from "./derive.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
@@ -7,6 +15,31 @@ import type { TicketRecord } from "./types.js";
 /** Whom the event names as the human asking for the work: its actor, when that is a trusted human. */
 export const trustedHuman = (event: WorkflowEvent): string | undefined =>
   event.actor.kind === "human" && event.data["untrusted"] !== true ? event.actor.id : undefined;
+
+/** The events whose human actor asks for the work. */
+const REQUESTING = new Set<string>(["ticket.created", "ticket.assigned"]);
+
+const PENDING = new Set<string>(["queued", "waiting"]);
+
+/** The person node of an assignee who is one of the team's agents. */
+const agentNode = (team: TeamConfig, a?: TicketRecord["assignee"]) =>
+  a?.kind === "agent" && team.people.some((p) => p.handle === a.id) ? personNode(a.id) : undefined;
+
+/** Who the previous record says asked for the work, carried over to a record read anew. */
+const keptRequester = (prev?: TicketRecord) => ({
+  ...(prev?.requester ? { requester: prev.requester } : {}),
+  ...(prev?.requesterAt ? { requesterAt: prev.requesterAt } : {}),
+});
+
+/** An item not started yet on the ticket or on one of its pull requests. */
+function pendingOn(item: WorkItem, key: string, prKeys: Set<string>): boolean {
+  const on = item.subject;
+  if (!on || !PENDING.has(item.status)) {
+    return false;
+  }
+
+  return on.type === "ticket" ? on.ref === key : on.type === "pr" && prKeys.has(on.ref);
+}
 
 /** Ticket records: read from the tracker, saved, and forgotten when the tracker no longer has them. */
 export function createTickets(core: WorkstateCore): TicketOps {
@@ -43,17 +76,12 @@ export function createTickets(core: WorkstateCore): TicketOps {
     tickets.set(rec.key, rec);
     await store.upsertSubject("ticket", rec.key, rec);
     await store.link(ROOT, ticketNode(rec.key), "tracks");
-    const person = (a?: TicketRecord["assignee"]) =>
-      a?.kind === "agent" && team.people.some((p) => p.handle === a.id)
-        ? personNode(a.id)
-        : undefined;
-
     await relink(
       store,
       ticketNode(rec.key),
       "assigned_to",
-      person(prev?.assignee),
-      person(rec.assignee),
+      agentNode(team, prev?.assignee),
+      agentNode(team, rec.assignee),
     );
   };
 
@@ -67,10 +95,35 @@ export function createTickets(core: WorkstateCore): TicketOps {
       ...(status ? { status } : {}),
       ...(assignee ? { assignee } : {}),
       labels: [...issue.labels],
-      ...(prev?.requester ? { requester: prev.requester } : {}),
-      ...(prev?.requesterAt ? { requesterAt: prev.requesterAt } : {}),
+      ...keptRequester(prev),
       updatedAt: clock.now().toISOString(),
     };
+  };
+
+  /** Takes the ticket off its pull requests; the keys of those pull requests. */
+  const unlinkPrs = async (key: string): Promise<Set<string>> => {
+    const prKeys = new Set<string>();
+    for (const rec of [...prs.values()].filter((p) => p.ticket === key)) {
+      const { ticket: _ticket, ...unlinked } = rec;
+      const prKey = prSubject(rec.ref);
+      prKeys.add(prKey);
+      prs.set(prKey, unlinked);
+      await store.upsertSubject("pr", prKey, unlinked);
+      await store.unlink(prNode(prKey), ticketNode(key), "implements");
+    }
+
+    return prKeys;
+  };
+
+  /** Cancels the work that has not started on the ticket or its pull requests. */
+  const cancelPending = async (key: string, prKeys: Set<string>) => {
+    const note = `Ticket ${key} no longer exists in the tracker.`;
+    for (const item of await store.listItems()) {
+      if (pendingOn(item, key, prKeys)) {
+        await store.updateItem(item.id, { status: "canceled" });
+        await store.appendJournal(item.id, "office", note);
+      }
+    }
   };
 
   /**
@@ -88,7 +141,6 @@ export function createTickets(core: WorkstateCore): TicketOps {
     }
 
     logger.warn("ticket not found, forgetting it", { key });
-    const note = `Ticket ${key} no longer exists in the tracker.`;
     const at = clock.now().toISOString();
     const gone: TicketRecord = {
       key,
@@ -101,33 +153,41 @@ export function createTickets(core: WorkstateCore): TicketOps {
 
     tickets.set(key, gone);
     await store.upsertSubject("ticket", key, gone);
-    const assignee = prev.assignee;
-    if (assignee?.kind === "agent" && team.people.some((p) => p.handle === assignee.id)) {
-      await store.unlink(ticketNode(key), personNode(assignee.id), "assigned_to");
+    const assignee = agentNode(team, prev.assignee);
+    if (assignee) {
+      await store.unlink(ticketNode(key), assignee, "assigned_to");
     }
 
-    const linked = [...prs.values()].filter((p) => p.ticket === key);
-    const prKeys = new Set<string>();
-    for (const rec of linked) {
-      const { ticket: _ticket, ...unlinked } = rec;
-      const prKey = prSubject(rec.ref);
-      prKeys.add(prKey);
-      prs.set(prKey, unlinked);
-      await store.upsertSubject("pr", prKey, unlinked);
-      await store.unlink(prNode(prKey), ticketNode(key), "implements");
-    }
+    await cancelPending(key, await unlinkPrs(key));
+  };
 
-    for (const item of await store.listItems()) {
-      const on = item.subject;
-      if (
-        (item.status === "queued" || item.status === "waiting") &&
-        on &&
-        ((on.type === "ticket" && on.ref === key) || (on.type === "pr" && prKeys.has(on.ref)))
-      ) {
-        await store.updateItem(item.id, { status: "canceled" });
-        await store.appendJournal(item.id, "office", note);
+  /** The ticket as the tracker has it; undefined when the tracker no longer has it. */
+  const readTicket = async (from: Tracker, key: string, prev?: TicketRecord) => {
+    try {
+      return toTicket(await from.getIssue(key), prev);
+    } catch (error) {
+      if (notFound(error)) {
+        await forgetTicket(key, prev);
+        return undefined;
       }
+
+      throw error;
     }
+  };
+
+  /** Without a tracker the events are all there is to go on. */
+  const fromEvent = (key: string, prev?: TicketRecord, event?: WorkflowEvent): TicketRecord => {
+    const rec = prev ?? { key, title: key, labels: [], updatedAt: clock.now().toISOString() };
+    const to = event?.data["to"];
+    return event?.type === "ticket.moved" && typeof to === "string"
+      ? { ...rec, status: to as CanonicalStatus }
+      : rec;
+  };
+
+  /** The record with the human who created or assigned the ticket as its requester. */
+  const withEventRequester = (rec: TicketRecord, event?: WorkflowEvent) => {
+    const requestedBy = event && REQUESTING.has(event.type) ? trustedHuman(event) : undefined;
+    return requestedBy && event ? withRequester(rec, requestedBy, event) : rec;
   };
 
   const refreshTicket = async (key: string, event?: WorkflowEvent) => {
@@ -136,33 +196,10 @@ export function createTickets(core: WorkstateCore): TicketOps {
       return;
     }
 
-    let rec: TicketRecord;
-    if (tracker) {
-      try {
-        rec = toTicket(await tracker.getIssue(key), prev);
-      } catch (error) {
-        if (notFound(error)) {
-          await forgetTicket(key, prev);
-          return;
-        }
-
-        throw error;
-      }
-    } else {
-      // Without a tracker the events are all there is to go on.
-      rec = prev ?? { key, title: key, labels: [], updatedAt: clock.now().toISOString() };
-      const to = event?.data["to"];
-      if (event?.type === "ticket.moved" && typeof to === "string") {
-        rec = { ...rec, status: to as CanonicalStatus };
-      }
+    const rec = tracker ? await readTicket(tracker, key, prev) : fromEvent(key, prev, event);
+    if (rec) {
+      await saveTicket(withEventRequester(rec, event));
     }
-
-    const requestedBy =
-      event && ["ticket.created", "ticket.assigned"].includes(event.type)
-        ? trustedHuman(event)
-        : undefined;
-
-    await saveTicket(requestedBy && event ? withRequester(rec, requestedBy, event) : rec);
   };
 
   const withRequester = (rec: TicketRecord, requester: string, event: WorkflowEvent) => {
