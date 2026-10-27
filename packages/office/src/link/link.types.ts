@@ -13,6 +13,7 @@ export type LinkStore = Pick<
   | "getSubject"
   | "getTrace"
   | "listTraces"
+  | "countTraces"
   | "listTracesRecorded"
 >;
 

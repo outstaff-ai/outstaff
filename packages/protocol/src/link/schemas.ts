@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { comparisonSummarySchema } from "./comparison.js";
-import { itemSchema, itemSummarySchema, personSchema, traceSchema } from "./entities.js";
+import {
+  itemSchema,
+  itemSubjectSchema,
+  itemSummarySchema,
+  personSchema,
+  traceSchema,
+} from "./entities.js";
 import { time } from "./fields.js";
 import { healthSchema } from "./health.js";
 
@@ -28,6 +34,9 @@ const limit = z
   .max(200)
   .optional()
   .describe("How many, at most. Default 50.");
+
+/** The longest window `activity` counts: 30 days. */
+export const MAX_WINDOW_SECONDS = 30 * 24 * 3600;
 
 /** What the service can ask the office, and with what. */
 export const requestSchema = z.discriminatedUnion("method", [
@@ -105,6 +114,22 @@ export const requestSchema = z.discriminatedUnion("method", [
   }),
   z.strictObject({
     id: requestId,
+    method: z.literal("activity"),
+    params: z
+      .strictObject({
+        windows: z
+          .array(z.number().int().min(1).max(MAX_WINDOW_SECONDS))
+          .min(1)
+          .max(10)
+          .optional()
+          .describe(
+            "Window lengths in seconds, each counted back from now. Default one hour and one day.",
+          ),
+      })
+      .optional(),
+  }),
+  z.strictObject({
+    id: requestId,
     method: z.literal("health"),
     params: z
       .strictObject({
@@ -123,6 +148,10 @@ const results = {
   people: z.strictObject({ at: time, people: z.array(personSchema) }),
   events: z.strictObject({
     events: z.array(traceSchema).describe("Newest first."),
+    total: z
+      .number()
+      .int()
+      .describe("How many events match the filters, however many this page holds."),
     nextBefore: time
       .optional()
       .describe("Pass as `before` for the next page; absent when there are no more events."),
@@ -130,11 +159,28 @@ const results = {
   event: z.strictObject({ trace: traceSchema }),
   items: z.strictObject({
     items: z.array(itemSummarySchema).describe("Newest first, by when they were created."),
+    total: z
+      .number()
+      .int()
+      .describe("How many items match the filters, however many this page holds."),
     nextBefore: time
       .optional()
       .describe("Pass as `before` for the next page; absent when there are no more items."),
   }),
   compare: comparisonSummarySchema,
+  activity: z.strictObject({
+    at: time.describe("The office's time of the count; each window ends here."),
+    windows: z
+      .array(
+        z.strictObject({
+          seconds: z.number().int().describe("The window's length, as requested."),
+          since: time.describe("Where the window starts: `at` minus `seconds`."),
+          events: z.number().int().describe("Events that happened in the window."),
+          items: z.number().int().describe("Work items created in the window."),
+        }),
+      )
+      .describe("In the order requested."),
+  }),
   item: z.strictObject({
     item: itemSchema,
     traces: z
@@ -152,6 +198,7 @@ export const responseSchema = z.union([
       results.events,
       results.event,
       results.compare,
+      results.activity,
       results.items,
       results.item,
       results.health,
@@ -209,6 +256,8 @@ export const linkMessageSchema = z.discriminatedUnion("type", [
       id: z.string(),
       person: z.string(),
       kind: z.string(),
+      title: z.string(),
+      subject: itemSubjectSchema,
       status: itemSchema.shape.status,
       updatedAt: time,
     }),

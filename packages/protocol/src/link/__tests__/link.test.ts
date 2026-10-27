@@ -145,6 +145,7 @@ describe("the office link messages", () => {
                 scheduledBy: null,
               },
             ],
+            total: 7,
             nextBefore: "2026-10-05T08:00:00.000Z",
           },
         },
@@ -199,10 +200,25 @@ describe("the office link messages", () => {
           },
         },
       },
+      { type: "request", payload: { id: "r8", method: "activity", params: { windows: [3600] } } },
+      { type: "request", payload: { id: "r10", method: "activity" } },
+      {
+        type: "response",
+        payload: {
+          id: "r8",
+          result: {
+            at: "2026-10-05T10:00:00.000Z",
+            windows: [{ seconds: 3600, since: "2026-10-05T09:00:00.000Z", events: 12, items: 2 }],
+          },
+        },
+      },
       { type: "request", payload: { id: "r4", method: "item", params: { id: "item-1" } } },
       {
         type: "response",
-        payload: { id: "r2", result: { events: [TRACE], nextBefore: "2026-10-05T09:00:00.000Z" } },
+        payload: {
+          id: "r2",
+          result: { events: [TRACE], total: 142, nextBefore: "2026-10-05T09:00:00.000Z" },
+        },
       },
       { type: "response", payload: { id: "r4", result: { item: ITEM, traces: [TRACE] } } },
       {
@@ -244,6 +260,8 @@ describe("the office link messages", () => {
           id: "item-1",
           person: "sam",
           kind: "merge",
+          title: "merge: ACME-1",
+          subject: { type: "ticket", ref: "ACME-1" },
           status: "done",
           updatedAt: "2026-10-05T09:05:00.000Z",
         },
@@ -270,6 +288,12 @@ describe("the office link messages", () => {
       ok: false,
       id: "r1",
     });
+
+    expect(
+      decodeLinkMessage(
+        '{"type":"request","payload":{"id":"r3","method":"activity","params":{"windows":[0]}}}',
+      ),
+    ).toMatchObject({ ok: false, id: "r3" });
 
     const bad = decodeLinkMessage(
       '{"type":"request","payload":{"id":"r2","method":"events","params":{"limit":0}}}',

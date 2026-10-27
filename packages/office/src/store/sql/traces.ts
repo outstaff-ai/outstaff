@@ -22,7 +22,10 @@ const toTrace = (r: {
 export function traceQueries({
   db,
   now,
-}: StoreInternals): Pick<Store, "recordTrace" | "getTrace" | "listTraces" | "listTracesRecorded"> {
+}: StoreInternals): Pick<
+  Store,
+  "recordTrace" | "getTrace" | "listTraces" | "countTraces" | "listTracesRecorded"
+> {
   const stamp = () => iso(now());
   return {
     async recordTrace({ ref, type, at, data }) {
@@ -60,6 +63,19 @@ export function traceQueries({
         .execute();
 
       return rows.map(toTrace);
+    },
+
+    async countTraces({ since, before } = {}) {
+      let q = db.selectFrom("pipeline_traces").select((eb) => eb.fn.countAll<number>().as("n"));
+      if (since !== undefined) {
+        q = q.where("at", ">", since);
+      }
+
+      if (before !== undefined) {
+        q = q.where("at", "<", before);
+      }
+
+      return Number((await q.executeTakeFirstOrThrow()).n);
     },
 
     async listTracesRecorded({ from, limit }) {

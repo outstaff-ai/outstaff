@@ -77,6 +77,8 @@ export function createNotifier(opts: OfficeLinkOptions, send: (m: LinkMessage) =
               id,
               person: i.person,
               kind: i.kind,
+              title: i.title,
+              subject: i.subject,
               status: i.status,
               updatedAt: i.updatedAt,
             },

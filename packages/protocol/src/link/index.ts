@@ -11,6 +11,7 @@ export {
 export { renderLinkReference } from "./docs.js";
 export {
   itemSchema,
+  itemSubjectSchema,
   itemSummarySchema,
   personSchema,
   scheduledBySchema,

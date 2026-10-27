@@ -2,7 +2,7 @@ import { prLabel } from "#/log.js";
 import type { Trace } from "#/pipeline/trace.types.js";
 import type { EventFilter, LinkStore } from "./link.types.js";
 
-const PAGE = 200;
+export const PAGE = 200;
 
 /** How many traces one request looks through at most; past that it answers with what it found and a cursor. */
 export const SCAN_LIMIT = 2000;
@@ -24,7 +24,7 @@ const FILTERS: ((t: Trace, f: EventFilter) => boolean)[] = [
   (t, f) => f.differs === undefined || t.comparison?.agree === false,
 ];
 
-const matches = (t: Trace, f: EventFilter) => FILTERS.every((test) => test(t, f));
+export const matches = (t: Trace, f: EventFilter) => FILTERS.every((test) => test(t, f));
 
 /** Where a search stands: what it found, how many traces it looked at, and the time of the last one. */
 interface Scan {
@@ -44,7 +44,7 @@ const answer = (scan: Scan, more: boolean): { events: Trace[]; nextBefore?: stri
   ...(more && scan.last ? { nextBefore: scan.last } : {}),
 });
 
-const readPage = async (store: LinkStore, before: string | undefined) =>
+export const readPage = async (store: LinkStore, before: string | undefined) =>
   (await store.listTraces({ limit: PAGE, ...(before ? { before } : {}) })).map(
     (r) => r.data as Trace,
   );

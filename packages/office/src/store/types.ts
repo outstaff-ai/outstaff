@@ -182,6 +182,11 @@ export interface TraceQuery {
   limit?: number;
 }
 
+export interface TraceWindow {
+  since?: string | undefined;
+  before?: string | undefined;
+}
+
 export interface Store extends DoctorStore, ItemRefStore {
   readonly dialect: "postgres" | "sqlite";
 
@@ -273,6 +278,9 @@ export interface Store extends DoctorStore, ItemRefStore {
 
   /** Newest event first. */
   listTraces(query?: TraceQuery): Promise<StoredTrace[]>;
+
+  /** How many traces have an event time after `since` and before `before` (both exclusive, both optional). */
+  countTraces(query?: TraceWindow): Promise<number>;
 
   /** In the order they were recorded (then by ref), from `from` on, inclusive: for shipping traces out in order. */
   listTracesRecorded(query: { from?: string | undefined; limit: number }): Promise<StoredTrace[]>;
