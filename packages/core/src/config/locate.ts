@@ -15,6 +15,7 @@ import type { ConfigIssue, ParsedYaml, Position } from "./types.js";
 /** These issues are about a key itself, so they point at the key rather than its value. */
 const KEY_CODES: string[] = [
   CONFIG_CODES.unknownKey,
+  CONFIG_CODES.removedKey,
   CONFIG_CODES.peopleUnknownRepo,
   CONFIG_CODES.peopleInvalidGrantKey,
 ];

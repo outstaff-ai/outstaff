@@ -614,14 +614,41 @@ Options mise passes to the tool's backend, such as url, bin_path and checksum fo
 - Type: `map`
 - Optional
 
+#### people[].tools.<key>.valued_options
+
+Options of the tool that take their value as the next word, such as -c or --context. Their values are never taken for a subcommand, so a rule finds `delete` in `acmectl -c prod delete`. `--option=value` is one word and needs no entry.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+#### people[].tools.<key>.valued_options[]
+
+- Type: `string`
+- Optional
+- Must match `^--?[^\s=-][^\s=]*$`
+
 #### people[].tools.<key>.allow
 
-Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.
+Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. Deny rules and the built-in denies still win.
 
 - Type: `string or list of string or list of object`
 - Optional
 
 #### people[].tools.<key>.allow[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### people[].tools.<key>.deny
+
+Commands of the tool the agent may never run: a list of first subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.
+
+- Type: `list of string or list of object`
+- Optional
+
+#### people[].tools.<key>.deny[]
 
 - Type: `string`
 - Optional
@@ -672,57 +699,6 @@ Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>
 - Type: `string`
 - Optional
 - Must match `^[A-Za-z0-9_]+$`
-
-#### people[].network.adb
-
-Devices reachable with `ost adb`.
-
-- Type: `list of object`
-- Optional
-
-#### people[].network.adb[]
-
-An Android device the agent may reach with `ost adb`.
-
-- Type: `object`
-- Optional
-
-#### people[].network.adb[].name
-
-Name the agent gives to `ost adb`, for example test-tablet.
-
-- Type: `string`
-- Required
-- Minimum length 1
-- Maximum length 30
-- Must match `^[a-z][a-z0-9-]*$`
-
-#### people[].network.adb[].host
-
-Host name or IP address of the device, for example 10.0.0.16.
-
-- Type: `string`
-- Required
-- Minimum length 1
-- Maximum length 253
-- Must match `^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`
-
-#### people[].network.adb[].port
-
-Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.
-
-- Type: `integer`
-- Optional
-- Minimum 1
-- Maximum 65535
-
-#### people[].network.adb[].pairing
-
-Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.
-
-- Type: `string`
-- Optional
-- Must be `wireless`
 
 ### people[].avatar
 
@@ -973,14 +949,41 @@ Options mise passes to the tool's backend, such as url, bin_path and checksum fo
 - Type: `map`
 - Optional
 
+#### tools.<key>.valued_options
+
+Options of the tool that take their value as the next word, such as -c or --context. Their values are never taken for a subcommand, so a rule finds `delete` in `acmectl -c prod delete`. `--option=value` is one word and needs no entry.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+#### tools.<key>.valued_options[]
+
+- Type: `string`
+- Optional
+- Must match `^--?[^\s=-][^\s=]*$`
+
 #### tools.<key>.allow
 
-Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.
+Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. Deny rules and the built-in denies still win.
 
 - Type: `string or list of string or list of object`
 - Optional
 
 #### tools.<key>.allow[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
+#### tools.<key>.deny
+
+Commands of the tool the agent may never run: a list of first subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.
+
+- Type: `list of string or list of object`
+- Optional
+
+#### tools.<key>.deny[]
 
 - Type: `string`
 - Optional
@@ -1045,57 +1048,6 @@ Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>
 - Type: `string`
 - Optional
 - Must match `^[A-Za-z0-9_]+$`
-
-#### roles.<key>.network.adb
-
-Devices reachable with `ost adb`.
-
-- Type: `list of object`
-- Optional
-
-#### roles.<key>.network.adb[]
-
-An Android device the agent may reach with `ost adb`.
-
-- Type: `object`
-- Optional
-
-#### roles.<key>.network.adb[].name
-
-Name the agent gives to `ost adb`, for example test-tablet.
-
-- Type: `string`
-- Required
-- Minimum length 1
-- Maximum length 30
-- Must match `^[a-z][a-z0-9-]*$`
-
-#### roles.<key>.network.adb[].host
-
-Host name or IP address of the device, for example 10.0.0.16.
-
-- Type: `string`
-- Required
-- Minimum length 1
-- Maximum length 253
-- Must match `^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$`
-
-#### roles.<key>.network.adb[].port
-
-Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.
-
-- Type: `integer`
-- Optional
-- Minimum 1
-- Maximum 65535
-
-#### roles.<key>.network.adb[].pairing
-
-Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.
-
-- Type: `string`
-- Optional
-- Must be `wireless`
 
 ## workflow
 

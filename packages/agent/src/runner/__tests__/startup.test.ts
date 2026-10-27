@@ -148,7 +148,7 @@ describe("prepareAgent", () => {
 people:`,
     ).replace(
       "role: developer, repos: { shop: write } }",
-      `role: developer, repos: { shop: write }, network: { http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }], adb: [{ name: wall-panel, host: 10.0.0.18, port: 5555 }] } }`,
+      `role: developer, repos: { shop: write }, network: { http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }] } }`,
     );
 
     const { home, options } = setup({ HOME_TOKEN: "home-token-value-123" }, granted);
@@ -183,8 +183,6 @@ people:`,
     const run = (command: string) => evaluate(agent.policy, { kind: "shell", command, cwd });
     // The grants feed the verbs; the shell reaches the network directly, as the deployment's network policy allows.
     expect(run("curl -s https://hub.acme.example/status").effect).toBe("allow");
-    expect(run("adb -s 10.0.0.18:5555 shell ls").effect).toBe("allow");
-    expect(run("adb -s 10.0.0.18:5555 shell rm -rf /data").effect).toBe("deny");
   });
 
   it("prepares a sweeper that removes the scratch folders of items the person no longer has", async () => {

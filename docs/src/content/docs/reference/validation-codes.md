@@ -21,7 +21,6 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `email.missing_placeholder` | email.pattern does not contain {handle}. |
 | `integrations.invalid_options` | An integration's options are rejected by its adapter. |
 | `integrations.unknown_adapter` | An integration names an adapter that is not installed for that port. |
-| `network.adb_mode` | An adb grant gives both port and pairing, or neither. |
 | `network.duplicate_name` | Two network grants of the same kind share a name. |
 | `network.invalid_url` | A network http grant url is not an origin (scheme, host and optional port only). |
 | `network.reserved_token` | A network token names a secret the framework or an adapter reads, so it cannot be a service token. |
@@ -46,6 +45,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `schema.invalid_format` | A value does not match the required format. |
 | `schema.invalid_type` | A value has the wrong type. |
 | `schema.invalid_value` | A value is not one of the allowed values. |
+| `schema.removed_key` | A key was removed from the schema; the message says what replaces it. |
 | `schema.too_big` | A value, list or string is above its maximum. |
 | `schema.too_small` | A value, list or string is below its minimum. |
 | `schema.unknown_key` | A key is not part of the schema. |

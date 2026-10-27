@@ -3,13 +3,13 @@ title: Permissions
 description: What agents may run, the short list of hard denies, and the boundary an operator provides around them.
 ---
 
-Every tool call an agent makes is judged by its permission policy before it runs. The policy allows by default: an agent runs any program, with any arguments and any shell syntax, inside its sandbox. A short list of hard denies protects secrets, pushes, privileges and devices. The boundary that matters sits outside the agent, and the operator provides it ([where the boundary sits](#where-the-boundary-sits)). The reasons are in [0015](/decisions/0015-allow-by-default-in-the-sandbox/).
+Every tool call an agent makes is judged by its permission policy before it runs. The policy allows by default: an agent runs any program, with any arguments and any shell syntax, inside its sandbox. A short list of hard denies protects secrets, pushes and privileges. The boundary that matters sits outside the agent, and the operator provides it ([where the boundary sits](#where-the-boundary-sits)). The reasons are in [0015](/decisions/0015-allow-by-default-in-the-sandbox/).
 
 ## What an agent may do
 
 - Run any program with any arguments: `UPDATE_SNAPSHOT=1 pnpm test`, `pnpm --filter web build`, `pnpm exec tsc`, `npx <tool>`, `sed -i`, `xargs`, `timeout`, its own node or python scripts.
 - Use any shell syntax: `$VAR`, `$(...)`, subshells, pipes, here-documents such as `git commit -F - <<'EOF'`.
-- Reach the network with `curl`, `wget`, `nc`, a WebSocket client in its own script, or raw `adb`. What it reaches is decided by the deployment's network policy. [Network grants](/guides/network-grants/) name services and devices for `ost http` (which adds a token the agent never sees) and `ost adb` (which picks the device, connects and remembers ports).
+- Reach the network with `curl`, `wget`, `nc`, a WebSocket client in its own script, or a declared tool such as `adb` or a vendor CLI. What it reaches is decided by the deployment's network policy. [Network grants](/guides/network-grants/) name services for `ost http`, which adds a token the agent never sees.
 - Read any file except credentials, including its own tool-result files and memory under `~/.claude`.
 - Write its scratch and memory folders, `/tmp`, Claude Code's session folders (`~/.claude/projects`, where its memory and tool-result files live) with the edit tools, and the worktrees its profile allows ([profiles](#profiles)). Shell commands are not limited to those folders; the hard denies below still apply to them.
 
@@ -24,7 +24,6 @@ No profile, toolset, tool declaration or team rule lifts these.
 | Pushes outside the push rules      | Force push without a lease (`--force`, `-f`, `+refspec`), a push to the repository's default branch (or deleting it), `--mirror`, `--all`, a push to a URL, a push to a read-only repository or from outside the granted repositories, `--no-verify`, and `git remote` or `git config` changes that could redirect a push or skip its hooks. `--force-with-lease` to your own branch is fine.                                                                             |
 | Configuration the agent runs under | Writing Claude Code's configuration (`~/.claude/settings*.json`, `CLAUDE.md`, `hooks/`, `skills/`, `agents/`, `commands/`, `plugins/`, `output-styles/`, `~/.claude.json`) and the agent's working directory (its `.claude/` project settings and the rendered skills and references), with the edit tools, redirections, or writing programs such as `cp`, `mv`, `rm`, `tee` and `sed -i`. A file there would otherwise carry instructions or hooks into later sessions. |
 | Privilege tools                    | `sudo`, `doas`, `su`, `pkexec`, `runuser`, `nsenter`, `chroot`, `setpriv`, `capsh`.                                                                                                                                                                                                                                                                                                                                                                                       |
-| Destructive device commands        | `adb` factory reset and wipes, reboots into recovery or the bootloader, `rm -r` of the device's data roots (`/data`, `/sdcard`, `/storage/emulated/0`, `/system`, ...), removing or clearing system packages; `fastboot` erase, format, flash and `-w`.                                                                                                                                                                                                                   |
 
 Patterns count too: `cat /proc/self/env*`, `cat *.pem` and a path pattern that could reach the secrets folder are denied, and so are recursive reads (`grep -r`, the search tool, `tar`, `cp -r`) of `/proc` or of a folder that holds the secrets folder. Process memory (`/proc/<pid>/mem`) is off limits like the environment. The policy reads through wrappers: a command inside `bash -c`, `eval`, `env`, `xargs`, `timeout`, `nohup`, `find -exec`, `$(...)`, a subshell or an expanding here-document is judged like any other.
 
@@ -41,11 +40,12 @@ Declare the tool without `allow` (or with `allow: all`) and these run. The stock
 
 ## Narrowing
 
-Teams can still narrow a program. Once an allow rule names a program, the program runs only what such rules allow:
+Teams can still narrow a program, or refuse some of its commands. Once an allow rule names a program, the program runs only what such rules allow; a deny rule refuses what it matches whatever allows it:
 
 ```yaml
 tools:
   kubectl: { version: 1.31.3, allow: [get, describe, logs] }
+  acmectl: { version: 2.4.0, allow: all, deny: [delete, wipe] }
 
 policies:
   commands:
@@ -55,7 +55,7 @@ policies:
       - { program: acme-cli, subcommand: [prod], reason: Never touch prod. }
 ```
 
-`kubectl delete pod x` and `make deploy` are then denied, and `acme-cli prod` is denied whatever else allows it. See [tools](/guides/tools/#narrowing-a-tool) for the forms `allow` takes.
+`kubectl delete pod x`, `make deploy` and `acmectl -c prod delete x` are then denied, `acmectl -c prod status` runs, and `acme-cli prod` is denied whatever else allows it. A refusal names the rule that decided it, such as `tools.acmectl.deny.delete`. Rules find the subcommand after the program's leading global options; see [tools](/guides/tools/#denying-commands) for the forms `allow` and `deny` take and for `valued_options`.
 
 ## Profiles
 

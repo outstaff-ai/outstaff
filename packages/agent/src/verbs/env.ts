@@ -113,10 +113,10 @@ function startAdapter(
   });
 }
 
-/** The services and devices this person may reach, or `undefined` when they may reach none. */
+/** The services this person may reach, or `undefined` when they may reach none. */
 function networkAccess(opts: CreateAgentEnvOptions, me: Person): NetworkAccess | undefined {
   const grants = networkGrants(opts.team, me);
-  if (grants.http.length === 0 && grants.adb.length === 0) {
+  if (grants.http.length === 0) {
     return undefined;
   }
 
@@ -129,7 +129,6 @@ function networkAccess(opts: CreateAgentEnvOptions, me: Person): NetworkAccess |
         ...(key ? { token: () => opts.secrets.require(key) } : {}),
       };
     }),
-    adb: grants.adb,
     ...(opts.fetch ? { fetch: opts.fetch } : {}),
   };
 }

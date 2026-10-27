@@ -641,9 +641,6 @@ describe("ost doctor network grants", () => {
       http:
         - { name: hub, url: "https://hub.acme.example" }
         - { name: home, url: "https://home.acme.example", token: HOME_TOKEN }
-      adb:
-        - { name: test-tablet, host: 10.0.0.16, pairing: wireless }
-        - { name: wall-panel, host: 10.0.0.18, port: 5555 }
 `,
     );
 
@@ -652,26 +649,20 @@ describe("ost doctor network grants", () => {
       status: String(url).includes("home.") ? 401 : 200,
     })) as unknown as typeof fetch;
 
-  it("reports a missing token secret, services that answer and devices that accept a connection", async () => {
+  it("reports a missing token secret and services that answer", async () => {
     const dir = project(withGrants);
     secretFiles(dir, { FAKE_TOKEN: VALUE, FAKE_ID: VALUE });
     const r = await ost(dir, ["doctor", "mira"], {
       registry: fakeRegistry(() => []),
       fetch: answers,
-      tcpProbe: async (host, port) => host === "10.0.0.18" && port === 5555,
-      adbProbe: async () => true,
-      home: dir,
     });
 
     expect(r.out).toContain("fail  HOME_TOKEN present");
     expect(r.out).toContain("Service hub answers: https://hub.acme.example answered 200.");
     expect(r.out).toContain("Service home answers: https://home.acme.example answered 401.");
-    expect(r.out).toContain("ok    adb runs");
-    expect(r.out).toContain("Device wall-panel reachable: 10.0.0.18:5555 accepts connections.");
-    expect(r.out).toContain("Device test-tablet reachable: 10.0.0.16 uses wireless debugging");
   });
 
-  it("warns outside the container when a service or device is unreachable, and never sends the token", async () => {
+  it("warns outside the container when a service is unreachable, and never sends the token", async () => {
     const dir = project(withGrants);
     secretFiles(dir, { FAKE_TOKEN: VALUE, FAKE_ID: VALUE, HOME_TOKEN: "home-secret-value" });
     const seen: unknown[] = [];
@@ -681,9 +672,6 @@ describe("ost doctor network grants", () => {
         seen.push(init?.headers);
         throw new Error("connect ECONNREFUSED");
       }) as unknown as typeof fetch,
-      tcpProbe: async () => false,
-      adbProbe: async () => false,
-      home: dir,
     });
 
     expect(seen.every((h) => h === undefined)).toBe(true);
@@ -694,7 +682,6 @@ describe("ost doctor network grants", () => {
     const by = (name: string) => checks.find((c) => c.name === name)!;
     expect(by("Service hub answers")).toMatchObject({ status: "warn" });
     expect(by("Service hub answers").fix).toContain("NetworkPolicy");
-    expect(by("adb runs")).toMatchObject({ status: "warn" });
     expect(r.out).not.toContain("home-secret-value");
   });
 });

@@ -93,8 +93,10 @@ people: []`),
 
   describe("options", () => {
     const sum = "sha256:" + "ab".repeat(32);
-    const tool = (opts: string, source = '"http:adb"') =>
-      codes(`tools:\n  adb: { version: 36.0.0, source: ${source}, options: ${opts} }\npeople: []`);
+    const tool = (opts: string, source = '"http:acmectl"') =>
+      codes(
+        `tools:\n  acmectl: { version: 36.0.0, source: ${source}, options: ${opts} }\npeople: []`,
+      );
 
     it("accepts an http source with a checksum, or one per platform", () => {
       expect(
@@ -110,15 +112,15 @@ people: []`),
 
     it("rejects options without a source", () => {
       expect(
-        codes(`tools:\n  adb: { version: 36.0.0, options: { url: "x" } }\npeople: []`),
+        codes(`tools:\n  acmectl: { version: 36.0.0, options: { url: "x" } }\npeople: []`),
       ).toContain("tools.options_without_source");
     });
 
     it("rejects an http source without a checksum", () => {
       expect(tool('{ url: "https://dl.acme.example/a.zip" }')).toContain("tools.http_checksum");
-      expect(codes(`tools:\n  adb: { version: 36.0.0, source: "http:adb" }\npeople: []`)).toContain(
-        "tools.http_checksum",
-      );
+      expect(
+        codes(`tools:\n  acmectl: { version: 36.0.0, source: "http:acmectl" }\npeople: []`),
+      ).toContain("tools.http_checksum");
     });
 
     it("rejects a platform without a checksum", () => {
@@ -131,7 +133,7 @@ people: []`),
 
     it("rejects a version option and does not require a checksum for other backends", () => {
       expect(tool(`{ version: "1.0.0", checksum: "${sum}" }`)).toContain("tools.reserved_option");
-      expect(tool('{ bin_path: "bin" }', '"github:acme/adb"')).toEqual([]);
+      expect(tool('{ bin_path: "bin" }', '"github:acme/acmectl"')).toEqual([]);
     });
 
     it("rejects values that are not strings", () => {
@@ -140,7 +142,7 @@ people: []`),
 
     it("keeps the options on the effective tool", () => {
       const r = parseTeam(
-        `tools:\n  adb: { version: 36.0.0, source: "http:adb", options: { checksum: "${sum}" } }\npeople: []`,
+        `tools:\n  acmectl: { version: 36.0.0, source: "http:acmectl", options: { checksum: "${sum}" } }\npeople: []`,
       );
 
       expect(r.ok && effectiveTools({ team: r.config.tools })[0]?.options).toEqual({
@@ -261,12 +263,10 @@ describe("policy from tools", () => {
     const t = {
       team: {
         sudo: { version: "1.9.0", allow: "all" as const },
-        adb: { version: "35.0.0", allow: "all" as const },
       },
     };
 
     expect(run(t, "sudo ls").effect).toBe("deny");
-    expect(run(t, "adb shell rm -rf /data").effect).toBe("deny");
   });
 
   it("an overridden toolset declaration no longer allows its verbs", () => {

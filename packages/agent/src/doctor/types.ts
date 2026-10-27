@@ -1,15 +1,10 @@
 import type { DoctorCheck, TeamConfig } from "@outstaff/core";
 import type { ToolStatus } from "#/tools/index.js";
 
-/** How the network checks reach services and devices; each defaults to the real thing (overrides are for tests). */
+/** How the network checks reach services; defaults to the real thing (the override is for tests). */
 export interface NetworkProbes {
   env: NodeJS.ProcessEnv;
-
-  /** The agent's home, where `ost adb connect` remembers wireless ports. */
-  home?: string | undefined;
   fetch?: typeof fetch | undefined;
-  tcpProbe?: ((host: string, port: number) => Promise<boolean>) | undefined;
-  adbProbe?: (() => Promise<boolean>) | undefined;
 }
 
 /** Used and total bytes of a volume. */

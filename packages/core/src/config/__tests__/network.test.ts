@@ -33,7 +33,7 @@ const codes = (input: TeamConfigInput) => {
 };
 
 describe("network grants in team.yaml", () => {
-  it("accepts http and adb grants on a person and a role", () => {
+  it("accepts http grants on a person and a role", () => {
     const r = parseTeamConfig(
       base((c) => {
         c.roles = {
@@ -42,10 +42,6 @@ describe("network grants in team.yaml", () => {
 
         c.people[0].network = {
           http: [{ name: "home", url: "https://home.acme.example:8123/", token: "HOME_TOKEN" }],
-          adb: [
-            { name: "test-tablet", host: "10.0.0.16", pairing: "wireless" },
-            { name: "wall-panel", host: "10.0.0.18", port: 5555 },
-          ],
         };
       }),
     );
@@ -65,7 +61,7 @@ describe("network grants in team.yaml", () => {
     );
   });
 
-  it("rejects duplicate names, adb without exactly one of port and pairing, and framework keys", () => {
+  it("rejects duplicate names and framework keys", () => {
     expect(
       codes(
         base(
@@ -80,15 +76,6 @@ describe("network grants in team.yaml", () => {
       ),
     ).toContain(CONFIG_CODES.networkDuplicateName);
 
-    for (const adb of [
-      { name: "t", host: "10.0.0.16" },
-      { name: "t", host: "10.0.0.16", port: 5555, pairing: "wireless" },
-    ]) {
-      expect(codes(base((c) => (c.people[0].network = { adb: [adb] })))).toContain(
-        CONFIG_CODES.networkAdbMode,
-      );
-    }
-
     expect(
       codes(
         base(
@@ -101,15 +88,28 @@ describe("network grants in team.yaml", () => {
     ).toContain(CONFIG_CODES.networkReservedToken);
   });
 
-  it("rejects a host with a scheme or port", () => {
-    expect(
-      codes(
-        base(
-          (c) =>
-            (c.people[0].network = { adb: [{ name: "t", host: "http://10.0.0.16", port: 1 }] }),
-        ),
-      ),
-    ).not.toEqual([]);
+  it("says network.adb was removed and what replaces it, on a person and a role", () => {
+    const r = parseTeamConfig(
+      base((c) => {
+        c.roles = { developer: { network: { adb: [{ name: "panel" }] } } };
+        c.people[0].network = { adb: [{ name: "panel" }] };
+      }),
+    );
+
+    const issues = r.ok ? [] : r.issues;
+    expect(issues.map((i) => [i.path.join("."), i.code])).toEqual([
+      ["people.0.network.adb", CONFIG_CODES.removedKey],
+      ["roles.developer.network.adb", CONFIG_CODES.removedKey],
+    ]);
+
+    expect(issues[0]!.message).toMatch(/removed.*network policy.*under tools, with deny rules/);
+  });
+
+  it("still calls other unknown keys unknown", () => {
+    const r = parseTeamConfig(base((c) => (c.people[0].network = { ssh: [] })));
+    expect(r.ok ? [] : r.issues.map((i) => [i.code, i.message])).toEqual([
+      [CONFIG_CODES.unknownKey, 'Unknown key "ssh".'],
+    ]);
   });
 });
 
@@ -122,7 +122,6 @@ describe("networkGrants", () => {
             { name: "hub", url: "https://hub.acme.example" },
             { name: "home", url: "https://home.acme.example", token: "ROLE_TOKEN" },
           ],
-          adb: [{ name: "panel", host: "10.0.0.18", port: 5555 }],
         },
       },
       qa: { network: { http: [{ name: "qa", url: "https://qa.acme.example" }] } },
@@ -135,25 +134,23 @@ describe("networkGrants", () => {
       extends: ["qa"],
       network: {
         http: [{ name: "home", url: "https://home.acme.example", token: "HOME_TOKEN" }],
-        adb: [{ name: "tablet", host: "10.0.0.16", pairing: "wireless" }],
       },
     });
 
     expect(g.http.map((h) => h.name).toSorted()).toEqual(["home", "hub", "qa"]);
     expect(g.http.find((h) => h.name === "home")?.token).toBe("HOME_TOKEN");
-    expect(g.adb.map((a) => a.name)).toEqual(["panel", "tablet"]);
     expect(grantTokenKeys(g)).toEqual(["HOME_TOKEN"]);
   });
 
   it("gives a person with no grants nothing", () => {
-    expect(networkGrants(team, { role: "architect" })).toEqual({
-      http: [],
-      adb: [],
-    });
+    expect(networkGrants(team, { role: "architect" })).toEqual({ http: [] });
   });
 
   it("inherits from the role when the person has none", () => {
-    expect(networkGrants(team, { role: "developer" }).adb.map((a) => a.name)).toEqual(["panel"]);
+    expect(networkGrants(team, { role: "developer" }).http.map((a) => a.name)).toEqual([
+      "hub",
+      "home",
+    ]);
   });
 });
 

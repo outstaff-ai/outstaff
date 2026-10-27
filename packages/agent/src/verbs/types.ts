@@ -4,7 +4,6 @@ import type {
   SecretSource,
   TeamConfig,
   Vcs,
-  AdbGrant,
   Chat,
   Knowledge,
   Layout,
@@ -25,7 +24,7 @@ export interface VerbResult {
   links: string[];
 }
 
-/** The services and devices this person may reach (`network` in team.yaml, roles and person merged). */
+/** The services this person may reach (`network` in team.yaml, roles and person merged). */
 export interface NetworkAccess {
   http: {
     name: string;
@@ -34,11 +33,9 @@ export interface NetworkAccess {
     /** The bearer token, read when a request is made; it never leaves the verb. */
     token?: () => string;
   }[];
-  adb: AdbGrant[];
 
-  /** Replaces the global `fetch` and the `adb` binary (tests only). */
+  /** Replaces the global `fetch` (tests only). */
   fetch?: typeof fetch;
-  adbCommand?: string;
 }
 
 /** Everything a verb touches: who is acting, the team, and the ports built from its config. */

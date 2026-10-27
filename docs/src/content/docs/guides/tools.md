@@ -1,9 +1,9 @@
 ---
 title: Tools
-description: Declare the tools your agents need in team.yaml or a toolset, pin their versions, and narrow a tool to some of its commands when you need to.
+description: Declare the tools your agents need in team.yaml or a toolset, pin their versions, and narrow a tool or deny some of its commands when you need to.
 ---
 
-One image cannot carry every tool a team needs, and Outstaff keeps no list of tools. Instead you declare the tools by name and exact version, and each agent installs them with [mise](https://mise.jdx.dev/) when it starts. Agents run any program inside the sandbox (see [permissions](/guides/permissions/)), so a declared tool runs with any arguments unless its declaration narrows it.
+One image cannot carry every tool a team needs, and Outstaff keeps no list of tools. Instead you declare the tools by name and exact version, and each agent installs them with [mise](https://mise.jdx.dev/) when it starts. Agents run any program inside the sandbox (see [permissions](/guides/permissions/)), so a declared tool runs with any arguments unless its declaration narrows it or denies some of its commands.
 
 ## Declare a tool
 
@@ -94,7 +94,80 @@ Without `allow`, or with `allow: all`, the tool runs with any arguments. `allow`
 
 Declaring a tool also lifts the built-in default denies for infrastructure writes (`kubectl apply`, `terraform apply`, `helm upgrade` and the like): they run when the declaration allows them, with `all` or a list that names them.
 
-Outstaff's hard denies still win over everything here: reading secrets and credential files, printing the environment, privilege tools such as `sudo`, destructive `adb` commands, and git pushes outside the push rules. Declaring `sudo` with `allow: all` does not make it runnable. See [permissions](/guides/permissions/).
+## Denying commands
+
+`deny` refuses commands of a tool, in the same forms as `allow`: a list of first subcommands, or structured rules with a `reason`. Deny always wins, over `allow` and over `all`, so a tool can run whole except for a few commands:
+
+```yaml
+tools:
+  acmectl: { version: 2.4.0, allow: all, deny: [delete, wipe] }
+```
+
+`acmectl -c prod status` runs. `acmectl -c prod delete x` is refused, and the refusal names the rule: `acmectl delete is denied by the acmectl tools declaration.` (`tools.acmectl.deny.delete`). A structured rule's `reason` is what the agent sees instead.
+
+### Global options
+
+Many tools take options before the subcommand: `acmectl -c prod delete`, `adb -s <serial> shell`, `docker -H <host> rm`. Rules look past them:
+
+- `--option=value` is one word, so it never hides the subcommand.
+- `valued_options` lists the options of the tool that take the next word as their value. With it, `allow` and `deny` find the subcommand exactly.
+- Without it, a deny rule also tries each leading word that follows an option as that option's value, so `-c prod delete` cannot slip past a deny of `delete`. An allow list does not guess: `acmectl -c prod status` is outside `allow: [status]` until `-c` is in `valued_options`.
+
+```yaml
+tools:
+  acmectl:
+    version: 2.4.0
+    valued_options: [-c, --context]
+    allow: [status, logs]
+    deny: [delete]
+```
+
+Guessing can refuse a command whose leading option took no value: without `valued_options`, `acmectl --verbose status delete` is refused as if it were a `delete`. Listing the tool's valued options makes deny rules exact too.
+
+### Example: guarding a device
+
+Outstaff has no built-in rules for any device. A team that lets agents drive Android devices declares `adb` and `fastboot` with the commands it never wants run. The device is reached over the network the deployment allows ([network grants](/guides/network-grants/#devices-and-other-protocols)):
+
+```yaml
+tools:
+  adb:
+    source: "http:adb"
+    version: 37.0.1
+    options:
+      url: "https://dl.google.com/android/repository/platform-tools_r{{ version }}-linux.zip"
+      bin_path: platform-tools
+      checksum: "sha256:d230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1"
+    valued_options: [-s, -t, -H, -P, -L]
+    deny:
+      - subcommand: [reboot]
+        args: [{ kind: positional, index: 0, pattern: "^(bootloader|recovery|sideload|fastboot)" }]
+        reason: Leaves the device in a mode only a human can undo.
+      - { subcommand: [shell, recovery], reason: Factory reset and data wipes are refused. }
+      - subcommand: [uninstall]
+        args:
+          [{ kind: positional, index: 0, pattern: "^(android|com\\.android\\.|com\\.google\\.)" }]
+        reason: System packages stay installed.
+      - { subcommand: [sideload], reason: Flashing an update is for a human. }
+
+policies:
+  commands:
+    deny:
+      - program: fastboot
+        args:
+          [{ kind: positional, index: 0, pattern: "^(erase|format|flash|flashall|flashing|oem)$" }]
+        reason: fastboot can wipe or reflash the device.
+      - program: fastboot
+        args: [{ kind: flag, names: [-w], present: true }]
+        reason: fastboot -w wipes the device.
+```
+
+That `adb` URL is the linux x86-64 build; Google publishes no arm64 Linux platform-tools, so a team whose agents run on arm64 needs its own image with `adb` on the `PATH`. The checksum is the SHA-256 of `platform-tools_r37.0.1-linux.zip`, computed from the download (Google's repository manifest lists SHA-1 only). When you change the version, compare the new zip's SHA-1 with the manifest at `https://dl.google.com/android/repository/repository2-3.xml` and put its SHA-256 in `checksum`. Platform-tools carries `fastboot` too, and two tools cannot share a source, so its rules go in `policies.commands`, which needs no tool declaration.
+
+Rules match words, not intent: `adb shell` with a script the patterns do not foresee (`adb shell am broadcast -a android.intent.action.MASTER_CLEAR`, an `rm -r` of the device's data) still runs. Tune the patterns to your devices, and grant agents only devices you can afford to lose state on.
+
+## Hard denies still win
+
+Outstaff's hard denies win over everything here: reading secrets and credential files, printing the environment, privilege tools such as `sudo`, and git pushes outside the push rules. Declaring `sudo` with `allow: all` does not make it runnable. See [permissions](/guides/permissions/).
 
 ## What happens at start
 

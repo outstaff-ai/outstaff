@@ -297,35 +297,35 @@ describe("installTools", () => {
 
   describe("tool options", () => {
     const sum = `sha256:${"ab".repeat(32)}`;
-    const adb = (
+    const acmectl = (
       options: Record<string, string | Record<string, string | Record<string, string>>>,
     ) =>
       effectiveTools({
-        team: { adb: { version: "36.0.0", source: "http:adb", options } },
+        team: { acmectl: { version: "36.0.0", source: "http:acmectl", options } },
       });
 
     it("renders options as an inline table after the version", () => {
       const toml = renderMiseToml(
-        adb({
-          url: "https://dl.acme.example/platform-tools_r{{ version }}-linux.zip",
-          bin_path: "platform-tools",
+        acmectl({
+          url: "https://dl.acme.example/acmectl_r{{ version }}-linux.zip",
+          bin_path: "bin",
           checksum: sum,
         }),
       );
 
       expect(toml).toContain(
-        `"http:adb" = { version = "36.0.0", url = "https://dl.acme.example/platform-tools_r{{ version }}-linux.zip", bin_path = "platform-tools", checksum = "${sum}" }`,
+        `"http:acmectl" = { version = "36.0.0", url = "https://dl.acme.example/acmectl_r{{ version }}-linux.zip", bin_path = "bin", checksum = "${sum}" }`,
       );
 
-      expect(renderGlobalMiseToml(adb({ checksum: sum }))).toContain(
-        `"http:adb" = { version = "36.0.0", checksum = "${sum}" }`,
+      expect(renderGlobalMiseToml(acmectl({ checksum: sum }))).toContain(
+        `"http:acmectl" = { version = "36.0.0", checksum = "${sum}" }`,
       );
     });
 
     it("renders platform-keyed options as nested inline tables", () => {
       expect(
         renderMiseToml(
-          adb({
+          acmectl({
             platforms: {
               "linux-x64": { url: "https://dl.acme.example/a.zip", checksum: sum },
               "linux-arm64": { url: "https://dl.acme.example/b.zip", checksum: sum },
@@ -333,14 +333,14 @@ describe("installTools", () => {
           }),
         ),
       ).toContain(
-        `"http:adb" = { version = "36.0.0", platforms = { linux-x64 = { url = "https://dl.acme.example/a.zip", checksum = "${sum}" }, linux-arm64 = { url = "https://dl.acme.example/b.zip", checksum = "${sum}" } } }`,
+        `"http:acmectl" = { version = "36.0.0", platforms = { linux-x64 = { url = "https://dl.acme.example/a.zip", checksum = "${sum}" }, linux-arm64 = { url = "https://dl.acme.example/b.zip", checksum = "${sum}" } } }`,
       );
     });
 
     it("escapes values so they cannot break out of the string", () => {
-      const toml = renderMiseToml(adb({ url: 'a"b\\c\nd\u007f }, evil = "1' }));
+      const toml = renderMiseToml(acmectl({ url: 'a"b\\c\nd\u007f }, evil = "1' }));
       expect(toml).toContain('url = "a\\"b\\\\c\\nd\\u007f }, evil = \\"1"');
-      expect(toml.split("\n").filter((l) => l.startsWith('"http:adb"'))).toHaveLength(1);
+      expect(toml.split("\n").filter((l) => l.startsWith('"http:acmectl"'))).toHaveLength(1);
     });
 
     it("renders a plain version string without options", () => {
@@ -352,10 +352,10 @@ describe("installTools", () => {
     it("installs again when an option changes", async () => {
       const home = homeDir();
       const m = fakeMise();
-      await installTools({ tools: adb({ checksum: sum }), home, env: {}, mise: m.runner });
+      await installTools({ tools: acmectl({ checksum: sum }), home, env: {}, mise: m.runner });
       const first = m.calls.length;
       const same = await installTools({
-        tools: adb({ checksum: sum }),
+        tools: acmectl({ checksum: sum }),
         home,
         env: {},
         mise: m.runner,
@@ -365,7 +365,7 @@ describe("installTools", () => {
       expect(m.calls.slice(first).some((c) => c[0] === "install" || c[0] === "lock")).toBe(false);
 
       const other = await installTools({
-        tools: adb({ checksum: `sha256:${"cd".repeat(32)}` }),
+        tools: acmectl({ checksum: `sha256:${"cd".repeat(32)}` }),
         home,
         env: {},
         mise: m.runner,

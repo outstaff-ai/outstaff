@@ -26,7 +26,6 @@ export { parseYaml } from "./config/locate.js";
 export type {
   AdapterInfo,
   AdapterPort,
-  AdbGrant,
   ConfigCode,
   ConfigFs,
   ConfigIssue,

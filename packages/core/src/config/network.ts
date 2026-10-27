@@ -7,7 +7,6 @@ const d = (description: string) => ({ description });
 
 const SLUG = /^[a-z][a-z0-9-]*$/;
 const SECRET_KEY = /^[A-Za-z0-9_]+$/;
-const HOST = /^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$/;
 
 /** The origin of an http(s) URL (`https://hub.acme.example:8443`), or undefined for anything else. */
 export function originOf(url: string): string | undefined {
@@ -70,62 +69,29 @@ const httpGrantSchema = z
   })
   .meta(d("A service the agent may reach with `ost http`."));
 
-const adbGrantSchema = z
-  .strictObject({
-    name: name("Name the agent gives to `ost adb`, for example test-tablet."),
-    host: z
-      .string()
-      .min(1)
-      .max(253)
-      .regex(HOST, "Use a host name or an IP address, without scheme or port.")
-      .meta(d("Host name or IP address of the device, for example 10.0.0.16.")),
-    port: z
-      .int()
-      .min(1)
-      .max(65535)
-      .optional()
-      .meta(d("Fixed adb port, for example 5555 (adb over TCP). Omit for wireless pairing.")),
-    pairing: z
-      .literal("wireless")
-      .optional()
-      .meta(
-        d(
-          "Android 11+ wireless debugging: the connect port is random and changes, so a human supplies it. Use instead of port.",
-        ),
-      ),
-  })
-  .refine((g) => (g.port === undefined) !== (g.pairing === undefined), {
-    message: "Give either a port (adb over TCP) or pairing: wireless, not both and not neither.",
-    params: { code: CONFIG_CODES.networkAdbMode },
-  })
-  .meta(d("An Android device the agent may reach with `ost adb`."));
-
 export const networkSchema = z
   .strictObject({
     http: z.array(httpGrantSchema).optional().meta(d("Services reachable with `ost http`.")),
-    adb: z.array(adbGrantSchema).optional().meta(d("Devices reachable with `ost adb`.")),
   })
   .superRefine((n, ctx) => {
-    for (const key of ["http", "adb"] as const) {
-      const seen = new Set<string>();
-      n[key]?.forEach((g, i) => {
-        if (seen.has(g.name)) {
-          ctx.addIssue(
-            customIssue(
-              CONFIG_CODES.networkDuplicateName,
-              `The ${key} grant name "${g.name}" is used twice.`,
-              [key, i, "name"],
-            ),
-          );
-        }
+    const seen = new Set<string>();
+    n.http?.forEach((g, i) => {
+      if (seen.has(g.name)) {
+        ctx.addIssue(
+          customIssue(
+            CONFIG_CODES.networkDuplicateName,
+            `The http grant name "${g.name}" is used twice.`,
+            ["http", i, "name"],
+          ),
+        );
+      }
 
-        seen.add(g.name);
-      });
-    }
+      seen.add(g.name);
+    });
   })
   .meta(
     d(
-      "Network grants: the services and devices the `ost http` and `ost adb` verbs reach, with tokens and device pairing handled for the agent. They do not limit the network; the deployment's network policy does.",
+      "Network grants: the services the `ost http` verb reaches, with the token handled for the agent. They do not limit the network; the deployment's network policy does.",
     ),
   );
 
@@ -148,10 +114,7 @@ export function networkGrants(
   const roles = [person.role, ...(person.extends ?? [])];
   const layers = [...roles.map((r) => team.roles?.[r]?.network), person.network];
 
-  return {
-    http: latestByName(layers.map((layer) => layer?.http)),
-    adb: latestByName(layers.map((layer) => layer?.adb)),
-  };
+  return { http: latestByName(layers.map((layer) => layer?.http)) };
 }
 
 /** The grants of every layer, a later one replacing an earlier one with the same name. */

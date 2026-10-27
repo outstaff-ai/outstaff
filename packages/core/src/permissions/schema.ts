@@ -2,6 +2,7 @@ import { z } from "zod";
 import { CONFIG_CODES } from "#/config/codes.js";
 import { customIssue } from "#/config/issues.js";
 import { PROFILES } from "./constants.js";
+import { checkEntries } from "./tool-entries.js";
 import { checkOptions } from "./tool-options.js";
 
 const d = (description: string) => ({ description });
@@ -111,6 +112,13 @@ export const toolRuleSchema = z
   })
   .meta(d("A command rule for the tool."));
 
+/** A list of first subcommands, or structured rules: the shapes `allow` and `deny` of a tool take. */
+const commandList = (verbs: string) =>
+  z.union([
+    z.array(z.string().min(1)).min(1).meta(d(verbs)),
+    z.array(toolRuleSchema).min(1).meta(d("Structured command rules.")),
+  ]);
+
 export const toolDeclarationSchema = z
   .strictObject({
     version: z
@@ -137,16 +145,28 @@ export const toolDeclarationSchema = z
           'Options mise passes to the tool\'s backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: "..." } }. Needs source.',
         ),
       ),
-    allow: z
-      .union([
-        z.literal("all"),
-        z.array(z.string().min(1)).min(1).meta(d("Subcommand verbs the agent may run.")),
-        z.array(toolRuleSchema).min(1).meta(d("Structured command rules.")),
-      ])
+    valued_options: z
+      .array(z.string().regex(/^--?[^\s=-][^\s=]*$/, "Use the option as typed, for example -c."))
+      .min(1)
       .optional()
       .meta(
         d(
-          'Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. The built-in denies still win.',
+          "Options of the tool that take their value as the next word, such as -c or --context. Their values are never taken for a subcommand, so a rule finds `delete` in `acmectl -c prod delete`. `--option=value` is one word and needs no entry.",
+        ),
+      ),
+    allow: z
+      .union([z.literal("all"), commandList("Subcommand verbs the agent may run.")])
+      .optional()
+      .meta(
+        d(
+          'Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. Deny rules and the built-in denies still win.',
+        ),
+      ),
+    deny: commandList("Subcommand verbs the agent may never run.")
+      .optional()
+      .meta(
+        d(
+          'Commands of the tool the agent may never run: a list of first subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.',
         ),
       ),
   })
@@ -180,35 +200,8 @@ export const toolsSchema = z
       }
 
       checkOptions(name, t, ctx);
-
-      if (!Array.isArray(t.allow)) {
-        continue;
-      }
-
-      const seen = new Set<string>();
-      t.allow.forEach((entry, i) => {
-        if (typeof entry === "string") {
-          if (seen.has(entry)) {
-            ctx.addIssue(
-              customIssue(CONFIG_CODES.toolsDuplicate, `Verb "${entry}" is listed twice.`, [
-                name,
-                "allow",
-                i,
-              ]),
-            );
-          }
-
-          seen.add(entry);
-        } else if (entry.program !== undefined && entry.program !== name) {
-          ctx.addIssue(
-            customIssue(
-              CONFIG_CODES.toolsRuleProgram,
-              `A rule of tool "${name}" names program "${entry.program}"; omit program or use "${name}".`,
-              [name, "allow", i, "program"],
-            ),
-          );
-        }
-      });
+      checkEntries(name, "allow", t.allow, ctx);
+      checkEntries(name, "deny", t.deny, ctx);
     }
   })
   .meta(

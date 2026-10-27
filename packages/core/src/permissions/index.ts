@@ -6,7 +6,6 @@ export { loadToolset, parseToolset, teamCommandsToPack, toolsetToPack } from "./
 export { effectiveTools, toolsToPacks } from "./tools.js";
 export { teamCommandsSchema, toolsSchema, toolsetSchema } from "./schema.js";
 
-export { adbCommand, adbDestructive } from "./adb.js";
 export { evaluate } from "./evaluate.js";
 export { globToRegExp, matchesAny, resolvePath } from "./paths.js";
 export { PROFILES, TOOL_KINDS } from "./constants.js";

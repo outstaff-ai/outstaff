@@ -66,11 +66,11 @@ The office checks its own scope: every office secret is present (including each 
 
 Each agent checks what only its own container can tell when it starts, and reports the result to the office over the agent connection:
 
-| Check             | Fails when                                                                                                                                                      |
-| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Tools install     | A tool declared for the person (toolsets, `tools:`) did not install; one check per tool, with mise's reason.                                                    |
-| Services, devices | A granted HTTP service does not answer, adb does not run, or an adb device does not accept a connection (a wireless device only warns, since its port changes). |
-| Home volume space | The volume of the agent's home is 90% full or more; from 80% it warns. The message gives used and total space; the fix is to free space or grow the volume.     |
+| Check             | Fails when                                                                                                                                                  |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tools install     | A tool declared for the person (toolsets, `tools:`) did not install; one check per tool, with mise's reason.                                                |
+| Services          | A granted HTTP service does not answer.                                                                                                                     |
+| Home volume space | The volume of the agent's home is 90% full or more; from 80% it warns. The message gives used and total space; the fix is to free space or grow the volume. |
 
 The office stores every check with its status, message, fix, when it first had that status and when a run last reported it. A check keeps its status until a later run of the same scope (the office's own, or that agent's next start) reports otherwise, so a failing check stays failing until a run passes; a check a later run no longer reports is dropped. The office logs each run (`doctor: checks recorded`, with the counts) and each check that is not ok (`doctor: <check>`, at `warn`). It never posts the results to chat or the tracker.
 
