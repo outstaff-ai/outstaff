@@ -362,6 +362,28 @@ Sent by: office.
 | `items[].prUrl`       | string          | no       |                                                            |
 | `items[].current`     | boolean         | no       | True for the item the caller asked about.                  |
 
+### `work_status`
+
+Asks for the state of a list of work items, for example to find the ones whose worktree and scratch folder can go.
+
+Sent by: agent. Answered by: `work_status_result`, `error`.
+
+| Field         | Type           | Required | Description             |
+| ------------- | -------------- | -------- | ----------------------- |
+| `workItemIds` | list of string | yes      | The items to ask about. |
+
+### `work_status_result`
+
+The state of each item asked about, in the order asked. An item of someone else is `not_yours` and an item the office does not have is `unknown`; nothing else about either is given.
+
+Sent by: office.
+
+| Field                | Type                                                                                               | Required | Description                                                                                                                      |
+| -------------------- | -------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `items`              | list of objects                                                                                    | yes      |                                                                                                                                  |
+| `items[].workItemId` | string                                                                                             | yes      | Id of the work item.                                                                                                             |
+| `items[].state`      | `queued` or `active` or `waiting` or `blocked` or `done` or `canceled` or `not_yours` or `unknown` | yes      | The item's status. `not_yours` when it belongs to someone else, whatever its status; `unknown` when the office has no such item. |
+
 ### `work_move`
 
 Changes the status of one of the caller's work items.

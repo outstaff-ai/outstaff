@@ -1,8 +1,19 @@
-import type { Member, WorkSummary } from "@outstaff/protocol";
+import type { Member, WorkState, WorkSummary } from "@outstaff/protocol";
 import { ProtocolError, type Offer } from "@outstaff/office";
 import type { FakeSource } from "./types.js";
 
 type State = NonNullable<ReturnType<FakeSource["stateOf"]>>;
+
+const SHOWN: Record<State, WorkState["state"]> = {
+  queued: "queued",
+  offered: "active",
+  accepted: "active",
+  done: "done",
+  failed: "blocked",
+  waiting: "waiting",
+  blocked: "blocked",
+  canceled: "canceled",
+};
 
 export function createFakeSource(members: Member[] = []): FakeSource {
   const items = new Map<string, { person: string; offer: Offer; state: State; title: string }>();
@@ -123,6 +134,19 @@ export function createFakeSource(members: Member[] = []): FakeSource {
           ...summary(id, i),
           ...(id === q.workItemId ? { current: true } : {}),
         }));
+    },
+    async status(person, ids) {
+      return ids.map((workItemId): WorkState => {
+        const it = items.get(workItemId);
+        if (!it) {
+          return { workItemId, state: "unknown" };
+        }
+
+        return {
+          workItemId,
+          state: it.person === person ? SHOWN[it.state] : "not_yours",
+        };
+      });
     },
     async move(person, id, status) {
       record("move", person, id);

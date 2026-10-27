@@ -55,6 +55,7 @@ try {
     stopping = true;
     log.info("stopping", { signal });
     agent.usage.stop();
+    agent.sweeper.stop();
     (agent.chat?.stop() ?? Promise.resolve())
       .then(() => agent.loop.stop())
       .then(() => agent.connection.stop())
@@ -69,6 +70,7 @@ try {
   await agent.connection.whenConnected();
   log.info("connected");
   agent.usage.start();
+  agent.sweeper.start();
   void reportAgentChecks(agent, process.env, process.env["HOME"] ?? homedir(), log);
   await agent.chat?.start().catch((e: unknown) => {
     log.error("chat requests are off: the chat connection failed", { error: String(e) });

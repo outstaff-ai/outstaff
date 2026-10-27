@@ -93,6 +93,18 @@ export const MESSAGE_META = {
     replies: ["work_list_result", "error"],
   },
   work_list_result: { from: "office", summary: "The caller's work items.", replies: [] },
+  work_status: {
+    from: "agent",
+    summary:
+      "Asks for the state of a list of work items, for example to find the ones whose worktree and scratch folder can go.",
+    replies: ["work_status_result", "error"],
+  },
+  work_status_result: {
+    from: "office",
+    summary:
+      "The state of each item asked about, in the order asked. An item of someone else is `not_yours` and an item the office does not have is `unknown`; nothing else about either is given.",
+    replies: [],
+  },
   work_move: {
     from: "agent",
     summary: "Changes the status of one of the caller's work items.",

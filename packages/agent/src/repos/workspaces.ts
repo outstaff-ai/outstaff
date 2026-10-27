@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseRepoUrl, silentLogger } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
@@ -95,6 +95,9 @@ export function repoForItem(offer: Offer, repos: ClonedRepo[]): ClonedRepo | und
   return writable.find((r) => r.kind === "primary") ?? writable[0];
 }
 
+/** The names of the entries of a directory; none when it does not exist. */
+const namesIn = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
+
 export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
   const git = opts.git ?? runGit;
   const log = opts.log ?? silentLogger;
@@ -188,6 +191,15 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       return space(repo, worktree, branch, scratch);
     },
 
+    held() {
+      const dirs = [
+        opts.layout.scratchDir,
+        ...opts.repos.map((r) => join(opts.layout.worktreesDir, r.name)),
+      ];
+
+      return [...new Set(dirs.flatMap(namesIn))];
+    },
+
     async release(workItemId) {
       for (const repo of opts.repos) {
         const worktree = worktreeOf(repo.name, workItemId);
@@ -197,6 +209,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
         try {
           await git(["worktree", "remove", "--force", worktree], { cwd: repo.dir });
+          await git(["worktree", "prune"], { cwd: repo.dir });
         } catch (e) {
           log.warn("could not remove a worktree", {
             workItemId,

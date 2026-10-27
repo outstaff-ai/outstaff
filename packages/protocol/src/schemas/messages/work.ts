@@ -2,7 +2,7 @@ import { z } from "zod";
 import { refSchema } from "#/schemas/common.js";
 import { empty, itemId, message, text } from "#/schemas/fields.js";
 import { answerStateSchema, humanSchema, memberSchema } from "#/schemas/team.js";
-import { filedSchema, workSummarySchema } from "#/schemas/work.js";
+import { filedSchema, workStateSchema, workSummarySchema } from "#/schemas/work.js";
 
 export const workMessages = [
   message(
@@ -25,6 +25,13 @@ export const workMessages = [
   ),
   message("work_list", z.strictObject({ workItemId: itemId.optional() })),
   message("work_list_result", z.strictObject({ items: z.array(workSummarySchema) })),
+  message(
+    "work_status",
+    z.strictObject({
+      workItemIds: z.array(itemId).min(1).max(500).describe("The items to ask about."),
+    }),
+  ),
+  message("work_status_result", z.strictObject({ items: z.array(workStateSchema) })),
   message(
     "work_move",
     z.strictObject({

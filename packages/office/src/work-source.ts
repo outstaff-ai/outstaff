@@ -6,6 +6,7 @@ import type { WorkSource } from "./protocol/source.types.js";
 import type { Scheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
 import { workMoves } from "./work-moves.js";
+import { workStatus } from "./work-status.js";
 import { offerBuilder } from "./work-offer.js";
 import type { HandBackResult, WorkSourceOptions } from "./work-source.types.js";
 
@@ -187,5 +188,6 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
     },
 
     ...workMoves(opts, own, summaryOf),
+    ...workStatus(store),
   };
 }

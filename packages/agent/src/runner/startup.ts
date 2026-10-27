@@ -9,12 +9,14 @@ import { loadStartupContext, officeConnection } from "./startup-context.js";
 import { createRuntime, runtimeAdapter, writeWorkdirFiles } from "./startup-runtime.js";
 import { buildPolicies, renderWorkdir } from "./startup-steps.js";
 import {
+  agentWorkspaces,
   cloneRepositories,
   installTools,
   prepareDirs,
   roleCapabilities,
   usageReporter,
   workLoop,
+  workSweeper,
 } from "./startup-work.js";
 
 const DEFAULT_SECRETS_DIR = "/run/secrets/outstaff";
@@ -79,6 +81,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
 
   const usage = usageReporter(ctx, connection, runtime);
   const started = startChat(connection, { env, team, me, role, model, person, log });
+  const workspaces = agentWorkspaces(ctx, layout, repos);
   const loop = workLoop(ctx, {
     ...started,
     connection,
@@ -90,6 +93,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     chatPolicy,
     systemPrompt,
     repos,
+    workspaces,
     addDirs,
     model,
   });
@@ -100,6 +104,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     connection,
     loop,
     usage,
+    sweeper: workSweeper(ctx, connection, workspaces),
     env,
     runtime,
     rendered,

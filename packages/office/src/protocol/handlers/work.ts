@@ -46,6 +46,10 @@ export const workHandlers: RequestHandlers = {
     const items = await ctx.opts.source.list(person, defined({ workItemId: payload.workItemId }));
     reply("work_list_result", { items });
   },
+  async work_status({ ctx, person, payload, reply }) {
+    const items = await ctx.opts.source.status(person, payload.workItemIds);
+    reply("work_status_result", { items });
+  },
   async work_move({ ctx, person, payload, reply }) {
     const item = await ctx.opts.source.move(person, payload.workItemId, payload.status);
     reply("work_move_result", { item });

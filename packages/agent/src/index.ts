@@ -6,3 +6,4 @@ export * from "./runner/index.js";
 export * from "./repos/index.js";
 export * from "./tools/index.js";
 export * from "./doctor/index.js";
+export * from "./sweep/index.js";

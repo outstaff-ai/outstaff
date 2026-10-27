@@ -93,6 +93,7 @@ export function storeSource(
       return started.started ? offerOf(started.item) : undefined;
     },
     accept: async () => {},
+    status: async () => [],
     async setSession(person, id, sessionId) {
       await own(person, id);
       await store.updateItem(id, { sessionId });

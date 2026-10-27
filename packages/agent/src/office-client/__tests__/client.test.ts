@@ -310,6 +310,21 @@ describe("office connection", () => {
 
       expect(await work).toEqual([{ id: "w1", title: "T", status: "active" }]);
 
+      const status = conn.workStatus(["w1", "w2", "w3"]);
+      expect(current().last()).toMatchObject({
+        type: "work_status",
+        payload: { workItemIds: ["w1", "w2", "w3"] },
+      });
+
+      const states = [
+        { workItemId: "w1", state: "active" },
+        { workItemId: "w2", state: "not_yours" },
+        { workItemId: "w3", state: "unknown" },
+      ];
+
+      current().reply(current().last(), "work_status_result", { items: states });
+      expect(await status).toEqual(states);
+
       const team = conn.team();
       expect(current().last().type).toBe("roster");
       current().reply(current().last(), "roster_result", { members: [] });
