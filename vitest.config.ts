@@ -36,6 +36,12 @@ const coreAlias = [
       new URL("integrations/tracker/itsaplan/src/index.ts", import.meta.url),
     ),
   },
+  {
+    find: /^@outstaff\/integration\.knowledge\.itsaplan$/,
+    replacement: fileURLToPath(
+      new URL("integrations/knowledge/itsaplan/src/index.ts", import.meta.url),
+    ),
+  },
 ];
 
 const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];

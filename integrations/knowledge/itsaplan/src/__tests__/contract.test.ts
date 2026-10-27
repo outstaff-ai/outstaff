@@ -1,10 +1,9 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { knowledgeContract } from "@outstaff/core/contracts";
 import { knowledgeOptions, type KnowledgeOptions } from "@outstaff/integration.tracker.itsaplan";
-import { API_KEY, secretMap, team } from "@outstaff/testing.itsaplan";
+import { API_KEY, createItsaplanFake, secretMap, team } from "@outstaff/testing.itsaplan";
 import { itsaplanKnowledge } from "../index.js";
 import { createItsaplanKnowledge } from "../knowledge.js";
-import { createItsaplanFake } from "../testing/itsaplan-fake.js";
 
 const base = {
   secrets: secretMap({ ITSAPLAN_API_KEY: API_KEY }),

@@ -4,7 +4,8 @@ import { createServer as createHttps } from "node:https";
 import { createChat } from "./chat.ts";
 import { BareRepo } from "./git.ts";
 import { createGithub } from "./github.ts";
-import { readBody, router, type Route } from "./http.ts";
+import { router, type Route } from "./http.ts";
+import { readBody } from "@outstaff/testing.http";
 import { createTracker } from "./tracker.ts";
 
 /**

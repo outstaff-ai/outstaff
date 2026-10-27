@@ -5,9 +5,8 @@ import {
   trackerOptions,
 } from "@outstaff/integration.tracker.itsaplan";
 import { describe, expect, it } from "vitest";
-import { API_KEY, secretMap, team } from "@outstaff/testing.itsaplan";
+import { API_KEY, createItsaplanFake, secretMap, team } from "@outstaff/testing.itsaplan";
 import { createItsaplanKnowledge } from "../knowledge.js";
-import { createItsaplanFake } from "../testing/itsaplan-fake.js";
 
 const trackerCtx = (fake: ReturnType<typeof createItsaplanFake>, t: TeamConfig = team) =>
   ({

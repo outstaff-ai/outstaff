@@ -1,111 +1,58 @@
+import { createRouter, incomingFromFetch, toResponse } from "@outstaff/testing.http";
 import { expect } from "vitest";
-import type { Route, StubReply, StubRequest } from "./types.js";
+import type { Route, StubRequest } from "./types.js";
 
-const compile = (pattern: string): ((path: string) => Record<string, string> | undefined) => {
-  const parts = pattern.split("/");
-  return (path) => {
-    const segs = path.split("/");
-    const params: Record<string, string> = {};
-    for (let i = 0; i < parts.length; i++) {
-      const p = parts[i]!;
-      if (p === "*") {
-        return params;
-      }
+/** A route whose path is a full URL serves another host (a log download); it must never get the token. */
+function expectExternal(url: URL, headers: Headers, routes: Route[]) {
+  expect(
+    routes.some((r) => r.path.startsWith(url.origin)),
+    `requests must stay on the API host, not ${url.origin}`,
+  ).toBe(true);
 
-      const s = segs[i];
-      if (s === undefined) {
-        return undefined;
-      }
+  expect(headers.get("authorization"), `${url.origin} must not receive the token`).toBeNull();
+}
 
-      if (p.startsWith(":")) {
-        params[p.slice(1)] = decodeURIComponent(s);
-      } else if (p !== s) {
-        return undefined;
-      }
-    }
+/** Every call to the API identifies itself the way GitHub requires. */
+function expectApi(url: URL, method: string | undefined, headers: Headers) {
+  expect(headers.get("authorization"), `${method} ${url.pathname} is unauthenticated`).toMatch(
+    /^Bearer \S+/,
+  );
 
-    return segs.length === parts.length ? params : undefined;
-  };
-};
+  expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
+    headers.get("accept"),
+  );
 
-const isReply = (v: unknown): v is StubReply =>
-  typeof v === "object" &&
-  v !== null &&
-  !Array.isArray(v) &&
-  Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body" || k === "text");
+  expect(headers.get("x-github-api-version")).toBe("2022-11-28");
+}
 
 /** A fetch that serves JSON by method and path and records every call. Unmatched requests fail the test. */
 export function createStubFetch(routes: Route[], origin = "https://api.github.test") {
-  const compiled = routes.map((r) => ({ r, match: compile(r.path) }));
   const calls: StubRequest[] = [];
+  const dispatch = createRouter(
+    routes.map((r) => ({
+      ...r,
+      handler: (req: StubRequest) => {
+        calls.push(req);
+        return r.handler(req);
+      },
+    })),
+  );
+
   const stub = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-    );
-
-    const headers = new Headers(init?.headers);
-    // A route whose path is a full URL serves another host (a log download); it must never get the token.
-    const external = url.origin !== origin;
-    if (external) {
-      expect(
-        compiled.some(({ r }) => r.path.startsWith(url.origin)),
-        `requests must stay on the API host, not ${url.origin}`,
-      ).toBe(true);
-
-      expect(headers.get("authorization"), `${url.origin} must not receive the token`).toBeNull();
+    const { url, incoming } = incomingFromFetch(input, init, origin);
+    if (url.origin === origin) {
+      expectApi(url, init?.method, incoming.headers);
     } else {
-      // Every call identifies itself the way GitHub requires.
-      expect(
-        headers.get("authorization"),
-        `${init?.method} ${url.pathname} is unauthenticated`,
-      ).toMatch(/^Bearer \S+/);
-
-      expect(["application/vnd.github+json", "application/vnd.github.diff"]).toContain(
-        headers.get("accept"),
-      );
-
-      expect(headers.get("x-github-api-version")).toBe("2022-11-28");
+      expectExternal(url, incoming.headers, routes);
     }
 
-    expect(headers.get("user-agent")).toBeTruthy();
-    const method = (init?.method ?? "GET").toUpperCase();
-    const path = external ? `${url.origin}${url.pathname}` : url.pathname;
-    for (const { r, match } of compiled) {
-      if (r.method !== method) {
-        continue;
-      }
-
-      const params = match(path);
-      if (!params) {
-        continue;
-      }
-
-      const req: StubRequest = {
-        method,
-        path: decodeURIComponent(path),
-        query: url.searchParams,
-        headers,
-        params,
-        json: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
-      };
-
-      calls.push(req);
-      const out = await r.handler(req);
-      const reply: StubReply = isReply(out) ? out : { body: out };
-      const status = reply.status ?? 200;
-      const body =
-        status === 304 || status === 204 ? null : (reply.text ?? JSON.stringify(reply.body ?? {}));
-
-      return new Response(body, {
-        status,
-        headers: {
-          "content-type": reply.text === undefined ? "application/json" : "text/plain",
-          ...reply.headers,
-        },
-      });
+    expect(incoming.headers.get("user-agent")).toBeTruthy();
+    const served = await dispatch(incoming);
+    if (!served) {
+      throw new Error(`stub: no route for ${incoming.method} ${incoming.path}${url.search}`);
     }
 
-    throw new Error(`stub: no route for ${method} ${path}${url.search}`);
+    return toResponse(served.reply);
   }) as typeof fetch;
 
   return {

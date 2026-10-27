@@ -207,20 +207,7 @@ importers:
         specifier: 19.0.0
         version: 19.0.0(@types/node@24.19.2)
 
-  e2e:
-    devDependencies:
-      '@outstaff/integration.knowledge.itsaplan':
-        specifier: workspace:*
-        version: link:../integrations/knowledge/itsaplan
-      '@outstaff/integration.tracker.itsaplan':
-        specifier: workspace:*
-        version: link:../integrations/tracker/itsaplan
-      '@outstaff/integration.vcs.github':
-        specifier: workspace:*
-        version: link:../integrations/vcs/github
-      '@outstaff/testing.github':
-        specifier: workspace:*
-        version: link:../testing/github
+  e2e: {}
 
   e2e/runtime-scripted:
     dependencies:
@@ -240,6 +227,12 @@ importers:
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
+
+  e2e/stubs:
+    dependencies:
+      '@outstaff/testing.http':
+        specifier: workspace:*
+        version: link:../../testing/http
 
   integrations/avatars/dicebear:
     dependencies:
@@ -288,9 +281,6 @@ importers:
         specifier: workspace:*
         version: link:../../tracker/itsaplan
     devDependencies:
-      '@outstaff/testing.itsaplan':
-        specifier: workspace:*
-        version: link:../../../testing/itsaplan
       vitest:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
@@ -534,6 +524,10 @@ importers:
 
   testing/github:
     dependencies:
+      '@outstaff/testing.http':
+        specifier: workspace:*
+        version: link:../http
+    devDependencies:
       '@outstaff/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -547,11 +541,20 @@ importers:
         specifier: 5.0.5
         version: 5.0.5(@opentelemetry/api@1.10.0)(@types/node@24.19.2)(@vitest/coverage-v8@5.0.5)(vite@8.3.5(@types/node@24.19.2)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1))
 
+  testing/http: {}
+
   testing/itsaplan:
     dependencies:
+      '@outstaff/testing.http':
+        specifier: workspace:*
+        version: link:../http
+    devDependencies:
       '@outstaff/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@outstaff/integration.knowledge.itsaplan':
+        specifier: workspace:*
+        version: link:../../integrations/knowledge/itsaplan
       '@outstaff/integration.tracker.itsaplan':
         specifier: workspace:*
         version: link:../../integrations/tracker/itsaplan

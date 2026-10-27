@@ -32,7 +32,6 @@
     "@outstaff/integration.tracker.itsaplan": "workspace:*"
   },
   "devDependencies": {
-    "@outstaff/testing.itsaplan": "workspace:*",
     "vitest": "5.0.5"
   }
 }

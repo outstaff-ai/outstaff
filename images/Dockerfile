@@ -115,9 +115,14 @@ COPY --from=builder-e2e /out/e2e /opt/outstaff-e2e
 RUN mise install pnpm@12.9.1
 CMD ["node", "/opt/outstaff-e2e/dist/bin.js"]
 
-# Stand-ins for GitHub (API and git remote) and the tracker. It binds port 443 for git, so it runs as root.
+# Stand-ins for GitHub (API and git remote) and the tracker, served by the shared vendor stand-ins (testing/*).
+FROM builder AS builder-stubs
+RUN pnpm --filter @outstaff/e2e-stubs... run build \
+ && pnpm --filter @outstaff/e2e-stubs deploy --prod /out/stubs
+
+# It binds port 443 for git, so it runs as root.
 FROM base AS e2e-stubs
-COPY e2e/stubs /opt/stubs
+COPY --from=builder-stubs /out/stubs /opt/stubs
 USER root
 EXPOSE 443 8081
 CMD ["node", "/opt/stubs/server.ts"]

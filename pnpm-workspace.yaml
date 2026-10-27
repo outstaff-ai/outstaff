@@ -5,6 +5,7 @@ packages:
   - "docs"
   - "e2e"
   - "e2e/runtime-scripted"
+  - "e2e/stubs"
 allowBuilds:
   esbuild: true
 savePrefix: ""
