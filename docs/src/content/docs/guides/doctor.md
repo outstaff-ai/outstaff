@@ -62,7 +62,7 @@ The running office makes the checks it can see from its own container, so an exp
 - every day at `office.doctor.daily_at` (`HH:MM`, default `06:00`) in the office container's time zone (its `TZ`, UTC unless set);
 - on demand, with `ost doctor --via-office` or the office link's `health` request.
 
-The office checks its own scope: every office secret is present (including each person's `OUTSTAFF_AGENT_TOKEN_<HANDLE>`; file modes are left to the platform that mounts the secrets), and each configured adapter's live checks as listed above, for example the office GitHub App's repositories and permissions and the Slack office token. `office.doctor.skip` lists ports (for example `[chat]`) whose live checks the office leaves out, for a provider it cannot or should not call; their secrets are still checked, and `ost doctor` still runs them.
+The office checks its own scope: every office secret is present (including each person's `OUTSTAFF_AGENT_TOKEN_<HANDLE>`; file modes are left to the platform that mounts the secrets), and each configured adapter's live checks as listed above, for example the office GitHub App's repositories and permissions and the Slack office token. It also reads the code host's merge rules of every repository agents may merge, as `ost doctor office` does (see [Merging on approval](/concepts/automation/#merging-on-approval)). `office.doctor.skip` lists ports (for example `[chat]`) whose live checks the office leaves out, for a provider it cannot or should not call; their secrets are still checked, and `ost doctor` still runs them.
 
 Each agent checks what only its own container can tell when it starts, and reports the result to the office over the agent connection:
 

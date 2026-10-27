@@ -11,7 +11,7 @@ import type {
 } from "#/ports/index.js";
 import type { FakeVcsOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
-import type { FakeVcsState, StoredPr } from "./vcs.types.js";
+import type { FakeBranchRule, FakeVcsState, StoredPr } from "./vcs.types.js";
 
 export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
   const host = opts.host ?? "git.acme.example";
@@ -98,6 +98,7 @@ export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
 
   const defaultBranch = "main";
   const mergeSettings = new Map<string, MergeOptions>();
+  const branchRules = new Map<string, FakeBranchRule[]>();
   const settingsOf = (repo: RepoRef): MergeOptions =>
     mergeSettings.get(key(repo)) ?? { queue: false, methods: ["merge", "squash"] };
 
@@ -131,6 +132,7 @@ export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
     conversation,
     reactions,
     mergeSettings,
+    branchRules,
     defaultBranch,
     defaultRepo,
     links,

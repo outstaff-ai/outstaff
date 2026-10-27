@@ -1,5 +1,6 @@
 import type { EventPage } from "./events.js";
 import type { Links } from "./links.js";
+import type { MergeMethod, MergeOptions, MergeRequirements, MergeResult } from "./vcs-merge.js";
 import type { RepoRef } from "./types.js";
 
 export interface PullRequest {
@@ -104,22 +105,6 @@ export interface PullRequestReviewState {
 
   /** Logins asked to review who have not done so (or whose review was dismissed and re-requested). */
   requestedReviewers: string[];
-}
-
-/** How a repository lets a pull request into a branch. */
-export interface MergeOptions {
-  /** The branch has a merge queue. */
-  queue: boolean;
-
-  /** The direct methods the repository's settings allow. */
-  methods: ("merge" | "squash")[];
-}
-
-export type MergeMethod = "queue" | "merge" | "squash";
-
-export interface MergeResult {
-  /** `merged` when the pull request is in, `queued` when the host's queue took it and will merge it. */
-  outcome: "merged" | "queued";
 }
 
 export interface NewPullRequest {
@@ -264,7 +249,7 @@ export interface Vcs {
   react(repo: RepoRef, target: ReactionTarget, reaction: Reaction): Promise<void>;
 
   /**
-   * Merge support, for adapters with the `vcs.merge` capability; leave all four out otherwise.
+   * Merge support, for adapters with the `vcs.merge` capability; leave all five out otherwise.
    *
    * `reviewState`: the submitted reviews and the reviewers still asked (read grant).
    * `requiredChecks`: the checks the host requires of this pull request before it merges, at its head, with
@@ -273,10 +258,13 @@ export interface Vcs {
    * `mergePullRequest`: queues or merges as the person this port instance belongs to (write grant). `sha` is
    * the head the caller checked; a head that moved is refused (`conflict`). The host's protection and
    * rulesets stay the final gate: what it refuses is `invalid` or `conflict` with the host's reason, never bypassed.
+   * `mergeRequirements`: what the host requires before anything merges into the repository's default branch, from
+   * all of its protection rules (read grant, the office's identity).
    */
   reviewState?(repo: RepoRef, number: number): Promise<PullRequestReviewState>;
   requiredChecks?(repo: RepoRef, number: number): Promise<Check[]>;
   mergeOptions?(repo: RepoRef, base: string): Promise<MergeOptions>;
+  mergeRequirements?(repo: RepoRef): Promise<MergeRequirements>;
   mergePullRequest?(
     repo: RepoRef,
     number: number,

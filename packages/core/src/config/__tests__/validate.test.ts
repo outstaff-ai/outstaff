@@ -233,34 +233,9 @@ describe("validateTeam", () => {
     expect(validateTeam(off, plain).warnings).toEqual([]);
   });
 
-  it("warns when merging on approval is on for a repo with no checks, or an adapter that cannot merge", () => {
-    const on = (extra: Record<string, unknown> = {}) =>
-      config((x) => (x.policies = { merge: { on_approval: true, ...extra } }));
-
-    expect(validateTeam(on(), ctx()).warnings).toEqual([
-      expect.objectContaining({
-        path: ["repos", 0, "checks"],
-        code: "policies.merge_without_checks",
-      }),
-    ]);
-
-    const withChecks = config((x) => {
-      x.policies = { merge: { on_approval: true } };
-      x.repos[0].checks = ["pnpm lint"];
-    });
-
-    expect(validateTeam(withChecks, ctx()).warnings).toEqual([]);
-    expect(validateTeam(config(), ctx()).warnings).toEqual([]);
-
-    const other = config((x) => {
-      x.repos.push({ name: "docs", url: "github.com/acme/docs", kind: "other" });
-      x.policies = { merge: { on_approval: true, repos: ["docs"] } };
-      x.repos[0].checks = ["pnpm lint"];
-    });
-
-    expect(validateTeam(other, ctx()).warnings).toEqual([
-      expect.objectContaining({ path: ["repos", 1, "checks"] }),
-    ]);
+  it("leaves merge gates to the code host, and warns when the adapter cannot merge", () => {
+    const withoutChecks = config((x) => (x.policies = { merge: { on_approval: true } }));
+    expect(validateTeam(withoutChecks, ctx()).warnings).toEqual([]);
 
     const noMerge = ctx({
       adapters: new Map([
@@ -276,7 +251,7 @@ describe("validateTeam", () => {
       ]),
     });
 
-    expect(validateTeam(withChecks, noMerge).warnings).toEqual([
+    expect(validateTeam(withoutChecks, noMerge).warnings).toEqual([
       expect.objectContaining({
         path: ["policies", "merge", "on_approval"],
         code: "policies.capability_missing",

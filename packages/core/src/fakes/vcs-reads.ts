@@ -107,6 +107,15 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
     async mergeOptions(repo) {
       return structuredClone(settingsOf(repo));
     },
+    async mergeRequirements(repo) {
+      const rules = st.branchRules.get(key(repo)) ?? [];
+      return {
+        branch: st.defaultBranch,
+        requiredChecks: [...new Set(rules.flatMap((r) => r.requiredChecks))],
+        requiredApprovals: Math.max(0, ...rules.map((r) => r.requiredApprovals)),
+        upToDate: rules.some((r) => r.upToDate),
+      };
+    },
     async diff(repo, number) {
       grant(repo, "read");
       const s = need(repo, number);

@@ -70,6 +70,21 @@ describe("startOffice", () => {
     expect((await fetch(`${base}/readyz`)).status).toBe(503);
   });
 
+  it("reads the code host's merge rules in the office's doctor runs", async () => {
+    const merging = env({ OUTSTAFF_SECRETS_DIR: "/nonexistent" });
+    writeFileSync(
+      merging.OUTSTAFF_TEAM_FILE,
+      `${TEAM}policies:\n  merge: { on_approval: true, repos: [app] }\n`,
+    );
+
+    running = await startOffice(merging, deps);
+    const base = `http://127.0.0.1:${running.health.port()}`;
+    const ran = await fetch(`${base}/doctor`, { method: "POST" });
+    expect(((await ran.json()) as { checks: unknown[] }).checks).toContainEqual(
+      expect.objectContaining({ scope: "office", name: "Merge gate of app", status: "fail" }),
+    );
+  });
+
   it("explains a team file that is not valid", async () => {
     const bad = env();
     writeFileSync(bad.OUTSTAFF_TEAM_FILE, "version: 2\n");

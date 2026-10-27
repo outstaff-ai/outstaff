@@ -1,11 +1,13 @@
 import type { PullRequest, RepoRef, Vcs, VcsPermission } from "@outstaff/core";
 import type {
+  RestBranchProtection,
   RestCheckRun,
   RestEvent,
   RestIssueComment,
   RestPull,
   RestReview,
   RestReviewComment,
+  RestRule,
   ThreadNode,
 } from "@outstaff/integration.vcs.github";
 
@@ -109,6 +111,9 @@ export interface StoredJob {
   log: string;
 }
 
+export type StoredProtection = RestBranchProtection;
+export type StoredRule = RestRule;
+
 /** The fake's id and clock counters; each is bumped before use. */
 export interface FakeCounters {
   tick: number;
@@ -131,6 +136,9 @@ export interface FakeState {
   reviews: Map<number, StoredReview>;
   perms: Map<string, VcsPermission>;
   mergeSettings: { queue: boolean; methods: string[] };
+
+  /** The default branch's classic protection, when it has one, and the rules its rulesets add. */
+  branch: { protection?: StoredProtection; rules: StoredRule[] };
   issueComments: Map<number, StoredIssueComment>;
   reactions: Map<string, Set<string>>;
   events: RestEvent[];

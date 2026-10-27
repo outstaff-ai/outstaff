@@ -16,6 +16,7 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
     conversation,
     reactions,
     mergeSettings,
+    branchRules,
     defaultRepo,
     links,
     reactionKey,
@@ -141,6 +142,11 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
     },
     async mergeSettings(repo, o) {
       mergeSettings.set(key(repo), { ...settingsOf(repo), ...o });
+    },
+    async protectBranch(repo, rule) {
+      const rules = branchRules.get(key(repo)) ?? [];
+      rules.push({ requiredChecks: [], requiredApprovals: 0, upToDate: false, ...rule });
+      branchRules.set(key(repo), rules);
     },
     async comment(repo, number, actor, body) {
       need(repo, number);

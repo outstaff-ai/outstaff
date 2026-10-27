@@ -10,6 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { AdapterRegistry, type DoctorCheck } from "@outstaff/core";
+import { createFakeVcs } from "@outstaff/core/fakes";
 import { githubVcs } from "@outstaff/integration.vcs.github";
 import { describe, expect, it } from "vitest";
 import { ACME_TEAM_FILE, testKey } from "@outstaff/testing.core";
@@ -177,6 +178,60 @@ describe("ost doctor", () => {
     const r = await ost(dir, ["doctor", "mira"], { registry });
     expect(r.code).toBe(1);
     expect(r.out).toContain("github checks: The checks could not run: boom");
+  });
+
+  describe("merge gates", () => {
+    const merging = (team: string) =>
+      team.replace(
+        "policies:\n",
+        "policies:\n  merge:\n    on_approval: true\n    repos: [shop, infra]\n",
+      );
+
+    const registry = (create: () => unknown) => {
+      const reg = fakeRegistry(() => []);
+      const def = reg.get("vcs", "github") as unknown as {
+        create: () => unknown;
+        options: unknown;
+      };
+
+      def.create = create;
+      def.options = { parse: (v: unknown) => v };
+      return reg;
+    };
+
+    it("reports each repo agents may merge from the code host's rules, in the office scope only", async () => {
+      const dir = project(merging);
+      const vcs = createFakeVcs();
+      await vcs.seed.protectBranch!(
+        { host: "github.com", owner: "acme-example", name: "shop" },
+        { requiredChecks: ["ci"], requiredApprovals: 1 },
+      );
+
+      const r = await ost(dir, ["doctor", "office"], { registry: registry(() => vcs) });
+      expect(r.out).toContain(
+        "ok    Merge gate of shop: main requires checks ci and 1 approving review.",
+      );
+
+      expect(r.out).toContain(
+        "fail  Merge gate of infra: main requires no status check and no approving review.",
+      );
+
+      const person = await ost(dir, ["doctor", "mira"], { registry: registry(() => vcs) });
+      expect(person.out).not.toContain("Merge gate");
+    });
+
+    it("reports a vcs adapter that cannot start as a failure", async () => {
+      const dir = project(merging);
+      const r = await ost(dir, ["doctor", "office"], {
+        registry: registry(() => {
+          throw new Error("no office App");
+        }),
+      });
+
+      expect(r.out).toContain(
+        "fail  Merge gates: The merge requirements could not be read: no office App",
+      );
+    });
   });
 
   it("checks the office and every person without a handle, as JSON", async () => {

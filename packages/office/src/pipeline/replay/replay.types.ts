@@ -1,4 +1,4 @@
-import type { Rule, StaticWorkflowData, WorkflowOptions } from "@outstaff/core";
+import type { MergeRequirements, Rule, StaticWorkflowData, WorkflowOptions } from "@outstaff/core";
 import type { Outcome } from "#/pipeline/compare/compare.types.js";
 import type { PipelineEvent } from "#/pipeline/events.types.js";
 import type { Policy } from "#/pipeline/policy.types.js";
@@ -14,7 +14,9 @@ export interface ReplayMerge {
   /** Mergeability of the other pull requests before and after the merge, by number; clean when not listed. */
   before?: Record<number, "clean" | "conflicting">;
   after?: Record<number, "clean" | "conflicting">;
-  requiresUpToDate?: boolean;
+
+  /** What the code host requires of the default branch, as the vcs port reads it; nothing when not given. */
+  requirements?: MergeRequirements;
 
   /** Why a derived event is decided differently, by its id. */
   notes?: Record<string, string>;

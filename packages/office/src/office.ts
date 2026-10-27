@@ -216,7 +216,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       ),
   });
 
-  const doctor = doctorForOffice(input, log);
+  const doctor = doctorForOffice(input, ports.vcs, log);
   server = createProtocolServer({
     source,
     doctor,

@@ -1,4 +1,5 @@
 import type {
+  BranchRule,
   Check,
   ConversationEntry,
   MergeOptions,
@@ -14,6 +15,8 @@ import type {
 } from "#/ports/index.js";
 import type { VcsSeed } from "#/contracts/seeds.js";
 import type { EventLog } from "./util.js";
+
+export type FakeBranchRule = BranchRule;
 
 export interface StoredPr {
   pr: PullRequest;
@@ -43,6 +46,9 @@ export interface FakeVcsState {
   conversation: Map<string, string>;
   reactions: Map<string, Set<string>>;
   mergeSettings: Map<string, MergeOptions>;
+
+  /** The protection rules of each repository's default branch, by repository key. */
+  branchRules: Map<string, FakeBranchRule[]>;
   defaultBranch: string;
   defaultRepo: RepoRef;
   links: Vcs["links"];
@@ -83,6 +89,7 @@ export type VcsReads = Pick<
   | "reviewState"
   | "requiredChecks"
   | "mergeOptions"
+  | "mergeRequirements"
   | "diff"
   | "permission"
   | "events"

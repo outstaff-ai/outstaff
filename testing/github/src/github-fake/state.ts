@@ -196,6 +196,7 @@ export function createFakeState(repo: RepoRef): FakeState {
     reviews,
     perms,
     mergeSettings: { queue: false, methods: ["merge", "squash"] },
+    branch: { rules: [] },
     issueComments,
     reactions,
     events,

@@ -13,12 +13,15 @@ export type { GithubDeps, GithubOptions } from "./types.js";
 // The REST and GraphQL shapes the adapter reads, for the GitHub stand-ins used in tests.
 export type {
   RequiredChecksData,
+  RestBranch,
+  RestBranchProtection,
   RestCheckRun,
   RestEvent,
   RestIssueComment,
   RestPull,
   RestReview,
   RestReviewComment,
+  RestRule,
   RollupContext,
   ThreadNode,
   ThreadsData,

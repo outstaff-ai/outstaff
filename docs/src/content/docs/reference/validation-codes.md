@@ -79,5 +79,4 @@ A warning describes something that will not work as written or a default that ap
 | `people.reviewer_without_github` | A person in the reviewer role has no repo grant, or no identities.vcs, so cannot review pull requests as themselves. |
 | `people.runtime_without_usage` | A person's runtime reports no usage windows, so the usage policy is not applied to that person. |
 | `policies.capability_missing` | A policies switch is on, but the configured adapter lacks the capability it needs. |
-| `policies.merge_without_checks` | policies.merge.on_approval is on for a repo with no checks configured, so an approval merges untested code. |
 | `trust.default` | humans is omitted, so the default trust rule applies. |

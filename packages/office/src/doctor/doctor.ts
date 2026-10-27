@@ -8,8 +8,8 @@ const DEFAULT_DAILY_AT = "06:00";
 const DEFAULT_RUN_TIMEOUT_MS = 60_000;
 
 /**
- * Runs the doctor checks the office can make itself (its secrets, which include each person's agent token, and each
- * configured adapter's live checks) at start, daily and on demand, and keeps the ones agents report. Results are
+ * Runs the doctor checks the office can make itself (its secrets, which include each person's agent token, each
+ * configured adapter's live checks and the `extraChecks` of its own ports) at start, daily and on demand, and keeps the ones agents report. Results are
  * stored and logged; nothing is posted.
  */
 export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
@@ -57,23 +57,24 @@ export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
     return { expired, cancel: () => cancelTimer?.() };
   };
 
+  const officeChecks = async () =>
+    scopeChecks({
+      team,
+      scope: "office",
+      adapters: officeAdapters(),
+      secrets: opts.secrets,
+      dir: opts.secretsDir,
+      // The platform mounts the office's secrets and sets their mode; the CLI checks the files people write.
+      fileModes: false,
+      handle: "office",
+      context: { fetch: opts.fetch ?? fetch, now: () => clock.now() },
+      extra: (await opts.extraChecks?.()) ?? [],
+    });
+
   const once = async () => {
     const limit = deadline(opts.runTimeoutMs ?? DEFAULT_RUN_TIMEOUT_MS);
     try {
-      const checks = await Promise.race([
-        scopeChecks({
-          team,
-          scope: "office",
-          adapters: officeAdapters(),
-          secrets: opts.secrets,
-          dir: opts.secretsDir,
-          // The platform mounts the office's secrets and sets their mode; the CLI checks the files people write.
-          fileModes: false,
-          handle: "office",
-          context: { fetch: opts.fetch ?? fetch, now: () => clock.now() },
-        }),
-        limit.expired,
-      ]);
+      const checks = await Promise.race([officeChecks(), limit.expired]);
 
       await record("office", checks);
       last = clock.now().toISOString();

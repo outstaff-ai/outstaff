@@ -124,6 +124,23 @@ describe("the office's doctor", () => {
     expect((await doctor.health()).summary).toEqual({ ok: 2, warn: 0, fail: 0 });
   });
 
+  it("adds the extra checks of the office's own ports to each run", async () => {
+    let extraRuns = 0;
+    make(team(), {
+      extraChecks: async () => {
+        extraRuns += 1;
+        return [{ name: "Merge gate of app", status: "warn", detail: "main requires checks ci." }];
+      },
+    });
+
+    await doctor.run();
+    await doctor.run();
+    expect(extraRuns).toBe(2);
+    expect((await doctor.health()).checks).toContainEqual(
+      expect.objectContaining({ scope: "office", name: "Merge gate of app", status: "warn" }),
+    );
+  });
+
   it("joins a run in progress, keeps agents' reports and numbers repeated names", async () => {
     make(team("05:30"));
     let release!: () => void;

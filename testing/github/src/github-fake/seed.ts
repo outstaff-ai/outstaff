@@ -77,6 +77,30 @@ export function createSeed(s: FakeState, vcsRef: FakeVcsRef): VcsSeed {
         methods: o.methods ?? s.mergeSettings.methods,
       };
     },
+    // The first rule becomes the branch's classic protection, the others rulesets, so both are read.
+    async protectBranch(_repo, rule) {
+      const required = { strict: rule.upToDate ?? false, contexts: rule.requiredChecks ?? [] };
+      const approvals = rule.requiredApprovals ?? 0;
+      if (!s.branch.protection) {
+        s.branch.protection = {
+          required_status_checks: required,
+          required_pull_request_reviews: { required_approving_review_count: approvals },
+        };
+
+        return;
+      }
+
+      s.branch.rules.push(
+        { type: "pull_request", parameters: { required_approving_review_count: approvals } },
+        {
+          type: "required_status_checks",
+          parameters: {
+            required_status_checks: required.contexts.map((context) => ({ context })),
+            strict_required_status_checks_policy: required.strict,
+          },
+        },
+      );
+    },
     async comment(_repo, number, actor, body) {
       const id = ++n.commentCounter;
       issueComments.set(id, { prNumber: number, author: actor, body, at: clockIso() });

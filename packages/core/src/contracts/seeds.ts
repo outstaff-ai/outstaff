@@ -7,6 +7,7 @@ import type {
   ReactionTarget,
   RepoRef,
   Check,
+  BranchRule,
   VcsPermission,
 } from "#/ports/index.js";
 
@@ -75,6 +76,12 @@ export interface VcsSeed {
     repo: RepoRef,
     o: { queue?: boolean; methods?: ("merge" | "squash")[] },
   ): Promise<void>;
+
+  /**
+   * Add a rule to the repository's default branch, as a ruleset or branch protection would; the rules add up.
+   * Merge cases only.
+   */
+  protectBranch?(repo: RepoRef, rule: Partial<BranchRule>): Promise<void>;
 
   /** A comment on the pull request conversation. Resolves to the comment id. */
   comment(repo: RepoRef, number: number, actor: string, body: string): Promise<string>;

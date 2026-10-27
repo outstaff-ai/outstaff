@@ -41,33 +41,3 @@ function idleSwitch(
     },
   ];
 }
-
-/** Repos that merge on approval without any checks to run first. */
-export function mergesWithoutChecks(config: TeamConfig): ConfigWarning[] {
-  if (!policyOn(config.policies, "merge.on_approval")) {
-    return [];
-  }
-
-  const scope = config.policies?.merge.repos;
-
-  return config.repos.flatMap((repo, i) => {
-    const merges = scope ? scope.includes(repo.name) : hasWriter(config, repo);
-    if (!merges || repo.checks?.length) {
-      return [];
-    }
-
-    return [
-      {
-        path: ["repos", i, "checks"],
-        code: WARNING_CODES.policyMergeWithoutChecks,
-        message: `policies.merge.on_approval is on for repo "${repo.name}", which has no checks.`,
-        consequence: `an approval merges untested code in ${repo.name}; list its checks under repos[].checks, or limit policies.merge.repos.`,
-      },
-    ];
-  });
-}
-
-const hasWriter = (config: TeamConfig, repo: TeamConfig["repos"][number]) =>
-  config.people.some((p) =>
-    [repo.name, `kind:${repo.kind}`, "*"].some((key) => p.repos[key] === "write"),
-  );

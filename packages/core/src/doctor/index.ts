@@ -1,4 +1,5 @@
 export { adapterChecks, configuredAdapters } from "./adapters.js";
+export { mergeGateCheck, mergeGateChecks, mergeRepos } from "./merge-gate.js";
 export { scopeChecks } from "./scope.js";
 export { secretChecks } from "./secrets.js";
 export { coreSpecs, secretSections, tokenKey } from "./specs.js";
