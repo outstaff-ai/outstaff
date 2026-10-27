@@ -25,52 +25,68 @@ export function createFakeRuntime(): FakeRuntime {
     async *run(req) {
       requests.push(req);
       const steps = queue.shift() ?? [{ type: "text", text: "ok" }];
-      yield {
-        type: "started",
-        sessionId: req.sessionId ?? `fake-session-${++sessions}`,
-      } satisfies RuntimeEvent;
-
-      let last = "";
-      for (const step of steps) {
-        if (req.signal?.aborted) {
-          yield { type: "finished", ok: false, text: last, interrupted: true };
-          return;
-        }
-
-        if (step.type === "text") {
-          last = step.text;
-          yield { type: "text", text: step.text };
-        } else if (step.type === "tool_call") {
-          yield {
-            type: "tool_call",
-            tool: step.tool,
-            input: step.call,
-            decision: evaluate(req.policy, step.call),
-          };
-        } else if (step.type === "usage") {
-          yield step;
-        } else {
-          const text = step.text ?? last;
-          yield {
-            type: "finished",
-            ok: step.ok ?? true,
-            text,
-            ...(step.error !== undefined ? { error: step.error } : {}),
-            ...(step.costUsd !== undefined ? { costUsd: step.costUsd } : {}),
-            ...(step.sessionLost ? { sessionLost: true } : {}),
-          };
-
-          return;
-        }
-      }
-
-      if (req.signal?.aborted) {
-        yield { type: "finished", ok: false, text: last, interrupted: true };
-      } else {
-        yield { type: "finished", ok: true, text: last };
-      }
+      yield { type: "started", sessionId: req.sessionId ?? `fake-session-${++sessions}` };
+      yield* play(steps, req);
     },
   };
 
   return runtime;
+}
+
+/** Plays the steps of one run; an aborted signal interrupts it before the next step. */
+async function* play(steps: FakeRunStep[], req: RunRequest): AsyncGenerator<RuntimeEvent> {
+  let last = "";
+  for (const step of steps) {
+    if (req.signal?.aborted) {
+      yield interrupted(last);
+      return;
+    }
+
+    const event = stepEvent(step, req, last);
+    yield event;
+    if (event.type === "finished") {
+      return;
+    }
+
+    last = step.type === "text" ? step.text : last;
+  }
+
+  yield req.signal?.aborted ? interrupted(last) : { type: "finished", ok: true, text: last };
+}
+
+const interrupted = (text: string): RuntimeEvent => ({
+  type: "finished",
+  ok: false,
+  text,
+  interrupted: true,
+});
+
+/** The event a step emits; `last` is the text of the latest text step, the default text of a finish. */
+function stepEvent(step: FakeRunStep, req: RunRequest, last: string): RuntimeEvent {
+  switch (step.type) {
+    case "text":
+      return { type: "text", text: step.text };
+    case "tool_call":
+      return {
+        type: "tool_call",
+        tool: step.tool,
+        input: step.call,
+        decision: evaluate(req.policy, step.call),
+      };
+    case "usage":
+      return step;
+    default:
+      return finished(step, last);
+  }
+}
+
+function finished(step: Extract<FakeRunStep, { type: "finish" }>, last: string): RuntimeEvent {
+  return {
+    type: "finished",
+    ok: step.ok ?? true,
+    text: step.text ?? last,
+    ...(step.error !== undefined ? { error: step.error } : {}),
+    ...(step.costUsd !== undefined ? { costUsd: step.costUsd } : {}),
+    ...(step.sessionLost ? { sessionLost: true } : {}),
+  };
 }

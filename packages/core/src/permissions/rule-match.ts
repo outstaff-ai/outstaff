@@ -4,26 +4,24 @@ import { repoFor } from "./git.js";
 import type { ArgPredicate, CommandRule, Decision, Policy } from "./types.js";
 
 function flagValues(args: string[], names: string[]): string[] | null {
-  const found: string[] = [];
-  for (let i = 0; i < args.length; i++) {
-    const a = args[i]!;
-    for (const name of names) {
-      if (a === name) {
-        found.push(args[i + 1] ?? "");
-      } else if (name.startsWith("--") && a.startsWith(`${name}=`)) {
-        found.push(a.slice(name.length + 1));
-      } else if (
-        !name.startsWith("--") &&
-        a.startsWith(name) &&
-        !a.startsWith("--") &&
-        a.length > name.length
-      ) {
-        found.push(a.slice(name.length).replace(/^=/, ""));
-      }
-    }
-  }
+  const found = args.flatMap((a, i) => names.flatMap((name) => flagValue(a, args[i + 1], name)));
 
   return found.length === 0 ? null : found;
+}
+
+/** The value `a` gives the flag `name`: the next word, the part after `--name=`, or the rest of a joined `-n5`. */
+function flagValue(a: string, next: string | undefined, name: string): string[] {
+  if (a === name) {
+    return [next ?? ""];
+  }
+
+  if (name.startsWith("--")) {
+    return a.startsWith(`${name}=`) ? [a.slice(name.length + 1)] : [];
+  }
+
+  const joined = !a.startsWith("--") && a.startsWith(name) && a.length > name.length;
+
+  return joined ? [a.slice(name.length).replace(/^=/, "")] : [];
 }
 
 function predicateHolds(p: ArgPredicate, args: string[], positionals: string[]): boolean {
@@ -48,6 +46,16 @@ function predicateHolds(p: ArgPredicate, args: string[], positionals: string[]):
   }
 }
 
+/** The words that are not options; after `--` every word is one. */
+function operands(args: string[]): string[] {
+  const dashes = args.indexOf("--");
+  if (dashes < 0) {
+    return args.filter((a) => !a.startsWith("-"));
+  }
+
+  return [...args.slice(0, dashes).filter((a) => !a.startsWith("-")), ...args.slice(dashes + 1)];
+}
+
 function matchRule(
   r: CommandRule,
   program: string,
@@ -57,16 +65,7 @@ function matchRule(
     return null;
   }
 
-  const all: string[] = [];
-  let afterDashes = false;
-  for (const a of args) {
-    if (a === "--" && !afterDashes) {
-      afterDashes = true;
-    } else if (afterDashes || !a.startsWith("-")) {
-      all.push(a);
-    }
-  }
-
+  const all = operands(args);
   const sub = r.subcommand ?? [];
   if (sub.some((w, i) => all[i] !== w)) {
     return null;
@@ -115,32 +114,58 @@ export function evaluateCommandRules(
   }
 
   const { r, m } = hit;
-  if (r.requiresRepo) {
-    if (flagValues(args, ["-R", "--repo"]) !== null) {
-      return deny(
-        "A -R/--repo target cannot be mapped to a granted repository.",
-        "commands.repo-flag",
-      );
-    }
 
-    const repo = repoFor(policy, cwd);
-    if (!repo) {
-      return deny(`${program} ran outside the granted repositories.`, "git.no-repo");
-    }
+  return (
+    unmetRepoRequirement(policy, r, program, args, cwd) ??
+    deniedPathArgument(policy, r, m!.positionals, cwd) ??
+    allow(r.reason, r.id)
+  );
+}
 
-    if (r.requiresRepo === "write" && repo.mode !== "write") {
-      return deny("This repository is read-only for this person.", "git.read-only-repo");
-    }
+/** Why the repository the command runs in does not meet the rule's `requiresRepo`, if it does not. */
+function unmetRepoRequirement(
+  policy: Policy,
+  r: CommandRule,
+  program: string,
+  args: string[],
+  cwd: string,
+): Decision | undefined {
+  if (!r.requiresRepo) {
+    return undefined;
   }
 
-  if (r.pathArgs) {
-    for (const raw of m!.positionals) {
-      const d = checkPath(policy, r.pathArgs, raw, cwd);
-      if (d.effect !== "allow") {
-        return d;
-      }
-    }
+  if (flagValues(args, ["-R", "--repo"]) !== null) {
+    return deny(
+      "A -R/--repo target cannot be mapped to a granted repository.",
+      "commands.repo-flag",
+    );
   }
 
-  return allow(r.reason, r.id);
+  const repo = repoFor(policy, cwd);
+  if (!repo) {
+    return deny(`${program} ran outside the granted repositories.`, "git.no-repo");
+  }
+
+  if (r.requiresRepo === "write" && repo.mode !== "write") {
+    return deny("This repository is read-only for this person.", "git.read-only-repo");
+  }
+}
+
+/** The first positional the rule's `pathArgs` refuses, as its decision. */
+function deniedPathArgument(
+  policy: Policy,
+  r: CommandRule,
+  positionals: string[],
+  cwd: string,
+): Decision | undefined {
+  if (!r.pathArgs) {
+    return undefined;
+  }
+
+  for (const raw of positionals) {
+    const d = checkPath(policy, r.pathArgs, raw, cwd);
+    if (d.effect !== "allow") {
+      return d;
+    }
+  }
 }

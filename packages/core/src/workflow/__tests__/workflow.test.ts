@@ -9,7 +9,7 @@ import { evaluateWorkflow, explainWorkflow } from "../evaluate.js";
 import { ruleInputSchema } from "../rules.js";
 import { createStatusMap } from "../status-map.js";
 import { renderTemplate, TemplateError } from "../template.js";
-import type { Rule, WorkflowPr } from "../types.js";
+import type { Effect, Rule, WorkflowPr } from "../types.js";
 
 /** The preset as a team gets it by default: approved-merge exists only while policies.merge.on_approval is on. */
 const kanban = presetRules("kanban").filter((r) => !r.id.startsWith("approved-merge"));
@@ -1127,22 +1127,21 @@ describe("one pull request per ticket", () => {
       prs: [pr(10), pr(11, { author: human })],
     });
 
+    const bodyOf = (effect: Effect | undefined) =>
+      effect?.type === "comment" ? effect.body : undefined;
+
     it("comments on the ticket, saying which merge closes it", () => {
       const comment = run(opened(11), second).find((e) => e.type === "comment");
       expect(comment).toMatchObject({ type: "comment", on: { ticket: "ACME-1" } });
-      expect(comment && "body" in comment && comment.body).toContain("2 pull requests");
-      expect(comment && "body" in comment && comment.body).toContain("#10 Change 10");
-      expect(comment && "body" in comment && comment.body).toContain("#11 Change 11");
-      expect(comment && "body" in comment && comment.body).toContain(
-        "last of these to merge closes",
-      );
+      expect(bodyOf(comment)).toContain("2 pull requests");
+      expect(bodyOf(comment)).toContain("#10 Change 10");
+      expect(bodyOf(comment)).toContain("#11 Change 11");
+      expect(bodyOf(comment)).toContain("last of these to merge closes");
     });
 
     it("says what closes the ticket with many", () => {
       const comment = run(opened(11), second, many).find((e) => e.type === "comment");
-      expect(comment && "body" in comment && comment.body).toContain(
-        "handed its work back as done",
-      );
+      expect(bodyOf(comment)).toContain("handed its work back as done");
     });
 
     it("does not comment on a first pull request, an agent's or a closed one", () => {

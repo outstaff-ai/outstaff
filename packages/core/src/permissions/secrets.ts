@@ -73,6 +73,18 @@ export function namesSecretsDir(policy: Policy, text: string): boolean {
 
 /** A word that names a credential file: the word itself, the value of `--opt=value` and an `@file` argument. */
 export function secretWord(policy: Policy, word: string, cwd: string): Decision | undefined {
+  for (const path of wordPaths(word)) {
+    const denied = secretPath(policy, path, cwd);
+    if (denied) {
+      return denied;
+    }
+  }
+
+  return undefined;
+}
+
+/** The paths a word may name: itself, the value of `--opt=value` and the file of `@file`; never an option or a URL. */
+function wordPaths(word: string): string[] {
   const candidates = [word];
   const eq = word.indexOf("=");
   if (eq > 0) {
@@ -83,46 +95,41 @@ export function secretWord(policy: Policy, word: string, cwd: string): Decision 
     candidates.push(word.slice(1));
   }
 
-  for (const c of candidates) {
-    if (c === "" || c.startsWith("-") || /^[a-z][a-z0-9+.-]*:\/\//i.test(c)) {
-      continue;
-    }
-
-    const abs = resolvePath(c, cwd, policy.home);
-    if (judgePath(policy.paths.read, abs) === "denied") {
-      return deny(`${abs} holds credentials; it is off limits.`, "paths.read.deny");
-    }
-
-    if (/[*?[]/.test(c) && patternReachesSecrets(policy, abs)) {
-      return deny(`The pattern ${abs} could expand to credentials.`, "paths.read.deny");
-    }
-  }
-
-  return undefined;
+  return candidates.filter(
+    (c) => c !== "" && !c.startsWith("-") && !/^[a-z][a-z0-9+.-]*:\/\//i.test(c),
+  );
 }
 
-export function envPrinting(program: string, args: string[]): Decision | undefined {
-  const printing = deny(
-    "Printing the environment is denied: it holds credentials.",
-    "secrets.environment",
-  );
+function secretPath(policy: Policy, path: string, cwd: string): Decision | undefined {
+  const abs = resolvePath(path, cwd, policy.home);
+  if (judgePath(policy.paths.read, abs) === "denied") {
+    return deny(`${abs} holds credentials; it is off limits.`, "paths.read.deny");
+  }
 
-  switch (program) {
-    case "printenv":
-      return printing;
-    case "export":
-      return args.every((a) => a === "-p") ? printing : undefined;
-    case "declare":
-    case "typeset":
-      return args.every((a) => a.startsWith("-")) ? printing : undefined;
-    case "set":
-      return args.length === 0 ? printing : undefined;
-    case "ps":
-      // BSD-style `e` (and `-E` on macOS) adds each process's environment to the listing.
-      return /^[a-zA-Z]*e[a-zA-Z]*$/.test(args[0] ?? "") || args.some((a) => /^-[a-zA-Z]*E/.test(a))
-        ? printing
-        : undefined;
-    default:
-      return undefined;
+  if (/[*?[]/.test(path) && patternReachesSecrets(policy, abs)) {
+    return deny(`The pattern ${abs} could expand to credentials.`, "paths.read.deny");
+  }
+}
+
+const printsAll = (args: string[]) => args.every((a) => a.startsWith("-"));
+
+/** Programs that print the environment, each with whether these arguments make it do so. */
+const ENV_PRINTERS = new Map<string, (args: string[]) => boolean>([
+  ["printenv", () => true],
+  ["export", (args) => args.every((a) => a === "-p")],
+  ["declare", printsAll],
+  ["typeset", printsAll],
+  ["set", (args) => args.length === 0],
+  // BSD-style `e` (and `-E` on macOS) adds each process's environment to the listing.
+  [
+    "ps",
+    (args) =>
+      /^[a-zA-Z]*e[a-zA-Z]*$/.test(args[0] ?? "") || args.some((a) => /^-[a-zA-Z]*E/.test(a)),
+  ],
+]);
+
+export function envPrinting(program: string, args: string[]): Decision | undefined {
+  if (ENV_PRINTERS.get(program)?.(args)) {
+    return deny("Printing the environment is denied: it holds credentials.", "secrets.environment");
   }
 }

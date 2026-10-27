@@ -4,21 +4,14 @@ import type {
   EffectiveTool,
   EffectiveToolsInput,
   RulePack,
+  Toolset,
 } from "./types.js";
 
 /** Person beats team beats toolset; the winning declaration replaces the others whole, so its `allow` is the only one. */
 export function effectiveTools(input: EffectiveToolsInput): EffectiveTool[] {
   const out = new Map<string, EffectiveTool>();
-  for (const ts of input.toolsets ?? []) {
-    for (const [name, t] of Object.entries(ts.tools ?? {})) {
-      out.set(name, {
-        ...t,
-        name,
-        origin: "toolset",
-        toolset: ts.name,
-        ...(ts.profiles ? { profiles: ts.profiles } : {}),
-      });
-    }
+  for (const tool of (input.toolsets ?? []).flatMap(toolsetTools)) {
+    out.set(tool.name, tool);
   }
 
   for (const [origin, tools] of [
@@ -31,6 +24,16 @@ export function effectiveTools(input: EffectiveToolsInput): EffectiveTool[] {
   }
 
   return [...out.values()].toSorted((a, b) => a.name.localeCompare(b.name));
+}
+
+function toolsetTools(ts: Toolset): EffectiveTool[] {
+  return Object.entries(ts.tools ?? {}).map(([name, t]) => ({
+    ...t,
+    name,
+    origin: "toolset",
+    toolset: ts.name,
+    ...(ts.profiles ? { profiles: ts.profiles } : {}),
+  }));
 }
 
 function toolRules(tool: EffectiveTool): CommandRule[] {

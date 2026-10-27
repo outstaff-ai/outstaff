@@ -1,5 +1,5 @@
 import { PortError } from "../ports/index.js";
-import type { PullRequest } from "../ports/index.js";
+import type { MergeMethod, MergeOptions, PullRequest } from "../ports/index.js";
 import type { FakeVcsState, StoredPr, VcsWrites } from "./vcs.types.js";
 
 /** What a fake vcs does as its own identity: opens, updates, reviews, merges, replies and reacts. */
@@ -135,20 +135,9 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
     async mergePullRequest(repo, number, input) {
       grant(repo, "write");
       const s = need(repo, number);
-      if (s.pr.state !== "open") {
-        throw new PortError("invalid", `${key(repo)}#${number} is ${s.pr.state}, not open.`);
-      }
-
-      if (input.sha !== s.pr.head.sha) {
-        throw new PortError(
-          "conflict",
-          `The head of ${key(repo)}#${number} moved since it was checked.`,
-        );
-      }
-
-      const options = settingsOf(repo);
-      if (input.method === "queue" ? !options.queue : !options.methods.includes(input.method)) {
-        throw new PortError("invalid", `${key(repo)} does not allow merging by ${input.method}.`);
+      const refused = mergeRefusal(key(repo), number, s, input, settingsOf(repo));
+      if (refused) {
+        throw refused;
       }
 
       const failing = (checks.get(`${key(repo)}@${s.pr.head.sha}`) ?? []).filter(
@@ -199,4 +188,25 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
       reactions.set(reactionKey(repo, target), set);
     },
   };
+}
+
+/** Why the merge request itself is refused: the pull request is not open, has moved, or the method is off. */
+function mergeRefusal(
+  repo: string,
+  number: number,
+  s: StoredPr,
+  input: { method: MergeMethod; sha: string },
+  options: MergeOptions,
+): PortError | undefined {
+  if (s.pr.state !== "open") {
+    return new PortError("invalid", `${repo}#${number} is ${s.pr.state}, not open.`);
+  }
+
+  if (input.sha !== s.pr.head.sha) {
+    return new PortError("conflict", `The head of ${repo}#${number} moved since it was checked.`);
+  }
+
+  if (input.method === "queue" ? !options.queue : !options.methods.includes(input.method)) {
+    return new PortError("invalid", `${repo} does not allow merging by ${input.method}.`);
+  }
 }

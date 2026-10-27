@@ -44,32 +44,59 @@ export const base = (word: string): string => word.slice(word.lastIndexOf("/") +
 
 export const isDynamic = (word: string): boolean => /[$`]/.test(word);
 
+const ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/;
+
+/** env options that take their value as the next word. */
+const ENV_VALUED = new Set(["-u", "-C", "--unset", "--chdir"]);
+
 /** The command `env` runs, or null when it runs none and so prints the environment. */
 export function envCommand(args: string[]): { words: string[] } | { script: string } | null {
-  let i = 0;
-  for (; i < args.length; i++) {
-    const a = args[i]!;
-    if (a === "--") {
-      i++;
-      break;
-    }
-
-    if (a === "-u" || a === "-C" || a === "--unset" || a === "--chdir") {
-      i++;
-    } else if (a === "-S" || a === "--split-string") {
-      return { script: args.slice(i + 1).join(" ") };
-    } else if (a.startsWith("--split-string=")) {
-      return { script: [a.slice(15), ...args.slice(i + 1)].join(" ") };
-    } else if (!a.startsWith("-")) {
-      break;
-    }
+  const options = readEnvOptions(args);
+  if ("script" in options) {
+    return options;
   }
 
-  while (i < args.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(args[i]!)) {
+  let i = options.next;
+  while (i < args.length && ASSIGNMENT.test(args[i]!)) {
     i++;
   }
 
   return i < args.length ? { words: args.slice(i) } : null;
+}
+
+/** Reads env's options: where its operands start, or the command line `-S` hands it as one string. */
+function readEnvOptions(args: string[]): { next: number } | { script: string } {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i]!;
+    if (a === "--") {
+      return { next: i + 1 };
+    }
+
+    const script = splitString(args, i);
+    if (script !== undefined) {
+      return { script };
+    }
+
+    if (ENV_VALUED.has(a)) {
+      i++;
+    } else if (!a.startsWith("-")) {
+      return { next: i };
+    }
+  }
+
+  return { next: args.length };
+}
+
+/** The script of a `-S`/`--split-string` option at `i`, which env splits into a command line of its own. */
+function splitString(args: string[], i: number): string | undefined {
+  const a = args[i]!;
+  if (a === "-S" || a === "--split-string") {
+    return args.slice(i + 1).join(" ");
+  }
+
+  if (a.startsWith("--split-string=")) {
+    return [a.slice(15), ...args.slice(i + 1)].join(" ");
+  }
 }
 
 /** The command a wrapper runs after its own options, or an empty list when it runs none. */

@@ -1,4 +1,4 @@
-import type { VcsSeed } from "../contracts/seeds.js";
+import type { NewSeedPullRequest, VcsSeed } from "../contracts/seeds.js";
 import { PortError } from "../ports/index.js";
 import type { PullRequest, ReviewInlineComment, ReviewThread } from "../ports/index.js";
 import type { FakeVcsState, StoredPr } from "./vcs.types.js";
@@ -37,20 +37,16 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
       const map = prs.get(key(repo)) ?? new Map<number, StoredPr>();
       prs.set(key(repo), map);
       const number = map.size + 1;
-      const pr: PullRequest = {
-        repo: withHost(repo),
-        number,
-        title: p.title,
-        body: p.body ?? "",
-        url: links.pr(repo, number),
-        author: p.author ?? { login: "sam", kind: "agent" },
-        head: { ref: p.head?.ref ?? `feat/${number}`, sha: p.head?.sha ?? newSha() },
-        base: { ref: p.base?.ref ?? "main" },
-        state: "open",
-        draft: p.draft ?? false,
-        mergeable: "unknown",
-        updatedAt: now().toISOString(),
-      };
+      const pr = seededPr(
+        p,
+        {
+          repo: withHost(repo),
+          number,
+          url: links.pr(repo, number),
+          updatedAt: now().toISOString(),
+        },
+        newSha,
+      );
 
       map.set(number, {
         pr,
@@ -201,4 +197,34 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
     },
     forbiddenCall: () => Promise.reject(new PortError("forbidden", "Forbidden.")),
   };
+}
+
+/** A seeded pull request: open, with what the seed gives and defaults for the rest. */
+function seededPr(
+  p: NewSeedPullRequest,
+  at: Pick<PullRequest, "repo" | "number" | "url" | "updatedAt">,
+  newSha: () => string,
+): PullRequest {
+  return {
+    repo: at.repo,
+    number: at.number,
+    title: p.title,
+    body: p.body ?? "",
+    url: at.url,
+    author: p.author ?? { login: "sam", kind: "agent" },
+    head: seededHead(p, at.number, newSha),
+    base: { ref: p.base?.ref ?? "main" },
+    state: "open",
+    draft: p.draft ?? false,
+    mergeable: "unknown",
+    updatedAt: at.updatedAt,
+  };
+}
+
+function seededHead(
+  p: NewSeedPullRequest,
+  number: number,
+  newSha: () => string,
+): PullRequest["head"] {
+  return { ref: p.head?.ref ?? `feat/${number}`, sha: p.head?.sha ?? newSha() };
 }

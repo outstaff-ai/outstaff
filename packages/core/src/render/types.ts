@@ -1,4 +1,4 @@
-import type { Catalog, CatalogRole } from "../catalog/types.js";
+import type { Catalog, CatalogContext, CatalogIssue, CatalogRole } from "../catalog/types.js";
 import type { TeamConfig } from "../config/types.js";
 
 export type RenderWarning = { code: string; message: string };
@@ -41,4 +41,14 @@ export type RenderToDirOptions = RenderPersonOptions & {
 
   /** Write into a non-empty directory. Existing files with the same path are overwritten. */
   force?: boolean;
+};
+
+/** Rendered output by path: rendered text, or the issues that rendering it raised. */
+export type RoleCache = Map<string, string | CatalogIssue[]>;
+
+/** What every document of one person renders with, and the output shared between people. */
+export type DocRendering = {
+  cache: RoleCache;
+  context: CatalogContext;
+  workdir: string | undefined;
 };

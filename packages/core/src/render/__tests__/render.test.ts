@@ -134,18 +134,21 @@ describe("golden output per acme person", () => {
       })),
     ];
 
+    const docPaths = (text: string) =>
+      [...text.matchAll(/\/?[\w./-]*\b(?:process|references|templates)\/[\w.-]+\.md\b/g)].map(
+        ([path]) => path,
+      );
+
     const dangling: string[] = [];
     for (const team of teams) {
       const handle = team.people[0]!.handle;
       const { files } = renderPerson({ team, handle, catalog: real, workdir: "/work/dir" });
       for (const [file, text] of files) {
-        for (const [path] of text.matchAll(
-          /\/?[\w./-]*\b(?:process|references|templates)\/[\w.-]+\.md\b/g,
-        )) {
-          if (!path.startsWith("/work/dir/") || !files.has(path.slice("/work/dir/".length))) {
-            dangling.push(`${file} -> ${path}`);
-          }
-        }
+        const missing = docPaths(text).filter(
+          (path) => !path.startsWith("/work/dir/") || !files.has(path.slice("/work/dir/".length)),
+        );
+
+        dangling.push(...missing.map((path) => `${file} -> ${path}`));
       }
     }
 

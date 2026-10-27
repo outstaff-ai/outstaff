@@ -1,70 +1,12 @@
-import type { RepoRef } from "../ports/types.js";
-import { livePrs, mentionedBy } from "./evaluate-check.js";
+import { mentionedBy } from "./evaluate-check.js";
 import type { Ctx, Resolved } from "./evaluate.types.js";
 import { BUILTIN_TEMPLATES, renderTemplate, TemplateError } from "./template.js";
-import type { Action, Effect, EffectTarget, PrRef, WorkflowPr, WorkflowState } from "./types.js";
+import { variables } from "./template-variables.js";
+import type { CanonicalStatus } from "../ports/types.js";
+import type { Action, Effect, EffectTarget, PrRef } from "./types.js";
 
-function stackOf(pr: WorkflowPr, state: WorkflowState): WorkflowPr[] {
-  const out: WorkflowPr[] = [pr];
-  const seen = new Set<string>([key(pr.ref)]);
-  let level: WorkflowPr[] = [pr];
-  for (let depth = 0; depth < 50 && level.length > 0; depth++) {
-    const next: WorkflowPr[] = [];
-    for (const p of level) {
-      for (const above of state.stackedOn(p.ref.repo, p.headRef)) {
-        if (seen.has(key(above.ref))) {
-          continue;
-        }
-
-        seen.add(key(above.ref));
-        next.push(above);
-      }
-    }
-
-    next.sort((a, b) => a.ref.number - b.ref.number);
-    out.push(...next);
-    level = next;
-  }
-
-  return out;
-}
-
-const repoName = (r: RepoRef) => `${r.owner}/${r.name}`;
-function key(ref: PrRef): string {
-  return `${repoName(ref.repo)}#${ref.number}`;
-}
-
-/** The template variables of an event (TEMPLATE_VARIABLES), every one present. */
-export function variables(ctx: Ctx): Record<string, string> {
-  const pr = ctx.pr;
-  const stack = pr ? stackOf(pr, ctx.state) : [];
-  const ticketPrs = ctx.ticket
-    ? livePrs(ctx.state.pullRequestsOf(ctx.ticket)).toSorted((a, b) => a.ref.number - b.ref.number)
-    : [];
-
-  return {
-    ticket: ctx.ticket ?? "",
-    status: (ctx.ticket && ctx.state.ticketStatus(ctx.ticket)) || "",
-    "actor.id": ctx.event.actor.id,
-    "actor.kind": ctx.event.actor.kind,
-    "event.type": ctx.event.type,
-    "pr.number": pr ? String(pr.ref.number) : "",
-    "pr.title": pr?.title ?? "",
-    "pr.url": pr?.url ?? "",
-    "pr.repo": pr ? repoName(pr.ref.repo) : "",
-    "pr.base": pr?.baseRef ?? "",
-    "pr.head": pr?.headRef ?? "",
-    "pr.author": pr?.author.person ?? pr?.author.login ?? "",
-    "ticket.prs": ticketPrs
-      .map((p) => `- #${p.ref.number} ${p.title}${p.url ? ` (${p.url})` : ""}`)
-      .join("\n"),
-    "ticket.prs.count": String(ticketPrs.length),
-    stack: stack
-      .map((p, i) => `${i + 1}. #${p.ref.number} ${p.title}${p.url ? ` (${p.url})` : ""}`)
-      .join("\n"),
-    "stack.count": String(stack.length),
-  };
-}
+type CommentSpec = Extract<Action, { comment: unknown }>["comment"];
+type ScheduleSpec = Extract<Action, { schedule: unknown }>["schedule"];
 
 /** The recorded requester, else the first listed human. */
 const requesterOf = (ctx: Ctx): string | undefined =>
@@ -75,58 +17,77 @@ const noRequester = (ctx: Ctx) =>
     ? `ticket ${ctx.ticket} has no known requester and there is no first-human fallback (the team lists no humans, or policies.hand_back.fallback is none)`
     : "event has no linked ticket";
 
+const agent = (id: string | undefined, skip: string): Resolved<EffectTarget> =>
+  id ? { value: { kind: "agent", id } } : { skip };
+
+/** Assignment targets with a name of their own; the rest are `human:<id>` and `role:<role>`. */
+const TARGETS = new Map<string, (ctx: Ctx) => Resolved<EffectTarget | null>>([
+  ["none", () => ({ value: null })],
+  [
+    "author",
+    (ctx) =>
+      agent(
+        ctx.pr?.author.kind === "agent" ? ctx.pr.author.person : undefined,
+        "pull request has no agent author",
+      ),
+  ],
+  [
+    "last_worker",
+    (ctx) =>
+      agent(
+        ctx.ticket ? ctx.state.lastWorker(ctx.ticket) : undefined,
+        "no agent has worked on the ticket yet",
+      ),
+  ],
+  ["mentioned", (ctx) => agent(mentionedBy(ctx.event)[0], "the comment mentions no agent")],
+  [
+    "requester",
+    (ctx) => {
+      const r = requesterOf(ctx);
+      return r ? { value: { kind: "human", id: r } } : { skip: noRequester(ctx) };
+    },
+  ],
+]);
+
 function assignTarget(spec: string, ctx: Ctx): Resolved<EffectTarget | null> {
-  if (spec === "none") {
-    return { value: null };
-  }
-
-  if (spec === "author") {
-    const agentId = ctx.pr?.author.kind === "agent" ? ctx.pr.author.person : undefined;
-    return agentId
-      ? { value: { kind: "agent", id: agentId } }
-      : { skip: "pull request has no agent author" };
-  }
-
-  if (spec === "last_worker") {
-    const p = ctx.ticket ? ctx.state.lastWorker(ctx.ticket) : undefined;
-    return p
-      ? { value: { kind: "agent", id: p } }
-      : { skip: "no agent has worked on the ticket yet" };
-  }
-
-  if (spec === "mentioned") {
-    const first = mentionedBy(ctx.event)[0];
-    return first
-      ? { value: { kind: "agent", id: first } }
-      : { skip: "the comment mentions no agent" };
-  }
-
-  if (spec === "requester") {
-    const r = requesterOf(ctx);
-    return r ? { value: { kind: "human", id: r } } : { skip: noRequester(ctx) };
+  const named = TARGETS.get(spec);
+  if (named) {
+    return named(ctx);
   }
 
   if (spec.startsWith("human:")) {
     return { value: { kind: "human", id: spec.slice(6) } };
   }
 
-  const agentId = ctx.state.personForRole(spec.slice(5));
-  return agentId ? { value: { kind: "agent", id: agentId } } : { skip: `no agent plays ${spec}` };
+  return agent(ctx.state.personForRole(spec.slice(5)), `no agent plays ${spec}`);
 }
+
+/** People to schedule work for that are not assignment targets. */
+const PEOPLE = new Map<string, (ctx: Ctx) => Resolved<string>>([
+  [
+    "doc_author",
+    (ctx) => {
+      const doc = ctx.event.subject.doc;
+      const author = doc ? ctx.state.docAuthor(doc) : undefined;
+      return author
+        ? { value: author }
+        : { skip: "no agent is recorded as the author of the document" };
+    },
+  ],
+  [
+    "assignee",
+    (ctx) => {
+      const a = ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined;
+      return a?.kind === "agent" ? { value: a.id } : { skip: "ticket is not assigned to an agent" };
+    },
+  ],
+]);
 
 /** The agent a schedule's `person` names (`author`, `assignee`, `mentioned`, `role:<role>` ...), or why there is none. */
 export function person(spec: string, ctx: Ctx): Resolved<string> {
-  if (spec === "doc_author") {
-    const doc = ctx.event.subject.doc;
-    const author = doc ? ctx.state.docAuthor(doc) : undefined;
-    return author
-      ? { value: author }
-      : { skip: "no agent is recorded as the author of the document" };
-  }
-
-  if (spec === "assignee") {
-    const a = ctx.ticket ? ctx.state.assignee(ctx.ticket) : undefined;
-    return a?.kind === "agent" ? { value: a.id } : { skip: "ticket is not assigned to an agent" };
+  const named = PEOPLE.get(spec);
+  if (named) {
+    return named(ctx);
   }
 
   const t = assignTarget(spec, ctx);
@@ -179,77 +140,87 @@ export function performAll(a: Action, ctx: Ctx): Resolved<Effect[]> {
   return "skip" in r ? r : { value: [r.value] };
 }
 
+const NEED_TICKET = { skip: "event has no linked ticket" } as const;
+
 function perform(a: Action, ctx: Ctx, forced?: string): Resolved<Effect> {
-  const { ticket } = ctx;
-  const needTicket = { skip: "event has no linked ticket" } as const;
   if ("move" in a) {
-    if (!ticket) {
-      return needTicket;
-    }
-
-    if (ctx.state.ticketStatus(ticket) === a.move) {
-      return { skip: `ticket is already ${a.move}` };
-    }
-
-    return { value: { type: "move", ticket, to: a.move } };
+    return move(a.move, ctx);
   }
 
   if ("assign" in a) {
-    if (!ticket) {
-      return needTicket;
-    }
-
-    const t = assignTarget(a.assign, ctx);
-    return "skip" in t ? t : { value: { type: "assign", ticket, to: t.value } };
+    return assign(a.assign, ctx);
   }
 
-  if ("comment" in a) {
-    const template = typeof a.comment === "string" ? a.comment : a.comment.template;
-    const on = typeof a.comment === "string" ? "ticket" : (a.comment.on ?? "ticket");
-    const target =
-      on === "pr"
-        ? ctx.event.subject.pr
-          ? { pr: ctx.event.subject.pr }
-          : undefined
-        : ticket
-          ? { ticket }
-          : undefined;
+  return "comment" in a ? comment(a.comment, ctx) : schedule(a.schedule, ctx, forced);
+}
 
-    if (!target) {
-      return { skip: on === "pr" ? "event has no pull request" : needTicket.skip };
-    }
-
-    const body = render(template, ctx);
-    return "skip" in body
-      ? body
-      : { value: { type: "comment", on: target, template, body: body.value } };
+function move(to: CanonicalStatus, ctx: Ctx): Resolved<Effect> {
+  const { ticket } = ctx;
+  if (!ticket) {
+    return NEED_TICKET;
   }
 
-  {
-    const p = forced === undefined ? person(a.schedule.person, ctx) : { value: forced };
-    if ("skip" in p) {
-      return p;
-    }
+  if (ctx.state.ticketStatus(ticket) === to) {
+    return { skip: `ticket is already ${to}` };
+  }
 
-    const e: Effect = {
+  return { value: { type: "move", ticket, to } };
+}
+
+function assign(spec: string, ctx: Ctx): Resolved<Effect> {
+  const { ticket } = ctx;
+  if (!ticket) {
+    return NEED_TICKET;
+  }
+
+  const t = assignTarget(spec, ctx);
+  return "skip" in t ? t : { value: { type: "assign", ticket, to: t.value } };
+}
+
+function comment(spec: CommentSpec, ctx: Ctx): Resolved<Effect> {
+  const template = typeof spec === "string" ? spec : spec.template;
+  const on = typeof spec === "string" ? "ticket" : (spec.on ?? "ticket");
+  const target = commentTarget(on, ctx);
+  if ("skip" in target) {
+    return target;
+  }
+
+  const body = render(template, ctx);
+  return "skip" in body
+    ? body
+    : { value: { type: "comment", on: target.value, template, body: body.value } };
+}
+
+function commentTarget(
+  on: "ticket" | "pr",
+  ctx: Ctx,
+): Resolved<{ ticket: string } | { pr: PrRef }> {
+  if (on === "pr") {
+    const pr = ctx.event.subject.pr;
+    return pr ? { value: { pr } } : { skip: "event has no pull request" };
+  }
+
+  return ctx.ticket ? { value: { ticket: ctx.ticket } } : NEED_TICKET;
+}
+
+/** Work for a person, on the event's ticket, pull request and document; `forced` names the person outright. */
+function schedule(spec: ScheduleSpec, ctx: Ctx, forced: string | undefined): Resolved<Effect> {
+  const p = forced === undefined ? person(spec.person, ctx) : { value: forced };
+  if ("skip" in p) {
+    return p;
+  }
+
+  const { pr, doc } = ctx.event.subject;
+
+  return {
+    value: {
       type: "schedule",
       person: p.value,
-      kind: a.schedule.kind,
-      priority: a.schedule.priority,
-    };
-
-    if (ticket) {
-      e.ticket = ticket;
-    }
-
-    if (ctx.event.subject.pr) {
-      e.pr = ctx.event.subject.pr;
-    }
-
-    if (ctx.event.subject.doc) {
-      e.doc = ctx.event.subject.doc;
-    }
-
-    return { value: e };
-  }
+      kind: spec.kind,
+      priority: spec.priority,
+      ...(ctx.ticket ? { ticket: ctx.ticket } : {}),
+      ...(pr ? { pr } : {}),
+      ...(doc ? { doc } : {}),
+    },
+  };
 }

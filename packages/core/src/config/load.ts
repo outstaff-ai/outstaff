@@ -31,6 +31,17 @@ const fail = (
 
 type Resolved = { source: ConfigSource; base: string } | { error: LoadResult };
 
+/** Where to load the team config from, and what to load it with. */
+type SourceRequest = {
+  target: string | undefined;
+  envRef: string | undefined;
+  cwd: string;
+  env: NodeJS.ProcessEnv;
+  fs: ConfigFs;
+  git: GitClient;
+  cacheDir: string | undefined;
+};
+
 /**
  * Precedence: explicit `team` option, then OUTSTAFF_TEAM_FILE, then
  * OUTSTAFF_TEAM_REPO (+ OUTSTAFF_TEAM_REF), then discovery in `cwd`.
@@ -39,21 +50,12 @@ export async function loadTeamConfig(options: LoadOptions = {}): Promise<LoadRes
   const cwd = resolve(options.cwd ?? process.cwd());
   const env = options.env ?? process.env;
   const fs = options.fs ?? nodeFs;
-  const git = options.git ?? nodeGit;
-
-  const target = options.team ?? env.OUTSTAFF_TEAM_FILE;
-  const envRepo =
-    options.team === undefined && !env.OUTSTAFF_TEAM_FILE ? env.OUTSTAFF_TEAM_REPO : undefined;
-
-  const ref = envRepo ? env.OUTSTAFF_TEAM_REF || undefined : undefined;
-
   const resolved = await resolveSource({
-    target: envRepo ?? target,
-    envRef: ref,
+    ...teamTarget(options.team, env),
     cwd,
     env,
     fs,
-    git,
+    git: options.git ?? nodeGit,
     cacheDir: options.cacheDir,
   });
 
@@ -62,22 +64,38 @@ export async function loadTeamConfig(options: LoadOptions = {}): Promise<LoadRes
   }
 
   const { source, base } = resolved;
-
+  const file = display(source, base, cwd);
   let text: string;
   try {
     text = await fs.readFile(source.file);
   } catch (err) {
     return {
-      ...fail(
-        display(source, base, cwd),
-        CONFIG_CODES.readFailed,
-        `Cannot read file: ${(err as Error).message}`,
-      ),
+      ...fail(file, CONFIG_CODES.readFailed, `Cannot read file: ${(err as Error).message}`),
       source,
     };
   }
 
-  const file = display(source, base, cwd);
+  return parseSource(text, file, source);
+}
+
+/** The `team` option or OUTSTAFF_TEAM_FILE; without either, OUTSTAFF_TEAM_REPO and its OUTSTAFF_TEAM_REF. */
+function teamTarget(
+  team: string | undefined,
+  env: NodeJS.ProcessEnv,
+): Pick<SourceRequest, "target" | "envRef"> {
+  if (team !== undefined || env.OUTSTAFF_TEAM_FILE) {
+    return { target: team ?? env.OUTSTAFF_TEAM_FILE, envRef: undefined };
+  }
+
+  const repo = env.OUTSTAFF_TEAM_REPO;
+
+  return {
+    target: repo ?? env.OUTSTAFF_TEAM_FILE,
+    envRef: repo ? env.OUTSTAFF_TEAM_REF || undefined : undefined,
+  };
+}
+
+function parseSource(text: string, file: string, source: ConfigSource): LoadResult {
   const parsed = parseYaml(text);
   if (parsed.syntaxErrors.length > 0) {
     return {
@@ -111,42 +129,47 @@ function display(source: ConfigSource, base: string, cwd: string): string {
   return rel === "" || rel.startsWith("..") || isAbsolute(rel) ? source.file : rel;
 }
 
-async function resolveSource(a: {
-  target: string | undefined;
-  envRef: string | undefined;
-  cwd: string;
-  env: NodeJS.ProcessEnv;
-  fs: ConfigFs;
-  git: GitClient;
-  cacheDir: string | undefined;
-}): Promise<Resolved> {
-  const { target, cwd, fs } = a;
-  if (target === undefined) {
-    return discoverUp(cwd, fs);
+async function resolveSource(a: SourceRequest): Promise<Resolved> {
+  if (a.target === undefined) {
+    return discoverUp(a.cwd, a.fs);
   }
 
-  const gitUrl = parseGitUrl(target);
-  if (gitUrl) {
-    const ref = gitUrl.ref ?? a.envRef;
-    const dir = join(a.cacheDir ?? defaultCacheDir(a.env), cacheKey(gitUrl.url, ref));
-    try {
-      await a.git.sync({ url: gitUrl.url, ...(ref ? { ref } : {}), dir });
-    } catch (err) {
-      const msg = `Cannot fetch ${gitUrl.url}${ref ? `#${ref}` : ""}: ${((err as { stderr?: string }).stderr || (err as Error).message).trim()}`;
-      return { error: fail(gitUrl.url, CONFIG_CODES.gitFailed, msg) };
-    }
+  const gitUrl = parseGitUrl(a.target);
 
-    return discover(dir, "git", fs, cwd, { repo: gitUrl.url, ...(ref ? { ref } : {}) });
+  return gitUrl ? gitSource(gitUrl, a) : pathSource(a.target, a);
+}
+
+/** A config repository, fetched into the cache. */
+async function gitSource(
+  gitUrl: { url: string; ref?: string | undefined },
+  a: SourceRequest,
+): Promise<Resolved> {
+  const ref = gitUrl.ref ?? a.envRef;
+  const refPart = ref ? { ref } : {};
+  const dir = join(a.cacheDir ?? defaultCacheDir(a.env), cacheKey(gitUrl.url, ref));
+  try {
+    await a.git.sync({ url: gitUrl.url, ...refPart, dir });
+  } catch (err) {
+    const msg = `Cannot fetch ${gitUrl.url}${ref ? `#${ref}` : ""}: ${errorText(err)}`;
+    return { error: fail(gitUrl.url, CONFIG_CODES.gitFailed, msg) };
   }
 
-  const path = resolve(cwd, target);
-  const kind = await fs.kind(path);
+  return discover(dir, "git", a.fs, a.cwd, { repo: gitUrl.url, ...refPart });
+}
+
+const errorText = (err: unknown): string =>
+  ((err as { stderr?: string }).stderr || (err as Error).message).trim();
+
+/** A named file, or a directory to look for the config in. */
+async function pathSource(target: string, a: SourceRequest): Promise<Resolved> {
+  const path = resolve(a.cwd, target);
+  const kind = await a.fs.kind(path);
   if (kind === "file") {
-    return { source: { kind: "file", file: path, dir: dirname(path) }, base: cwd };
+    return { source: { kind: "file", file: path, dir: dirname(path) }, base: a.cwd };
   }
 
   if (kind === "dir") {
-    return discover(path, "file", fs, cwd);
+    return discover(path, "file", a.fs, a.cwd);
   }
 
   return { error: fail(target, CONFIG_CODES.notFound, `No team config at ${path}.`) };
