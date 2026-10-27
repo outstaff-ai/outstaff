@@ -1,5 +1,6 @@
 import type { TeamConfig } from "#/config/types.js";
 import { policyOn, policyValue } from "#/policies/switches.js";
+import { PRESET_MOVES_TICKETS } from "#/workflow/presets.js";
 import type {
   CatalogContext,
   ContextExtras,
@@ -96,6 +97,12 @@ function integrationsOf(team: TeamConfig): CatalogContext["integrations"] {
   return { has, adapter };
 }
 
+/** Whether a ticket may have several pull requests, and whether the office makes the routine ticket moves. */
+const ticketsOf = (team: TeamConfig): CatalogContext["policies"]["tickets"] => ({
+  many_prs: policyValue(team.policies, "tickets.prs_per_ticket") === "many",
+  office_moves: PRESET_MOVES_TICKETS[team.workflow?.preset ?? "kanban"],
+});
+
 function policiesOf(team: TeamConfig): CatalogContext["policies"] {
   const messages = team.policies?.messages;
 
@@ -105,7 +112,7 @@ function policiesOf(team: TeamConfig): CatalogContext["policies"] {
       always_link: messages?.always_link ?? true,
       omit: messages?.omit ?? DEFAULT_OMIT,
     },
-    tickets: { many_prs: policyValue(team.policies, "tickets.prs_per_ticket") === "many" },
+    tickets: ticketsOf(team),
     design: { canvas: policyOn(team.policies, "design.canvas") },
   };
 }

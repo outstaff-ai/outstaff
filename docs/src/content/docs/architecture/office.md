@@ -5,9 +5,33 @@ description: How the office takes in events, tracks work and schedules agents.
 
 The office is one long-running process per team. It owns the store, talks to integrations only through adapters, and talks to agents only over the agent protocol. Each component below has its own section.
 
+## How an event flows
+
+```text
+code host, tracker, docs --> intake --> work state --+    chat.message (passed on by the agent)
+                                         |           |    skips the work state
+                   pr.conflicted,        |           v
+                   pr.ci_failed ---------+---> judge the event <--- agent.handed_back, agent.idle
+                                                     |               (raised by the office)
+                     off:    the engine's workflow rules decide; nothing is traced
+                     shadow: the event pipeline judges and traces first, then the rules decide
+                     live:   the event pipeline decides, and traces why
+                                                     |
+                   +---------------------------------+------------------------------+
+                   v                                 v                              v
+                 wake                               act                           drop
+       the scheduler queues a work      the office changes the tracker        the reason is on
+       item (coalesced, live)           for the agent, with a note            the trace
+                   |
+                   v
+       the agent connection offers the item with its journal and wake context
+```
+
+[Intake](#intake) records each event once and hands it on in order; the [work state](#work-state) applies it and raises the events no platform sends; the [engine](#engine) (pipeline off or shadow) or the [event pipeline](#event-pipeline) (live) decides; the [scheduler](#scheduler) runs the work; the [agent connection](#agent-connection) offers it with its [wake context](#wake-context). [What outstaff does on its own](/concepts/automation/) explains the decisions, the default policies and the modes from a team's point of view.
+
 ## Intake
 
-Intake turns activity in your repositories and tracker into deduplicated, normalized events for the workflow engine.
+Intake turns activity in your repositories, tracker, knowledge base and chat into deduplicated, normalized events for the work state and whichever of the event pipeline and the engine decides.
 
 ### Modes
 
@@ -18,7 +42,7 @@ Intake turns activity in your repositories and tracker into deduplicated, normal
 
 ### What the logs say
 
-Intake and the engine log at info level by default, so "the agent did not react" can be answered from the logs. Feeds are re-read with a 5-minute overlap, so the same events come back on every poll; those repeats are kept out of the info level.
+Intake, the engine and the pipeline log at info level by default, so "the agent did not react" can be answered from the logs; with the pipeline in shadow or live mode, `ost explain <event-id>` answers it in full. Feeds are re-read with a 5-minute overlap, so the same events come back on every poll; those repeats are kept out of the info level.
 
 - `intake: recorded <source> <type> on <repo#n or ticket> by <actor> (trusted|untrusted)` for every event kept. Info.
 - `intake: dropped <source> <type> on <subject>: <reason>` for every event read but not kept. The reason is that the adapter does not map the event type, that the office does not map it (for example `pr.synchronize`), or that it is a duplicate.
@@ -26,14 +50,16 @@ Intake and the engine log at info level by default, so "the agent did not react"
   - A duplicate of an event already recorded is always debug.
 - `engine: rule <id> matched <type> on <subject>: <effects>` for each rule that matched, then `engine: scheduled review_feedback for sam on acme/app#8` (or moved, assigned, commented) for each effect that was applied, and `engine: no rule matched <type> on <subject>` when none did. Feedback for a pull request whose `review_feedback` item is already queued or running is not an error: it is attached to that item and logged as `engine: attached to work item <id> (review_feedback, queued)` (or `running`). Other effects that were skipped or failed are warnings.
 - `engine: queued follow-up work item <id> for sam: 1 new feedback after <id> was offered` after a hand-back, when feedback was attached to the item after the agent was offered it.
+- Live, `pipeline: queued work item <id> for sam (review_feedback)` for each wake, or `pipeline: folded the wake into work item <id> for sam (review_feedback)` when it joined an item in its [coalescing](#coalescing) window. The pipeline's other decisions are on the trace, not in the log. A `pipeline.policies` entry the office cannot use is a warning at start (`pipeline: pipeline.policies.<id>: ...`).
+- `idle pull: queued work item <id> for sam on ACME-12` when an idle agent is given its next ready ticket with the pipeline off or in shadow mode.
 - A failed poll is an error. When a polled source has had no successful poll for `office.poll_warn_after_minutes` (default 10), each further failure also logs a warning with the minutes.
 
-| Level | Lines                                                                                                                                  |
-| ----- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| debug | duplicates of recorded events; unmapped events after their first sighting                                                              |
-| info  | recorded events; first sighting of an unmapped event; rule matches, no-match and applied effects; baseline set                         |
-| warn  | effects not applied; failing event handlers (before they are given up on); polls with no success past `office.poll_warn_after_minutes` |
-| error | failed polls; failed event delivery; events given up on                                                                                |
+| Level | Lines                                                                                                                                      |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| debug | duplicates of recorded events; unmapped events after their first sighting                                                                  |
+| info  | recorded events; first sighting of an unmapped event; rule matches, no-match and applied effects; pipeline wakes; idle pulls; baseline set |
+| warn  | effects not applied; failing event handlers (before they are given up on); polls with no success past `office.poll_warn_after_minutes`     |
+| error | failed polls; failed event delivery; events given up on                                                                                    |
 
 The office writes `info` and above. Set `OUTSTAFF_LOG_LEVEL` to `debug` to see the repeats as well (`info`, `warn` or `error` are the other values).
 
@@ -59,7 +85,7 @@ A failed poll never stops the loop.
 
 ### Normalized events
 
-| Source event                               | Workflow event                                                                                   |
+| Source event                               | Event                                                                                            |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
 | pull request opened, merged, closed        | `pr.opened`, `pr.merged`, `pr.closed`                                                            |
 | review submitted                           | `pr.review_submitted` (`data.state`)                                                             |
@@ -73,7 +99,7 @@ Document comments have no webhook and are not in the tracker's feed, so the offi
 
 Pushes to a pull request are not forwarded; `pr.conflicted` and `pr.ci_failed` come from the work state, not from intake. Every event carries `data.at`, the time the source reported.
 
-A chat message is not read from a source: the agent the message was written to passes it on (see [Chat requests and report-back](#chat-requests-and-report-back)). With `office.pipeline` in shadow or live mode, intake records it with `receive` as `chat.message`, source `chat`, id `<agent>:<channel>:<message id>`, and delivers it with the other events, in order and at least once. Its subject is the conversation: the thread of a reply or of a top-level message in a channel, and the whole direct message for its top-level messages, so quick follow-ups are one conversation. The actor is the human who wrote it (the agent passes on only trusted humans' messages), and `data` has the text (`body`), the agent it was written to (`addressed`) and the message itself. The work state and the engine never see it; only the [event pipeline](/decisions/0016-event-pipeline/) judges it.
+A chat message is not read from a source: the agent the message was written to passes it on (see [Chat requests and report-back](#chat-requests-and-report-back)). With `office.pipeline` in shadow or live mode, intake records it with `receive` as `chat.message`, source `chat`, id `<agent>:<channel>:<message id>`, and delivers it with the other events, in order and at least once. Its subject is the conversation: the thread of a reply or of a top-level message in a channel, and the whole direct message for its top-level messages, so quick follow-ups are one conversation. The actor is the human who wrote it (the agent passes on only trusted humans' messages), and `data` has the text (`body`), the agent it was written to (`addressed`) and the message itself. The work state and the engine never see it; only the [event pipeline](#event-pipeline) judges it. With the pipeline off it is not recorded: the chat desk routes it.
 
 ### Who acted, and whether to trust them
 
@@ -83,7 +109,7 @@ Each event has an actor kind.
 - **automation**: any other login ending in `[bot]`, or a tracker member of kind `agent` that is not a team person.
 - **human**: everyone else. A human is trusted when they have `write` or `admin` permission on the repository (looked up with `vcs.permission` and cached in the store for 10 minutes), or are listed in `humans:` when that list exists. Tracker members of kind `human` are trusted.
 
-Events from untrusted humans are still recorded and delivered, but carry `data.untrusted: true` (and `meta.trusted === false` in the handler) so the engine never treats them as instructions.
+Events from untrusted humans are still recorded and delivered, but carry `data.untrusted: true` (and `meta.trusted === false` in the handler) so neither the engine nor the pipeline ever treats them as instructions: the pipeline drops them with that reason on the trace.
 
 ### Using it
 
@@ -220,7 +246,7 @@ Every wake hands the agent what the office already knows about the work, so the 
 
 ## Work state
 
-The work state is the office's picture of the world: every live ticket and pull request, who owns it, whether CI is green, whether it merges cleanly, how many review threads are open, and which pull requests are stacked on which. It is built from intake events and from reading the ports, and it implements the read-only `WorkflowState` the workflow engine evaluates rules against.
+The work state is the office's picture of the world: every live ticket and pull request, who owns it, whether CI is green, whether it merges cleanly, how many review threads are open, and which pull requests are stacked on which. It is built from intake events and from reading the ports, and it implements the read-only `WorkflowState` that the engine's rules and the pipeline's policies are evaluated against.
 
 **Source of truth.** The latest state of each ticket and pull request is stored as a subject (`ticket` / `pr`) and the relations as links: `pr implements ticket`, `pr authored_by person`, `pr stacked_on pr`, `ticket assigned_to person`. A `workstate/index tracks ...` link marks the records the work state keeps. On start the state is rebuilt from the store. Losing the store only costs a `rescan()`.
 
@@ -233,9 +259,9 @@ The work state is the office's picture of the world: every live ticket and pull 
 - after `pr.merged`, every other open pull request in the repository is re-read waiting for the host to compute mergeability; one that now conflicts (including one that was still `unknown` before) raises `pr.conflicted`. If the host still has not decided, the next rescan catches it;
 - when the checks of an open pull request turn to failure, it raises `pr.ci_failed`.
 
-**Stacks and the end of a ticket.** `pr.merged` moves the ticket to done (`pr-merged-done`) only when the pull request targets the repository's default branch (`repos[].default_branch`) and no other pull request linked to the ticket is open. A pull request merged into another one's branch, or while another is open, leaves the ticket where it is, so the conflict on the next pull request of the stack (`pr.conflicted`) still goes to its author whatever the ticket's status (`conflict-back-to-author` needs only an open pull request by an agent), and the ticket goes back to active while that work runs. `pr.ci_failed` works the same way (`ci-failed-back-to-author`): an open agent pull request whose checks fail schedules a `ci_failed` round for its author, with the failing checks (names, links, summaries) as feedback, whatever the ticket's status; the work state raises it once per head commit.
+**Stacks and the end of a ticket.** The rule ids below are the engine's; live, the policies `merged_closes_ticket`, `rebase_to_author` and `ci_failed_to_author` decide the same. `pr.merged` moves the ticket to done (`pr-merged-done`) only when the pull request targets the repository's default branch (`repos[].default_branch`) and no other pull request linked to the ticket is open. A pull request merged into another one's branch, or while another is open, leaves the ticket where it is, so the conflict on the next pull request of the stack (`pr.conflicted`) still goes to its author whatever the ticket's status (`conflict-back-to-author` needs only an open pull request by an agent), and the ticket goes back to active while that work runs. `pr.ci_failed` works the same way (`ci-failed-back-to-author`): an open agent pull request whose checks fail schedules a `ci_failed` round for its author, with the failing checks (names, links, summaries) as feedback, whatever the ticket's status; the work state raises it once per head commit.
 
-Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`), so each is raised once per head commit. They are recorded with `store.recordEvent` before the new state is saved, then handed to the handlers registered with `onEvent` (the engine); a handler failure leaves the event unprocessed, and intake redelivers it. The first rescan of a pull request the work state did not know only sets a baseline and raises nothing.
+Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`), so each is raised once per head commit. They are recorded with `store.recordEvent` before the new state is saved, then handed to the handlers registered with `onEvent` (the engine, or the pipeline, as the mode says); a handler failure leaves the event unprocessed, and intake redelivers it. The first rescan of a pull request the work state did not know only sets a baseline and raises nothing.
 
 **When a ticket entered its status.** Each ticket records `statusSince`, when it entered its current status: the time of the tracker event that moved or created it, else the tracker's last update of the ticket when a rescan finds the change. It stays while the status stays; a move event restarts it even when the status reads the same (the ticket left and came back between two reads), but never back in time. Ordering uses these timestamps, never ids. A ticket also keeps the tracker's `priority` when the adapter reports one (`Issue.priority`, 1 the most urgent). `readyTickets(person)` lists the ready tickets an agent could start next, for the idle pull.
 
@@ -261,7 +287,7 @@ Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`)
 
 ## Chat requests and report-back
 
-A trusted human asks an agent for something in chat; the agent's chat relay (see [The agent](/architecture/agent/)) sends the message to the office with `chat_message`, and the office decides. The state lives in the store as subjects (`chat_origin` per item, `chat_thread` per thread, `chat_message` per message, `chat_log` with the latest messages of each thread), so it survives a restart. Each item also records its chat thread and message as [references](#wake-context).
+A trusted human asks an agent for something in chat; the agent's chat relay (see [The agent](/architecture/agent/)) sends the message to the office with `chat_message`, and the office decides. What follows is the chat desk's routing, which decides with the pipeline off or in shadow mode; live, the pipeline does (see [Chat in the event pipeline](#chat-in-the-event-pipeline)), and the desk keeps the filing verbs and the reports. The state lives in the store as subjects (`chat_origin` per item, `chat_thread` per thread, `chat_message` per message, `chat_log` with the latest messages of each thread), so it survives a restart. Each item also records its chat thread and message as [references](#wake-context).
 
 **A new top-level message** becomes a chat session for the asked person: trigger `human`, kind `chat`, subject the thread. It ranks first in the queue and is offered at once, beside the active work item, so a question is answered while a review round runs. There is no "busy" reply and no placement question. Its origin (channel, thread, requester) is recorded and offered with the item. The office files nothing itself, since many messages are questions: the session decides. If all `policies.chat.parallel_sessions` sessions are taken the result is `limited`, the agent says so briefly, and the message starts when a session ends.
 
@@ -298,12 +324,32 @@ Live, the desk is only the backend of the chat session's verbs (`work_link`, `wo
 
 ### Blocked hand-backs
 
-When an agent hands an item back as `blocked` (or as `done` on a ticket it left blocked), the preset rule `hand-back-blocked-to-requester` moves the ticket to `blocked`, assigns the requester, and routes the rest by `policies.hand_back.blocked_notify`:
+When an agent hands an item back as `blocked` (or as `done` on a ticket it left blocked), the preset rule `hand-back-blocked-to-requester` moves the ticket to `blocked`, assigns the requester, and routes the rest by `policies.hand_back.blocked_notify`. Live, the policy `hand_back_blocked` makes the move and the assignment; the PM's `unblock` round on a blocked hand-back is not in the default set yet. An item the scheduler blocks is routed as below in every mode.
 
 - `pm` (the default when the team has a PM role): the rule schedules an `unblock` round for the PM. The round is about the ticket, and carries the blocked agent and its last comment on the ticket (its hand-back summary when the ticket has no comment) as feedback, which the PM reads as data. The PM follows the catalog process `process/unblock.md`: try to unblock (answer, `ost ask` a teammate, re-plan) and give the ticket back to the agent, and only when a human is needed hand back as blocked with a final message that the PM's agent sends to the requester. The thread of a chat item always gets its agent's reply, whatever the switch says; the switch governs only the direct message for work with no chat origin. An item the scheduler blocked takes the same two routes, with the block reason as the data. An `unblock` round never moves or assigns the ticket and does not make the PM the agent who last worked on it, so a trusted human's comment on the ticket still sends it back to the blocked agent.
 - `agent`, and always for a team without a PM or when the blocked agent is the PM: no round is scheduled. The blocked agent tells the requester itself, right after the hand-back: in the thread of a chat item, otherwise in a direct message with the requester of the ticket (the first human when the ticket has none), with the ticket linked and what is needed. The direct message is opened by the agent's own chat identity, from `humans[].identities.chat`.
 
+## Event pipeline
+
+**Proposed** ([decision 0016](/decisions/0016-event-pipeline/)). The pipeline (`packages/office/src/pipeline`) judges each event against the team's policies: the [default set](/reference/pipeline-policies/) in order, with `pipeline.policies` applied. A `pipeline.policies` entry it cannot use (an unknown id, an instruction with an unknown variable) is logged as a warning when the office starts, and the default stays.
+
+**What it judges.** Every event intake delivers, after the work state applied it; the work state's own `pr.conflicted` and `pr.ci_failed`; `chat.message`; `agent.handed_back`, which the office raises when an agent hands an item back; and `agent.idle`, which the [idle pull](#idle-pull) raises. Two kinds are dropped before any policy is evaluated: an event from an untrusted human, and an inline comment of a review that is still pending. An event no policy matches is dropped with `no policy matched`.
+
+**The trace.** Every judged event gets one trace in the store, under the event's `<source>:<externalId>`: each policy that listens to it, whether it matched and why, the first condition that failed, and the decisions. In shadow mode it also records what the engine applied for the same event and how the two compare; live, the work item each wake queued or was folded into and the result of each act; in both, what the [wake context](#wake-context) carried. `ost explain` prints a trace, `ost explain --compare` sums up the comparison, and the [office link](#office-link) serves both.
+
+**Shadow.** The pipeline judges each event before the engine applies anything, so both judge the same state, then records what the engine did. It never throws, so it cannot hold up or fail the engine.
+
+**Live.** The pipeline judges instead of the engine.
+
+- A **wake** queues a work item for the person through the scheduler, with the trigger of the event's actor (an idle pull is `automation`), the event's feedback, its references, and the instruction as the item's first journal line, written by `office`. Wakes for the same person and subject [coalesce](#coalescing). A chat wake queues a chat session with the thread's origin, as the desk would.
+- An **act** is made by the office with its own tracker and knowledge ports, for the agent it names: the changes, then the policy's note as a comment on the ticket, saying whom they were for. Each act is made once per event and policy; its result goes on the trace, so a redelivered event does not repeat it.
+- Errors propagate, so intake delivers the event again; the trace, the queue and the acts are idempotent per event.
+
+The engine's item hooks still run live: moving a ticket to active when its work starts, follow-up rounds, and routing an item the scheduler blocked. What the engine's rules do that the default set does not yet is listed in [Modes](/concepts/automation/#modes).
+
 ## Engine
+
+With `office.pipeline` off or in shadow mode, the engine decides. Live, only its item hooks run (see [Event pipeline](#event-pipeline)).
 
 The engine (`createEngine`) is the glue between what happened and what the office does about it. It receives every event after the work state has applied it, asks the workflow what to do, and carries out the answer.
 
@@ -348,7 +394,7 @@ After a `move` or `assign` the engine refreshes the ticket in the work state str
 The office acts under its own name on every system it uses, named `<team>-outstaff-office`:
 
 - **Code host:** a read-only GitHub App (`GH_OFFICE_APP_*`). All reads go through it, and agents hold it too to clone read-granted repositories.
-- **Tracker:** its own member account (`ITSAPLAN_API_KEY` in the office scope), so its comments and assignments are visibly the office's.
+- **Tracker:** its own member account (`ITSAPLAN_API_KEY` in the office scope), so its comments and assignments are visibly the office's. Live, the pipeline's acts are made with it too, each with a note naming the agent it was for. This is the office's only write scope: ticket status, assignment, labels, parent links and those notes.
 - **Chat:** none, unless the team sets `office.channel`. The office posts to no person; the only thing it ever writes to chat is the mirror of agent-to-agent questions and answers in that team channel, through its own Slack app (`SLACK_OFFICE_BOT_TOKEN`), which has no app-level token because the office never listens to chat. Without `office.channel` the office has no chat port and needs no chat app; with it, `createOffice` creates the port in office scope and stops at startup with an error naming `SLACK_OFFICE_BOT_TOKEN` when the token is missing.
 
 **Why per-team apps.** Outstaff hosts no shared keys. A shared app would hold every team's installation behind one credential, and revoking or auditing one team would touch all. With one app per team, the team owns the credential, its permissions and its audit trail, and can remove it at will.
@@ -361,9 +407,9 @@ The office acts under its own name on every system it uses, named `<team>-outsta
 
 `createOffice` assembles the parts above into one process, and `outstaff-office` (the `bin` of `@outstaff/office`) starts it from the environment. The office image runs that command.
 
-**Wiring.** The office creates its ports from `integrations` in team.yaml through the adapter registry, with the office-scope secrets. Version control is required; the tracker and chat are used when configured. An adapter that is configured but not installed in the image stops the start with a message naming it. Events then flow in one fixed order: intake records an event, the work state applies it, the engine evaluates the workflow. The work state's own `pr.conflicted` and `pr.ci_failed` go straight to the engine. Every item the engine, the messaging or an agent queues goes through the scheduler, which tells the protocol server so the agent is offered the work at once. An item of kind `conflict` starts with the rebase steps for its pull request, including the pull requests stacked above it, in its journal.
+**Wiring.** The office creates its ports from `integrations` in team.yaml through the adapter registry, with the office-scope secrets. Version control is required; the tracker and chat are used when configured. An adapter that is configured but not installed in the image stops the start with a message naming it. Events then flow in one fixed order, as in [How an event flows](#how-an-event-flows): intake records an event, the work state applies it, then the pipeline and the engine judge it as `office.pipeline` says. The work state's own `pr.conflicted` and `pr.ci_failed` skip intake and are judged the same way. Every item the engine, the messaging or an agent queues goes through the scheduler, which tells the protocol server so the agent is offered the work at once. An item of kind `conflict` starts with the rebase steps for its pull request, including the pull requests stacked above it, in its journal.
 
-**Offers.** What was offered and what the agent accepted is stored (as `offer` subjects), so a restart offers again only what was not accepted. The offer carries the item's journal, the ticket and pull requests it concerns with their links, and `ost work` shows the agent's open items. When an agent hands an item back as `done`, the office raises `agent.handed_back` for the ticket, so the workflow moves it to review and assigns the requester. A `done` hand-back on a ticket that is `blocked` is treated as `blocked`: the ticket stays blocked, goes to the requester, and is routed as a [blocked hand-back](#blocked-hand-backs). The office does not move a blocked ticket to active when work on it starts, so a retry that is still blocked leaves it blocked; the agent runner also hands back as `blocked` an item that ends with its ticket still blocked in the tracker, when the agent moved nothing and asked nothing. When an item of a person finishes the work on a ticket that is no longer blocked, that person's earlier blocked items on the ticket are closed (canceled), so none is left behind. A repeated hand-back repeats nothing. The runtime session an agent reports for an item is stored with it and goes on the next offer. An agent that restarts gives back the items it had accepted with `decline`: they stay as they are (same run, journal and session, no new attempt) and are offered again. Agents report their usage windows with `usage`; see the usage policy above.
+**Offers.** What was offered and what the agent accepted is stored (as `offer` subjects), so a restart offers again only what was not accepted. The offer carries the item's journal, the ticket and pull requests it concerns with their links, and `ost work` shows the agent's open items. When an agent hands an item back as `done`, the office raises `agent.handed_back` for the ticket, so the rule `hand-back-to-requester` (live, the policy `hand_back_done`) moves it to review and assigns the requester. A `done` hand-back on a ticket that is `blocked` is treated as `blocked`: the ticket stays blocked, goes to the requester, and is routed as a [blocked hand-back](#blocked-hand-backs). The office does not move a blocked ticket to active when work on it starts, so a retry that is still blocked leaves it blocked; the agent runner also hands back as `blocked` an item that ends with its ticket still blocked in the tracker, when the agent moved nothing and asked nothing. When an item of a person finishes the work on a ticket that is no longer blocked, that person's earlier blocked items on the ticket are closed (canceled), so none is left behind. A repeated hand-back repeats nothing. The runtime session an agent reports for an item is stored with it and goes on the next offer. An agent that restarts gives back the items it had accepted with `decline`: they stay as they are (same run, journal and session, no new attempt) and are offered again. Agents report their usage windows with `usage`; see the usage policy above.
 
 **Start and stop.** `start()` opens the agent connection, then the work state (with one rescan) and intake, which redelivers any events that were recorded but not handled. `stop()` stops intake, lets running handlers finish, closes connections and the store. `SIGTERM` and `SIGINT` do this.
 
@@ -394,6 +440,10 @@ The `doctor` component sums up the doctor checks and is always `ok`. The same po
 ### Doctor checks
 
 The office runs the [doctor checks](/guides/doctor/#the-office-runs-the-checks-itself) of its own scope (its secrets, including each person's agent token, and each configured adapter's live checks) once it is running, every day at `office.doctor.daily_at` in the container's time zone, and on demand. A run in progress is joined, not repeated. Each agent runs its own checks (tools installed, services and devices reachable, home volume space) when it starts and sends them with `doctor_report`. The store keeps one row per scope and check with its status, message, fix, first seen and last seen; a run replaces its scope's rows, keeping the first-seen time of a check whose status did not change. Results go to the logs, the `doctor` health component, `/doctor` on the health port and the office link; the office never posts them.
+
+### Office link
+
+**Proposed** ([decision 0016](/decisions/0016-event-pipeline/)). With `link.url` in team.yaml and the secret `OUTSTAFF_LINK_TOKEN`, the office connects out over a WebSocket to a monitoring or management service, a dashboard for example. The service keeps no office data: it asks the office for people, events, one event's trace, work items, its health with the doctor checks, and the shadow comparison (`compare`), and the office tells it when people, traces or items change. An office that is offline shows nothing. See the [office link protocol](/reference/office-link/).
 
 ### Logs
 

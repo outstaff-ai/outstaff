@@ -13,7 +13,7 @@ Outstaff has five kinds of component. The hosting of the containers and the stor
 
 **Team config.** `.outstaff/team.yaml` in the client repository describes humans, people, repositories with read and write grants, integrations, workflow and policies. The CLI creates and updates it.
 
-**Office.** One container per team. It takes in events by polling or webhooks, keeps work state (tickets, pull requests, CI, reviews), runs a configurable workflow engine, schedules work items for each agent, routes agent-to-agent questions through messaging, and stores state in Postgres or SQLite.
+**Office.** One container per team. It takes in events by polling or webhooks, keeps work state (tickets, pull requests, CI, reviews), decides what to do about each event (with the workflow engine, or the proposed [event pipeline](/concepts/automation/) when it is live), schedules work items for each agent, routes agent-to-agent questions through messaging, and stores state in Postgres or SQLite.
 
 **Agent.** One container per person. `ost-agent` connects out to the office, so agents need no inbound network access. It runs work items through an LLM runtime adapter (the Claude Code CLI first), keeps a separate session, worktree and journal per work item, and gives the agent a small set of tracker-neutral `ost` verbs.
 
