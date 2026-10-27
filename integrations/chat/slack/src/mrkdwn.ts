@@ -114,6 +114,18 @@ function tableToCode(rows: string[]): string[] {
   ];
 }
 
+const isTableRow = (l: string) => l.trimStart().startsWith("|");
+
+/** The consecutive table rows from line `start` on. */
+function tableRows(lines: string[], start: number): string[] {
+  const rows: string[] = [];
+  for (let i = start; i < lines.length && isTableRow(lines[i]!); i++) {
+    rows.push(lines[i]!);
+  }
+
+  return rows;
+}
+
 /**
  * GitHub-flavoured markdown to Slack mrkdwn: bold, italics, strikethrough, links, headings as bold lines, bullets,
  * quotes, fenced code kept, tables as aligned code blocks (Slack has no tables).
@@ -127,20 +139,22 @@ export function toMrkdwn(markdown: string): string {
     if (FENCE.test(current)) {
       inCode = !inCode;
       out.push("```");
-    } else if (inCode) {
-      out.push(escapeSlack(current));
-    } else if (current.trimStart().startsWith("|") && TABLE_SEPARATOR.test(lines[i + 1] ?? "")) {
-      const rows: string[] = [];
-      while (i < lines.length && lines[i]!.trimStart().startsWith("|")) {
-        rows.push(lines[i]!);
-        i++;
-      }
-
-      i--;
-      out.push(...tableToCode(rows));
-    } else {
-      out.push(line(current));
+      continue;
     }
+
+    if (inCode) {
+      out.push(escapeSlack(current));
+      continue;
+    }
+
+    if (isTableRow(current) && TABLE_SEPARATOR.test(lines[i + 1] ?? "")) {
+      const rows = tableRows(lines, i);
+      i += rows.length - 1;
+      out.push(...tableToCode(rows));
+      continue;
+    }
+
+    out.push(line(current));
   }
 
   return out.join("\n");

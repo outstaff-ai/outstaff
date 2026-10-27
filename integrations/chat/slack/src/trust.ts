@@ -5,6 +5,8 @@ import type { Sender } from "./types.js";
 
 const TTL_MS = 10 * 60_000;
 
+const nameOf = (user: SlackUser) => user.profile?.display_name || user.real_name || user.name;
+
 /**
  * Who may talk to the agents. With a `humans` list in the team config: the people whose `identities.chat` is their
  * Slack member id, matched exactly. Names are never matched: any member can change their display name. Without one: full workspace members, so not guests (restricted or single-channel),
@@ -36,19 +38,18 @@ export function createTrust(deps: {
 
   const cache = new Map<string, { at: number; sender: Sender }>();
 
+  /** Listed humans when the team names any; otherwise full members, not guests. */
+  const isTrustedPerson = (id: string, user: SlackUser) =>
+    listed ? listed.has(id) : !user.is_restricted && !user.is_ultra_restricted;
+
   const classify = (id: string, user: SlackUser): Sender => {
-    const name = user.profile?.display_name || user.real_name || user.name;
+    const name = nameOf(user);
     const bot = Boolean(user.is_bot) || id === deps.botUserId();
-    const base = { bot, ...(name ? { name } : {}) };
-    if (bot || user.deleted) {
-      return { ...base, trusted: false };
-    }
-
-    if (listed) {
-      return { ...base, trusted: listed.has(id) };
-    }
-
-    return { ...base, trusted: !user.is_restricted && !user.is_ultra_restricted };
+    return {
+      bot,
+      ...(name ? { name } : {}),
+      trusted: !bot && !user.deleted && isTrustedPerson(id, user),
+    };
   };
 
   return {

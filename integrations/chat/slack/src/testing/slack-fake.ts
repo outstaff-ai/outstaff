@@ -8,6 +8,12 @@ export const BOT_TOKEN = "xoxb-test";
 export const FILES_HOST = "https://files.slack.com";
 
 /** A Slack platform error as the SDK throws it. */
+/** The optional thread and files of a message row or event. */
+const extrasOf = (thread: string | undefined, shared: SlackFile[]) => ({
+  ...(thread ? { thread_ts: thread } : {}),
+  ...(shared.length ? { files: shared } : {}),
+});
+
 export function slackError(error: string): Error {
   return Object.assign(new Error(`An API error occurred: ${error}`), {
     code: "slack_webapi_platform_error",
@@ -129,41 +135,40 @@ export function createFakeSlack(): FakeSlack {
     await handler?.(event);
   };
 
+  /** Trusted people are full members; the rest are guests, so the default trust rule decides. */
+  const ensureUser = (m: InboundMessage, bot: boolean) => {
+    if (!users.has(m.authorId)) {
+      users.set(m.authorId, {
+        id: m.authorId,
+        name: m.authorId.toLowerCase(),
+        is_bot: bot,
+        is_restricted: !(m.trusted ?? true),
+      });
+    }
+  };
+
+  const share = (attached: InboundMessage["files"] = []): SlackFile[] =>
+    attached.map((f) => {
+      const id = `F${files.size + 1}`;
+      files.set(id, f);
+      return {
+        id,
+        name: f.name,
+        mimetype: f.mimetype,
+        size: f.data.byteLength,
+        url_private_download: `${FILES_HOST}/files-pri/T0-${id}/download/${encodeURIComponent(f.name)}`,
+      };
+    });
+
   const seed: ChatSeed = {
     channel: "C-general",
     userId: "U-noor",
     async inbound(m: InboundMessage): Promise<ChatMessage> {
       const bot = m.bot ?? false;
-      if (!users.has(m.authorId)) {
-        // Trusted people are full members; the rest are guests, so the default trust rule decides.
-        users.set(m.authorId, {
-          id: m.authorId,
-          name: m.authorId.toLowerCase(),
-          is_bot: bot,
-          is_restricted: !(m.trusted ?? true),
-        });
-      }
-
+      ensureUser(m, bot);
       const ts = nextTs();
-      const shared: SlackFile[] = (m.files ?? []).map((f) => {
-        const id = `F${files.size + 1}`;
-        files.set(id, f);
-        return {
-          id,
-          name: f.name,
-          mimetype: f.mimetype,
-          size: f.data.byteLength,
-          url_private_download: `${FILES_HOST}/files-pri/T0-${id}/download/${encodeURIComponent(f.name)}`,
-        };
-      });
-
-      const row = {
-        ts,
-        text: m.text,
-        user: m.authorId,
-        ...(m.thread ? { thread_ts: m.thread } : {}),
-        ...(shared.length ? { files: shared } : {}),
-      };
+      const extras = extrasOf(m.thread, share(m.files));
+      const row = { ts, text: m.text, user: m.authorId, ...extras };
 
       inChannel(m.channel).push(row);
       await emit({
@@ -173,8 +178,7 @@ export function createFakeSlack(): FakeSlack {
         user: m.authorId,
         text: `<@${BOT_USER}> ${m.text}`,
         ...(bot ? { bot_id: m.authorId } : {}),
-        ...(m.thread ? { thread_ts: m.thread } : {}),
-        ...(shared.length ? { files: shared } : {}),
+        ...extras,
       });
 
       return {

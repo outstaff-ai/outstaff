@@ -1,7 +1,6 @@
 import { PortError } from "@outstaff/core";
+import { graphqlError, parseJson, reach, redirectTarget, toHttpError } from "./http-errors.js";
 import type { HttpConfig, HttpResult, RequestOptions } from "./types.js";
-
-const DEFAULT_SECONDARY_LIMIT_MS = 60_000;
 
 /** A small typed REST + GraphQL client. Every failure leaves here as a PortError. */
 export class GithubHttp {
@@ -19,9 +18,10 @@ export class GithubHttp {
    */
   async getRedirected(path: string, token: string): Promise<string> {
     const url = this.url(path);
-    let res: Response;
-    try {
-      res = await this.cfg.fetch(url, {
+    const res = await reach(
+      this.cfg.fetch,
+      url,
+      {
         method: "GET",
         redirect: "manual",
         headers: {
@@ -30,46 +30,12 @@ export class GithubHttp {
           "user-agent": "outstaff-vcs-github",
           authorization: `Bearer ${token}`,
         },
-      });
-    } catch (cause) {
-      throw new PortError("unavailable", `GitHub is unreachable: ${(cause as Error).message}`, {
-        cause,
-      });
-    }
+      },
+      "GitHub",
+    );
 
     if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get("location");
-      let target: URL;
-      try {
-        target = new URL(location ?? "", url);
-      } catch {
-        throw new PortError("unavailable", "GitHub redirected without a usable location.");
-      }
-
-      if (target.protocol !== "https:" && target.origin !== new URL(url).origin) {
-        throw new PortError("unavailable", "GitHub redirected to a URL that is not https.");
-      }
-
-      try {
-        res = await this.cfg.fetch(target.toString(), {
-          method: "GET",
-          headers: { "user-agent": "outstaff-vcs-github" },
-        });
-      } catch (cause) {
-        throw new PortError(
-          "unavailable",
-          `The log host is unreachable: ${(cause as Error).message}`,
-          {
-            cause,
-          },
-        );
-      }
-
-      if (!res.ok) {
-        throw new PortError("unavailable", `The log host answered ${res.status}.`);
-      }
-
-      return res.text();
+      return this.followRedirect(url, res.headers.get("location"));
     }
 
     const text = await res.text();
@@ -77,14 +43,7 @@ export class GithubHttp {
       return text;
     }
 
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : undefined;
-    } catch {
-      data = undefined;
-    }
-
-    throw this.toError("GET", url, res, data, text);
+    throw toHttpError({ method: "GET", url, now: this.cfg.now }, res, parseJson(text), text);
   }
 
   /** Follows `Link: rel="next"` and concatenates the pages (at most `maxPages`). */
@@ -116,21 +75,7 @@ export class GithubHttp {
 
     const { data, errors } = res.data;
     if (errors?.length) {
-      const first = errors[0]!;
-      const code =
-        first.type === "NOT_FOUND"
-          ? "not_found"
-          : first.type === "FORBIDDEN" || first.type === "INSUFFICIENT_SCOPES"
-            ? "forbidden"
-            : first.type === "RATE_LIMITED"
-              ? "rate_limited"
-              : "invalid";
-
-      throw new PortError(
-        code,
-        `GitHub GraphQL: ${first.message}`,
-        code === "rate_limited" ? { retryAfterMs: DEFAULT_SECONDARY_LIMIT_MS } : {},
-      );
+      throw graphqlError(errors[0]!);
     }
 
     if (data === undefined) {
@@ -170,97 +115,40 @@ export class GithubHttp {
       headers["content-type"] = "application/json";
     }
 
-    let res: Response;
-    try {
-      res = await this.cfg.fetch(url, {
-        method,
-        headers,
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      });
-    } catch (cause) {
-      throw new PortError("unavailable", `GitHub is unreachable: ${(cause as Error).message}`, {
-        cause,
-      });
-    }
+    const res = await reach(
+      this.cfg.fetch,
+      url,
+      { method, headers, ...(body === undefined ? {} : { body: JSON.stringify(body) }) },
+      "GitHub",
+    );
 
     if (res.status === 304) {
       return { status: 304, data: undefined as T, text: "", headers: res.headers };
     }
 
     const text = await res.text();
-    let data: unknown;
-    try {
-      data = text ? JSON.parse(text) : undefined;
-    } catch {
-      data = undefined;
-    }
-
+    const data = parseJson(text);
     if (res.ok) {
       return { status: res.status, data: data as T, text, headers: res.headers };
     }
 
-    throw this.toError(method, url, res, data, text);
+    throw toHttpError({ method, url, now: this.cfg.now }, res, data, text);
   }
 
-  private toError(
-    method: string,
-    url: string,
-    res: Response,
-    data: unknown,
-    text: string,
-  ): PortError {
-    const message =
-      (data as { message?: string } | undefined)?.message ?? (text.slice(0, 200) || res.statusText);
+  /** Reads a redirect's target without the token, so the credential never travels to the other host. */
+  private async followRedirect(url: string, location: string | null): Promise<string> {
+    const res = await reach(
+      this.cfg.fetch,
+      redirectTarget(url, location),
+      { method: "GET", headers: { "user-agent": "outstaff-vcs-github" } },
+      "The log host",
+    );
 
-    const what = `${method} ${new URL(url).pathname}: ${res.status} ${message}`;
-    const retryAfter = res.headers.get("retry-after");
-    const remaining = res.headers.get("x-ratelimit-remaining");
-    const limited =
-      res.status === 429 ||
-      (res.status === 403 &&
-        (retryAfter !== null || remaining === "0" || /rate limit/i.test(message)));
-
-    if (limited) {
-      return new PortError("rate_limited", `GitHub rate limit: ${what}`, {
-        retryAfterMs: this.retryAfterMs(res.headers),
-      });
+    if (!res.ok) {
+      throw new PortError("unavailable", `The log host answered ${res.status}.`);
     }
 
-    if (res.status === 401 || res.status === 403) {
-      return new PortError("forbidden", `GitHub refused: ${what}`);
-    }
-
-    if (res.status === 404) {
-      return new PortError("not_found", `GitHub: ${what}`);
-    }
-
-    if (res.status === 409) {
-      return new PortError("conflict", `GitHub: ${what}`);
-    }
-
-    if (res.status === 422 || res.status === 400) {
-      return new PortError("invalid", `GitHub: ${what}`);
-    }
-
-    if (res.status >= 500) {
-      return new PortError("unavailable", `GitHub: ${what}`);
-    }
-
-    return new PortError("invalid", `GitHub: ${what}`);
-  }
-
-  private retryAfterMs(headers: Headers): number {
-    const retryAfter = Number(headers.get("retry-after"));
-    if (headers.get("retry-after") !== null && Number.isFinite(retryAfter)) {
-      return Math.max(0, retryAfter * 1000);
-    }
-
-    const reset = Number(headers.get("x-ratelimit-reset"));
-    if (headers.get("x-ratelimit-reset") !== null && Number.isFinite(reset)) {
-      return Math.max(0, reset * 1000 - this.cfg.now().getTime());
-    }
-
-    return DEFAULT_SECONDARY_LIMIT_MS;
+    return res.text();
   }
 }
 

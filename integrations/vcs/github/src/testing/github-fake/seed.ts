@@ -1,25 +1,32 @@
 import type { NewSeedPullRequest, VcsSeed } from "@outstaff/core/contracts";
 import type { FakeState, FakeVcsRef, StoredPull } from "../types.js";
 
+/** The login a seeded author has on the host: an agent acts through its App's bot. */
+const seedLogin = (author: NewSeedPullRequest["author"]): string =>
+  (author?.login ?? "sam") + (author?.kind === "agent" ? "[bot]" : "");
+
 /** Seeds the fake the way the contract suite drives a host: pull requests, pushes, reviews, checks and more. */
 export function createSeed(s: FakeState, vcsRef: FakeVcsRef): VcsSeed {
   const { repo, counters: n, prs, checks, jobs, threads, reactions, issueComments, perms } = s;
   const { emit, need, domain, touch, prPayload, submitReview, clockIso } = s;
+  const nextSha = () => (++n.sha).toString(16).padStart(40, "0");
+  const seedHead = (head: NewSeedPullRequest["head"], number: number) => ({
+    ref: head?.ref ?? `feat/${number}`,
+    sha: head?.sha ?? nextSha(),
+  });
+
   return {
     repo,
     selfLogin: "sam",
     async pullRequest(_repo, p: NewSeedPullRequest) {
       const number = prs.size + 1;
-      const login = (p.author?.login ?? "sam") + (p.author?.kind === "agent" ? "[bot]" : "");
+      const login = seedLogin(p.author);
       const pr: StoredPull = {
         number,
         title: p.title,
         body: p.body ?? "",
         login,
-        head: {
-          ref: p.head?.ref ?? `feat/${number}`,
-          sha: p.head?.sha ?? (++n.sha).toString(16).padStart(40, "0"),
-        },
+        head: seedHead(p.head, number),
         base: { ref: p.base?.ref ?? "main" },
         state: "open",
         merged: false,
@@ -34,7 +41,7 @@ export function createSeed(s: FakeState, vcsRef: FakeVcsRef): VcsSeed {
     },
     async push(_repo, number, actor) {
       const pr = need(number);
-      pr.head = { ...pr.head, sha: (++n.sha).toString(16).padStart(40, "0") };
+      pr.head = { ...pr.head, sha: nextSha() };
       touch(pr);
       emit("PullRequestEvent", actor, prPayload(pr, "synchronize"));
       return domain(pr);

@@ -1,7 +1,12 @@
-import { PortError, maskSecrets, type Check, type Vcs } from "@outstaff/core";
+import { PortError, maskSecrets, type Check, type RepoRef, type Vcs } from "@outstaff/core";
 import { failedStepNames, failedSteps } from "../check-log.js";
 import { actionsJobId, checkRunStatus, checkSummary, commitStatusState } from "../mapping.js";
-import type { RequiredChecksData, RestCheckRun } from "../api.types.js";
+import type {
+  RequiredChecksData,
+  RestCheckRun,
+  RollupContext,
+  RollupContexts,
+} from "../api.types.js";
 import { repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 
@@ -13,11 +18,57 @@ const DEFAULT_TAIL = 200;
 const REQUIRED_CHECKS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){commits(last:1){nodes{commit{statusCheckRollup{contexts(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{__typename ... on CheckRun{name status conclusion detailsUrl isRequired(pullRequestNumber:$number)} ... on StatusContext{context state targetUrl isRequired(pullRequestNumber:$number)}}}}}}}}}}`;
 const REQUIRED_CHECK_PAGES = 5;
 
+function requiredCheck(ctx: RollupContext, fallback: string): Check {
+  if (ctx.__typename === "CheckRun") {
+    return {
+      name: ctx.name,
+      status: checkRunStatus({
+        name: ctx.name,
+        status: ctx.status.toLowerCase(),
+        conclusion: ctx.conclusion?.toLowerCase() ?? null,
+      }),
+      url: ctx.detailsUrl ?? fallback,
+    };
+  }
+
+  return {
+    name: ctx.context,
+    status: commitStatusState(ctx.state.toLowerCase()),
+    url: ctx.targetUrl ?? fallback,
+  };
+}
+
 /** CI checks on a commit, the logs of failed jobs, and the checks a pull request requires. */
 export function checkOperations(
   c: GithubContext,
 ): Pick<Vcs, "checks" | "checkLog" | "requiredChecks"> {
   const { http, secrets, self, links, apiToken, actingToken } = c;
+
+  /** One page of the status check rollup of the pull request's head commit; undefined when it has none. */
+  async function rollupPage(
+    repo: RepoRef,
+    number: number,
+    token: string,
+    after: string | null,
+  ): Promise<RollupContexts | undefined> {
+    const data = await http.graphql<RequiredChecksData>(token, REQUIRED_CHECKS_QUERY, {
+      owner: repo.owner,
+      name: repo.name,
+      number,
+      after,
+    });
+
+    const pr = data.repository?.pullRequest;
+    if (!pr) {
+      throw new PortError(
+        "not_found",
+        `Pull request ${repo.owner}/${repo.name}#${number} not found.`,
+      );
+    }
+
+    return pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
+  }
+
   return {
     async checks(repo, sha) {
       const token = await apiToken(repo);
@@ -106,45 +157,9 @@ export function checkOperations(
       const out: Check[] = [];
       let after: string | null = null;
       for (let page = 0; page < REQUIRED_CHECK_PAGES; page++) {
-        const data: RequiredChecksData = await http.graphql<RequiredChecksData>(
-          token,
-          REQUIRED_CHECKS_QUERY,
-          { owner: repo.owner, name: repo.name, number, after },
-        );
-
-        const pr = data.repository?.pullRequest;
-        if (!pr) {
-          throw new PortError(
-            "not_found",
-            `Pull request ${repo.owner}/${repo.name}#${number} not found.`,
-          );
-        }
-
-        const contexts = pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
-        for (const c of contexts?.nodes ?? []) {
-          if (!c.isRequired) {
-            continue;
-          }
-
-          out.push(
-            c.__typename === "CheckRun"
-              ? {
-                  name: c.name,
-                  status: checkRunStatus({
-                    name: c.name,
-                    status: c.status.toLowerCase(),
-                    conclusion: c.conclusion?.toLowerCase() ?? null,
-                  }),
-                  url: c.detailsUrl ?? fallback,
-                }
-              : {
-                  name: c.context,
-                  status: commitStatusState(c.state.toLowerCase()),
-                  url: c.targetUrl ?? fallback,
-                },
-          );
-        }
-
+        const contexts = await rollupPage(repo, number, token, after);
+        const required = (contexts?.nodes ?? []).filter((ctx) => ctx.isRequired);
+        out.push(...required.map((ctx) => requiredCheck(ctx, fallback)));
         if (!contexts?.pageInfo.hasNextPage) {
           break;
         }

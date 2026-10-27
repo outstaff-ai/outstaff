@@ -5,6 +5,7 @@ import {
   type ReviewThread,
   type Vcs,
 } from "@outstaff/core";
+import type { AppAuth } from "../auth.js";
 import { stripBot } from "../mapping.js";
 import type { RestPull, RestReviewComment, ThreadNode, ThreadsData } from "../api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
@@ -22,6 +23,39 @@ const REVIEW_EVENTS = {
   request_changes: "REQUEST_CHANGES",
   comment: "COMMENT",
 } as const;
+
+const NO_OWN_APP = "Resolving review threads needs this container's own GitHub App.";
+
+/** GraphQL reports Apps without the "[bot]" suffix that REST uses. */
+function sameLogin(a: string, b: string): boolean {
+  return stripBot(a).toLowerCase() === stripBot(b).toLowerCase();
+}
+
+/** The bot login of this container's own App, which resolves threads when no login is given. */
+async function botLogin(app: AppAuth | undefined): Promise<string> {
+  if (!app) {
+    throw new PortError("forbidden", NO_OWN_APP);
+  }
+
+  return `${await app.slug()}[bot]`;
+}
+
+/** This container's own App, as long as it is the one acting as `asLogin`. */
+async function resolverApp(app: AppAuth | undefined, asLogin: string): Promise<AppAuth> {
+  if (!app) {
+    throw new PortError("forbidden", NO_OWN_APP);
+  }
+
+  const slug = await app.slug();
+  if (stripBot(asLogin).toLowerCase() !== slug.toLowerCase()) {
+    throw new PortError(
+      "forbidden",
+      `Only ${slug}[bot] can resolve threads from this container, not ${asLogin}.`,
+    );
+  }
+
+  return app;
+}
 
 type ReviewOperations =
   | "reviewThreads"
@@ -62,6 +96,23 @@ export function reviewOperations(c: GithubContext): Pick<Vcs, ReviewOperations> 
     }
 
     return nodes;
+  }
+
+  /** A review thread with the author of its last comment. */
+  async function lastComment(token: string, threadId: string) {
+    const read = await http.graphql<{
+      node: {
+        id: string;
+        isResolved: boolean;
+        comments: { nodes: { author: { login: string } | null }[] };
+      } | null;
+    }>(token, LAST_COMMENT_QUERY, { id: threadId });
+
+    if (!read.node?.id) {
+      throw new PortError("not_found", `Review thread ${threadId} not found.`);
+    }
+
+    return read.node;
   }
 
   return {
@@ -120,56 +171,23 @@ export function reviewOperations(c: GithubContext): Pick<Vcs, ReviewOperations> 
 
     async resolveThread(repo, threadId, login) {
       const app = own();
-      const asLogin = login ?? (app ? `${await app.slug()}[bot]` : undefined);
-      if (asLogin === undefined) {
-        throw new PortError(
-          "forbidden",
-          "Resolving review threads needs this container's own GitHub App.",
-        );
-      }
-
-      const token = await apiToken(repo);
-      const read = await http.graphql<{
-        node: {
-          id: string;
-          isResolved: boolean;
-          comments: { nodes: { author: { login: string } | null }[] };
-        } | null;
-      }>(token, LAST_COMMENT_QUERY, { id: threadId });
-
-      if (!read.node?.id) {
-        throw new PortError("not_found", `Review thread ${threadId} not found.`);
-      }
-
-      if (read.node.isResolved) {
+      const asLogin = login ?? (await botLogin(app));
+      const node = await lastComment(await apiToken(repo), threadId);
+      if (node.isResolved) {
         return { resolved: true };
       }
 
-      const last = read.node.comments.nodes[0]?.author?.login;
-      // GraphQL reports Apps without the "[bot]" suffix that REST uses.
-      if (!last || stripBot(last).toLowerCase() !== stripBot(asLogin).toLowerCase()) {
+      const last = node.comments.nodes[0]?.author?.login;
+      if (!last || !sameLogin(last, asLogin)) {
         return {
           resolved: false,
           reason: `The last comment is by ${last ?? "an unknown author"}, not ${asLogin}; reply or let the reviewer resolve it.`,
         };
       }
 
-      if (!app) {
-        throw new PortError(
-          "forbidden",
-          "Resolving review threads needs this container's own GitHub App.",
-        );
-      }
-
-      if (stripBot(asLogin).toLowerCase() !== (await app.slug()).toLowerCase()) {
-        throw new PortError(
-          "forbidden",
-          `Only ${await app.slug()}[bot] can resolve threads from this container, not ${asLogin}.`,
-        );
-      }
-
+      const resolver = await resolverApp(app, asLogin);
       await http.graphql(
-        (await app.token(repo, { repositories: [repo.name], permissions: PERMISSIONS.write }))
+        (await resolver.token(repo, { repositories: [repo.name], permissions: PERMISSIONS.write }))
           .token,
         RESOLVE_MUTATION,
         { id: threadId },

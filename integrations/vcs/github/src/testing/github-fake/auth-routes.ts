@@ -1,6 +1,10 @@
 import { appOf, installationOf, personOf } from "./requests.js";
 import type { FakeState, Route } from "../types.js";
 
+/** Whether a seeded permission level lets an installation mint the token it asks for. */
+const grants = (level: string, wantsWrite: boolean): boolean =>
+  wantsWrite ? level === "write" || level === "admin" : level !== "none";
+
 /** The App endpoints: installations, installation tokens, the App itself and bot users. */
 export function authRoutes(s: FakeState): Route[] {
   const { repo, perms } = s;
@@ -16,10 +20,8 @@ export function authRoutes(s: FakeState): Route[] {
       handler: (r) => {
         const person = personOf(Number(r.params["id"]) - 1000);
         // An App with no seeded permission is fully granted; seeding a lower level withdraws it.
-        const level = person ? (perms.get(person) ?? "write") : "write";
-        const wantsWrite = r.json?.permissions?.contents === "write";
-        const allowed = wantsWrite ? level === "write" || level === "admin" : level !== "none";
-        if (!allowed) {
+        const level = (person ? perms.get(person) : undefined) ?? "write";
+        if (!grants(level, r.json?.permissions?.contents === "write")) {
           return {
             status: 422,
             body: { message: "The permissions requested are not granted to this installation." },

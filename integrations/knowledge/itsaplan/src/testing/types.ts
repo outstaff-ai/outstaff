@@ -21,3 +21,13 @@ export type ItsaplanFake = TrackerFake & {
   state: TrackerFake["state"] & { docs: StoredDoc[]; docComments: StoredDocComment[] };
   knowledgeSeed: KnowledgeSeed;
 };
+
+/** The body of a request that comments on a document. */
+export interface NewDocComment {
+  body: string;
+  parentId?: string;
+  quote?: string;
+  from?: number;
+  to?: number;
+  version: number;
+}

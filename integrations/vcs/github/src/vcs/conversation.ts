@@ -6,6 +6,43 @@ import type { GithubContext } from "./types.js";
 // A long conversation has more than the default ten pages; the newest entries are on the last ones.
 const CONVERSATION_PAGES = 50;
 
+function commentEntry(c: RestIssueComment): ConversationEntry {
+  return {
+    id: `comment-${c.id}`,
+    kind: "comment",
+    author: c.user?.login ?? "ghost",
+    at: c.created_at,
+    url: c.html_url,
+    body: c.body ?? "",
+  };
+}
+
+/** Pending reviews are invisible to others; one with neither text nor verdict only wraps inline comments. */
+function isVisibleReview(r: RestReview, state: string): r is RestReview & { submitted_at: string } {
+  return (
+    Boolean(r.submitted_at) && state !== "pending" && (state !== "commented" || !!r.body?.trim())
+  );
+}
+
+function reviewEntry(r: RestReview): ConversationEntry[] {
+  const state = r.state.toLowerCase();
+  if (!isVisibleReview(r, state)) {
+    return [];
+  }
+
+  return [
+    {
+      id: `review-${r.id}`,
+      kind: "review",
+      author: r.user?.login ?? "ghost",
+      at: r.submitted_at,
+      url: r.html_url,
+      body: r.body ?? "",
+      state,
+    },
+  ];
+}
+
 /** A pull request's conversation, its review state, and reactions on its comments. */
 export function conversationOperations(
   c: GithubContext,
@@ -35,37 +72,8 @@ export function conversationOperations(
 
       const since = opts.since === undefined ? undefined : Date.parse(opts.since);
       const entries: ConversationEntry[] = [
-        ...comments.map((c): ConversationEntry => ({
-          id: `comment-${c.id}`,
-          kind: "comment",
-          author: c.user?.login ?? "ghost",
-          at: c.created_at,
-          url: c.html_url,
-          body: c.body ?? "",
-        })),
-        ...reviews.flatMap((r): ConversationEntry[] => {
-          const state = r.state.toLowerCase();
-          // Pending reviews are invisible to others; one with neither text nor verdict only wraps inline comments.
-          if (
-            !r.submitted_at ||
-            state === "pending" ||
-            (state === "commented" && !r.body?.trim())
-          ) {
-            return [];
-          }
-
-          return [
-            {
-              id: `review-${r.id}`,
-              kind: "review",
-              author: r.user?.login ?? "ghost",
-              at: r.submitted_at,
-              url: r.html_url,
-              body: r.body ?? "",
-              state,
-            },
-          ];
-        }),
+        ...comments.map(commentEntry),
+        ...reviews.flatMap(reviewEntry),
       ]
         .filter((e) => since === undefined || Date.parse(e.at) >= since)
         .toSorted((a, b) => Date.parse(a.at) - Date.parse(b.at));

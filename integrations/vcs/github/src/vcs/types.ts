@@ -1,4 +1,12 @@
-import type { RepoRef, SecretSource, Vcs, repoGrant } from "@outstaff/core";
+import type {
+  RepoRef,
+  SecretSource,
+  UnmappedEvent,
+  Vcs,
+  VcsEvent,
+  repoGrant,
+} from "@outstaff/core";
+import type { Cursor } from "../api.types.js";
 import type { AppAuth } from "../auth.js";
 import type { GithubHttp } from "../http.js";
 
@@ -32,4 +40,32 @@ export interface GithubContext {
     permissions: Record<string, "read" | "write">,
     optionalPermissions?: Record<string, "read" | "write">,
   ) => Promise<{ token: string; app: AppAuth }>;
+}
+
+/** Where the last poll of one repository's event feed left off. */
+export interface FeedPosition {
+  /** Time of the newest event read before; NaN when the cursor has no valid entry for the repository. */
+  since: number;
+  unknown: boolean;
+
+  /** A cursor that lacks this repository: this poll only baselines it (#229). */
+  baseline: boolean;
+  etag: string | undefined;
+
+  /** Ids already read at baseline time, which the overlap would otherwise hand back as news. */
+  skip: Set<string>;
+}
+
+/** A mapped event with the time and id it is ordered by. */
+export interface FoundEvent {
+  event: VcsEvent;
+  at: number;
+  id: bigint;
+}
+
+/** What one poll of a repository's event feed read, and the cursor entry to store for it. */
+export interface RepoPoll {
+  entry: Cursor[string];
+  found: FoundEvent[];
+  unmapped: UnmappedEvent[];
 }

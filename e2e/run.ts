@@ -337,6 +337,65 @@ function hire() {
 
 // ---------------------------------------------------------------- the run
 
+/** The image of each Dockerfile target the stack runs. The tags are the defaults of compose.e2e.yaml. */
+const IMAGES = [
+  ["office", "outstaff/office:local"],
+  ["agent-e2e", "outstaff/agent-e2e:local"],
+  ["e2e-stubs", "outstaff/e2e-stubs:local"],
+] as const;
+
+/** Builds one image. Docker Hub answers the frontend lookup with a gateway error now and then; a build is worth a retry. */
+async function buildWithRetry(target: string, tag: string) {
+  let build = buildImage(target, tag);
+  for (let attempt = 1; build.status !== 0 && attempt < 3; attempt++) {
+    await sleep(5_000);
+    build = buildImage(target, tag);
+  }
+
+  if (build.status !== 0) {
+    throw new Error(`The ${target} image did not build:\n${build.stdout}${build.stderr}`);
+  }
+}
+
+async function buildImages() {
+  if (process.env["E2E_PREBUILT"] === "1") {
+    return;
+  }
+
+  for (const [target, tag] of IMAGES) {
+    await buildWithRetry(target, tag);
+  }
+
+  step("images: built office, agent-e2e and stubs");
+}
+
+/** Runs a compose command; fails with `what` and the command's output when it does not succeed. */
+function dcOrFail(what: string, ...args: string[]) {
+  const out = dc(...args);
+  if (out.status !== 0) {
+    throw new Error(`${what}:\n${out.stdout}${out.stderr}`);
+  }
+}
+
+const samConnected = () => /"agent connected","person":"sam"/.test(logs("office"));
+
+/** Brings up the stubs and the office, then the agent, and waits until it connects to the office. */
+async function startStack() {
+  const healthy = ["--wait", "--wait-timeout", "240"];
+  dcOrFail("The stack did not come up", "up", "-d", ...healthy, "stubs", "office");
+  step("stack: stubs, Postgres and the office are healthy");
+  dcOrFail("The agent did not start", "up", "-d", "--no-deps", "sam");
+  for (let i = 0; i < 60 && !samConnected(); i++) {
+    await sleep(1_000);
+  }
+
+  if (!samConnected()) {
+    throw new Error("The agent never connected to the office.");
+  }
+
+  step("agent: sam connected to the office");
+}
+
 async function main() {
   hire();
   step("hire: ost hire developer sam, architect mira and pm pia, team file validates");
@@ -355,48 +414,8 @@ async function main() {
     STUB_HOME_TOKEN: homeToken,
   };
 
-  if (process.env["E2E_PREBUILT"] !== "1") {
-    // The tags are the defaults of compose.e2e.yaml.
-    for (const [target, tag] of [
-      ["office", "outstaff/office:local"],
-      ["agent-e2e", "outstaff/agent-e2e:local"],
-      ["e2e-stubs", "outstaff/e2e-stubs:local"],
-    ] as const) {
-      // Docker Hub answers the frontend lookup with a gateway error now and then; a build is worth a retry.
-      let build = buildImage(target, tag);
-      for (let attempt = 1; build.status !== 0 && attempt < 3; attempt++) {
-        await sleep(5_000);
-        build = buildImage(target, tag);
-      }
-
-      if (build.status !== 0) {
-        throw new Error(`The ${target} image did not build:\n${build.stdout}${build.stderr}`);
-      }
-    }
-
-    step("images: built office, agent-e2e and stubs");
-  }
-
-  const up = dc("up", "-d", "--wait", "--wait-timeout", "240", "stubs", "office");
-  if (up.status !== 0) {
-    throw new Error(`The stack did not come up:\n${up.stdout}${up.stderr}`);
-  }
-
-  step("stack: stubs, Postgres and the office are healthy");
-  const sam = dc("up", "-d", "--no-deps", "sam");
-  if (sam.status !== 0) {
-    throw new Error(`The agent did not start:\n${sam.stdout}${sam.stderr}`);
-  }
-
-  for (let i = 0; i < 60 && !/"agent connected","person":"sam"/.test(logs("office")); i++) {
-    await sleep(1_000);
-  }
-
-  if (!/"agent connected","person":"sam"/.test(logs("office"))) {
-    throw new Error("The agent never connected to the office.");
-  }
-
-  step("agent: sam connected to the office");
+  await buildImages();
+  await startStack();
 
   // ---- 1. a human assigns a ticket; the office schedules it; the agent clones, commits, pushes, opens a pull request
   const { key: first } = await stub("POST", "/_test/tickets", { title: "Add a greeting" });

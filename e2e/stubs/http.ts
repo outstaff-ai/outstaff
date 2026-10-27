@@ -72,55 +72,73 @@ export const readBody = (req: IncomingMessage): Promise<Buffer> =>
     req.on("error", reject);
   });
 
+const BAD_JSON = Symbol("bad json");
+
+/** The JSON body when the request declares one, `undefined` without one, `BAD_JSON` when it doesn't parse. */
+function parseJson(req: IncomingMessage, body: Buffer): unknown {
+  if (!body.length || !String(req.headers["content-type"] ?? "").includes("json")) {
+    return undefined;
+  }
+
+  try {
+    return JSON.parse(body.toString("utf8"));
+  } catch {
+    return BAD_JSON;
+  }
+}
+
+function writeReply(res: ServerResponse, out: unknown): void {
+  const reply: Reply = isReply(out) ? out : { body: out };
+  const status = reply.status ?? 200;
+  if (reply.buffer) {
+    res.writeHead(status, reply.headers ?? {}).end(reply.buffer);
+    return;
+  }
+
+  const noBody = status === 304 || status === 204;
+  res
+    .writeHead(status, { "content-type": "application/json", ...reply.headers })
+    .end(noBody ? undefined : JSON.stringify(reply.body ?? {}));
+}
+
 export function router(routes: Route[]) {
   const compiled = routes.map((r) => ({ r, match: compile(r.path) }));
+  const find = (method: string, pathname: string) => {
+    for (const { r, match } of compiled) {
+      const params = r.method === method ? match(pathname) : undefined;
+      if (params) {
+        return { r, params };
+      }
+    }
+
+    return undefined;
+  };
+
   return async (req: IncomingMessage, res: ServerResponse, body: Buffer): Promise<boolean> => {
     const url = new URL(req.url ?? "/", "http://stub");
     const method = (req.method ?? "GET").toUpperCase();
-    for (const { r, match } of compiled) {
-      if (r.method !== method) {
-        continue;
-      }
+    const found = find(method, url.pathname);
+    if (!found) {
+      return false;
+    }
 
-      const params = match(url.pathname);
-      if (!params) {
-        continue;
-      }
-
-      let json: unknown;
-      if (body.length && String(req.headers["content-type"] ?? "").includes("json")) {
-        try {
-          json = JSON.parse(body.toString("utf8"));
-        } catch {
-          res.writeHead(400, { "content-type": "application/json" }).end('{"message":"bad json"}');
-          return true;
-        }
-      }
-
-      const out = await r.handler({
-        method,
-        path: decodeURIComponent(url.pathname),
-        query: url.searchParams,
-        headers: req.headers,
-        params,
-        raw: body,
-        json,
-      });
-
-      const reply: Reply = isReply(out) ? out : { body: out };
-      const status = reply.status ?? 200;
-      if (reply.buffer) {
-        res.writeHead(status, reply.headers ?? {}).end(reply.buffer);
-      } else {
-        const noBody = status === 304 || status === 204;
-        res
-          .writeHead(status, { "content-type": "application/json", ...reply.headers })
-          .end(noBody ? undefined : JSON.stringify(reply.body ?? {}));
-      }
-
+    const json = parseJson(req, body);
+    if (json === BAD_JSON) {
+      res.writeHead(400, { "content-type": "application/json" }).end('{"message":"bad json"}');
       return true;
     }
 
-    return false;
+    const out = await found.r.handler({
+      method,
+      path: decodeURIComponent(url.pathname),
+      query: url.searchParams,
+      headers: req.headers,
+      params: found.params,
+      raw: body,
+      json,
+    });
+
+    writeReply(res, out);
+    return true;
   };
 }

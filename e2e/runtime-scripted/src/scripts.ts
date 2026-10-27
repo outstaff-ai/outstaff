@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import type { ItemContext } from "./prompt.js";
+import type { Feedback, ItemContext } from "./prompt.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
 const body = (text: string) => /\n\n(\{.*\})\n/.exec(text)?.[1] ?? "(no body)";
@@ -145,17 +145,15 @@ async function* mustBeDenied(command: string, cwd: string): AsyncGenerator<Actio
 const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
 
 /**
- * A ticket is assigned: take it, change the file, push, open the pull request, and ask when the ticket says so. A
- * ticket that says `split: <title>` needs two pull requests, so it is split first: a sub-ticket with that title, the
- * parent told about it, then one pull request each (and a second one for the parent, which is refused).
+ * Moves the ticket to active, unless it says `blocked: <what>`: a retry of a ticket that is still blocked moves
+ * nothing, and a new one is blocked. Returns the message to stop with, or undefined to go on.
  */
-export async function* assigned(ctx: ItemContext): Script {
-  const key = need(ctx.ticket, "the ticket");
-  const cwd = need(ctx.worktree, "the worktree");
-  const repo = need(ctx.repo, "the repository");
-  const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
-  // A retry of a ticket that is blocked and still has its blocker: the agent moves nothing.
+async function* takeTicket(
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
   const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
+  // A retry of a ticket that is blocked and still has its blocker: the agent moves nothing.
   if (blocker && /^Status: .*\(blocked\)/m.test(shown)) {
     return `Still blocked: ${blocker}`;
   }
@@ -168,6 +166,11 @@ export async function* assigned(ctx: ItemContext): Script {
     return `Stopped: ${blocker}`;
   }
 
+  return undefined;
+}
+
+/** The toolset works in the worktree, ordinary shell work runs in the sandbox, and the hard denies still hold. */
+async function* checkSandbox(cwd: string): AsyncGenerator<Action, void, string> {
   // The toolset's tools work in the worktree: the mise shim has a version set, not just an install behind it.
   const pnpm = (yield { type: "shell", command: "CI=1 pnpm --version", cwd }).trim();
   if (!/^\d+\.\d+\.\d+/.test(pnpm)) {
@@ -185,101 +188,129 @@ export async function* assigned(ctx: ItemContext): Script {
   for (const command of ["env", "cat /proc/self/environ", "git push origin main", "sudo true"]) {
     yield* mustBeDenied(command, cwd);
   }
+}
 
-  // A ticket that says `network: <what>` asks for the services the team granted: the hub needs no token, the home
-  // service does (added by the verb, never shown), and a service that was not granted is refused.
-  if (/^network: /m.test(shown)) {
-    const hub = yield {
-      type: "tool",
-      tool: "http",
-      input: { service: "hub", method: "GET", path: "/hub/status" },
-    };
+/**
+ * A ticket that says `network: <what>` asks for the services the team granted: the hub needs no token, the home
+ * service does (added by the verb, never shown), and a service that was not granted is refused.
+ */
+async function* checkNetwork(key: string): AsyncGenerator<Action, string, string> {
+  const hub = yield {
+    type: "tool",
+    tool: "http",
+    input: { service: "hub", method: "GET", path: "/hub/status" },
+  };
 
-    const home = yield {
-      type: "tool",
-      tool: "http",
-      input: { service: "home", method: "GET", path: "/hub/secure" },
-    };
+  const home = yield {
+    type: "tool",
+    tool: "http",
+    input: { service: "home", method: "GET", path: "/hub/secure" },
+  };
 
-    let refusal = "";
-    try {
-      yield {
-        type: "tool",
-        tool: "http",
-        input: { service: "other", method: "GET", path: "/hub/status" },
-      };
-    } catch (e) {
-      refusal = String(e);
-    }
-
-    if (!refusal.includes("is not an HTTP service granted")) {
-      throw new Error(`The ungranted service was not refused: ${refusal}`);
-    }
-
+  let refusal = "";
+  try {
     yield {
       type: "tool",
-      tool: "ticket_comment",
-      input: {
-        key,
-        body: `Network check: hub ${body(hub)}; home ${body(home)}; other refused.`,
-      },
+      tool: "http",
+      input: { service: "other", method: "GET", path: "/hub/status" },
     };
-
-    return `Reached hub and home; other was refused.`;
+  } catch (e) {
+    refusal = String(e);
   }
 
-  // A ticket that says `which repo: unclear` names no repository, and there are two the agent can write to: the
-  // agent asks in the ticket, linking the candidates, and waits. It does not take whichever one it was given.
+  if (!refusal.includes("is not an HTTP service granted")) {
+    throw new Error(`The ungranted service was not refused: ${refusal}`);
+  }
+
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `Network check: hub ${body(hub)}; home ${body(home)}; other refused.`,
+    },
+  };
+
+  return `Reached hub and home; other was refused.`;
+}
+
+/**
+ * A ticket that says `which repo: unclear` names no repository, and there are two the agent can write to: the agent
+ * asks in the ticket, linking the candidates, and waits. It does not take whichever one it was given. Returns the
+ * message to stop with, or undefined when the repository is clear.
+ */
+async function* askWhichRepo(
+  ctx: ItemContext,
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
   const writable = (ctx.repos ?? []).filter((r) => r.access === "write");
-  if (/^which repo: unclear$/m.test(shown) && writable.length > 1) {
-    const named = writable.filter((r) => shown.includes(r.name) || shown.includes(r.location));
-    if (named.length !== 1) {
-      const candidates = writable.map((r) => `\`${r.name}\` (${r.location})`).join(" or ");
-      yield {
-        type: "tool",
-        tool: "ask",
-        input: {
-          to: "architect",
-          question: `Which repository is ${key} for: ${candidates}? The ticket does not say, so I have changed nothing.`,
-        },
-      };
-
-      return `Asked which repository ${key} is for; waiting for the answer. No change made.`;
-    }
+  if (!/^which repo: unclear$/m.test(shown) || writable.length <= 1) {
+    return undefined;
   }
 
-  const part = /^split: (.+)$/m.exec(shown)?.[1];
-  let sub: { key: string; url: string } | undefined;
-  if (part) {
-    const created = yield {
-      type: "tool",
-      tool: "ticket_create",
-      input: {
-        title: part,
-        body: `The second pull request of ${key}.`,
-        parent: key,
-        assignee: "me",
-        status: "active",
-      },
-    };
-
-    const subKey = /^Created (\S+?)\./m.exec(created)?.[1];
-    if (!subKey) {
-      throw new Error(`ticket_create did not say which ticket it created: ${created}`);
-    }
-
-    sub = { key: subKey, url: firstUrl(created) };
-    yield {
-      type: "tool",
-      tool: "ticket_comment",
-      input: { key, body: `Split: ${part} is ${sub.key}, ${sub.url}. One pull request each.` },
-    };
+  const named = writable.filter((r) => shown.includes(r.name) || shown.includes(r.location));
+  if (named.length === 1) {
+    return undefined;
   }
 
-  // The worktree is detached at the default branch: now that the work is known, name the branch by the repo's rules.
-  const rules = yield* conventions(ctx, cwd);
-  const branch = branchFor(rules, key, subject(ctx.title));
-  yield { type: "shell", command: `git switch -c ${q(branch)}`, cwd };
+  const candidates = writable.map((r) => `\`${r.name}\` (${r.location})`).join(" or ");
+  yield {
+    type: "tool",
+    tool: "ask",
+    input: {
+      to: "architect",
+      question: `Which repository is ${key} for: ${candidates}? The ticket does not say, so I have changed nothing.`,
+    },
+  };
+
+  return `Asked which repository ${key} is for; waiting for the answer. No change made.`;
+}
+
+/** The sub-ticket a split ticket's second pull request is for. */
+interface SubTicket {
+  key: string;
+  url: string;
+  title: string;
+}
+
+/** Splits the ticket: a sub-ticket with the given title, and the parent told about it. */
+async function* splitTicket(key: string, title: string): AsyncGenerator<Action, SubTicket, string> {
+  const created = yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: {
+      title,
+      body: `The second pull request of ${key}.`,
+      parent: key,
+      assignee: "me",
+      status: "active",
+    },
+  };
+
+  const subKey = /^Created (\S+?)\./m.exec(created)?.[1];
+  if (!subKey) {
+    throw new Error(`ticket_create did not say which ticket it created: ${created}`);
+  }
+
+  const sub = { key: subKey, url: firstUrl(created), title };
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: { key, body: `Split: ${title} is ${sub.key}, ${sub.url}. One pull request each.` },
+  };
+
+  return sub;
+}
+
+/** Makes the ticket's change on the new branch, commits and pushes it. */
+async function* pushChange(
+  ctx: ItemContext,
+  cwd: string,
+  key: string,
+  branch: string,
+  sub: SubTicket | undefined,
+): AsyncGenerator<Action, void, string> {
   if (sub) {
     yield { type: "write", path: `${cwd}/${PART_ONE}`, text: `goodbye from ${key}\n` };
   } else {
@@ -296,48 +327,58 @@ export async function* assigned(ctx: ItemContext): Script {
   };
 
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
-  const opened = yield {
+}
+
+/**
+ * The sub-ticket's pull request, on a branch of its own from the default branch, in a file of its own; then a second
+ * pull request for the parent, which is refused naming the one it has.
+ */
+async function* openSubTicketPr(
+  ctx: ItemContext,
+  opts: { key: string; sub: SubTicket; rules: string; branch: string; url: string },
+): AsyncGenerator<Action, string, string> {
+  const { key, sub, rules, branch, url } = opts;
+  const cwd = need(ctx.worktree, "the worktree");
+  const repo = need(ctx.repo, "the repository");
+  const second = branchFor(rules, sub.key, sub.title);
+  yield { type: "shell", command: "git fetch --prune origin", cwd };
+  yield { type: "shell", command: `git switch -c ${q(second)} origin/main`, cwd };
+  yield { type: "write", path: `${cwd}/${PART_TWO}`, text: `goodbye from ${sub.key}\n` };
+  yield { type: "shell", command: "git add -A", cwd };
+  yield { type: "shell", command: `git commit -m ${q(`${sub.key}: ${sub.title}`)}`, cwd };
+  yield { type: "shell", command: `git push origin ${q(second)}`, cwd };
+  const opened2 = yield {
     type: "tool",
     tool: "pr_open",
-    input: { repo, title: `${key}: ${subject(ctx.title)}`, body: `Closes ${key}\n` },
+    input: { repo, title: `${sub.key}: ${sub.title}`, body: `Closes ${sub.key}\n` },
   };
 
-  const url = firstUrl(opened);
-  if (sub) {
-    // The sub-ticket's change is on a branch of its own, from the default branch, in a file of its own.
-    const second = branchFor(rules, sub.key, part!);
-    yield { type: "shell", command: "git fetch --prune origin", cwd };
-    yield { type: "shell", command: `git switch -c ${q(second)} origin/main`, cwd };
-    yield { type: "write", path: `${cwd}/${PART_TWO}`, text: `goodbye from ${sub.key}\n` };
-    yield { type: "shell", command: "git add -A", cwd };
-    yield { type: "shell", command: `git commit -m ${q(`${sub.key}: ${part}`)}`, cwd };
-    yield { type: "shell", command: `git push origin ${q(second)}`, cwd };
-    const opened2 = yield {
+  // Back on the parent's branch: the branch names the ticket a pull request links to.
+  yield { type: "shell", command: `git switch ${q(branch)}`, cwd };
+  // A second pull request for the parent is refused; the answer names the pull request it has.
+  try {
+    yield {
       type: "tool",
       tool: "pr_open",
-      input: { repo, title: `${sub.key}: ${part}`, body: `Closes ${sub.key}\n` },
+      input: { repo, title: `${key}: more of the same`, body: `Closes ${key}\n` },
     };
-
-    // Back on the parent's branch: the branch names the ticket a pull request links to.
-    yield { type: "shell", command: `git switch ${q(branch)}`, cwd };
-    // A second pull request for the parent is refused; the answer names the pull request it has.
-    try {
-      yield {
-        type: "tool",
-        tool: "pr_open",
-        input: { repo, title: `${key}: more of the same`, body: `Closes ${key}\n` },
-      };
-    } catch (e) {
-      if (!String(e).includes(url)) {
-        throw new Error(`The refusal does not name ${url}.`, { cause: e });
-      }
-
-      return `Opened ${url} and ${firstUrl(opened2)}, one per ticket (${key}, ${sub.key}).`;
+  } catch (e) {
+    if (!String(e).includes(url)) {
+      throw new Error(`The refusal does not name ${url}.`, { cause: e });
     }
 
-    throw new Error(`A second pull request for ${key} was not refused.`);
+    return `Opened ${url} and ${firstUrl(opened2)}, one per ticket (${key}, ${sub.key}).`;
   }
 
+  throw new Error(`A second pull request for ${key} was not refused.`);
+}
+
+/** What the ticket asks for beside its pull request: a design document, or a question to the architect. */
+async function* followUpOnTicket(
+  key: string,
+  shown: string,
+  url: string,
+): AsyncGenerator<Action, string, string> {
   // A ticket that asks for a design document gets one next to its pull request.
   const design = /^doc: (.+)$/m.exec(shown)?.[1];
   if (design) {
@@ -363,6 +404,144 @@ export async function* assigned(ctx: ItemContext): Script {
   return `Opened ${url}`;
 }
 
+/**
+ * A ticket is assigned: take it, change the file, push, open the pull request, and ask when the ticket says so. A
+ * ticket that says `split: <title>` needs two pull requests, so it is split first: a sub-ticket with that title, the
+ * parent told about it, then one pull request each (and a second one for the parent, which is refused).
+ */
+export async function* assigned(ctx: ItemContext): Script {
+  const key = need(ctx.ticket, "the ticket");
+  const cwd = need(ctx.worktree, "the worktree");
+  const repo = need(ctx.repo, "the repository");
+  const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+  const stopped = yield* takeTicket(key, shown);
+  if (stopped !== undefined) {
+    return stopped;
+  }
+
+  yield* checkSandbox(cwd);
+  if (/^network: /m.test(shown)) {
+    return yield* checkNetwork(key);
+  }
+
+  const unclear = yield* askWhichRepo(ctx, key, shown);
+  if (unclear !== undefined) {
+    return unclear;
+  }
+
+  const part = /^split: (.+)$/m.exec(shown)?.[1];
+  const sub = part ? yield* splitTicket(key, part) : undefined;
+  // The worktree is detached at the default branch: now that the work is known, name the branch by the repo's rules.
+  const rules = yield* conventions(ctx, cwd);
+  const branch = branchFor(rules, key, subject(ctx.title));
+  yield { type: "shell", command: `git switch -c ${q(branch)}`, cwd };
+  yield* pushChange(ctx, cwd, key, branch, sub);
+  const opened = yield {
+    type: "tool",
+    tool: "pr_open",
+    input: { repo, title: `${key}: ${subject(ctx.title)}`, body: `Closes ${key}\n` },
+  };
+
+  const url = firstUrl(opened);
+  if (sub) {
+    return yield* openSubTicketPr(ctx, { key, sub, rules, branch, url });
+  }
+
+  return yield* followUpOnTicket(key, shown, url);
+}
+
+/** The threads a review round answers: a review's prompt lists them; otherwise every open thread is meant. */
+function threadsToAnswer(feedback: Feedback[], threads: string): string[] {
+  // A message from chat has no thread: it is answered on the pull request.
+  if (feedback.length > 0 && feedback.every((f) => f.kind === "chat")) {
+    return [];
+  }
+
+  const listed = feedback.flatMap((f) => f.threads);
+  return listed.length > 0 ? listed : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
+}
+
+/**
+ * Fails unless the round's worktree is on the pull request's own branch; a branch of its own would leave the pull
+ * request behind. A waiting item may hold the branch itself; the round then works on a local branch of the same commit.
+ */
+async function* onBranch(cwd: string, branch: string): AsyncGenerator<Action, void, string> {
+  const here = (yield { type: "shell", command: "git rev-parse --abbrev-ref HEAD", cwd }).trim();
+  if (here !== branch && !here.startsWith(`${branch}-`)) {
+    throw new Error(`The worktree is on ${here}, not on the pull request's branch ${branch}.`);
+  }
+}
+
+/** The agent's own proposal an approval answers, read from the pull request's conversation. */
+async function* proposalApproved(
+  repo: string,
+  number: number,
+): AsyncGenerator<Action, string, string> {
+  const talk = yield { type: "tool", tool: "pr_conversation", input: { repo, number } };
+  const proposal = /^\s*> Proposal: (.+)$/m.exec(talk)?.[1]?.trim();
+  if (!proposal) {
+    throw new Error("The conversation holds no proposal for the reply to answer.");
+  }
+
+  return proposal;
+}
+
+/** Files a reviewer's "follow-up: <title>" under this ticket; returns the key of the ticket filed. */
+async function* fileFollowUp(
+  key: string,
+  conversational: Feedback[],
+): AsyncGenerator<Action, string | undefined, string> {
+  const title = conversational.map((f) => /^follow-up: (.+)$/im.exec(f.body)?.[1]).find(Boolean);
+  if (!title) {
+    return undefined;
+  }
+
+  const created = yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: { title, body: `Found while reviewing ${key}.` },
+  };
+
+  return /^Created (\S+?)\./m.exec(created)?.[1];
+}
+
+const quoted = (text: string) =>
+  text
+    .split("\n")
+    .map((l) => `> ${l}`)
+    .join("\n");
+
+/** Replies to and resolves every thread the round answers. */
+async function* answerThreads(
+  repo: string,
+  number: number,
+  ids: string[],
+  sha: string,
+): AsyncGenerator<Action, void, string> {
+  for (const thread of ids) {
+    yield {
+      type: "tool",
+      tool: "pr_reply",
+      input: { repo, number, thread, body: `Fixed in ${sha}.` },
+    };
+
+    yield { type: "tool", tool: "pr_resolve", input: { repo, number, thread } };
+  }
+}
+
+/** The answer to a summary or a conversation comment: what it says quoted, its link, and what was done. */
+function conversationAnswer(f: Feedback, sha: string, approved?: string): string {
+  const link = f.url ? `${f.url}\n\n` : "";
+  const done = approved === undefined ? "" : `Done as proposed: ${approved}. `;
+  return `${quoted(f.body)}\n\n${link}${done}Fixed in ${sha}.`;
+}
+
+/** What a review round did, for its last message. */
+function addressed(threads: number, number: number, sha: string, followUp?: string): string {
+  const filed = followUp ? ` Filed follow-up ${followUp}.` : "";
+  return `Addressed ${threads} thread${threads === 1 ? "" : "s"} on pull request ${number} (${sha}).${filed}`;
+}
+
 /** A human gave feedback: fix on the pull request's own branch, answer every open thread and a summary or comment. */
 export async function* reviewFeedback(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
@@ -373,53 +552,18 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   yield { type: "gate", name: "review" };
   const branch = yield* branchOf(ctx, key);
   const threads = yield { type: "tool", tool: "pr_threads", input: { repo, number } };
-  const feedback = ctx.feedback;
-  // A review's prompt lists its inline comments with their threads; otherwise every open thread is meant.
-  const listed = feedback.flatMap((f) => f.threads);
-  // A message from chat has no thread: it is answered on the pull request.
-  const chatOnly = feedback.length > 0 && feedback.every((f) => f.kind === "chat");
-  const ids = chatOnly
-    ? []
-    : listed.length > 0
-      ? listed
-      : [...threads.matchAll(/^(PRRT_\w+)/gm)].map((m) => m[1]!);
-
-  const conversational = feedback.filter((f) => f.kind !== "inline_comment");
+  const ids = threadsToAnswer(ctx.feedback, threads);
+  const conversational = ctx.feedback.filter((f) => f.kind !== "inline_comment");
   if (ids.length === 0 && conversational.length === 0) {
     throw new Error("The feedback left no open thread and no summary or comment to answer.");
   }
 
-  // The round's worktree is on the pull request's own branch; a branch of its own would leave the pull request behind.
-  const here = (yield { type: "shell", command: "git rev-parse --abbrev-ref HEAD", cwd }).trim();
-  // A waiting item may hold the branch itself; the round then works on a local branch of the same commit.
-  if (here !== branch && !here.startsWith(`${branch}-`)) {
-    throw new Error(`The worktree is on ${here}, not on the pull request's branch ${branch}.`);
-  }
-
+  yield* onBranch(cwd, branch);
   // A short "yes" answers an earlier comment (the agent's own proposal): read the conversation to know what it says.
   const approval = conversational.find((f) => f.kind === "comment" && /^yes\b/i.test(f.body));
-  let proposal: string | undefined;
-  if (approval) {
-    const talk = yield { type: "tool", tool: "pr_conversation", input: { repo, number } };
-    proposal = /^\s*> Proposal: (.+)$/m.exec(talk)?.[1]?.trim();
-    if (!proposal) {
-      throw new Error("The conversation holds no proposal for the reply to answer.");
-    }
-  }
-
+  const proposal = approval ? yield* proposalApproved(repo, number) : undefined;
   // A reviewer's "follow-up: <title>" is work for later: filed from here, under this ticket, not asked of anyone.
-  const followUp = conversational.map((f) => /^follow-up: (.+)$/im.exec(f.body)?.[1]).find(Boolean);
-  let filedFollowUp: string | undefined;
-  if (followUp) {
-    const created = yield {
-      type: "tool",
-      tool: "ticket_create",
-      input: { title: followUp, body: `Found while reviewing ${key}.` },
-    };
-
-    filedFollowUp = /^Created (\S+?)\./m.exec(created)?.[1];
-  }
-
+  const filedFollowUp = yield* fileFollowUp(key, conversational);
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
     type: "write",
@@ -430,35 +574,54 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   yield { type: "shell", command: "git add -A", cwd };
   yield* commitToPush(ctx, cwd, branch, `${key}: address review`);
   const sha = (yield { type: "shell", command: "git rev-parse --short HEAD", cwd }).trim();
-  for (const thread of ids) {
-    yield {
-      type: "tool",
-      tool: "pr_reply",
-      input: { repo, number, thread, body: `Fixed in ${sha}.` },
-    };
-
-    yield { type: "tool", tool: "pr_resolve", input: { repo, number, thread } };
-  }
-
+  yield* answerThreads(repo, number, ids, sha);
   // A summary or a conversation comment has no thread: answer it on the pull request, quoting what it says.
   for (const f of conversational.filter((c) => c.body)) {
-    const quote = f.body
-      .split("\n")
-      .map((l) => `> ${l}`)
-      .join("\n");
-
-    yield {
-      type: "tool",
-      tool: "pr_comment",
-      input: {
-        repo,
-        number,
-        body: `${quote}\n\n${f.url ? `${f.url}\n\n` : ""}${f === approval ? `Done as proposed: ${proposal}. ` : ""}Fixed in ${sha}.`,
-      },
-    };
+    const answer = conversationAnswer(f, sha, f === approval ? proposal : undefined);
+    yield { type: "tool", tool: "pr_comment", input: { repo, number, body: answer } };
   }
 
-  return `Addressed ${ids.length} thread${ids.length === 1 ? "" : "s"} on pull request ${number} (${sha}).${filedFollowUp ? ` Filed follow-up ${filedFollowUp}.` : ""}`;
+  return addressed(ids.length, number, sha, filedFollowUp);
+}
+
+/** The open top-level comments `doc_show` lists, as `- <id> [resolved] (reply to <id>) <author>: <text>`. */
+function openComments(shown: string): string[] {
+  const open = [...shown.matchAll(/^- (\S+) (\[resolved\] )?(\(reply to \S+\) )?.+?: /gm)]
+    .filter((m) => m[2] === undefined && m[3] === undefined)
+    .map((m) => m[1]!);
+
+  if (open.length === 0) {
+    throw new Error("The document has no open comment to answer.");
+  }
+
+  return open;
+}
+
+/** The text of the document `doc_show` shows. */
+function docText(shown: string): string {
+  const text = /^\S.*\n\S+\n\n([\s\S]*?)\n\nComments \(/.exec(shown)?.[1];
+  if (text === undefined) {
+    throw new Error(`doc_show did not show the text of the document: ${shown}`);
+  }
+
+  return text;
+}
+
+/**
+ * Resolves only a thread whose last word is ours: reads the comments again just before. Comments list their author's
+ * name.
+ */
+async function* resolveAnswered(doc: string, open: string[]): AsyncGenerator<Action, void, string> {
+  const after = (yield { type: "tool", tool: "doc_show", input: { id: doc } }).split("\n");
+  for (const comment of open) {
+    const thread = after.filter(
+      (l) => l.startsWith(`- ${comment} `) || l.includes(`(reply to ${comment})`),
+    );
+
+    if (/ Sam Duarte: /.test(thread.at(-1) ?? "")) {
+      yield { type: "tool", tool: "doc_resolve", input: { doc, commentId: comment } };
+    }
+  }
 }
 
 /**
@@ -473,24 +636,11 @@ export async function* docFeedback(ctx: ItemContext): Script {
   }
 
   const shown = yield { type: "tool", tool: "doc_show", input: { id: doc } };
-  // `- <id> [resolved] (reply to <id>) <author>: <text>`; the threads to answer are the open top-level comments.
-  const open = [...shown.matchAll(/^- (\S+) (\[resolved\] )?(\(reply to \S+\) )?.+?: /gm)]
-    .filter((m) => m[2] === undefined && m[3] === undefined)
-    .map((m) => m[1]!);
-
-  if (open.length === 0) {
-    throw new Error("The document has no open comment to answer.");
-  }
-
-  const text = /^\S.*\n\S+\n\n([\s\S]*?)\n\nComments \(/.exec(shown)?.[1];
-  if (text === undefined) {
-    throw new Error(`doc_show did not show the text of the document: ${shown}`);
-  }
-
+  const open = openComments(shown);
   yield {
     type: "tool",
     tool: "doc_update",
-    input: { id: doc, body: `${text}\n\nRevised after review: ${feedback.body}\n` },
+    input: { id: doc, body: `${docText(shown)}\n\nRevised after review: ${feedback.body}\n` },
   };
 
   for (const comment of open) {
@@ -501,18 +651,7 @@ export async function* docFeedback(ctx: ItemContext): Script {
     };
   }
 
-  // Resolve only a thread whose last word is ours: read the comments again just before. Comments list their author's name.
-  const after = (yield { type: "tool", tool: "doc_show", input: { id: doc } }).split("\n");
-  for (const comment of open) {
-    const thread = after.filter(
-      (l) => l.startsWith(`- ${comment} `) || l.includes(`(reply to ${comment})`),
-    );
-
-    if (/ Sam Duarte: /.test(thread.at(-1) ?? "")) {
-      yield { type: "tool", tool: "doc_resolve", input: { doc, commentId: comment } };
-    }
-  }
-
+  yield* resolveAnswered(doc, open);
   return `Answered ${open.length} comment${open.length === 1 ? "" : "s"} on the document and updated it.`;
 }
 
@@ -530,6 +669,40 @@ export async function* ticketComment(ctx: ItemContext): Script {
   return `Answered the comment on ${key}.`;
 }
 
+/** The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own. */
+async function* fileFollowUpTicket(
+  ticket: string | undefined,
+  number: number,
+): AsyncGenerator<Action, string | undefined, string> {
+  if (!ticket) {
+    return undefined;
+  }
+
+  const created = yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: {
+      title: `Follow up on #${number}`,
+      body: `Feedback on the merged #${number}.`,
+      parent: ticket,
+      assignee: "me",
+      status: "active",
+    },
+  };
+
+  return /^Created (\S+?)\./m.exec(created)?.[1];
+}
+
+/** The title and body of the follow-up pull request to a merged one. */
+function followUpPr(number: number, feedback: Feedback, own?: string) {
+  const closes = own ? `Closes ${own}\n\n` : "";
+  const link = feedback.url ? `: ${feedback.url}` : "";
+  return {
+    title: `${own ? `${own}: ` : ""}follow up on #${number}`,
+    body: `${closes}Follows up on #${number}, which is merged.\n\nFeedback${link}\n\n${quoted(feedback.body)}\n`,
+  };
+}
+
 /**
  * A human commented on a merged pull request: answer on it, then open a follow-up pull request from the default
  * branch that links the original and the feedback, and link the follow-up from a second reply.
@@ -540,36 +713,18 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   const repo = need(ctx.repo, "the repository");
   // A merged pull request gets one comment per round; the first piece of feedback is the one to answer.
   const feedback = need(ctx.feedback?.[0], "the feedback");
-  const quote = feedback.body
-    .split("\n")
-    .map((l) => `> ${l}`)
-    .join("\n");
-
   const where = feedback.url ? `${feedback.url}\n\n` : "";
   yield {
     type: "tool",
     tool: "pr_comment",
-    input: { repo, number, body: `${quote}\n\n${where}Thanks, I am opening a follow-up for this.` },
+    input: {
+      repo,
+      number,
+      body: `${quoted(feedback.body)}\n\n${where}Thanks, I am opening a follow-up for this.`,
+    },
   };
 
-  // The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own.
-  let own: string | undefined;
-  if (ctx.ticket) {
-    const created = yield {
-      type: "tool",
-      tool: "ticket_create",
-      input: {
-        title: `Follow up on #${number}`,
-        body: `Feedback on the merged #${number}.`,
-        parent: ctx.ticket,
-        assignee: "me",
-        status: "active",
-      },
-    };
-
-    own = /^Created (\S+?)\./m.exec(created)?.[1];
-  }
-
+  const own = yield* fileFollowUpTicket(ctx.ticket, number);
   // The item's worktree may predate the merge: start from the default branch as it is now.
   yield { type: "shell", command: "git fetch --prune origin", cwd };
   const branch = branchFor(
@@ -589,18 +744,13 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   yield { type: "shell", command: "git add -A", cwd };
   yield { type: "shell", command: `git commit -m ${q(`chore: follow up on #${number}`)}`, cwd };
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
-  const title = `${own ? `${own}: ` : ""}follow up on #${number}`;
   const opened = yield {
     type: "tool",
     tool: "pr_open",
-    input: {
-      repo,
-      title,
-      body: `${own ? `Closes ${own}\n\n` : ""}Follows up on #${number}, which is merged.\n\nFeedback${feedback.url ? `: ${feedback.url}` : ""}\n\n${quote}\n`,
-    },
+    input: { repo, ...followUpPr(number, feedback, own) },
   };
 
-  const url = /https?:\/\/\S+/.exec(opened)?.[0] ?? "";
+  const url = firstUrl(opened);
   yield {
     type: "tool",
     tool: "pr_comment",
@@ -622,12 +772,7 @@ export async function* conflict(ctx: ItemContext): Script {
     cwd,
   }).trim();
 
-  const here = (yield { type: "shell", command: "git rev-parse --abbrev-ref HEAD", cwd }).trim();
-  // A waiting item may hold the branch itself; the round then works on a local branch of the same commit.
-  if (here !== branch && !here.startsWith(`${branch}-`)) {
-    throw new Error(`The worktree is on ${here}, not on the pull request's branch ${branch}.`);
-  }
-
+  yield* onBranch(cwd, branch);
   let clean = true;
   try {
     yield { type: "shell", command: "git rebase origin/main", cwd };
@@ -660,109 +805,124 @@ export async function* conflict(ctx: ItemContext): Script {
 
 const QUESTION = /in review, or do it as a follow-up\?/;
 
-/**
- * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
- * view of it; a request about an open pull request is attached to it, after asking when the pull request is in
- * review. Nothing is ever filed as a new ticket.
- */
-export async function* chat(ctx: ItemContext): Script {
-  const talk = ctx.conversation ?? [];
-  const humans = talk.filter((m) => !m.agent);
-  const latest = humans.at(-1)?.text ?? "";
+type Message = NonNullable<ItemContext["conversation"]>[number];
 
-  // A status question is answered from the pull request itself, not from the office's list of work.
-  const statusOf = /^what is the status of PR #(\d+)/i.exec(latest)?.[1];
-  if (statusOf) {
-    // `ost work` links the pull request; its address names the repository.
-    const work = yield { type: "tool", tool: "work", input: {} };
-    const repo = need(
-      new RegExp(`\\((\\S+?)/pull/${statusOf}\\)`).exec(work)?.[1],
-      "the repository",
-    );
+/** A status question is answered from the pull request itself, not from the office's list of work. */
+async function* prStatus(number: string): AsyncGenerator<Action, string, string> {
+  // `ost work` links the pull request; its address names the repository.
+  const work = yield { type: "tool", tool: "work", input: {} };
+  const repo = need(new RegExp(`\\((\\S+?)/pull/${number}\\)`).exec(work)?.[1], "the repository");
+  const status = yield {
+    type: "tool",
+    tool: "pr_status",
+    input: { repo, number: Number(number) },
+  };
 
-    const status = yield {
+  return `Pull request ${number}:\n${status}`;
+}
+
+/** A question about the work, answered with a tool of the work session (a chat session has them) and `ost work`. */
+async function* describeWork(): AsyncGenerator<Action, string, string> {
+  yield { type: "shell", command: "CI=1 pnpm --version", cwd: homedir() };
+  const work = yield { type: "tool", tool: "work", input: {} };
+  const first = work.split("\n")[0] ?? "";
+  return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;
+}
+
+/** A reply in the thread of running or finished work: an instruction is attached to that work, a question is answered. */
+async function* replyAboutWork(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string, string> {
+  const target = ctx.ticket ?? (ctx.pr === undefined ? undefined : String(ctx.pr));
+  // A session that goes on with the thread's conversation has no history in its prompt: the reply is in the journal.
+  const said =
+    [...ctx.journal.matchAll(/replied in chat \(thread \S+\):\n([^\n]*)/g)].at(-1)?.[1] ?? latest;
+
+  if (target && /^(also|please|split)\b/i.test(said)) {
+    yield {
       type: "tool",
-      tool: "pr_status",
-      input: { repo, number: Number(statusOf) },
+      tool: "work_attach",
+      input: { target, confirmed: true, request: said },
     };
 
-    return `Pull request ${statusOf}:\n${status}`;
+    return `Noted for ${target}.`;
   }
 
-  if (ctx.about) {
-    // A reply in the thread of running or finished work: an instruction is attached to that work, a question is answered.
-    const target = ctx.ticket ?? (ctx.pr === undefined ? undefined : String(ctx.pr));
-    // A session that goes on with the thread's conversation has no history in its prompt: the reply is in the journal.
-    const said =
-      [...ctx.journal.matchAll(/replied in chat \(thread \S+\):\n([^\n]*)/g)].at(-1)?.[1] ?? latest;
+  return yield* describeWork();
+}
 
-    if (target && /^(also|please|split)\b/i.test(said)) {
-      yield {
-        type: "tool",
-        tool: "work_attach",
-        input: { target, confirmed: true, request: said },
-      };
-
-      return `Noted for ${target}.`;
-    }
-
-    // A chat session has the tools of a work session.
-    yield { type: "shell", command: "CI=1 pnpm --version", cwd: homedir() };
-    const work = yield { type: "tool", tool: "work", input: {} };
-    return `Greetings live in greeting.txt on the main branch. Right now I am on: ${work.split("\n")[0] ?? ""}`;
-  }
-
-  // New work is filed as a ticket, which the office turns into the work.
+/**
+ * New work is filed as a ticket, which the office turns into the work; a message with pictures is a request to file,
+ * and the ticket gets the files, which the agent attaches itself. Returns undefined when the message asks for neither.
+ */
+async function* fileRequest(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
   const filed = /^new work: (.+)$/i.exec(latest)?.[1];
   if (filed) {
     yield { type: "tool", tool: "ticket_create", input: { title: filed, body: filed } };
     return "Filed.";
   }
 
-  // A message with pictures is a request to file: the ticket gets the files, which the agent attaches itself.
-  if (ctx.files?.length) {
+  if (!ctx.files?.length) {
+    return undefined;
+  }
+
+  yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: {
+      title: "Fix the page in the screenshot",
+      body: "The page looks wrong, see the attached screenshot.",
+    },
+  };
+
+  return "Filed it.";
+}
+
+/** The human answered the question: this pull request, or a follow-up. The request is what they said first. */
+async function* answered(
+  talk: Message[],
+  asked: Message,
+  latest: string,
+  pr: string,
+): AsyncGenerator<Action, string, string> {
+  const before = talk.slice(0, talk.indexOf(asked)).filter((m) => !m.agent);
+  const request = before.findLast((m) => /PR #\d+/i.test(m.text))?.text ?? latest;
+  if (/follow-?up/i.test(latest)) {
     yield {
       type: "tool",
       tool: "ticket_create",
-      input: {
-        title: "Fix the page in the screenshot",
-        body: "The page looks wrong, see the attached screenshot.",
-      },
+      input: { title: request.slice(0, 80), body: request },
     };
 
-    return "Filed it.";
+    return "Filed a follow-up.";
   }
 
+  yield {
+    type: "tool",
+    tool: "work_attach",
+    input: { target: pr, confirmed: true, request },
+  };
+
+  return `Added to PR #${pr}.`;
+}
+
+/** A request about an open pull request is attached to it, after asking when the pull request is in review. */
+async function* attachToPr(
+  talk: Message[],
+  latest: string,
+): AsyncGenerator<Action, string, string> {
   const asked = talk.find((m) => m.agent && QUESTION.test(m.text));
   const pr = /PR #(\d+)/i.exec(asked ? asked.text : latest)?.[1];
   if (!pr) {
-    yield { type: "shell", command: "CI=1 pnpm --version", cwd: homedir() };
-    const work = yield { type: "tool", tool: "work", input: {} };
-    const first = work.split("\n")[0] ?? "";
-    return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;
+    return yield* describeWork();
   }
 
   if (asked) {
-    // The human answered: this pull request, or a follow-up. The request is what they said first.
-    const before = talk.slice(0, talk.indexOf(asked)).filter((m) => !m.agent);
-    const request = before.findLast((m) => /PR #\d+/i.test(m.text))?.text ?? latest;
-    if (/follow-?up/i.test(latest)) {
-      yield {
-        type: "tool",
-        tool: "ticket_create",
-        input: { title: request.slice(0, 80), body: request },
-      };
-
-      return "Filed a follow-up.";
-    }
-
-    yield {
-      type: "tool",
-      tool: "work_attach",
-      input: { target: pr, confirmed: true, request },
-    };
-
-    return `Added to PR #${pr}.`;
+    return yield* answered(talk, asked, latest, pr);
   }
 
   // Without the human's word the verb refuses a pull request in review: ask in the thread, linking both options.
@@ -772,6 +932,27 @@ export async function* chat(ctx: ItemContext): Script {
   } catch {
     return `Add this to PR #${pr}, which is in review, or do it as a follow-up?`;
   }
+}
+
+/**
+ * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
+ * view of it; a request about an open pull request is attached to it, after asking when the pull request is in
+ * review. Nothing is ever filed as a new ticket.
+ */
+export async function* chat(ctx: ItemContext): Script {
+  const talk = ctx.conversation ?? [];
+  const latest = talk.findLast((m) => !m.agent)?.text ?? "";
+  const statusOf = /^what is the status of PR #(\d+)/i.exec(latest)?.[1];
+  if (statusOf) {
+    return yield* prStatus(statusOf);
+  }
+
+  if (ctx.about) {
+    return yield* replyAboutWork(ctx, latest);
+  }
+
+  const filed = yield* fileRequest(ctx, latest);
+  return filed ?? (yield* attachToPr(talk, latest));
 }
 
 /** An allowed approver approved the pull request: run the verb and report; a refusal is the answer. */

@@ -9,7 +9,13 @@ import {
 } from "@outstaff/core";
 import { AppAuth } from "../auth.js";
 import { GithubHttp } from "../http.js";
-import type { AppCredentials, GithubDeps, GithubOptions } from "../types.js";
+import type {
+  AppCredentials,
+  GithubDeps,
+  GithubOptions,
+  InstallationToken,
+  TokenScope,
+} from "../types.js";
 import type { GithubContext } from "./types.js";
 
 export const PERMISSIONS = {
@@ -21,6 +27,35 @@ export const PERMISSIONS = {
 export const OPTIONAL_WRITE = { workflows: "write" } as const;
 
 export const repoPath = (r: RepoRef) => `/repos/${r.owner}/${r.name}`;
+
+/** Whether a grant allows acting at `level`: any grant reads, only a write grant writes. */
+function grantCovers(grant: ReturnType<typeof repoGrant>, level: "read" | "write"): boolean {
+  return Boolean(grant) && (level === "read" || grant === "write");
+}
+
+/** A token from a container's own App; an App without access to the repo is a forbidden PortError. */
+export async function ownAppToken(
+  app: AppAuth,
+  who: string,
+  level: "read" | "write",
+  repo: RepoRef,
+  scope: TokenScope,
+): Promise<InstallationToken> {
+  try {
+    return await app.token(repo, scope);
+  } catch (e) {
+    // The App lacks the permission, is not installed on the repo, or the repo is not visible to it.
+    if (e instanceof PortError && (e.code === "invalid" || e.code === "not_found")) {
+      throw new PortError(
+        "forbidden",
+        `${who} has no ${level} access to ${repo.owner}/${repo.name}: ${e.message}`,
+        { cause: e },
+      );
+    }
+
+    throw e;
+  }
+}
 
 /** The clients, credentials and lookups the adapter's operations share. */
 export function createGithubContext(
@@ -152,12 +187,10 @@ export function createGithubContext(
     permissions: Record<string, "read" | "write">,
     optionalPermissions?: Record<string, "read" | "write">,
   ): Promise<{ token: string; app: AppAuth }> {
-    const where = `${repo.owner}/${repo.name}`;
-    const grant = self ? grantOf(self, repo) : undefined;
-    if (!self || !grant || (level === "write" && grant !== "write")) {
+    if (!self || !grantCovers(grantOf(self, repo), level)) {
       throw new PortError(
         "forbidden",
-        `"${self ?? "this container"}" has no ${level} grant on ${where}.`,
+        `"${self ?? "this container"}" has no ${level} grant on ${repo.owner}/${repo.name}.`,
       );
     }
 
@@ -166,27 +199,13 @@ export function createGithubContext(
       throw new PortError("forbidden", "Writing to GitHub needs this container's own GitHub App.");
     }
 
-    try {
-      const issued = await app.token(repo, {
-        repositories: [repo.name],
-        permissions,
-        ...(optionalPermissions ? { optionalPermissions } : {}),
-      });
+    const issued = await ownAppToken(app, self, level, repo, {
+      repositories: [repo.name],
+      permissions,
+      ...(optionalPermissions ? { optionalPermissions } : {}),
+    });
 
-      return { token: issued.token, app };
-    } catch (e) {
-      if (e instanceof PortError && (e.code === "invalid" || e.code === "not_found")) {
-        throw new PortError(
-          "forbidden",
-          `${self} has no ${level} access to ${where}: ${e.message}`,
-          {
-            cause: e,
-          },
-        );
-      }
-
-      throw e;
-    }
+    return { token: issued.token, app };
   }
 
   return {

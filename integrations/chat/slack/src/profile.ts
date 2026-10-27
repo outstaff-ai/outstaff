@@ -51,11 +51,8 @@ export function formatWhen(iso: string, tz?: string): string {
   return `${format("UTC")} UTC`;
 }
 
-/**
- * The Home tab: who the agent is, whether it is working, on what, how to talk to it, and any extra sections.
- * `tz` is the viewer's timezone, when known; times are in UTC otherwise.
- */
-export function homeView(profile: AgentProfile, tz?: string): SlackHomeView {
+/** Who the agent is: its role, description and model. */
+function aboutLines(profile: AgentProfile): string[] {
   const about = [`*${escapeSlack(profile.role)}*`];
   if (profile.description) {
     about.push(escapeSlack(profile.description));
@@ -65,29 +62,33 @@ export function homeView(profile: AgentProfile, tz?: string): SlackHomeView {
     about.push(`_Model: ${escapeSlack(profile.model)}_`);
   }
 
-  const status: string[] = [STATUS[profile.status]];
-  if (profile.current && profile.status === "working") {
-    const { title, url } = profile.current;
-    const label =
-      url && /^https?:\/\//.test(url) ? `<${url}|${escapeSlack(title)}>` : escapeSlack(title);
+  return about;
+}
 
-    status[0] = `:large_green_circle: *Working on* ${label}`;
-  }
+/** The work item as a link when it has a web address, plain text otherwise. */
+function workLabel({ title, url }: { title: string; url?: string }): string {
+  return url && /^https?:\/\//.test(url) ? `<${url}|${escapeSlack(title)}>` : escapeSlack(title);
+}
+
+/** Whether the agent is working, on what, and when it was last active. */
+function statusLines(profile: AgentProfile, tz: string | undefined): string[] {
+  const working = profile.current && profile.status === "working";
+  const status: string[] = [
+    working
+      ? `:large_green_circle: *Working on* ${workLabel(profile.current!)}`
+      : STATUS[profile.status],
+  ];
 
   if (profile.lastActiveAt) {
     status.push(`_Last active ${formatWhen(profile.lastActiveAt, tz)}_`);
   }
 
-  const blocks: Record<string, unknown>[] = [
-    { type: "header", text: { type: "plain_text", text: clip(profile.name, 150) } },
-    section(about.join("\n")),
-    section(status.join("\n")),
-  ];
+  return status;
+}
 
-  if (profile.hint) {
-    blocks.push(section(toMrkdwn(profile.hint)));
-  }
-
+/** How to talk to the agent and its extra sections, each after a divider. */
+function extraBlocks(profile: AgentProfile): Record<string, unknown>[] {
+  const blocks: Record<string, unknown>[] = profile.hint ? [section(toMrkdwn(profile.hint))] : [];
   for (const s of (profile.sections ?? []).slice(0, 40)) {
     blocks.push(
       { type: "divider" },
@@ -95,5 +96,21 @@ export function homeView(profile: AgentProfile, tz?: string): SlackHomeView {
     );
   }
 
-  return { type: "home", blocks };
+  return blocks;
+}
+
+/**
+ * The Home tab: who the agent is, whether it is working, on what, how to talk to it, and any extra sections.
+ * `tz` is the viewer's timezone, when known; times are in UTC otherwise.
+ */
+export function homeView(profile: AgentProfile, tz?: string): SlackHomeView {
+  return {
+    type: "home",
+    blocks: [
+      { type: "header", text: { type: "plain_text", text: clip(profile.name, 150) } },
+      section(aboutLines(profile).join("\n")),
+      section(statusLines(profile, tz).join("\n")),
+      ...extraBlocks(profile),
+    ],
+  };
 }

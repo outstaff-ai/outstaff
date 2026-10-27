@@ -44,45 +44,41 @@ export function isIndex(file) {
   return /(^|\/)index\.(ts|tsx|mts)$/.test(file);
 }
 
-/** Classifies a module's exports: whether it exports types and whether it exports runtime values. */
-export function exportKinds(source) {
-  let types = false;
-  let values = false;
+/** The kind ("type" or "value") of each name in an `export { ... }` list starting at `index`. */
+function listKinds(source, index) {
+  const list = source.slice(index).match(/^export\s+(type\s+)?\{([^}]*)\}/);
+  const names = (list?.[2] ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
 
-  // Top-level export statements start a line; the formatter guarantees it.
-  for (const match of source.matchAll(/^export\s+(type\s+|declare\s+)?(\S+)/gm)) {
-    const [, modifier = "", head] = match;
+  return names.map((name) => (list?.[1] || name.startsWith("type ") ? "type" : "value"));
+}
 
-    if (modifier.startsWith("type") && !head.startsWith("{") && !head.startsWith("*")) {
-      types = true;
-    } else if (/^(interface|type)$/.test(head)) {
-      types = true;
-    } else if (head.startsWith("{")) {
-      const list = source.slice(match.index).match(/^export\s+(type\s+)?\{([^}]*)\}/);
-      const names = (list?.[2] ?? "")
-        .split(",")
-        .map((name) => name.trim())
-        .filter(Boolean);
+/** The kinds ("type" or "value") one top-level export statement exports. */
+function statementKinds(source, match) {
+  const [, modifier = "", head] = match;
+  const typeOnly = modifier.startsWith("type");
 
-      for (const name of names) {
-        if (list?.[1] || name.startsWith("type ")) {
-          types = true;
-        } else {
-          values = true;
-        }
-      }
-    } else if (head.startsWith("*")) {
-      if (modifier.startsWith("type")) {
-        types = true;
-      } else {
-        values = true;
-      }
-    } else {
-      values = true;
-    }
+  if (head.startsWith("{")) {
+    return listKinds(source, match.index);
   }
 
-  return { types, values };
+  if (head.startsWith("*")) {
+    return [typeOnly ? "type" : "value"];
+  }
+
+  return typeOnly || /^(interface|type)$/.test(head) ? ["type"] : ["value"];
+}
+
+/** Classifies a module's exports: whether it exports types and whether it exports runtime values. */
+export function exportKinds(source) {
+  // Top-level export statements start a line; the formatter guarantees it.
+  const kinds = [...source.matchAll(/^export\s+(type\s+|declare\s+)?(\S+)/gm)].flatMap((match) =>
+    statementKinds(source, match),
+  );
+
+  return { types: kinds.includes("type"), values: kinds.includes("value") };
 }
 
 /** Returns the problems in the given files, read with `read`. */

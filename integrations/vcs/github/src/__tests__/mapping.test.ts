@@ -9,8 +9,8 @@ import {
   permissionLevel,
   stripBot,
   toPullRequest,
-  toVcsEvent,
 } from "../mapping.js";
+import { toVcsEvent } from "../event-mapping.js";
 import type { RestEvent, RestPull } from "../api.types.js";
 
 const REPO = { owner: "acme", name: "app" };

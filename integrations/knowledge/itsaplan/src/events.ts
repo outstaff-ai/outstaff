@@ -1,50 +1,79 @@
-import { mentionData, PortError, type DocEvent, type EventPage } from "@outstaff/core";
-import { OVERLAP_MS, parseCursor, type Itsaplan } from "@outstaff/integration.tracker.itsaplan";
+import { mentionData, PortError, type DocEvent, type EventPage, type Member } from "@outstaff/core";
+import {
+  nextCursor,
+  OVERLAP_MS,
+  parseCursor,
+  type Itsaplan,
+} from "@outstaff/integration.tracker.itsaplan";
 import { commentId } from "./comment-ids.js";
-import type { ApiDoc, ApiDocComment } from "./types.js";
+import type { ApiDocComment, DocEventDeps, ReadComment } from "./types.js";
+
+/** A document that was deleted or closed to this account is no longer news; anything else is retried. */
+const isGone = (error: unknown) =>
+  error instanceof PortError && ["not_found", "forbidden"].includes(error.code);
+
+async function commentsOf(api: Itsaplan, docs: string, docId: number): Promise<ReadComment[]> {
+  try {
+    const found = await api.http.request<ApiDocComment[]>("GET", `${docs}/${docId}/comments`);
+    return found.map((comment) => ({ docId, comment, at: Date.parse(comment.createdAt) }));
+  } catch (error) {
+    if (!isGone(error)) {
+      throw error;
+    }
+
+    return [];
+  }
+}
+
+// Document comments are not in the project's activity feed, so the comments of each document are read.
+async function readComments(deps: DocEventDeps, ids: string[]): Promise<ReadComment[]> {
+  const all: ReadComment[] = [];
+  for (const id of new Set(ids)) {
+    all.push(...(await commentsOf(deps.api, deps.docs, await deps.idOf(id))));
+  }
+
+  return all;
+}
+
+const key = (r: ReadComment) => commentId(r.docId, r.comment.id);
+
+function toEvent(api: Itsaplan, member: Member, r: ReadComment, title: string): DocEvent {
+  const c = r.comment;
+  return {
+    externalId: `itsaplan-doc:${key(r)}`,
+    type: "commented",
+    doc: String(r.docId),
+    title,
+    url: api.docUrl(String(r.docId)),
+    actor: member,
+    at: c.createdAt,
+    data: {
+      commentId: key(r),
+      ...(c.parentId ? { parentId: commentId(r.docId, c.parentId) } : {}),
+      ...(c.quote ? { anchorText: c.quote } : {}),
+      body: c.body,
+      ...mentionData(c.body),
+    },
+  };
+}
 
 /** New comments on the given documents since `cursor`. */
 export async function readDocEvents(
-  deps: {
-    api: Itsaplan;
-    docs: string;
-    idOf: (idOrPath: string) => Promise<number>;
-    read: (id: number | string) => Promise<ApiDoc>;
-    now: () => Date;
-  },
+  deps: DocEventDeps,
   ids: string[],
   cursor: string | undefined,
 ): Promise<EventPage<DocEvent>> {
-  const { api, docs, idOf, read, now } = deps;
-  // Document comments are not in the project's activity feed, so the comments of each document are read.
+  const { api, read, now } = deps;
   const after = parseCursor(cursor);
   const setup = await api.project();
-  const all: { docId: number; comment: ApiDocComment; at: number }[] = [];
-  for (const id of new Set(ids)) {
-    const docId = await idOf(id);
-    try {
-      const found = await api.http.request<ApiDocComment[]>("GET", `${docs}/${docId}/comments`);
-
-      for (const comment of found) {
-        all.push({ docId, comment, at: Date.parse(comment.createdAt) });
-      }
-    } catch (error) {
-      // A document that was deleted or closed to this account is no longer news; anything else is retried.
-      if (!(error instanceof PortError) || !["not_found", "forbidden"].includes(error.code)) {
-        throw error;
-      }
-    }
-  }
-
-  const key = (r: (typeof all)[number]) => commentId(r.docId, r.comment.id);
+  const all = await readComments(deps, ids);
   const times = all.map((r) => r.at).filter((t) => !Number.isNaN(t));
   // Without a position, the window is what lies within the overlap of the newest comment.
   const floor = (after?.since ?? Math.max(...times)) - OVERLAP_MS;
   // No cursor at all is the first poll (the office decides if it is a baseline); a cursor we cannot use baselines here.
   const baseline = cursor !== undefined && !after;
-  const fresh = baseline
-    ? []
-    : all.filter((r) => r.at >= floor && !(after?.seen.has(key(r)) ?? false));
+  const isNew = (r: ReadComment) => r.at >= floor && !(after?.seen.has(key(r)) ?? false);
+  const fresh = baseline ? [] : all.filter(isNew);
 
   const titles = new Map<number, string>();
   const events: DocEvent[] = [];
@@ -53,32 +82,10 @@ export async function readDocEvents(
       titles.set(r.docId, (await read(r.docId)).title);
     }
 
-    const c = r.comment;
-    events.push({
-      externalId: `itsaplan-doc:${key(r)}`,
-      type: "commented",
-      doc: String(r.docId),
-      title: titles.get(r.docId)!,
-      url: api.docUrl(String(r.docId)),
-      actor: api.member(setup, c.authorId, c.authorName),
-      at: c.createdAt,
-      data: {
-        commentId: key(r),
-        ...(c.parentId ? { parentId: commentId(r.docId, c.parentId) } : {}),
-        ...(c.quote ? { anchorText: c.quote } : {}),
-        body: c.body,
-        ...mentionData(c.body),
-      },
-    });
+    const member = api.member(setup, r.comment.authorId, r.comment.authorName);
+    events.push(toEvent(api, member, r, titles.get(r.docId)!));
   }
 
-  const newest = Math.max(after?.since ?? Number.NEGATIVE_INFINITY, ...times);
-  const since = new Date(Number.isFinite(newest) ? newest : now().getTime()).toISOString();
-  // Ids read at baseline time, kept while they are inside the overlap so that history is not handed back as news.
-  const keep = after?.seen;
-  const seen = all
-    .filter((r) => (keep ? keep.has(key(r)) : true) && r.at >= Date.parse(since) - OVERLAP_MS)
-    .map(key);
-
-  return { events, cursor: JSON.stringify({ since, ...(seen.length > 0 ? { seen } : {}) }) };
+  const seen = all.map((r) => ({ id: key(r), at: r.at }));
+  return { events, cursor: nextCursor(after, seen, () => now().getTime()) };
 }

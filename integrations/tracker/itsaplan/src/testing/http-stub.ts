@@ -37,30 +37,68 @@ const isReply = (v: unknown): v is StubReply =>
   !Array.isArray(v) &&
   Object.keys(v).every((k) => k === "status" || k === "headers" || k === "body" || k === "buffer");
 
+const hrefOf = (input: string | URL | Request) => {
+  if (typeof input === "string") {
+    return input;
+  }
+
+  return input instanceof URL ? input.href : input.url;
+};
+
+/** The URL, headers and upper-case method of a fetch call. */
+function parseCall(input: string | URL | Request, init: RequestInit | undefined) {
+  return {
+    url: new URL(hrefOf(input)),
+    headers: new Headers(init?.headers),
+    method: (init?.method ?? "GET").toUpperCase(),
+  };
+}
+
+function expectAuthenticated(
+  url: URL,
+  headers: Headers,
+  method: string | undefined,
+  origin: string,
+  apiKey: string,
+): void {
+  expect(url.origin, "requests must stay on the API host").toBe(origin);
+  expect(headers.get("x-api-key"), `${method} ${url.pathname} is unauthenticated`).toBe(apiKey);
+  expect(headers.get("origin")).toBeTruthy();
+}
+
+/** A JSON body parsed, and a multipart one as it is. */
+function requestBody(body: RequestInit["body"]): Pick<StubRequest, "json" | "form"> {
+  return {
+    json: typeof body === "string" ? JSON.parse(body) : undefined,
+    ...(body instanceof FormData ? { form: body } : {}),
+  };
+}
+
+/** A handler's result as a response: a reply as it says, anything else as a JSON body. */
+function toResponse(out: unknown): Response {
+  const reply: StubReply = isReply(out) ? out : { body: out };
+  const status = reply.status ?? 200;
+  if (reply.buffer) {
+    return new Response(reply.buffer.slice(), { status, headers: reply.headers ?? {} });
+  }
+
+  const body = status === 304 || status === 204 ? null : JSON.stringify(reply.body ?? {});
+  return new Response(body, {
+    status,
+    headers: { "content-type": "application/json", ...reply.headers },
+  });
+}
+
 /** A fetch that serves JSON by method and path and records every call. Unmatched requests fail the test. */
 export function createStubFetch(routes: Route[], origin = API_ORIGIN, apiKey = API_KEY) {
   const compiled = routes.map((r) => ({ r, match: compile(r.path) }));
   const calls: StubRequest[] = [];
   const stub = (async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {
-    const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
-    );
-
-    expect(url.origin, "requests must stay on the API host").toBe(origin);
-    const headers = new Headers(init?.headers);
-    expect(headers.get("x-api-key"), `${init?.method} ${url.pathname} is unauthenticated`).toBe(
-      apiKey,
-    );
-
-    expect(headers.get("origin")).toBeTruthy();
-    const method = (init?.method ?? "GET").toUpperCase();
+    const { url, headers, method } = parseCall(input, init);
+    expectAuthenticated(url, headers, init?.method, origin, apiKey);
     const path = url.pathname;
     for (const { r, match } of compiled) {
-      if (r.method !== method) {
-        continue;
-      }
-
-      const params = match(path);
+      const params = r.method === method ? match(path) : undefined;
       if (!params) {
         continue;
       }
@@ -71,23 +109,11 @@ export function createStubFetch(routes: Route[], origin = API_ORIGIN, apiKey = A
         query: url.searchParams,
         headers,
         params,
-        json: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
-        ...(init?.body instanceof FormData ? { form: init.body } : {}),
+        ...requestBody(init?.body),
       };
 
       calls.push(req);
-      const out = await r.handler(req);
-      const reply: StubReply = isReply(out) ? out : { body: out };
-      const status = reply.status ?? 200;
-      if (reply.buffer) {
-        return new Response(reply.buffer.slice(), { status, headers: reply.headers ?? {} });
-      }
-
-      const body = status === 304 || status === 204 ? null : JSON.stringify(reply.body ?? {});
-      return new Response(body, {
-        status,
-        headers: { "content-type": "application/json", ...reply.headers },
-      });
+      return toResponse(await r.handler(req));
     }
 
     throw new Error(`stub: no route for ${method} ${path}${url.search}`);

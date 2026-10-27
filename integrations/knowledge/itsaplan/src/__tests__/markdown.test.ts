@@ -4,6 +4,13 @@ import { mdToDoc } from "../markdown.js";
 import { findRange, plainText } from "../text-range.js";
 import type { PmNode } from "../types.js";
 
+/** The node at the given content indexes, or undefined where the path runs out. */
+const nodeAt = (node: PmNode | undefined, ...path: number[]): PmNode | undefined =>
+  path.reduce<PmNode | undefined>((n, i) => n?.content?.[i], node);
+
+/** The types of a node's children. */
+const childTypes = (node: PmNode | undefined) => node?.content?.map((b) => b.type);
+
 describe("mdToDoc", () => {
   it("builds headings, paragraphs and inline marks", () => {
     const doc = mdToDoc(
@@ -39,13 +46,9 @@ describe("mdToDoc", () => {
 
   it("builds nested bullet, ordered and task lists", () => {
     const doc = mdToDoc("- a\n  - b\n- c\n\n1. one\n2. two\n\n- [x] done\n- [ ] todo");
-    expect(doc.content?.map((b) => b.type)).toEqual(["bulletList", "orderedList", "taskList"]);
-    expect(doc.content?.[0]?.content?.[0]?.content?.map((b) => b.type)).toEqual([
-      "paragraph",
-      "bulletList",
-    ]);
-
-    expect(doc.content?.[2]?.content?.map((i) => i.attrs?.["checked"])).toEqual([true, false]);
+    expect(childTypes(doc)).toEqual(["bulletList", "orderedList", "taskList"]);
+    expect(childTypes(nodeAt(doc, 0, 0))).toEqual(["paragraph", "bulletList"]);
+    expect(nodeAt(doc, 2)?.content?.map((i) => i.attrs?.["checked"])).toEqual([true, false]);
   });
 
   it("builds code blocks, rules, quotes and tables", () => {
@@ -53,16 +56,10 @@ describe("mdToDoc", () => {
       "```ts\nconst a = 1;\n```\n\n---\n\n> quoted\n\n| a | b |\n| - | - |\n| 1 | 2 |",
     );
 
-    expect(doc.content?.map((b) => b.type)).toEqual([
-      "codeBlock",
-      "horizontalRule",
-      "blockquote",
-      "table",
-    ]);
-
-    expect(doc.content?.[0]?.attrs).toEqual({ language: "ts" });
-    expect(doc.content?.[3]?.content?.[0]?.content?.[0]?.type).toBe("tableHeader");
-    expect(doc.content?.[3]?.content?.[1]?.content?.[1]?.type).toBe("tableCell");
+    expect(childTypes(doc)).toEqual(["codeBlock", "horizontalRule", "blockquote", "table"]);
+    expect(nodeAt(doc, 0)?.attrs).toEqual({ language: "ts" });
+    expect(nodeAt(doc, 3, 0, 0)?.type).toBe("tableHeader");
+    expect(nodeAt(doc, 3, 1, 1)?.type).toBe("tableCell");
   });
 
   it("gives an empty document one empty paragraph and turns soft breaks into hard breaks", () => {
@@ -133,14 +130,14 @@ describe("findRange", () => {
 describe("mdToDoc edge cases", () => {
   it("starts a paragraph with a mark and keeps empty cells and empty headings empty", () => {
     const doc = mdToDoc("**lead** text\n\n#  \n\n| a |  |\n| - | - |");
-    expect(doc.content?.[0]?.content?.[0]).toEqual({
+    expect(nodeAt(doc, 0, 0)).toEqual({
       type: "text",
       text: "lead",
       marks: [{ type: "bold" }],
     });
 
-    expect(doc.content?.[1]).toEqual({ type: "heading", attrs: { level: 1 } });
-    expect(doc.content?.[2]?.content?.[0]?.content?.[1]).toEqual({
+    expect(nodeAt(doc, 1)).toEqual({ type: "heading", attrs: { level: 1 } });
+    expect(nodeAt(doc, 2, 0, 1)).toEqual({
       type: "tableHeader",
       content: [{ type: "paragraph" }],
     });
@@ -151,10 +148,10 @@ describe("mdToDoc edge cases", () => {
   });
 
   it("joins an indented continuation line to its list item, also when the item itself is empty", () => {
-    const wrapped = mdToDoc("- one\n  more text").content?.[0]?.content?.[0]?.content?.[0];
+    const wrapped = nodeAt(mdToDoc("- one\n  more text"), 0, 0, 0);
     expect(wrapped?.content?.map((n) => n.text)).toEqual(["one", " more text"]);
 
-    const empty = mdToDoc("- \n  later").content?.[0]?.content?.[0]?.content?.[0];
+    const empty = nodeAt(mdToDoc("- \n  later"), 0, 0, 0);
     expect(empty?.content?.map((n) => n.text)).toEqual([" later"]);
   });
 

@@ -74,6 +74,44 @@ const now = () => new Date((lastMs = Math.max(Date.now(), lastMs + 1))).toISOStr
 const bearer = (req: Req): string =>
   String(req.headers["authorization"] ?? "").replace(/^[Bb]earer /, "");
 
+// No check is required in this repository.
+const requiredChecks = () => {
+  const data: RequiredChecksData = {
+    repository: {
+      pullRequest: {
+        commits: {
+          nodes: [
+            {
+              commit: {
+                statusCheckRollup: {
+                  contexts: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  };
+
+  return { data };
+};
+
+/** The password of a Basic authorization header, or "" without one. */
+const basicPassword = (req: Req): string => {
+  const basic = /^Basic (.+)$/.exec(String(req.headers["authorization"] ?? ""))?.[1];
+  return basic ? Buffer.from(basic, "base64").toString("utf8").split(":").slice(1).join(":") : "";
+};
+
+const isPush = (req: Req) =>
+  req.path.endsWith("/git-receive-pack") || req.query.get("service") === "git-receive-pack";
+
+const gitDenied = (authenticated: boolean) => ({
+  status: authenticated ? 403 : 401,
+  headers: { "www-authenticate": 'Basic realm="github"', "content-type": "text/plain" },
+  body: Buffer.from(authenticated ? "write access required\n" : "authentication required\n"),
+});
+
 export function createGithub(opts: GithubOptions) {
   const { repo } = opts;
   const full = `${repo.owner}/${repo.name}`;
@@ -283,98 +321,110 @@ export function createGithub(opts: GithubOptions) {
   const need = (n: string | number): StoredPull | undefined => prs.get(Number(n));
   const notFound = { status: 404, body: { message: "Not Found" } };
 
-  const graphql = (req: Req) => {
-    const { query, variables } = req.json as { query: string; variables: Json };
-    const actor = botOf(req) ?? "unknown";
-    if (query.includes("reviewThreads(")) {
-      const nodes = [...threads.values()]
-        .filter((t) => t.prNumber === variables["number"])
-        .map(toNode);
+  const reviewThreads = (variables: Json) => {
+    const nodes = [...threads.values()]
+      .filter((t) => t.prNumber === variables["number"])
+      .map(toNode);
 
-      const data: ThreadsData = {
-        repository: {
-          pullRequest: {
-            reviewThreads: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
-          },
+    const data: ThreadsData = {
+      repository: {
+        pullRequest: {
+          reviewThreads: { pageInfo: { hasNextPage: false, endCursor: null }, nodes },
         },
-      };
+      },
+    };
 
-      return { data };
-    }
+    return { data };
+  };
 
-    if (query.includes("addPullRequestReviewThreadReply")) {
-      const t = threads.get(variables["id"]);
-      if (!t) {
-        return {
-          data: null,
-          errors: [{ type: "NOT_FOUND", message: "Could not resolve to a node" }],
-        };
-      }
-
-      t.comments.push({
-        id: `${t.id}_c${t.comments.length}`,
-        databaseId: ++commentId,
-        seq: ++seq,
-        author: actor,
-        body: variables["body"],
-      });
-
-      return { data: { addPullRequestReviewThreadReply: { comment: { id: t.id } } } };
-    }
-
-    if (/markPullRequestReadyForReview|convertPullRequestToDraft/.test(query)) {
-      const pr = need(String(variables["id"]).slice("PR_".length));
-      if (pr) {
-        pr.draft = query.includes("convertPullRequestToDraft");
-      }
-
-      return { data: { pullRequest: { id: variables["id"], isDraft: pr?.draft ?? false } } };
-    }
-
-    if (query.includes("statusCheckRollup")) {
-      // No check is required in this repository.
-      const data: RequiredChecksData = {
-        repository: {
-          pullRequest: {
-            commits: {
-              nodes: [
-                {
-                  commit: {
-                    statusCheckRollup: {
-                      contexts: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] },
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-      };
-
-      return { data };
-    }
-
-    if (query.includes("mergeQueue(")) {
-      return { data: { repository: { mergeQueue: { id: "MQ_1" } } } };
-    }
-
-    if (query.startsWith("mutation")) {
-      const t = threads.get(variables["id"]);
-      if (t) {
-        t.resolved = true;
-      }
-
+  const replyToThread = (variables: Json, actor: string) => {
+    const t = threads.get(variables["id"]);
+    if (!t) {
       return {
-        data: { resolveReviewThread: { thread: { id: variables["id"], isResolved: true } } },
+        data: null,
+        errors: [{ type: "NOT_FOUND", message: "Could not resolve to a node" }],
       };
     }
 
+    t.comments.push({
+      id: `${t.id}_c${t.comments.length}`,
+      databaseId: ++commentId,
+      seq: ++seq,
+      author: actor,
+      body: variables["body"],
+    });
+
+    return { data: { addPullRequestReviewThreadReply: { comment: { id: t.id } } } };
+  };
+
+  const setDraft = (variables: Json, _actor: string, query: string) => {
+    const pr = need(String(variables["id"]).slice("PR_".length));
+    if (pr) {
+      pr.draft = query.includes("convertPullRequestToDraft");
+    }
+
+    return { data: { pullRequest: { id: variables["id"], isDraft: pr?.draft ?? false } } };
+  };
+
+  const resolveThread = (variables: Json) => {
+    const t = threads.get(variables["id"]);
+    if (t) {
+      t.resolved = true;
+    }
+
+    return {
+      data: { resolveReviewThread: { thread: { id: variables["id"], isResolved: true } } },
+    };
+  };
+
+  const threadNode = (variables: Json) => {
     const t = threads.get(variables["id"]);
     return {
       data: {
         node: t ? { ...toNode(t), comments: { nodes: toNode(t).comments.nodes.slice(-1) } } : null,
       },
     };
+  };
+
+  /** The GraphQL operations the adapter sends, matched on the query text in order; the rest read a thread. */
+  const graphqlOps: [
+    (query: string) => boolean,
+    (v: Json, actor: string, query: string) => unknown,
+  ][] = [
+    [(q) => q.includes("reviewThreads("), reviewThreads],
+    [(q) => q.includes("addPullRequestReviewThreadReply"), replyToThread],
+    [(q) => /markPullRequestReadyForReview|convertPullRequestToDraft/.test(q), setDraft],
+    [(q) => q.includes("statusCheckRollup"), requiredChecks],
+    [
+      (q) => q.includes("mergeQueue("),
+      () => ({ data: { repository: { mergeQueue: { id: "MQ_1" } } } }),
+    ],
+    [(q) => q.startsWith("mutation"), resolveThread],
+  ];
+
+  const graphql = (req: Req) => {
+    const { query, variables } = req.json as { query: string; variables: Json };
+    const actor = botOf(req) ?? "unknown";
+    const op = graphqlOps.find(([matches]) => matches(query))?.[1] ?? threadNode;
+    return op(variables, actor, query);
+  };
+
+  /** Queues the pull request; the queue passes a moment later and the host merges it. */
+  const enqueueMerge = (pr: StoredPull, json: Json, actor: string) => {
+    if (json["merge_action"] !== "merge_queue") {
+      return { status: 422, body: { message: "merge_action must be merge_queue" } };
+    }
+
+    pr.queued = true;
+    setTimeout(() => {
+      void (async () => {
+        await repo.merge(pr.base, pr.head, `Merge pull request #${pr.number} (queue)`);
+        Object.assign(pr, { state: "closed", merged: true, updatedAt: now() });
+        emit("PullRequestEvent", actor, await prPayload(pr, "closed"));
+      })();
+    }, 1500);
+
+    return { status: 202, body: { status: "enqueued" } };
   };
 
   const pulls = `${API}/repos/${full}/pulls`;
@@ -451,21 +501,7 @@ export function createGithub(opts: GithubOptions) {
 
         const actor = botOf(r) ?? "unknown";
         if (kind === "merge-async") {
-          if (r.json.merge_action !== "merge_queue") {
-            return { status: 422, body: { message: "merge_action must be merge_queue" } };
-          }
-
-          pr.queued = true;
-          // The queue passes a moment later and the host merges the pull request.
-          setTimeout(() => {
-            void (async () => {
-              await repo.merge(pr.base, pr.head, `Merge pull request #${pr.number} (queue)`);
-              Object.assign(pr, { state: "closed", merged: true, updatedAt: now() });
-              emit("PullRequestEvent", actor, await prPayload(pr, "closed"));
-            })();
-          }, 1500);
-
-          return { status: 202, body: { status: "enqueued" } };
+          return enqueueMerge(pr, r.json, actor);
         }
 
         await repo.merge(pr.base, pr.head, `Merge pull request #${pr.number}`);
@@ -748,21 +784,9 @@ export function createGithub(opts: GithubOptions) {
   async function serveGit(
     req: Req,
   ): Promise<{ status: number; headers: Record<string, string>; body: Buffer }> {
-    const basic = /^Basic (.+)$/.exec(String(req.headers["authorization"] ?? ""))?.[1];
-    const token = basic
-      ? Buffer.from(basic, "base64").toString("utf8").split(":").slice(1).join(":")
-      : "";
-
-    const who = tokens.get(token);
-    const pushing =
-      req.path.endsWith("/git-receive-pack") || req.query.get("service") === "git-receive-pack";
-
-    if (!who || (pushing && !who.write)) {
-      return {
-        status: who ? 403 : 401,
-        headers: { "www-authenticate": 'Basic realm="github"', "content-type": "text/plain" },
-        body: Buffer.from(who ? "write access required\n" : "authentication required\n"),
-      };
+    const who = tokens.get(basicPassword(req));
+    if (!who || (isPush(req) && !who.write)) {
+      return gitDenied(Boolean(who));
     }
 
     const served = [repo, ...(opts.more ?? [])].find((r) =>

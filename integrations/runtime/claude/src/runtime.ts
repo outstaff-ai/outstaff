@@ -15,22 +15,12 @@ import {
 import { renderedSkillNames } from "./layout.js";
 import { mapMessage } from "./messages.js";
 import { permissionHook } from "./permissions.js";
+import { sessionEvents } from "./run-events.js";
 import { ALWAYS_DROPPED, CREDENTIAL_KEYS } from "./credentials.js";
 import { builtinToolNames, disallowedToolNames, OST_SERVER, ostServer } from "./tools.js";
 import type { AgentSdkRuntimeConfig, MapState, QueryFn } from "./types.js";
 
 const PROBE_MODEL = "haiku";
-
-/** What Claude Code says when `resume` names a session it cannot find. */
-const SESSION_LOST =
-  /no conversation found|session\b.{0,40}\b(not found|expired|does not exist|unknown)/i;
-
-/** Marks a failed finish as a lost session when the run tried to resume one. */
-function markLost(e: Extract<RuntimeEvent, { type: "finished" }>, resumed: boolean): RuntimeEvent {
-  return resumed && !e.ok && !e.interrupted && e.error && SESSION_LOST.test(e.error)
-    ? { ...e, sessionLost: true }
-    : e;
-}
 
 export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
   const query: QueryFn = config.query ?? sdkQuery;
@@ -119,24 +109,14 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
     };
   }
 
-  async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
-    if (req.signal?.aborted) {
-      yield { type: "finished", ok: false, text: "", interrupted: true };
-      return;
-    }
-
-    const pending: RuntimeEvent[] = [];
+  function runOptions(req: RunRequest, abort: AbortController, pending: RuntimeEvent[]): Options {
     const onDecision = (tool: string, input: unknown, decision: Decision) => {
       log.debug("tool call judged", { tool, effect: decision.effect, rule: decision.rule });
       pending.push({ type: "tool_call", tool, input, decision });
     };
 
-    const abort = new AbortController();
-    const onAbort = () => abort.abort();
-    req.signal?.addEventListener("abort", onAbort, { once: true });
-
     const maxTurns = req.maxTurns ?? config.options.maxTurns;
-    const options: Options = {
+    return {
       ...isolated(req.builtinTools.includes("artifact")),
       cwd: req.workdir,
       skills: renderedSkillNames(req.workdir),
@@ -153,44 +133,29 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
       permissionMode: "dontAsk",
       hooks: { PreToolUse: [{ hooks: [permissionHook(req.policy, req.workdir, onDecision)] }] },
     };
+  }
 
+  async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
+    if (req.signal?.aborted) {
+      yield { type: "finished", ok: false, text: "", interrupted: true };
+      return;
+    }
+
+    const pending: RuntimeEvent[] = [];
+    const abort = new AbortController();
+    const onAbort = () => abort.abort();
+    req.signal?.addEventListener("abort", onAbort, { once: true });
+
+    const options = runOptions(req, abort, pending);
     const state: MapState = { lastText: "" };
-    let finished = false;
+    let finished: boolean;
     try {
-      for await (const m of query({ prompt: req.prompt, options })) {
-        const events = mapMessage(m, state, req.signal);
-        // Hook decisions for the calls in this message arrive before its results; flush them ahead of the result.
-        for (const e of events) {
-          if (e.type === "finished") {
-            yield* pending.splice(0);
-          }
-
-          if (e.type === "finished") {
-            finished = true;
-          }
-
-          yield e.type === "finished" ? markLost(e, req.sessionId !== undefined) : e;
-        }
-
-        yield* pending.splice(0);
-      }
-    } catch (e) {
-      yield* pending.splice(0);
-      if (!finished) {
-        finished = true;
-        const interrupted = req.signal?.aborted === true;
-        yield markLost(
-          {
-            type: "finished",
-            ok: false,
-            text: state.lastText,
-            ...(interrupted
-              ? { interrupted: true }
-              : { error: e instanceof Error ? e.message : String(e) }),
-          },
-          req.sessionId !== undefined,
-        );
-      }
+      finished = yield* sessionEvents(() => query({ prompt: req.prompt, options }), {
+        pending,
+        state,
+        signal: req.signal,
+        resumed: req.sessionId !== undefined,
+      });
     } finally {
       req.signal?.removeEventListener("abort", onAbort);
     }

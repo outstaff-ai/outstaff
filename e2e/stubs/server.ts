@@ -239,51 +239,65 @@ const route = router([
   ...tracker.routes,
 ]);
 
+/** The request line for the access log: method, path and the start of the query. */
+const requestLine = (req: IncomingMessage, url: URL) =>
+  `${req.method} ${url.pathname}${url.search ? "?" : ""}${url.searchParams.size ? url.search.slice(1, 80) : ""}`;
+
+/** Answers the request from the git server, a stub route or a 404, and returns the status sent. */
+async function respond(
+  req: IncomingMessage,
+  res: ServerResponse,
+  url: URL,
+  body: Buffer,
+): Promise<number> {
+  if (github.isGitPath(url.pathname)) {
+    const out = await github.serveGit({
+      method: req.method ?? "GET",
+      path: url.pathname,
+      query: url.searchParams,
+      headers: req.headers,
+      params: {},
+      raw: body,
+      json: undefined,
+    });
+
+    res.writeHead(out.status, out.headers).end(out.body);
+    return out.status;
+  }
+
+  if (await route(req, res, body)) {
+    return res.statusCode;
+  }
+
+  res
+    .writeHead(404, { "content-type": "application/json" })
+    .end('{"message":"no such stub route"}');
+
+  return 404;
+}
+
+function fail(req: IncomingMessage, res: ServerResponse, url: URL, e: unknown): void {
+  log(`error ${req.method} ${url.pathname}: ${e instanceof Error ? e.stack : String(e)}`);
+  if (!res.headersSent) {
+    res.writeHead(500, { "content-type": "application/json" });
+  }
+
+  res.end(JSON.stringify({ message: e instanceof Error ? e.message : String(e) }));
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const started = Date.now();
   const body = await readBody(req);
   const url = new URL(req.url ?? "/", "http://stub");
-  const done = (status: number) =>
-    log(
-      `${req.method} ${url.pathname}${url.search ? "?" : ""}${url.searchParams.size ? url.search.slice(1, 80) : ""} ${status} ${Date.now() - started}ms`,
-    );
-
+  let status: number;
   try {
-    if (github.isGitPath(url.pathname)) {
-      const out = await github.serveGit({
-        method: req.method ?? "GET",
-        path: url.pathname,
-        query: url.searchParams,
-        headers: req.headers,
-        params: {},
-        raw: body,
-        json: undefined,
-      });
-
-      res.writeHead(out.status, out.headers).end(out.body);
-      done(out.status);
-      return;
-    }
-
-    if (await route(req, res, body)) {
-      done(res.statusCode);
-      return;
-    }
-
-    res
-      .writeHead(404, { "content-type": "application/json" })
-      .end('{"message":"no such stub route"}');
-
-    done(404);
+    status = await respond(req, res, url, body);
   } catch (e) {
-    log(`error ${req.method} ${url.pathname}: ${e instanceof Error ? e.stack : String(e)}`);
-    if (!res.headersSent) {
-      res.writeHead(500, { "content-type": "application/json" });
-    }
-
-    res.end(JSON.stringify({ message: e instanceof Error ? e.message : String(e) }));
-    done(500);
+    fail(req, res, url, e);
+    status = 500;
   }
+
+  log(`${requestLine(req, url)} ${status} ${Date.now() - started}ms`);
 }
 
 createHttp((req, res) => void handle(req, res)).listen(

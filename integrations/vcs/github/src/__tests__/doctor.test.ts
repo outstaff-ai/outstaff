@@ -38,48 +38,50 @@ interface Fake {
   repos?: string[];
 }
 
+const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
+
+/** The App id is in the JWT's iss claim; installation tokens carry the id. */
+function appIdOf(init?: RequestInit): string {
+  const auth = String((init!.headers as Record<string, string>)["authorization"]);
+  const jwt = auth.replace("Bearer ", "");
+  return jwt.startsWith("tok-")
+    ? jwt.slice(4)
+    : JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()).iss;
+}
+
+function appReply(a: Fake, iss: string): Response {
+  return a.app?.status ? json(a.app.status, {}) : json(200, { slug: a.app?.slug ?? `acme-${iss}` });
+}
+
+function installationReply(a: Fake): Response {
+  const i = a.installation ?? {};
+  return i.status
+    ? json(i.status, {})
+    : json(200, {
+        account: { login: i.account ?? "acme-example" },
+        repository_selection: i.selection ?? "selected",
+        permissions: i.permissions ?? READ,
+      });
+}
+
+const ROUTES: [(path: string) => boolean, (a: Fake, iss: string) => Response][] = [
+  [(path) => path === "/app", appReply],
+  [(path) => /^\/app\/installations\/\d+$/.test(path), installationReply],
+  [(path) => path.endsWith("/access_tokens"), (_a, iss) => json(201, { token: `tok-${iss}` })],
+  [
+    (path) => path === "/installation/repositories",
+    (a) => json(200, { repositories: (a.repos ?? []).map((full_name) => ({ full_name })) }),
+  ],
+];
+
 function fake(apps: Record<string, Fake>) {
   const calls: string[] = [];
   const impl = (async (url: string | URL, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
     calls.push(`${init?.method ?? "GET"} ${path}`);
-    const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status });
-    // The App id is in the JWT's iss claim; installation tokens carry the id.
-    const auth = String((init!.headers as Record<string, string>)["authorization"]);
-    const jwt = auth.replace("Bearer ", "");
-    const claims = jwt.startsWith("tok-")
-      ? { iss: jwt.slice(4) }
-      : JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString());
-
-    const a = apps[claims.iss] ?? {};
-    if (path === "/app") {
-      return a.app?.status
-        ? json(a.app.status, {})
-        : json(200, { slug: a.app?.slug ?? `acme-${claims.iss}` });
-    }
-
-    if (/^\/app\/installations\/\d+$/.test(path)) {
-      const i = a.installation ?? {};
-      return i.status
-        ? json(i.status, {})
-        : json(200, {
-            account: { login: i.account ?? "acme-example" },
-            repository_selection: i.selection ?? "selected",
-            permissions: i.permissions ?? READ,
-          });
-    }
-
-    if (path.endsWith("/access_tokens")) {
-      return json(201, { token: `tok-${claims.iss}` });
-    }
-
-    if (path === "/installation/repositories") {
-      return json(200, {
-        repositories: (a.repos ?? []).map((full_name) => ({ full_name })),
-      });
-    }
-
-    return json(404, {});
+    const iss = appIdOf(init);
+    const reply = ROUTES.find(([matches]) => matches(path))?.[1];
+    return reply ? reply(apps[iss] ?? {}, iss) : json(404, {});
   }) as typeof fetch;
 
   return { impl, calls };
