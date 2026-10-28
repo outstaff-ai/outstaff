@@ -5,10 +5,11 @@ packages:
   - "docs"
   - "e2e"
   - "e2e/runtime-scripted"
+  - "e2e/stubs"
 allowBuilds:
   esbuild: true
 savePrefix: ""
 # A package's tests may use a private test kit (testing/*) that depends on the package itself: a devDependency cycle.
-# The kits are source only and have no build, so their tasks can run in any order relative to the package's. This
-# hides every cycle from pnpm, so `pnpm check:files` (scripts/file-layout.mjs) fails on any other cycle.
+# A kit's build reads the package from source (the @outstaff/source condition), so their tasks can run in any order
+# relative to each other. This hides every cycle from pnpm, so `pnpm check:files` (scripts/file-layout.mjs) fails on any other cycle.
 ignoreWorkspaceCycles: true

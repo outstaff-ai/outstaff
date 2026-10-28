@@ -1,4 +1,4 @@
-import type { Route } from "./http.ts";
+import type { Route } from "@outstaff/testing.http";
 
 /**
  * A chat workspace for the end-to-end test: the agent's chat adapter polls it (e2e/runtime-scripted/src/chat.ts), and

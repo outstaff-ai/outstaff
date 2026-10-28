@@ -15,7 +15,7 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 | `packages/agent`               | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.                                                     |
 | `packages/protocol`            | The agent connection protocol: zod schemas and types shared by the office and the agent.                                                                             |
 | `integrations/<port>/<vendor>` | One adapter package per integration, published as `@outstaff/integration.<port>.<vendor>`. Code two adapters of a vendor share is in `integrations/shared/<vendor>`. |
-| `testing/<name>`               | Private test kits shared between packages (`@outstaff/testing.<name>`): fixtures, the GitHub and Its a Plan stand-ins. Never published.                              |
+| `testing/<name>`               | Private test kits shared between packages (`@outstaff/testing.<name>`): fixtures, the GitHub and Its a Plan stand-ins (also served by `e2e/stubs`). Never published. |
 | `docs/`                        | The Starlight documentation site (`@outstaff/docs`), published to GitHub Pages at docs.outstaff.work.                                                                |
 | `docs/scripts/llms.mjs`        | Generates `llms.txt` and `llms-full.txt` into `docs/dist` after the docs build.                                                                                      |
 

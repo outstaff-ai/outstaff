@@ -1,9 +1,9 @@
 import { silentLogger, type AdapterContext } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { API_KEY, secretMap, team } from "@outstaff/testing.itsaplan";
+import { createItsaplanFake } from "./fake.js";
 import { knowledgeOptions } from "#/index.js";
 import { createItsaplanKnowledge } from "#/knowledge.js";
-import { createItsaplanFake } from "#/testing/itsaplan-fake.js";
 
 const knowledgeCtx = (fake: ReturnType<typeof createItsaplanFake>) =>
   ({

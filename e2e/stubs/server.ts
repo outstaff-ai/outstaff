@@ -1,15 +1,23 @@
 import { readFileSync } from "node:fs";
 import { createServer as createHttp, type IncomingMessage, type ServerResponse } from "node:http";
 import { createServer as createHttps } from "node:https";
+import {
+  createRouter,
+  incomingFromNode,
+  readBody,
+  writeReply,
+  type Incoming,
+  type StandInReply,
+} from "@outstaff/testing.http";
+import { BareRepo, createGithubE2e } from "@outstaff/testing.github/stand-in";
+import { createItsaplanE2e } from "@outstaff/testing.itsaplan/stand-in";
 import { createChat } from "./chat.ts";
-import { BareRepo } from "./git.ts";
-import { createGithub } from "./github.ts";
-import { readBody, router, type Route } from "./http.ts";
-import { createTracker } from "./tracker.ts";
+import { controlRoutes, serviceRoutes } from "./control.ts";
 
 /**
- * Stand-ins for GitHub (API and git remote), the tracker and a chat workspace, for the end-to-end test. Configuration comes from the
- * environment so the same file runs in a container and on a laptop:
+ * The end-to-end test's stand-ins over HTTP: GitHub (API and git remote) and Its a Plan from the shared vendor
+ * stand-ins (testing/github, testing/itsaplan), plus a chat workspace and two team services. Configuration comes
+ * from the environment so the same file runs in a container and on a laptop:
  *
  *   STUB_DATA_DIR      where the bare repository lives
  *   STUB_APPS          `<app id>=<slug>,...` the GitHub Apps that exist
@@ -53,7 +61,7 @@ await repo.init({
 const ops = new BareRepo(env("STUB_DATA_DIR"), "acme", "ops");
 await ops.init({ "README.md": "# Acme Ops\n" });
 
-const github = createGithub({
+const github = createGithubE2e({
   repo,
   more: [ops],
   apps: pairs(env("STUB_APPS")),
@@ -61,7 +69,7 @@ const github = createGithub({
   permissions: { "ada-admin": "write", "grace-lead": "write" },
 });
 
-const tracker = createTracker({
+const tracker = createItsaplanE2e({
   projectKey: "SHOP",
   teamRef: "acme",
   columns: [
@@ -86,219 +94,59 @@ const tracker = createTracker({
 });
 
 const chat = createChat();
-const ok = (body: unknown = { ok: true }) => body;
-const control: Route[] = [
-  { method: "GET", path: "/_test/healthz", handler: () => ok() },
-  {
-    method: "GET",
-    path: "/_test/state",
-    handler: async () => ({
-      github: await github.state(),
-      tickets: tracker.state(),
-      docs: tracker.docs(),
-      chat: chat.state(),
-      attachmentsServed: tracker.served(),
-    }),
-  },
-  {
-    // A person edits a file on main, for example the contribution rules.
-    method: "POST",
-    path: "/_test/repo/file",
-    handler: async (r) => {
-      await repo.commitFile("main", r.json.path, r.json.text, r.json.message ?? "Update");
-      return ok();
-    },
-  },
-  {
-    method: "POST",
-    path: "/_test/tickets",
-    handler: (r) => ({
-      key: tracker.createTicket(
-        r.json.title,
-        r.json.description ?? "",
-        r.json.status ?? "Ready",
-        r.json.assignee,
-        r.json.as,
-      ),
-    }),
-  },
-  {
-    method: "POST",
-    path: "/_test/tickets/:key/assign",
-    handler: (r) => {
-      tracker.assignTicket(r.params["key"]!, r.json.to);
-      return ok();
-    },
-  },
-  {
-    method: "POST",
-    path: "/_test/tickets/:key/comment",
-    handler: (r) => {
-      tracker.commentTicket(r.params["key"]!, r.json.body);
-      return ok();
-    },
-  },
-  {
-    // A person comments on a document of the knowledge base, anchored to `quote`, or replies to `parentId`.
-    method: "POST",
-    path: "/_test/docs/:id/comments",
-    handler: (r) => ({
-      id: tracker.commentDoc(r.params["id"]!, r.json.body, r.json.quote ?? "", r.json.parentId),
-    }),
-  },
-  {
-    method: "POST",
-    path: "/_test/pulls/:n/review",
-    handler: async (r) => {
-      const event = {
-        approved: "APPROVE",
-        changes_requested: "REQUEST_CHANGES",
-        commented: "COMMENT",
-      }[r.json.state as string];
-
-      if (!event) {
-        return {
-          status: 400,
-          body: { message: "state: approved, changes_requested or commented" },
-        };
-      }
-
-      await github.review(
-        Number(r.params["n"]),
-        r.json.actor ?? "grace-lead",
-        event,
-        r.json.body ?? "",
-        r.json.comments,
-      );
-
-      return ok();
-    },
-  },
-  {
-    method: "POST",
-    path: "/_test/pulls/:n/comment",
-    handler: async (r) => {
-      await github.comment(Number(r.params["n"]), r.json.actor ?? "grace-lead", r.json.body ?? "");
-      return ok();
-    },
-  },
-  {
-    method: "POST",
-    path: "/_test/pulls/:n/check",
-    handler: async (r) => {
-      await github.setCheck(Number(r.params["n"]), r.json.name, r.json.conclusion);
-      return ok();
-    },
-  },
-  {
-    method: "POST",
-    path: "/_test/pulls/:n/merge",
-    handler: async (r) => {
-      await github.merge(Number(r.params["n"]), "grace-lead");
-      return ok();
-    },
-  },
-];
-
-// Two services of the team reached by `ost http`: a hub with no authentication and a home service with a bearer
-// token. Both are served by this process under their own host names; every request is recorded.
-const serviceHits: { host: string; path: string; authorized: boolean }[] = [];
-const homeToken = env("STUB_HOME_TOKEN");
-const services: Route[] = [
-  {
-    method: "GET",
-    path: "/_test/service-hits",
-    handler: () => serviceHits,
-  },
-  {
-    method: "GET",
-    path: "/hub/status",
-    handler: (r) => {
-      serviceHits.push({ host: String(r.headers.host), path: r.path, authorized: false });
-      return { devices: 2 };
-    },
-  },
-  {
-    method: "GET",
-    path: "/hub/secure",
-    handler: (r) => {
-      const authorized = r.headers.authorization === `Bearer ${homeToken}`;
-      serviceHits.push({ host: String(r.headers.host), path: r.path, authorized });
-      // The body repeats the credential it was given, so the test can see the agent never gets it back.
-      return authorized
-        ? { status: 200, body: { lights: "on", seen: r.headers.authorization } }
-        : { status: 401, body: { error: "unauthorized" } };
-    },
-  },
-];
-
-const route = router([
-  ...control,
-  ...services,
+const dispatch = createRouter([
+  ...controlRoutes({ repo, github, tracker, chat }),
+  ...serviceRoutes(env("STUB_HOME_TOKEN")),
   ...chat.routes,
   ...github.routes,
   ...tracker.routes,
 ]);
 
+const NOT_FOUND: StandInReply = { status: 404, body: { message: "no such stub route" } };
+
+/** The answer of the git server, a stand-in route or a 404. */
+async function answer(incoming: Incoming): Promise<StandInReply> {
+  if (github.isGitPath(incoming.path)) {
+    return github.serveGit(incoming);
+  }
+
+  return (await dispatch(incoming))?.reply ?? NOT_FOUND;
+}
+
+/** The request as the stand-ins see it, or a 400 for a JSON body that does not parse. */
+async function incomingOf(req: IncomingMessage): Promise<Incoming | StandInReply> {
+  const raw = await readBody(req);
+  try {
+    return await incomingFromNode(req, raw);
+  } catch (e) {
+    if (e instanceof SyntaxError) {
+      return { status: 400, body: { message: "bad json" } };
+    }
+
+    throw e;
+  }
+}
+
+async function respond(req: IncomingMessage): Promise<StandInReply> {
+  const incoming = await incomingOf(req);
+  return "path" in incoming ? answer(incoming) : incoming;
+}
+
+function fail(req: IncomingMessage, url: URL, e: unknown): StandInReply {
+  log(`error ${req.method} ${url.pathname}: ${e instanceof Error ? e.stack : String(e)}`);
+  return { status: 500, body: { message: e instanceof Error ? e.message : String(e) } };
+}
+
 /** The request line for the access log: method, path and the start of the query. */
 const requestLine = (req: IncomingMessage, url: URL) =>
   `${req.method} ${url.pathname}${url.search ? "?" : ""}${url.searchParams.size ? url.search.slice(1, 80) : ""}`;
 
-/** Answers the request from the git server, a stub route or a 404, and returns the status sent. */
-async function respond(
-  req: IncomingMessage,
-  res: ServerResponse,
-  url: URL,
-  body: Buffer,
-): Promise<number> {
-  if (github.isGitPath(url.pathname)) {
-    const out = await github.serveGit({
-      method: req.method ?? "GET",
-      path: url.pathname,
-      query: url.searchParams,
-      headers: req.headers,
-      params: {},
-      raw: body,
-      json: undefined,
-    });
-
-    res.writeHead(out.status, out.headers).end(out.body);
-    return out.status;
-  }
-
-  if (await route(req, res, body)) {
-    return res.statusCode;
-  }
-
-  res
-    .writeHead(404, { "content-type": "application/json" })
-    .end('{"message":"no such stub route"}');
-
-  return 404;
-}
-
-function fail(req: IncomingMessage, res: ServerResponse, url: URL, e: unknown): void {
-  log(`error ${req.method} ${url.pathname}: ${e instanceof Error ? e.stack : String(e)}`);
-  if (!res.headersSent) {
-    res.writeHead(500, { "content-type": "application/json" });
-  }
-
-  res.end(JSON.stringify({ message: e instanceof Error ? e.message : String(e) }));
-}
-
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
   const started = Date.now();
-  const body = await readBody(req);
   const url = new URL(req.url ?? "/", "http://stub");
-  let status: number;
-  try {
-    status = await respond(req, res, url, body);
-  } catch (e) {
-    fail(req, res, url, e);
-    status = 500;
-  }
-
-  log(`${requestLine(req, url)} ${status} ${Date.now() - started}ms`);
+  const reply = await respond(req).catch((e: unknown) => fail(req, url, e));
+  writeReply(res, reply);
+  log(`${requestLine(req, url)} ${reply.status ?? 200} ${Date.now() - started}ms`);
 }
 
 createHttp((req, res) => void handle(req, res)).listen(

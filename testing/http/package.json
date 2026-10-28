@@ -1,0 +1,28 @@
+{
+  "name": "@outstaff/testing.http",
+  "version": "0.0.0",
+  "description": "The HTTP plumbing of the vendor stand-ins: a route table, and adapters that serve it as a fetch (adapter tests) or from a Node server (the end-to-end stubs). Private: never packed or published.",
+  "license": "Apache-2.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "@outstaff/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "imports": {
+    "#/*": {
+      "@outstaff/source": "./src/*",
+      "default": "./dist/*"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  }
+}
