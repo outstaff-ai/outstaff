@@ -7,6 +7,10 @@ on:
   merge_group:
   push:
     tags: ["v*"]
+  # arm64 is built every night and on release tags, natively (see `arm64` below)
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,20 +20,20 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Pull requests and the merge queue build the native amd64 image and smoke-test it. Building arm64 here ran under
+  # emulation, took most of the queue's time and timed out (#417); it is built natively by `arm64` instead.
   build:
     name: build (${{ matrix.image }})
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         image: [agent, office]
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: docker/setup-qemu-action@v4.4.0
       - uses: docker/setup-buildx-action@v4.4.1
-      # Native-arch build loaded into the runner, so the smoke test can start it.
-      - name: Build (linux/amd64) for the smoke test
+      - name: Build (linux/amd64)
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
@@ -42,22 +46,38 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
       - name: Smoke test
         run: images/smoke.sh local ci ${{ matrix.image }}
-      # Nothing is pushed here; this proves both architectures build.
-      - name: Build (linux/amd64, linux/arm64)
+
+  # Proves arm64 builds and starts, on a native arm64 runner: every night, by hand, and before a release publishes.
+  arm64:
+    name: build arm64 (${{ matrix.image }})
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [agent, office]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-buildx-action@v4.4.1
+      - name: Build (linux/arm64)
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: images/Dockerfile
           target: ${{ matrix.image }}
-          platforms: linux/amd64,linux/arm64
-          push: false
-          cache-from: type=gha,scope=${{ matrix.image }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          platforms: linux/arm64
+          load: true
+          tags: local/${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}-arm64
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
+      - name: Smoke test
+        run: images/smoke.sh local ci ${{ matrix.image }}
 
   publish:
     name: publish (${{ matrix.image }})
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    needs: build
+    needs: [build, arm64]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -92,4 +112,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-from: |
+            type=gha,scope=${{ matrix.image }}
+            type=gha,scope=${{ matrix.image }}-arm64
