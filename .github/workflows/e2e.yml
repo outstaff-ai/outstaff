@@ -57,8 +57,11 @@ jobs:
           target: agent-e2e
           load: true
           tags: outstaff/agent-e2e:local
-          cache-from: type=gha,scope=agent
-          cache-to: type=gha,mode=max,scope=agent
+          # Its own scope: sharing `agent` with the Images workflow made each overwrite the other's cache (#417).
+          cache-from: |
+            type=gha,scope=agent-e2e
+            type=gha,scope=agent
+          cache-to: type=gha,mode=max,scope=agent-e2e
       - name: Build the GitHub and tracker stand-ins
         uses: docker/build-push-action@v7.4.0
         with:
