@@ -161,7 +161,7 @@ describe("default policies", () => {
 
     expect(trace.decisions[0]).toMatchObject({
       instruction:
-        "Your pull request #9 (Change 9) is behind its base branch, and the repository requires it to be up to date after #8 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push.",
+        "Your pull request #9 (Change 9) is behind its base branch, and the repository requires it to be up to date after #8 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why.",
     });
 
     expect(

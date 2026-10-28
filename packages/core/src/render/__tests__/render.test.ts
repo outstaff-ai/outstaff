@@ -114,6 +114,23 @@ describe("golden output per acme person", () => {
     expect(git).toContain("Squash merge. Titles start with the ticket key.");
   });
 
+  it("tells developer and devops to keep the pull request description current after a rebase", () => {
+    for (const handle of ["sam", "kofi"]) {
+      const files = renderPerson({ team: acme, handle, catalog: real }).files;
+      expect(files.get("references/git.md")).toContain(
+        "the description must still describe what the branch does now",
+      );
+
+      const skill = [...files].find(
+        ([path]) => path.endsWith("SKILL.md") && /### rebase/.test(files.get(path) ?? ""),
+      );
+
+      expect(skill?.[1], `${handle} has a rebase section`).toContain(
+        "Keep the pull request description current",
+      );
+    }
+  });
+
   it("tells agents to settle the target repository only when the team has more than one", () => {
     const work = (team: TeamConfig) =>
       renderPerson({ team, handle: "sam", catalog: real }).files.get("process/work-items.md");

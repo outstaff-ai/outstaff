@@ -27,6 +27,8 @@ export async function recipeFor(
     `    git rebase origin/${pr.baseRef}`,
     "    git push --force-with-lease",
     "",
+    "Then make sure the pull request description still describes what the branch does now, and if the approach changed, comment on the pull request with what changed, which merge caused it and why.",
+    "",
     `If \`${pr.baseRef}\` is a branch of a pull request that was merged and deleted, the stack moved on: retarget the pull request onto the default branch first and rebase with \`git rebase --onto origin/<default branch> <old base head> ${pr.headRef}\`.`,
     ...(above.length > 0
       ? [

@@ -51,6 +51,16 @@ Something is broken in a running environment.
 - Gather evidence with read-only commands: what changed, when, what the logs say. Link or quote the minimum needed.
 - Report the likely cause, the evidence and options with risks. Do not fix by hand; propose the change as a pull request or ask a trusted human for a granted action.
 
+### rebase
+
+A branch has a conflict, or its parent in a stack merged.
+
+1. Fetch. Bring the branch up to date the way the repository's conventions say; if they say nothing, rebase onto the base rather than merging the base in.
+2. For a stack, go bottom-up with `git rebase --onto` as in `references/git.md`, push each branch with `--force-with-lease`, and retarget each pull request with `ost pr update <n> --base <branch>`.
+3. If resolving a conflict changes what the infrastructure code means, say so in the pull request.
+4. Keep the pull request description current, as `references/git.md` (Conflicts) says: rewrite what no longer matches the branch (the approach, the plan summary, rollout and rollback), and when the approach changed, comment with what changed, which merge caused it and why. Mention it in your hand-back.
+5. Run validate, lint and plan again before you hand back.
+
 ### doc-feedback
 
 A trusted human commented on a document you wrote, or mentioned you on one.
