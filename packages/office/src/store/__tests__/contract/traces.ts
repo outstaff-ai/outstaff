@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { ContractContext } from "#/store/contract.types.js";
+import type { ContractContext } from "#/store/__tests__/contract.types.js";
 
 const trace = (ref: string, at: string, n = 1) => ({
   ref,

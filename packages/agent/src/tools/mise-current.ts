@@ -4,7 +4,8 @@ import type { MiseRunner } from "./types.js";
 
 /**
  * Answers `mise current <tool>` the way mise does: with the version the global config file sets, and nothing when
- * it sets none. Wraps a runner for everything else (tests only).
+ * it sets none. Wraps a runner for everything else. Used by tests and the scripted runtime, where nothing is really
+ * installed.
  */
 export const withGlobalConfig =
   (inner: MiseRunner): MiseRunner =>

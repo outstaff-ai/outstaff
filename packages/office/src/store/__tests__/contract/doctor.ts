@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { ContractContext } from "#/store/contract.types.js";
+import type { ContractContext } from "#/store/__tests__/contract.types.js";
 
 const T1 = "2026-10-01T06:00:00.000Z";
 const T2 = "2026-10-02T06:00:00.000Z";

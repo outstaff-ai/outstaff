@@ -1,6 +1,6 @@
 import type { PrRef, WorkflowEvent } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { REPO, teamConfig } from "#/intake/test-support.js";
+import { REPO, teamConfig } from "#/intake/__tests__/test-support.js";
 import { harness, SAM, type Harness, type HarnessOptions } from "./test-support.js";
 
 const dana = { kind: "human", id: "dana" } as const;

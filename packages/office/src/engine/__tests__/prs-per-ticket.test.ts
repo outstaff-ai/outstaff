@@ -1,6 +1,6 @@
 import type { TeamConfig } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
-import { REPO, teamConfig } from "#/intake/test-support.js";
+import { REPO, teamConfig } from "#/intake/__tests__/test-support.js";
 import { harness, SAM, type Harness } from "./test-support.js";
 
 // policies.tickets.prs_per_ticket: the comment on a second pull request a person opens, and when a ticket is done.

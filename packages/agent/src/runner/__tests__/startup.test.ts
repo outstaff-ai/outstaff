@@ -7,8 +7,8 @@ import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fak
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createOfficeConnection } from "#/office-client/index.js";
-import { FakeSocket, createManualClock } from "#/office-client/testing.js";
-import { withGlobalConfig } from "#/tools/testing.js";
+import { FakeSocket, createManualClock } from "#/office-client/__tests__/testing.js";
+import { withGlobalConfig } from "#/tools/mise-current.js";
 import { StartupError } from "#/runner/startup-error.js";
 import { prepareAgent } from "#/runner/startup.js";
 

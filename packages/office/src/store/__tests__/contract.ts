@@ -5,9 +5,10 @@ import { orderingCases } from "./contract/ordering.js";
 import { pauseCases } from "./contract/pauses.js";
 import { queueCases } from "./contract/queue.js";
 import { recordCases } from "./contract/records.js";
+import { refCases } from "./contract/refs.js";
 import { traceCases } from "./contract/traces.js";
 import type { ContractContext, StoreHarness } from "./contract.types.js";
-import type { OpenStoreOptions, Store } from "./types.js";
+import type { OpenStoreOptions, Store } from "#/store/types.js";
 
 /** Runs the store contract against a fresh, isolated storage per test. */
 export function storeContract(name: string, makeHarness: () => StoreHarness): void {
@@ -42,5 +43,6 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
     pauseCases(ctx);
     traceCases(ctx);
     doctorCases(ctx);
+    refCases(ctx);
   });
 }

@@ -1,8 +1,10 @@
 import type { DoctorStore } from "./doctor.types.js";
+import type { ItemRefStore, NewItemRef } from "./refs.types.js";
 import type { ConversationStatus, WorkItemStatus, WorkItemTrigger } from "./schema.js";
 
 export type { ConversationStatus, WorkItemStatus, WorkItemTrigger };
 export type { NewDoctorCheck, StoredDoctorCheck } from "./doctor.types.js";
+export type { ItemRef, ItemRefRole, ItemRefType, NewItemRef } from "./refs.types.js";
 
 export interface NewEvent {
   source: string;
@@ -24,6 +26,12 @@ export interface NewWorkItem {
   position?: number;
   parentId?: string;
   subject?: { type: string; ref: string };
+
+  /** What the item refers to beside its subject, which is recorded as a `subject` reference by itself. */
+  refs?: NewItemRef[];
+
+  /** What created the item, recorded as the source of its subject reference. Default `office`. */
+  source?: string;
 }
 
 export interface StoredEvent extends NewEvent {
@@ -98,6 +106,9 @@ export interface Link {
   from: Ref;
   to: Ref;
   relation: string;
+
+  /** When the edge was first linked (ISO-8601); null for an edge older than the column. */
+  createdAt: string | null;
 }
 
 export interface LinkQuery {
@@ -171,7 +182,7 @@ export interface TraceQuery {
   limit?: number;
 }
 
-export interface Store extends DoctorStore {
+export interface Store extends DoctorStore, ItemRefStore {
   readonly dialect: "postgres" | "sqlite";
 
   getCursor(source: string, key: string): Promise<string | undefined>;

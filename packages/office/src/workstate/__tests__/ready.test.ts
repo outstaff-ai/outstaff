@@ -2,7 +2,7 @@ import { createFakeTracker, createFakeVcs, type FakeTracker } from "@outstaff/co
 import type { Tracker, WorkflowEvent } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
-import { teamConfig } from "#/intake/test-support.js";
+import { teamConfig } from "#/intake/__tests__/test-support.js";
 import { openStore } from "#/store/open.js";
 import type { Store } from "#/store/types.js";
 import type { ManualClock } from "#/types.js";

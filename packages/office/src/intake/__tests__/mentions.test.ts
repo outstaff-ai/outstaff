@@ -1,6 +1,6 @@
 import { createFakeKnowledge, createFakeVcs } from "@outstaff/core/fakes";
 import { describe, expect, it, vi } from "vitest";
-import { human, setup } from "#/intake/test-support.js";
+import { human, setup } from "./test-support.js";
 
 // The adapters parse `@name` out of a comment; intake maps the names to the team's agents.
 

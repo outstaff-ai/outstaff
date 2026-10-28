@@ -6,6 +6,7 @@ import type {
   WorkItemStatus,
 } from "#/store/types.js";
 import { iso, newId } from "./ids.js";
+import { subjectRef, writeItemRefs } from "./refs.js";
 import { toItem } from "./rows.js";
 import type { StoreInternals } from "./types.js";
 
@@ -95,6 +96,11 @@ export function itemQueries({
         })
         .returningAll()
         .executeTakeFirstOrThrow();
+
+      await writeItemRefs(db, iso(at), row.id, [
+        ...subjectRef(input.subject, input.source ?? "office"),
+        ...(input.refs ?? []),
+      ]);
 
       return toItem(row);
     },

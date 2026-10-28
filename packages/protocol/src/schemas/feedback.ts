@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { journalEntrySchema, linkSchema, refSchema } from "./common.js";
+import { wakeContextSchema } from "./context.js";
 
 export const inlineCommentSchema = z.strictObject({
   id: z.string().min(1).describe("The comment's id on the host."),
@@ -81,5 +82,10 @@ export const offerContextSchema = z.strictObject({
     .optional()
     .describe(
       "For a round started by a comment on the pull request conversation or a review summary: the few entries of the conversation before the first of them, oldest first, so a short reply has its context.",
+    ),
+  wake: wakeContextSchema
+    .optional()
+    .describe(
+      "What the office knows about the work, handed over with the wake: the linked tickets, pull requests, documents and chat threads, each with its link and why it belongs.",
     ),
 });

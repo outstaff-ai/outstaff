@@ -1,4 +1,5 @@
 import { addFeedback } from "#/engine/feedback.js";
+import { triggerRefs } from "#/refs/index.js";
 import { priorityFor } from "#/scheduler/index.js";
 import type { WorkItemTrigger } from "#/store/types.js";
 import type { Wake } from "#/pipeline/decisions.types.js";
@@ -66,10 +67,13 @@ export async function enqueueWake(
       i.subject.ref === subject.ref,
   );
 
+  const refs = triggerRefs(event.subject, event.id, opts.workState.prSubject);
   if (live) {
     for (const f of wake.feedback) {
       await addFeedback(opts.store, live.id, f);
     }
+
+    await opts.store.addItemRefs(live.id, refs);
 
     await linkEvent(opts, live.id, event.id);
     return { itemId: live.id, joined: true };
@@ -84,6 +88,8 @@ export async function enqueueWake(
     trigger,
     priority: priorityFor(trigger, wake.kind),
     subject,
+    source: event.id,
+    refs,
     init: async (created) => {
       for (const f of wake.feedback) {
         await addFeedback(opts.store, created.id, f);

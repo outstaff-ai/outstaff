@@ -1,4 +1,4 @@
-import type { OpenStoreOptions, Store } from "./types.js";
+import type { OpenStoreOptions, Store } from "#/store/types.js";
 
 export interface StoreHarness {
   /** False when data does not survive close() (in-memory). */

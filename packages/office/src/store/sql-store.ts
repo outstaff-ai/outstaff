@@ -5,6 +5,7 @@ import { eventQueries } from "./sql/events.js";
 import { guardQueries } from "./sql/guards.js";
 import { itemQueries } from "./sql/items.js";
 import { linkQueries } from "./sql/links.js";
+import { refQueries } from "./sql/refs.js";
 import { runQueries } from "./sql/runs.js";
 import { traceQueries } from "./sql/traces.js";
 import type { StoreInternals } from "./sql/types.js";
@@ -17,6 +18,7 @@ export function createSqlStore(internals: StoreInternals): Store {
     ...itemQueries(internals),
     ...runQueries(internals),
     ...linkQueries(internals),
+    ...refQueries(internals),
     ...guardQueries(internals),
     ...conversationQueries(internals),
     ...traceQueries(internals),

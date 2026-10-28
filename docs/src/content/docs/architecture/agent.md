@@ -41,7 +41,7 @@ For each offer the agent:
 
 1. accepts it;
 2. for a `review_feedback` or `merged_feedback` item, reacts with `eyes` on the code host (see [Acknowledgements](#acknowledgements));
-3. builds the prompt from the offer: item kind and title, subjects and links, and the journal of earlier rounds;
+3. builds the prompt from the offer: item kind and title, subjects and links, the [wake context](/architecture/office/#wake-context) (the linked tickets, pull requests, documents and chat threads, their text quoted as data), and the journal of earlier rounds;
 4. runs it through the runtime with the identity prompt, the policy, the built-in tools of the profile and the `ost` verbs as in-process tools (`createRuntimeTools`, including `ask` and `question answer`);
 5. sends `progress` from the runtime's text events, at most once per interval (30 seconds by default);
 6. appends a journal entry (see [Journal](#journal));

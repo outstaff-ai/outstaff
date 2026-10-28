@@ -9,6 +9,10 @@ const EVENT_PIPELINE = [
   "packages/office/src/pipeline/**/*.ts",
   "packages/office/src/store/sql/traces.ts",
   "packages/office/src/store/migrations/0006_pipeline_traces.ts",
+  "packages/office/src/store/sql/refs.ts",
+  "packages/office/src/store/migrations/0009_work_item_refs.ts",
+  "packages/office/src/refs/**/*.ts",
+  "packages/office/src/wake-context/**/*.ts",
   "packages/core/src/config/pipeline.ts",
   "packages/cli/src/commands/explain.ts",
   "packages/office/src/link/**/*.ts",
@@ -33,10 +37,10 @@ export default defineConfig({
   test: {
     coverage: {
       // Every integration, including new ones, and the event pipeline are held to 100% of lines, branches, functions
-      // and statements, file by file. Test kits shipped for other packages are not measured.
+      // and statements, file by file. Tests and their helpers (`__tests__`) are not measured.
       provider: "v8",
       include: ["integrations/*/*/src/**/*.ts", ...EVENT_PIPELINE],
-      exclude: ["**/__tests__/**", "**/src/testing/**", "**/testing.ts", "**/contract.ts"],
+      exclude: ["**/__tests__/**"],
       reporter: ["text-summary", "json-summary"],
       thresholds: { perFile: true, lines: 100, branches: 100, functions: 100, statements: 100 },
     },

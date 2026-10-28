@@ -5,8 +5,17 @@ export function createMemoryTraceStore(): TraceStore {
   const traces = new Map<string, Trace>();
   return {
     async record(trace) {
-      const results = trace.results ?? traces.get(trace.event.id)?.results;
-      traces.set(trace.event.id, structuredClone({ ...trace, ...(results ? { results } : {}) }));
+      const kept = traces.get(trace.event.id);
+      const results = trace.results ?? kept?.results;
+      const context = trace.context ?? kept?.context;
+      traces.set(
+        trace.event.id,
+        structuredClone({
+          ...trace,
+          ...(results ? { results } : {}),
+          ...(context ? { context } : {}),
+        }),
+      );
     },
     async get(id) {
       const t = traces.get(id);

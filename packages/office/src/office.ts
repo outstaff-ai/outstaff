@@ -164,6 +164,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     team,
     ports: { ...tracker, vcs: ports.vcs },
     roles,
+    traces: officePipeline.traces,
+    logger: log,
     notify,
     onBlocked,
     onStarted: (item) => engine.started(item.id),

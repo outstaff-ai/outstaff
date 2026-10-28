@@ -2,6 +2,7 @@ import type { PrRef, PrVerdict, PullRequest, RepoRef, WorkflowEvent } from "@out
 import type { PrLive, PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
 import { notFound, openPrs } from "./derive.js";
 import { ticketCandidates } from "./infer.js";
+import { inferStackRefs, inferTicketRefs } from "./item-refs.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
 import { ciFailure, keptLive, readLive, toPrRecord } from "./pr-record.js";
 import type { PrRecord } from "./types.js";
@@ -96,6 +97,10 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
         rec.stackedOn ? prNode(rec.stackedOn) : undefined,
         next ? prNode(next) : undefined,
       );
+
+      if (next) {
+        await inferStackRefs(store, key, next);
+      }
     }
   };
 
@@ -139,6 +144,8 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
       prev?.ticket ? ticketNode(prev.ticket) : undefined,
       rec.ticket ? ticketNode(rec.ticket) : undefined,
     );
+
+    await inferTicketRefs(store, key, rec, prev);
 
     await relink(
       store,

@@ -1,5 +1,6 @@
 import type { ConditionEvent } from "@outstaff/core";
 import type { Feedback } from "@outstaff/protocol";
+import { mentionedRefs } from "#/refs/index.js";
 import type { Store } from "#/store/types.js";
 
 /**
@@ -110,8 +111,9 @@ export async function readFeedback(store: Reader, itemId: string): Promise<Feedb
   return byTime(await arrived(store, itemId));
 }
 
+/** Adds feedback to an item, and the tickets it names that the office knows as `mentioned` references. */
 export async function addFeedback(
-  store: Reader & Pick<Store, "upsertSubject">,
+  store: Reader & Pick<Store, "upsertSubject" | "addItemRefs">,
   itemId: string,
   feedback: Feedback,
 ): Promise<void> {
@@ -119,6 +121,10 @@ export async function addFeedback(
     ...(await arrived(store, itemId)),
     feedback,
   ]);
+
+  const source = feedback.url ?? `feedback:${feedback.kind}:${feedback.actor}`;
+  const known = async (key: string) => (await store.getSubject("ticket", key)) !== undefined;
+  await store.addItemRefs(itemId, await mentionedRefs(feedback.body, source, known));
 }
 
 /** Reads the feedback for an offer and records how much of it that was. */

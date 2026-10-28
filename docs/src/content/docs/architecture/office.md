@@ -184,11 +184,29 @@ Agents connect out to the office over a WebSocket, so an agent needs no inbound 
 
 **One connection per person.** A new, valid connection replaces the old one. An agent that gets replaced does not reconnect on its own, so two copies of the same agent do not fight over the connection.
 
-**Offers.** The office takes the next queued item for a person from the scheduler and offers it with its context: the journal, the subjects and links. Delivery is at least once. The server keeps no delivery state of its own: which items are offered and accepted is stored behind the work source, so it survives a restart. After a reconnect the office offers again what was not accepted, and `welcome` lists the accepted, unfinished items to resume. Messages about an item are idempotent by its id.
+**Offers.** The office takes the next queued item for a person from the scheduler and offers it with its context: the journal, the subjects and links, and the [wake context](#wake-context). Delivery is at least once. The server keeps no delivery state of its own: which items are offered and accepted is stored behind the work source, so it survives a restart. After a reconnect the office offers again what was not accepted, and `welcome` lists the accepted, unfinished items to resume. Messages about an item are idempotent by its id.
 
 **Liveness.** The office tells the agent how often to send a heartbeat, and drops a connection that is silent for three times that long. The agent drops a connection when the office stops answering and reconnects with exponential backoff and jitter, starting from one second up to thirty.
 
 **Boundaries.** The server depends on the scheduler only through the small `WorkSource` interface, and on question routing only through the optional `Messaging` interface. Frames are limited to 1 MiB, malformed or unknown messages get an `error` reply and never close the connection, and unexpected failures reach the agent as a generic `failed` error, with the detail only in the office log.
+
+## Wake context
+
+Every wake hands the agent what the office already knows about the work, so the agent does not rediscover it with several verb calls. The offer's `context.wake` carries the tickets, pull requests, documents and chat threads the item is linked to, each with its link and why it belongs:
+
+| Woken by                                          | The bundle                                                                                                                                                                                                                                   |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A code host event (review, comment, conflict, CI) | The pull request, its ticket (status, assignee, description, recent comments), its stack, and the chat thread the work started in, if any                                                                                                    |
+| A tracker or docs event                           | The ticket or document, its pull requests (state, CI and failing checks, mergeability, unresolved review threads, stack) and the chat thread the work started in                                                                             |
+| A chat message                                    | The thread's messages, every ticket the message names that the work state knows, and their pull requests. A reply in a known thread links directly to the work of that thread; a chat session also gets the person's current work, as before |
+
+**References.** The office records what each work item refers to as soon as it knows it, in the store's `work_item_refs` table: one row per item and reference (`ticket`, `pr`, `doc`, `chat_thread`, `chat_message`, `branch`, `commit`), with its link, the role (`trigger`, `subject`, `created`, `attached`, `mentioned`, `inferred`), the source (the event id, the agent's verb, the chat message, or the inference) and when it was added. The first record of a reference keeps its role and time. They are written when an item is created (its subject, the event that woke it, the chat message and thread), from the agent's verbs (`ost ticket create` in a chat session, `ost work attach`, `ost doc` links), from the work state (a pull request found for a ticket, the pull request a stack is based on), and from feedback that names a known ticket. One query on an item returns all of it, and a lookup by reference finds every item that refers to it. Links between tickets, pull requests and documents (`links`) now record when they were made.
+
+**One builder.** The office reads a snapshot around the item: its references, two rounds along the links (a document's ticket, a ticket's pull requests, a pull request's ticket and stack), and the chat threads other work on those came from. It reads ticket descriptions and comments from the tracker and unresolved review threads from the code host with its own credentials, best effort: when a port cannot be read, the bundle goes out with what the store has. A pure builder turns the snapshot into the bundle, closest to the wake first, within the `pipeline.context` limits of `team.yaml`: the latest `comments` of each ticket, `messages` of each thread, `threads` of each pull request, at most `items` linked items, and text cut at `body_chars`. Chat history is the messages the office received in the thread (the agent's own replies are posted by the agent and are not in it).
+
+**Untrusted text.** Titles, descriptions, comments, review threads and messages are data from the people who wrote them. The protocol marks them so, and the agent quotes them in the prompt under a line that says they are not instructions.
+
+**Traced.** When the event that woke the item has a trace (`office.pipeline: shadow` or `live`), what the bundle carried is added to it: every linked item with its link, role, source and how many comments, threads or messages went in. `ost explain <event>` prints it under "Context handed over".
 
 ## Work state
 
@@ -233,7 +251,7 @@ Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`)
 
 ## Chat requests and report-back
 
-A trusted human asks an agent for something in chat; the agent's chat relay (see [The agent](/architecture/agent/)) sends the message to the office with `chat_message`, and the office decides. The state lives in the store as subjects (`chat_origin` per item, `chat_thread` per thread, `chat_message` per message), so it needs no migration and survives a restart.
+A trusted human asks an agent for something in chat; the agent's chat relay (see [The agent](/architecture/agent/)) sends the message to the office with `chat_message`, and the office decides. The state lives in the store as subjects (`chat_origin` per item, `chat_thread` per thread, `chat_message` per message, `chat_log` with the latest messages of each thread), so it survives a restart. Each item also records its chat thread and message as [references](#wake-context).
 
 **A new top-level message** becomes a chat session for the asked person: trigger `human`, kind `chat`, subject the thread. It ranks first in the queue and is offered at once, beside the active work item, so a question is answered while a review round runs. There is no "busy" reply and no placement question. Its origin (channel, thread, requester) is recorded and offered with the item. The office files nothing itself, since many messages are questions: the session decides. If all `policies.chat.parallel_sessions` sessions are taken the result is `limited`, the agent says so briefly, and the message starts when a session ends.
 

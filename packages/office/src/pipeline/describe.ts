@@ -2,6 +2,7 @@ import { subjectLabel } from "#/log.js";
 import { formatEngine } from "./compare/describe.js";
 import type { ActOp, Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
+import type { ContextManifest, ManifestEntry } from "./context/context.types.js";
 import type { Trace } from "./trace.types.js";
 
 /** One tracker change, in words. */
@@ -63,6 +64,30 @@ const decisionLines = (decisions: Trace["decisions"]): string[] =>
     ...(d.type === "wake" ? [`    instruction: ${d.instruction}`] : []),
   ]);
 
+function entryLine(e: ManifestEntry): string {
+  const counted =
+    e.shown === undefined ? "" : `, ${e.shown} shown${e.left ? `, ${e.left} left out` : ""}`;
+
+  return `    ${e.type} ${e.ref} (${e.why.role}: ${e.why.source}${counted})${e.url ? ` ${e.url}` : ""}`;
+}
+
+/** What each wake the event started was handed, item by item. */
+function contextLines(context: Trace["context"]): string[] {
+  const manifests: ContextManifest[] = Object.values(context ?? {});
+  if (manifests.length === 0) {
+    return [];
+  }
+
+  return [
+    "",
+    "Context handed over:",
+    ...manifests.flatMap((m) => [
+      `  work item ${m.itemId}: ${m.entries.length} linked${m.omitted ? `, ${m.omitted} left out by pipeline.context.items` : ""}`,
+      ...m.entries.map(entryLine),
+    ]),
+  ];
+}
+
 /** A trace as text: the event, each policy that listens to it with why it matched or not, and the decisions. */
 export function formatTrace(trace: Trace): string {
   const { event } = trace;
@@ -79,5 +104,6 @@ export function formatTrace(trace: Trace): string {
     "Decisions:",
     ...decisionLines(trace.decisions),
     ...(trace.engine ? ["", ...formatEngine(trace.engine, trace.comparison)] : []),
+    ...contextLines(trace.context),
   ].join("\n");
 }

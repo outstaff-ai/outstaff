@@ -3,8 +3,8 @@ import { silentLogger, type ChatMessage } from "@outstaff/core";
 import { describe, expect, it, vi } from "vitest";
 import { createSlackChat } from "#/chat.js";
 import { createSocketModeSocket } from "#/socket.js";
-import { createFakeSlack } from "#/testing/slack-fake.js";
-import { secretMap } from "#/testing/harness.js";
+import { createFakeSlack } from "./support/slack-fake.js";
+import { secretMap } from "./support/harness.js";
 
 interface Client extends EventEmitter {
   options: { appToken: string };

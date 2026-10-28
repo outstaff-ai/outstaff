@@ -49,7 +49,7 @@ export interface ProbeResult {
 
 export type ProbeSpawn = (command: string, args: readonly string[]) => ProbeResult;
 
-/** One recorded call to the fake `query` in testing.ts. */
+/** One recorded call to the fake `query` in `__tests__/testing.ts`. */
 export interface Call {
   prompt: string;
   options: Options;

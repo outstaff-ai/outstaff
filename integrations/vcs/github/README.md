@@ -118,4 +118,4 @@ Webhook payload parsing (`vcs.webhooks`) is not implemented yet, so the capabili
 
 ## Tests
 
-`pnpm test` runs the vcs contract kit against the adapter backed by a recorded-fixture HTTP fake (`src/testing/`), plus unit tests for JWT signing (verified with a generated key), token caching, ETag/304, the mergeable retry and the resolve refusal. `src/__tests__/live.test.ts` runs against a real scratch repository only when `OUTSTAFF_TEST_GITHUB_REPO` (for example `github.com/acme/scratch`) and the `GH_OFFICE_APP_*` secrets are set; otherwise it shows as skipped.
+`pnpm test` runs the vcs contract kit against the adapter backed by the GitHub stand-in (`@outstaff/testing.github`) and recorded fixtures (`src/__tests__/fixtures/`), plus unit tests for JWT signing (verified with a generated key), token caching, ETag/304, the mergeable retry and the resolve refusal. `src/__tests__/live.test.ts` runs against a real scratch repository only when `OUTSTAFF_TEST_GITHUB_REPO` (for example `github.com/acme/scratch`) and the `GH_OFFICE_APP_*` secrets are set; otherwise it shows as skipped.

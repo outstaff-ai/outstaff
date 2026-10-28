@@ -14,7 +14,10 @@ export interface WakeReason {
 
 export interface LiveOptions {
   team: TeamConfig;
-  store: Pick<Store, "listItems" | "upsertSubject" | "getSubject" | "appendJournal">;
+  store: Pick<
+    Store,
+    "listItems" | "upsertSubject" | "getSubject" | "appendJournal" | "addItemRefs"
+  >;
   workState: WorkState;
   scheduler: Pick<Scheduler, "enqueue">;
   executor: ActExecutor;

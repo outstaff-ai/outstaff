@@ -1,6 +1,6 @@
 import type { Logger } from "@outstaff/core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { REPO, teamConfig } from "#/intake/test-support.js";
+import { REPO, teamConfig } from "#/intake/__tests__/test-support.js";
 import { schedulerWorkSource } from "#/work-source.js";
 import { readOrigin } from "#/chat/origin.js";
 import { readFeedback } from "#/engine/feedback.js";

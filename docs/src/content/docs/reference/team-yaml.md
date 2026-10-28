@@ -1429,7 +1429,7 @@ Ticket label that keeps work with a human. Default "needs-human".
 
 ## pipeline
 
-Proposed (decision 0016): the event pipeline's policies. Read only by the office's shadow mode (office.pipeline: shadow), which records what the pipeline would decide and changes nothing.
+Proposed (decision 0016): the event pipeline's policies, read in the office's shadow and live modes (office.pipeline), and the context every wake carries, in every mode.
 
 - Type: `object`
 - Optional
@@ -1659,6 +1659,58 @@ Wakes for the same person and subject within this many seconds become one run. D
 - Optional
 - Minimum 0
 - Maximum 3600
+
+### pipeline.context
+
+The context bundle every wake carries: the tickets, pull requests and chat threads the work is linked to, with their recent comments, threads and messages.
+
+- Type: `object`
+- Optional
+
+#### pipeline.context.comments
+
+The latest comments of each ticket handed over. Default 5.
+
+- Type: `integer`
+- Optional
+- Minimum 0
+- Maximum 50
+
+#### pipeline.context.messages
+
+The latest messages of each chat thread handed over. Default 10.
+
+- Type: `integer`
+- Optional
+- Minimum 0
+- Maximum 50
+
+#### pipeline.context.threads
+
+The unresolved review threads of each pull request handed over. Default 5.
+
+- Type: `integer`
+- Optional
+- Minimum 0
+- Maximum 50
+
+#### pipeline.context.items
+
+How many tickets, pull requests, documents and chat threads one wake carries at most, the closest to what woke the agent first. Default 8.
+
+- Type: `integer`
+- Optional
+- Minimum 1
+- Maximum 50
+
+#### pipeline.context.body_chars
+
+Longer descriptions, comments and messages are cut to this many characters; the link has the rest. Default 1500.
+
+- Type: `integer`
+- Optional
+- Minimum 100
+- Maximum 20000
 
 ## link
 

@@ -13,8 +13,8 @@ import { createFakeAdapterRegistry, createFakeRuntime } from "@outstaff/core/fak
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { createOfficeConnection } from "#/office-client/index.js";
-import { FakeSocket } from "#/office-client/testing.js";
-import { withGlobalConfig } from "#/tools/testing.js";
+import { FakeSocket } from "#/office-client/__tests__/testing.js";
+import { withGlobalConfig } from "#/tools/mise-current.js";
 import { installedRuntimes } from "#/runner/runtime-select.js";
 import { prepareAgent } from "#/runner/startup.js";
 

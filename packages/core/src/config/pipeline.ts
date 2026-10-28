@@ -27,6 +27,54 @@ export const pipelinePolicySchema = z
   })
   .meta(d("Changes to one policy of the event pipeline."));
 
+/** How much of what the office knows goes with each wake. */
+export const pipelineContextSchema = z
+  .strictObject({
+    comments: z
+      .int()
+      .min(0)
+      .max(50)
+      .optional()
+      .meta(d("The latest comments of each ticket handed over. Default 5.")),
+    messages: z
+      .int()
+      .min(0)
+      .max(50)
+      .optional()
+      .meta(d("The latest messages of each chat thread handed over. Default 10.")),
+    threads: z
+      .int()
+      .min(0)
+      .max(50)
+      .optional()
+      .meta(d("The unresolved review threads of each pull request handed over. Default 5.")),
+    items: z
+      .int()
+      .min(1)
+      .max(50)
+      .optional()
+      .meta(
+        d(
+          "How many tickets, pull requests, documents and chat threads one wake carries at most, the closest to what woke the agent first. Default 8.",
+        ),
+      ),
+    body_chars: z
+      .int()
+      .min(100)
+      .max(20_000)
+      .optional()
+      .meta(
+        d(
+          "Longer descriptions, comments and messages are cut to this many characters; the link has the rest. Default 1500.",
+        ),
+      ),
+  })
+  .meta(
+    d(
+      "The context bundle every wake carries: the tickets, pull requests and chat threads the work is linked to, with their recent comments, threads and messages.",
+    ),
+  );
+
 export const pipelineSchema = z
   .strictObject({
     policies: z
@@ -51,9 +99,10 @@ export const pipelineSchema = z
       })
       .optional()
       .meta(d("How wakes are batched.")),
+    context: pipelineContextSchema.optional(),
   })
   .meta(
     d(
-      "Proposed (decision 0016): the event pipeline's policies. Read only by the office's shadow mode (office.pipeline: shadow), which records what the pipeline would decide and changes nothing.",
+      "Proposed (decision 0016): the event pipeline's policies, read in the office's shadow and live modes (office.pipeline), and the context every wake carries, in every mode.",
     ),
   );

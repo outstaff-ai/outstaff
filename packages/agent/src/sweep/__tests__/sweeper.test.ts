@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type { Logger } from "@outstaff/core";
 import type { WorkState } from "@outstaff/protocol";
 import { describe, expect, it, vi } from "vitest";
-import { createManualClock } from "#/office-client/testing.js";
+import { createManualClock } from "#/office-client/__tests__/testing.js";
 import type { Offer } from "#/office-client/index.js";
 import { createWorkspaces } from "#/repos/workspaces.js";
 import type { ClonedRepo } from "#/repos/index.js";

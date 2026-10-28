@@ -2,7 +2,7 @@ import type { Logger, Member, TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { manualClock } from "#/clock.js";
 import { createIntake } from "#/intake/index.js";
-import { REPO, teamConfig } from "#/intake/test-support.js";
+import { REPO, teamConfig } from "#/intake/__tests__/test-support.js";
 import { createScheduler } from "#/scheduler/index.js";
 import { openStore } from "#/store/index.js";
 import { createWorkState } from "#/workstate/index.js";
