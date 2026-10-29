@@ -181,6 +181,24 @@ describe("the office link", () => {
       result: { items: [{ id: item.id }] },
     });
 
+    expect(await dash.request({ method: "events", params: { limit: 1 } })).toMatchObject({
+      result: { events: [{ event: { id: "vcs:2" } }], total: 2 },
+    });
+
+    expect(await dash.request({ method: "items", params: { limit: 1 } })).toMatchObject({
+      result: { total: 1 },
+    });
+
+    expect(await dash.request({ method: "activity" })).toMatchObject({
+      result: {
+        at: "2026-10-05T10:00:00.000Z",
+        windows: [
+          { seconds: 3600, since: "2026-10-05T09:00:00.000Z", events: 1, items: 1 },
+          { seconds: 86400, since: "2026-10-04T10:00:00.000Z", events: 2, items: 1 },
+        ],
+      },
+    });
+
     expect(await dash.request({ method: "compare" })).toMatchObject({
       result: { events: 2, compared: 0, agree: 0, differ: 0, differing: [] },
     });
@@ -319,6 +337,11 @@ describe("the office link", () => {
     expect(dash.of("item").map((m) => [m.payload.id, m.payload.status])).toEqual([
       [item.id, "active"],
       [queued.id, "queued"],
+    ]);
+
+    expect(dash.of("item").map((m) => [m.payload.title, m.payload.subject])).toEqual([
+      ["t", null],
+      ["ci", null],
     ]);
 
     expect(dash.of("people")[1]!.payload.people[0]).toMatchObject({

@@ -1,12 +1,14 @@
 import type { LinkErrorCode, LinkMethod, LinkRequest, LinkResponse } from "@outstaff/protocol";
 import type { Trace } from "#/pipeline/trace.types.js";
 import { compareRange } from "#/pipeline/compare/summary.js";
+import { countActivity } from "./activity.js";
 import { findEvents } from "./events.js";
 import { findItem } from "./item.js";
 import { findItems } from "./items.js";
 import type { OfficeLinkOptions } from "./link.types.js";
 import { listPeople } from "./people.js";
 import { present } from "./present.js";
+import { countEvents } from "./totals.js";
 
 /** The office store's traces, as the comparison reads them. */
 const storeTraces = (store: OfficeLinkOptions["store"]) => ({
@@ -31,8 +33,16 @@ async function events(
   id: string,
   params: Params<"events">,
 ): Promise<LinkResponse> {
-  const found = await findEvents(opts.store, params ?? {});
-  return { id, result: { ...found, events: found.events.map((t) => present(t, opts.links)) } };
+  const filter = params ?? {};
+  const [found, total] = await Promise.all([
+    findEvents(opts.store, filter),
+    countEvents(opts.store, filter),
+  ]);
+
+  return {
+    id,
+    result: { ...found, total, events: found.events.map((t) => present(t, opts.links)) },
+  };
 }
 
 async function event(opts: OfficeLinkOptions, id: string, eventId: string): Promise<LinkResponse> {
@@ -58,6 +68,15 @@ const compare = async (
 ): Promise<LinkResponse> => ({
   id,
   result: await compareRange(storeTraces(opts.store), params ?? {}),
+});
+
+const activity = async (
+  opts: OfficeLinkOptions,
+  id: string,
+  params: Params<"activity">,
+): Promise<LinkResponse> => ({
+  id,
+  result: await countActivity(opts.store, opts.clock.now(), params?.windows),
 });
 
 async function item(opts: OfficeLinkOptions, id: string, itemId: string): Promise<LinkResponse> {
@@ -87,6 +106,7 @@ const HANDLERS: { [M in LinkMethod]: Handler<M> } = {
   event: (opts, r) => event(opts, r.id, r.params.id),
   items: (opts, r) => items(opts, r.id, r.params),
   compare: (opts, r) => compare(opts, r.id, r.params),
+  activity: (opts, r) => activity(opts, r.id, r.params),
   item: (opts, r) => item(opts, r.id, r.params.id),
   health: (opts, r) => health(opts, r.id, r.params?.run === true),
 };

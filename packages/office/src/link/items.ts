@@ -31,12 +31,12 @@ export const summary = async (
 /** Work items newest first, by when they were created; `before` is the time cursor of the next page. */
 export async function findItems(store: LinkStore, f: ItemFilter): Promise<LinkResultOf<"items">> {
   const limit = f.limit ?? 50;
-  const all = (
-    await store.listItems({
-      ...(f.person ? { person: f.person } : {}),
-      ...(f.status ? { status: f.status } : {}),
-    })
-  )
+  const matching = await store.listItems({
+    ...(f.person ? { person: f.person } : {}),
+    ...(f.status ? { status: f.status } : {}),
+  });
+
+  const all = matching
     .filter((i) => f.before === undefined || i.createdAt < f.before)
     .toSorted((a, b) => b.createdAt.localeCompare(a.createdAt));
 
@@ -44,5 +44,6 @@ export async function findItems(store: LinkStore, f: ItemFilter): Promise<LinkRe
   const cut = all.slice(0, limit).at(-1)?.createdAt;
   const page = all.filter((i, n) => n < limit || i.createdAt === cut);
   const items = await Promise.all(page.map((i) => summary(store, i)));
-  return page.length < all.length ? { items, nextBefore: cut! } : { items };
+  const total = matching.length;
+  return page.length < all.length ? { items, total, nextBefore: cut! } : { items, total };
 }

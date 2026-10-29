@@ -37,6 +37,22 @@ export function traceCases(ctx: ContractContext): void {
     ).toEqual(["vcs:1"]);
   });
 
+  it("counts pipeline traces in a window of event time", async () => {
+    expect(await ctx.store.countTraces()).toBe(0);
+    await ctx.store.recordTrace(trace("vcs:1", "2026-10-01T10:00:00.000Z"));
+    await ctx.store.recordTrace(trace("vcs:2", "2026-10-01T11:00:00.000Z"));
+    await ctx.store.recordTrace(trace("vcs:3", "2026-10-01T12:00:00.000Z"));
+    expect(await ctx.store.countTraces()).toBe(3);
+    expect(await ctx.store.countTraces({ since: "2026-10-01T10:00:00.000Z" })).toBe(2);
+    expect(await ctx.store.countTraces({ before: "2026-10-01T12:00:00.000Z" })).toBe(2);
+    expect(
+      await ctx.store.countTraces({
+        since: "2026-10-01T10:00:00.000Z",
+        before: "2026-10-01T12:00:00.000Z",
+      }),
+    ).toBe(1);
+  });
+
   it("lists pipeline traces in the order they were recorded, from a time on", async () => {
     expect(await ctx.store.listTracesRecorded({ limit: 10 })).toEqual([]);
     await ctx.store.recordTrace(trace("vcs:b", "2026-10-01T09:00:00.000Z"));

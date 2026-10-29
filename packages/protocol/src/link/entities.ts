@@ -4,7 +4,7 @@ import { feedbackSchema } from "#/schemas/index.js";
 import { comparisonSchema, engineSchema } from "./comparison.js";
 import { time } from "./fields.js";
 
-const subject = z
+export const itemSubjectSchema = z
   .strictObject({ type: z.string(), ref: z.string() })
   .nullable()
   .describe(
@@ -15,7 +15,7 @@ const itemFields = {
   id: z.string().describe("Id of the work item."),
   kind: z.string().describe("What the item is, for example `assigned` or `review_feedback`."),
   title: z.string(),
-  subject,
+  subject: itemSubjectSchema,
 };
 
 /** The pipeline policy and event that queued an item. */

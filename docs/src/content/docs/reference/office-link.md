@@ -57,7 +57,7 @@ Result:
 
 ### `events`
 
-Traces of the events the pipeline judged, newest first, filtered on the office. Page with `before` = `nextBefore`.
+Traces of the events the pipeline judged, newest first, filtered on the office, with the `total` that match. Page with `before` = `nextBefore`.
 
 Params:
 
@@ -127,6 +127,7 @@ Result:
 | `events[].comparison.differences[].pipeline` | any                                                                            | no       |                                                                                                                                                                                                                                                                                              |
 | `events[].comparison.differences[].policy`   | string                                                                         | no       | The pipeline policy behind the pipeline's side.                                                                                                                                                                                                                                              |
 | `events[].comparison.differences[].note`     | string                                                                         | no       |                                                                                                                                                                                                                                                                                              |
+| `total`                                      | integer                                                                        | yes      | How many events match the filters, however many this page holds.                                                                                                                                                                                                                             |
 | `nextBefore`                                 | string                                                                         | no       | Pass as `before` for the next page; absent when there are no more events.                                                                                                                                                                                                                    |
 
 ### `event`
@@ -197,7 +198,7 @@ Result:
 
 ### `items`
 
-Work items, newest first by when they were created, optionally of one status or person. Page with `before` = `nextBefore`.
+Work items, newest first by when they were created, optionally of one status or person, with the `total` that match. Page with `before` = `nextBefore`.
 
 Params:
 
@@ -224,6 +225,7 @@ Result:
 | `items[].createdAt`   | string                                                                 | yes      | ISO-8601 time, UTC.                                                                          |
 | `items[].updatedAt`   | string                                                                 | yes      | ISO-8601 time, UTC.                                                                          |
 | `items[].scheduledBy` | object (policy, eventId) or null                                       | yes      | The policy and event that queued it, when the event pipeline did.                            |
+| `total`               | integer                                                                | yes      | How many items match the filters, however many this page holds.                              |
 | `nextBefore`          | string                                                                 | no       | Pass as `before` for the next page; absent when there are no more items.                     |
 
 ### `compare`
@@ -348,6 +350,27 @@ Result:
 | `traces[].comparison.differences[].pipeline` | any                                                                            | no       |                                                                                                                                                                                                                                                                                              |
 | `traces[].comparison.differences[].policy`   | string                                                                         | no       | The pipeline policy behind the pipeline's side.                                                                                                                                                                                                                                              |
 | `traces[].comparison.differences[].note`     | string                                                                         | no       |                                                                                                                                                                                                                                                                                              |
+
+### `activity`
+
+How much happened in each of the last few windows of time (default the last hour and the last day): events that happened and work items created. Exact, since the office counts them in its store.
+
+Params:
+
+| Field     | Type            | Required | Description                                                                          |
+| --------- | --------------- | -------- | ------------------------------------------------------------------------------------ |
+| `windows` | list of integer | no       | Window lengths in seconds, each counted back from now. Default one hour and one day. |
+
+Result:
+
+| Field               | Type            | Required | Description                                            |
+| ------------------- | --------------- | -------- | ------------------------------------------------------ |
+| `at`                | string          | yes      | The office's time of the count; each window ends here. |
+| `windows`           | list of objects | yes      | In the order requested.                                |
+| `windows[].seconds` | integer         | yes      | The window's length, as requested.                     |
+| `windows[].since`   | string          | yes      | Where the window starts: `at` minus `seconds`.         |
+| `windows[].events`  | integer         | yes      | Events that happened in the window.                    |
+| `windows[].items`   | integer         | yes      | Work items created in the window.                      |
 
 ### `health`
 
@@ -515,17 +538,19 @@ Sent by: the office.
 
 ### `item`
 
-A work item was queued or its status changed.
+A work item was queued or its status changed, with what a list of items shows (title, subject, kind, person, status), so a service can patch its list without asking.
 
 Sent by: the office.
 
-| Field       | Type                                                                   | Required | Description         |
-| ----------- | ---------------------------------------------------------------------- | -------- | ------------------- |
-| `id`        | string                                                                 | yes      |                     |
-| `person`    | string                                                                 | yes      |                     |
-| `kind`      | string                                                                 | yes      |                     |
-| `status`    | `queued` or `active` or `waiting` or `done` or `blocked` or `canceled` | yes      |                     |
-| `updatedAt` | string                                                                 | yes      | ISO-8601 time, UTC. |
+| Field       | Type                                                                   | Required | Description                                                                                  |
+| ----------- | ---------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------- |
+| `id`        | string                                                                 | yes      |                                                                                              |
+| `person`    | string                                                                 | yes      |                                                                                              |
+| `kind`      | string                                                                 | yes      |                                                                                              |
+| `title`     | string                                                                 | yes      |                                                                                              |
+| `subject`   | object (type, ref) or null                                             | yes      | What the item is about: a ticket key, a pull request (`host/owner/name#n`) or a document id. |
+| `status`    | `queued` or `active` or `waiting` or `done` or `blocked` or `canceled` | yes      |                                                                                              |
+| `updatedAt` | string                                                                 | yes      | ISO-8601 time, UTC.                                                                          |
 
 ### `health`
 
