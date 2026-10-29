@@ -28,17 +28,23 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
       await traces.record(trace);
       let queued = false;
       for (const d of trace.decisions) {
-        // Chat stays with the chat desk until chat messages are events of their own.
-        if (d.type === "wake" && d.subject.type !== "chat") {
-          const { itemId, joined } = await enqueueWake(d, event, opts);
+        if (d.type === "act") {
+          await executor.execute(d, event.id);
+          continue;
+        }
+
+        if (d.type === "wake") {
+          const { itemId, folded } = await enqueueWake(d, event, opts);
           // The same decision object sits in its policy's trace too, so both show the item.
           d.itemId = itemId;
+          if (folded) {
+            d.folded = folded;
+          }
+
           queued = true;
           logger.info(
-            `pipeline: ${joined ? "joined" : "queued"} work item ${itemId} for ${d.person} (${d.kind})`,
+            `pipeline: ${folded ? "folded the wake into" : "queued"} work item ${itemId} for ${d.person} (${d.kind})`,
           );
-        } else if (d.type === "act") {
-          await executor.execute(d, event.id);
         }
       }
 

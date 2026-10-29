@@ -55,6 +55,15 @@ Run `ost policies` to see every switch with its effective value and where the va
 
 `policies.retry` also holds the backoff settings (`base_minutes`, `cap_minutes`, `max_failures`) that decide when a failing item is blocked in the first place.
 
+## Chat and batched wakes in the event pipeline
+
+Proposed ([decision 0016](/decisions/0016-event-pipeline/)), with `office.pipeline: live` in `.outstaff/team.yaml`:
+
+- **A chat message wakes the agent it was written to.** A direct message, a mention or a reply in a thread to an agent is an event like a review or a ticket change. The default policy `chat_to_addressed` starts a chat session for the agent, which decides what the message asks for: an answer, new work, or a change to work it already has. `pipeline.policies.chat_to_addressed` turns it off, narrows it or changes its instruction. In shadow mode the chat desk keeps answering, and `ost explain` shows what the pipeline would have done beside it.
+- **Wakes that come close together become one run.** Wakes for the same agent and the same pull request, ticket, document or chat conversation within `pipeline.wake.coalesce_seconds` (default 60) of the first are folded into one run that carries all of them: four review comments left within a minute are one `review_feedback` round, three quick messages are one chat session. The run starts when the window closes. `0` turns it off.
+
+See [Chat in the event pipeline](/architecture/office/#chat-in-the-event-pipeline) and [Coalescing](/architecture/office/#coalescing) for the details.
+
 ## Switches and workflow rules
 
 Several switches act on preset [workflow](/reference/team-yaml/#workflow) rules: `feedback.merged_prs` removes `merged-feedback-follow-up`, `feedback.doc_comments` removes `doc-feedback-to-author`, `feedback.ticket_comments` removes `ticket-comment-to-assignee` and `ticket-comment-reactivates-ticket`, `feedback.mentions` removes `mention-assigns-agent`, `doc-mention-feedback` and `doc-mention-assigns-ticket`, `conflicts.follow_up` removes `conflict-back-to-author`, `hand_back.reassign: none` drops the assignment from `hand-back-to-requester` and `hand-back-blocked-to-requester`, `hand_back.blocked_notify: agent` drops the PM round from `hand-back-blocked-to-requester`, and `tickets.prs_per_ticket: many` edits `pr-merged-done`, `pr-closed-ready`, `hand-back-to-requester` and `second-pr-comment` so that a ticket is done when the agent has handed it back as done and its pull requests are all closed with one merged (conditions `ticket_prs_all_closed`, `ticket_prs_open`, `ticket_handed_back` and `ticket_prs_several`). `tickets.prs_per_ticket` is also enforced by `ost pr open`, whatever the preset, so it is not shown as off for the `minimal` preset. The others are carried out by the agent or the office and have no rule behind them.

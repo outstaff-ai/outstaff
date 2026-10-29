@@ -93,7 +93,7 @@ export const pipelineSchema = z
           .optional()
           .meta(
             d(
-              "Wakes for the same person and subject within this many seconds become one run. Default 60; 0 turns it off.",
+              "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes (office.pipeline: live). Default 60; 0 turns it off.",
             ),
           ),
       })

@@ -35,13 +35,15 @@ import {
   threadsOf,
   withThread,
 } from "./origin.js";
+import { withFiles } from "./event.js";
 import { appendChatLog } from "./log.js";
 import { createReportQueue } from "./pending.js";
 import { chatRefsOf, messageMentions, messageRefs, messageSource, workRefsOf } from "./refs.js";
 import { parsePlacement, placeQueued } from "./placement.js";
 import type { ChatOriginRecord, ParsedPlacement } from "./types.js";
 
-type MessageResult = PayloadOf<"chat_message_result">;
+/** The desk always names the item a message belongs to. */
+type MessageResult = PayloadOf<"chat_message_result"> & { item: WorkSummary };
 type Message = PayloadOf<"chat_message">;
 
 export const PM_ROLE = "pm";
@@ -85,13 +87,9 @@ const firstLine = (text: string, max = 80) => {
   return line.length > max ? `${line.slice(0, max - 1)}…` : line;
 };
 
-/** The message's text with a line naming its files, for the journal. The files are data from the author. */
-const withFiles = (m: Pick<Message, "text" | "files">) =>
-  m.files?.length
-    ? `${m.text}\n(Shared ${m.files.map((f) => `${f.name} (${f.mimetype})`).join(", ")}.)`.trimStart()
-    : m.text;
-
 export interface ChatRequests extends ChatDesk {
+  message(person: string, m: Message): Promise<MessageResult>;
+
   /**
    * An item the scheduler blocked (the agent did not hand it back): queues the report its agent owes the requester,
    * so the agent posts it as itself (the thread of a chat item, else a direct message), live if connected and

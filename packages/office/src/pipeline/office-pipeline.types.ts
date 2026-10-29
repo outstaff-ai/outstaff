@@ -42,4 +42,11 @@ export interface OfficePipeline {
    * `pull` in shadow mode; by the pipeline alone when live.
    */
   idle(event: PipelineEvent, pull: () => Promise<unknown>): Promise<unknown>;
+
+  /**
+   * Has a `chat.message` judged, which the engine never sees: nothing when off (the chat desk alone handles chat); in
+   * shadow mode traced, with what the desk did (the event's `data.desk`, an `EngineRecord`) compared as the engine's
+   * side; by the pipeline alone when live.
+   */
+  chat(event: WorkflowEvent, meta: { source: string; externalId: string }): Promise<unknown>;
 }

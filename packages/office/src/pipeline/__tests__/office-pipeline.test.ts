@@ -135,4 +135,35 @@ describe("createOfficePipeline", () => {
       { type: "drop", policy: "idle_pulls_next", reason: "no ready ticket is assigned to sam" },
     ]);
   });
+
+  it("judges a chat message: not at all when off, against what the desk did in shadow mode, alone when live", async () => {
+    const message = {
+      type: "chat.message" as const,
+      subject: { chat: { channel: "D-1" } },
+      actor: { kind: "human" as const, id: "U-ADA" },
+      data: { body: "hi", addressed: "sam" },
+    };
+
+    const meta = (n: string) => ({ source: "chat", externalId: n });
+    const off = await make({});
+    expect(await off.chat(message, meta("1"))).toBeUndefined();
+    expect(await off.traces.list()).toEqual([]);
+
+    const shadow = await make({ pipeline: "shadow" });
+    const wake = { type: "wake" as const, person: "sam", kind: "chat" };
+    const desk = { effects: [{ ...wake, subject: { type: "chat", ref: "D-1" } }] };
+    await shadow.chat({ ...message, data: { ...message.data, desk } }, meta("2"));
+    expect(await shadow.traces.get("chat:2")).toMatchObject({
+      engine: desk,
+      comparison: { agree: true, differences: [] },
+    });
+
+    // Without the desk's record there is nothing to compare.
+    await shadow.chat(message, meta("3"));
+    expect((await shadow.traces.get("chat:3"))?.comparison).toBeUndefined();
+
+    const live = await make({ pipeline: "live" });
+    await expect(live.chat(message, meta("4"))).rejects.toThrow("not in this test");
+    expect((await live.traces.get("chat:4"))?.decisions).toMatchObject([wake]);
+  });
 });

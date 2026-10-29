@@ -3,7 +3,10 @@ import type { Store } from "./store/types.js";
 import { recipeFor } from "./recipes.js";
 import type { WorkState } from "./workstate/index.js";
 
-/** Every queued item reaches the scheduler through here: it gets its recipe (if any) and the agent hears of it. */
+/**
+ * Every queued item reaches the scheduler through here: it gets its recipe (if any) and the agent hears of it. A held
+ * item is offered once its hold runs out (`onReleased` of the scheduler).
+ */
 export function notifyingScheduler(deps: {
   scheduler: Scheduler;
   store: Store;
@@ -14,8 +17,25 @@ export function notifyingScheduler(deps: {
   return {
     ...scheduler,
     async enqueue(item) {
-      const created = await scheduler.enqueue(item);
-      const recipe = await recipeFor(created, store, workState);
+      // A wake folded into a held item is not new work: the item has its recipe already.
+      let folded = false;
+      const { coalesce } = item;
+      const created = await scheduler.enqueue(
+        coalesce
+          ? {
+              ...item,
+              coalesce: {
+                ...coalesce,
+                fold: (into) => {
+                  folded = true;
+                  return coalesce.fold(into);
+                },
+              },
+            }
+          : item,
+      );
+
+      const recipe = folded ? undefined : await recipeFor(created, store, workState);
       if (recipe) {
         await store.appendJournal(created.id, "office", recipe);
       }

@@ -20,9 +20,30 @@ export interface SchedulerOptions {
 
   /** Interval of the background tick started by `start()`. Default 60 seconds. */
   tickIntervalMs?: number;
+
+  /** A queued item held for coalescing can be offered now; the person is told there is work. */
+  onReleased?: (person: string) => void;
 }
 
 export type Placement = "next" | "last" | { before: string } | { after: string };
+
+/**
+ * Wakes that come close together become one run: the item queued for the first is held until its window closes, and
+ * a later wake with the same key inside the window is folded into it instead of queuing another.
+ */
+export interface Coalesce {
+  /** What makes two wakes the same run: the person and the subject. */
+  key: string;
+
+  /** When the event behind the wake happened (ISO-8601). The window counts from the first one's. */
+  at: string;
+
+  /** How long the window stays open; 0 folds and holds nothing. */
+  windowMs: number;
+
+  /** Adds this wake to the held item an earlier one queued. */
+  fold(item: WorkItem): Promise<void>;
+}
 
 export interface EnqueueInput extends Omit<NewWorkItem, "position"> {
   /**
@@ -36,6 +57,9 @@ export interface EnqueueInput extends Omit<NewWorkItem, "position"> {
    * stores for the item (its chat origin, its feedback).
    */
   init?: (item: WorkItem) => Promise<void>;
+
+  /** Folds the item into a held one with the same key, or holds it for the ones that follow. */
+  coalesce?: Coalesce;
 }
 
 export type StartResult =

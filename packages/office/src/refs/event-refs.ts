@@ -5,6 +5,10 @@ import type { EventSubject } from "./types.js";
 /** The key of a chat thread: `<channel>:<thread>`. */
 export const chatThreadRef = (channel: string, thread: string) => `${channel}:${thread}`;
 
+/** The key of a chat conversation, as wakes and work items name a chat subject: `<channel>:<thread>`, or the channel. */
+export const conversationRef = (c: { channel: string; thread?: string | undefined }) =>
+  c.thread === undefined ? c.channel : chatThreadRef(c.channel, c.thread);
+
 /** What woke an item: everything the event is about, each a `trigger` reference with the event as its source. */
 export function triggerRefs(
   subject: EventSubject,

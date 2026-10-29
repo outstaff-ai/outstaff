@@ -24,25 +24,30 @@ const unclearReply = (hasPm: boolean, describe: Describe, work: WorkSummary[]) =
     ...describe(work),
   ].join("\n");
 
+/**
+ * What the office did that needs no answer: the reaction shows the message was seen, and the first reply comes with the
+ * work (received by the pipeline, a chat session started, or joined to the thread's work).
+ */
+const SILENT = new Set<ChatMessageResult["disposition"]>(["received", "started", "joined"]);
+
 /** What the agent answers a trusted human's message with, given what the office made of it. */
 export function replyFor(
   r: ChatMessageResult,
   hasPm: boolean,
   describe: Describe,
 ): string | undefined {
+  if (SILENT.has(r.disposition)) {
+    return undefined;
+  }
+
   switch (r.disposition) {
-    case "started":
-      // The reaction shows it was seen; the first reply comes with the ticket, when the request is work.
-      return undefined;
     case "limited":
       return "I am answering other chats right now. Yours is next in line.";
     case "placed":
       return `Got it, this goes ${r.placement ?? "where you said"}.`;
     case "asked_pm":
       return "I asked the PM to prioritize it. It waits at the end of my queue until you tell me where it goes.";
-    case "unclear":
+    default:
       return unclearReply(hasPm, describe, r.work);
-    case "joined":
-      return undefined;
   }
 }

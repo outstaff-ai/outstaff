@@ -1,5 +1,6 @@
 import type { Logger, TeamConfig, WorkflowEvent } from "@outstaff/core";
 import type { EffectOutcome } from "#/engine/types.js";
+import type { EngineRecord } from "./compare/compare.types.js";
 import type { Clock } from "#/types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { PipelineState } from "./state.types.js";
@@ -36,5 +37,14 @@ export interface ShadowPipeline extends PipelineRunner {
   engineDid(
     meta: { source: string; externalId: string },
     outcomes: readonly EffectOutcome[],
+  ): Promise<Trace | undefined>;
+
+  /**
+   * Adds to the event's trace what the office's own handling did for it (the engine's outcomes, or what the chat desk
+   * did with a message), and how that compares with the pipeline's decisions. Never throws.
+   */
+  compare(
+    meta: { source: string; externalId: string },
+    record: () => EngineRecord,
   ): Promise<Trace | undefined>;
 }

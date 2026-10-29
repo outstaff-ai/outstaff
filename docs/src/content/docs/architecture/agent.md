@@ -101,6 +101,7 @@ For each message the relay reacts with `eyes`, sends `chat_message` to the offic
 
 | The office says | The agent posts                                                                                                                                                     |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `received`      | Nothing; with `office.pipeline: live` the message is an event the office's pipeline decides on, and the chat session it starts answers.                             |
 | `started`       | Nothing; a chat session starts at once, beside the active work item, and the `eyes` reaction shows the message was seen. The answer comes from the session (below). |
 | `limited`       | Briefly, that all chat sessions are taken and this message is next in line.                                                                                         |
 | `placed`        | Where the request went.                                                                                                                                             |

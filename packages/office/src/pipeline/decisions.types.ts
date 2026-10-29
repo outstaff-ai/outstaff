@@ -7,7 +7,7 @@ export type { ActOp, ActTarget } from "@outstaff/core";
 export interface WakeSubject {
   type: "pr" | "ticket" | "doc" | "chat";
 
-  /** `owner/name#n` for a pull request, the key of a ticket, the id of a document, `channel/thread` for chat. */
+  /** `owner/name#n` for a pull request, the key of a ticket, the id of a document, `channel:thread` (or the channel, for a direct message's top-level messages) for chat. */
   ref: string;
 }
 
@@ -25,6 +25,12 @@ export interface Wake {
 
   /** The work item the wake queued, or joined; set once the live pipeline has queued it. */
   itemId?: string | undefined;
+
+  /**
+   * Set when the wake was folded into an item an earlier wake queued, coalesced within `pipeline.wake.coalesce_seconds`
+   * or joining work of the same kind: every event of that item so far, this one last.
+   */
+  folded?: string[] | undefined;
 }
 
 /**
