@@ -241,6 +241,7 @@ describe("work loop", () => {
     loop = createWorkLoop({
       office: conn,
       runtime,
+      runtimeName: "claude",
       env: {
         ...env,
         vcs: ownVcs ?? vcs,
@@ -387,6 +388,12 @@ describe("work loop", () => {
     await until(() => sentOf("handback").length === 1);
 
     expect(types()).toEqual(["accept", "session", "progress", "journal", "handback"]);
+    expect(sentOf("accept")[0]?.payload).toEqual({
+      workItemId: "w1",
+      runtime: "claude",
+      model: "sonnet",
+    });
+
     expect(sentOf("session")[0]?.payload).toEqual({
       workItemId: "w1",
       sessionId: "fake-session-1",
@@ -771,6 +778,28 @@ describe("work loop", () => {
     expect(sentOf("fail")).toHaveLength(0);
     await conn.stop();
     await running;
+  });
+
+  it("reports the model the runtime started with", async () => {
+    await connect();
+    const runtime: Runtime = {
+      async *run() {
+        yield { type: "started", sessionId: "s", model: "claude-opus-4-1" };
+        yield { type: "finished", ok: true, text: "Done." };
+      },
+    };
+
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+    expect(sentOf("session")[0]?.payload).toEqual({
+      workItemId: "w1",
+      sessionId: "s",
+      model: "claude-opus-4-1",
+    });
+
+    await loop.stop();
+    await conn.stop();
   });
 
   it("hands back as waiting when the agent asked a question that is still open", async () => {

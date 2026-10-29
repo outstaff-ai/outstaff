@@ -10,7 +10,8 @@ export const workHandlers: RequestHandlers = {
     reply("ack", {});
   },
   async accept({ ctx, person, payload, reply }) {
-    await ctx.opts.source.accept(person, payload.workItemId);
+    const { workItemId, ...on } = payload;
+    await ctx.opts.source.accept(person, workItemId, on);
     reply("ack", {});
   },
   async decline({ ctx, c, person, payload, reply }) {
@@ -23,7 +24,7 @@ export const workHandlers: RequestHandlers = {
     reply("ack", {});
   },
   async session({ ctx, person, payload, reply }) {
-    await ctx.opts.source.setSession(person, payload.workItemId, payload.sessionId);
+    await ctx.opts.source.setSession(person, payload.workItemId, payload.sessionId, payload.model);
     reply("ack", {});
   },
   async journal({ ctx, person, payload, reply }) {

@@ -11,6 +11,18 @@ export const itemSubjectSchema = z
     "What the item is about: a ticket key, a pull request (`host/owner/name#n`) or a document id.",
   );
 
+const runtimeField = z
+  .string()
+  .nullable()
+  .describe("The runtime adapter that ran it, for example `claude`; null until the agent said.");
+
+const modelField = z
+  .string()
+  .nullable()
+  .describe(
+    "The model that ran it: the concrete id the runtime reported, else the one the person is configured with; null when neither is known.",
+  );
+
 const itemFields = {
   id: z.string().describe("Id of the work item."),
   kind: z.string().describe("What the item is, for example `assigned` or `review_feedback`."),
@@ -39,6 +51,8 @@ export const personSchema = z.strictObject({
     .strictObject({
       ...itemFields,
       startedAt: time.nullable().describe("When the item's current run started."),
+      runtime: runtimeField.describe("The runtime adapter running the current run, once it said."),
+      model: modelField.describe("The model of the current run, once known."),
       lastHeartbeat: time.describe("The item's latest sign of life."),
     })
     .nullable()
@@ -178,6 +192,8 @@ export const itemSchema = z.strictObject({
           .nullable()
           .describe("How the run ended, for example `done` or `blocked`."),
         error: z.string().nullable(),
+        runtime: runtimeField,
+        model: modelField,
       }),
     )
     .describe("Every run, oldest first."),

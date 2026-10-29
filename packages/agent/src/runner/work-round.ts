@@ -38,7 +38,7 @@ export function createRounds({ opts, log, sessions }: WorkerContext, run: ItemRu
     switch (e.type) {
       case "started":
         run.current = e.sessionId;
-        await sessions.started(id, e.sessionId);
+        await sessions.started(id, e.sessionId, e.model);
         return undefined;
       case "text":
         run.lastText = e.text;

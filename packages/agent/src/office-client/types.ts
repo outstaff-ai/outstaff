@@ -12,6 +12,9 @@ import type { OfficeClient } from "#/verbs/office.types.js";
 
 export type Offer = PayloadOf<"offer">;
 
+/** What an accepted item runs on: the runtime adapter, and the model the person is configured with. */
+export type RunOn = Omit<PayloadOf<"accept">, "workItemId">;
+
 /** The same shape as the office's clock, so one fake serves both. */
 export interface ClientClock {
   now(): Date;
@@ -82,12 +85,16 @@ export interface OfficeConnection extends OfficeClient {
    */
   onReports?(handler: (reports: QueuedReport[]) => void): void;
 
-  accept(workItemId: string): Promise<void>;
+  /** Takes the offer, saying which runtime adapter runs it and the model the person is configured with, if any. */
+  accept(workItemId: string, on: RunOn): Promise<void>;
   decline(workItemId: string, reason: string): Promise<void>;
   progress(workItemId: string, text: string): Promise<void>;
 
-  /** Stores the runtime session of the item; the next offer of the item carries it. */
-  session(workItemId: string, sessionId: string): Promise<void>;
+  /**
+   * Stores the runtime session of the item; the next offer of the item carries it. `model` is the concrete model
+   * the runtime reports it runs.
+   */
+  session(workItemId: string, sessionId: string, model?: string): Promise<void>;
   journal(workItemId: string, text: string): Promise<void>;
   handBack(
     workItemId: string,

@@ -76,6 +76,8 @@ The runtime knows how close the person's LLM subscription is to its limits; the 
 
 One runtime session per work item ([0010](/decisions/0010-context-per-work-item/)). When the runtime starts a session the agent stores its id with the item by sending `session`; the office keeps it and puts it in `sessionId` on every later offer of that item. The agent resumes that session when present and starts a new one otherwise. A session is never used for another item, and nothing is kept on the agent's disk, so a replaced container loses nothing.
 
+Which runtime and model ran an item is recorded on its run. The agent says which runtime adapter it runs on, and the model the person is configured with, when it accepts the offer (`accept`). When the runtime starts a session and names the model it runs (the Claude adapter reads it from the session start), the agent sends it with `session` in every round, so a person on the runtime's default model gets the concrete model id on the run. A runtime that does not name its model leaves it unknown.
+
 **A lost session.** The runtime adapter marks a failed run as `sessionLost` when it was asked to resume a session the runtime no longer knows (unknown or expired; the Claude Agent SDK adapter recognizes "No conversation found"). The agent then:
 
 1. appends the journal note "Session restarted from journal: the stored session could not be resumed.";

@@ -81,7 +81,7 @@ describe.each(["off", "shadow", "live"] as const)(
         throw new Error("no offer");
       }
 
-      await kofi.accept(r.value.workItem.id);
+      await kofi.accept(r.value.workItem.id, { runtime: "claude" });
       return r.value;
     };
 

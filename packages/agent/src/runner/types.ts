@@ -83,7 +83,7 @@ export interface ProfilePublisher {
 
 /** Where the office keeps the session of an item. */
 export interface SessionStore {
-  session(workItemId: string, sessionId: string): Promise<void>;
+  session(workItemId: string, sessionId: string, model?: string): Promise<void>;
 }
 
 /**
@@ -99,8 +99,11 @@ export interface SessionManager {
   /** The session to resume for the offered item, if an earlier round started one. */
   resumeFor(offer: Offer): string | undefined;
 
-  /** Stores the session the runtime started (or kept) for the item, once. */
-  started(workItemId: string, sessionId: string): Promise<void>;
+  /**
+   * Stores the session the runtime started (or kept) for the item, once. A model the runtime reports is sent every
+   * round, because each round is a run of its own.
+   */
+  started(workItemId: string, sessionId: string, model?: string): Promise<void>;
 }
 
 export interface UsageThresholds {

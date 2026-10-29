@@ -124,7 +124,7 @@ describe("the office with the event pipeline in shadow mode", () => {
     await office!.parts.intake.pollOnce();
     const offer = await conn.offers()[Symbol.asyncIterator]().next();
     const item = offer.value!.workItem;
-    await conn.accept(item.id);
+    await conn.accept(item.id, { runtime: "claude" });
     await conn.handBack(item.id, { summary: "Done.", status: "done" });
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
 

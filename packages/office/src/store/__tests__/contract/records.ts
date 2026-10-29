@@ -20,6 +20,32 @@ export function recordCases(ctx: ContractContext): void {
     await expect(ctx.store.finishRun("missing", { outcome: "ok" })).rejects.toThrow(/./);
   });
 
+  it("tags the open run with its runtime and model", async () => {
+    const item = await ctx.store.enqueue({
+      person: "ann",
+      kind: "k",
+      title: "t",
+      trigger: "human",
+    });
+
+    await ctx.store.tagRun(item.id, { runtime: "claude" });
+    expect(await ctx.store.listRuns(item.id)).toEqual([]);
+
+    const run = await ctx.store.startRun(item.id);
+    expect(run).toMatchObject({ runtime: null, model: null });
+    await ctx.store.tagRun(item.id, { runtime: "claude", model: "opus" });
+    await ctx.store.tagRun(item.id, { model: "opus-4" });
+    await ctx.store.tagRun(item.id, {});
+    expect((await ctx.store.listRuns(item.id))[0]).toMatchObject({
+      runtime: "claude",
+      model: "opus-4",
+    });
+
+    await ctx.store.finishRun(run.id, { outcome: "ok" });
+    await ctx.store.tagRun(item.id, { runtime: "other" });
+    expect((await ctx.store.listRuns(item.id))[0]).toMatchObject({ runtime: "claude" });
+  });
+
   it("keeps a journal per item, in order", async () => {
     const a = await ctx.store.enqueue({ person: "ann", kind: "k", title: "a", trigger: "human" });
     const b = await ctx.store.enqueue({ person: "ann", kind: "k", title: "b", trigger: "human" });

@@ -69,9 +69,12 @@ export function parseUsage(message: unknown): UsageEvent | undefined {
 type Mapper = (msg: Rec, state: MapState, signal?: AbortSignal) => RuntimeEvent[];
 
 function mapSystem(msg: Rec): RuntimeEvent[] {
-  return msg["subtype"] === "init" && typeof msg["session_id"] === "string"
-    ? [{ type: "started", sessionId: msg["session_id"] }]
-    : [];
+  if (msg["subtype"] !== "init" || typeof msg["session_id"] !== "string") {
+    return [];
+  }
+
+  const model = typeof msg["model"] === "string" && msg["model"] ? msg["model"] : undefined;
+  return [{ type: "started", sessionId: msg["session_id"], ...(model ? { model } : {}) }];
 }
 
 const isTextBlock = (b: unknown): b is Rec =>

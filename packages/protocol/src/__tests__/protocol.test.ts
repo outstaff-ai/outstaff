@@ -30,7 +30,12 @@ describe("protocol", () => {
   });
 
   it("round-trips a message", () => {
-    const m = { id: "1", type: "accept", payload: { workItemId: "w1" } } as const;
+    const m = {
+      id: "1",
+      type: "accept",
+      payload: { workItemId: "w1", runtime: "claude" },
+    } as const;
+
     expect(decode(encode(m))).toEqual({ ok: true, message: m });
   });
 

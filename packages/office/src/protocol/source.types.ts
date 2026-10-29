@@ -13,6 +13,9 @@ import type {
 
 export type Offer = PayloadOf<"offer">;
 
+/** What an accepted item runs on, as the agent reports it. */
+export type RunOn = Omit<PayloadOf<"accept">, "workItemId">;
+
 /**
  * What the protocol server needs from the scheduler and store. The server keeps no state that must survive a
  * restart: which items were offered and accepted lives behind this interface. Every call is scoped to the person
@@ -25,8 +28,8 @@ export interface WorkSource {
   /** Takes the next queued item for the person, or nothing when they are busy or the queue is empty. */
   next(person: string): Promise<Offer | undefined>;
 
-  /** Idempotent. */
-  accept(person: string, workItemId: string): Promise<void>;
+  /** Idempotent. Records the runtime and model the agent says it runs the item on, on the item's run. */
+  accept(person: string, workItemId: string, on: RunOn): Promise<void>;
 
   /**
    * Puts an offered item back in the queue, untouched: no failure is counted, and the journal and stored session
@@ -36,8 +39,11 @@ export interface WorkSource {
   heartbeat(person: string, workItemId: string | undefined): Promise<void>;
   progress(person: string, workItemId: string, text: string): Promise<void>;
 
-  /** Stores the runtime session of the item; the offer of a later round carries it. */
-  setSession(person: string, workItemId: string, sessionId: string): Promise<void>;
+  /**
+   * Stores the runtime session of the item; the offer of a later round carries it. `model` is the concrete model
+   * the runtime reported, recorded on the item's run.
+   */
+  setSession(person: string, workItemId: string, sessionId: string, model?: string): Promise<void>;
   journal(person: string, workItemId: string, text: string): Promise<void>;
   handBack(
     person: string,

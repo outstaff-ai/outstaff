@@ -9,7 +9,7 @@ export function runQueries({
   now,
 }: StoreInternals): Pick<
   Store,
-  "startRun" | "finishRun" | "listRuns" | "appendJournal" | "readJournal"
+  "startRun" | "finishRun" | "listRuns" | "tagRun" | "appendJournal" | "readJournal"
 > {
   const stamp = () => iso(now());
 
@@ -26,6 +26,8 @@ export function runQueries({
           outcome: null,
           error: null,
           usage: null,
+          runtime: null,
+          model: null,
         })
         .returningAll()
         .executeTakeFirstOrThrow();
@@ -59,6 +61,26 @@ export function runQueries({
         .execute();
 
       return rows.map(toRun);
+    },
+
+    async tagRun(workItemId, tags) {
+      const set = {
+        ...(tags.runtime === undefined ? {} : { runtime: tags.runtime }),
+        ...(tags.model === undefined ? {} : { model: tags.model }),
+      };
+
+      const open = await db
+        .selectFrom("runs")
+        .select("id")
+        .where("work_item_id", "=", workItemId)
+        .where("finished_at", "is", null)
+        .orderBy("id", "desc")
+        .limit(1)
+        .executeTakeFirst();
+
+      if (open && Object.keys(set).length > 0) {
+        await db.updateTable("runs").set(set).where("id", "=", open.id).execute();
+      }
     },
 
     async appendJournal(workItemId, author, text) {

@@ -50,7 +50,23 @@ export const sessionMessages = [
         ),
     }),
   ),
-  message("accept", z.strictObject({ workItemId: itemId })),
+  message(
+    "accept",
+    z.strictObject({
+      workItemId: itemId,
+      runtime: z
+        .string()
+        .min(1)
+        .max(100)
+        .describe("The runtime adapter this agent runs the item on, for example `claude`."),
+      model: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("The model the person is configured with; left out for the runtime's default."),
+    }),
+  ),
   message(
     "decline",
     z.strictObject({
@@ -68,6 +84,14 @@ export const sessionMessages = [
     z.strictObject({
       workItemId: itemId,
       sessionId: z.string().min(1).max(200).describe("Id of the runtime session working the item."),
+      model: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe(
+          "The concrete model id the runtime reports it started with; it names the runtime's default.",
+        ),
     }),
   ),
   message(

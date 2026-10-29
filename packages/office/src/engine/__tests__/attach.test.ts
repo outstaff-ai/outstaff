@@ -102,7 +102,7 @@ describe("feedback during a review round", () => {
     const work = source();
     await comment(pr.number, "Rename the flag.");
     const offer = (await work.next("sam"))!;
-    await work.accept("sam", offer.workItem.id);
+    await work.accept("sam", offer.workItem.id, { runtime: "claude" });
     expect(bodies(offer.context.feedback)).toEqual(["Rename the flag."]);
 
     await comment(pr.number, "And add a test.");
@@ -131,7 +131,7 @@ describe("feedback during a review round", () => {
     const work = source();
     await comment(pr.number, "Rename the flag.");
     const offer = (await work.next("sam"))!;
-    await work.accept("sam", offer.workItem.id);
+    await work.accept("sam", offer.workItem.id, { runtime: "claude" });
     await h.store.upsertSubject("chat_origin", offer.workItem.id, {
       channel: "D1",
       thread: "t1",
@@ -173,7 +173,7 @@ describe("feedback during a review round", () => {
     const work = source();
     await comment(pr.number, "Rename the flag.");
     const offer = (await work.next("sam"))!;
-    await work.accept("sam", offer.workItem.id);
+    await work.accept("sam", offer.workItem.id, { runtime: "claude" });
     await comment(pr.number, "And add a test.");
     await work.handBack("sam", offer.workItem.id, { summary: "Done.", links: [], status: "done" });
     expect((await h.items("sam")).filter((i) => i.status === "queued")).toEqual([]);
