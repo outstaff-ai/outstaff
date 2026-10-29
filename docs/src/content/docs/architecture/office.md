@@ -137,7 +137,7 @@ A run of an agent- or automation-triggered item is counted when it starts. When 
 
 ### Which runtime ran it
 
-A run records the runtime adapter and the model that ran it (`runs.runtime`, `runs.model`; both stay empty for a run the agent never accepted and for runs from before the columns). The agent reports them: `accept` carries the adapter and the model the person is configured with, and `session` carries the concrete model id the runtime reports when it starts, which replaces the configured one, so an item run on the runtime's default shows the model that was used. The office link shows them on each of an item's `runs` and on the `current` item of a person, and usage can be grouped by them from the run records.
+A run records the runtime adapter and the model that ran it (`runs.runtime`, `runs.model`; both stay empty for a run the agent never accepted and for runs from before the columns). The agent reports them: `accept` carries the adapter and the model the person is configured with, and `session` carries the concrete model id the runtime reports when it starts, which replaces the configured one, so an item run on the runtime's default shows the model that was used. The office link shows them on each of an item's `runs` and on the `current` item of a person, and usage can be grouped by them from the run records. Each person on the link also carries what they are configured with, whether or not a run is going: `runtime`, the adapter of their own `runtime` or else the team's `integrations.runtime`, and `model`, their `model` from `team.yaml` or null.
 
 ### Failed runs
 

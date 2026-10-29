@@ -26,7 +26,10 @@ describe("the office link", () => {
     const base = {
       url: dash.url,
       token: TOKEN,
-      team: { people: [{ handle: "sam", name: "Sam Duarte", role: "developer" }] as never },
+      team: {
+        integrations: { runtime: { adapter: "claude" } },
+        people: [{ handle: "sam", name: "Sam Duarte", role: "developer" }],
+      } as never,
       store,
       links: {
         ticket: (key: string) => `https://tracker.acme.example/issue/${key}`,
@@ -99,6 +102,8 @@ describe("the office link", () => {
         handle: "sam",
         name: "Sam Duarte",
         role: "developer",
+        runtime: "claude",
+        model: null,
         connected: true,
         counts: { queued: 0, running: 0 },
         current: null,
