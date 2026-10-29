@@ -1,11 +1,91 @@
 ---
 title: What outstaff does on its own
-description: Every automated behaviour, whether it is on by default, and the policies switch that controls it.
+description: How the office decides what to do with every event, the default policies, the pipeline's modes, and the policies switches.
 sidebar:
   order: 3
 ---
 
-Outstaff acts without being asked in a few places: it reacts to messages, starts follow-up rounds, hands tickets back and retries stuck work. Each of these has a named switch under `policies` in `.outstaff/team.yaml`. Everything that happens today is on by default; a team that wants less turns a switch off. Anything that merges, approves or acts without a human in the loop is off until a team opts in.
+The office acts without being asked: it wakes an agent when a review lands, moves a ticket when its pull request merges, hands work back to the person who asked, and starts the next ready ticket when an agent runs out of work. This page explains how it decides.
+
+**Proposed** ([decision 0016](/decisions/0016-event-pipeline/)). Every event goes through one **event pipeline**: an ordered list of policies that decides to wake an agent, act for one, or drop the event, and records why. `office.pipeline` in `.outstaff/team.yaml` sets how much the pipeline decides. Until it is `live`, the [workflow rules and the policies switches](#the-policies-switches) decide, as they always have; live replaces them.
+
+## Events
+
+An event is anything that happened that the office might act on, from any source:
+
+| Source     | Events                                                                                                                                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat       | `chat.message`: a direct message, a mention or a thread reply to an agent, which the agent passes on to the office                                                                                 |
+| Code host  | `pr.opened`, `pr.review_submitted`, `pr.comment`, `pr.merged`, `pr.closed`                                                                                                                         |
+| Work state | `pr.conflicted` and `pr.ci_failed`, which the office raises itself when a pull request starts to conflict or its checks fail; `pr.behind_base` and `pr.base_merged` are defined but not raised yet |
+| Tracker    | `ticket.commented`, `ticket.assigned`, `ticket.moved`, `ticket.created`                                                                                                                            |
+| Docs       | `doc.commented`                                                                                                                                                                                    |
+| The office | `agent.handed_back` when an agent hands an item back, and `agent.idle` when an agent has nothing queued or running and a ready ticket to start                                                     |
+
+Each event has an actor (a human, an agent or automation). An event from an untrusted human is recorded, never acted on; in shadow and live mode its trace says why. How the office reads each source, and who counts as trusted, is in [The office](/architecture/office/#intake).
+
+## Three decisions
+
+A policy decides one of three things, and nothing else:
+
+- **wake** an agent: queue a work item for it with an instruction and the context. The instruction says what is expected ("address each point, answer in its thread and push"); the agent decides how, following the repository's conventions.
+- **act** for an agent: make a tracker change (move a ticket, assign it, comment, set its parent) or comment on a document, without a model run. The office makes it with its own tracker and knowledge accounts and posts a note naming the agent it was for, so the ticket's history says who the change served. With no agent to act for, the act is dropped.
+- **drop** the event, with a reason.
+
+The office's write scope is tracker coordination metadata: status, assignee, labels, parent and those notes. On the code host it is strictly read-only. It never merges and never messages people; every message a person reads in chat comes from an agent.
+
+## The default policies
+
+The office ships a default set, listed with each policy's conditions and instruction in the generated [pipeline policies reference](/reference/pipeline-policies/). In short:
+
+- **Wakes.** A chat message wakes the agent it was written to; a human's review or comment wakes the pull request's author; a conflict or failing checks wake the author; a ticket assigned to an agent by someone else, a comment on it, or a human moving it to active wakes the agent; a comment on a document wakes the agent it mentions, else its author; an idle agent is woken with its next ready ticket.
+- **Acts.** A pull request opened for review moves its ticket to review; a merge into the default branch, with no other pull request of the ticket open, moves it to done; a hand-back moves the ticket to review (done) or blocked (blocked) and assigns it to the person who asked. This is bookkeeping agents do not do themselves. With the pipeline off or in shadow mode the workflow rules make the same moves, except in the `minimal` preset, which moves no tickets; the agents' instructions say which applies.
+
+Every policy is evaluated for every event, in order, and every one that matches contributes its decision. Change one under `pipeline.policies.<id>`:
+
+```yaml
+pipeline:
+  policies:
+    ci_failed_to_author:
+      instruction: "Checks fail on #{{pr.number}} ({{pr.title}}). Fix the cause and push."
+    review_to_author:
+      when: { not: { has_label: wip } } # narrows the policy: its own condition and this one must hold
+    moved_active_to_assignee:
+      enabled: false
+```
+
+`enabled: false` turns a policy off (it still shows in the trace as turned off), `instruction` replaces the instruction of a wake or the note of an act, and `when` narrows it. An instruction with an unknown variable keeps the default, with a warning in the office log. The variables are listed in the [reference](/reference/pipeline-policies/#instruction-variables). One policy also follows a switch: `idle_pulls_next` is on only with `policies.pull_ready`.
+
+## Modes
+
+`office.pipeline` takes three values:
+
+| Mode            | Who decides                                    | What the pipeline does                                                                                                                                            |
+| --------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `off` (default) | the workflow rules and the switches            | nothing; nothing is traced                                                                                                                                        |
+| `shadow`        | the workflow rules and the switches, as in off | judges every event before the rules apply anything, and records its decisions, what the rules did for the same event, and how the two compare. It changes nothing |
+| `live`          | the pipeline                                   | judges every event instead of the workflow rules, queues its wakes and makes its acts                                                                             |
+
+Live replaces the workflow rules, and with them the switches that only edit rules (see [Switches and workflow rules](#switches-and-workflow-rules)); the office's own mechanics still run in every mode: moving a ticket to active when its work starts (`tickets.start_moves_active`), follow-up rounds for feedback that came in late (`feedback.follow_up_round`), and routing an item the scheduler blocked. Some of what the rules do is not in the default set yet: the PM's `unblock` round on a blocked hand-back, a mention handing a ticket to the agent mentioned, a human taking a ticket back by moving it to active, and retrying a blocked item on a human's signal (`retry.on_signal`). Look for them in shadow mode before going live.
+
+### From off to shadow to live
+
+1. **Shadow.** Set `office.pipeline: shadow` and restart the office, which reads team.yaml when it starts. Nothing the team sees changes.
+2. **Watch it.** Let the team work as usual for a few days. `ost explain --recent 20` lists the latest traced events; `ost explain <event-id>` prints one: every policy that listens to it, whether it matched and why, the first condition that failed, the decisions, what the rules applied for the same event, and what the wake context handed over. `ost explain --compare --since 7d` sums it up: how many events agree and differ, the differences by kind and by policy, and the events that differ. A dashboard connected over the [office link](/reference/office-link/) shows the same comparison (`compare`) and filters the events that differ. See the [CLI reference](/reference/cli/#ost-explain).
+3. **Settle the differences.** For each, decide whether the pipeline is right, or change the policy under `pipeline.policies` until it is. The known gaps above show up here; a team that relies on one of them stays in shadow until the default set covers it.
+4. **Live.** Set `office.pipeline: live` and restart the office. Every event is still traced, so `ost explain <event-id>` keeps answering why the office did something. Going back is setting `shadow` or `off` again.
+
+## Coalescing
+
+Live, wakes that come close together become one run. Wakes for the same agent and the same pull request, ticket, document or chat conversation within `pipeline.wake.coalesce_seconds` (default 60) of the first are folded into one work item that carries all of them: four review comments left within a minute are one `review_feedback` round, three quick chat messages are one chat session. The run starts when the window closes. `0` turns it off, and an idle pull is never held. The trace of each folded event names the item and every event folded into it. With the pipeline off or in shadow mode the rules schedule, and nothing is coalesced. See [Coalescing](/architecture/office/#coalescing).
+
+## Wake context
+
+Every wake, in every mode, hands the agent what the office already knows about the work: the tickets, pull requests, documents and chat threads the item is linked to, each with its link and why it belongs, within the `pipeline.context` limits of team.yaml. The agent starts from that and the wake's instruction instead of rediscovering them with several verb calls. When the event has a trace, what the bundle carried is added to it. See [Wake context](/architecture/office/#wake-context).
+
+## The policies switches
+
+With `office.pipeline` off or in shadow mode, the workflow rules decide, and a few places are governed by a named switch under `policies` in `.outstaff/team.yaml`. Everything that happens today is on by default; a team that wants less turns a switch off. Anything that merges, approves or acts without a human in the loop is off until a team opts in. Live replaces the rules; the switches the office or the agent carry out themselves keep working.
 
 ```yaml
 policies:
@@ -30,7 +110,7 @@ policies:
 
 Run `ost policies` to see every switch with its effective value and where the value comes from, and `ost workflow explain` to see which switch is behind each rule an event triggers.
 
-## The behaviours
+### The behaviours
 
 | Switch                                | Default       | What outstaff does while it is on                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | ------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -55,16 +135,7 @@ Run `ost policies` to see every switch with its effective value and where the va
 
 `policies.retry` also holds the backoff settings (`base_minutes`, `cap_minutes`, `max_failures`) that decide when a failing item is blocked in the first place.
 
-## Chat and batched wakes in the event pipeline
-
-Proposed ([decision 0016](/decisions/0016-event-pipeline/)), with `office.pipeline: live` in `.outstaff/team.yaml`:
-
-- **A chat message wakes the agent it was written to.** A direct message, a mention or a reply in a thread to an agent is an event like a review or a ticket change. The default policy `chat_to_addressed` starts a chat session for the agent, which decides what the message asks for: an answer, new work, or a change to work it already has. `pipeline.policies.chat_to_addressed` turns it off, narrows it or changes its instruction. In shadow mode the chat desk keeps answering, and `ost explain` shows what the pipeline would have done beside it.
-- **Wakes that come close together become one run.** Wakes for the same agent and the same pull request, ticket, document or chat conversation within `pipeline.wake.coalesce_seconds` (default 60) of the first are folded into one run that carries all of them: four review comments left within a minute are one `review_feedback` round, three quick messages are one chat session. The run starts when the window closes. `0` turns it off.
-
-See [Chat in the event pipeline](/architecture/office/#chat-in-the-event-pipeline) and [Coalescing](/architecture/office/#coalescing) for the details.
-
-## Switches and workflow rules
+### Switches and workflow rules
 
 Several switches act on preset [workflow](/reference/team-yaml/#workflow) rules: `feedback.merged_prs` removes `merged-feedback-follow-up`, `feedback.doc_comments` removes `doc-feedback-to-author`, `feedback.ticket_comments` removes `ticket-comment-to-assignee` and `ticket-comment-reactivates-ticket`, `feedback.mentions` removes `mention-assigns-agent`, `doc-mention-feedback` and `doc-mention-assigns-ticket`, `conflicts.follow_up` removes `conflict-back-to-author`, `hand_back.reassign: none` drops the assignment from `hand-back-to-requester` and `hand-back-blocked-to-requester`, `hand_back.blocked_notify: agent` drops the PM round from `hand-back-blocked-to-requester`, and `tickets.prs_per_ticket: many` edits `pr-merged-done`, `pr-closed-ready`, `hand-back-to-requester` and `second-pr-comment` so that a ticket is done when the agent has handed it back as done and its pull requests are all closed with one merged (conditions `ticket_prs_all_closed`, `ticket_prs_open`, `ticket_handed_back` and `ticket_prs_several`). `tickets.prs_per_ticket` is also enforced by `ost pr open`, whatever the preset, so it is not shown as off for the `minimal` preset. The others are carried out by the agent or the office and have no rule behind them.
 
@@ -75,6 +146,8 @@ Precedence, strongest first:
 3. The built-in default.
 
 A switch can only do something the workflow preset has. The `minimal` preset has no `conflict-back-to-author` or `hand-back-to-requester`, so `ost policies` shows those switches as `off` with the source `preset`.
+
+With `office.pipeline: live` none of these rules is evaluated: the pipeline's policies decide instead, and `pipeline.policies` is where a team changes them. A rule-only switch then does nothing, except `pull_ready`, which also gates a policy.
 
 ## Merging on approval
 

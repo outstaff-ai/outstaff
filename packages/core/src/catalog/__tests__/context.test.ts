@@ -100,7 +100,7 @@ describe("buildContext", () => {
   });
 
   it("tells a template whether the team allows several pull requests per ticket", () => {
-    expect(ctx.policies.tickets).toEqual({ many_prs: false });
+    expect(ctx.policies.tickets).toEqual({ many_prs: false, office_moves: true });
     const many = buildContext({
       ...acme,
       policies: {
@@ -109,7 +109,12 @@ describe("buildContext", () => {
       },
     });
 
-    expect(many.policies.tickets).toEqual({ many_prs: true });
+    expect(many.policies.tickets).toEqual({ many_prs: true, office_moves: true });
+  });
+
+  it("tells a template whether the office moves tickets, which the minimal preset never does", () => {
+    const minimal = buildContext({ ...acme, workflow: { ...acme.workflow, preset: "minimal" } });
+    expect(minimal.policies.tickets.office_moves).toBe(false);
   });
 
   it("renders a template end to end and keeps typos strict", () => {

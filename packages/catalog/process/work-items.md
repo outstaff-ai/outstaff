@@ -6,7 +6,7 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 
 - Work on one item at a time, the one you were started on. Finish it or hand it back before looking at another.
 - Never mix items. Do not carry code, branches, decisions or assumptions from one item into another. Anything that applies to later items goes in memory (see `references/memory.md`).
-- Start from the current state the office gives you (ticket, pull request, CI, open review threads), not from what you remember.
+- Start from what the office hands you with the item: the instruction it wrote in the journal, when there is one, the feedback, and what it knows about this work (the linked tickets, pull requests with their CI and open review threads, documents and chat threads, each with its link). Read more with `ost` only where that is not enough; do not look up again what it already says, and do not go by what you remember.
 - Stay inside the item. If you find unrelated work, file or mention it; do not do it now.
 - Use `ost work list` to see your current item and your queue.{{#if integrations.has.tracker}}
 - A ticket is one pull request. If its work needs several, split it into sub-tickets before you start (`process/ticket-lifecycle.md`, "One pull request per ticket").{{/if}}
@@ -14,8 +14,7 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 ## Comments on documents and tickets
 
 - `doc_feedback`: a trusted human commented on a document you wrote, or mentioned you in a comment on one. Read the comments, act, and reply (`process/doc-feedback.md`).
-- `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back, which then comes back to you as active. Read the comment, act, and reply on the ticket.
-- A ticket you were mentioned on (`@you` in a comment by a trusted human) is yours now: it is assigned to you and active, and its work item is a `ticket_comment`. Read the thread and act.
+- `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back, or mentioned you (`@you`) in a comment on a ticket. Read the thread, act, and reply on the ticket. When the mention handed you the ticket, it is assigned to you; otherwise leave its assignee as it is.
 - `unblock`: a teammate handed a ticket back as blocked and you are the team's PM. Follow `process/unblock.md`; the ticket is not yours.
 - `asked`: a trusted human mentioned you and others in one comment; the first mentioned has the ticket, not you. Read the thread and answer on the ticket. The ticket stays with its assignee.
 

@@ -6,23 +6,32 @@ Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-spec
 | -------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | backlog  | Not yet refined or not scheduled    | Do not start it. Refine it only if it is assigned to you for refinement.                                                                                                  |
 | ready    | Clear, scoped, waiting for a person | Pick it up only when it is assigned to you and you have no active item.                                                                                                   |
-| active   | You are working on it               | The office moves it here when you start; keep it accurate as you go. Keep one active item.                                                                                |
-| review   | Waiting for someone else            | Move it here at hand-back. Answer review feedback; do not start new work on it.                                                                                           |
+| active   | You are working on it               | Work on it. Keep one active item.                                                                                                                                         |
+| review   | Waiting for someone else            | Answer review feedback; do not start new work on it.                                                                                                                      |
 | blocked  | Cannot continue                     | Say what blocks it and who can unblock it, then ask that person with `ost ask`. Pick up other work. Hand the item back as `blocked`, not `done` (`process/hand-back.md`). |
 | done     | Finished and accepted               | Nothing. Never reopen it; file a new ticket for follow-ups.                                                                                                               |
 | canceled | Will not be done                    | Nothing. Say why in a comment if you are the one canceling.                                                                                                               |
 
 ## Rules
 
-- A comment on your ticket from a trusted human reaches you as feedback. Read it, act on it and reply on the ticket. On a ticket you handed back it comes back to you as `active`.
-- Move a ticket the moment its real state changes, not later in a batch.
-- Assign the ticket to yourself before you start it. Never work on a ticket assigned to someone else.
-- Comment on every status change that is not obvious: why it is blocked, why it is canceled.
+- A comment on your ticket from a trusted human reaches you as feedback, also on a ticket you handed back. Read it, act on it and reply on the ticket.
+- Work only on tickets assigned to you. Never work on a ticket assigned to someone else.
+- When you change a status yourself and the reason is not obvious, say why in a comment: why it is blocked, why it is canceled.
 - Do not set `done` unless your role is allowed to. Work you finish goes to `review`.
 {{#if integrations.has.tracker}}
 ## Keeping the tracker in sync
 
-- The tracker is the shared record. Keep the status, assignee and a short comment current with `ost ticket`.
+{{#if policies.tickets.office_moves}}The tracker is the shared record, and the office keeps its routine changes for you, from what you do:
+
+- your work on the ticket starts: it moves to `active`;
+- you open its pull request for review (not as a draft): it moves to `review`;
+- its last open pull request merges into the default branch: it moves to `done`{{#if policies.tickets.many_prs}}, once you have also handed it back as `done` (below){{/if}};
+- you hand back as `done`: it moves to `review` and goes to the person who asked; as `blocked`: it moves to `blocked` and goes to them.
+
+Do not make these moves or assignments yourself; hand back with the status that says where the work is (`process/hand-back.md`). Change a ticket yourself only for what the office cannot see, the moment it happens: you cancel it, or you file, split or re-parent tickets. Comment with `ost ticket` on anything a reader would not see from the status.
+
+{{else}}- The tracker is the shared record, and {{ team.name }}'s workflow does not move tickets. Keep the status, assignee and a short comment current with `ost ticket`, and move a ticket the moment its real state changes, not later in a batch: to `active` when you start, to `review` when you hand back as `done`, to `blocked` when you cannot continue.
+{{/if}}
 - File what you find yourself with `ost ticket create`; do not ask someone else to. Work that is part of an existing ticket's scope is a subtask of it (`--parent <ticket>`, the default inside that ticket's work item, or `ost ticket parent <ticket> <parent>` for one that exists). A follow-up that stands on its own is a separate ticket with a relates link: `ost ticket create --related <ticket>`. It lands in the backlog, unassigned, unless you pass `--assignee` or `--status`. Name every ticket you filed in your hand-back.
 - If the tracker and a work item disagree, trust the tracker, fix the work item, and mention it in the journal.
 
