@@ -1,5 +1,6 @@
 import type { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
+import { removedKey } from "./removed-keys.js";
 import type { ConfigIssue } from "./types.js";
 
 const BY_ZOD_CODE: Record<string, string> = {
@@ -15,18 +16,20 @@ export function customIssue(code: string, message: string, path: (string | numbe
   return { code: "custom" as const, message, path, params: { code } };
 }
 
+function unknownKey(path: (string | number)[]): ConfigIssue {
+  const removed = removedKey(path);
+
+  return removed === undefined
+    ? { path, code: CONFIG_CODES.unknownKey, message: `Unknown key "${String(path.at(-1))}".` }
+    : { path, code: CONFIG_CODES.removedKey, message: removed };
+}
+
 export function toConfigIssues(error: z.ZodError, prefix: (string | number)[] = []): ConfigIssue[] {
   const out: ConfigIssue[] = [];
   for (const issue of error.issues) {
     const path = [...prefix, ...issue.path.map((p) => (typeof p === "symbol" ? String(p) : p))];
     if (issue.code === "unrecognized_keys") {
-      for (const key of issue.keys) {
-        out.push({
-          path: [...path, key],
-          code: CONFIG_CODES.unknownKey,
-          message: `Unknown key "${key}".`,
-        });
-      }
+      out.push(...issue.keys.map((key) => unknownKey([...path, key])));
 
       continue;
     }

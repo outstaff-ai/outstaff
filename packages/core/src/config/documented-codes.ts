@@ -7,6 +7,7 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "schema.too_small": "A value, list or string is below its minimum.",
   "schema.too_big": "A value, list or string is above its maximum.",
   "schema.unknown_key": "A key is not part of the schema.",
+  "schema.removed_key": "A key was removed from the schema; the message says what replaces it.",
   "config.not_found": "No team file was found in any of the places searched.",
   "config.yaml_syntax": "The team file is not valid YAML.",
   "config.read_failed": "The team file could not be read.",
@@ -50,7 +51,6 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "network.invalid_url":
     "A network http grant url is not an origin (scheme, host and optional port only).",
   "network.duplicate_name": "Two network grants of the same kind share a name.",
-  "network.adb_mode": "An adb grant gives both port and pairing, or neither.",
   "network.reserved_token":
     "A network token names a secret the framework or an adapter reads, so it cannot be a service token.",
   "roles.unknown_role": "A roles entry names a role that is not in the catalog.",

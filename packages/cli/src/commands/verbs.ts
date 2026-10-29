@@ -29,7 +29,6 @@ export const groupSummaries: Record<string, string> = {
   pr: "Open, update, review and diff pull requests, and work their review threads.",
   role: "Add custom roles to the team's catalog.",
   workflow: "Inspect how the team workflow reacts to events.",
-  adb: "Pair with, connect to and run adb commands on the Android devices granted to you.",
 };
 
 /** The adapters this build can create; teams using others get a clear message from the verbs that need them. */

@@ -49,12 +49,6 @@ export type Context = {
   /** Runs mise for `ost doctor`'s tool check; defaults to the `mise` on the PATH (tests only). */
   mise?: MiseRunner;
 
-  /** Whether host:port accepts a TCP connection, for `ost doctor`'s adb checks; defaults to a real connection (tests only). */
-  tcpProbe?: (host: string, port: number) => Promise<boolean>;
-
-  /** Whether `adb` runs, for `ost doctor`; defaults to running `adb version` (tests only). */
-  adbProbe?: () => Promise<boolean>;
-
   /** Home directory, where `ost setup --derive` looks for a downloaded key in `Downloads`; defaults to the user's. */
   home?: string;
 

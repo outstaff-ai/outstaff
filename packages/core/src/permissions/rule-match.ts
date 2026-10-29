@@ -1,6 +1,7 @@
 import { checkPath } from "./check-path.js";
 import { allow, deny } from "./decision.js";
 import { repoFor } from "./git.js";
+import { leadingValues, operands } from "./operands.js";
 import type { ArgPredicate, CommandRule, Decision, Policy } from "./types.js";
 
 function flagValues(args: string[], names: string[]): string[] | null {
@@ -46,16 +47,11 @@ function predicateHolds(p: ArgPredicate, args: string[], positionals: string[]):
   }
 }
 
-/** The words that are not options; after `--` every word is one. */
-function operands(args: string[]): string[] {
-  const dashes = args.indexOf("--");
-  if (dashes < 0) {
-    return args.filter((a) => !a.startsWith("-"));
-  }
-
-  return [...args.slice(0, dashes).filter((a) => !a.startsWith("-")), ...args.slice(dashes + 1)];
-}
-
+/**
+ * Whether the rule applies to the command, and the positionals after its subcommand when it does. A deny rule of a
+ * program whose valued options are not declared also tries each leading word that may be an option's value as not
+ * being the subcommand, so `-c prod delete` cannot hide a denied `delete`.
+ */
 function matchRule(
   r: CommandRule,
   program: string,
@@ -65,13 +61,29 @@ function matchRule(
     return null;
   }
 
-  const all = operands(args);
+  const all = operands(args, r.valuedOptions);
+  const skips = r.effect === "deny" && !r.valuedOptions ? leadingValues(args) : 0;
+  for (let skip = 0; skip <= skips; skip++) {
+    const m = matchAt(r, args, all.slice(skip));
+    if (m) {
+      return m;
+    }
+  }
+
+  return null;
+}
+
+function matchAt(
+  r: CommandRule,
+  args: string[],
+  words: string[],
+): { positionals: string[] } | null {
   const sub = r.subcommand ?? [];
-  if (sub.some((w, i) => all[i] !== w)) {
+  if (sub.some((w, i) => words[i] !== w)) {
     return null;
   }
 
-  const positionals = all.slice(sub.length);
+  const positionals = words.slice(sub.length);
   if (!(r.args ?? []).every((p) => predicateHolds(p, args, positionals))) {
     return null;
   }

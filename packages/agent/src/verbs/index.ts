@@ -1,5 +1,4 @@
 import { PortError, type RuntimeTool } from "@outstaff/core";
-import { adbVerbs } from "./adb.js";
 import { docVerbs } from "./doc.js";
 import { http } from "./http.js";
 import { me } from "./me.js";
@@ -37,7 +36,6 @@ export const VERBS: readonly Verb[] = [
   me,
   ...officeVerbs,
   http,
-  ...adbVerbs,
 ];
 
 export const findVerb = (name: string): Verb | undefined => VERBS.find((v) => v.name === name);

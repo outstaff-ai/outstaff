@@ -1,4 +1,3 @@
-import { adbCommand, adbDestructive, fastbootDestructive } from "./adb.js";
 import { WRAPPERS, envCommand, findCommands, wrapped } from "./command-words.js";
 import { deny } from "./decision.js";
 import { evaluateGit } from "./git.js";
@@ -58,9 +57,6 @@ function shell(args: string[], scope: CommandScope): Decision[] {
   return script === undefined ? [] : [scope.script(script)];
 }
 
-const destructive = (problem: string | undefined): Decision[] =>
-  problem ? [deny(problem, "adb.destructive")] : [];
-
 function treeReads(program: string, args: string[], scope: CommandScope): Decision[] {
   if (!TREE_READERS.has(program)) {
     return [];
@@ -79,6 +75,4 @@ const PROGRAMS = new Map<string, ProgramJudge>([
   ["eval", (args, scope) => [scope.script(args.join(" "))]],
   ["find", (args, scope) => findCommands(args).map(scope.inner)],
   ["git", (args, scope) => [evaluateGit(scope.policy, args, scope.cwd, scope.call)]],
-  ["adb", (args) => destructive(adbDestructive(adbCommand(args)))],
-  ["fastboot", (args) => destructive(fastbootDestructive(args))],
 ]);

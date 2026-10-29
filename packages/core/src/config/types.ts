@@ -42,12 +42,10 @@ export type ParsedYaml = {
 
 export type Network = z.output<typeof networkSchema>;
 export type HttpGrant = NonNullable<Network["http"]>[number];
-export type AdbGrant = NonNullable<Network["adb"]>[number];
 
 /** What a person may reach after role and person grants are merged. */
 export interface NetworkGrants {
   http: HttpGrant[];
-  adb: AdbGrant[];
 }
 
 export type ParseResult = { ok: true; config: TeamConfig } | { ok: false; issues: ConfigIssue[] };

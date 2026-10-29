@@ -11,18 +11,12 @@ const toolLine = (t: ToolStatus) =>
 
 const listOrNone = (items: string[], sep: string) => (items.length ? items.join(sep) : "none");
 
-/** The services and devices granted, as "http hub, adb phone (wireless)". */
-function networkLine(http: NetworkAccess["http"], adb: NetworkAccess["adb"]): string {
-  return [
-    ...http.map((g) => `http ${g.name}`),
-    ...adb.map((g) => `adb ${g.name}${g.pairing ? " (wireless)" : ""}`),
-  ].join(", ");
-}
+/** The services granted, as "http hub, http home". */
+const networkLine = (http: NetworkAccess["http"]): string =>
+  http.map((g) => `http ${g.name}`).join(", ");
 
-/** The HTTP services and adb devices granted to this person. */
-function grantedNetwork(env: AgentEnv): Pick<NetworkAccess, "http" | "adb"> {
-  return { http: env.network?.http ?? [], adb: env.network?.adb ?? [] };
-}
+/** The HTTP services granted to this person. */
+const grantedHttp = (env: AgentEnv): NetworkAccess["http"] => env.network?.http ?? [];
 
 /** Which of the team's integrations this process has connected. */
 function connectedPorts(env: AgentEnv): Record<string, boolean> {
@@ -51,7 +45,7 @@ export const me = defineVerb({
     const grants = Object.entries(person.repos).map(([k, v]) => `${k}: ${v}`);
     const connected = connectedPorts(env);
     const tools = env.tools ?? [];
-    const { http, adb } = grantedNetwork(env);
+    const http = grantedHttp(env);
     const email = env.team.email?.pattern.replace("{handle}", person.handle);
     return result(
       [
@@ -59,7 +53,7 @@ export const me = defineVerb({
         ...(email ? [`Email: ${email}`] : []),
         `Repositories: ${listOrNone(grants, ", ")}`,
         `Tools: ${listOrNone(tools.map(toolLine), "; ")}`,
-        `Network: ${networkLine(http, adb) || "none"}`,
+        `Network: ${networkLine(http) || "none"}`,
         `Connected: ${Object.entries(connected)
           .map(([k, v]) => `${k} ${v ? "yes" : "no"}`)
           .join(", ")}`,
@@ -72,7 +66,7 @@ export const me = defineVerb({
         email: email ?? null,
         repos: person.repos,
         tools,
-        network: { http: http.map((g) => g.name), adb: adb.map((g) => g.name) },
+        network: { http: http.map((g) => g.name) },
         connected,
       },
       [],

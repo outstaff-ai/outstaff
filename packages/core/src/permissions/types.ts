@@ -56,6 +56,12 @@ export interface CommandRule {
   requiresRepo?: GitMode;
 
   /**
+   * Options of the program that take their value as the next word (`-c`, `--context`). Their values are not operands.
+   * Without it, a deny rule also tries the words after the leading options as the subcommand, in case one is a value.
+   */
+  valuedOptions?: string[];
+
+  /**
    * A built-in default deny, such as mutating kubectl verbs. It applies only while no allow rule names the program, so a
    * tool declaration or a team rule that allows the program lifts it.
    */

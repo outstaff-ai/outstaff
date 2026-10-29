@@ -36,46 +36,62 @@ function toolsetTools(ts: Toolset): EffectiveTool[] {
   }));
 }
 
+type Entry = Exclude<NonNullable<EffectiveTool["allow"]>, "all">[number];
+
+/** The rules of a tool: its allow rules ("all" when it gives none), then its deny rules. */
 function toolRules(tool: EffectiveTool): CommandRule[] {
-  const id = (...parts: string[]) => ["tools", tool.name, ...parts].join(".");
-  const { allow = "all", name } = tool;
-  if (allow === "all") {
-    return [
-      {
-        id: id("all"),
-        program: name,
-        effect: "allow",
-        reason: `${name} is declared in tools.`,
-      },
-    ];
+  const { allow = "all", deny = [], name, valued_options } = tool;
+  const valued = valued_options ? { valuedOptions: valued_options } : {};
+  const allows =
+    allow === "all"
+      ? [{ ...allRule(name), ...valued }]
+      : allow.map((entry, i) => ({ ...entryRule(name, "allow", entry, i), ...valued }));
+
+  return [
+    ...allows,
+    ...deny.map((entry, i) => ({ ...entryRule(name, "deny", entry, i), ...valued })),
+  ];
+}
+
+const allRule = (name: string): CommandRule => ({
+  id: `tools.${name}.all`,
+  program: name,
+  effect: "allow",
+  reason: `${name} is declared in tools.`,
+});
+
+/** The rule of one `allow` or `deny` entry: a first subcommand, or a structured rule. */
+function entryRule(
+  name: string,
+  effect: CommandRule["effect"],
+  entry: Entry,
+  i: number,
+): CommandRule {
+  const prefix = effect === "allow" ? `tools.${name}` : `tools.${name}.deny`;
+  if (typeof entry === "string") {
+    return {
+      id: `${prefix}.${entry}`,
+      program: name,
+      subcommand: [entry],
+      effect,
+      reason: `${name} ${entry} is ${effect === "allow" ? "allowed" : "denied"} by the ${name} tools declaration.`,
+    };
   }
 
-  return allow.map((entry, i): CommandRule => {
-    if (typeof entry === "string") {
-      return {
-        id: id(entry),
-        program: name,
-        subcommand: [entry],
-        effect: "allow",
-        reason: `${name} ${entry} is declared in tools.`,
-      };
-    }
-
-    return {
-      id: id(String(i)),
-      program: name,
-      ...(entry.subcommand ? { subcommand: entry.subcommand } : {}),
-      ...(entry.args ? { args: entry.args as ArgPredicate[] } : {}),
-      effect: "allow",
-      reason: entry.reason,
-      ...(entry.requires_repo ? { requiresRepo: entry.requires_repo } : {}),
-    };
-  });
+  return {
+    id: `${prefix}.${i}`,
+    program: name,
+    ...(entry.subcommand ? { subcommand: entry.subcommand } : {}),
+    ...(entry.args ? { args: entry.args as ArgPredicate[] } : {}),
+    effect,
+    reason: entry.reason,
+    ...(entry.requires_repo ? { requiresRepo: entry.requires_repo } : {}),
+  };
 }
 
 /**
- * The allow rules of the effective tools. A tool without `allow` (or with `all`) runs with any arguments and lifts the
- * built-in default denies for its program; a list or rules narrow it to what they match.
+ * The rules of the effective tools. A tool without `allow` (or with `all`) runs with any arguments and lifts the
+ * built-in default denies for its program; a list or rules narrow it to what they match. Its `deny` rules always win.
  */
 export function toolsToPacks(tools: EffectiveTool[]): RulePack[] {
   const packs = new Map<string, RulePack>();

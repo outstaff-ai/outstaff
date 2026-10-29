@@ -5,7 +5,7 @@ sidebar:
   order: 15
 ---
 
-**Status:** accepted. Replaces the command and network parts of [0006](/decisions/0006-runtime-neutral-permissions/).
+**Status:** accepted. Replaces the command and network parts of [0006](/decisions/0006-runtime-neutral-permissions/). The device parts (the `adb` and `fastboot` hard denies and `ost adb`) are replaced by [0017](/decisions/0017-no-bespoke-protocol-verbs/).
 
 ## Context
 

@@ -166,7 +166,7 @@ describe("ost validate", () => {
         readFileSync(ACME_TEAM_FILE, "utf8")
           .replace(
             "  - handle: mira\n",
-            "  - handle: mira\n    network:\n      adb:\n        - { name: wall-panel, host: 10.0.0.18, port: 5555 }\n",
+            '  - handle: mira\n    network:\n      http:\n        - { name: home, url: "https://home.acme.example", token: HOME_TOKEN }\n',
           )
           .replace(
             "\npeople:",
