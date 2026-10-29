@@ -23,7 +23,7 @@ export interface OfficeLinkOptions {
 
   /** `OUTSTAFF_LINK_TOKEN`, sent as the bearer token. */
   token: string;
-  team: Pick<TeamConfig, "people">;
+  team: Pick<TeamConfig, "people" | "integrations">;
   store: LinkStore;
 
   /** Links to tickets, pull requests and documents, from the office's adapters. */

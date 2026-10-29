@@ -40,6 +40,17 @@ export const personSchema = z.strictObject({
   handle: z.string(),
   name: z.string(),
   role: z.string(),
+  runtime: z
+    .string()
+    .describe(
+      "The runtime adapter the person is configured with, for example `claude`: their own `runtime`, else the team's `integrations.runtime`.",
+    ),
+  model: z
+    .string()
+    .nullable()
+    .describe(
+      "The model the person is configured with; null when unset, so the role's or the runtime's default applies.",
+    ),
   connected: z.boolean().describe("Whether the person's agent is connected to the office now."),
   counts: z
     .strictObject({

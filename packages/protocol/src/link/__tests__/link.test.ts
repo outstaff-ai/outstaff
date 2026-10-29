@@ -243,6 +243,8 @@ describe("the office link messages", () => {
               handle: "sam",
               name: "Sam Duarte",
               role: "developer",
+              runtime: "claude",
+              model: "opus",
               connected: true,
               counts: { queued: 1, running: 0 },
               current: null,
@@ -282,6 +284,27 @@ describe("the office link messages", () => {
     for (const m of messages) {
       expect(decodeLinkMessage(encodeLinkMessage(m))).toEqual({ ok: true, message: m });
     }
+  });
+
+  it("needs each person's configured runtime, and takes a null model", () => {
+    const person = {
+      handle: "sam",
+      name: "Sam Duarte",
+      role: "developer",
+      runtime: "claude",
+      model: null,
+      connected: false,
+      counts: { queued: 0, running: 0 },
+      current: null,
+      queue: [],
+    };
+
+    const frame = (p: Record<string, unknown>) =>
+      JSON.stringify({ type: "people", payload: { at: "2026-10-05T10:00:00.000Z", people: [p] } });
+
+    expect(decodeLinkMessage(frame(person))).toMatchObject({ ok: true });
+    const { runtime: _runtime, ...withoutRuntime } = person;
+    expect(decodeLinkMessage(frame(withoutRuntime))).toMatchObject({ ok: false });
   });
 
   it("says what is wrong with a frame, and keeps a request's id so it can be answered", () => {

@@ -13,14 +13,21 @@ describe("listPeople", () => {
     await store.close();
   });
 
-  it("gives each person's connection, current item with its run, and queue in run order with why", async () => {
+  it("gives each person's runtime, connection, current item with its run, and queue in run order with why", async () => {
     const team = {
+      integrations: { runtime: { adapter: "claude" } },
       people: [
-        { handle: "sam", name: "Sam Duarte", role: "developer" },
-        { handle: "noor", name: "Noor Haddad", role: "developer" },
+        { handle: "sam", name: "Sam Duarte", role: "developer", model: "opus" },
+        {
+          handle: "noor",
+          name: "Noor Haddad",
+          role: "developer",
+          model: "acme-large",
+          runtime: { adapter: "scripted" },
+        },
         { handle: "kofi", name: "Kofi Mensah", role: "devops" },
       ] as never,
-    };
+    } as never;
 
     const active = await store.enqueue({
       person: "sam",
@@ -89,6 +96,8 @@ describe("listPeople", () => {
         handle: "sam",
         name: "Sam Duarte",
         role: "developer",
+        runtime: "claude",
+        model: "opus",
         connected: true,
         counts: { queued: 3, running: 1 },
         current: {
@@ -119,6 +128,8 @@ describe("listPeople", () => {
         handle: "noor",
         name: "Noor Haddad",
         role: "developer",
+        runtime: "scripted",
+        model: "acme-large",
         connected: false,
         counts: { queued: 0, running: 1 },
         current: item(busy, {
@@ -133,6 +144,8 @@ describe("listPeople", () => {
         handle: "kofi",
         name: "Kofi Mensah",
         role: "devops",
+        runtime: "claude",
+        model: null,
         connected: false,
         counts: { queued: 0, running: 0 },
         current: null,

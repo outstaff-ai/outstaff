@@ -1,6 +1,7 @@
 import { WAKE_SUBJECT } from "#/pipeline/live/wake.js";
 import type { WakeReason } from "#/pipeline/live/live.types.js";
 import type { WorkItem } from "#/store/types.js";
+import { runtimeOf } from "@outstaff/core";
 import type { LinkPerson, ScheduledBy } from "@outstaff/protocol";
 import type { OfficeLinkOptions } from "./link.types.js";
 
@@ -61,6 +62,8 @@ export async function listPeople(deps: Deps): Promise<LinkPerson[]> {
         handle: p.handle,
         name: p.name,
         role: p.role,
+        runtime: runtimeOf(deps.team, p).adapter,
+        model: p.model ?? null,
         connected: online.has(p.handle),
         counts: { queued: queued.length, running: active.length },
         current: await currentOf(deps, active[0]),
