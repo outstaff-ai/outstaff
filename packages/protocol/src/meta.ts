@@ -10,7 +10,7 @@ export const MESSAGE_META = {
   welcome: {
     from: "office",
     summary:
-      "The connection is accepted. Lists accepted items to resume and the reports to requesters the agent was offline for; the agent posts those itself and confirms each.",
+      "The connection is accepted. Carries the team config the agent works from, and lists accepted items to resume and the reports to requesters the agent was offline for; the agent posts those itself and confirms each.",
     replies: [],
   },
   offer: {

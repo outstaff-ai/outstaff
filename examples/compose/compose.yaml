@@ -22,8 +22,9 @@ x-hardening: &hardening
   tmpfs: ["/tmp"]
   restart: unless-stopped
 
-x-team:
-  &team # The directory that holds team.yaml. A team repository works too: set OUTSTAFF_TEAM_REPO instead.
+x-team: &team
+  # The directory that holds team.yaml, mounted into the office only: each agent receives the team
+  # config from the office when it connects. A team repository works too: set OUTSTAFF_TEAM_REPO instead.
   type: bind
   source: ${OUTSTAFF_TEAM_DIR:-../acme/.outstaff}
   target: /team
@@ -45,7 +46,6 @@ x-agent: &agent
       limits: { cpus: "1", memory: 2g }
   environment: &agent-env
     OUTSTAFF_OFFICE_URL: ws://office:8080/agent
-    OUTSTAFF_TEAM_FILE: /team/team.yaml
 
 services:
   postgres:
@@ -147,7 +147,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: priya
     volumes:
-      - { <<: *team }
       - priya-home:/home/outstaff
     networks: [default]
     secrets:
@@ -180,7 +179,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: tomas
     volumes:
-      - { <<: *team }
       - tomas-home:/home/outstaff
     networks: [default]
     secrets:
@@ -213,7 +211,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: mira
     volumes:
-      - { <<: *team }
       - mira-home:/home/outstaff
     networks: [default]
     secrets:
@@ -246,7 +243,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: leo
     volumes:
-      - { <<: *team }
       - leo-home:/home/outstaff
     networks: [default]
     secrets:
@@ -276,7 +272,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: sam
     volumes:
-      - { <<: *team }
       - sam-home:/home/outstaff
     networks: [default]
     secrets:
@@ -306,7 +301,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: noor
     volumes:
-      - { <<: *team }
       - noor-home:/home/outstaff
     networks: [default]
     secrets:
@@ -339,7 +333,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: ines
     volumes:
-      - { <<: *team }
       - ines-home:/home/outstaff
     networks: [default]
     secrets:
@@ -372,7 +365,6 @@ services:
       <<: *agent-env
       OUTSTAFF_PERSON: kofi
     volumes:
-      - { <<: *team }
       - kofi-home:/home/outstaff
     networks: [default]
     secrets:

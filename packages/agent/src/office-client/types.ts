@@ -15,6 +15,9 @@ export type Offer = PayloadOf<"offer">;
 /** What an accepted item runs on: the runtime adapter, and the model the person is configured with. */
 export type RunOn = Omit<PayloadOf<"accept">, "workItemId">;
 
+/** The team config as the office sends it in the `welcome`; the agent validates it before using it. */
+export type Team = PayloadOf<"welcome">["team"];
+
 /** The same shape as the office's clock, so one fake serves both. */
 export interface ClientClock {
   now(): Date;
@@ -77,6 +80,15 @@ export interface OfficeConnection extends OfficeClient {
 
   /** Ids of accepted, unfinished items the office listed when the connection was last established. */
   resume(): string[];
+
+  /** The team config of the last `welcome`; undefined until the first one. */
+  teamConfig(): Team | undefined;
+
+  /**
+   * Called when a later `welcome` brings a team config that differs from the one before it. A change that came
+   * before the handler was set is handed to it when it is set.
+   */
+  onTeamConfigChange(handler: (team: Team) => void): void;
 
   /**
    * Reports to requesters for the agent to post: the office hands them over each time the connection is established
@@ -173,5 +185,14 @@ export interface OfferQueue {
 /** The requests a connection makes on behalf of the agent, once it is up. */
 export type OfficeMethods = Omit<
   OfficeConnection,
-  "start" | "stop" | "state" | "rejection" | "whenConnected" | "offers" | "resume" | "onReports"
+  | "start"
+  | "stop"
+  | "state"
+  | "rejection"
+  | "whenConnected"
+  | "offers"
+  | "resume"
+  | "onReports"
+  | "teamConfig"
+  | "onTeamConfigChange"
 >;

@@ -7,7 +7,7 @@ import { createAgentAuth, agentAuthFromSecrets, agentTokenKey } from "#/protocol
 import { createProtocolServer } from "#/protocol/server.js";
 import { ProtocolError } from "#/protocol/errors.js";
 import type { ChatDesk, Messaging } from "#/protocol/source.types.js";
-import { createFakeSource, type FakeSource } from "@outstaff/testing.office";
+import { createFakeSource, fakeTeam, type FakeSource } from "@outstaff/testing.office";
 import type { ProtocolServer } from "#/protocol/types.js";
 
 class Agent {
@@ -113,6 +113,7 @@ describe("protocol server", () => {
     agents = [];
     server = createProtocolServer({
       source,
+      team: fakeTeam(),
       auth: createAgentAuth(tokens),
       clock,
       port: 0,
@@ -148,6 +149,7 @@ describe("protocol server", () => {
       await server.stop();
       server = createProtocolServer({
         source,
+        team: fakeTeam(),
         auth: createAgentAuth(tokens),
         clock,
         port: 0,
@@ -204,7 +206,12 @@ describe("protocol server", () => {
       const welcome = await a.next("welcome");
       expect(welcome).toMatchObject({
         replyTo: id,
-        payload: { protocolVersion: PROTOCOL_VERSION, heartbeatMs: 1000, resume: [] },
+        payload: {
+          protocolVersion: PROTOCOL_VERSION,
+          heartbeatMs: 1000,
+          resume: [],
+          team: JSON.parse(JSON.stringify(fakeTeam())),
+        },
       });
 
       expect(server.connected()).toEqual(["ada"]);
@@ -530,6 +537,7 @@ describe("protocol server with a document desk", () => {
     const linked: unknown[] = [];
     const server = createProtocolServer({
       source: createFakeSource(),
+      team: fakeTeam(),
       docs: {
         async link(person, workItemId, doc) {
           if (workItemId === "other") {
@@ -566,6 +574,7 @@ describe("protocol server with a doctor", () => {
     const reported: unknown[] = [];
     const server = createProtocolServer({
       source: createFakeSource(),
+      team: fakeTeam(),
       doctor: {
         async report(person, checks) {
           reported.push({ person, checks });
@@ -598,6 +607,7 @@ describe("protocol server with a ticket desk", () => {
     const asked: unknown[] = [];
     const server = createProtocolServer({
       source: createFakeSource(),
+      team: fakeTeam(),
       tickets: {
         async forDraft(draft) {
           asked.push(draft);
@@ -652,6 +662,7 @@ describe("protocol server with messaging", () => {
 
     const server = createProtocolServer({
       source: createFakeSource(),
+      team: fakeTeam(),
       messaging,
       auth: createAgentAuth(tokens),
       clock: manualClock(),

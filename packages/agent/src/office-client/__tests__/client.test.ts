@@ -104,6 +104,41 @@ describe("office connection", () => {
     await done;
   });
 
+  it("keeps the team of the last welcome and reports a changed one after a reconnect", async () => {
+    expect(conn.teamConfig()).toBeUndefined();
+    await connectUp({ team: { team: { name: "acme" } } });
+    expect(conn.teamConfig()).toEqual({ team: { name: "acme" } });
+    const changes: unknown[] = [];
+    conn.onTeamConfigChange((t) => changes.push(t));
+
+    // The same team again is no change.
+    current().terminate();
+    clock.advance(30_000);
+    current().open();
+    current().welcome({ team: { team: { name: "acme" } } });
+    expect(changes).toEqual([]);
+
+    current().terminate();
+    clock.advance(30_000);
+    current().open();
+    current().welcome({ team: { team: { name: "acme", product: "Shop" } } });
+    expect(changes).toEqual([{ team: { name: "acme", product: "Shop" } }]);
+    expect(conn.teamConfig()).toEqual({ team: { name: "acme", product: "Shop" } });
+  });
+
+  it("holds a team change that came before the handler was set", async () => {
+    await connectUp({ team: { team: { name: "acme" } } });
+    current().terminate();
+    clock.advance(30_000);
+    current().open();
+    current().welcome({ team: { team: { name: "acme-next" } } });
+
+    const changes: unknown[] = [];
+    conn.onTeamConfigChange((t) => changes.push(t));
+    conn.onTeamConfigChange((t) => changes.push(t));
+    expect(changes).toEqual([{ team: { name: "acme-next" } }]);
+  });
+
   it("reconnects with exponential backoff, capped, and resets after a welcome", async () => {
     conn.start();
     const delays: number[] = [];

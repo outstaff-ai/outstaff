@@ -221,6 +221,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const doctor = doctorForOffice(input, ports.vcs, log);
   server = createProtocolServer({
     source,
+    team,
     doctor,
     messaging,
     usage,

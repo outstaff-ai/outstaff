@@ -20,6 +20,11 @@ export const sessionMessages = [
     z.strictObject({
       protocolVersion: z.number().int().describe("PROTOCOL_VERSION the office speaks."),
       heartbeatMs: z.number().int().positive().describe("Send a heartbeat at least this often."),
+      team: z
+        .record(z.string(), z.unknown())
+        .describe(
+          "The team config the office loaded, validated and with its defaults filled in. The agent validates it again, renders its working files from it and, when a later welcome brings a different one, renders them again between work items. It holds no secrets: the team file names the secrets adapters need, and each agent reads its own from its secret source.",
+        ),
       resume: z
         .array(z.string())
         .describe("Ids of accepted, unfinished items the agent should carry on with."),

@@ -35,7 +35,7 @@ spec:
             # The patches in people/<handle> replace the person; keep it the first entry.
             - { name: OUTSTAFF_PERSON, value: PERSON }
             - { name: OUTSTAFF_OFFICE_URL, value: "ws://outstaff-office:8080/agent" }
-            - { name: OUTSTAFF_TEAM_FILE, value: /team/team.yaml }
+            # No team file: the agent receives the team config from the office when it connects.
           # No port and no probes: the agent listens on nothing and exits when it cannot run, and the
           # StatefulSet restarts it.
           # Starting points from the container contract. An agent that builds and tests needs more.
@@ -49,7 +49,6 @@ spec:
               drop: [ALL]
           volumeMounts:
             - { name: secrets, mountPath: /run/secrets/outstaff, readOnly: true }
-            - { name: team, mountPath: /team, readOnly: true }
             - { name: home, mountPath: /home/outstaff }
             - { name: tmp, mountPath: /tmp }
       volumes:
@@ -59,9 +58,6 @@ spec:
           secret:
             secretName: outstaff-agent-PERSON
             defaultMode: 0440
-        - name: team
-          configMap:
-            name: outstaff-team
         # HOME of the agent: worktrees, memory and the tools mise installed. A plain PVC named
         # <handle>-home (agent/pvc.yaml), so the name is predictable and an existing volume can be adopted.
         - name: home

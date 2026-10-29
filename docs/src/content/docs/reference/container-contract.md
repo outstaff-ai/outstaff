@@ -91,30 +91,32 @@ If none of the team variables is set, the office looks for `.outstaff/team.yaml`
 
 ### Agent
 
-| Variable                                                        | Default                 | Meaning                                                                |
-| --------------------------------------------------------------- | ----------------------- | ---------------------------------------------------------------------- |
-| `OUTSTAFF_PERSON`                                               | required                | Handle of the person this container runs as.                           |
-| `OUTSTAFF_OFFICE_URL`                                           | required                | WebSocket URL of the office, for example `ws://office:8080/agent`.     |
-| `OUTSTAFF_TEAM_FILE`, `OUTSTAFF_TEAM_REPO`, `OUTSTAFF_TEAM_REF` | as for the office       | Where the team config is. The agent reads the same team as the office. |
-| `OUTSTAFF_SECRETS_DIR`                                          | `/run/secrets/outstaff` | Directory of secret files.                                             |
-| `HOME`                                                          | the user's home         | Root of the agent's directories, see [volumes](#volumes).              |
+| Variable               | Default                 | Meaning                                                            |
+| ---------------------- | ----------------------- | ------------------------------------------------------------------ |
+| `OUTSTAFF_PERSON`      | required                | Handle of the person this container runs as.                       |
+| `OUTSTAFF_OFFICE_URL`  | required                | WebSocket URL of the office, for example `ws://office:8080/agent`. |
+| `OUTSTAFF_SECRETS_DIR` | `/run/secrets/outstaff` | Directory of secret files.                                         |
+| `HOME`                 | the user's home         | Root of the agent's directories, see [volumes](#volumes).          |
+
+The agent takes no team location: only the office loads the team file, and each agent receives the team config from the office when it connects (see [The agent](/architecture/agent/#startup)). Mount the team file into the office container only.
 
 The office URL is the only address an agent needs. Use `wss://` when the connection crosses a network you do not control; Outstaff does not terminate TLS itself.
 
 ## Volumes
 
-| Container | Path                                           | What it holds                                                                                  | Keep it?                                                     |
-| --------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| office    | `/var/lib/outstaff`                            | The SQLite store, when `OUTSTAFF_STORE_URL` is not set. The folder is created when missing.    | Yes, unless you use Postgres, which needs no volume.         |
-| agent     | `$HOME/repos`                                  | Clones of the repositories the person may read or write.                                       | Optional; a cache that is cloned again when missing.         |
-| agent     | `$HOME/worktrees`                              | One git worktree per work item.                                                                | Yes, if unpushed work should survive a restart.              |
-| agent     | `$HOME/memory`                                 | The person's notes between work items.                                                         | Yes.                                                         |
-| agent     | `$HOME/artifacts`                              | Files a role with `design.canvas` publishes to its Design canvas. Created only for such roles. | Yes, so the canvas files survive a restart.                  |
-| agent     | `$HOME/scratch`                                | Throwaway files.                                                                               | No.                                                          |
-| agent     | `$HOME/work`                                   | The person's rendered working files (skills, references, templates), written on every start.   | No.                                                          |
-| agent     | `$HOME/.local/share/mise`, `$HOME/.cache/mise` | The tools installed from the declared toolsets and `tools:` (mise data and cache directories). | Yes. The first start installs them, later starts reuse them. |
-| agent     | `$HOME/.config/mise`                           | The global mise config the agent writes at start, which makes the declared tools active.       | No. Written on every start.                                  |
-| both      | `$HOME/.cache/outstaff/teams`                  | Clone of the team repository when `OUTSTAFF_TEAM_REPO` is used (`XDG_CACHE_HOME` moves it).    | No.                                                          |
+| Container | Path                                           | What it holds                                                                                         | Keep it?                                                     |
+| --------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| office    | `/var/lib/outstaff`                            | The SQLite store, when `OUTSTAFF_STORE_URL` is not set. The folder is created when missing.           | Yes, unless you use Postgres, which needs no volume.         |
+| agent     | `$HOME/repos`                                  | Clones of the repositories the person may read or write.                                              | Optional; a cache that is cloned again when missing.         |
+| agent     | `$HOME/worktrees`                              | One git worktree per work item.                                                                       | Yes, if unpushed work should survive a restart.              |
+| agent     | `$HOME/memory`                                 | The person's notes between work items.                                                                | Yes.                                                         |
+| agent     | `$HOME/artifacts`                              | Files a role with `design.canvas` publishes to its Design canvas. Created only for such roles.        | Yes, so the canvas files survive a restart.                  |
+| agent     | `$HOME/scratch`                                | Throwaway files.                                                                                      | No.                                                          |
+| agent     | `$HOME/work`                                   | The person's rendered working files (skills, references, templates), written on every start.          | No.                                                          |
+| agent     | `$HOME/.local/share/mise`, `$HOME/.cache/mise` | The tools installed from the declared toolsets and `tools:` (mise data and cache directories).        | Yes. The first start installs them, later starts reuse them. |
+| agent     | `$HOME/.config/outstaff/team.json`             | The team config from the office, for the agent's child processes (`ost git-credential`, `ost` verbs). | No. Written on every start.                                  |
+| agent     | `$HOME/.config/mise`                           | The global mise config the agent writes at start, which makes the declared tools active.              | No. Written on every start.                                  |
+| office    | `$HOME/.cache/outstaff/teams`                  | Clone of the team repository when `OUTSTAFF_TEAM_REPO` is used (`XDG_CACHE_HOME` moves it).           | No.                                                          |
 
 The agent's own directories are all below `$HOME`, so mount that writable if you run with a read-only root filesystem. The agent keeps no session or journal on its own disk: the office stores both, and a replaced container resumes from them. What a lost volume costs is work that was never pushed, which is why `worktrees` is worth keeping.
 

@@ -117,14 +117,12 @@ services:
       office: { condition: service_healthy }
     environment:
       OUTSTAFF_OFFICE_URL: ws://office:8080/agent
-      OUTSTAFF_TEAM_FILE: /team/team.yaml
       OUTSTAFF_PERSON: sam
       # The chat workspace and the gates that hold a scripted round live in the stub.
       E2E_STUB_URL: http://tracker.acme.example:8081
       # git reaches the stub over https, with a certificate the test's own CA signed.
       GIT_SSL_CAINFO: /tls/ca.pem
     volumes:
-      - { type: bind, source: "${E2E_DIR}/team", target: /team, read_only: true }
       - { type: bind, source: "${E2E_DIR}/tls", target: /tls, read_only: true }
       - sam-home:/home/outstaff
     networks: [default]

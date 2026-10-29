@@ -604,6 +604,9 @@ importers:
 
   testing/office:
     dependencies:
+      '@outstaff/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@outstaff/office':
         specifier: workspace:*
         version: link:../../packages/office

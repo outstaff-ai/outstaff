@@ -9,21 +9,26 @@ description: How ost-agent starts, takes work from the office, keeps one session
 
 The [container contract](/reference/container-contract/) is a few environment variables and secrets. Hosting and secret storage stay with the operator ([0008](/decisions/0008-hosting-and-secrets-out-of-scope/)).
 
-| Input                                                           | What it is                                                                          |
-| --------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `OUTSTAFF_PERSON`                                               | Handle of the person this container runs as.                                        |
-| `OUTSTAFF_OFFICE_URL`                                           | WebSocket URL of the office, for example `ws://office:8080/agent`.                  |
-| `OUTSTAFF_AGENT_TOKEN`                                          | The person's agent token, read as a secret (file first, environment as a fallback). |
-| `OUTSTAFF_TEAM_FILE`, `OUTSTAFF_TEAM_REPO`, `OUTSTAFF_TEAM_REF` | Where the team config is, as for the CLI.                                           |
+| Input                  | What it is                                                                          |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| `OUTSTAFF_PERSON`      | Handle of the person this container runs as.                                        |
+| `OUTSTAFF_OFFICE_URL`  | WebSocket URL of the office, for example `ws://office:8080/agent`.                  |
+| `OUTSTAFF_AGENT_TOKEN` | The person's agent token, read as a secret (file first, environment as a fallback). |
+
+The agent has no team file of its own. Only the office loads `team.yaml`; the agent receives it in the office's `welcome` (see the [agent protocol](/reference/agent-protocol/)), over the connection its token authenticated.
 
 In order, startup:
 
-1. Loads the team config and checks that the person is on it.
+1. Connects to the office, validates the team config the `welcome` carries and checks that the person is on it. An invalid team config, or one without the person, stops the start. The agent writes the team to `~/.config/outstaff/team.json` and sets `OUTSTAFF_TEAM_FILE` to it for its own child processes: `ost git-credential`, which git starts as the credential helper, and the `ost` verbs run from its shell.
 2. Builds the ports the verbs use from the installed adapters (`createAgentEnv`). A configured port whose adapter is missing or fails is recorded, and the verb that needs it says why.
 3. Renders the person's working files from the stock catalog plus the team's ejected catalog, and writes them into `~/work`. The runtime adapter says where it expects them: for the Claude Agent SDK, skills go to `.claude/skills/<role>/SKILL.md`. Adapters declare this with `workdirLayout`, so the agent has no runtime-specific paths. Other files (references, templates, process documents) stay where they were rendered, which is where the skills point.
 4. Creates the runtime the person runs on: their own `people[].runtime`, else the team's `integrations.runtime` (see [Runtimes](/guides/runtimes/)). It stops with an error naming the person when this build does not carry that runtime adapter, or when the adapter cannot enforce a permission policy (`runtime.permissions`), and logs `runtime selected` with the person, the runtime adapter and the model. Every part of startup that reads `integrations.runtime` (the working-file layout, the runtime's rule pack, the Design canvas) sees the person's runtime; the canvas is on only when that runtime provides `design.canvas`.
 5. Builds the permission policy ([0006](/decisions/0006-runtime-neutral-permissions/), [0015](/decisions/0015-allow-by-default-in-the-sandbox/)) from the role's profile, the person's repository grants, the container layout, and the rule packs: adapter packs from the registry, the role's toolset and tool declarations, and `policies.commands` from the team. Anything no rule denies is allowed; see [permissions](/guides/permissions/).
-6. Connects to the office and starts the work loop.
+6. Starts the work loop on that connection.
+
+When the agent reconnects and the `welcome` brings a different team config (the office restarted with a changed team file), the agent takes no new items, lets the running ones finish, closes the connection and goes through startup again with the new team. Working files, policy and runtime never change under a running item.
+
+A team with an ejected catalog builds its own agent image with the catalog in it ([Customizing the catalog](/guides/customizing-the-catalog/#build-your-image)); the agent reads it from `/opt/outstaff/team/.outstaff`, at the `catalog.path` of the team config.
 
 The layout below `$HOME`: `work` (rendered files, the runtime's working directory), `repos`, `worktrees`, `scratch` and `memory`. The secrets directory is `OUTSTAFF_SECRETS_DIR`.
 

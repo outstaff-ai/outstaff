@@ -401,7 +401,13 @@ async function startStack() {
     throw new Error("The agent never connected to the office.");
   }
 
-  if (!/runtime selected {"person":"sam","runtime":"scripted"/.test(logs("sam"))) {
+  // The agent connects before it prepares (the team comes from the office), so the runtime is picked a moment later.
+  const selected = () => /runtime selected {"person":"sam","runtime":"scripted"/.test(logs("sam"));
+  for (let i = 0; i < 120 && !selected(); i++) {
+    await sleep(1_000);
+  }
+
+  if (!selected()) {
     throw new Error("sam did not start on its own runtime (people[].runtime: scripted).");
   }
 

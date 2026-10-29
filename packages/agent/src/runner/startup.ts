@@ -22,13 +22,14 @@ import {
 const DEFAULT_SECRETS_DIR = "/run/secrets/outstaff";
 
 /**
- * Everything the agent needs before it takes work: the team, the person's rendered working files, the permission
- * policy, the runtime and the office connection. Nothing connects until the caller starts the connection.
+ * Everything the agent needs before it takes work: the office connection, the team the office sends over it, the
+ * person's rendered working files, the permission policy and the runtime. It connects to the office to learn the
+ * team; work is taken only once the caller runs the loop.
  */
 export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent> {
-  const ctx = await loadStartupContext(opts);
+  const connection = officeConnection(opts);
+  const ctx = await loadStartupContext(opts, connection);
   const { team, me, person, secrets, log } = ctx;
-  const connection = officeConnection(ctx);
   const env = await createAgentEnv({
     team,
     person,

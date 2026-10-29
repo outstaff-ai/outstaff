@@ -11,6 +11,7 @@ import { createProtocolServer } from "#/protocol/server.js";
 import type { ProtocolServer } from "#/protocol/types.js";
 import { harness, storeSource } from "./test-support.js";
 import { createMessaging } from "#/messaging/messaging.js";
+import { fakeTeam } from "@outstaff/testing.office";
 
 type Harness = Awaited<ReturnType<typeof harness>>;
 
@@ -36,6 +37,7 @@ describe("agent-to-agent questions through the real server and client", () => {
 
     server = createProtocolServer({
       source,
+      team: fakeTeam(),
       messaging,
       auth: createAgentAuth({ sam: "sam-token", mira: "mira-token", lena: "lena-token" }),
       clock: h.clock,
@@ -187,6 +189,7 @@ describe("an answer that arrives while the asker is still running", () => {
 
     const server = createProtocolServer({
       source,
+      team: fakeTeam(),
       messaging,
       auth: createAgentAuth({ sam: "sam-token", mira: "mira-token" }),
       clock: h.clock,
