@@ -115,7 +115,17 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   // event is delivered again; its trace, its wakes and its acts are idempotent per event.
   // Its acts go to the agents they are for, which make them as themselves; the office's tracker account only reads.
   const push = (person: string, act: QueuedAct) => server?.act(person, act) ?? false;
-  const pipelineOptions = { team, store, workState, scheduler, push, clock, logger: log };
+  const pipelineOptions = {
+    team,
+    store,
+    workState,
+    scheduler,
+    push,
+    clock,
+    logger: log,
+    ...defined({ policies: input.policies }),
+  };
+
   const { runner: pipeline, traces, acts } = createOfficePipeline(pipelineOptions);
   const judge = (event: WorkflowEvent, meta: { source: string; externalId: string }) =>
     track(pipeline.handle(event, meta));

@@ -1,4 +1,4 @@
-import type { ReadyTicket } from "./state.types.js";
+import type { ReadyTicket } from "./policy.types.js";
 
 /** No priority sorts after every priority. */
 const rank = (t: ReadyTicket): number => t.priority ?? Number.POSITIVE_INFINITY;

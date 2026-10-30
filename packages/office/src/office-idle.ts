@@ -1,6 +1,6 @@
 import { policyOn, type WorkflowEvent } from "@outstaff/core";
 import type { IdlePull, IdlePullOptions } from "./office-idle.types.js";
-import type { PipelineEvent } from "./pipeline/events.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import { CHAT_KIND } from "./scheduler/index.js";
 
 const TRIGGER = "automation";

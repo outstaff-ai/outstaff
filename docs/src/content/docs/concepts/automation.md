@@ -1,13 +1,13 @@
 ---
 title: What outstaff does on its own
-description: How the office decides what to do with every event, the default policies, and the policies switches.
+description: How the office decides what to do with every event, the built-in and custom policies, and the policies switches.
 sidebar:
   order: 3
 ---
 
 The office acts without being asked: it wakes an agent when a review lands, moves a ticket when its pull request merges, hands work back to the person who asked, and starts the next ready ticket when an agent runs out of work. This page explains how it decides.
 
-Every event goes through one **event pipeline** ([decision 0016](/decisions/0016-event-pipeline/), the only way the office decides since [decision 0018](/decisions/0018-pipeline-only/)): an ordered list of policies that decides to wake an agent, act for one, or drop the event, and records why.
+Every event goes through one **event pipeline** ([decision 0016](/decisions/0016-event-pipeline/), the only way the office decides since [decision 0018](/decisions/0018-pipeline-only/)): policies that each propose to wake an agent, act for one, or drop the event, and an aggregation layer that turns their proposals into the decisions, and records why.
 
 ## Events
 
@@ -26,24 +26,24 @@ Each event has an actor (a human, an agent or automation). An event from an untr
 
 ## Three decisions
 
-A policy decides one of three things, and nothing else (an act can be followed by a wake):
+A policy proposes; the [aggregation layer](#from-proposals-to-decisions) decides. The decisions are three, and nothing else (an act can be followed by a wake):
 
 - **wake** an agent: queue a work item for it with an instruction and the context. The instruction says what is expected ("address each point, answer in its thread and push"); the agent decides how, following the repository's conventions.
-- **act** for an agent: make a tracker change (move a ticket, assign it, comment, set its parent) or comment on a document, without a model run. The agent's own process makes it, with the agent's tracker and knowledge accounts, so the ticket's history shows the agent; the policy's instruction, if any, is a note the agent posts with it. An agent that is offline makes it when it connects again. With no agent to act for, the act is dropped. An act can be followed by a wake of the agent it was for, as when a ticket is assigned back to an agent; it then posts no note, and the policy's instruction is the wake's.
+- **act** for an agent: make a bookkeeping change on the tracker (move a ticket, assign it, set its parent), without a model run. Anything that needs judgement is a wake. The agent's own process makes it, with the agent's tracker and knowledge accounts, so the ticket's history shows the agent; the policy's instruction, if any, is a note the agent posts with it. An agent that is offline makes it when it connects again. With no agent to act for, the act is dropped. An act can be followed by a wake of the agent it was for, as when a ticket is assigned back to an agent; it then posts no note, and the policy's instruction is the wake's.
 - **drop** the event, with a reason.
 
 The office writes nothing to the tracker, the knowledge base or the code host: its accounts there only read, and every change is made by an agent as itself ([decision 0019](/decisions/0019-agents-make-their-acts/)). It never merges and never messages people; every message a person reads in chat comes from an agent.
 
-## The default policies
+## The built-in policies
 
-The office ships a default set, listed with each policy's conditions and instruction in the generated [pipeline policies reference](/reference/pipeline-policies/). In short:
+The office ships a built-in set, each policy a module of its own, listed with each policy's conditions and instruction in the generated [pipeline policies reference](/reference/pipeline-policies/). In short:
 
 - **Wakes.** A chat message wakes the agent it was written to; a human's review or comment wakes the pull request's author; a conflict or failing checks wake the author; a ticket assigned to an agent by someone else, a comment on it, or a human moving it to active wakes the agent; a human's comment on a ticket an agent handed back (assigned to a human, in review or blocked, mentioning no agent) wakes the agent who last worked on it, to answer, and to take the ticket back only if it needs more work; a comment on a document wakes the agent it mentions, else its author; an idle agent is woken with its next ready ticket.
 - **Acts.** A pull request opened for review moves its ticket to review; a merge into the default branch, with no other pull request of the ticket open, moves it to done; a hand-back moves the ticket to review (done) or blocked (blocked) and assigns it to the person who asked; a human moving a ticket they hold to active, without the needs-human label, assigns it back to the agent who last worked on it and wakes them.
 
 Everything else on the ticket is the agent's: a woken agent assigns the ticket to itself and moves it to active when it starts work on it, as its catalog instructions say.
 
-Every policy is evaluated for every event, in order, and every one that matches contributes its decision. Change one under `pipeline.policies.<id>`:
+Every policy that listens to an event receives it and proposes. Change one under `pipeline.policies.<id>`:
 
 ```yaml
 pipeline:
@@ -56,17 +56,37 @@ pipeline:
       enabled: false
 ```
 
-`enabled: false` turns a policy off (it still shows in the trace as turned off), `instruction` replaces the instruction of a wake or the note of an act, and `when` narrows it. An instruction with an unknown variable keeps the default, with a warning in the office log. The variables are listed in the [reference](/reference/pipeline-policies/#instruction-variables). One policy also follows a switch: `idle_pulls_next` is on only with `policies.pull_ready`. A team cannot add policies of its own.
+`enabled: false` turns a policy off (it still shows in the trace as turned off), `instruction` replaces the instruction of a wake or the note of an act, and `when` narrows it. An instruction with an unknown variable keeps the default, with a warning in the office log. The variables are listed in the [reference](/reference/pipeline-policies/#instruction-variables). One policy also follows a switch: `idle_pulls_next` is on only with `policies.pull_ready`.
+
+## Policies of your own
+
+A team adds policies of its own as code, under `policies.custom`: a module of its repository or an npm package, written with the `@outstaff/policy` SDK. They run after the built-in ones, show up in the trace like them, and `pipeline.policies.<id>` changes them the same way. YAML only turns policies on and off and tweaks them; new behaviour is a policy. See [Writing a policy](/guides/writing-a-policy/).
+
+```yaml
+policies:
+  custom:
+    - module: ./policies/release-freeze.ts
+      settings: { until: "2026-12-01T00:00:00Z" }
+```
+
+## From proposals to decisions
+
+The aggregation layer makes the decisions from every policy's proposals, the same way whichever policies made them:
+
+- **Invariants.** It never acts as the office or for anyone who is not an agent on the team, never wakes an agent for its own action, lets no event a bot caused wake anyone (the loop guard), and keeps acts to bookkeeping. A proposal that breaks one is rejected.
+- **Suppression.** A policy can propose that an agent is not woken (for example during a release freeze); that beats a wake, whatever the priorities.
+- **Conflicts.** Two acts that set the same field of the same ticket are settled by the policies' priority, then by their order; the same change twice is made once.
+- **Merging.** Wakes of one agent on one subject, of one kind, become one run with every instruction.
 
 Not in the default set yet: the PM's round to unblock a blocked hand-back (the ticket goes to the person who asked), a mention handing a ticket to the agent mentioned (the agent is woken and takes the ticket itself if asked), and moving the ticket of a pull request a person opened or merged, which has no agent to act for.
 
 ## Why the office did something
 
-Every event is traced: each policy, whether it matched and why, the first condition that failed, the decisions, what each act did and what each wake's context carried. `ost explain --recent 20` lists the latest traced events; `ost explain <event-id>` prints one. A dashboard connected over the [office link](/reference/office-link/) shows the same traces. See the [CLI reference](/reference/cli/#ost-explain).
+Every event is traced: each policy, whether it matched and why, the first condition that failed, what it proposed, what the aggregation made of each proposal, the decisions, what each act did and what each wake's context carried. `ost explain --recent 20` lists the latest traced events; `ost explain <event-id>` prints one. A dashboard connected over the [office link](/reference/office-link/) shows the same traces. See the [CLI reference](/reference/cli/#ost-explain).
 
 ## Coalescing
 
-Wakes that come close together become one run. Wakes for the same agent and the same pull request, ticket, document or chat conversation within `pipeline.wake.coalesce_seconds` (default 60) of the first are folded into one work item that carries all of them: four review comments left within a minute are one `review_feedback` round, three quick chat messages are one chat session. The run starts when the window closes. `0` turns it off, and an idle pull is never held. A wake also joins an item of the same kind and subject that is queued or running (a chat message only a chat session that has not started), and its feedback reaches a running item in a follow-up round. The trace of each folded event names the item and every event folded into it. See [Coalescing](/architecture/office/#coalescing).
+Wakes that come close together become one run. Wakes for the same agent and the same pull request, ticket, document or chat conversation within `pipeline.wake.coalesce_seconds` (default 60) of the first are folded into one work item that carries all of them: four review comments left within a minute are one `review_feedback` round, a review and failing checks on one pull request are one run. The run starts when the window closes. `0` turns it off. A chat message is never held: it is answered at once, and a message that arrives while its session is still queued joins it. An idle pull is never held either. A wake also joins an item of the same kind and subject that is queued or running (a chat message only a chat session that has not started), and its feedback reaches a running item in a follow-up round. The trace of each folded event names the item and every event folded into it. See [Coalescing](/architecture/office/#coalescing).
 
 ## Wake context
 

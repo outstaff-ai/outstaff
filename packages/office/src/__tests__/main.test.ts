@@ -1,6 +1,6 @@
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { envSecretSource, parseTeamConfig, parseYaml, silentLogger } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -126,6 +126,47 @@ describe("startOffice", () => {
         `OUTSTAFF_POLL_INTERVAL_MS must be a positive whole number, got "${bad}".`,
       );
     }
+  });
+
+  it("loads the team's custom policies, which run after the built-in ones", async () => {
+    const custom = env({ OUTSTAFF_SECRETS_DIR: "/nonexistent" });
+    const dir = dirname(custom.OUTSTAFF_TEAM_FILE);
+    writeFileSync(
+      join(dir, "freeze.mjs"),
+      `export const policy = { id: "freeze", summary: "s", on: ["agent.idle"], decide: () => [{ type: "drop", reason: "frozen" }] };\n`,
+    );
+
+    writeFileSync(
+      custom.OUTSTAFF_TEAM_FILE,
+      `${TEAM}policies:\n  custom:\n    - { module: ./freeze.mjs, settings: { until: "2026-12-01" } }\n`,
+    );
+
+    running = await startOffice(custom, deps);
+    const trace = await running.office.parts.pipeline.judge({
+      id: "office:idle:sam:1",
+      type: "agent.idle",
+      at: "2026-10-05T09:00:00.000Z",
+      subject: {},
+      actor: { kind: "agent", id: "sam" },
+      data: {},
+    });
+
+    expect(trace.policies.at(-1)).toMatchObject({
+      policy: "freeze",
+      proposals: [{ type: "drop", reason: "frozen" }],
+    });
+  });
+
+  it("does not start with a custom policy it cannot load", async () => {
+    const broken = env();
+    writeFileSync(
+      broken.OUTSTAFF_TEAM_FILE,
+      `${TEAM}policies:\n  custom:\n    - module: ./missing.mjs\n`,
+    );
+
+    await expect(startOffice(broken, deps)).rejects.toThrow(
+      /a custom policy cannot be loaded:\npolicies.custom\[0\]: \.\/missing\.mjs: cannot be loaded/,
+    );
   });
 
   it("rejects a port that is not a number", async () => {

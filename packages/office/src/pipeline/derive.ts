@@ -1,6 +1,6 @@
 import { prLabel } from "#/log.js";
 import type { PrSnapshot, MergeChange } from "./derive.types.js";
-import type { MergeDerivedType, PipelineEvent } from "./events.types.js";
+import type { MergeDerivedType, PipelineEvent } from "@outstaff/policy";
 
 /** The id of an event a merge raised for a pull request. */
 export const derivedId = (type: string, pr: PrSnapshot, merged: PrSnapshot): string =>

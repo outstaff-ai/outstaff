@@ -83,7 +83,7 @@ export const pipelineSchema = z
         pipelinePolicySchema,
       )
       .optional()
-      .meta(d("Changes to the default policies, by policy id.")),
+      .meta(d("Changes to the built-in and custom policies, by policy id.")),
     wake: z
       .strictObject({
         coalesce_seconds: z
@@ -93,7 +93,7 @@ export const pipelineSchema = z
           .optional()
           .meta(
             d(
-              "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. Default 60; 0 turns it off.",
+              "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. A chat message is answered at once: its wake waits for no window, though a message for a session still queued joins it. Default 60; 0 turns it off.",
             ),
           ),
       })

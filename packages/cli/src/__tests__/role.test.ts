@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { readAcmeTeam } from "@outstaff/testing.core";
+import { copyAcmePolicies, readAcmeTeam } from "@outstaff/testing.core";
 import type { Context } from "#/types.js";
 import { run } from "#/program.js";
 
@@ -45,6 +45,7 @@ function project(role = "reviewer") {
       .replace("role: reviewer", `role: ${role}`),
   });
 
+  copyAcmePolicies(join(dir, ".outstaff"));
   return dir;
 }
 

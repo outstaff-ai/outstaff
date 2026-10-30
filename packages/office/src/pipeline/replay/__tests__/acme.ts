@@ -22,5 +22,5 @@ export function acmeTeam(): TeamConfig {
 export function acmeSetup(): ReplaySetup {
   const team = acmeTeam();
   const pipeline = configurePipeline(team);
-  return { policies: pipeline.policies, pipelineOptions: pipeline.options, coalesceMs: 60_000 };
+  return { policies: pipeline.policies, pipelineOptions: pipeline.options };
 }

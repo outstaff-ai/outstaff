@@ -1,19 +1,15 @@
 import type { ActOp } from "@outstaff/core";
+import type { WakeSubject } from "@outstaff/policy";
 import type { Feedback } from "@outstaff/protocol";
 
 export type { ActOp, ActTarget } from "@outstaff/core";
-
-/** What a woken agent's run is about; the key coalescing groups by, together with the person. */
-export interface WakeSubject {
-  type: "pr" | "ticket" | "doc" | "chat";
-
-  /** `owner/name#n` for a pull request, the key of a ticket, the id of a document, `channel:thread` (or the channel, for a direct message's top-level messages) for chat. */
-  ref: string;
-}
+export type { WakeSubject } from "@outstaff/policy";
 
 /** Schedule an agent run. The instruction says what is expected; the agent decides how. */
 export interface Wake {
   type: "wake";
+
+  /** The policy that proposed it; the first, when the wakes of several policies were merged. */
   policy: string;
   person: string;
   kind: string;
@@ -22,6 +18,12 @@ export interface Wake {
   /** The reviews, comments or messages the run must act on, oldest first. */
   feedback: Feedback[];
   subject: WakeSubject;
+
+  /**
+   * How long the run waits for related wakes to join it (`pipeline.wake.coalesce_seconds`), in milliseconds: 0 for a
+   * chat message, which is answered at once, and for an idle pull.
+   */
+  coalesceMs: number;
 
   /** The work item the wake queued, or joined; set once the live pipeline has queued it. */
   itemId?: string | undefined;

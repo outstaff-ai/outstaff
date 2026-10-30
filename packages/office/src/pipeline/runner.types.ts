@@ -1,5 +1,5 @@
 import type { WorkflowEvent } from "@outstaff/core";
-import type { PipelineEvent } from "./events.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import type { Trace } from "./trace.types.js";
 
 /** Judges office events with the pipeline and carries out what it decides. */

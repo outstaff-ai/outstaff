@@ -205,6 +205,12 @@ policies:
     prs_per_ticket: one
   messages:
     max_lines: 3
+  # Event pipeline policies of the team's own, loaded from this repository. See "Writing a policy" in the docs.
+  custom:
+    - module: ./policies/release-freeze.ts
+      settings:
+        until: "2026-12-01T00:00:00Z"
+        label: hotfix
 ```
 
 ## Fields
@@ -1072,7 +1078,7 @@ The event pipeline, which decides what the office does with every event (decisio
 
 ### pipeline.policies
 
-Changes to the default policies, by policy id.
+Changes to the built-in and custom policies, by policy id.
 
 - Type: `map`
 - Optional
@@ -1289,7 +1295,7 @@ How wakes are batched.
 
 #### pipeline.wake.coalesce_seconds
 
-Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. Default 60; 0 turns it off.
+Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. A chat message is answered at once: its wake waits for no window, though a message for a session still queued joins it. Default 60; 0 turns it off.
 
 - Type: `integer`
 - Optional
@@ -1838,3 +1844,40 @@ The working repository must have at least this grant.
 - Type: `string`
 - Optional
 - Allowed values: `read`, `write`
+
+### policies.custom
+
+Event pipeline policies of the team's own, which run after the built-in ones: each a module of the team's repository or an npm package that exports `policy` (or a `policies` list). They run in the office process, as trusted as this repository. `ost validate` and the office load and check each one.
+
+- Type: `list of object`
+- Optional
+
+### policies.custom[]
+
+A custom policy to load: `module` or `package`, and its settings.
+
+- Type: `object`
+- Optional
+
+#### policies.custom[].module
+
+Path of the module, relative to this file, for example ./policies/release-freeze.ts.
+
+- Type: `string`
+- Required
+- Minimum length 1
+
+#### policies.custom[].settings
+
+Values the policy reads as `ctx.settings`; what it accepts is up to the policy.
+
+- Type: `map`
+- Optional
+
+#### policies.custom[].package
+
+Name of an installed npm package, for example @acme/outstaff-policy-oncall.
+
+- Type: `string`
+- Required
+- Minimum length 1

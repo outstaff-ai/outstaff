@@ -16,4 +16,5 @@ Every deployment guide builds on the [container contract](/reference/container-c
 - [Network grants](/guides/network-grants/): name HTTP services for `ost http`, and open the network path to services and devices.
 - [Runtimes](/guides/runtimes/): the runtime and model each person runs on, what is checked per person, and which runtimes an image carries.
 - [Design canvas](/guides/design-canvas/): let the designer work on a private Claude Design canvas, and what it needs.
+- [Writing a policy](/guides/writing-a-policy/): add behaviour to the office as a policy of your own, loaded from team.yaml and tested by replaying events.
 - [Hire and remove people](/guides/hiring/): add a person with `ost hire`, which generates what you leave out, and remove one with `ost fire`.

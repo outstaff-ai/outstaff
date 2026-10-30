@@ -23,9 +23,10 @@ const EVENT_PIPELINE = [
   "packages/office/src/chat/event.ts",
   "packages/office/src/chat/session.ts",
   "packages/office/src/office-chat.ts",
+  "packages/policy/src/**/*.ts",
 ];
 
-const packages = ["core", "catalog", "cli", "agent", "office", "protocol"];
+const packages = ["core", "catalog", "cli", "agent", "office", "protocol", "policy"];
 // Adapter packages live in integrations/<port>/<vendor>; each is a project named like its package.
 const integrations = [
   "vcs/github",

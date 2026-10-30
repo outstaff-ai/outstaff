@@ -6,7 +6,7 @@ import { teamConfig } from "#/intake/__tests__/test-support.js";
 import { createIdlePull } from "#/office-idle.js";
 import type { IdlePullOptions } from "#/office-idle.types.js";
 import { createOfficePipeline } from "#/pipeline/office-pipeline.js";
-import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import { createScheduler, type Scheduler } from "#/scheduler/index.js";
 import { openStore } from "#/store/open.js";
 import type { Store } from "#/store/types.js";

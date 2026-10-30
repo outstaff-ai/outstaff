@@ -5,8 +5,8 @@ import {
   type StaticWorkflowData,
   type WorkflowPr,
 } from "@outstaff/core";
-import type { PipelineEvent, PipelineEventType } from "#/pipeline/events.types.js";
-import type { PipelineOptions, PipelineState, ReadyTicket } from "#/pipeline/state.types.js";
+import type { PipelineEvent, PipelineEventType, ReadyTicket } from "@outstaff/policy";
+import type { PipelineOptions, PipelineState } from "#/pipeline/state.types.js";
 
 export const REPO = { host: "github.com", owner: "acme-example", name: "shop" };
 export const prRef = (number: number) => ({ repo: REPO, number });

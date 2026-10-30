@@ -28,6 +28,7 @@ export const CONFIG_CODES = {
   toolsReservedOption: "tools.reserved_option",
   toolsHttpChecksum: "tools.http_checksum",
   policiesCommandProgram: "policies.command_program",
+  policiesCustomInvalid: "policies.custom_invalid",
   adapterInvalidOptions: "integrations.invalid_options",
   notFound: "config.not_found",
   yamlSyntax: "config.yaml_syntax",

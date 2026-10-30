@@ -4,7 +4,7 @@ import { priorityFor } from "#/scheduler/index.js";
 import { chatTitle, joinChatSession, messageOf, openChatSession } from "#/chat/session.js";
 import type { WorkItem, WorkItemTrigger } from "#/store/types.js";
 import type { Wake } from "#/pipeline/decisions.types.js";
-import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import type { LiveOptions, WakeReason } from "./live.types.js";
 
 export const WAKE_SUBJECT = "pipeline_wake";
@@ -64,10 +64,6 @@ async function linkEvent(opts: LiveOptions, itemId: string, eventId: string): Pr
   return all;
 }
 
-/** How long wakes for the same person and subject fold into one run; an idle pull has nothing to wait for. */
-const windowMs = (event: PipelineEvent, opts: LiveOptions) =>
-  event.type === "agent.idle" ? 0 : (opts.team.pipeline?.wake?.coalesce_seconds ?? 60) * 1000;
-
 /**
  * Adds a wake to an item queued or running for an earlier one: its feedback, what it refers to, and its instruction
  * when the item is of another kind. Returns the item's events.
@@ -116,8 +112,10 @@ async function init(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 
 /**
  * Queues the run a wake asks for. A wake for an item of the same kind and subject that is queued or running joins that
- * item (a chat message only one that is queued: a running session does not see it); a wake for the same person and subject within `pipeline.wake.coalesce_seconds` of the first is folded into
- * the item the first queued, which is held until then. `folded` lists the events of the item it joined, this one last.
+ * item (a chat message only one that is queued: a running session does not see it); a wake for the same person and
+ * subject within its window (`coalesceMs`, which the aggregation set) of the first is folded into the item the first
+ * queued, which is held until then. A chat wake has no window: its item is offered at once. `folded` lists the events
+ * of the item it joined, this one last.
  */
 export async function enqueueWake(
   wake: Wake,
@@ -153,7 +151,7 @@ export async function enqueueWake(
     coalesce: {
       key: JSON.stringify([wake.person, subject.type, subject.ref]),
       at: event.at,
-      windowMs: windowMs(event, opts),
+      windowMs: wake.coalesceMs,
       fold: async (into) => {
         folded = await join(into, wake, event, opts);
       },

@@ -1,7 +1,6 @@
+import type { PipelineEvent, PolicyRun } from "@outstaff/policy";
 import type { ContextManifest } from "./context/context.types.js";
 import type { Decision } from "./decisions.types.js";
-import type { PipelineEvent } from "./events.types.js";
-import type { PipelineCondition } from "./policy.types.js";
 
 /** Where an act stands: the agent it is for makes its changes, so it waits while that agent is offline. */
 export interface ActRecord {
@@ -21,23 +20,43 @@ export interface ActRecord {
   error?: string | undefined;
 }
 
-/** How one policy judged one event. */
-export interface PolicyTrace {
+/** How one policy judged one event: whether it matched, why, and what it proposed. */
+export type PolicyTrace = PolicyRun;
+
+/**
+ * What the aggregation made of one proposal: `kept` (it is a decision), `merged` into another wake of the same person
+ * and subject, `suppressed` by another policy, `rejected` by an invariant, `dropped` as pointless or by a conflict it
+ * lost, or `error`, a policy that threw.
+ */
+export type AggregationOutcome =
+  | "kept"
+  | "merged"
+  | "suppressed"
+  | "rejected"
+  | "dropped"
+  | "error";
+
+export interface AggregationEntry {
   policy: string;
-  matched: boolean;
 
-  /** Why it matched or did not: the event types it listens to, that it is off, or the deciding condition's detail. */
-  reason: string;
+  /** The proposal's index in its policy's `proposals`. */
+  proposal: number;
+  outcome: AggregationOutcome;
 
-  /** For a policy that listens to the event but did not match: the first condition that failed. */
-  failed?: PipelineCondition | undefined;
-  decisions: Decision[];
+  /** Why, for every outcome but a plain `kept`. */
+  reason?: string | undefined;
+
+  /** The index in `decisions` of the decision it became, or was merged into. */
+  decision?: number | undefined;
 }
 
-/** Every policy evaluated for an event, in order, and every decision made. */
+/** Every policy evaluated for an event, in order, what each proposed, what the aggregation made of it, and the decisions. */
 export interface Trace {
   event: PipelineEvent;
   policies: PolicyTrace[];
+
+  /** One entry per proposal, in the order the policies proposed them. */
+  aggregation: AggregationEntry[];
   decisions: Decision[];
 
   /** Each act's progress and, once the agent answered, what it did; by act id (`<event id>:<policy>`). */

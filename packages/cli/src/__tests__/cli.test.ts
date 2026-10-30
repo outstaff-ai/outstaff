@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ACME_TEAM_FILE,
+  copyAcmePolicies,
   DUPLICATE_HANDLE_TEAM,
   MISSING_MODEL_TEAM,
   MISSING_REPOS_TEAM,
@@ -22,6 +23,7 @@ function project(name = `p${n++}`, team?: string) {
   mkdirSync(join(dir, ".outstaff"), { recursive: true });
   if (team !== undefined) {
     writeFileSync(join(dir, ".outstaff", "team.yaml"), team);
+    copyAcmePolicies(join(dir, ".outstaff"));
   }
 
   return dir;
@@ -282,6 +284,24 @@ describe("ost validate", () => {
   it("honors --team", async () => {
     const r = await ost(project(), ["--team", join(acme(), ".outstaff", "team.yaml"), "validate"]);
     expect(r.code).toBe(0);
+  });
+
+  it("loads the custom policies as the office will, and names one it cannot load at its line", async () => {
+    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
+      "    - module: ./policies/release-freeze.ts",
+      "    - module: ./policies/release-freeze.ts\n    - module: ./policies/missing.ts",
+    );
+
+    const r = await ost(project(undefined, team), ["validate", "--json"]);
+    expect(r.code).toBe(1);
+    const report = JSON.parse(r.out) as { errors: { code: string; path: unknown[] }[] };
+    expect(report.errors).toEqual([
+      expect.objectContaining({
+        code: "policies.custom_invalid",
+        path: ["policies", "custom", 1],
+        message: expect.stringMatching(/^\.\/policies\/missing\.ts: cannot be loaded: /),
+      }),
+    ]);
   });
 });
 

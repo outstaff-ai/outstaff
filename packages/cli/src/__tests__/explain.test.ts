@@ -24,23 +24,31 @@ const trace: Trace = {
       policy: "assigned_to_assignee",
       matched: true,
       reason: "all conditions hold",
-      decisions: [
+      proposals: [
         {
           type: "wake",
-          policy: "assigned_to_assignee",
           person: "sam",
           kind: "assigned",
           instruction: "ACME-150 is assigned to you.",
-          feedback: [],
-          subject: { type: "ticket", ref: "ACME-150" },
+          reason: "all conditions hold",
         },
       ],
     },
   ],
-  decisions: [],
+  aggregation: [{ policy: "assigned_to_assignee", proposal: 0, outcome: "kept", decision: 0 }],
+  decisions: [
+    {
+      type: "wake",
+      policy: "assigned_to_assignee",
+      person: "sam",
+      kind: "assigned",
+      instruction: "ACME-150 is assigned to you.",
+      feedback: [],
+      subject: { type: "ticket", ref: "ACME-150" },
+      coalesceMs: 60_000,
+    },
+  ],
 };
-
-trace.decisions = trace.policies[0]!.decisions;
 
 async function ost(args: string[], env: Record<string, string> = {}, extra: Partial<Context> = {}) {
   let out = "";

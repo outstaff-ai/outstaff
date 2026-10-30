@@ -1,5 +1,5 @@
 import { silentLogger, type Logger } from "@outstaff/core";
-import { linkMessageSchema } from "@outstaff/protocol";
+import { LINK_VERSION, linkMessageSchema } from "@outstaff/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
 import type { ManualClock } from "#/types.js";
@@ -90,7 +90,7 @@ describe("the office link", () => {
     start();
     await until(() => dash.links.length === 1);
     expect(dash.last.headers.authorization).toBe(`Bearer ${TOKEN}`);
-    expect(dash.last.headers["outstaff-link-version"]).toBe("1");
+    expect(dash.last.headers["outstaff-link-version"]).toBe(String(LINK_VERSION));
     expect(link.status().state).toBe("connecting");
 
     // Before the welcome nothing is answered.
@@ -408,9 +408,11 @@ describe("the office link", () => {
   it("closes on another link version, answers pings, pings a quiet service and drops a silent one", async () => {
     start();
     await until(() => dash.links.length === 1);
-    dash.welcome(2);
+    dash.welcome(LINK_VERSION + 1);
     await until(() => link.status().state === "backoff");
-    expect(link.status().lastError).toBe("the service speaks another link version: 2, not 1");
+    expect(link.status().lastError).toBe(
+      `the service speaks another link version: ${LINK_VERSION + 1}, not ${LINK_VERSION}`,
+    );
 
     clock.advance(100);
     await until(() => dash.links.length === 2);

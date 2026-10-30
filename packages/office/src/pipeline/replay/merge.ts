@@ -2,7 +2,7 @@ import type { WorkflowPr } from "@outstaff/core";
 import { prLabel } from "#/log.js";
 import { deriveAfterMerge } from "#/pipeline/derive.js";
 import type { PrSnapshot } from "#/pipeline/derive.types.js";
-import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import type { ReplayStep } from "./replay.types.js";
 
 const snapshots = (step: ReplayStep, mergeable: Record<number, "clean" | "conflicting"> = {}) =>

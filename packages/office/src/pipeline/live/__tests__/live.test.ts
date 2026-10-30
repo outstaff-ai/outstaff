@@ -118,8 +118,9 @@ describe("createLivePipeline", () => {
 
     const traced = await opts.traces.get("tracker:e-1");
     expect(traced?.decisions).toMatchObject([{ type: "wake", itemId: item!.id }]);
-    expect(traced?.policies.find((p) => p.matched)?.decisions).toMatchObject([
-      { itemId: item!.id },
+    // The policy's proposal stays as it proposed it; only the decision names the item.
+    expect(traced?.policies.find((p) => p.matched)?.proposals).toEqual([
+      expect.not.objectContaining({ itemId: expect.anything() }),
     ]);
 
     expect((await s.getSubject(WAKE_SUBJECT, item!.id))?.data).toEqual({
@@ -204,6 +205,7 @@ describe("enqueueWake", () => {
     instruction: "Address it.",
     feedback,
     subject: { type: "pr" as const, ref: "acme-example/shop#9" },
+    coalesceMs: 60_000,
   };
 
   const onPr = (n: number) => ({

@@ -30,6 +30,7 @@ const trace = (id: string): Trace => ({
     data: {},
   },
   policies: [],
+  aggregation: [],
   decisions: [act()],
 });
 

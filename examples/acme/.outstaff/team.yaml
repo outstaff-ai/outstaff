@@ -177,3 +177,9 @@ policies:
     prs_per_ticket: one
   messages:
     max_lines: 3
+  # Event pipeline policies of the team's own, loaded from this repository. See "Writing a policy" in the docs.
+  custom:
+    - module: ./policies/release-freeze.ts
+      settings:
+        until: "2026-12-01T00:00:00Z"
+        label: hotfix

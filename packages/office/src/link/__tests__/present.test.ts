@@ -1,6 +1,10 @@
 import { traceSchema } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
 import { present, sourceOf } from "#/link/present.js";
+import { event, OPTS, stateOf } from "#/pipeline/__tests__/support.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
+import { BUILT_IN_POLICIES } from "#/pipeline/policies/index.js";
+import type { Trace } from "#/pipeline/trace.types.js";
 import { trace } from "./support.js";
 
 describe("sourceOf", () => {
@@ -57,5 +61,35 @@ describe("present", () => {
     expect(present({ ...msg, event: { ...msg.event, type: "ticket.commented" } }, {}).urls).toEqual(
       {},
     );
+  });
+
+  it("carries every policy's proposals and the aggregation, in a shape the link's schema reads", () => {
+    const e = event("ticket.moved", {
+      id: "tracker:9",
+      subject: { ticket: "ACME-1" },
+      data: { to: "active", toName: "In Progress" },
+    });
+
+    const world = {
+      tickets: {
+        "ACME-1": {
+          status: "active" as const,
+          lastWorker: "sam",
+          assignee: { id: "ada.admin", kind: "human" as const },
+        },
+      },
+    };
+
+    const t = evaluatePipeline(e, stateOf(world), BUILT_IN_POLICIES, OPTS);
+    expect(t.aggregation.length).toBeGreaterThan(1);
+    const presented = present(t, links);
+    expect(presented.aggregation).toEqual(t.aggregation);
+    expect(traceSchema.parse(presented).policies.flatMap((p) => p.proposals)).toHaveLength(2);
+  });
+
+  it("gives a trace recorded before the aggregation layer an empty aggregation", () => {
+    const old = trace("vcs:2", "2026-10-05T09:00:00.000Z") as Partial<Trace>;
+    delete old.aggregation;
+    expect(present(old as Trace, links).aggregation).toEqual([]);
   });
 });

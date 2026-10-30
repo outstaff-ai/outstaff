@@ -1435,7 +1435,7 @@
       "type": "object",
       "properties": {
         "policies": {
-          "description": "Changes to the default policies, by policy id.",
+          "description": "Changes to the built-in and custom policies, by policy id.",
           "type": "object",
           "propertyNames": {
             "type": "string",
@@ -1471,7 +1471,7 @@
           "type": "object",
           "properties": {
             "coalesce_seconds": {
-              "description": "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. Default 60; 0 turns it off.",
+              "description": "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. A chat message is answered at once: its wake waits for no window, though a message for a session still queued joins it. Default 60; 0 turns it off.",
               "type": "integer",
               "minimum": 0,
               "maximum": 3600
@@ -2146,6 +2146,59 @@
           },
           "additionalProperties": false,
           "description": "Command rules for this team's own tools, on top of the built-in and toolset rules."
+        },
+        "custom": {
+          "description": "Event pipeline policies of the team's own, which run after the built-in ones: each a module of the team's repository or an npm package that exports `policy` (or a `policies` list). They run in the office process, as trusted as this repository. `ost validate` and the office load and check each one.",
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "module": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Path of the module, relative to this file, for example ./policies/release-freeze.ts."
+                  },
+                  "settings": {
+                    "description": "Values the policy reads as `ctx.settings`; what it accepts is up to the policy.",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "module"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "package": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Name of an installed npm package, for example @acme/outstaff-policy-oncall."
+                  },
+                  "settings": {
+                    "description": "Values the policy reads as `ctx.settings`; what it accepts is up to the policy.",
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  }
+                },
+                "required": [
+                  "package"
+                ],
+                "additionalProperties": false
+              }
+            ],
+            "description": "A custom policy to load: `module` or `package`, and its settings."
+          }
         }
       },
       "additionalProperties": false,
