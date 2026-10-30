@@ -287,10 +287,23 @@ function hire() {
   const file = join(dir, ".outstaff/team.yaml");
   write(file, TEAM);
   for (const p of [
-    { role: "developer", handle: "sam", name: "Sam Duarte", pronouns: "they/them" },
-    { role: "architect", handle: "mira", name: "Mira Okafor", pronouns: "she/her" },
+    {
+      role: "developer",
+      handle: "sam",
+      name: "Sam Duarte",
+      pronouns: "they/them",
+      model: "sonnet",
+    },
+    { role: "architect", handle: "mira", name: "Mira Okafor", pronouns: "she/her", model: "opus" },
     // The PM only receives work in this run: no container is started for it.
-    { role: "pm", handle: "pia", name: "Pia Novak", pronouns: "she/her", repos: false },
+    {
+      role: "pm",
+      handle: "pia",
+      name: "Pia Novak",
+      pronouns: "she/her",
+      model: "sonnet",
+      repos: false,
+    },
   ]) {
     const out = spawnSync(
       "node",
@@ -304,6 +317,8 @@ function hire() {
         p.handle,
         "--pronouns",
         p.pronouns,
+        "--model",
+        p.model,
         ...(p.repos === false ? [] : ["--repos", "shop=write,ops=write"]),
         "--yes",
         "--out",

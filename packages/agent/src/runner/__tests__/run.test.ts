@@ -23,7 +23,7 @@ catalog: { version: 0.0.0 }
 repos:
   - { name: shop, url: github.com/acme-example/shop, kind: primary }
 people:
-  - { handle: sam, name: Sam Duarte, role: developer, repos: { shop: write } }
+  - { handle: sam, name: Sam Duarte, role: developer, model: sonnet, repos: { shop: write } }
 integrations:
   chat: { adapter: fake }
   vcs: { adapter: fake }

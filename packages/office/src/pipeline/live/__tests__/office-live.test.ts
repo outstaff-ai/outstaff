@@ -30,7 +30,15 @@ function team(): TeamConfig {
     catalog: { version: "1.0.0" },
     humans: [{ name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "u-ada" } }],
     repos: [{ name: "shop", url: "git.acme.example/acme-example/shop", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer", identities: { tracker: "u-sam" } }],
+    people: [
+      {
+        handle: "sam",
+        name: "Sam",
+        role: "developer",
+        model: "sonnet",
+        identities: { tracker: "u-sam" },
+      },
+    ],
     integrations: {
       chat: { adapter: "fake" },
       vcs: { adapter: "fake" },
@@ -143,7 +151,7 @@ describe("the office with the event pipeline live", () => {
       `${issue.key} is assigned to you. Work on it the way the repository asks.`,
     );
 
-    await conn.accept(item.id, { runtime: "claude" });
+    await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
     await conn.handBack(item.id, { summary: "Built it.", status: "done" });
     await until(async () => (await tracker.getIssue(issue.key)).status.canonical === "review");
 

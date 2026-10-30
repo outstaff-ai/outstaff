@@ -14,7 +14,7 @@ catalog: { version: 1.0.0 }
 repos:
   - { name: app, url: git.acme.example/acme/app, kind: primary }
 people:
-  - { handle: sam, name: Sam, role: developer }
+  - { handle: sam, name: Sam, role: developer, model: sonnet }
 integrations:
   chat: { adapter: fake }
   vcs: { adapter: fake }

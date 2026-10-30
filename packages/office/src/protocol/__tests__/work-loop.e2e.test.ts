@@ -57,6 +57,7 @@ describe("the agent work loop against the real protocol server", () => {
       office: conn,
       runtime,
       runtimeName: "claude",
+      model: "sonnet",
       env: { ...env, office: conn },
       systemPrompt: "x",
       policy: buildPolicy({
@@ -110,7 +111,7 @@ describe("the agent work loop against the real protocol server", () => {
     const team = { people: [{ handle: "sam", repos: {} }], repos: [] } as unknown as TeamConfig;
     source.enqueue("sam", "w3", "Half done");
     await source.next("sam");
-    await source.accept("sam", "w3", { runtime: "claude" });
+    await source.accept("sam", "w3", { runtime: "claude", model: "sonnet" });
     source.calls.length = 0;
 
     const conn = createOfficeConnection({
@@ -124,6 +125,7 @@ describe("the agent work loop against the real protocol server", () => {
       office: conn,
       runtime: createFakeRuntime(),
       runtimeName: "claude",
+      model: "sonnet",
       env: { person: "sam", team } as AgentEnv,
       systemPrompt: "x",
       policy: buildPolicy({

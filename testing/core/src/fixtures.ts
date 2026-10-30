@@ -45,3 +45,10 @@ export const YAML_SYNTAX_ERROR_TEAM = replaceOnce(
 
 /** The required `repos` key is missing. */
 export const MISSING_REPOS_TEAM = acme.replace(/\nrepos:[\s\S]*?\npeople:/, "\npeople:");
+
+/** Agent at people[4] ("sam") has no model. */
+export const MISSING_MODEL_TEAM = replaceOnce(
+  acme,
+  "    role: developer\n    model: sonnet\n",
+  "    role: developer\n",
+);

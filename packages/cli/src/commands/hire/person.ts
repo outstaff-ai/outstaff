@@ -56,6 +56,18 @@ async function chooseHandle(
   return handle;
 }
 
+/** --model, which a terminal user may edit; there is no default, so without one hiring stops. */
+async function chooseModel(ask: Ask, options: HireOptions): Promise<string> {
+  const model = (await ask("Model", given(options.model) ?? "")).trim();
+  if (!model) {
+    throw new Invalid(
+      "Give the model the person runs on with --model, for example --model sonnet. There is no default model.",
+    );
+  }
+
+  return model;
+}
+
 const grantsOrThrow = (grants: Grants | string, prefix: string): Grants => {
   if (typeof grants === "string") {
     throw new Invalid(`${prefix}${grants}`);
@@ -109,7 +121,7 @@ function summaryOf(person: NewPerson, avatar: AvatarChoice): string[] {
     `Name:      ${person.name}`,
     `Pronouns:  ${person.pronouns}`,
     `Role:      ${person.role}`,
-    `Model:     ${person.model ?? "(the runtime's default)"}`,
+    `Model:     ${person.model}`,
     `Repos:     ${formatGrants(person.repos)}`,
     `Avatar:    ${avatar.label}`,
   ];
@@ -129,7 +141,7 @@ async function pickPerson(
   const name = await chooseName(answer, options, taken);
   const handle = await chooseHandle(answer, options, name, taken);
   const pronouns = await answer("Pronouns", given(options.pronouns) ?? "they/them");
-  const model = given(options.model);
+  const model = await chooseModel(answer, options);
   const repos = await chooseGrants(ask, options, config, permissions);
   const avatar = chooseAvatar(options, handle);
   const person: NewPerson = {
@@ -137,7 +149,7 @@ async function pickPerson(
     name,
     pronouns,
     role,
-    ...(model ? { model } : {}),
+    model,
     repos,
     avatar: avatar.avatar,
   };

@@ -13,7 +13,13 @@ const team = {
 } as unknown as TeamConfig;
 
 const person = (repos: Record<string, string>) =>
-  ({ handle: "leo", name: "Leo", role: "designer", repos }) as TeamConfig["people"][number];
+  ({
+    handle: "leo",
+    name: "Leo",
+    role: "designer",
+    model: "sonnet",
+    repos,
+  }) as TeamConfig["people"][number];
 
 const keys = (specs: SecretSpec[]) => specs.map((s) => s.key);
 const own = (specs: SecretSpec[]) => specs.filter((s) => s.key.startsWith("GH_APP_"));

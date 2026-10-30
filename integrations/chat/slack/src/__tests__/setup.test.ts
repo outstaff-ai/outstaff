@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { deriveSlack, slackSetupGuide } from "#/setup.js";
 
 const team = { team: { name: "acme" } } as unknown as TeamConfig;
-const sam = { handle: "sam", name: "Sam", role: "developer" } as never;
+const sam = { handle: "sam", name: "Sam", role: "developer", model: "sonnet" } as never;
 
 describe("slackSetupGuide", () => {
   it("gives a Socket Mode manifest with the scopes and events the adapter uses", () => {

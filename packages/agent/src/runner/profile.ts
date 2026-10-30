@@ -55,7 +55,7 @@ export function createProfilePublisher(opts: ProfilePublisherOptions): ProfilePu
       name: opts.who.name,
       role: opts.who.role,
       ...(opts.who.description ? { description: opts.who.description } : {}),
-      ...(opts.who.model ? { model: opts.who.model } : {}),
+      model: opts.who.model,
       status: working ? "working" : "idle",
       ...(active ? { current: groupHead(active, ticketUrl) } : {}),
       lastActiveAt: new Date(lastActive).toISOString(),

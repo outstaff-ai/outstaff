@@ -236,9 +236,9 @@
             }
           },
           "model": {
-            "description": "LLM model for this agent; the runtime adapter's default when omitted.",
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "LLM model this agent runs on, as the runtime adapter names it, for example \"sonnet\". Required: there is no default model."
           },
           "runtime": {
             "description": "Runtime adapter for this agent, in the same shape as integrations.runtime: `adapter` and that adapter's options. It replaces the team's runtime for this agent as a whole (options are not merged); integrations.runtime when omitted.",
@@ -755,7 +755,8 @@
         "required": [
           "handle",
           "name",
-          "role"
+          "role",
+          "model"
         ],
         "additionalProperties": false,
         "description": "An AI agent on the team."

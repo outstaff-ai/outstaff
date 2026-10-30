@@ -368,7 +368,7 @@ describe("office connection", () => {
 
     it("turns error replies into port errors", async () => {
       await connectUp();
-      const p = conn.accept("nope", { runtime: "claude" });
+      const p = conn.accept("nope", { runtime: "claude", model: "sonnet" });
       current().reply(current().last(), "error", {
         code: "unknown_item",
         message: "No such item.",

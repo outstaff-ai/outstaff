@@ -7,15 +7,11 @@ import type { ChatStartOptions, StartedChat } from "./startup.types.js";
 import type { ProfilePublisher } from "./types.js";
 
 /** Who the agent is, for the top of its chat profile. */
-const profileWho = (
-  me: ChatStartOptions["me"],
-  role: ChatStartOptions["role"],
-  model: string | undefined,
-) => ({
+const profileWho = (me: ChatStartOptions["me"], role: ChatStartOptions["role"], model: string) => ({
   name: me.name,
   role: role?.title ?? me.role,
   ...(role?.summary ? { description: role.summary } : {}),
-  ...(model ? { model } : {}),
+  model,
 });
 
 /** The chat profile publisher, when the chat can show one and the team has it on. */

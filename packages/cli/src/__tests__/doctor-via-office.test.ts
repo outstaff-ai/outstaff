@@ -13,7 +13,7 @@ import { run } from "#/program.js";
 
 const TEAM = {
   team: { name: "acme" },
-  people: [{ handle: "sam", name: "Sam", role: "developer" }],
+  people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
   integrations: {},
 } as unknown as TeamConfig;
 

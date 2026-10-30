@@ -33,6 +33,7 @@ const valid = (): TeamConfigInput => ({
       name: "Ada",
       pronouns: "she/her",
       role: "backend-engineer",
+      model: "sonnet",
       repos: { app: "write", "kind:baseline": "read" },
     },
     {
@@ -47,6 +48,7 @@ const valid = (): TeamConfigInput => ({
       handle: "cy",
       name: "Cy",
       role: "qa-engineer",
+      model: "sonnet",
       repos: { "*": "read" },
       avatar: { seed: "cy" },
     },
@@ -54,12 +56,14 @@ const valid = (): TeamConfigInput => ({
       handle: "di",
       name: "Di",
       role: "devops-engineer",
+      model: "sonnet",
       repos: { infra: "write", "kind:infra": "write" },
     },
     {
       handle: "ed",
       name: "Ed",
       role: "tech-writer",
+      model: "sonnet",
       repos: {},
       avatar: { url: "https://acme.example/ed.png" },
     },
@@ -108,7 +112,7 @@ describe("parseTeamConfig", () => {
       team: { name: "acme" },
       catalog: { version: "1.0.0" },
       repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-      people: [{ handle: "ada", name: "Ada", role: "r" }],
+      people: [{ handle: "ada", name: "Ada", role: "r", model: "sonnet" }],
       integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
       office: {},
       workflow: {},
@@ -217,6 +221,29 @@ describe("parseTeamConfig", () => {
   it("reports wrong types with the exact path", () => {
     expect(bad((c) => (c.team.name = 5))).toEqual([
       { path: ["team", "name"], code: "schema.invalid_type", message: expect.any(String) },
+    ]);
+  });
+
+  it("names a person without a model and shows an example", () => {
+    expect(bad((c) => delete c.people[1].model)).toEqual([
+      {
+        path: ["people", 1, "model"],
+        code: "people.missing_model",
+        message: 'Person "bo" has no model. Every person needs one, for example `model: sonnet`.',
+      },
+    ]);
+
+    expect(
+      bad((c) => {
+        delete c.people[1].model;
+        delete c.people[1].handle;
+      }).map((i) => i.message),
+    ).toContain(
+      "Person people[1] has no model. Every person needs one, for example `model: sonnet`.",
+    );
+
+    expect(bad((c) => (c.people[1].model = 5))).toEqual([
+      { path: ["people", 1, "model"], code: "schema.invalid_type", message: expect.any(String) },
     ]);
   });
 

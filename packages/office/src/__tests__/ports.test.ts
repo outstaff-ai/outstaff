@@ -17,7 +17,7 @@ const team = (office: Record<string, unknown> = { channel: "C0TEAM" }) => {
     team: { name: "acme" },
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "git.acme.example/acme/app", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer" }],
+    people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     office,
     integrations: {
       vcs: { adapter: "fake" },

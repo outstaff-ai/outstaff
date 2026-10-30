@@ -24,6 +24,7 @@ people:
   - handle: sam
     name: Sam Duarte
     role: developer
+    model: sonnet
     network:
       http:
         - { name: home, url: "https://home.acme.example", token: HOME_TOKEN }

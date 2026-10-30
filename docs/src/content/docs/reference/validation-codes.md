@@ -26,6 +26,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `network.reserved_token` | A network token names a secret the framework or an adapter reads, so it cannot be a service token. |
 | `people.duplicate_handle` | Two people share the same handle. |
 | `people.invalid_grant_key` | A repo grant key is not a repo name, kind:<kind> or *. |
+| `people.missing_model` | A person has no model; every person names the model they run on. |
 | `people.runtime_missing_capability` | A person's runtime lacks a capability every agent needs (runtime.permissions) or one the person's role needs. |
 | `people.unknown_extends` | An extends entry names a role that is not in the catalog. |
 | `people.unknown_repo` | A repo grant names a repo that is not listed in repos. |

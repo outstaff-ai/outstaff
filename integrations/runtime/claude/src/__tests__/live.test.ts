@@ -14,12 +14,13 @@ afterAll(() => dir && rmSync(dir, { recursive: true, force: true }));
 
 describe.skipIf(!live)("live Claude Agent SDK run (OUTSTAFF_TEST_LIVE_SDK=1)", () => {
   it("replies and reports usage", { timeout: 120_000 }, async () => {
-    const rt = createAgentSdkRuntime({ options: agentSdkOptions.parse({ model: "haiku" }) });
+    const rt = createAgentSdkRuntime({ options: agentSdkOptions.parse({}) });
     const events: RuntimeEvent[] = [];
     const req = sampleRunRequest({
       prompt: "Reply with the word ok and nothing else.",
       workdir: dir,
       builtinTools: [],
+      model: "haiku",
       maxTurns: 3,
     });
 

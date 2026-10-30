@@ -45,6 +45,7 @@ function team(pipeline: "off" | "shadow" | "live"): TeamConfig {
         handle: "kofi",
         name: "Kofi",
         role: "developer",
+        model: "sonnet",
         identities: { vcs: KOFI_LOGIN, tracker: "u-3" },
       },
     ],
@@ -83,7 +84,7 @@ describe.each(["off", "shadow", "live"] as const)(
         throw new Error("no offer");
       }
 
-      await kofi.accept(r.value.workItem.id, { runtime: "claude" });
+      await kofi.accept(r.value.workItem.id, { runtime: "claude", model: "sonnet" });
       return r.value;
     };
 

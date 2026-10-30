@@ -45,7 +45,9 @@ export interface WorkLoopOptions {
 
   /** The repositories the person has a grant on, listed in the work prompt with their access. */
   repos?: ClonedRepo[];
-  model?: string;
+
+  /** The model the person is configured with; every run uses it. */
+  model: string;
   maxTurns?: number;
   sessions?: SessionManager;
 

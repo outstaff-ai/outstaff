@@ -8,7 +8,6 @@ needs:
   - tracker.issues
 optional_needs:
   - knowledge.docs
-default_model: example-model
 modes:
   - name: review
     when: A pull request needs a second pair of eyes.

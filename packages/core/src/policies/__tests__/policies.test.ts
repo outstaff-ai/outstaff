@@ -11,7 +11,7 @@ const config = (extra: Record<string, unknown> = {}) => {
     humans: [{ name: "Dana", identities: { tracker: "dana" } }],
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "r" }],
+    people: [{ handle: "sam", name: "Sam", role: "r", model: "sonnet" }],
     integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
     ...extra,
   });
@@ -73,8 +73,8 @@ describe("policy switches", () => {
 describe("blockedNotify", () => {
   const withPm = config({
     people: [
-      { handle: "sam", name: "Sam", role: "r" },
-      { handle: "pia", name: "Pia", role: "pm" },
+      { handle: "sam", name: "Sam", role: "r", model: "sonnet" },
+      { handle: "pia", name: "Pia", role: "pm", model: "sonnet" },
     ],
   });
 
@@ -85,7 +85,7 @@ describe("blockedNotify", () => {
 
   it("is agent when the switch says so, even with a PM", () => {
     const c = config({
-      people: [{ handle: "pia", name: "Pia", role: "pm" }],
+      people: [{ handle: "pia", name: "Pia", role: "pm", model: "sonnet" }],
       policies: { hand_back: { blocked_notify: "agent" } },
     });
 
@@ -106,7 +106,10 @@ describe("describePolicies for the blocked_notify switch", () => {
   });
 
   it("shows pm when the team has a PM", () => {
-    const r = value(config({ people: [{ handle: "pia", name: "Pia", role: "pm" }] }));
+    const r = value(
+      config({ people: [{ handle: "pia", name: "Pia", role: "pm", model: "sonnet" }] }),
+    );
+
     expect(r.value).toBe("pm");
     expect(r.note).toBeUndefined();
   });

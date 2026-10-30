@@ -8,22 +8,21 @@ A person is an entry in `people` in the team file, credentials of their own, and
 ## Hire
 
 ```sh
-ost hire developer
-ost hire reviewer --name "Ines Varga" --pronouns she/her --yes
+ost hire developer --model sonnet
+ost hire reviewer --name "Ines Varga" --pronouns she/her --model sonnet --yes
 ```
 
-The argument is a role from the stock catalog or a [custom one](/guides/customizing-the-catalog/). Everything else is optional; what you leave out is generated:
+The argument is a role from the stock catalog or a [custom one](/guides/customizing-the-catalog/). The model is required, because there is no default model: give it with `--model`, or answer when asked in a terminal. Everything else is optional; what you leave out is generated:
 
 | Value      | If not given                                                                                                                                |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `--name`   | A name from a small built-in list of neutral names whose handle is free.                                                                    |
 | `--handle` | The first name, as a DNS label of at most 30 characters. A handle that is taken, or `office`, gets a numeric suffix (`sam-2`).              |
 | Pronouns   | Asked for in a terminal, `they/them` otherwise.                                                                                             |
-| `--model`  | Left out of the file, so the runtime adapter's default applies.                                                                             |
 | `--repos`  | Write on the primary repository for code roles and on the infra repository for infra roles, read on everything else. Other roles read only. |
 | `--avatar` | The handle as the seed. An `https` URL is stored as `avatar.url` instead.                                                                   |
 
-In a terminal it asks about the name, handle, pronouns and repo grants (press Enter to keep the generated value), shows a summary and asks to confirm. Without a terminal it needs `--yes`; with `--json` and no `--yes` it prints the plan with `"written": false` and changes nothing.
+In a terminal it asks about the name, handle, pronouns, model and repo grants (press Enter to keep the generated value), shows a summary and asks to confirm. Without a terminal it needs `--yes`; with `--json` and no `--yes` it prints the plan with `"written": false` and changes nothing.
 
 ## What it does
 

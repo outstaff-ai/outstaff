@@ -24,6 +24,7 @@ people:
   - handle: sam
     name: Sam Duarte
     role: developer
+    model: sonnet
     tools:
       terraform: { version: 1.9.8, allow: [init, validate, plan] }
 ```

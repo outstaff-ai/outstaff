@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import { CONFIG_CODES } from "./codes.js";
-import { removedKey } from "./removed-keys.js";
-import type { ConfigIssue } from "./types.js";
+import { removedKey, REMOVED_TEAM_KEYS } from "./removed-keys.js";
+import type { ConfigIssue, RemovedKeys } from "./types.js";
 
 const BY_ZOD_CODE: Record<string, string> = {
   invalid_type: CONFIG_CODES.invalidType,
@@ -16,20 +16,25 @@ export function customIssue(code: string, message: string, path: (string | numbe
   return { code: "custom" as const, message, path, params: { code } };
 }
 
-function unknownKey(path: (string | number)[]): ConfigIssue {
-  const removed = removedKey(path);
+function unknownKey(path: (string | number)[], keys: RemovedKeys): ConfigIssue {
+  const removed = removedKey(path, keys);
 
   return removed === undefined
     ? { path, code: CONFIG_CODES.unknownKey, message: `Unknown key "${String(path.at(-1))}".` }
     : { path, code: CONFIG_CODES.removedKey, message: removed };
 }
 
-export function toConfigIssues(error: z.ZodError, prefix: (string | number)[] = []): ConfigIssue[] {
+/** `removed` names the keys of this schema that are gone, with what to do instead. */
+export function toConfigIssues(
+  error: z.ZodError,
+  prefix: (string | number)[] = [],
+  removed: RemovedKeys = REMOVED_TEAM_KEYS,
+): ConfigIssue[] {
   const out: ConfigIssue[] = [];
   for (const issue of error.issues) {
     const path = [...prefix, ...issue.path.map((p) => (typeof p === "symbol" ? String(p) : p))];
     if (issue.code === "unrecognized_keys") {
-      out.push(...issue.keys.map((key) => unknownKey([...path, key])));
+      out.push(...issue.keys.map((key) => unknownKey([...path, key], removed)));
 
       continue;
     }

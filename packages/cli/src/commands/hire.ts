@@ -72,7 +72,7 @@ export const hire = defineCommand<HireOptions>({
   name: "hire",
   summary: "Add a person to the team and prepare them to start.",
   description:
-    "Adds one person with the given role (stock or custom) to `people` in the team file, keeping its comments and quoting. Anything not given is generated: the name from a small built-in list of neutral names, the handle from the name (a DNS label, made unique with a numeric suffix), the pronouns they/them, the repo grants (write on the primary repository for code roles and on the infra repository for infra roles, read everywhere else), the avatar seed (the handle) and the model (left out, so the runtime adapter's default applies). In a terminal it asks about each generated value, shows a summary and asks to confirm; without a terminal it needs --yes. Then it renders the avatar to `.outstaff/people/<handle>/avatar.png|svg` when the team configures an avatars adapter and the avatar is not a URL, does what `ost setup <handle>` does, prints what is left to do by hand (the person's identities in the team file, the compose service or the Kubernetes folder to add) and runs `ost validate`. Nothing is created in GitHub, the chat workspace or the tracker.",
+    "Adds one person with the given role (stock or custom) to `people` in the team file, keeping its comments and quoting. Anything not given is generated: the name from a small built-in list of neutral names, the handle from the name (a DNS label, made unique with a numeric suffix), the pronouns they/them, the repo grants (write on the primary repository for code roles and on the infra repository for infra roles, read everywhere else) and the avatar seed (the handle). The model has no default: give it with --model. In a terminal it asks about each generated value and the model, shows a summary and asks to confirm; without a terminal it needs --yes. Then it renders the avatar to `.outstaff/people/<handle>/avatar.png|svg` when the team configures an avatars adapter and the avatar is not a URL, does what `ost setup <handle>` does, prints what is left to do by hand (the person's identities in the team file, the compose service or the Kubernetes folder to add) and runs `ost validate`. Nothing is created in GitHub, the chat workspace or the tracker.",
   args: "<role>",
   options: [
     { flags: "--name <name>", description: "Display name. Generated when omitted." },
@@ -84,7 +84,8 @@ export const hire = defineCommand<HireOptions>({
     { flags: "--pronouns <pronouns>", description: "Pronouns. Asked for, default they/them." },
     {
       flags: "--model <model>",
-      description: "LLM model. Omitted from the file by default, so the runtime's default applies.",
+      description:
+        "LLM model the person runs on, for example sonnet. Required: asked for in a terminal, needed with --yes.",
     },
     {
       flags: "--avatar <seed|url>",
@@ -108,9 +109,9 @@ export const hire = defineCommand<HireOptions>({
     },
   ],
   examples: [
-    "ost hire developer",
-    'ost hire reviewer --name "Ines Varga" --pronouns she/her --yes',
-    'ost hire developer --repos "shop=write,*=read" --avatar sam --yes --json',
+    "ost hire developer --model sonnet",
+    'ost hire reviewer --name "Ines Varga" --pronouns she/her --model sonnet --yes',
+    'ost hire developer --model opus --repos "shop=write,*=read" --avatar sam --yes --json',
   ],
   exitCodes: [
     "0: the person was added and the team file validates",

@@ -123,7 +123,7 @@ export type NewPerson = {
   name: string;
   pronouns: string;
   role: string;
-  model?: string;
+  model: string;
   repos: Record<string, "read" | "write">;
   avatar?: { seed: string } | { url: string };
 };

@@ -35,6 +35,7 @@ function team(pipeline: "off" | "shadow" | undefined): TeamConfig {
         handle: "sam",
         name: "Sam",
         role: "developer",
+        model: "sonnet",
         identities: { vcs: SAM_LOGIN, tracker: "u-2" },
       },
     ],
@@ -124,7 +125,7 @@ describe("the office with the event pipeline in shadow mode", () => {
     await office!.parts.intake.pollOnce();
     const offer = await conn.offers()[Symbol.asyncIterator]().next();
     const item = offer.value!.workItem;
-    await conn.accept(item.id, { runtime: "claude" });
+    await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
     await conn.handBack(item.id, { summary: "Done.", status: "done" });
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
 

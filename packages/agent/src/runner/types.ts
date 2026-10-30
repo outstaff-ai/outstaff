@@ -57,7 +57,7 @@ export interface ProfilePublisherOptions {
   team: TeamConfig;
 
   /** Who the agent is, for the top of the profile. */
-  who: { name: string; role: string; description?: string; model?: string };
+  who: { name: string; role: string; description?: string; model: string };
   tracker?: Pick<Tracker, "links">;
   log?: Logger;
   now?: () => number;

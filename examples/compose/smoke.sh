@@ -26,7 +26,7 @@ catalog: { version: 0.0.0 }
 repos:
   - { name: shop, url: github.com/acme-example/shop, kind: primary }
 people:
-  - { handle: sam, name: Sam Duarte, role: developer, identities: { vcs: "acme-sam[bot]" }, repos: { shop: write } }
+  - { handle: sam, name: Sam Duarte, role: developer, model: sonnet, identities: { vcs: "acme-sam[bot]" }, repos: { shop: write } }
 integrations:
   chat: { adapter: slack }
   vcs: { adapter: github }

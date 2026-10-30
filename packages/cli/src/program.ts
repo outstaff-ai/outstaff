@@ -35,7 +35,10 @@ export function nodeContext(): Context {
           async ask(question: string, fallback: string) {
             const rl = createInterface({ input: process.stdin, output: process.stdout });
             try {
-              return (await rl.question(`${question} [${fallback}] `)).trim() || fallback;
+              return (
+                (await rl.question(`${question}${fallback ? ` [${fallback}]` : ""} `)).trim() ||
+                fallback
+              );
             } finally {
               rl.close();
             }

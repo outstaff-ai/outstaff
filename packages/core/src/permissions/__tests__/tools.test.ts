@@ -54,6 +54,7 @@ people:
   - handle: sam
     name: Sam
     role: developer
+    model: sonnet
     tools:
       kubectl: { version: 1.31.3, allow: [get, logs] }
 tools:

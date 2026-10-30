@@ -233,11 +233,11 @@ Takes an offered item. Accepting twice is harmless.
 
 Sent by: agent. Answered by: `ack`, `error`.
 
-| Field        | Type   | Required | Description                                                                  |
-| ------------ | ------ | -------- | ---------------------------------------------------------------------------- |
-| `workItemId` | string | yes      | Id of the work item.                                                         |
-| `runtime`    | string | yes      | The runtime adapter this agent runs the item on, for example `claude`.       |
-| `model`      | string | no       | The model the person is configured with; left out for the runtime's default. |
+| Field        | Type   | Required | Description                                                            |
+| ------------ | ------ | -------- | ---------------------------------------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                                                   |
+| `runtime`    | string | yes      | The runtime adapter this agent runs the item on, for example `claude`. |
+| `model`      | string | yes      | The model the person is configured with (`people[].model`).            |
 
 ### `decline`
 
@@ -277,11 +277,11 @@ Stores the runtime session of an item, so a later round of the item resumes it. 
 
 Sent by: agent. Answered by: `ack`, `error`.
 
-| Field        | Type   | Required | Description                                                                                |
-| ------------ | ------ | -------- | ------------------------------------------------------------------------------------------ |
-| `workItemId` | string | yes      | Id of the work item.                                                                       |
-| `sessionId`  | string | yes      | Id of the runtime session working the item.                                                |
-| `model`      | string | no       | The concrete model id the runtime reports it started with; it names the runtime's default. |
+| Field        | Type   | Required | Description                                                                                                               |
+| ------------ | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                                                                                                      |
+| `sessionId`  | string | yes      | Id of the runtime session working the item.                                                                               |
+| `model`      | string | no       | The concrete model id the runtime reports it started with, when it reports one (for example the full id behind an alias). |
 
 ### `usage`
 

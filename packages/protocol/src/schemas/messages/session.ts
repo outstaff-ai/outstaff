@@ -68,8 +68,7 @@ export const sessionMessages = [
         .string()
         .min(1)
         .max(200)
-        .optional()
-        .describe("The model the person is configured with; left out for the runtime's default."),
+        .describe("The model the person is configured with (`people[].model`)."),
     }),
   ),
   message(
@@ -95,7 +94,7 @@ export const sessionMessages = [
         .max(200)
         .optional()
         .describe(
-          "The concrete model id the runtime reports it started with; it names the runtime's default.",
+          "The concrete model id the runtime reports it started with, when it reports one (for example the full id behind an alias).",
         ),
     }),
   ),

@@ -458,7 +458,7 @@ describe("roster", () => {
 
   it("shows a hire at once", async () => {
     const h = await harness();
-    h.team.people.push({ handle: "zoe", name: "Zoe", role: "devops", repos: {} });
+    h.team.people.push({ handle: "zoe", name: "Zoe", role: "devops", model: "sonnet", repos: {} });
     expect((await h.messaging.roster()).members.map((m) => m.handle)).toContain("zoe");
     const asker = await h.startItem("sam");
     expect(

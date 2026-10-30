@@ -28,7 +28,6 @@ export const roleSchema = z
       .array(z.enum(CAPABILITIES))
       .default([])
       .meta(d("Capabilities the role uses when available.")),
-    default_model: z.string().min(1).optional().meta(d("Model used when the person has none.")),
     modes: z
       .array(z.strictObject({ name: slug, when: z.string().min(1) }))
       .default([])

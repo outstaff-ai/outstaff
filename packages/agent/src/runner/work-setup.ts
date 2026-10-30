@@ -51,7 +51,7 @@ function buildRequest(
       workspace ? { cwd: workspace.worktree } : {},
     ),
     builtinTools: parts.session?.builtinTools ?? opts.builtinTools,
-    ...(opts.model ? { model: opts.model } : {}),
+    model: opts.model,
     ...(opts.maxTurns ? { maxTurns: opts.maxTurns } : {}),
     signal: parts.abort.signal,
   };

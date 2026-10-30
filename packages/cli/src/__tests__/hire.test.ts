@@ -96,7 +96,7 @@ describe("ost hire", () => {
 
   it("generates what is missing and gives code roles write on the primary repository", async () => {
     const dir = project();
-    const r = await ost(dir, ["hire", "developer", "--yes", "--json"]);
+    const r = await ost(dir, ["hire", "developer", "--model", "sonnet", "--yes", "--json"]);
     expect(r.code).toBe(0);
     const { person, written, validate } = JSON.parse(r.out);
     expect(written).toBe(true);
@@ -104,33 +104,70 @@ describe("ost hire", () => {
     expect(person.handle).toMatch(/^[a-z][a-z0-9-]*$/);
     expect(person.avatar).toEqual({ seed: person.handle });
     expect(person.repos).toEqual({ shop: "write", "*": "read" });
-    expect(person).not.toHaveProperty("model");
+    expect(person.model).toBe("sonnet");
     expect(validate.ok).toBe(true);
   });
 
   it("gives infra roles write on the infra repository and read roles read only", async () => {
     const dir = project();
-    const infra = JSON.parse((await ost(dir, ["hire", "devops", "--yes", "--json"])).out);
+    const infra = JSON.parse(
+      (await ost(dir, ["hire", "devops", "--model", "sonnet", "--yes", "--json"])).out,
+    );
+
     expect(infra.person.repos).toEqual({ infra: "write", "*": "read" });
-    const reviewer = JSON.parse((await ost(dir, ["hire", "reviewer", "--yes", "--json"])).out);
+    const reviewer = JSON.parse(
+      (await ost(dir, ["hire", "reviewer", "--model", "sonnet", "--yes", "--json"])).out,
+    );
+
     expect(reviewer.person.repos).toEqual({ "*": "read" });
   });
 
   it("makes a colliding handle unique and refuses a colliding explicit one", async () => {
     const dir = project();
     const first = JSON.parse(
-      (await ost(dir, ["hire", "developer", "--name", "Sam Duarte", "--yes", "--json"])).out,
+      (
+        await ost(dir, [
+          "hire",
+          "developer",
+          "--model",
+          "sonnet",
+          "--name",
+          "Sam Duarte",
+          "--yes",
+          "--json",
+        ])
+      ).out,
     );
 
     expect(first.person.handle).toBe("sam-2");
     const second = JSON.parse(
-      (await ost(dir, ["hire", "developer", "--name", "Sam Other", "--yes", "--json"])).out,
+      (
+        await ost(dir, [
+          "hire",
+          "developer",
+          "--model",
+          "sonnet",
+          "--name",
+          "Sam Other",
+          "--yes",
+          "--json",
+        ])
+      ).out,
     );
 
     expect(second.person.handle).toBe("sam-3");
 
     const before = teamOf(dir);
-    const clash = await ost(dir, ["hire", "developer", "--handle", "sam", "--yes"]);
+    const clash = await ost(dir, [
+      "hire",
+      "developer",
+      "--model",
+      "sonnet",
+      "--handle",
+      "sam",
+      "--yes",
+    ]);
+
     expect(clash.code).toBe(1);
     expect(clash.err).toContain('"sam" is already used');
     expect(teamOf(dir)).toBe(before);
@@ -139,23 +176,52 @@ describe("ost hire", () => {
   it("never uses the office scope name, and rejects invalid handles", async () => {
     const dir = project();
     const office = JSON.parse(
-      (await ost(dir, ["hire", "pm", "--name", "Office Worker", "--yes", "--json"])).out,
+      (
+        await ost(dir, [
+          "hire",
+          "pm",
+          "--model",
+          "sonnet",
+          "--name",
+          "Office Worker",
+          "--yes",
+          "--json",
+        ])
+      ).out,
     );
 
     expect(office.person.handle).toBe("office-2");
-    const bad = await ost(dir, ["hire", "pm", "--handle", "Not_Valid", "--yes"]);
+    const bad = await ost(dir, [
+      "hire",
+      "pm",
+      "--model",
+      "sonnet",
+      "--handle",
+      "Not_Valid",
+      "--yes",
+    ]);
+
     expect(bad.code).toBe(1);
     expect(bad.err).toContain("not a valid handle");
   });
 
   it("refuses an unknown role and bad grants without touching the file", async () => {
     const dir = project();
-    const role = await ost(dir, ["hire", "wizard", "--yes"]);
+    const role = await ost(dir, ["hire", "wizard", "--model", "sonnet", "--yes"]);
     expect(role.code).toBe(1);
     expect(role.err).toContain('No role "wizard"');
     expect(role.err).toContain("developer");
 
-    const grants = await ost(dir, ["hire", "developer", "--repos", "nope=write", "--yes"]);
+    const grants = await ost(dir, [
+      "hire",
+      "developer",
+      "--model",
+      "sonnet",
+      "--repos",
+      "nope=write",
+      "--yes",
+    ]);
+
     expect(grants.code).toBe(1);
     expect(grants.err).toContain("not a repo of this team");
     expect(teamOf(dir)).toBe(original);
@@ -164,7 +230,7 @@ describe("ost hire", () => {
   it("accepts a custom role", async () => {
     const dir = project();
     expect((await ost(dir, ["role", "new", "auditor"])).code).toBe(0);
-    const r = await ost(dir, ["hire", "auditor", "--yes", "--json"]);
+    const r = await ost(dir, ["hire", "auditor", "--model", "sonnet", "--yes", "--json"]);
     expect(r.code).toBe(0);
     expect(JSON.parse(r.out).person.role).toBe("auditor");
   });
@@ -192,7 +258,16 @@ describe("ost hire", () => {
 
   it("writes a person into an empty people list", async () => {
     const dir = project(original.replace(/^people:[\s\S]*?\n(?=integrations:)/m, "people: []\n\n"));
-    const r = await ost(dir, ["hire", "developer", "--yes", "--name", "Ari Lindqvist"]);
+    const r = await ost(dir, [
+      "hire",
+      "developer",
+      "--model",
+      "sonnet",
+      "--yes",
+      "--name",
+      "Ari Lindqvist",
+    ]);
+
     expect(r.code).toBe(0);
     expect(teamOf(dir)).toContain("people:\n  - handle: ari\n");
   });
@@ -202,6 +277,8 @@ describe("ost hire", () => {
     const r = await ost(dir, [
       "hire",
       "pm",
+      "--model",
+      "sonnet",
       "--handle",
       "pat",
       "--avatar",
@@ -216,19 +293,19 @@ describe("ost hire", () => {
 
   it("skips the avatar when the team has no avatars adapter", async () => {
     const dir = project(original.replace(/ {2}avatars:\n.*\n.*\n/, ""));
-    const r = await ost(dir, ["hire", "pm", "--handle", "pat", "--yes"]);
+    const r = await ost(dir, ["hire", "pm", "--model", "sonnet", "--handle", "pat", "--yes"]);
     expect(r.code).toBe(0);
     expect(r.out).toContain("No integrations.avatars");
   });
 
   it("needs --yes without a terminal and writes nothing", async () => {
     const dir = project();
-    const r = await ost(dir, ["hire", "developer"]);
+    const r = await ost(dir, ["hire", "developer", "--model", "sonnet"]);
     expect(r.code).toBe(1);
     expect(r.err).toContain("--yes");
     expect(teamOf(dir)).toBe(original);
 
-    const json = await ost(dir, ["hire", "developer", "--json"]);
+    const json = await ost(dir, ["hire", "developer", "--model", "sonnet", "--json"]);
     expect(json.code).toBe(1);
     expect(JSON.parse(json.out).written).toBe(false);
   });
@@ -236,7 +313,12 @@ describe("ost hire", () => {
   it("asks for each generated value and confirms in a terminal", async () => {
     const dir = project();
     const asked: string[] = [];
-    const answers: Record<string, string> = { Pronouns: "he/him", Handle: "dev-one" };
+    const answers: Record<string, string> = {
+      Pronouns: "he/him",
+      Handle: "dev-one",
+      Model: "opus",
+    };
+
     const r = await ost(dir, ["hire", "developer"], {
       ask: async (q, fallback) => {
         asked.push(q);
@@ -250,17 +332,37 @@ describe("ost hire", () => {
       "Name",
       "Handle",
       "Pronouns",
+      "Model",
       "Repo access (repo=read|write, comma separated)",
     ]);
 
+    expect(teamOf(dir)).toContain("model: opus");
     expect(teamOf(dir)).toContain("handle: dev-one");
     expect(teamOf(dir)).toContain("pronouns: he/him");
     expect(r.out).toContain("Repos:     shop=write,*=read");
   });
 
+  it("needs a model, given or answered, and writes nothing without one", async () => {
+    const dir = project();
+    const flagless = await ost(dir, ["hire", "developer", "--yes"]);
+    expect(flagless.code).toBe(1);
+    expect(flagless.err).toBe(
+      "error    Give the model the person runs on with --model, for example --model sonnet. There is no default model.\n",
+    );
+
+    const unanswered = await ost(dir, ["hire", "developer"], {
+      ask: async (q, fallback) => (q === "Model" ? "  " : fallback),
+      confirm: async () => true,
+    });
+
+    expect(unanswered.code).toBe(1);
+    expect(unanswered.err).toContain("--model");
+    expect(teamOf(dir)).toBe(original);
+  });
+
   it("writes nothing when the confirmation is declined", async () => {
     const dir = project();
-    const r = await ost(dir, ["hire", "developer"], {
+    const r = await ost(dir, ["hire", "developer", "--model", "sonnet"], {
       ask: async (_q, fallback) => fallback,
       confirm: async () => false,
     });
@@ -369,11 +471,12 @@ describe("team file edits", () => {
       name: "A B",
       pronouns: "they/them",
       role: "pm",
+      model: "sonnet",
       repos: { "*": "read" },
     });
 
     expect(out).toBe(
-      'people:\n  - handle: a\n    name: A B\n    pronouns: they/them\n    role: pm\n    repos:\n      "*": read\n',
+      'people:\n  - handle: a\n    name: A B\n    pronouns: they/them\n    role: pm\n    model: sonnet\n    repos:\n      "*": read\n',
     );
   });
 });

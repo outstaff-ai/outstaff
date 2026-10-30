@@ -109,7 +109,7 @@ export interface ChatStartOptions {
   team: TeamConfig;
   me: TeamConfig["people"][number];
   role: { title: string; summary?: string | undefined } | undefined;
-  model: string | undefined;
+  model: string;
   person: string;
   log: Logger;
 }
@@ -135,5 +135,5 @@ export interface LoopParts extends StartedChat {
 
   /** Directories besides the working directory the runtime may use. */
   addDirs: string[];
-  model: string | undefined;
+  model: string;
 }

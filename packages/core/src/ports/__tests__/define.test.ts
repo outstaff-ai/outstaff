@@ -24,7 +24,9 @@ const team = (integrations: Record<string, unknown>) => {
     humans: [{ name: "Alex", identities: { vcs: "alex" } }],
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-    people: [{ handle: "ada", name: "Ada", role: "developer", repos: { app: "write" } }],
+    people: [
+      { handle: "ada", name: "Ada", role: "developer", model: "sonnet", repos: { app: "write" } },
+    ],
     integrations: {
       chat: { adapter: "fake" },
       vcs: { adapter: "fake" },

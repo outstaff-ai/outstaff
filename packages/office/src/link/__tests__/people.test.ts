@@ -25,7 +25,7 @@ describe("listPeople", () => {
           model: "acme-large",
           runtime: { adapter: "scripted" },
         },
-        { handle: "kofi", name: "Kofi Mensah", role: "devops" },
+        { handle: "kofi", name: "Kofi Mensah", role: "devops", model: "sonnet" },
       ] as never,
     } as never;
 
@@ -145,7 +145,7 @@ describe("listPeople", () => {
         name: "Kofi Mensah",
         role: "devops",
         runtime: "claude",
-        model: null,
+        model: "sonnet",
         connected: false,
         counts: { queued: 0, running: 0 },
         current: null,

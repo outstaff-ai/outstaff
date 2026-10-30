@@ -39,7 +39,7 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
     try {
       await opts.office.accept(id, {
         runtime: opts.runtimeName,
-        ...(opts.model ? { model: opts.model } : {}),
+        model: opts.model,
       });
 
       return true;

@@ -65,7 +65,6 @@ describe("loadCatalog on the example role", () => {
       permissions: "readonly",
       needs: ["tracker.issues"],
       optional_needs: ["knowledge.docs"],
-      default_model: "example-model",
     });
 
     expect(r?.files).toEqual({ skill: "SKILL.md" });
@@ -251,6 +250,19 @@ describe("loadCatalog errors", () => {
     );
 
     expect(cap[0]).toMatchObject({ code: "catalog.invalid_value", line: 8 });
+  });
+
+  it("reports a role's default_model as removed: every person names their model", () => {
+    const issues = issuesOf(make(role("dev", GOOD_ROLE + "default_model: sonnet\n")));
+    expect(issues).toEqual([
+      expect.objectContaining({
+        code: "catalog.removed_key",
+        line: 6,
+        message: expect.stringMatching(
+          /^default_model: default_model was removed.*people\[\]\.model/,
+        ),
+      }),
+    ]);
   });
 
   it("checks the name against the directory", () => {

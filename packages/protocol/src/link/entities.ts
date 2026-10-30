@@ -47,9 +47,8 @@ export const personSchema = z.strictObject({
     ),
   model: z
     .string()
-    .nullable()
     .describe(
-      "The model the person is configured with; null when unset, so the role's or the runtime's default applies.",
+      "The model the person is configured with: their `model` from `team.yaml`, which every person has.",
     ),
   connected: z.boolean().describe("Whether the person's agent is connected to the office now."),
   counts: z

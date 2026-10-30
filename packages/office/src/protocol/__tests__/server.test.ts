@@ -303,7 +303,7 @@ describe("protocol server", () => {
       await settle();
       expect(a.inbox.filter((m) => m.type === "offer")).toEqual([]);
 
-      const accept = a.send("accept", { workItemId: "w1", runtime: "claude" });
+      const accept = a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
       expect(await a.next("ack")).toMatchObject({ replyTo: accept });
       a.send("heartbeat", { workItemId: "w1" });
       await a.next("ack");
@@ -339,7 +339,7 @@ describe("protocol server", () => {
       source.enqueue("ada", "w2");
       const a = await login();
       await a.next("offer");
-      a.send("accept", { workItemId: "w1", runtime: "claude" });
+      a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
       await a.next("ack");
       a.send("fail", { workItemId: "w1", reason: "no access" });
       await a.next("ack");
@@ -358,7 +358,7 @@ describe("protocol server", () => {
       source.enqueue("ada", "w1");
       server.notify("ada");
       expect((await a.next("offer")).payload).toMatchObject({ workItem: { id: "w1" } });
-      a.send("accept", { workItemId: "w1", runtime: "claude" });
+      a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
       await a.next("ack");
       a.send("handback", { workItemId: "w1", summary: "ok", links: [], status: "waiting" });
       await a.next("ack");
@@ -384,8 +384,8 @@ describe("protocol server", () => {
       expect(second.inbox.filter((m) => m.type === "offer")).toEqual([]);
 
       // Accepting twice is harmless.
-      second.send("accept", { workItemId: "w1", runtime: "claude" });
-      second.send("accept", { workItemId: "w1", runtime: "claude" });
+      second.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
+      second.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
       await second.next("ack");
       await second.next("ack");
 
@@ -493,13 +493,13 @@ describe("protocol server", () => {
       const a = await login();
       await a.next("offer");
       source.failNext(new Error("database password is hunter2"));
-      a.send("accept", { workItemId: "w1", runtime: "claude" });
+      a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
       const err = await a.next("error");
       expect(err.payload).toMatchObject({ code: "failed" });
       expect(JSON.stringify(err)).not.toContain("hunter2");
 
       source.failNext(new ProtocolError("invalid", "Cannot do that."));
-      a.send("accept", { workItemId: "w1", runtime: "claude" });
+      a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
       expect((await a.next("error")).payload).toEqual({
         code: "invalid",
         message: "Cannot do that.",

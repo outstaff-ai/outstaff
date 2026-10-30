@@ -14,7 +14,13 @@ const config = (merge: Record<string, unknown> | undefined, repos: Record<string
       { name: "docs", url: "github.com/acme/docs", kind: "other" },
     ],
     people: [
-      { handle: "sam", name: "Sam", role: "r", repos: { "kind:primary": "write", ...repos } },
+      {
+        handle: "sam",
+        name: "Sam",
+        role: "r",
+        model: "sonnet",
+        repos: { "kind:primary": "write", ...repos },
+      },
     ],
     integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
     ...(merge ? { policies: { merge } } : {}),

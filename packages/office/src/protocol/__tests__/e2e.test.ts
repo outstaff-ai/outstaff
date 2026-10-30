@@ -111,7 +111,9 @@ describe("office verbs through the real client and server", () => {
   });
 
   it("shows protocol errors as verb errors", async () => {
-    await expect(conn.accept("missing", { runtime: "claude" })).rejects.toMatchObject({
+    await expect(
+      conn.accept("missing", { runtime: "claude", model: "sonnet" }),
+    ).rejects.toMatchObject({
       code: "not_found",
     });
   });
@@ -122,7 +124,7 @@ describe("office verbs through the real client and server", () => {
     const stream = conn.offers()[Symbol.asyncIterator]();
     const { value: offer } = await stream.next();
     expect(offer?.workItem.title).toBe("Build the cart");
-    await conn.accept("w1", { runtime: "claude" });
+    await conn.accept("w1", { runtime: "claude", model: "sonnet" });
     await conn.progress("w1", "started");
     await conn.journal("w1", "decided");
     await conn.handBack("w1", { summary: "done", status: "done" });

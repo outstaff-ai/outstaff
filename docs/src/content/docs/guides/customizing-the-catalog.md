@@ -95,6 +95,7 @@ people:
   - handle: ines
     name: Ines Moreau
     role: auditor
+    model: sonnet
 ```
 
 `ost validate` accepts the role like any stock one, `ost render` and `ost build` render it, and the template context lists it in `roles[]` and `people.byRole`, so other roles' skills can mention it. A role can also list other roles in `extends` to include their skills.

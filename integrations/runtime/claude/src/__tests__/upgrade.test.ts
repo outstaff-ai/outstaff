@@ -87,7 +87,7 @@ function recordingRuntime() {
 
   // No `env` override: the process environment (and so its Claude credentials) is the starting point, as in production.
   const runtime = createAgentSdkRuntime({
-    options: agentSdkOptions.parse({ model: "haiku", maxTurns: 6 }),
+    options: agentSdkOptions.parse({ maxTurns: 6 }),
     query,
   });
 
@@ -123,6 +123,7 @@ async function session(
       systemPrompt: "You are a test agent. Do exactly what the user asks, using the tools named.",
       builtinTools: ["read", "search"],
       addDirs: [layout().scratchDir],
+      model: "haiku",
       maxTurns: 6,
       ...overrides,
     }),
