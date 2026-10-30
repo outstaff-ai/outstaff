@@ -27,7 +27,7 @@ function pollTiming(opts: IntakeOptions) {
     opts.stalePollMinutes ?? office?.poll_warn_after_minutes ?? DEFAULT_STALE_POLL_MINUTES;
 
   return {
-    intervalMs: (office?.poll_interval_seconds ?? 60) * 1000,
+    intervalMs: opts.pollIntervalMs ?? (office?.poll_interval_seconds ?? 60) * 1000,
     stalePollMs: staleMinutes * 60_000,
   };
 }
@@ -157,6 +157,7 @@ export function createIntake(opts: IntakeOptions): Intake {
         await source.poll();
       }
     },
+    polls: () => poller.polls(),
     address: () => address,
   };
 }

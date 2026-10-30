@@ -370,6 +370,29 @@ describe("poll loop", () => {
     expect(clock.pending()).toBe(0);
   });
 
+  it("polls on the override below the config's minimum, and counts the polls that succeed", async () => {
+    const { vcs, tracker, intake, clock, events } = await setup({
+      teamExtra: { office: { events: "poll", poll_interval_seconds: 30 } },
+      pollIntervalMs: 500,
+    });
+
+    expect(intake.polls()).toEqual({});
+    await intake.start();
+    const began = clock.now();
+    clock.advance(0);
+    await vi.waitFor(() => expect(intake.polls().tracker?.count).toBe(1));
+    await vi.waitFor(() => expect(intake.polls().vcs).toEqual({ count: 1, last: began }));
+
+    // A failed poll is not counted.
+    vi.spyOn(tracker, "events").mockRejectedValueOnce(new PortError("unavailable", "down"));
+    await vcs.seed.pullRequest(REPO, { ...pr });
+    clock.advance(500);
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    await vi.waitFor(() => expect(intake.polls().vcs).toEqual({ count: 2, last: clock.now() }));
+    expect(intake.polls().tracker?.count).toBe(1);
+    await intake.stop();
+  });
+
   it("honours retryAfterMs on rate limits, then backs off exponentially on unavailable", async () => {
     const base = await setup();
     const { vcs } = base;

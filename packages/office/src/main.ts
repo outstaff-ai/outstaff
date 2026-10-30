@@ -80,6 +80,24 @@ const port = (env: Env, key: string, fallback: number): number => {
   return n;
 };
 
+/**
+ * `OUTSTAFF_POLL_INTERVAL_MS`: a testing knob that overrides `office.poll_interval_seconds`, below its minimum too,
+ * so an end-to-end run does not wait seconds for every event. Unset for a real team.
+ */
+export function pollInterval(env: Env): { pollIntervalMs?: number } {
+  const raw = env["OUTSTAFF_POLL_INTERVAL_MS"];
+  if (raw === undefined || raw === "") {
+    return {};
+  }
+
+  const ms = Number(raw);
+  if (!Number.isInteger(ms) || ms < 1) {
+    throw new Error(`OUTSTAFF_POLL_INTERVAL_MS must be a positive whole number, got "${raw}".`);
+  }
+
+  return { pollIntervalMs: ms };
+}
+
 /** Roles of the stock catalog with the team's ejected ones over them. A missing catalog only costs the role titles. */
 function loadRoles(
   config: { catalog: { path: string; version: string } },
@@ -135,12 +153,23 @@ async function openStoreOf(env: Env) {
  * - `OUTSTAFF_STORE_URL`: `postgres://…`, `sqlite:///path` or `sqlite::memory:`
  * - `OUTSTAFF_AGENT_PORT` (8080), `OUTSTAFF_WEBHOOK_PORT` (8082), `OUTSTAFF_HEALTH_PORT` (8081)
  * - `OUTSTAFF_LOG_LEVEL`: `debug`, `info` (default), `warn` or `error`
+ * - `OUTSTAFF_POLL_INTERVAL_MS`: for tests, overrides `office.poll_interval_seconds`
  */
 export async function startOffice(
   env: Env = process.env,
   deps: StartDeps = {},
 ): Promise<RunningOffice> {
   const log = deps.logger ?? jsonLogger(undefined, logLevel(env));
+  const polling = pollInterval(env);
+  if (polling.pollIntervalMs !== undefined) {
+    log.warn(
+      "OUTSTAFF_POLL_INTERVAL_MS overrides office.poll_interval_seconds; it is meant for tests",
+      {
+        pollIntervalMs: polling.pollIntervalMs,
+      },
+    );
+  }
+
   const loaded = await loadTeamConfig({ env });
   if (!loaded.ok) {
     throw new Error(`team.yaml is not valid:\n${loaded.issues.map(formatIssue).join("\n")}`);
@@ -160,6 +189,7 @@ export async function startOffice(
         options: {
           agentPort: port(env, "OUTSTAFF_AGENT_PORT", 8080),
           webhookPort: port(env, "OUTSTAFF_WEBHOOK_PORT", 8082),
+          ...polling,
           ...(env["OUTSTAFF_SECRETS_DIR"] ? { secretsDir: env["OUTSTAFF_SECRETS_DIR"] } : {}),
         },
       }),

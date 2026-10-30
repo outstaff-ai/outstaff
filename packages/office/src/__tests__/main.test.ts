@@ -3,8 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { envSecretSource, parseTeamConfig, parseYaml, silentLogger } from "@outstaff/core";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
-import { afterEach, describe, expect, it } from "vitest";
-import { jsonLogger, logLevel, officeRegistry, startOffice } from "#/main.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { jsonLogger, logLevel, officeRegistry, pollInterval, startOffice } from "#/main.js";
 import type { RunningOffice } from "#/types.js";
 
 const TEAM = `
@@ -89,6 +89,43 @@ describe("startOffice", () => {
     const bad = env();
     writeFileSync(bad.OUTSTAFF_TEAM_FILE, "version: 2\n");
     await expect(startOffice(bad, deps)).rejects.toThrow("team.yaml is not valid");
+  });
+
+  it("polls on OUTSTAFF_POLL_INTERVAL_MS, says so, and shows the polls in the health answer", async () => {
+    const warnings: string[] = [];
+    const logger = { ...silentLogger, warn: (m: string) => void warnings.push(m) };
+    running = await startOffice(env({ OUTSTAFF_POLL_INTERVAL_MS: "20" }), { ...deps, logger });
+    expect(warnings).toContain(
+      "OUTSTAFF_POLL_INTERVAL_MS overrides office.poll_interval_seconds; it is meant for tests",
+    );
+
+    const base = `http://127.0.0.1:${running.health.port()}`;
+    const polls = async () =>
+      (
+        (await (await fetch(`${base}/healthz`)).json()) as {
+          components: { intake: { polls: Record<string, { count: number; last: string }> } };
+        }
+      ).components.intake.polls;
+
+    // The default interval is a minute: a third poll within the test's time comes from the override.
+    await vi.waitFor(async () => expect((await polls())["vcs"]?.count).toBeGreaterThan(2));
+    expect((await polls())["tracker"]).toEqual({
+      count: expect.any(Number),
+      last: expect.any(String),
+    });
+
+    expect(Date.parse((await polls())["vcs"]!.last)).toBeGreaterThan(0);
+  });
+
+  it("rejects a poll interval that is not a positive whole number", async () => {
+    expect(pollInterval({})).toEqual({});
+    expect(pollInterval({ OUTSTAFF_POLL_INTERVAL_MS: "" })).toEqual({});
+    expect(pollInterval({ OUTSTAFF_POLL_INTERVAL_MS: "1000" })).toEqual({ pollIntervalMs: 1000 });
+    for (const bad of ["0", "-5", "1.5", "fast"]) {
+      expect(() => pollInterval({ OUTSTAFF_POLL_INTERVAL_MS: bad })).toThrow(
+        `OUTSTAFF_POLL_INTERVAL_MS must be a positive whole number, got "${bad}".`,
+      );
+    }
   });
 
   it("rejects a port that is not a number", async () => {
