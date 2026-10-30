@@ -336,6 +336,7 @@ describe("work loop", () => {
       text: string,
       move?: "active" | "review",
       from: "blocked" | "active" = "blocked",
+      kind?: string,
     ) => {
       await connect();
       const runtime: Runtime = {
@@ -355,7 +356,7 @@ describe("work loop", () => {
       });
 
       await fake.tracker.createIssue({ title: "Checkout", body: "", status: from, labels: [] });
-      socket.offerWith("w1");
+      socket.offerWith("w1", kind ? { kind } : {});
       await until(() => sentOf("handback").length === 1);
       return { status: (sentOf("handback")[0]!.payload as { status: string }).status, logs };
     };
@@ -372,6 +373,11 @@ describe("work loop", () => {
 
     it("is done when the ticket is not blocked", async () => {
       expect((await retry("Still blocked on review.", undefined, "active")).status).toBe("done");
+    });
+
+    it("is done for a PM's round to unblock it, which leaves the ticket blocked for its agent", async () => {
+      const unblocked = "Answered on the ticket and gave it back to sam.";
+      expect((await retry(unblocked, undefined, "blocked", "unblock")).status).toBe("done");
     });
   });
 

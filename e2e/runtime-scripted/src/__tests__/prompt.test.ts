@@ -222,6 +222,54 @@ describe("parsePrompt", () => {
     ).toEqual([{ kind: "ticket_comment", body: "Mobile too?", threads: [] }]);
   });
 
+  it("reads a hand-back as blocked with the agent who is blocked, and a PM's answer the wake carries", () => {
+    const unblock = offer("unblock");
+    const round = buildWorkPrompt(
+      {
+        ...unblock,
+        context: {
+          ...unblock.context,
+          feedback: [{ actor: "sam", kind: "blocked", body: "Stopped: no tone yet." }],
+        },
+      } as never,
+      { resumed: false },
+    );
+
+    expect(parsePrompt(round)?.feedback).toEqual([
+      { kind: "blocked", actor: "sam", body: "Stopped: no tone yet.", threads: [] },
+    ]);
+
+    const assigned = offer("assigned");
+    const woken = buildWorkPrompt(
+      {
+        ...assigned,
+        context: {
+          ...assigned.context,
+          wake: {
+            tickets: [
+              {
+                key: "SHOP-1",
+                title: "Add a greeting",
+                comments: [
+                  { author: "Sam Duarte", at: "2026-01-01T00:00:00Z", body: "Blocked: no tone." },
+                  { author: "Pia Novak", at: "2026-01-01T00:01:00Z", body: "Unblocked: friendly" },
+                ],
+                why: { role: "subject", source: "e1" },
+              },
+            ],
+            prs: [],
+            docs: [],
+            chats: [],
+          },
+        },
+      } as never,
+      { resumed: false },
+    );
+
+    expect(parsePrompt(woken)?.unblocked).toBe("friendly");
+    expect(parsePrompt(round)?.unblocked).toBeUndefined();
+  });
+
   it("reads the files a requester shared with a chat session", () => {
     const asked = offer("chat");
     asked.workItem.origin = {

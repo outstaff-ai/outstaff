@@ -111,7 +111,8 @@ export function createStubChat(baseUrl: string): Chat {
 
 /**
  * Takes the place of the Slack adapter in the agent-e2e image, under its name, so the team file stays as it is.
- * `E2E_STUB_URL` is where the stub workspace listens.
+ * `E2E_STUB_URL` is where the stub workspace listens. The workspace has one inbox for everyone, so only one agent may
+ * read it: `E2E_CHAT=off` starts an agent without chat.
  */
 export const stubChat = defineAdapter({
   port: "chat",
@@ -119,5 +120,7 @@ export const stubChat = defineAdapter({
   capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
   options: z.strictObject({}),
   secrets: () => [],
+  unavailableFor: () =>
+    process.env["E2E_CHAT"] === "off" ? "this agent has no chat in the end-to-end run" : undefined,
   create: () => createStubChat(process.env["E2E_STUB_URL"] ?? "http://tracker.acme.example:8081"),
 });

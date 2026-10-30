@@ -18,6 +18,11 @@ function wakeViolation(p: WakeProposal, { event, options }: AggregateInput): str
     return `${p.person} is not an agent on the team`;
   }
 
+  const echo = event.data["echo"];
+  if (typeof echo === "string") {
+    return `the echo of act ${echo}, which the office decided: the event that caused the act already decided whom to wake`;
+  }
+
   const { actor } = event;
   if (actor.kind === "agent" && actor.id === p.person && !FOR_THE_AGENT.has(event.type)) {
     return `never wake an agent for its own action: ${p.person} caused the event`;
@@ -67,7 +72,8 @@ function violation(slot: Slot, input: AggregateInput, acted: Set<string>): strin
 
 /**
  * The invariants every proposal is held to, whichever policy made it: never act as the office, never wake an agent for
- * its own action, the loop guard (a bot's event wakes no one), acts are bookkeeping only, one act per policy. A wake or
+ * its own action, an act's echo wakes no one, the loop guard (a bot's event wakes no one), acts are bookkeeping only,
+ * one act per policy. A wake or
  * act that breaks one is rejected, and dropped with the reason.
  */
 export function enforceInvariants(slots: readonly Slot[], input: AggregateInput): void {

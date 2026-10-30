@@ -1490,7 +1490,7 @@ What happens to a ticket when an agent hands its work back.
 
 #### policies.hand_back.blocked_notify
 
-Who tells the requester about blocked work that did not come from chat: agent has the blocked agent tell them itself, in its own direct message; pm leaves it to the team's PM, and the blocked agent sends nothing (the hand-back still gives the ticket to the requester). Without a PM role the agent always does. The office never posts to people. Default pm.
+Who tells the requester about blocked work that did not come from chat: agent has the blocked agent tell them itself, in its own direct message; pm leaves it to the team's PM, who gives the ticket to the requester, saying what is needed, only when it cannot unblock it, and the blocked agent sends nothing. Either way a blocked ticket goes to the PM to unblock when the team has one; this only decides who sends the chat message. Without a PM role the agent always does. The office never posts to people. Default pm.
 
 - Type: `string`
 - Optional

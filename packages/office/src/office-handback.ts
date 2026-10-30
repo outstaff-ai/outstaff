@@ -1,5 +1,6 @@
 import type { Logger, WorkflowEvent } from "@outstaff/core";
 import { itemEventSubject } from "./office-item-subject.js";
+import type { HandBackResult } from "./work-source.types.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { WorkState } from "./workstate/index.js";
 
@@ -11,7 +12,10 @@ const HANDED_BACK = new Set(["done", "waiting", "blocked"]);
 // Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
 const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock"]);
 
-/** What follows an agent's hand-back of an item: an `agent.handed_back` event for its ticket or pull request. */
+/**
+ * What follows an agent's hand-back of an item: an `agent.handed_back` event for its ticket or pull request, with the
+ * summary the agent handed back.
+ */
 export function createHandedBack(deps: {
   store: Store;
   workState: WorkState;
@@ -21,7 +25,7 @@ export function createHandedBack(deps: {
   log: Logger;
 }) {
   const { store, workState, judge, log } = deps;
-  return async (item: WorkItem): Promise<void> => {
+  return async (item: WorkItem, result: Pick<HandBackResult, "summary">): Promise<void> => {
     if (!HANDED_BACK.has(item.status) || !item.subject || NOT_ON_TICKET.has(item.kind)) {
       return;
     }
@@ -36,7 +40,7 @@ export function createHandedBack(deps: {
       type: "agent.handed_back",
       subject,
       actor: { kind: "agent", id: item.person },
-      data: { workItem: item.id, kind: item.kind, status: item.status },
+      data: { workItem: item.id, kind: item.kind, status: item.status, summary: result.summary },
     };
 
     // The policies read who last worked on the ticket, and the ticket itself, from the state. The agent may have moved or

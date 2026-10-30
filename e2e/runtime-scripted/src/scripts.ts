@@ -146,16 +146,28 @@ const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
 
 /**
  * A ticket that says `blocked: <what>` cannot go on: the agent blocks it, says why, and still hands the item back as
- * done. The office made the ticket active when the round started, a retry of a blocked ticket too. Returns the message
- * to stop with, or undefined to go on.
+ * done. The office made the ticket active when the round started, a retry of a blocked ticket too. A blocked ticket the
+ * PM answered (`unblocked`, from the comment the wake carries) goes on with the answer instead. Returns the message to
+ * stop with, or undefined to go on.
  */
 async function* blockIfStuck(
   key: string,
   shown: string,
+  unblocked?: string,
 ): AsyncGenerator<Action, string | undefined, string> {
   const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
   if (!blocker) {
     return undefined;
+  }
+
+  if (unblocked !== undefined) {
+    yield {
+      type: "tool",
+      tool: "ticket_comment",
+      input: { key, body: `Resumed with: ${unblocked}` },
+    };
+
+    return `Resumed: ${unblocked}`;
   }
 
   yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
@@ -408,7 +420,7 @@ export async function* assigned(ctx: ItemContext): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
-  const stopped = yield* blockIfStuck(key, shown);
+  const stopped = yield* blockIfStuck(key, shown, ctx.unblocked);
   if (stopped !== undefined) {
     return stopped;
   }
@@ -985,6 +997,45 @@ export async function* ciFailed(ctx: ItemContext): Script {
   return `Looked at the failing checks of pull request ${number}.`;
 }
 
+/**
+ * The PM unblocks a ticket an agent handed back as blocked. A ticket that says `pm knows: <answer>` is answered on the
+ * ticket and given back to the blocked agent; any other needs a human, so it goes to the requester the office named,
+ * with what is needed.
+ */
+export async function* unblock(ctx: ItemContext): Script {
+  const key = need(ctx.ticket, "the ticket");
+  const blocked = need(
+    ctx.feedback.find((f) => f.kind === "blocked")?.actor,
+    "the agent who is blocked",
+  );
+
+  const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+  const answer = /^pm knows: (.+)$/m.exec(shown)?.[1];
+  if (answer) {
+    yield { type: "tool", tool: "ticket_comment", input: { key, body: `Unblocked: ${answer}` } };
+    yield { type: "tool", tool: "ticket_assign", input: { key, to: blocked } };
+    return `Unblocked ${key}: ${answer}. Gave it back to ${blocked}.`;
+  }
+
+  const requester = need(
+    /assign it to the requester, (\S+?), with a comment/.exec(ctx.journal)?.[1],
+    "the requester",
+  );
+
+  const blocker = /^blocked: (.+)$/m.exec(shown)?.[1] ?? "see the ticket";
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `Needs a human: ${blocker}. Nobody on the team can provide it; ${blocked} carries on once it is here.`,
+    },
+  };
+
+  yield { type: "tool", tool: "ticket_assign", input: { key, to: requester } };
+  return `${key} needs a human: ${blocker}. Gave it to ${requester}.`;
+}
+
 export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   assigned,
   ticket: assigned,
@@ -995,5 +1046,6 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   ticket_comment: ticketComment,
   rebase: conflict,
   ci_failed: ciFailed,
+  unblock,
   chat,
 };

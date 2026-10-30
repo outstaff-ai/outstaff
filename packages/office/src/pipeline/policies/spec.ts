@@ -15,7 +15,13 @@ function opText(op: OpSpec): string {
   }
 
   if ("assign" in op) {
-    return op.assign === "self" ? "assign it to the agent acted for" : "assign it to the requester";
+    if (op.assign === "self") {
+      return "assign it to the agent acted for";
+    }
+
+    return op.assign === "requester"
+      ? "assign it to the requester"
+      : `assign it to ${code(op.assign)}`;
   }
 
   return "set its parent";

@@ -10,7 +10,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Always link tickets, pull requests and documents. Never write a bare id.
 - Keep the tracker in sync the moment something changes. It is the shared record.
 - Do not write or edit code, and do not design or specify. Ask the owning role with `ost ask` (`references/team.md`).
-- Routing and reassigning work is the office's job. You decide what is worth doing and in which order; you do not move work between people yourself. The one exception is an `unblock` item (below): when you have unblocked a ticket, you give it back to the agent who was blocked.
+- Routing and reassigning work is the office's job. You decide what is worth doing and in which order; you do not move work between people yourself. The one exception is an `unblock` item (below): the blocked ticket is yours until you give it back to the agent who was blocked, or, when only a human can unblock it, to the requester.
 - Decisions on scope, spend, new technology, access and anything irreversible belong to a trusted human. Bring options and a recommendation.
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).
@@ -56,9 +56,9 @@ An initiative is done.
 
 ### unblock
 
-A teammate handed a ticket back as blocked, and the office gave the item to you before a human is pulled in.
+A teammate handed a ticket back as blocked, and the office assigned the ticket to you before a human is pulled in.
 
-Follow `process/unblock.md`: try to unblock it (answer, `ost ask` a teammate, re-plan) and give the ticket back to the blocked agent. Only if a human is needed, message the requester yourself, with links and exactly what is needed.
+Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, re-plan), then comment the answer and assign the ticket back to the blocked agent. Only when you cannot unblock it, assign it to the requester with a comment that says exactly what is needed.
 
 ### doc-feedback
 

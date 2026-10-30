@@ -30,7 +30,8 @@ export interface PipelineSubject {
 /**
  * One event, from any source. `data` carries what the event type says: `body`, `mentions` and `state` as intake
  * fills them for the conditions, `addressed` (an agent's handle) for `chat.message`, `cause` (a `MergeCause`) on
- * the merge-derived types, `kind` and `workItem` on `agent.started`, `status` and `kind` on `agent.handed_back`.
+ * the merge-derived types, `kind` and `workItem` on `agent.started`, `status`, `kind` and `summary` (what the agent
+ * handed back) on `agent.handed_back`, and `echo` (the act's id) on a tracker event that is the echo of an office act.
  */
 export interface PipelineEvent {
   /** Unique per event: the office's `<source>:<externalId>`. */

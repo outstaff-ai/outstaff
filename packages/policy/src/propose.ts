@@ -69,40 +69,49 @@ function moveOp(to: Extract<OpSpec, { move: unknown }>["move"], ticket: string, 
     : { value: { op: "move" as const, ticket, to } };
 }
 
+type AssignSpec = Extract<OpSpec, { assign: unknown }>;
+
 /** A change still needed, with why it goes where it goes when that is a choice; or why it is not needed. */
 type OpResult = { value: BookkeepingOp } | { value: BookkeepingOp; why: string } | { skip: string };
 
-/** Who an assignment goes to: the agent acted for, else the requester or the fallback human, and why. */
-function assignee(spec: { assign: "requester" | "self" }, as: string, ticket: string, ctx: Ctx) {
+type Chosen = { to: ActTarget; why?: string } | { skip: string };
+
+/**
+ * Who an assignment goes to: the agent acted for, the agent named (`role:pm`), else the requester or the fallback
+ * human, and why.
+ */
+function assignee(spec: AssignSpec, as: string, ticket: string, ctx: Ctx): Chosen {
   if (spec.assign === "self") {
-    return { to: { kind: "agent", id: as } satisfies ActTarget };
+    return { to: { kind: "agent", id: as } };
+  }
+
+  if (spec.assign !== "requester") {
+    const agent = ctx.person(spec.assign);
+    return "skip" in agent
+      ? { skip: `assign: ${agent.skip}` }
+      : { to: { kind: "agent", id: agent.value } };
   }
 
   const requester = ctx.state.requester(ticket);
   if (requester) {
-    return { to: { kind: "human", id: requester } satisfies ActTarget, why: "its requester" };
+    return { to: { kind: "human", id: requester }, why: "its requester" };
   }
 
   const fallback = ctx.options.fallbackRequester;
   return fallback
     ? {
-        to: { kind: "human", id: fallback } satisfies ActTarget,
+        to: { kind: "human", id: fallback },
         why: "the fallback (hand_back.fallback), as no requester is known",
       }
-    : undefined;
+    : {
+        skip: `assign: ${ticket} has no known requester and the team lists no human with a tracker identity`,
+      };
 }
 
-function assignOp(
-  spec: { assign: "requester" | "self" },
-  as: string,
-  ticket: string,
-  ctx: Ctx,
-): OpResult {
+function assignOp(spec: AssignSpec, as: string, ticket: string, ctx: Ctx): OpResult {
   const chosen = assignee(spec, as, ticket, ctx);
-  if (!chosen) {
-    return {
-      skip: `assign: ${ticket} has no known requester and the team lists no human with a tracker identity`,
-    };
+  if ("skip" in chosen) {
+    return chosen;
   }
 
   const { to, why } = chosen;
@@ -160,6 +169,9 @@ function actThenWake(spec: ActSpec, then: { kind: string }, as: string, ctx: Ctx
     : [woken];
 }
 
+/** The note an act posts: its own, else the policy's instruction. */
+const noteTemplate = (spec: ActSpec, ctx: Ctx) => spec.note ?? ctx.instruction ?? "";
+
 /** `ctx.act`: the changes for the agent the spec names, then its wake if asked; or a drop saying why there are none. */
 export function proposeAct(ctx: Ctx, spec: ActSpec, reason = ctx.matched): Proposal[] {
   const as = ctx.person(spec.as);
@@ -176,7 +188,7 @@ export function proposeAct(ctx: Ctx, spec: ActSpec, reason = ctx.matched): Propo
     return [drop(`nothing to change: ${skipped.join("; ")}`)];
   }
 
-  const note = ctx.render(ctx.instruction ?? "", { person: as.value });
+  const note = ctx.render(noteTemplate(spec, ctx), { person: as.value });
   if ("skip" in note) {
     return [drop(`the note cannot be rendered: ${note.skip}`)];
   }

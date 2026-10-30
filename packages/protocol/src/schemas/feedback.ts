@@ -31,7 +31,7 @@ export const feedbackSchema = z.strictObject({
       "ci_failure",
     ])
     .describe(
-      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, a message from a trusted human in chat, a comment on a ticket, a comment or reply on a knowledge document, an agent's hand-back as blocked (its last comment on the ticket), or the failing checks of a pull request (names, links and summaries, in the body).",
+      "A review with its summary, a comment on the pull request conversation, an inline comment on the diff, a message from a trusted human in chat, a comment on a ticket, a comment or reply on a knowledge document, an agent's hand-back as blocked (the summary it handed back), or the failing checks of a pull request (names, links and summaries, in the body).",
     ),
   state: z.string().optional().describe("For a review: approved, changes_requested or commented."),
   url: z.string().optional().describe("Link to the feedback."),

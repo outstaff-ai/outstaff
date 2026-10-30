@@ -28,7 +28,8 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
 | [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester |
-| [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester |
+| [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it |
+| [`hand_back_blocked_to_pm`](#hand_back_blocked_to_pm) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent |
 | [`idle_pulls_next`](#idle_pulls_next) | `agent.idle` | wake `actor` (kind `assigned`), with its next ready ticket |
 
 ## Policies
@@ -336,9 +337,9 @@ Moved to review and assigned to the requester: I handed the work back as done.
 
 ### hand_back_blocked
 
-A hand-back as blocked, or as done on a ticket the agent moved to blocked, moves the ticket to blocked and gives it to the requester, for the agent.
+A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with no PM to unblock it (none, or the PM is the blocked agent), moves the ticket to blocked and gives it to the requester, for the agent.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to the requester.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it.
 
 When:
 
@@ -355,6 +356,29 @@ Note posted with the change:
 
 ```text
 Moved to blocked and assigned to the requester: I handed the work back as blocked.
+```
+
+### hand_back_blocked_to_pm
+
+A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with a PM other than the blocked agent, moves the ticket to blocked and gives it to the PM, for the agent, then wakes the PM to unblock it.
+
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent.
+
+When:
+
+- all of:
+  - any of:
+    - `hand_back_status: blocked`
+    - all of:
+      - `hand_back_status: done`
+      - `ticket_status: blocked`
+  - not:
+    - `ticket_status: done, canceled`
+
+Instruction:
+
+```text
+{{actor.id}} handed {{ticket}} back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to {{actor.id}}. Only if a human is needed, assign it to the requester, {{requester}}, with a comment that says exactly what is needed.
 ```
 
 ### idle_pulls_next
@@ -423,3 +447,4 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `cause.number`
 - `cause.title`
 - `next.ticket`
+- `requester`

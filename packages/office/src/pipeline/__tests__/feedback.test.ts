@@ -30,4 +30,22 @@ describe("feedbackFor", () => {
 
     expect(feedbackFor(event("ticket.assigned"))).toEqual([]);
   });
+
+  it("carries what an agent handed back as blocked, and nothing for another hand-back", () => {
+    const sam = { kind: "agent" as const, id: "sam" };
+    const back = (status: string, summary?: string) =>
+      event("agent.handed_back", { actor: sam, data: { status, summary } });
+
+    expect(feedbackFor(back("blocked", "Stopped: no credentials."))).toEqual([
+      {
+        actor: "sam",
+        kind: "blocked",
+        body: "Stopped: no credentials.",
+        at: "2026-10-05T09:00:00.000Z",
+      },
+    ]);
+
+    expect(feedbackFor(back("done", "Opened #9."))).toEqual([]);
+    expect(feedbackFor(back("blocked"))).toEqual([]);
+  });
 });

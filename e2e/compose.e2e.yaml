@@ -1,6 +1,7 @@
-# The acme loop on one Docker host, with nothing outside it: the office and its Postgres, one agent (sam, a
-# developer) on the agent-e2e image, and `stubs`, which stands in for GitHub (API and git remote) and the tracker.
-# The agent's model is a fixed script (e2e/runtime-scripted), so no model is called. Run it with `node e2e/run.ts`,
+# The acme loop on one Docker host, with nothing outside it: the office and its Postgres, two agents on the
+# agent-e2e image (sam, a developer, and pia, the PM, who unblocks blocked tickets), and `stubs`, which stands in for
+# GitHub (API and git remote) and the tracker. The agents' model is a fixed script (e2e/runtime-scripted), so no model
+# is called. Run it with `node e2e/run.ts`,
 # which writes the team file, the secrets and the TLS files into $E2E_DIR first. See CONTRIBUTING.md.
 name: ${E2E_PROJECT:-outstaff-e2e}
 
@@ -110,6 +111,10 @@ services:
           target: /run/secrets/outstaff/SLACK_OFFICE_BOT_TOKEN,
         }
       - { source: sam_OUTSTAFF_AGENT_TOKEN, target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_SAM }
+      - {
+          source: office_OUTSTAFF_AGENT_TOKEN_PIA,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN_PIA,
+        }
 
   sam:
     <<: *hardening
@@ -143,6 +148,32 @@ services:
           target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
         }
 
+  # The PM: no repositories, so no GitHub keys; only the tracker. It has no chat in this run (E2E_CHAT=off), so it
+  # does not read the stub workspace that sam answers.
+  pia:
+    <<: *hardening
+    image: ${OUTSTAFF_AGENT_E2E_IMAGE:-outstaff/agent-e2e:local}
+    build:
+      context: ..
+      dockerfile: images/Dockerfile
+      target: agent-e2e
+    depends_on:
+      office: { condition: service_healthy }
+    environment:
+      OUTSTAFF_OFFICE_URL: ws://office:8080/agent
+      OUTSTAFF_PERSON: pia
+      E2E_STUB_URL: http://tracker.acme.example:8081
+      E2E_CHAT: "off"
+    volumes:
+      - pia-home:/home/outstaff
+    networks: [default]
+    secrets:
+      - {
+          source: office_OUTSTAFF_AGENT_TOKEN_PIA,
+          target: /run/secrets/outstaff/OUTSTAFF_AGENT_TOKEN,
+        }
+      - { source: pia_ITSAPLAN_API_KEY, target: /run/secrets/outstaff/ITSAPLAN_API_KEY }
+
 networks:
   # Postgres is only reachable from the office, as in the example.
   backend:
@@ -152,6 +183,7 @@ networks:
 volumes:
   office-data:
   sam-home:
+  pia-home:
 
 secrets:
   office_GH_OFFICE_APP_ID:
@@ -164,6 +196,8 @@ secrets:
     file: ${E2E_DIR}/secrets/office/SLACK_OFFICE_BOT_TOKEN
   office_OUTSTAFF_AGENT_TOKEN_MIRA:
     file: ${E2E_DIR}/secrets/office/OUTSTAFF_AGENT_TOKEN_MIRA
+  office_OUTSTAFF_AGENT_TOKEN_PIA:
+    file: ${E2E_DIR}/secrets/office/OUTSTAFF_AGENT_TOKEN_PIA
   sam_OUTSTAFF_AGENT_TOKEN:
     file: ${E2E_DIR}/secrets/sam/OUTSTAFF_AGENT_TOKEN
   sam_GH_APP_ID:
@@ -174,3 +208,5 @@ secrets:
     file: ${E2E_DIR}/secrets/sam/ITSAPLAN_API_KEY
   sam_E2E_HOME_TOKEN:
     file: ${E2E_DIR}/secrets/sam/E2E_HOME_TOKEN
+  pia_ITSAPLAN_API_KEY:
+    file: ${E2E_DIR}/secrets/pia/ITSAPLAN_API_KEY

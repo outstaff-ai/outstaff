@@ -15,7 +15,7 @@ A work item is one unit of work scheduled for you: a ticket, a new review round 
 
 - `doc_feedback`: a trusted human commented on a document you wrote, or mentioned you in a comment on one. Read the comments, act, and reply (`process/doc-feedback.md`).
 - `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back, or mentioned you (`@you`) in a comment on a ticket. Read the thread, act, and reply on the ticket. When the mention handed you the ticket, it is assigned to you; otherwise leave its assignee as it is.
-- `unblock`: a teammate handed a ticket back as blocked and you are the team's PM. Follow `process/unblock.md`; the ticket is not yours.
+- `unblock`: a teammate handed a ticket back as blocked and you are the team's PM; the office assigned the ticket to you to unblock. Follow `process/unblock.md`; the work on the ticket is not yours, only getting it unblocked.
 - `asked`: a trusted human mentioned you and others in one comment; the first mentioned has the ticket, not you. Read the thread and answer on the ticket. The ticket stays with its assignee.
 
 {{#if repos.many}}

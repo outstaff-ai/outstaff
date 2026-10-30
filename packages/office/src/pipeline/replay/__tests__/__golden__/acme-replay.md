@@ -76,9 +76,9 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 33 | `agent.handed_back` ACME-170 by noor | move ACME-170 to blocked (for noor)<br>assign ACME-170 to human ada.admin (for noor) |
+| 33 | `agent.handed_back` ACME-170 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-170 to blocked (for noor)<br>assign ACME-170 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-170 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
 | 34 | `agent.handed_back` ACME-171 by noor | move ACME-171 to review (for noor)<br>assign ACME-171 to human ada.admin (for noor) |
-| 35 | `agent.handed_back` ACME-172 by noor | assign ACME-172 to human ada.admin (for noor) |
+| 35 | `agent.handed_back` ACME-172 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>assign ACME-172 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-172 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
 | 36 | `agent.handed_back` ACME-173 by noor | (drop: no policy matched) |
 
 ## Chat messages
@@ -116,6 +116,6 @@ How to read it:
 
 ## Coalescing
 
-The pipeline's 21 wakes become 19 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 23 wakes become 21 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

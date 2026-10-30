@@ -10,6 +10,7 @@ import {
   mergedFeedback,
   reviewFeedback,
   ticketComment,
+  unblock,
   withGreeting,
   type Action,
 } from "#/scripts.js";
@@ -98,6 +99,75 @@ describe("assigned, on a ticket that says it is blocked", () => {
     ]);
 
     expect(text).toBe("Stopped: the staging credentials are missing");
+  });
+
+  it("resumes with the answer when the wake carries the PM's answer, on the ticket the office made active", async () => {
+    const shown = "SHOP-1 Tone\nStatus: In Progress (active)\nblocked: the tone is not decided";
+    const resumed = await play(assigned({ ...ctx, unblocked: "friendly" }), () => shown);
+    expect(resumed.seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Resumed with: friendly" },
+      },
+    ]);
+
+    expect(resumed.text).toBe("Resumed: friendly");
+  });
+});
+
+describe("unblock", () => {
+  const pm = {
+    ...ctx,
+    kind: "unblock",
+    title: "unblock: SHOP-1 Tone",
+    journal:
+      "- 2026-01-01T00:00:00Z office: sam handed SHOP-1 back as blocked. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed.",
+    feedback: [{ kind: "blocked" as const, actor: "sam", body: "Stopped.", threads: [] }],
+  };
+
+  const tools = (seen: Action[]) =>
+    seen.map((a) => (a.type === "tool" ? [a.tool, a.input] : a.type));
+
+  it("answers what it knows and gives the ticket back to the blocked agent", async () => {
+    const shown = "SHOP-1 Tone\nblocked: the tone is not decided\npm knows: friendly";
+    const done = await play(unblock(pm), () => shown);
+    expect(tools(done.seen)).toEqual([
+      ["ticket_show", { key: "SHOP-1" }],
+      ["ticket_comment", { key: "SHOP-1", body: "Unblocked: friendly" }],
+      ["ticket_assign", { key: "SHOP-1", to: "sam" }],
+    ]);
+
+    expect(done.text).toBe("Unblocked SHOP-1: friendly. Gave it back to sam.");
+  });
+
+  it("gives the ticket to the requester, saying what is needed, when it cannot answer", async () => {
+    const human = await play(unblock(pm), () => "SHOP-1 Key\nblocked: no credentials");
+    expect(tools(human.seen)).toEqual([
+      ["ticket_show", { key: "SHOP-1" }],
+      [
+        "ticket_comment",
+        {
+          key: "SHOP-1",
+          body: "Needs a human: no credentials. Nobody on the team can provide it; sam carries on once it is here.",
+        },
+      ],
+      ["ticket_assign", { key: "SHOP-1", to: "ada.admin" }],
+    ]);
+
+    const bare = await play(unblock(pm), () => "SHOP-1 Key");
+    expect(bare.text).toBe("SHOP-1 needs a human: see the ticket. Gave it to ada.admin.");
+  });
+
+  it("needs the blocked agent and the requester", async () => {
+    await expect(play(unblock({ ...pm, feedback: [] }), () => "")).rejects.toThrow(
+      "the agent who is blocked",
+    );
+
+    await expect(play(unblock({ ...pm, journal: "" }), () => "SHOP-1")).rejects.toThrow(
+      "the requester",
+    );
   });
 });
 

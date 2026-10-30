@@ -27,6 +27,7 @@ export const INSTRUCTION_VARIABLES = [
   "cause.number",
   "cause.title",
   "next.ticket",
+  "requester",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -48,6 +49,10 @@ function causeVariables(data: Record<string, unknown>): Record<string, string> {
   };
 }
 
+/** The human who asked for the ticket's work, else the team's first human, as a hand-back assigns it. */
+const requesterOf = ({ ticket, state, opts }: EvaluationContext): string =>
+  (ticket ? state.requester(ticket) : undefined) ?? opts.fallbackRequester ?? "";
+
 /** Every instruction variable for an event, unavailable ones empty. */
 export function instructionVariables(
   ctx: EvaluationContext,
@@ -62,6 +67,7 @@ export function instructionVariables(
     "pr.problem": PROBLEMS[event.type] ?? "",
     ...causeVariables(event.data),
     "next.ticket": extra.next ?? "",
+    requester: requesterOf(ctx),
   };
 }
 

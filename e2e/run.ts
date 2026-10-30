@@ -4,8 +4,8 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle. The office, Postgres and the agent are the real images; GitHub,
-// the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted).
+// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle. The office, Postgres and the agent are the real images; GitHub,
+// the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
 //
@@ -152,7 +152,7 @@ let composeEnv: NodeJS.ProcessEnv = process.env;
 
 function fail(e: unknown): never {
   process.stderr.write(`\nFAIL: ${e instanceof Error ? e.message : String(e)}\n`);
-  for (const service of ["stubs", "office", "sam"]) {
+  for (const service of ["stubs", "office", "sam", "pia"]) {
     process.stderr.write(
       `\n---------------- ${service} log (tail)\n${logs(service).split("\n").slice(-120).join("\n")}\n`,
     );
@@ -256,7 +256,7 @@ function prepareKeys() {
 /** The bearer token of the stub's home service: sam's secret, which the agent must never see. */
 const homeToken = randomBytes(12).toString("hex");
 
-function prepareSecrets(privateKey: string, keys: { office: string; sam: string }) {
+function prepareSecrets(privateKey: string, keys: { office: string; sam: string; pia: string }) {
   const s = join(work, "secrets");
   const token = randomBytes(24).toString("hex");
   write(join(s, "office/GH_OFFICE_APP_ID"), "100");
@@ -270,6 +270,7 @@ function prepareSecrets(privateKey: string, keys: { office: string; sam: string 
   write(join(s, "sam/GH_APP_PRIVATE_KEY"), privateKey);
   write(join(s, "sam/ITSAPLAN_API_KEY"), keys.sam);
   write(join(s, "sam/E2E_HOME_TOKEN"), homeToken);
+  write(join(s, "pia/ITSAPLAN_API_KEY"), keys.pia);
 }
 
 const TEAM = `version: 1
@@ -341,7 +342,7 @@ function hire() {
       model: "sonnet",
     },
     { role: "architect", handle: "mira", name: "Mira Okafor", pronouns: "she/her", model: "opus" },
-    // The PM only receives work in this run: no container is started for it.
+    // The PM has no repositories: it works on tickets only, here to unblock what sam hands back as blocked.
     {
       role: "pm",
       handle: "pia",
@@ -379,11 +380,13 @@ function hire() {
 
     const text = readFileSync(file, "utf8");
     // Sam runs on the scripted runtime and may also reach the stub's two services: the hub with no authentication,
-    // the home service with a token.
+    // the home service with a token. Pia, the PM, runs on the scripted runtime too.
     const network =
       p.handle === "sam"
         ? `    runtime: { adapter: scripted }\n    network:\n      http:\n        - { name: hub, url: "http://hub.acme.example:8081" }\n        - { name: home, url: "http://home.acme.example:8081", token: E2E_HOME_TOKEN }\n`
-        : "";
+        : p.handle === "pia"
+          ? "    runtime: { adapter: scripted }\n"
+          : "";
 
     const patched = text.replace(
       new RegExp(`(\\n {4}role: ${p.role}\\n)`),
@@ -446,33 +449,49 @@ function dcOrFail(what: string, ...args: string[]) {
   }
 }
 
-const samConnected = () => /"agent connected","person":"sam"/.test(logs("office"));
+/** The kind of each wake the office queued, or folded into an open item, for pia, in order: from its log. */
+const piaWakes = () =>
+  [
+    ...logs("office").matchAll(
+      /pipeline: (?:queued|folded the wake into) work item \S+ for pia \((\w+)\)/g,
+    ),
+  ].map((m) => m[1]);
 
-/** Brings up the stubs and the office, then the agent, and waits until it connects to the office. */
-async function startStack() {
-  const healthy = ["--wait", "--wait-timeout", "240"];
-  dcOrFail("The stack did not come up", "up", "-d", ...healthy, "stubs", "office");
-  step("stack: stubs, Postgres and the office are healthy");
-  dcOrFail("The agent did not start", "up", "-d", "--no-deps", "sam");
-  for (let i = 0; i < 60 && !samConnected(); i++) {
+const connected = (person: string) =>
+  new RegExp(`"agent connected","person":"${person}"`).test(logs("office"));
+
+/** Waits until the agent connects to the office and picks its own runtime. */
+async function awaitAgent(person: string) {
+  for (let i = 0; i < 60 && !connected(person); i++) {
     await sleep(1_000);
   }
 
-  if (!samConnected()) {
-    throw new Error("The agent never connected to the office.");
+  if (!connected(person)) {
+    throw new Error(`${person} never connected to the office.`);
   }
 
   // The agent connects before it prepares (the team comes from the office), so the runtime is picked a moment later.
-  const selected = () => /runtime selected {"person":"sam","runtime":"scripted"/.test(logs("sam"));
+  const selected = () =>
+    new RegExp(`runtime selected {"person":"${person}","runtime":"scripted"`).test(logs(person));
+
   for (let i = 0; i < 120 && !selected(); i++) {
     await sleep(1_000);
   }
 
   if (!selected()) {
-    throw new Error("sam did not start on its own runtime (people[].runtime: scripted).");
+    throw new Error(`${person} did not start on its own runtime (people[].runtime: scripted).`);
   }
+}
 
-  step("agent: sam connected to the office, on its own runtime");
+/** Brings up the stubs and the office, then the agents, and waits until they connect to the office. */
+async function startStack() {
+  const healthy = ["--wait", "--wait-timeout", "240"];
+  dcOrFail("The stack did not come up", "up", "-d", ...healthy, "stubs", "office");
+  step("stack: stubs, Postgres and the office are healthy");
+  dcOrFail("The agents did not start", "up", "-d", "--no-deps", "sam", "pia");
+  await awaitAgent("sam");
+  await awaitAgent("pia");
+  step("agents: sam and pia connected to the office, each on its own runtime");
 }
 
 async function main() {
@@ -480,7 +499,12 @@ async function main() {
   step("hire: ost hire developer sam, architect mira and pm pia, team file validates");
 
   const privateKey = prepareKeys();
-  const keys = { office: randomBytes(12).toString("hex"), sam: randomBytes(12).toString("hex") };
+  const keys = {
+    office: randomBytes(12).toString("hex"),
+    sam: randomBytes(12).toString("hex"),
+    pia: randomBytes(12).toString("hex"),
+  };
+
   prepareSecrets(privateKey, keys);
   composeEnv = {
     ...process.env,
@@ -490,7 +514,7 @@ async function main() {
     E2E_OFFICE_HEALTH_PORT: officePort,
     POSTGRES_PASSWORD: randomBytes(12).toString("hex"),
     STUB_APPS: "100=acme-office,201=acme-sam",
-    STUB_TRACKER_KEYS: `${keys.office}=office,${keys.sam}=sam`,
+    STUB_TRACKER_KEYS: `${keys.office}=office,${keys.sam}=sam,${keys.pia}=pia`,
     STUB_HOME_TOKEN: homeToken,
   };
 
@@ -1302,21 +1326,43 @@ async function main() {
     `chat files: a direct message with a picture was answered; ${withPicture.key} has the picture attached and the working agent downloaded it`,
   );
 
-  // ---- 10. a done hand-back on a ticket the agent left blocked stays blocked and goes to the requester
+  // ---- 10. a done hand-back on a ticket the agent left blocked stays blocked. The team has a PM, so the office gives
+  // it to pia, for sam, and wakes her to unblock it; a staging credential is not something she can answer, so she
+  // gives it to the requester, saying exactly what is needed.
+  const piaBefore10 = piaWakes().length;
   const { key: stuck } = await stub("POST", "/_test/tickets", {
     title: "Rotate the staging key",
     description: "blocked: the staging credentials are missing",
     assignee: "sam",
   });
 
-  const blockedAt = await until(`${stuck} handed back blocked`, (s) => {
+  const blockedAt = await until(`${stuck} handed on to the requester by the PM`, (s) => {
     const t = s.tickets.find((x: Json) => x.key === stuck);
-    return t.status === "Blocked" && t.assignee !== "sam"
-      ? { t, pulls: s.github.pulls.length }
+    const asked = t.comments.find(
+      (c: Json) => c.author === "pia" && c.body.startsWith("Needs a human:"),
+    );
+
+    return t.status === "Blocked" && t.assignee === "ada.admin" && asked
+      ? { t, asked, pulls: s.github.pulls.length }
       : undefined;
   });
 
-  assertEq(blockedAt.t.assignee, "ada.admin", "the blocked ticket went to the requester");
+  assertEq(
+    blockedAt.t.comments.some(
+      (c: Json) =>
+        c.author === "sam" &&
+        c.body.includes("assigned to the team's PM to unblock: I handed the work back as blocked"),
+    ),
+    true,
+    "the office gave the blocked ticket to the PM, as sam, and said so on the ticket",
+  );
+
+  assertEq(
+    blockedAt.asked.body.includes("the staging credentials are missing"),
+    true,
+    "the PM said exactly what is needed from the human",
+  );
+
   await until("the agent idle", (s) =>
     s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
       ? true
@@ -1332,11 +1378,22 @@ async function main() {
 
   assertEq(stays.github.pulls.length, blockedAt.pulls, "no pull request was opened for it");
   step(
-    `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, assigned to the requester`,
+    `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, goes to the PM, who cannot unblock it and gives it to the requester with what is needed`,
   );
 
+  // The act that gave the ticket to pia was made by sam, so the tracker reports "assigned to pia by sam". That is the
+  // echo of the office's own act: it wakes no one, so pia ran one round for the hand-back, the unblock one.
+  await officePolledTwice(`${stuck} went to the requester`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore10)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once for the blocked hand-back, to unblock it, and not again by the assignment's echo",
+  );
+
+  step(`blocked: pia ran exactly one round for ${stuck}, the unblock`);
+
   // The team has a PM (policies.hand_back.blocked_notify: pm), so the blocked agent leaves telling the requester to
-  // the PM, and the office posts nothing.
+  // the PM, who does it on the ticket, and the office posts nothing.
   assertEq(
     stays.chat.posts.some((p: Json) => p.text.includes(stuck)),
     false,
@@ -1344,6 +1401,65 @@ async function main() {
   );
 
   step(`blocked: no chat message was posted about ${stuck}`);
+
+  // ---- 10, unblocked: the PM can answer this blocker. She comments the answer and gives the ticket back to sam; the
+  // assignment wakes sam, the office makes the ticket active for him, the wake carries her comment, and sam resumes
+  // the work and hands it back as done.
+  const piaBeforeUnblock = piaWakes().length;
+  const { key: answerable } = await stub("POST", "/_test/tickets", {
+    title: "Pick the greeting's tone",
+    description: "blocked: the greeting's tone is not decided\npm knows: friendly",
+    assignee: "sam",
+  });
+
+  const unblockedTicket = await until(
+    `${answerable} unblocked by the PM and resumed by sam`,
+    (s) => {
+      const t = s.tickets.find((x: Json) => x.key === answerable);
+      const by = (author: string, body: string) =>
+        t.comments.some((c: Json) => c.author === author && c.body === body);
+
+      return t.status === "In Review" &&
+        t.assignee === "ada.admin" &&
+        by("pia", "Unblocked: friendly") &&
+        by("sam", "Resumed with: friendly")
+        ? t
+        : undefined;
+    },
+  );
+
+  const unblockedMoves = unblockedTicket.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`);
+  assertIncludes(unblockedMoves, "sam:In Progress>Blocked", "sam blocked the ticket");
+  assertIncludes(
+    unblockedMoves,
+    "sam:Blocked>In Progress",
+    "the office moved the unblocked ticket to active, as sam, when sam's round started",
+  );
+
+  assertEq(
+    unblockedTicket.comments.some(
+      (c: Json) => c.author === "pia" && c.body.startsWith("Needs a human:"),
+    ),
+    false,
+    "the PM answered it herself, without the human",
+  );
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${answerable} went to review`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforeUnblock)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once, to unblock this ticket, and not by the echo of the act that gave it to her",
+  );
+
+  step(
+    `unblock: ${answerable} blocked -> pia answered it and gave it back to sam -> active again when sam's round started, sam resumed from her comment and handed it back`,
+  );
 
   // ---- 10a. a ticket that asks for the services the team granted: the token is added and never shown
   const { key: network } = await stub("POST", "/_test/tickets", {
@@ -1627,25 +1743,38 @@ async function main() {
   );
 
   // ---- 10c. the blocked ticket is assigned to the agent again and the agent is still blocked: the office moves the
-  // ticket to active for the agent when the work starts, the agent blocks it again, and it ends Blocked, back with the
-  // requester, with no earlier blocked item left behind.
-  const movesBefore = (await state()).tickets.find((x: Json) => x.key === stuck).moves.length;
+  // ticket to active for the agent when the work starts, the agent blocks it again, it goes to the PM again, who gives
+  // it back to the requester, and no earlier blocked item is left behind.
+  const before10c = (await state()).tickets.find((x: Json) => x.key === stuck);
+  const movesBefore = before10c.moves.length;
+  const askedBefore = before10c.comments.filter((c: Json) => c.author === "pia").length;
+  const piaBefore10c = piaWakes().length;
   await stub("POST", `/_test/tickets/${stuck}/assign`, { to: "sam" });
-  const retried = await until(`${stuck}: the retry handed back as blocked`, (s) => {
-    const t = s.tickets.find((x: Json) => x.key === stuck);
-    return t.assignee !== "sam" ? t : undefined;
-  });
+  const retried = await until(
+    `${stuck}: the retry handed back as blocked, and on to the requester`,
+    (s) => {
+      const t = s.tickets.find((x: Json) => x.key === stuck);
+      const asked = t.comments.filter((c: Json) => c.author === "pia").length;
+      return t.assignee === "ada.admin" && asked > askedBefore ? t : undefined;
+    },
+  );
 
   assertEq(retried.status, "Blocked", "the ticket is still blocked after the retry");
-  assertEq(retried.assignee, "ada.admin", "the blocked ticket went back to the requester");
   assertEq(
     JSON.stringify(retried.moves.slice(movesBefore).map((m: Json) => `${m.from}>${m.to}`)),
     JSON.stringify(["Blocked>In Progress", "In Progress>Blocked"]),
     "the retry started with the ticket active, and the agent blocked it again",
   );
 
+  await officePolledTwice(`${stuck} went to the requester again`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore10c)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once for the retry's hand-back, to unblock it",
+  );
+
   step(
-    `blocked retry: ${stuck} assigned to sam again, still blocked -> active when the work started, blocked again by sam, back with the requester`,
+    `blocked retry: ${stuck} assigned to sam again, still blocked -> active when the work started, blocked again by sam, the PM gave it back to the requester`,
   );
 
   // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the ticket is the agent's again
@@ -1717,8 +1846,8 @@ async function main() {
     `merge on approval: #${made.pr.number} approved -> auto-merge queued it, merged by the queue, ${made.t.key} done`,
   );
 
-  // ---- 13. every change in the tracker and the knowledge base was made by the agent or a human, as themselves: the
-  // office's account only reads (decision 0019)
+  // ---- 13. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
+  // themselves: the office's account only reads (decision 0019)
   const authors = await state();
   const by = [
     ...authors.tickets.flatMap((t: Json) => [
@@ -1730,15 +1859,15 @@ async function main() {
     ),
   ] as [string, string | null][];
 
-  const others = by.filter(([, who]) => who !== "sam" && who !== "ada.admin");
+  const others = by.filter(([, who]) => !["sam", "pia", "ada.admin"].includes(who ?? ""));
   assertEq(
     others.map(([what, who]) => `${what} by ${who}`).join("; "),
     "",
-    "every tracker and document change is made by sam or a human",
+    "every tracker and document change is made by an agent or a human",
   );
 
   step(
-    `authors: all ${by.length} moves and comments were made by sam or a human, none by the office`,
+    `authors: all ${by.length} moves and comments were made by an agent or a human, none by the office`,
   );
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);

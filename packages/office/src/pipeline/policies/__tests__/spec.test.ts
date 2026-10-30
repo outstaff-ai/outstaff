@@ -17,12 +17,13 @@ describe("the policy specs", () => {
           { move: "review" },
           { assign: "requester" },
           { assign: "self" },
+          { assign: "role:pm" },
           { set_parent: true },
         ],
         wake: { kind: "assigned" },
       }).decides,
     ).toBe(
-      "act for `actor`: move the ticket to `review`, assign it to the requester, assign it to the agent acted for, set its parent, then wake them (kind `assigned`)",
+      "act for `actor`: move the ticket to `review`, assign it to the requester, assign it to the agent acted for, assign it to `role:pm`, set its parent, then wake them (kind `assigned`)",
     );
   });
 
