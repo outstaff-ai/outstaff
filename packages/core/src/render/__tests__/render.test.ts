@@ -102,11 +102,11 @@ describe("golden output per acme person", () => {
     expect(git).toContain("If the repository says nothing on a point, use these defaults");
   });
 
-  it("leaves the ticket moves the office makes to the office, and starting a ticket to the agent", () => {
+  it("leaves the ticket moves the office makes to the office, starting a ticket included", () => {
     for (const person of acme.people) {
       const text = dump(renderPerson({ team: acme, handle: person.handle, catalog: real }).files);
       expect(text).not.toMatch(
-        /move the item to `review`|move it here at hand-back|comes back to you as `?active/i,
+        /move the item to `review`|move it here at hand-back|comes back to you as `?active|assign it to yourself|move your ticket to `active`/i,
       );
     }
 
@@ -126,7 +126,7 @@ describe("golden output per acme person", () => {
     expect(sam.get("process/work-items.md")).toContain("do not look up again what it already says");
 
     expect(sam.get("process/ticket-lifecycle.md")).toContain(
-      "assign it to yourself if it went to someone else",
+      "you start a round on it (the work, review feedback, a comment, a rebase or failing checks), also on a ticket you handed back: it is assigned to you and moves to `active`",
     );
   });
 

@@ -2519,7 +2519,7 @@
         {
           "type": "object",
           "properties": {
-            "hand_back_kind": {
+            "work_kind": {
               "minItems": 1,
               "type": "array",
               "items": {
@@ -2529,10 +2529,10 @@
             }
           },
           "required": [
-            "hand_back_kind"
+            "work_kind"
           ],
           "additionalProperties": false,
-          "description": "An agent.handed_back event is for a work item of one of these kinds, for example \"review_feedback\"."
+          "description": "An agent.started or agent.handed_back event is for a work item of one of these kinds, for example \"review_feedback\"."
         },
         {
           "type": "object",

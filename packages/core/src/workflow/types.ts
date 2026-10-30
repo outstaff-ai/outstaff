@@ -156,7 +156,7 @@ export type Condition =
   | { agent_mentioned: boolean }
   | { review_state: string[] }
   | { hand_back_status: HandBackStatus[] }
-  | { hand_back_kind: string[] }
+  | { work_kind: string[] }
   | { pr_approved: boolean }
   | { ticket_prs_all_closed: boolean }
   | { ticket_prs_open: boolean }

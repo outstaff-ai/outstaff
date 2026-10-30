@@ -24,6 +24,9 @@ export interface WorkSourceOptions {
   /** Where a wake whose context could not be built is reported. */
   logger?: Pick<Logger, "warn">;
 
+  /** Called after the agent accepted an item, before it hears back, so the office can react (judge its start). */
+  onAccepted?: (item: WorkItem) => Promise<void>;
+
   /** Called after the item left `active` because of a hand-back, so the office can react (judge it, report it). */
   onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;
 

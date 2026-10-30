@@ -1249,13 +1249,13 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 - Optional
 - Allowed values: `done`, `waiting`, `blocked`
 
-#### pipeline.policies.<key>.when.hand_back_kind
+#### pipeline.policies.<key>.when.work_kind
 
 - Type: `list of string`
 - Required
 - Minimum items 1
 
-#### pipeline.policies.<key>.when.hand_back_kind[]
+#### pipeline.policies.<key>.when.work_kind[]
 
 - Type: `string`
 - Optional

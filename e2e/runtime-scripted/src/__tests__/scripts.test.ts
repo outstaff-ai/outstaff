@@ -79,23 +79,25 @@ describe("the greeting edits", () => {
   });
 });
 
-describe("assigned, retrying a blocked ticket", () => {
-  it("moves nothing and hands back that it is still blocked", async () => {
-    const shown = (status: string) =>
-      `SHOP-1 Stage\nStatus: ${status}\nblocked: the staging credentials are missing`;
+describe("assigned, on a ticket that says it is blocked", () => {
+  it("blocks the ticket, says why and stops, also on a retry the office made active again", async () => {
+    const { seen, text } = await play(assigned(ctx), (a) =>
+      a.type === "tool" && a.tool === "ticket_show"
+        ? "SHOP-1 Stage\nStatus: In Progress (active)\nblocked: the staging credentials are missing"
+        : "",
+    );
 
-    const play1 = (status: string) =>
-      play(assigned(ctx), (a) =>
-        a.type === "tool" && a.tool === "ticket_show" ? shown(status) : "12.9.1\n",
-      );
+    expect(seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      { type: "tool", tool: "ticket_move", input: { key: "SHOP-1", to: "blocked" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Blocked: the staging credentials are missing" },
+      },
+    ]);
 
-    const retry = await play1("Blocked (blocked)");
-    expect(retry.seen.map((a) => (a.type === "tool" ? a.tool : a.type))).toEqual(["ticket_show"]);
-    expect(retry.text).toBe("Still blocked: the staging credentials are missing");
-
-    // The first time the ticket is not blocked yet: the agent blocks it itself.
-    const first = await play1("Todo (ready)");
-    expect(first.seen.filter((a) => a.type === "tool" && a.tool === "ticket_move")).toHaveLength(2);
+    expect(text).toBe("Stopped: the staging credentials are missing");
   });
 });
 
@@ -111,13 +113,12 @@ describe("assigned", () => {
             ? "12.9.1\n"
             : "";
 
-  it("takes the ticket, commits, pushes and opens a pull request that closes it", async () => {
+  it("leaves the ticket to the office, commits, pushes and opens a pull request that closes it", async () => {
     const { seen, text } = await play(assigned(ctx), answer);
     expect(
       seen.map((a) => (a.type === "tool" ? a.tool : a.type === "shell" ? a.command : a.type)),
     ).toEqual([
       "ticket_show",
-      "ticket_move",
       "CI=1 pnpm --version",
       SHELL_WORK,
       ...MUST_DENY,
@@ -280,12 +281,7 @@ describe("assigned, for a ticket that needs two pull requests", () => {
       .filter((a) => a.type === "tool")
       .map((a) => (a.type === "tool" ? a.tool : ""));
 
-    expect(tools.slice(0, 4)).toEqual([
-      "ticket_show",
-      "ticket_move",
-      "ticket_create",
-      "ticket_comment",
-    ]);
+    expect(tools.slice(0, 3)).toEqual(["ticket_show", "ticket_create", "ticket_comment"]);
 
     expect(seen.find((a) => a.type === "tool" && a.tool === "ticket_create")).toMatchObject({
       input: { title: "Add a farewell", parent: "SHOP-1" },
@@ -606,36 +602,9 @@ describe("chat", () => {
 });
 
 describe("reviewFeedback", () => {
-  it("takes the ticket back, then waits at the review gate, so a driver can hold the round", async () => {
+  it("waits at the review gate first, so a driver can hold the round; the office made the ticket active", async () => {
     const script = reviewFeedback({ ...ctx, kind: "review_feedback", pr: 1 });
-    expect((await script.next()).value).toEqual({
-      type: "tool",
-      tool: "ticket_show",
-      input: { key: ctx.ticket },
-    });
-
-    expect((await script.next("SHOP-1: x\nStatus: In Review (review)\n")).value).toEqual({
-      type: "tool",
-      tool: "ticket_assign",
-      input: { key: ctx.ticket, to: "me" },
-    });
-
-    expect((await script.next("Assigned.")).value).toEqual({
-      type: "tool",
-      tool: "ticket_move",
-      input: { key: ctx.ticket, to: "active" },
-    });
-
-    expect((await script.next("Moved.")).value).toEqual({ type: "gate", name: "review" });
-  });
-
-  it("leaves an active ticket as it is before the gate", async () => {
-    const script = reviewFeedback({ ...ctx, kind: "review_feedback", pr: 1 });
-    await script.next();
-    expect((await script.next("Status: In Progress (active)\n")).value).toEqual({
-      type: "gate",
-      name: "review",
-    });
+    expect((await script.next()).value).toEqual({ type: "gate", name: "review" });
   });
 });
 

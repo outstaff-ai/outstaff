@@ -9,6 +9,7 @@ import { doctorForOffice } from "./office-doctor.js";
 import { createHandedBack } from "./office-handback.js";
 import { trackerHumans } from "./office-humans.js";
 import { createIdlePull } from "./office-idle.js";
+import { createStarted } from "./office-started.js";
 import { createOfficeRounds } from "./office-rounds.js";
 import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
@@ -152,6 +153,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
   const humans = trackerHumans(ports, log);
 
+  const started = createStarted({ store, workState, judge, log });
   const handedBack = createHandedBack({ store, workState, judge, log });
   const idle = createIdlePull({ ...pipelineOptions, pipeline });
   const rounds = createOfficeRounds({ store, scheduler, workState, team, logger: log });
@@ -176,6 +178,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     logger: log,
     notify,
     onBlocked,
+    onAccepted: started,
     onHandedBack: async (item, result) => {
       // An interrupted item is still the same round: nothing is reported or judged, no follow-up starts.
       if (result.status === "interrupted") {

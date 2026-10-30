@@ -67,7 +67,7 @@ export function createAttach(
     }
 
     // An open pull request is unfinished work whatever its ticket says: a merge into a stack's feature branch can
-    // close the ticket early. The request attaches to it, and the ticket goes back to active when the work starts.
+    // close the ticket early. The request attaches to it; the ticket stays done.
     const closedEarly = pr !== undefined && ticket?.status === "done";
     if (ticket && TERMINAL.has(ticket.status ?? "") && !closedEarly) {
       throw new ProtocolError(

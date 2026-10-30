@@ -514,7 +514,12 @@ async function main() {
   );
 
   const moved = pr1.t.moves.map((m: Json) => `${m.from}>${m.to}`);
-  assertIncludes(moved, "Ready>In Progress", "sam moved the ticket to active");
+  assertIncludes(
+    moved,
+    "Ready>In Progress",
+    "the office moved the ticket to active for sam when the work started",
+  );
+
   assertIncludes(moved, "In Progress>In Review", "the ticket went to review");
   step(
     `assignment: ${first} -> sam cloned, committed, pushed and opened pull request #${pr1.pr.number}; ticket in review`,
@@ -685,7 +690,7 @@ async function main() {
   assertIncludes(
     rounds,
     "In Review>In Progress",
-    "the review round took the ticket back to active",
+    "the office made the ticket active for sam again when the review round started",
   );
 
   step(
@@ -1605,8 +1610,9 @@ async function main() {
     `ci: the build of #${pr2.pr.number} failed -> a round for its author, who looked at the failing check`,
   );
 
-  // ---- 10c. the blocked ticket is assigned to the agent again and the agent is still blocked: it moves nothing. The ticket stays Blocked (the office did not move it to active when the work
-  // started), goes back to the requester, and no earlier blocked item is left behind.
+  // ---- 10c. the blocked ticket is assigned to the agent again and the agent is still blocked: the office moves the
+  // ticket to active for the agent when the work starts, the agent blocks it again, and it ends Blocked, back with the
+  // requester, with no earlier blocked item left behind.
   const movesBefore = (await state()).tickets.find((x: Json) => x.key === stuck).moves.length;
   await stub("POST", `/_test/tickets/${stuck}/assign`, { to: "sam" });
   const retried = await until(`${stuck}: the retry handed back as blocked`, (s) => {
@@ -1617,17 +1623,18 @@ async function main() {
   assertEq(retried.status, "Blocked", "the ticket is still blocked after the retry");
   assertEq(retried.assignee, "ada.admin", "the blocked ticket went back to the requester");
   assertEq(
-    retried.moves.slice(movesBefore).filter((m: Json) => m.to === "In Progress").length,
-    0,
-    "neither the office nor the agent moved the blocked ticket to active",
+    JSON.stringify(retried.moves.slice(movesBefore).map((m: Json) => `${m.from}>${m.to}`)),
+    JSON.stringify(["Blocked>In Progress", "In Progress>Blocked"]),
+    "the retry started with the ticket active, and the agent blocked it again",
   );
 
   step(
-    `blocked retry: ${stuck} assigned to sam again, still blocked -> handed back as blocked, stays Blocked, back with the requester`,
+    `blocked retry: ${stuck} assigned to sam again, still blocked -> active when the work started, blocked again by sam, back with the requester`,
   );
 
   // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the ticket is the agent's again
   const mentionText = "@sam the staging key is rotated, please carry on.";
+  const movesBeforeMention = retried.moves.length;
   await stub("POST", `/_test/tickets/${stuck}/comment`, { body: mentionText });
   const mentioned = await until(
     `${stuck}: the mention answered and the ticket handed back again`,
@@ -1642,7 +1649,9 @@ async function main() {
   );
 
   assertEq(
-    mentioned.moves.filter((m: Json) => m.from === "Blocked" && m.to === "In Progress").length,
+    mentioned.moves
+      .slice(movesBeforeMention)
+      .filter((m: Json) => m.from === "Blocked" && m.to === "In Progress").length,
     1,
     "the mention moved the blocked ticket to active once",
   );

@@ -183,6 +183,21 @@ describe("createLivePipeline", () => {
     ]);
   });
 
+  it("has the agent mark its ticket active when its work starts", async () => {
+    const { opts, acts } = await setup();
+    const live = createLivePipeline(opts);
+    const started = {
+      type: "agent.started" as const,
+      subject: { ticket: "ACME-1" },
+      actor: { kind: "agent" as const, id: "sam" },
+      data: { workItem: "w-1", kind: "assigned" },
+    };
+
+    const trace = await live.handle(started, { source: "workstate", externalId: "s-1" });
+    expect(trace?.decisions).toMatchObject([{ type: "act", policy: "start_marks_active" }]);
+    expect(acts).toHaveLength(1);
+  });
+
   it("logs configuration issues", async () => {
     const warned: string[] = [];
     const { opts } = await setup({

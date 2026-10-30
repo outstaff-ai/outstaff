@@ -73,10 +73,10 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
         d("An agent.handed_back event carries one of these statuses: done, waiting or blocked."),
       ),
     z
-      .strictObject({ hand_back_kind: z.array(z.string().min(1)).min(1) })
+      .strictObject({ work_kind: z.array(z.string().min(1)).min(1) })
       .meta(
         d(
-          'An agent.handed_back event is for a work item of one of these kinds, for example "review_feedback".',
+          'An agent.started or agent.handed_back event is for a work item of one of these kinds, for example "review_feedback".',
         ),
       ),
     z

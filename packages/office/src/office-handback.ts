@@ -1,6 +1,7 @@
 import type { Logger, WorkflowEvent } from "@outstaff/core";
+import { itemEventSubject } from "./office-item-subject.js";
 import type { Store, WorkItem } from "./store/types.js";
-import type { PrRecord, WorkState } from "./workstate/index.js";
+import type { WorkState } from "./workstate/index.js";
 
 const handedBackText = (item: WorkItem) => `handed back ${item.id}`;
 
@@ -9,23 +10,6 @@ const HANDED_BACK = new Set(["done", "waiting", "blocked"]);
 // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
 // Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
 const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock"]);
-
-/** What the event is about: the ticket, or the pull request with its ticket. Nothing for other subjects. */
-async function eventSubject(
-  store: Store,
-  subject: NonNullable<WorkItem["subject"]>,
-): Promise<WorkflowEvent["subject"] | undefined> {
-  if (subject.type === "ticket") {
-    return { ticket: subject.ref };
-  }
-
-  if (subject.type !== "pr") {
-    return undefined;
-  }
-
-  const pr = (await store.getSubject("pr", subject.ref))?.data as PrRecord | undefined;
-  return pr ? { pr: pr.ref, ...(pr.ticket ? { ticket: pr.ticket } : {}) } : undefined;
-}
 
 /** What follows an agent's hand-back of an item: an `agent.handed_back` event for its ticket or pull request. */
 export function createHandedBack(deps: {
@@ -42,7 +26,7 @@ export function createHandedBack(deps: {
       return;
     }
 
-    const subject = await eventSubject(store, item.subject);
+    const subject = await itemEventSubject(store, item.subject);
     if (!subject) {
       return;
     }

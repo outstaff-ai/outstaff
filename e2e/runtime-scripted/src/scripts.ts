@@ -145,43 +145,22 @@ async function* mustBeDenied(command: string, cwd: string): AsyncGenerator<Actio
 const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
 
 /**
- * Moves the ticket to active, unless it says `blocked: <what>`: a retry of a ticket that is still blocked moves
- * nothing, and a new one is blocked. Returns the message to stop with, or undefined to go on.
+ * A ticket that says `blocked: <what>` cannot go on: the agent blocks it, says why, and still hands the item back as
+ * done. The office made the ticket active when the round started, a retry of a blocked ticket too. Returns the message
+ * to stop with, or undefined to go on.
  */
-async function* takeTicket(
+async function* blockIfStuck(
   key: string,
   shown: string,
 ): AsyncGenerator<Action, string | undefined, string> {
   const blocker = /^blocked: (.+)$/m.exec(shown)?.[1];
-  // A retry of a ticket that is blocked and still has its blocker: the agent moves nothing.
-  if (blocker && /^Status: .*\(blocked\)/m.test(shown)) {
-    return `Still blocked: ${blocker}`;
+  if (!blocker) {
+    return undefined;
   }
 
-  yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
-  // A ticket that says `blocked: <what>` cannot go on: the agent blocks it and still hands the item back as done.
-  if (blocker) {
-    yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
-    yield { type: "tool", tool: "ticket_comment", input: { key, body: `Blocked: ${blocker}` } };
-    return `Stopped: ${blocker}`;
-  }
-
-  return undefined;
-}
-
-/**
- * Takes the ticket back at the start of a round on it, as the catalog asks: assigned to the agent and moved to active,
- * unless it is active already or finished. The office no longer does this for the agent.
- */
-async function* resume(key: string): AsyncGenerator<Action, void, string> {
-  const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
-  const status = /^Status: .*\((\w+)\)$/m.exec(shown)?.[1];
-  if (status === undefined || ["active", "done", "canceled"].includes(status)) {
-    return;
-  }
-
-  yield { type: "tool", tool: "ticket_assign", input: { key, to: "me" } };
-  yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
+  yield { type: "tool", tool: "ticket_comment", input: { key, body: `Blocked: ${blocker}` } };
+  return `Stopped: ${blocker}`;
 }
 
 /** The toolset works in the worktree, ordinary shell work runs in the sandbox, and the hard denies still hold. */
@@ -420,7 +399,7 @@ async function* followUpOnTicket(
 }
 
 /**
- * A ticket is assigned: take it, change the file, push, open the pull request, and ask when the ticket says so. A
+ * A ticket is assigned: read it, change the file, push, open the pull request, and ask when the ticket says so. A
  * ticket that says `split: <title>` needs two pull requests, so it is split first: a sub-ticket with that title, the
  * parent told about it, then one pull request each (and a second one for the parent, which is refused).
  */
@@ -429,7 +408,7 @@ export async function* assigned(ctx: ItemContext): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
-  const stopped = yield* takeTicket(key, shown);
+  const stopped = yield* blockIfStuck(key, shown);
   if (stopped !== undefined) {
     return stopped;
   }
@@ -563,7 +542,6 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const number = need(ctx.pr, "the pull request");
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
-  yield* resume(key);
   // The driver can hold a review round here to talk to the agent while it is under way.
   yield { type: "gate", name: "review" };
   const branch = yield* branchOf(ctx, key);
@@ -675,7 +653,6 @@ export async function* docFeedback(ctx: ItemContext): Script {
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const feedback = need(ctx.feedback[0], "the comment");
-  yield* resume(key);
   yield {
     type: "tool",
     tool: "ticket_comment",
@@ -781,7 +758,6 @@ export async function* conflict(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const number = need(ctx.pr, "the pull request");
   const cwd = need(ctx.worktree, "the worktree");
-  yield* resume(key);
   const branch = yield* branchOf(ctx, key);
   const lease = (yield {
     type: "shell",
@@ -996,7 +972,6 @@ export async function* ciFailed(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const number = need(ctx.pr, "the pull request");
   const repo = need(ctx.repo, "the repository");
-  yield* resume(key);
   const shown = yield { type: "tool", tool: "pr_status", input: { repo, number } };
   yield {
     type: "tool",

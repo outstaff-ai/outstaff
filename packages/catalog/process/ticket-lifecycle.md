@@ -21,13 +21,14 @@ Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-spec
 {{#if integrations.has.tracker}}
 ## Keeping the tracker in sync
 
-The tracker is the shared record. When you start work on a ticket, it is yours to show: assign it to yourself if it went to someone else (a hand-back gives it to the person who asked) and move it to `active`, unless it is `blocked` and still cannot go on. That holds for every round on the ticket, also one for review feedback, a comment or failing checks on a ticket you handed back. The office keeps the other routine changes for you, from what you do, and says on the ticket that it made them for you:
+The tracker is the shared record. The office keeps the routine changes for you, from what you do, and says on the ticket that it made them for you:
 
+- you start a round on it (the work, review feedback, a comment, a rebase or failing checks), also on a ticket you handed back: it is assigned to you and moves to `active`, unless it is `done` or `canceled`;
 - you open its pull request for review (not as a draft): it moves to `review`;
 - its last open pull request merges into the default branch: it moves to `done`;
 - you hand back as `done`: it moves to `review` and goes to the person who asked; as `blocked`: it moves to `blocked` and goes to them.
 
-Do not make these moves or assignments yourself; hand back with the status that says where the work is (`process/hand-back.md`). Change a ticket yourself for what the office cannot see, the moment it happens: you start on it, you cancel it, or you file, split or re-parent tickets. Comment with `ost ticket` on anything a reader would not see from the status.
+Do not make these moves or assignments yourself, not even when your round starts: the ticket is already yours and `active` when you first look at it. Hand back with the status that says where the work is (`process/hand-back.md`). Change a ticket yourself for what the office cannot see, the moment it happens: you cancel it, or you file, split or re-parent tickets. Comment with `ost ticket` on anything a reader would not see from the status.
 
 - File what you find yourself with `ost ticket create`; do not ask someone else to. Work that is part of an existing ticket's scope is a subtask of it (`--parent <ticket>`, the default inside that ticket's work item, or `ost ticket parent <ticket> <parent>` for one that exists). A follow-up that stands on its own is a separate ticket with a relates link: `ost ticket create --related <ticket>`. It lands in the backlog, unassigned, unless you pass `--assignee` or `--status`. Name every ticket you filed in your hand-back.
 - If the tracker and a work item disagree, trust the tracker, fix the work item, and mention it in the journal.
