@@ -1,5 +1,8 @@
 import type { ActSpec, OpSpec, PersonSpec, PolicyDefinition, WakeSpec } from "@outstaff/policy";
 
+/** The agent a pull request's ticket belongs to: its author, or, for a human's pull request, the ticket's agent. */
+export const TICKET_AGENT: PersonSpec = ["author", "assignee", "last_worker"];
+
 const code = (s: string) => `\`${s}\``;
 
 /** One person, or a list tried in order. */

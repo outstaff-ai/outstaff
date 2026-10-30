@@ -16,10 +16,10 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`chat_to_addressed`](#chat_to_addressed) | `chat.message` | wake `addressed` (kind `chat`) |
 | [`review_to_author`](#review_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `review_feedback`) |
 | [`merged_feedback_to_author`](#merged_feedback_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `merged_feedback`) |
-| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merged` | act for `author`: move the ticket to `done` |
+| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merged` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done` |
 | [`rebase_to_author`](#rebase_to_author) | `pr.conflicted`, `pr.behind_base`, `pr.base_merged` | wake `author` (kind `rebase`) |
 | [`ci_failed_to_author`](#ci_failed_to_author) | `pr.ci_failed` | wake `author` (kind `ci_failed`) |
-| [`opened_to_review`](#opened_to_review) | `pr.opened` | act for `author`: move the ticket to `review` |
+| [`opened_to_review`](#opened_to_review) | `pr.opened` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `review` |
 | [`assigned_to_assignee`](#assigned_to_assignee) | `ticket.assigned`, `ticket.created` | wake `assignee` (kind `assigned`) |
 | [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `mentioned`, else `assignee` (kind `ticket_comment`) |
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
@@ -96,9 +96,9 @@ Instruction:
 
 ### merged_closes_ticket
 
-A merge into the default branch closes the ticket for the author, unless another of its pull requests is open.
+A merge into the default branch closes the ticket, unless another of its pull requests is open: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
 
-Listens to `pr.merged`. Decides: act for `author`: move the ticket to `done`.
+Listens to `pr.merged`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`.
 
 When:
 
@@ -111,7 +111,7 @@ When:
 Note posted with the change:
 
 ```text
-Moved to done: my pull request #{{pr.number}} merged.
+Moved to done: pull request #{{pr.number}} by {{pr.author}} merged.
 ```
 
 ### rebase_to_author
@@ -156,9 +156,9 @@ Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}. The failing chec
 
 ### opened_to_review
 
-A pull request opened for review moves its ticket to review, for the author.
+A pull request opened for review moves its ticket to review: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
 
-Listens to `pr.opened`. Decides: act for `author`: move the ticket to `review`.
+Listens to `pr.opened`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `review`.
 
 When:
 
@@ -170,7 +170,7 @@ When:
 Note posted with the change:
 
 ```text
-Moved to review: I opened pull request #{{pr.number}}.
+Moved to review: pull request #{{pr.number}} by {{pr.author}} is open for review.
 ```
 
 ### assigned_to_assignee

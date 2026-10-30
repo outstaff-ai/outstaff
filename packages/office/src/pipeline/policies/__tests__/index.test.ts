@@ -23,7 +23,11 @@ describe("the built-in policies", () => {
     );
 
     expect(trace.decisions).toMatchObject([
-      { type: "act", as: "sam", note: "Moved to review: I opened pull request #9." },
+      {
+        type: "act",
+        as: "sam",
+        note: "Moved to review: pull request #9 by sam is open for review.",
+      },
     ]);
   });
 });
