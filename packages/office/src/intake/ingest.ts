@@ -6,6 +6,7 @@ import {
   normalizeTrackerEvent,
   normalizeVcsEvent,
   resolveMentions,
+  resolveStatuses,
 } from "./normalize.js";
 import type { Ingest, IngestOptions, IntakeMeta, StoredPayload } from "./types.js";
 
@@ -17,7 +18,7 @@ const UNMAPPED_MEMORY_CAP = 5_000;
 
 /** Classifies, records and passes on the events the sources read. */
 export function createIngest(opts: IngestOptions): Ingest {
-  const { store, clock, logger, trust, mentions } = opts;
+  const { store, clock, logger, trust, mentions, statuses } = opts;
 
   // Feeds are re-read with an overlap, so an unmapped event comes back on every poll. It is logged at info
   // once per event id and at debug after that. Kept in memory: after a restart it may be logged at info again.
@@ -164,6 +165,7 @@ export function createIngest(opts: IngestOptions): Ingest {
         const mapped = normalizeTrackerEvent(event, actor);
         if (mapped) {
           resolveMentions(mapped, mentions);
+          resolveStatuses(mapped, statuses);
         }
 
         return mapped && { event: mapped, trusted: actor.kind !== "human" || actor.trusted };

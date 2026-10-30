@@ -1,5 +1,5 @@
 import { parseTeamConfig } from "@outstaff/core";
-import type { Member, RepoRef, TeamConfig, WorkflowEvent } from "@outstaff/core";
+import type { Member, RepoRef, StatusMap, TeamConfig, WorkflowEvent } from "@outstaff/core";
 import { createFakeTracker, createFakeVcs } from "@outstaff/core/fakes";
 import { manualClock } from "#/clock.js";
 import { openStore } from "#/store/index.js";
@@ -50,6 +50,9 @@ export async function setup(
   over: Partial<IntakeOptions> & {
     teamExtra?: Record<string, unknown>;
     trackerActor?: Member;
+
+    /** The status names the fake tracker uses; the team's map is `teamExtra.workflow.statuses`. */
+    trackerStatuses?: StatusMap;
     noHandler?: boolean;
 
     /** Skip the baseline poll, to exercise the first poll itself. */
@@ -62,6 +65,7 @@ export async function setup(
   const tracker = createFakeTracker({
     now: clock.now,
     ...(over.trackerActor ? { actor: over.trackerActor } : {}),
+    ...(over.trackerStatuses ? { statusMap: over.trackerStatuses } : {}),
   });
 
   const events: { event: WorkflowEvent; meta: IntakeMeta }[] = [];

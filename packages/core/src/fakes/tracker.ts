@@ -164,9 +164,10 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
     },
     async transition(key, to) {
       const issue = need(key);
-      const from = issue.status.canonical;
+      const from = issue.status.name;
       issue.status = { name: statusName(to), canonical: to };
-      emit("moved", key, { from, to });
+      // As a real tracker reports a move: in its own status names.
+      emit("moved", key, { from, to: issue.status.name });
       return touch(issue);
     },
     async assign(key, memberId) {

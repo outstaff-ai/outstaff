@@ -137,7 +137,11 @@ export const traceSchema = z.strictObject({
       chat: z.strictObject({ channel: z.string(), thread: z.string().optional() }).optional(),
     }),
     actor: z.strictObject({ kind: z.enum(["human", "agent", "automation"]), id: z.string() }),
-    data: z.record(z.string(), z.unknown()).describe("Event data, as the source gave it."),
+    data: z
+      .record(z.string(), z.unknown())
+      .describe(
+        "Event data as intake normalized it: a ticket move has canonical statuses in `from` and `to` and the tracker's names in `fromName` and `toName`.",
+      ),
   }),
   urls: z
     .strictObject({

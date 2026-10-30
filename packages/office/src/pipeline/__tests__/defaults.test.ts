@@ -34,6 +34,21 @@ const t = (
   ...extra,
 });
 
+/** A team's tracker names for the statuses a move goes between; intake keeps them beside the canonical ones. */
+const TRACKER_NAMES: Record<string, string> = {
+  ready: "Up Next",
+  active: "In Progress",
+  review: "In Review",
+};
+
+/** A move as intake hands it on, from ready: canonical statuses, with the tracker's names beside them. */
+const moveData = (to: string) => ({
+  from: "ready",
+  fromName: TRACKER_NAMES["ready"],
+  to,
+  toName: TRACKER_NAMES[to],
+});
+
 const onPr = (
   type: PipelineEvent["type"],
   data: Record<string, unknown> = {},
@@ -264,7 +279,7 @@ describe("default policies", () => {
 
   it("moved_active_to_assignee: a human moving an agent's ticket to active", () => {
     const moved = (to: string) =>
-      event("ticket.moved", { subject: { ticket: "ACME-1" }, data: { to } });
+      event("ticket.moved", { subject: { ticket: "ACME-1" }, data: moveData(to) });
 
     const world = { tickets: { "ACME-1": t("active", "sam") } };
     expect(judge("moved_active_to_assignee", moved("active"), world)).toEqual([
@@ -274,6 +289,20 @@ describe("default policies", () => {
     expect(judge("moved_active_to_assignee", moved("review"), world)).toEqual({
       failed: { moved_to: ["active"] },
     });
+
+    const reason = (e: PipelineEvent) =>
+      evaluatePipeline(e, stateOf(world), DEFAULT_POLICIES, OPTS).policies.find(
+        (p) => p.policy === "moved_active_to_assignee",
+      )?.reason;
+
+    expect(reason(moved("review"))).toBe("moved to In Review (review) in [active]");
+    // A status the team's map does not know reaches the pipeline as its name only.
+    const unmapped = event("ticket.moved", {
+      subject: { ticket: "ACME-1" },
+      data: { fromName: "Up Next", toName: "Doing" },
+    });
+
+    expect(reason(unmapped)).toBe("moved to Doing (unmapped) in [active]");
   });
 
   it("ticket_comment_to_last_worker: a human's comment on a ticket an agent handed back", () => {
@@ -334,8 +363,6 @@ describe("default policies", () => {
     ]);
   });
 
-  // `moved_to` compares the tracker's status name with canonical statuses, so live it does not match yet (#425).
-  // These events carry the canonical status, as the other `moved_to` tests do; they do not cover that bug.
   it("moved_active_to_last_worker: a human moving a ticket an agent handed back to active", () => {
     const handedBack = (
       assignee = "ada.admin",
@@ -345,7 +372,7 @@ describe("default policies", () => {
     });
 
     const moved = (to = "active", actor = ADA) =>
-      event("ticket.moved", { subject: { ticket: "ACME-1" }, actor, data: { to } });
+      event("ticket.moved", { subject: { ticket: "ACME-1" }, actor, data: moveData(to) });
 
     const judged = (e: PipelineEvent, world: World) =>
       judge("moved_active_to_last_worker", e, world);

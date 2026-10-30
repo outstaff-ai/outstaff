@@ -70,8 +70,13 @@ const CHECKS: ConditionChecks = {
     };
   },
   moved_to: (wanted, ctx) => {
-    const to = ctx.event.data["to"];
-    return { ok: oneOf(to, wanted), detail: `moved to ${String(to ?? "none")} in ${list(wanted)}` };
+    // Intake puts the canonical status in `to` and the tracker's name in `toName`; `to` is absent when it is unmapped.
+    const { to, toName } = ctx.event.data;
+    const status = typeof to === "string" ? to : undefined;
+    const shown =
+      typeof toName === "string" ? `${toName} (${status ?? "unmapped"})` : (status ?? "none");
+
+    return { ok: oneOf(status, wanted), detail: `moved to ${shown} in ${list(wanted)}` };
   },
   actor_kind: (wanted, ctx) => ({
     ok: ctx.event.actor.kind === wanted,

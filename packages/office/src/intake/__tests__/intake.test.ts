@@ -66,6 +66,37 @@ describe("normalization", () => {
       data: { from: "backlog", to: "active" },
     });
   });
+
+  it("turns the tracker's status names of a move into canonical statuses, keeping the names", async () => {
+    const statuses = { ready: "Up Next", active: "In Progress" };
+    const { tracker, intake, events } = await setup({
+      trackerActor: human("u1", "dana"),
+      trackerStatuses: { ...statuses, review: "Waiting" },
+      teamExtra: { workflow: { statuses } },
+    });
+
+    const issue = await tracker.createIssue({ title: "Search", body: "", status: "ready" });
+    await tracker.transition(issue.key, "active");
+    await tracker.transition(issue.key, "review");
+    await tracker.comment(issue.key, "to: In Progress");
+    await intake.pollOnce();
+
+    const tracked = events.filter((e) => e.meta.source === "tracker").map((e) => e.event);
+    const moves = tracked.filter((e) => e.type === "ticket.moved").map((e) => e.data);
+    expect(moves).toEqual([
+      expect.objectContaining({
+        from: "ready",
+        fromName: "Up Next",
+        to: "active",
+        toName: "In Progress",
+      }),
+      // A name the team's map does not know is left as the name only.
+      expect.objectContaining({ from: "active", fromName: "In Progress", toName: "Waiting" }),
+    ]);
+
+    expect(moves[1]).not.toHaveProperty("to");
+    expect(tracked.find((e) => e.type === "ticket.commented")?.data).not.toHaveProperty("toName");
+  });
 });
 
 describe("trust classification", () => {

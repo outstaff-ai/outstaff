@@ -230,8 +230,11 @@ const kanbanRules: Rule[] = [
   {
     id: "active-human-takeback",
     on: "ticket.moved",
+    // A human's move only: the office's own move to active (reactivating a ticket for review feedback) comes back
+    // through the tracker's feed before its reassignment does, while the ticket is still the human's.
     if: {
       all: [
+        { actor_kind: "human" },
         { moved_to: ["active"] },
         { assignee_kind: "human" },
         { not: { has_label: "$needs_human" } },

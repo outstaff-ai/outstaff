@@ -1,4 +1,4 @@
-import { parseRepoUrl, policyOn, PortError } from "@outstaff/core";
+import { createStatusMap, parseRepoUrl, policyOn, PortError } from "@outstaff/core";
 import type { RepoRef } from "@outstaff/core";
 import { DEFAULT_BACKOFF } from "./backoff.js";
 import { createDelivery } from "./delivery.js";
@@ -75,6 +75,7 @@ export function createIntake(opts: IntakeOptions): Intake {
     logger,
     trust,
     mentions,
+    statuses: createStatusMap(team.workflow?.statuses),
     drain: () => drain(),
   });
 

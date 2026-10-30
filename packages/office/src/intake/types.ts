@@ -12,6 +12,7 @@ import type {
   Vcs,
   VcsEvent,
   WorkflowEvent,
+  WorkflowStatusMap,
 } from "@outstaff/core";
 import type { Store } from "#/store/index.js";
 import type { Clock } from "#/types.js";
@@ -163,6 +164,9 @@ export interface IngestOptions {
 
   /** Resolves `@mentions` to agent handles; unset when the switch is off. */
   mentions: ((names: unknown) => string[]) | undefined;
+
+  /** The team's `workflow.statuses`, to turn the tracker's status names into canonical statuses. */
+  statuses: WorkflowStatusMap;
   drain(): Promise<void>;
 }
 
