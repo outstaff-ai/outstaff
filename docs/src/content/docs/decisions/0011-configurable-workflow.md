@@ -5,7 +5,7 @@ sidebar:
   order: 11
 ---
 
-**Status:** accepted
+**Status:** replaced by [0018](/decisions/0018-pipeline-only/), except the status mapping (`workflow.statuses`), which stays.
 
 ## Context
 

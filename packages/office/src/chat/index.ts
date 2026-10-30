@@ -7,6 +7,8 @@ export {
   threadKey,
 } from "./origin.js";
 
-export { PM_ROLE, createChatDesk, type ChatDeskOptions, type ChatRequests } from "./desk.js";
-export { parsePlacement, placeQueued } from "./placement.js";
-export type { ChatOriginRecord, ParsedPlacement } from "./types.js";
+export { createChatDesk } from "./desk.js";
+export { PM_ROLE } from "./desk-reports.js";
+export type { ChatDeskOptions, ChatRequests } from "./desk.types.js";
+export { placeQueued } from "./placement.js";
+export type { ChatOriginRecord } from "./types.js";

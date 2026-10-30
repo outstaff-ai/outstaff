@@ -78,11 +78,7 @@ const valid = (): TeamConfigInput => ({
   },
   email: { pattern: "{handle}@acme.example" },
   office: { events: "webhook", poll_interval_seconds: 30 },
-  workflow: {
-    preset: "scrum",
-    statuses: { review: "In Review" },
-    rules: [{ id: "x", on: "pr.opened", do: [{ move: "review" }] }],
-  },
+  workflow: { statuses: { review: "In Review" }, needs_human_label: "hold" },
   policies: {
     agent_loop_guard: { max_runs_per_item_per_hour: 6 },
     usage: { defer_scheduled_at: 0.5, pause_automatic_at: 0.9 },
@@ -127,24 +123,17 @@ describe("parseTeamConfig", () => {
     expect(r.config.repos[0]?.default_branch).toBe("main");
     expect(r.config.people[0]?.repos).toEqual({});
     expect(r.config.office).toEqual({ events: "poll", poll_interval_seconds: 60 });
-    expect(r.config.workflow?.preset).toBe("kanban");
+    expect(r.config.workflow).toEqual({});
     expect(r.config.policies).toEqual({
       agent_loop_guard: { max_runs_per_item_per_hour: 12 },
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
       acknowledge: { chat: true, vcs: true },
-      feedback: {
-        follow_up_round: true,
-        merged_prs: true,
-        doc_comments: true,
-        ticket_comments: true,
-        mentions: true,
-      },
-      hand_back: { reassign: "requester", blocked_notify: "pm", fallback: "first_human" },
-      tickets: { prs_per_ticket: "one", start_moves_active: true },
+      feedback: { follow_up_round: true },
+      hand_back: { blocked_notify: "pm", fallback: "first_human" },
+      tickets: { prs_per_ticket: "one" },
       pull_ready: true,
-      conflicts: { follow_up: true },
       merge: { on_approval: false, approvers: ["humans"] },
-      retry: { on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 },
+      retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
       chat: { parallel_sessions: 2, profile: true },
       design: { canvas: true },
@@ -154,7 +143,7 @@ describe("parseTeamConfig", () => {
   it("keeps what the team sets in policies and fills the rest with defaults", () => {
     const r = parseTeamConfig({
       ...valid(),
-      policies: { acknowledge: { vcs: false }, hand_back: { reassign: "none" } },
+      policies: { acknowledge: { vcs: false }, hand_back: { blocked_notify: "agent" } },
     });
 
     if (!r.ok) {
@@ -163,12 +152,11 @@ describe("parseTeamConfig", () => {
 
     expect(r.config.policies?.acknowledge).toEqual({ chat: true, vcs: false });
     expect(r.config.policies?.hand_back).toEqual({
-      reassign: "none",
-      blocked_notify: "pm",
+      blocked_notify: "agent",
       fallback: "first_human",
     });
 
-    expect(r.config.policies?.conflicts).toEqual({ follow_up: true });
+    expect(r.config.policies?.feedback).toEqual({ follow_up_round: true });
   });
 
   it("rejects an unknown switch and a value outside a switch's choices", () => {
@@ -183,9 +171,66 @@ describe("parseTeamConfig", () => {
       expect.objectContaining({ path: ["policies", "review"], code: "schema.unknown_key" }),
     ]);
 
-    expect(bad((c) => (c.policies = { hand_back: { reassign: "everyone" } }))[0]).toMatchObject({
-      path: ["policies", "hand_back", "reassign"],
-    });
+    expect(
+      bad((c) => (c.policies = { hand_back: { blocked_notify: "everyone" } }))[0],
+    ).toMatchObject({ path: ["policies", "hand_back", "blocked_notify"] });
+  });
+
+  it("names what replaced each key the event pipeline made obsolete", () => {
+    const removed = (mutate: (c: any) => void) =>
+      bad(mutate).map((i) => [i.path.join("."), i.code, i.message]);
+
+    const cases: [(c: any) => void, string, string][] = [
+      [(c) => (c.office = { pipeline: "live" }), "office.pipeline", "It always runs"],
+      [
+        (c) => (c.policies = { feedback: { merged_prs: false } }),
+        "policies.feedback.merged_prs",
+        "merged_feedback_to_author",
+      ],
+      [
+        (c) => (c.policies = { feedback: { doc_comments: false } }),
+        "policies.feedback.doc_comments",
+        "doc_comment_to_agent",
+      ],
+      [
+        (c) => (c.policies = { feedback: { ticket_comments: false } }),
+        "policies.feedback.ticket_comments",
+        "ticket_comment_to_last_worker",
+      ],
+      [
+        (c) => (c.policies = { feedback: { mentions: false } }),
+        "policies.feedback.mentions",
+        "wakes that agent",
+      ],
+      [
+        (c) => (c.policies = { hand_back: { reassign: "none" } }),
+        "policies.hand_back.reassign",
+        "hand_back_done",
+      ],
+      [
+        (c) => (c.policies = { conflicts: { follow_up: false } }),
+        "policies.conflicts",
+        "rebase_to_author",
+      ],
+      [
+        (c) => (c.policies = { retry: { on_signal: false } }),
+        "policies.retry.on_signal",
+        "new round",
+      ],
+      [
+        (c) => (c.policies = { tickets: { start_moves_active: false } }),
+        "policies.tickets.start_moves_active",
+        "moves its ticket to active",
+      ],
+    ];
+
+    for (const [mutate, path, hint] of cases) {
+      const [[at, code, message]] = removed(mutate) as [[string, string, string]];
+      expect(at).toBe(path);
+      expect(code).toBe("schema.removed_key");
+      expect(message).toContain("decision 0018");
+      expect(message).toContain(hint);
+    }
   });
 
   it("accepts policies.merge and rejects a bad approver, method or repo", () => {

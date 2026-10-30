@@ -1,6 +1,6 @@
 import { buildWorkPrompt, type Offer } from "@outstaff/agent";
 import { describe, expect, it } from "vitest";
-import { parsePrompt } from "#/prompt.js";
+import { latestChatMessage, parsePrompt } from "#/prompt.js";
 
 const offer = (kind: string): Offer =>
   ({
@@ -256,5 +256,26 @@ describe("parsePrompt", () => {
     ]);
 
     expect(parsePrompt(buildWorkPrompt(offer("chat"), { resumed: false }))?.files).toBeUndefined();
+  });
+});
+
+describe("latestChatMessage", () => {
+  it("reads the message a chat wake carries, from the agent's own prompt", () => {
+    const woken = offer("chat");
+    const context = woken.context as unknown as Record<string, unknown>;
+    context["feedback"] = [
+      { actor: "ada.admin", kind: "chat", body: "For PR #1, also say goodbye." },
+      { actor: "ada.admin", kind: "chat", body: "This PR." },
+    ];
+
+    expect(latestChatMessage(buildWorkPrompt(woken, { resumed: true }))).toBe("This PR.");
+  });
+
+  it("reads the journal's note of a message added to the work, or nothing", () => {
+    expect(latestChatMessage("Ada asked in chat (thread T1); added to PR #1:\nAlso say bye.")).toBe(
+      "Also say bye.",
+    );
+
+    expect(latestChatMessage("No chat here.")).toBeUndefined();
   });
 });

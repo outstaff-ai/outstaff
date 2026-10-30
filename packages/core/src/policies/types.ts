@@ -1,4 +1,30 @@
-import type { PolicySwitch, PolicyValue } from "./switches.js";
+import type { Capability } from "#/types.js";
+
+/** A switch holds `true`/`false`, or one of a few named choices; `none` always means off. */
+export type PolicyValue = boolean | string;
+
+export interface PolicySwitch {
+  /** Dotted path under `policies` in team.yaml. */
+  path: string;
+
+  /** Value when team.yaml says nothing. Everything that happens today is on by default. */
+  default: PolicyValue;
+
+  /** The value that turns the behaviour off (or, for a limit, lifts it). */
+  off: false | "none" | "many" | "agent";
+
+  /** What outstaff does while the switch is on, for `ost policies` and the docs. */
+  behaviour: string;
+
+  /** Who carries the behaviour out: code in the agent or the office, or an option the office reads. */
+  kind: "agent" | "office" | "option";
+
+  /** The capability the configured adapter needs for the switch to do anything; `validate` warns when it lacks it. */
+  needs?: Capability;
+}
+
+/** The shape of `policies` the switches read; a parsed team config satisfies it. */
+export type PolicyConfig = { [group: string]: unknown } | undefined;
 
 /** Someone who submitted a review, as the host and the team know them. */
 export interface ApproverCandidate {
@@ -11,11 +37,8 @@ export interface ApproverCandidate {
   trusted: boolean;
 }
 
-/**
- * Where an effective value comes from: the built-in default, the team file, the workflow preset (which has no
- * such rule), or an explicit entry of `workflow.rules`, which wins over a switch.
- */
-export type PolicySource = "default" | "team.yaml" | "preset" | "workflow.rules";
+/** Where an effective value comes from: the built-in default or the team file. */
+export type PolicySource = "default" | "team.yaml";
 
 export interface PolicyReport {
   switch: PolicySwitch;

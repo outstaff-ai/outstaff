@@ -15,14 +15,10 @@ export const idle: ReplayScenario = {
           ],
         },
       },
-      note: "intended fix: an idle agent starts its next ready ticket (ACME-161); the engine's rules never see agent.idle, the scheduler's idle pull starts it instead",
     },
     { event: ev("s5-idle-noor", "agent.idle", "noor", {}, at(221)), world: {} },
   ],
 };
-
-const UNBLOCK =
-  "regression: the PM (priya) gets no unblock round; the plan turns blocked routing into a policy that is not in this set yet";
 
 const handBack = (id: string, key: string, status: string, minute: number) =>
   ev(id, "agent.handed_back", "noor", { ticket: key }, at(minute), {
@@ -37,7 +33,6 @@ export const handBacks: ReplayScenario = {
     {
       event: handBack("s6-blocked", "ACME-170", "blocked", 230),
       world: { tickets: { "ACME-170": ticket("active", "noor") }, roles: ROLES },
-      note: UNBLOCK,
     },
     {
       event: handBack("s6-done", "ACME-171", "done", 231),
@@ -46,7 +41,6 @@ export const handBacks: ReplayScenario = {
     {
       event: handBack("s6-done-on-blocked", "ACME-172", "done", 232),
       world: { tickets: { "ACME-172": ticket("blocked", "noor") }, roles: ROLES },
-      note: UNBLOCK,
     },
     {
       event: handBack("s6-waiting", "ACME-173", "waiting", 233),
@@ -64,7 +58,6 @@ export const chat: ReplayScenario = {
         body: "Can you look at the checkout bug from this morning?",
       }),
       world: {},
-      note: "intended fix: chat is an ordinary event that wakes the agent written to; today the chat desk routes it outside the rules",
     },
     {
       event: ev("s7-agent-dm", "chat.message", "kofi", { chat: { channel: "D0SAM" } }, at(241), {
@@ -113,7 +106,6 @@ export const docComments: ReplayScenario = {
         },
       ),
       world: { tickets: design, docs: { "doc-7": "mira" }, roles: ROLES },
-      note: "intended fix: per the plan's table a mention goes to the agent named (leo), not also to the author, and taking ACME-180 is left to leo",
     },
   ],
 };

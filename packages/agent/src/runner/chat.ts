@@ -12,7 +12,7 @@ import { acknowledgement } from "./chat-acknowledge.js";
 import { fromTrustedHuman, linksToList, officeMessage, reportBody } from "./chat-report.js";
 import type { ChatRelayOptions, ChatRelay, ReportDestination, ReportTarget } from "./chat.types.js";
 import { chatContext } from "./chat-context.js";
-import { placementQuestion, replyFor } from "./chat-replies.js";
+import { placementQuestion } from "./chat-replies.js";
 import { linkLine, splitReply, tag } from "./chat-text.js";
 import { reason } from "./reason.js";
 
@@ -21,7 +21,6 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   const log = opts.log ?? silentLogger;
   const historyLimit = opts.historyLimit ?? 10;
   const acknowledge = policyOn(team.policies, "acknowledge.chat");
-  const hasPm = team.people.some((p) => p.role === "pm");
 
   const linker = createTicketLinker(team, opts.tracker);
 
@@ -94,15 +93,8 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       chat.react(m.channel, m.id, "eyes").catch(() => {});
     }
 
-    const result = await toOffice(m, participant, thread);
-    if (!result || result.repeated) {
-      return;
-    }
-
-    const text = replyFor(result, hasPm, describe);
-    if (text) {
-      await post(m.channel, thread, linked(text));
-    }
+    // The office takes the message in as an event; the reply comes with the work it starts.
+    await toOffice(m, participant, thread);
   }
 
   /** Where a report goes: the threads it belongs to, else a direct message with the requester (no thread, no mention). */
@@ -208,7 +200,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         linked(
           [
             `${tag(origin)}${acknowledgement(what, filed, ticketUrl)}`,
-            ...(filed.waiting ? [placementQuestion(hasPm, describe, filed.work)] : []),
+            ...(filed.waiting ? [placementQuestion(describe, filed.work)] : []),
           ].join("\n"),
         ),
       );

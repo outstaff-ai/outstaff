@@ -285,142 +285,36 @@ describe("ost validate", () => {
   });
 });
 
-describe("ost workflow explain", () => {
-  const event = JSON.stringify({
-    type: "ticket.assigned",
-    subject: { ticket: "ACME-1" },
-    actor: { kind: "human", id: "dana" },
-  });
-
-  const state = JSON.stringify({
-    tickets: { "ACME-1": { status: "ready", assignee: { id: "sam", kind: "agent" } } },
-  });
-
-  it("explains each rule against the event and state", async () => {
-    const r = await ost(acme(), ["workflow", "explain", event, "--state", state]);
-    expect(r.code).toBe(0);
-    expect(r.out).toContain("match    assigned-agent-scheduled");
-    expect(r.out).toContain("schedule assigned for sam (normal)");
-    expect(r.out).toContain("no match  pr-opened-review");
-  });
-
-  it("names the switch behind a rule and lists a rule a switch removed", async () => {
-    const team = readFileSync(ACME_TEAM_FILE, "utf8").replace(
-      "  conflicts:\n    follow_up: true\n",
-      "  conflicts:\n    follow_up: false\n",
-    );
-
-    const conflicted = JSON.stringify({
-      type: "pr.conflicted",
-      subject: { pr: { repo: { owner: "acme", name: "app" }, number: 10 } },
-      actor: { kind: "automation", id: "engine" },
-    });
-
-    const off = await ost(project(undefined, team), ["workflow", "explain", conflicted]);
-    expect(off.out).toContain(
-      "off       conflict-back-to-author: removed by policies.conflicts.follow_up",
-    );
-
-    const handed = JSON.stringify({
-      type: "agent.handed_back",
-      subject: { ticket: "ACME-1" },
-      data: { status: "done" },
-    });
-
-    const on = await ost(acme(), ["workflow", "explain", handed]);
-    expect(on.out).toContain("switch policies.hand_back.reassign");
-    expect(on.out).not.toContain("removed by");
-  });
-
-  it("prints JSON", async () => {
-    const r = await ost(acme(), ["workflow", "explain", event, "--state", state, "--json"]);
-    expect(JSON.parse(r.out).effects).toEqual([
-      expect.objectContaining({ type: "schedule", person: "sam", kind: "assigned" }),
-    ]);
-  });
-
-  it("schedules PR feedback for the author when there is no linked ticket", async () => {
-    const pr = { repo: { owner: "acme", name: "app" }, number: 10 };
-    const r = await ost(acme(), [
-      "workflow",
-      "explain",
-      JSON.stringify({
-        type: "pr.comment",
-        subject: { pr },
-        actor: { kind: "human", id: "dana" },
-        data: { body: "please add a test" },
-      }),
-      "--state",
-      JSON.stringify({
-        prs: [
-          {
-            ref: pr,
-            title: "Add search",
-            headRef: "sam/search",
-            baseRef: "main",
-            draft: false,
-            state: "open",
-            author: { login: "acme-sam[bot]", kind: "agent", person: "sam" },
-          },
-        ],
-      }),
-    ]);
-
-    expect(r.out).toContain("match    human-feedback-back-to-author");
-    expect(r.out).toContain("schedule review_feedback for sam (high)");
-    expect(r.out).toContain("no match  human-feedback-reactivates-ticket");
-  });
-
-  it("works against an empty world", async () => {
-    const r = await ost(acme(), ["workflow", "explain", '{"type":"pr.opened"}']);
-    expect(r.code).toBe(0);
-    expect(r.out).toContain("Effects\n  none");
-  });
-
-  it("rejects a malformed event or state", async () => {
-    expect((await ost(acme(), ["workflow", "explain", "{"])).code).toBe(1);
-    expect((await ost(acme(), ["workflow", "explain", '{"type":"nope"}'])).err).toContain('"type"');
-
-    const bad = await ost(acme(), ["workflow", "explain", event, "--state", "[]"]);
-    expect(bad.code).toBe(1);
-  });
-});
-
 describe("ost policies", () => {
   it("lists every switch of the acme team with its value and source", async () => {
     const r = await ost(acme(), ["policies"]);
     expect(r.code).toBe(0);
-    expect(r.out).toBe(`SWITCH                               VALUE        SOURCE
-policies.acknowledge.chat            true         team.yaml
-policies.acknowledge.vcs             true         team.yaml
-policies.chat.profile                true         team.yaml
-policies.design.canvas               true         team.yaml
-policies.feedback.follow_up_round    true         team.yaml
-policies.feedback.merged_prs         true         team.yaml
-policies.feedback.doc_comments       true         team.yaml
-policies.feedback.ticket_comments    true         team.yaml
-policies.feedback.mentions           true         team.yaml
-policies.hand_back.reassign          requester    team.yaml
-policies.hand_back.blocked_notify    pm           default
-policies.hand_back.fallback          first_human  team.yaml
-policies.tickets.prs_per_ticket      one          team.yaml
-policies.tickets.start_moves_active  true         team.yaml
-policies.pull_ready                  true         default
-policies.merge.on_approval           false        default
-policies.conflicts.follow_up         true         team.yaml
-policies.retry.on_signal             true         team.yaml
+    expect(r.out).toBe(`SWITCH                             VALUE        SOURCE
+policies.acknowledge.chat          true         team.yaml
+policies.acknowledge.vcs           true         team.yaml
+policies.chat.profile              true         team.yaml
+policies.design.canvas             true         team.yaml
+policies.feedback.follow_up_round  true         team.yaml
+policies.hand_back.blocked_notify  pm           default
+policies.hand_back.fallback        first_human  team.yaml
+policies.tickets.prs_per_ticket    one          team.yaml
+policies.pull_ready                true         default
+policies.merge.on_approval         false        default
 `);
   });
 
   it("reports a switch the team set and one left at its default", async () => {
     const team = readFileSync(ACME_TEAM_FILE, "utf8")
       .replace("    vcs: true\n", "    vcs: false\n")
-      .replace("  conflicts:\n    follow_up: true\n", "");
+      .replace("  feedback:\n    follow_up_round: true\n", "");
 
     const r = await ost(project(undefined, team), ["policies", "--json"]);
     const by = Object.fromEntries(JSON.parse(r.out).map((e: any) => [e.switch, e]));
     expect(by["policies.acknowledge.vcs"]).toMatchObject({ value: false, source: "team.yaml" });
-    expect(by["policies.conflicts.follow_up"]).toMatchObject({ value: true, source: "default" });
+    expect(by["policies.feedback.follow_up_round"]).toMatchObject({
+      value: true,
+      source: "default",
+    });
   });
 });
 

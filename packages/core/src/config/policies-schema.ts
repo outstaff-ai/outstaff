@@ -31,29 +31,8 @@ export const policiesSchema = z
           "Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.",
         ),
       ),
-    conflicts: z
-      .strictObject({
-        follow_up: z
-          .boolean()
-          .default(true)
-          .meta(
-            d(
-              "Send a pull request that starts to conflict with its base, for example after another one merged, back to its agent author to rebase. Switches the preset rule conflict-back-to-author. Default on.",
-            ),
-          ),
-      })
-      .default({ follow_up: true })
-      .meta(d("Merge conflicts between pull requests.")),
     retry: z
       .strictObject({
-        on_signal: z
-          .boolean()
-          .default(true)
-          .meta(
-            d(
-              "Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread. Default on.",
-            ),
-          ),
         base_minutes: z
           .int()
           .min(1)
@@ -81,12 +60,8 @@ export const policiesSchema = z
           );
         }
       })
-      .default({ on_signal: true, base_minutes: 1, cap_minutes: 30, max_failures: 3 })
-      .meta(
-        d(
-          "How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.",
-        ),
-      ),
+      .default({ base_minutes: 1, cap_minutes: 30, max_failures: 3 })
+      .meta(d("How a failing work item is retried: exponential backoff, then blocked.")),
     merge: z
       .strictObject({
         on_approval: z

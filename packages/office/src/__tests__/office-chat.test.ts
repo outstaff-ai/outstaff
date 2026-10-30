@@ -3,7 +3,6 @@ import {
   AdapterRegistry,
   envSecretSource,
   parseTeamConfig,
-  silentLogger,
   type PortName,
   type RepoRef,
   type TeamConfig,
@@ -16,8 +15,7 @@ import {
 } from "@outstaff/core/fakes";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
-import { readFeedback } from "#/engine/feedback.js";
-import { createChatEntry } from "#/office-chat.js";
+import { readFeedback } from "#/work-feedback.js";
 import { createOffice } from "#/office.js";
 import type { Office } from "#/office.types.js";
 import type { Trace } from "#/pipeline/trace.types.js";
@@ -27,9 +25,7 @@ const REPO: RepoRef = { host: "git.acme.example", owner: "acme", name: "app" };
 const KOFI_LOGIN = "acme-kofi[bot]";
 const SAM_CHAT = "U-SAM";
 const DM = "D-SAM";
-type Mode = "off" | "shadow" | "live";
-
-function team(mode: Mode): TeamConfig {
+function team(): TeamConfig {
   const result = parseTeamConfig({
     version: 1,
     team: { name: "acme" },
@@ -54,7 +50,6 @@ function team(mode: Mode): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
-    office: { pipeline: mode },
   });
 
   if (!result.ok) {
@@ -73,7 +68,7 @@ const dm = (messageId: string, text: string) => ({
   participant: true,
 });
 
-function harness(mode: Mode) {
+function harness() {
   const h = {
     clock: manualClock(),
     office: undefined as unknown as Office,
@@ -106,7 +101,7 @@ function harness(mode: Mode) {
     await h.vcs.seed.permission(REPO, "dana", "write");
     h.store = await openStore("sqlite::memory:", { now: () => clock.now() });
     h.office = await createOffice({
-      team: team(mode),
+      team: team(),
       registry,
       secrets: envSecretSource({ OUTSTAFF_AGENT_TOKEN_KOFI: "kofi-token" }, "/nonexistent"),
       store: h.store,
@@ -163,95 +158,70 @@ async function next(kofi: OfficeConnection): Promise<Offer> {
 const traces = async (store: Store) =>
   (await store.listTraces({ limit: 100 })).map((t) => t.data as Trace);
 
-describe.each(["off", "shadow", "live"] as const)(
-  "Sam DMs Kofi about a ticket (office.pipeline: %s)",
-  { timeout: 30_000 },
-  (mode) => {
-    const h = harness(mode);
+describe("Sam DMs Kofi about a ticket", { timeout: 30_000 }, () => {
+  const h = harness();
 
-    /** Sam asks Kofi about a ticket; returns the ticket, the text and Kofi's offer. */
-    async function ask() {
-      const issue = await h.tracker.createIssue({ title: "Coupon", body: "", status: "backlog" });
-      await h.office.parts.intake.pollOnce();
-      const text = `can you look at ${issue.key}?`;
-      const result = await h.kofi.chatMessage(dm("1700.1", text));
-      expect(result.disposition).toBe(mode === "live" ? "received" : "started");
+  /** Sam asks Kofi about a ticket; returns the ticket, the text and Kofi's offer. */
+  async function ask() {
+    const issue = await h.tracker.createIssue({ title: "Coupon", body: "", status: "backlog" });
+    await h.office.parts.intake.pollOnce();
+    const text = `can you look at ${issue.key}?`;
+    expect(await h.kofi.chatMessage(dm("1700.1", text))).toEqual({ repeated: false });
 
-      // Live, the run is held for the coalescing window, then offered.
-      await until(async () => (await h.store.listItems({ person: "kofi" })).length > 0);
-      await pass(h, 60_000);
-      return { issue, text, offer: await next(h.kofi) };
-    }
+    // The run is held for the coalescing window, then offered.
+    await until(async () => (await h.store.listItems({ person: "kofi" })).length > 0);
+    await pass(h, 60_000);
+    return { issue, text, offer: await next(h.kofi) };
+  }
 
-    it("wakes Kofi once, in a chat session that carries the message and the ticket it names", async () => {
-      const { issue, text, offer } = await ask();
-      expect(offer.workItem).toMatchObject({
-        kind: "chat",
-        title: `Chat: ${text}`,
-        origin: { channel: DM, thread: "1700.1", requester: { id: SAM_CHAT, name: "Sam" } },
-      });
-
-      expect(await h.store.listItems({ person: "kofi" })).toHaveLength(1);
-      const carried = [
-        ...offer.context.journal.map((j) => j.text),
-        ...(offer.context.feedback ?? []).map((f) => f.body),
-      ];
-
-      expect(carried.some((t) => t.includes(text))).toBe(true);
-      const wake = offer.context.wake!;
-      expect(wake.chats[0]).toMatchObject({ channel: DM, thread: "1700.1" });
-      expect(wake.tickets.map((t) => [t.key, t.why.role])).toEqual([[issue.key, "mentioned"]]);
-
-      // The same message again is a repeat: nothing more is queued.
-      expect((await h.kofi.chatMessage(dm("1700.1", text))).repeated).toBe(true);
-      expect(await h.store.listItems({ person: "kofi" })).toHaveLength(1);
+  it("wakes Kofi once, in a chat session that carries the message and the ticket it names", async () => {
+    const { issue, text, offer } = await ask();
+    expect(offer.workItem).toMatchObject({
+      kind: "chat",
+      title: `Chat: ${text}`,
+      origin: { channel: DM, thread: "1700.1", requester: { id: SAM_CHAT, name: "Sam" } },
     });
 
-    it("traces the message: not when off, beside what the desk did in shadow mode, with its item live", async () => {
-      const { offer } = await ask();
-      await until(
-        async () => mode !== "shadow" || (await traces(h.store)).some((t) => t.comparison),
-      );
+    expect(await h.store.listItems({ person: "kofi" })).toHaveLength(1);
+    const carried = [
+      ...offer.context.journal.map((j) => j.text),
+      ...(offer.context.feedback ?? []).map((f) => f.body),
+    ];
 
-      const chat = (await traces(h.store))
-        .filter((t) => t.event.type === "chat.message")
-        .map((t) => ({
-          event: [t.event.id, t.event.subject, t.event.actor],
-          wakes: t.decisions.map(
-            (d) => d.type === "wake" && [d.policy, d.person, d.kind, d.itemId],
-          ),
-          engine: t.engine,
-          comparison: t.comparison,
-        }));
+    expect(carried.some((t) => t.includes(text))).toBe(true);
+    const wake = offer.context.wake!;
+    expect(wake.chats[0]).toMatchObject({ channel: DM, thread: "1700.1" });
+    expect(wake.tickets.map((t) => [t.key, t.why.role])).toEqual([[issue.key, "mentioned"]]);
 
-      const traced = {
+    // The same message again is a repeat: nothing more is queued.
+    expect((await h.kofi.chatMessage(dm("1700.1", text))).repeated).toBe(true);
+    expect(await h.store.listItems({ person: "kofi" })).toHaveLength(1);
+  });
+
+  it("traces the message with the item its wake queued", async () => {
+    const { offer } = await ask();
+    const chat = (await traces(h.store))
+      .filter((t) => t.event.type === "chat.message")
+      .map((t) => ({
+        event: [t.event.id, t.event.subject, t.event.actor],
+        wakes: t.decisions.map((d) => d.type === "wake" && [d.policy, d.person, d.kind, d.itemId]),
+      }));
+
+    expect(chat).toEqual([
+      {
         event: [
           `chat:kofi:${DM}:1700.1`,
           { chat: { channel: DM } },
           { kind: "human", id: SAM_CHAT },
         ],
-        wakes: [
-          ["chat_to_addressed", "kofi", "chat", mode === "live" ? offer.workItem.id : undefined],
-        ],
-      };
+        wakes: [["chat_to_addressed", "kofi", "chat", offer.workItem.id]],
+      },
+    ]);
+  });
+});
 
-      // In shadow mode the desk started the session, and the pipeline would wake Kofi on the same conversation.
-      const shadow = {
-        engine: {
-          effects: [
-            { type: "wake", person: "kofi", kind: "chat", subject: { type: "chat", ref: DM } },
-          ],
-        },
-        comparison: { agree: true, differences: [] },
-      };
-
-      expect(chat).toEqual({ off: [], shadow: [{ ...traced, ...shadow }], live: [traced] }[mode]);
-    });
-  },
-);
-
-describe("wakes coalesce (office.pipeline: live)", { timeout: 30_000 }, () => {
-  const h = harness("live");
+describe("wakes coalesce", { timeout: 30_000 }, () => {
+  const h = harness();
 
   it("runs three messages Sam sends Kofi within 20 seconds as one chat session", async () => {
     const texts = ["the checkout is broken", "it drops the coupon", "on reload only"];
@@ -323,30 +293,5 @@ describe("wakes coalesce (office.pipeline: live)", { timeout: 30_000 }, () => {
         .map((d) => d.folded!.length)
         .toSorted(),
     ).toEqual([2, 3, 4]);
-  });
-});
-
-describe("createChatEntry", () => {
-  it("still answers with what the desk did when shadow mode cannot record the message", async () => {
-    const warned: string[] = [];
-    const answer = {
-      disposition: "started" as const,
-      repeated: false,
-      item: { id: "w-1", title: "t", status: "queued" },
-      links: [],
-      work: [],
-    };
-
-    const entry = createChatEntry({
-      mode: "shadow",
-      desk: { message: async () => answer },
-      intake: { receive: () => Promise.reject(new Error("store down")) },
-      store: {} as never,
-      clock: manualClock(),
-      logger: { ...silentLogger, warn: (m) => void warned.push(m) },
-    });
-
-    expect(await entry.message("kofi", dm("1700.1", "hi"))).toBe(answer);
-    expect(warned).toEqual(["pipeline (shadow) could not record a chat message"]);
   });
 });

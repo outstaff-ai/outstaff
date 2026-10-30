@@ -258,7 +258,6 @@ integrations:
     project: SHOP
   knowledge: { adapter: itsaplan }
 workflow:
-  preset: kanban
   statuses:
     backlog: Backlog
     ready: Ready
@@ -272,6 +271,9 @@ office:
   poll_interval_seconds: 10
   # Slack has dummy tokens and no stand-in, so the office's doctor does not call it.
   doctor: { skip: [chat] }
+# Each event wakes the agent at once: the run waits for every step, and a batch of comments arrives as one review.
+pipeline:
+  wake: { coalesce_seconds: 0 }
 policies:
   # Agents turn on auto-merge when a pull request is ready; the stub's ruleset needs one approval, which only the
   # last step gives.
@@ -641,7 +643,12 @@ async function main() {
   assertEq(fixed.pr.commits, 1, "the repository's rule is one commit: the fix was amended into it");
   assertEq(fixed.pr.forcePushes > 0, true, "the amended commit was pushed with a lease");
   const rounds = fixed.t.moves.map((m: Json) => `${m.from}>${m.to}`);
-  assertIncludes(rounds, "In Review>In Progress", "the review sent the ticket back to active");
+  assertIncludes(
+    rounds,
+    "In Review>In Progress",
+    "the review round took the ticket back to active",
+  );
+
   step(
     `review: changes requested on #${pr1.pr.number} -> ticket active again, fix pushed, thread replied and resolved, back in review`,
   );
@@ -1268,23 +1275,15 @@ async function main() {
     `blocked: ${stuck} left blocked by the agent, handed back as done -> stays Blocked, assigned to the requester`,
   );
 
-  // The team has a PM, so the blocked hand-back is the PM's to deal with: the office queued an unblock round for pia
-  // (she has no container here, so it waits) and nobody posted anything to the requester about it.
-  assertEq(
-    logs("office").includes(`scheduled unblock for pia on ${stuck}`),
-    true,
-    "the office scheduled an unblock round for the PM on the blocked ticket",
-  );
-
+  // The team has a PM (policies.hand_back.blocked_notify: pm), so the blocked agent leaves telling the requester to
+  // the PM, and the office posts nothing.
   assertEq(
     stays.chat.posts.some((p: Json) => p.text.includes(stuck)),
     false,
-    "no chat message about the blocked ticket: the office posts nothing, and the PM has not run",
+    "no chat message about the blocked ticket: the office posts nothing, and the agent leaves it to the PM",
   );
 
-  step(
-    `blocked: an unblock round for the PM was scheduled for ${stuck} and no chat message was posted`,
-  );
+  step(`blocked: no chat message was posted about ${stuck}`);
 
   // ---- 10a. a ticket that asks for the services the team granted: the token is added and never shown
   const { key: network } = await stub("POST", "/_test/tickets", {

@@ -492,6 +492,47 @@ describe("chat", () => {
     ]);
   });
 
+  it("takes the human's answer to its question even when the thread carries work as its subject", async () => {
+    const { seen } = await play(
+      chat({
+        ...talk(
+          [false, "For PR #1, also say goodbye."],
+          [true, "<@U1> Add this to PR #1, which is in review, or do it as a follow-up?"],
+          [false, "This PR."],
+        ),
+        about: { itemId: "w9", title: "review feedback", state: "running" as const },
+      }),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: { target: "1", confirmed: true, request: "For PR #1, also say goodbye." },
+      },
+    ]);
+  });
+
+  it("answers a later question in a thread whose earlier question was settled, without attaching again", async () => {
+    const { seen, text } = await play(
+      chat({
+        ...talk(
+          [false, "For PR #1, also say goodbye."],
+          [true, "<@U1> Add this to PR #1, which is in review, or do it as a follow-up?"],
+          [false, "This PR."],
+          [true, "Adding this to PR #1."],
+          [false, "Anything else on the greetings?"],
+        ),
+        about: { itemId: "w9", title: "review feedback", state: "running" as const },
+      }),
+      () => "1. [SHOP-1 Add a greeting](x) (running)\n",
+    );
+
+    expect(seen.map((a) => (a.type === "tool" ? a.tool : a.type))).toEqual(["shell", "work"]);
+    expect(text).toContain("greeting.txt");
+  });
+
   it("answers a question in the thread of running work without attaching", async () => {
     const { seen, text } = await play(
       chat({
@@ -565,9 +606,36 @@ describe("chat", () => {
 });
 
 describe("reviewFeedback", () => {
-  it("starts at the review gate, so a driver can hold the round", async () => {
+  it("takes the ticket back, then waits at the review gate, so a driver can hold the round", async () => {
     const script = reviewFeedback({ ...ctx, kind: "review_feedback", pr: 1 });
-    expect((await script.next()).value).toEqual({ type: "gate", name: "review" });
+    expect((await script.next()).value).toEqual({
+      type: "tool",
+      tool: "ticket_show",
+      input: { key: ctx.ticket },
+    });
+
+    expect((await script.next("SHOP-1: x\nStatus: In Review (review)\n")).value).toEqual({
+      type: "tool",
+      tool: "ticket_assign",
+      input: { key: ctx.ticket, to: "me" },
+    });
+
+    expect((await script.next("Assigned.")).value).toEqual({
+      type: "tool",
+      tool: "ticket_move",
+      input: { key: ctx.ticket, to: "active" },
+    });
+
+    expect((await script.next("Moved.")).value).toEqual({ type: "gate", name: "review" });
+  });
+
+  it("leaves an active ticket as it is before the gate", async () => {
+    const script = reviewFeedback({ ...ctx, kind: "review_feedback", pr: 1 });
+    await script.next();
+    expect((await script.next("Status: In Progress (active)\n")).value).toEqual({
+      type: "gate",
+      name: "review",
+    });
   });
 });
 

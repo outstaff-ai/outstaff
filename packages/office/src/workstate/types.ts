@@ -157,6 +157,9 @@ export interface WorkState extends WorkflowState {
 
   /** Re-reads who last worked on each ticket from the work item history. */
   refreshWorkers(): Promise<void>;
+
+  /** Re-reads one ticket from the tracker, for a ticket an agent may have changed since the last poll. */
+  refreshTicket(key: string): Promise<void>;
   currentWork(person: string): CurrentWork;
 
   /**

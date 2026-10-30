@@ -11,7 +11,7 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 | `packages/core`                | Shared types and the team config model.                                                                                                                              |
 | `packages/catalog`             | Generic roles and skills, baked into container images and ejectable by clients.                                                                                      |
 | `packages/cli`                 | The `outstaff` command line (alias `ost`): creates and validates the team config, hires people, sets up credentials.                                                 |
-| `packages/office`              | The office: one container per team. Event intake, work state, workflow engine, scheduler, store (Postgres or SQLite).                                                |
+| `packages/office`              | The office: one container per team. Event intake, work state, event pipeline, scheduler, store (Postgres or SQLite).                                                 |
 | `packages/agent`               | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.                                                     |
 | `packages/protocol`            | The agent connection protocol: zod schemas and types shared by the office and the agent.                                                                             |
 | `integrations/<port>/<vendor>` | One adapter package per integration, published as `@outstaff/integration.<port>.<vendor>`. Code two adapters of a vendor share is in `integrations/shared/<vendor>`. |
@@ -51,6 +51,6 @@ Run lint, typecheck, test and build before opening a PR.
 ## Where to find the design
 
 - Architecture overview: `docs/src/content/docs/architecture/overview.md`
-- Decision records: `docs/src/content/docs/decisions/` (0001 to 0012, indexed in `index.md`). They are the source of truth. If you need to change a decision, add a new record that replaces the old one.
+- Decision records: `docs/src/content/docs/decisions/` (0001 to 0018, indexed in `index.md`). They are the source of truth. If you need to change a decision, add a new record that replaces the old one.
 - Vocabulary: `docs/src/content/docs/concepts/index.md`
 - Planned work is tracked in GitHub milestones M0 to M7 and "Later".

@@ -56,11 +56,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `tools.options_without_source` | A tool sets options but no source to pass them to. |
 | `tools.reserved_option` | A tool option is version, which the tool's version field sets. |
 | `tools.rule_program` | A structured rule of a tool names a different program than the tool. |
-| `workflow.duplicate_rule_id` | Two workflow rules share the same id. |
 | `workflow.duplicate_status_name` | Two canonical statuses map to the same tracker status name. |
-| `workflow.unknown_placeholder` | A workflow template is malformed or uses a variable that does not exist. |
-| `workflow.unknown_rule` | A rule is disabled by id but the preset has no rule with that id. |
-| `workflow.unknown_template` | A rule refers to a template that is neither built in nor defined in workflow.templates. |
 
 ## Warnings
 

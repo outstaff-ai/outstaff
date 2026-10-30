@@ -1,4 +1,4 @@
-import { addFeedback } from "#/engine/feedback.js";
+import { addFeedback } from "#/work-feedback.js";
 import { triggerRefs } from "#/refs/index.js";
 import { priorityFor } from "#/scheduler/index.js";
 import { chatTitle, joinChatSession, messageOf, openChatSession } from "#/chat/session.js";
@@ -12,6 +12,9 @@ export const WAKE_SUBJECT = "pipeline_wake";
 /** The events whose wakes queued or joined an item, by item id, in the order they came. */
 export const ITEM_EVENTS_SUBJECT = "pipeline_item_events";
 const LIVE = new Set(["queued", "active"]);
+
+/** A running chat session sees no later message, so a message joins only a session that has not started. */
+const CHAT_LIVE = new Set(["queued"]);
 
 /** An idle agent's pull is the office's own doing: automatic work, like the scheduler's. */
 const triggerOf = (event: PipelineEvent): WorkItemTrigger =>
@@ -105,7 +108,7 @@ async function init(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 
   const m = messageOf(event.data);
   if (m && wake.subject.type === "chat") {
-    await openChatSession(opts.store, item.id, m);
+    await openChatSession(opts.store, item, m);
   }
 
   await linkEvent(opts, item.id, event.id);
@@ -113,7 +116,7 @@ async function init(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 
 /**
  * Queues the run a wake asks for. A wake for an item of the same kind and subject that is queued or running joins that
- * item; a wake for the same person and subject within `pipeline.wake.coalesce_seconds` of the first is folded into
+ * item (a chat message only one that is queued: a running session does not see it); a wake for the same person and subject within `pipeline.wake.coalesce_seconds` of the first is folded into
  * the item the first queued, which is held until then. `folded` lists the events of the item it joined, this one last.
  */
 export async function enqueueWake(
@@ -122,9 +125,10 @@ export async function enqueueWake(
   opts: LiveOptions,
 ): Promise<{ itemId: string; folded?: string[] }> {
   const subject = itemSubject(event, wake, opts);
+  const joinable = wake.subject.type === "chat" ? CHAT_LIVE : LIVE;
   const live = (await opts.store.listItems({ person: wake.person })).find(
     (i) =>
-      LIVE.has(i.status) &&
+      joinable.has(i.status) &&
       i.kind === wake.kind &&
       i.subject?.type === subject.type &&
       i.subject.ref === subject.ref,

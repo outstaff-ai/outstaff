@@ -176,6 +176,25 @@ function parseAbout(prompt: string): Pick<ItemContext, "about"> {
   };
 }
 
+/**
+ * The latest chat message a resumed chat session's prompt carries, which the prompt does not repeat as conversation: a
+ * chat wake's feedback ("Triggered by a message in chat from …" and the message quoted), or the journal's note of a
+ * message added to the work ("… asked in chat (thread …):" and the message).
+ */
+export function latestChatMessage(prompt: string): string | undefined {
+  const woken = [
+    ...prompt.matchAll(
+      /^Triggered by a message in chat\b[^\n]*\n(?:[^>\n][^\n]*\n)?((?:> [^\n]*(?:\n|$))+)/gm,
+    ),
+  ].at(-1)?.[1];
+
+  if (woken) {
+    return woken.replaceAll(/^> /gm, "").trim();
+  }
+
+  return [...prompt.matchAll(/asked in chat \(thread [^)]*\)[^\n]*:\n([^\n]*)/g)].at(-1)?.[1];
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {

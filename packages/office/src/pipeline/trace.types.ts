@@ -1,5 +1,4 @@
 import type { ActOutcome } from "@outstaff/core";
-import type { Comparison, EngineRecord } from "./compare/compare.types.js";
 import type { ContextManifest } from "./context/context.types.js";
 import type { Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
@@ -26,12 +25,6 @@ export interface Trace {
 
   /** What each executed act did, by act id (`<event id>:<policy>`), once its result is in. */
   results?: Record<string, ActOutcome> | undefined;
-
-  /** In shadow mode: what the engine applied for the same event. */
-  engine?: EngineRecord | undefined;
-
-  /** In shadow mode: how the engine's outcome and the pipeline's compare. */
-  comparison?: Comparison | undefined;
 
   /** What the bundle of each wake the event started carried, by work item id, once the item was offered. */
   context?: Record<string, ContextManifest> | undefined;

@@ -22,11 +22,6 @@ const SKIPPED = [/(^|\/)__tests__\//, /\.d\.ts$/, /(^|\/)node_modules\//];
 
 /** Paths (a trailing slash covers a folder) the check skips, each with the reason. */
 export const EXEMPT = new Map([
-  ["packages/office/src/engine/", "deleted by the event-pipeline redesign"],
-  ["packages/core/src/workflow/presets.ts", "deleted by the event-pipeline redesign"],
-  ["packages/core/src/workflow/resolve.ts", "deleted by the event-pipeline redesign"],
-  ["packages/core/src/policies/switches.ts", "deleted by the event-pipeline redesign"],
-  ["packages/office/src/chat/desk.ts", "chat desk routing, deleted by the event-pipeline redesign"],
   ["e2e/", "end-to-end test harness (driver, stubs, scripted runtime), not shipped"],
 ]);
 

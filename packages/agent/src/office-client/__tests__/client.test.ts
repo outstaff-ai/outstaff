@@ -264,13 +264,7 @@ describe("office connection", () => {
         payload: { messageId: "m1" },
       });
 
-      const result = {
-        disposition: "started",
-        repeated: false,
-        item: { id: "c1", title: "hi", status: "queued" },
-        links: [],
-        work: [],
-      };
+      const result = { repeated: false };
 
       current().reply(current().last(), "chat_message_result", result);
       expect(await message).toEqual(result);

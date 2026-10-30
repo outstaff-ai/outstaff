@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { conditionSchema } from "#/workflow/rules.js";
+import { conditionSchema } from "#/workflow/condition-schema.js";
 
 const d = (description: string) => ({ description });
 
@@ -93,7 +93,7 @@ export const pipelineSchema = z
           .optional()
           .meta(
             d(
-              "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes (office.pipeline: live). Default 60; 0 turns it off.",
+              "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. Default 60; 0 turns it off.",
             ),
           ),
       })
@@ -103,6 +103,6 @@ export const pipelineSchema = z
   })
   .meta(
     d(
-      "Proposed (decision 0016): the event pipeline's policies, read in the office's shadow and live modes (office.pipeline), and the context every wake carries, in every mode.",
+      "The event pipeline, which decides what the office does with every event (decision 0018): changes to its default policies, how wakes are batched, and the context every wake carries.",
     ),
   );

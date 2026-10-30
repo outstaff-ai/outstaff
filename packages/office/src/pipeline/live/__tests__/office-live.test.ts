@@ -45,7 +45,6 @@ function team(): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
-    office: { pipeline: "live" },
     // These scenarios are about what a wake carries; coalescing has its own.
     pipeline: { wake: { coalesce_seconds: 0 } },
   });

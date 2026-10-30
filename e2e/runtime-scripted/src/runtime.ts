@@ -12,7 +12,7 @@ import {
   type ToolCall,
   type UsageEvent,
 } from "@outstaff/core";
-import { parsePrompt, type ItemContext } from "./prompt.js";
+import { latestChatMessage, parsePrompt, type ItemContext } from "./prompt.js";
 import { SCRIPTS, type Action } from "./scripts.js";
 
 const sh = (command: string, cwd: string): Promise<string> =>
@@ -201,7 +201,7 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
     }
 
     const known = talks.get(session);
-    const latest = [...prompt.matchAll(/asked in chat \(thread [^)]*\):\n([^\n]*)/g)].at(-1)?.[1];
+    const latest = latestChatMessage(prompt);
     if (known && latest) {
       known.push({ from: "human", agent: false, text: latest });
       ctx.conversation = [...known];

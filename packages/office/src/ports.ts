@@ -1,6 +1,5 @@
 import {
   PortError,
-  policyOn,
   type AdapterContext,
   type AdapterRegistry,
   type Chat,
@@ -74,12 +73,8 @@ async function chatPort(input: Input): Promise<Chat | undefined> {
     : undefined;
 }
 
-/** The knowledge base, unless doc comments are off; one that cannot start costs that feedback and nothing else. */
+/** The knowledge base; one that cannot start costs the comments on documents and nothing else. */
 async function knowledgePort(input: Input): Promise<Knowledge | undefined> {
-  if (!policyOn(input.team.policies, "feedback.doc_comments")) {
-    return undefined;
-  }
-
   try {
     return (await create("knowledge", input)) as Knowledge | undefined;
   } catch (error) {
@@ -93,8 +88,9 @@ async function knowledgePort(input: Input): Promise<Knowledge | undefined> {
 
 /**
  * The office-scope ports from team.yaml. Version control is required; the tracker is used when the team configures
- * it, and chat only when `office.channel` names the team channel agent questions are mirrored to. The knowledge base is read for comments on documents, unless `policies.feedback.doc_comments` is
- * off; a knowledge adapter this image lacks, or one that fails to start, costs that feedback and nothing else.
+ * it, and chat only when `office.channel` names the team channel agent questions are mirrored to. The knowledge base is
+ * read for comments on documents; a knowledge adapter this image lacks, or one that fails to start, costs that
+ * feedback and nothing else.
  * Runtime and avatars belong to the agents, not the office.
  */
 export async function createOfficePorts(input: Input): Promise<OfficePorts> {

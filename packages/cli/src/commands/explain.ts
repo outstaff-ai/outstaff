@@ -7,31 +7,14 @@ import type { Context } from "#/types.js";
  */
 const importOffice = () => import("@outstaff/office");
 
-/** A time to compare from: a duration back from now (`30m`, `24h`, `7d`) or an ISO-8601 time; undefined if neither. */
-export function sinceTime(raw: string, now: Date): string | undefined {
-  const ago = /^(\d+)(m|h|d)$/.exec(raw);
-  if (ago) {
-    const unit = { m: 60_000, h: 3_600_000, d: 86_400_000 }[ago[2] as "m" | "h" | "d"];
-    return new Date(now.getTime() - Number(ago[1]) * unit).toISOString();
-  }
-
-  const ms = Date.parse(raw);
-  return Number.isNaN(ms) ? undefined : new Date(ms).toISOString();
-}
-
 type Options = {
   store?: string;
   recent?: string;
-  compare?: boolean;
-  since?: string;
   json?: boolean;
 };
 
-/** What to print: a comparison over many events, the latest traces, or one event's trace. */
-type Mode =
-  | { kind: "compare"; since?: string | undefined }
-  | { kind: "recent"; limit: number }
-  | { kind: "one"; id: string };
+/** What to print: the latest traces, or one event's trace. */
+type Mode = { kind: "recent"; limit: number } | { kind: "one"; id: string };
 
 type Office = Awaited<ReturnType<typeof importOffice>>;
 type Traces = ReturnType<Office["createStoreTraceStore"]>;
@@ -50,29 +33,11 @@ function recentOf(raw: string | undefined): number | undefined | false {
   return Number.isInteger(n) && n > 0 ? n : false;
 }
 
-/** The time `--since` names, `false` when it names none, undefined without it. */
-function sinceOf(ctx: Context, raw: string | undefined): string | undefined | false {
-  if (raw === undefined) {
-    return undefined;
-  }
-
-  return sinceTime(raw, ctx.now?.() ?? new Date()) ?? false;
-}
-
 /** What the options ask for, or why they do not make sense. */
-function modeOf(ctx: Context, options: Options, args: string[]): Mode | string {
+function modeOf(options: Options, args: string[]): Mode | string {
   const recent = recentOf(options.recent);
-  const since = sinceOf(ctx, options.since);
   if (recent === false) {
     return "--recent takes a whole number above 0.";
-  }
-
-  if (since === false) {
-    return "--since takes a duration such as 24h or 7d, or an ISO-8601 time.";
-  }
-
-  if (options.compare) {
-    return { kind: "compare", since };
   }
 
   if (recent !== undefined) {
@@ -94,12 +59,6 @@ async function show(
   mode: Mode,
   asJson: boolean,
 ): Promise<number> {
-  if (mode.kind === "compare") {
-    const summary = await office.compareRange(traces, mode.since ? { since: mode.since } : {});
-    ctx.out(asJson ? json(summary) : `${office.formatSummary(summary)}\n`);
-    return 0;
-  }
-
   if (mode.kind === "recent") {
     const list = await traces.list({ limit: mode.limit });
     const line = (t: (typeof list)[number]) =>
@@ -111,10 +70,7 @@ async function show(
 
   const trace = await traces.get(mode.id);
   if (!trace) {
-    return fail(
-      ctx,
-      `No trace for ${mode.id}. Is the office running with office.pipeline: shadow?`,
-    );
+    return fail(ctx, `No trace for ${mode.id}. Is it an event id as the office logs it?`);
   }
 
   ctx.out(asJson ? json(trace) : `${office.formatTrace(trace)}\n`);
@@ -127,7 +83,7 @@ async function explain(ctx: Context, options: Options, args: string[]): Promise<
     return fail(ctx, "Give the office store with --store or OUTSTAFF_STORE_URL.");
   }
 
-  const mode = modeOf(ctx, options, args);
+  const mode = modeOf(options, args);
   if (typeof mode === "string") {
     return fail(ctx, mode);
   }
@@ -161,7 +117,7 @@ export const explainEvent = defineCommand<Options>({
   name: "explain",
   summary: "Show what the event pipeline decided for an event, and why.",
   description:
-    "Proposed (decision 0016). Reads the trace the office recorded for one event while running the event pipeline in shadow mode (office.pipeline: shadow) and prints every policy that listens to the event: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop, and in shadow mode what the engine applied for the same event and how the two compare. --compare sums that up over many events: how many agree and differ, the differences by kind and by policy, and the events that differ. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.",
+    "Reads the trace the office recorded for one event and prints every policy of the event pipeline that listens to it: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop, with what each act did and what each wake's bundle carried. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.",
   args: "[event-id]",
   options: [
     {
@@ -170,24 +126,14 @@ export const explainEvent = defineCommand<Options>({
         "The office store: postgres://..., sqlite:///path/office.db. Defaults to OUTSTAFF_STORE_URL.",
     },
     { flags: "--recent <n>", description: "List the n latest traced events instead." },
-    {
-      flags: "--compare",
-      description: "Compare the engine and the pipeline over the traced events instead.",
-    },
-    {
-      flags: "--since <when>",
-      description:
-        "With --compare: only events since then, a duration back from now (30m, 24h, 7d) or an ISO-8601 time.",
-    },
   ],
   examples: [
     "ost explain vcs:pr.merged:acme-example/shop#41 --store sqlite:///var/lib/outstaff/office.db",
     "ost explain --recent 20",
-    "ost explain --compare --since 24h",
   ],
   exitCodes: [
-    "0: the trace, the list or the comparison was printed",
-    "1: no store is given or it cannot be read, no event id is given, the event has no trace, or --since is not a time",
+    "0: the trace or the list was printed",
+    "1: no store is given or it cannot be read, no event id is given, or the event has no trace",
   ],
   run: (ctx, options, args) => explain(ctx, options, args),
 });

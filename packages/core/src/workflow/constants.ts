@@ -17,3 +17,6 @@ export const WORKFLOW_EVENT_TYPES = [
 ] as const;
 
 export const DEFAULT_NEEDS_HUMAN_LABEL = "needs-human";
+
+/** How an agent ended its turn on a work item: finished, waiting for an answer, or unable to continue. */
+export const HAND_BACK_STATUSES = ["done", "waiting", "blocked"] as const;

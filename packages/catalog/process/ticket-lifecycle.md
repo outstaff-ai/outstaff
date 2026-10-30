@@ -21,24 +21,21 @@ Every ticket in {{ team.name }} is in exactly one canonical status. Tracker-spec
 {{#if integrations.has.tracker}}
 ## Keeping the tracker in sync
 
-{{#if policies.tickets.office_moves}}The tracker is the shared record, and the office keeps its routine changes for you, from what you do:
+The tracker is the shared record. When you start work on a ticket, it is yours to show: assign it to yourself if it went to someone else (a hand-back gives it to the person who asked) and move it to `active`, unless it is `blocked` and still cannot go on. That holds for every round on the ticket, also one for review feedback, a comment or failing checks on a ticket you handed back. The office keeps the other routine changes for you, from what you do, and says on the ticket that it made them for you:
 
-- your work on the ticket starts: it moves to `active`;
 - you open its pull request for review (not as a draft): it moves to `review`;
-- its last open pull request merges into the default branch: it moves to `done`{{#if policies.tickets.many_prs}}, once you have also handed it back as `done` (below){{/if}};
+- its last open pull request merges into the default branch: it moves to `done`;
 - you hand back as `done`: it moves to `review` and goes to the person who asked; as `blocked`: it moves to `blocked` and goes to them.
 
-Do not make these moves or assignments yourself; hand back with the status that says where the work is (`process/hand-back.md`). Change a ticket yourself only for what the office cannot see, the moment it happens: you cancel it, or you file, split or re-parent tickets. Comment with `ost ticket` on anything a reader would not see from the status.
+Do not make these moves or assignments yourself; hand back with the status that says where the work is (`process/hand-back.md`). Change a ticket yourself for what the office cannot see, the moment it happens: you start on it, you cancel it, or you file, split or re-parent tickets. Comment with `ost ticket` on anything a reader would not see from the status.
 
-{{else}}- The tracker is the shared record, and {{ team.name }}'s workflow does not move tickets. Keep the status, assignee and a short comment current with `ost ticket`, and move a ticket the moment its real state changes, not later in a batch: to `active` when you start, to `review` when you hand back as `done`, to `blocked` when you cannot continue.
-{{/if}}
 - File what you find yourself with `ost ticket create`; do not ask someone else to. Work that is part of an existing ticket's scope is a subtask of it (`--parent <ticket>`, the default inside that ticket's work item, or `ost ticket parent <ticket> <parent>` for one that exists). A follow-up that stands on its own is a separate ticket with a relates link: `ost ticket create --related <ticket>`. It lands in the backlog, unassigned, unless you pass `--assignee` or `--status`. Name every ticket you filed in your hand-back.
 - If the tracker and a work item disagree, trust the tracker, fix the work item, and mention it in the journal.
 
 ## One pull request per ticket
 
-{{#if policies.tickets.many_prs}}A ticket in {{ team.name }} may have several pull requests. outstaff's automation moves it to `done` only when you have handed its work back as `done` and every pull request linked to it is closed with at least one merged; a merge alone does not close it. Hand back as `done` only once every pull request the ticket needs is open, and list them in the hand-back. Prefer one pull request per ticket: when the parts can be reviewed on their own, split them into sub-tickets as below.
-{{else}}outstaff's automation moves a ticket to `done` when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is), so in {{ team.name }} a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the office comments on the ticket that it now has two, and the last to merge closes it.
+{{#if policies.tickets.many_prs}}A ticket in {{ team.name }} may have several pull requests. The office moves it to `done` when its last open pull request merges into the default branch, so open every pull request the ticket needs before the first one merges, and list them in the hand-back. Prefer one pull request per ticket: when the parts can be reviewed on their own, split them into sub-tickets as below.
+{{else}}The office moves a ticket to `done` when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is), so in {{ team.name }} a ticket is one pull request. `ost pr open` refuses a second pull request for a ticket that already has one, open or merged, and says which one. A pull request a person opens for such a ticket is not refused; the last of them to merge closes the ticket.
 
 Plan the split before you start. When the work needs more than one pull request (independent parts, a stack, a change after a merge):
 

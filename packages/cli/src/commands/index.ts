@@ -16,7 +16,6 @@ import { team } from "./team.js";
 import { upgrade } from "./upgrade.js";
 import { validate } from "./validate.js";
 import { verbCommands } from "./verbs.js";
-import { explain } from "./workflow.js";
 
 export { groupSummaries } from "./verbs.js";
 
@@ -35,7 +34,6 @@ export const commands: CommandDef[] = [
   fire,
   doctor,
   policies,
-  explain,
   explainEvent,
   gitCredential,
   ...verbCommands,

@@ -5,7 +5,7 @@ Merging is the code host's job, not yours and not the office's. When the team le
 1. Mark a pull request ready only when it is ready to merge as it is: once a person approves it and the checks pass, it merges without you.
 2. Report what the verb said in the journal: auto-merge on, added to the merge queue, or not turned on and why. If it was not turned on, a person merges it; say so in the hand-back.
 3. A new push, a conflict or failing CI can cancel auto-merge on the host. You are woken for the conflict or the failing check as usual; after you fix it and push, run `ost pr update <n> --ready` again to turn auto-merge back on.
-4. If a work item asks you to merge (a team's own workflow rule), run `ost pr merge <n>`. The code checks the approvals, the required checks and the state of the pull request, then queues or merges it as the team's policy and the repository's settings say.
+4. If a work item asks you to merge, run `ost pr merge <n>`. The code checks the approvals, the required checks and the state of the pull request, then queues or merges it as the team's policy and the repository's settings say.
 5. Never merge another way: not with `gh` or `git`, not in the host's web page, not by editing the pull request, its checks or the repository's settings. A refusal is the answer; report it and stop.
 
 Do not rewrite the pull request's history or messages to get the merge through. How a repository wants commits and history handled is in its own files (`references/git.md`), and the host decides what it accepts.

@@ -3,7 +3,7 @@ import type { Ref } from "@outstaff/protocol";
 import type { ChatOriginRecord } from "./chat/types.js";
 import { publicOrigin, readOrigin } from "./chat/origin.js";
 import { previousConversation } from "./conversation-context.js";
-import { deliverFeedback, readFeedback } from "./engine/feedback.js";
+import { deliverFeedback, readFeedback } from "./work-feedback.js";
 import { itemRefs } from "./item-refs.js";
 import type { Offer } from "./protocol/index.js";
 import { INTERRUPTED } from "./scheduler/index.js";

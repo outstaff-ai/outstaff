@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 // their "@outstaff/source" condition. A custom list replaces Vite's default for the server, so the rest repeats it.
 const conditions = ["@outstaff/source", "module", "node", "development|production"];
 
-// The event pipeline proof of concept (decision 0016) is held to the same rule as the integrations.
+// The event pipeline (decisions 0016 and 0018) is held to the same rule as the integrations.
 const EVENT_PIPELINE = [
   "packages/office/src/pipeline/**/*.ts",
   "packages/office/src/store/sql/traces.ts",

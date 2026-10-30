@@ -92,7 +92,6 @@ describe("the office's office link", () => {
     expect(dash.of("hello")[0]!.payload.office).toEqual({
       team: "acme",
       version: "unknown",
-      pipelineMode: "off",
     });
 
     const health = await office!.health();

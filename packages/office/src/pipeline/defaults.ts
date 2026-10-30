@@ -213,7 +213,7 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
   },
 ];
 
-/** Policies that are on only while a `policies` switch is: the idle pull, as the scheduler does with the pipeline off. */
+/** Policies that are on only while a `policies` switch is: the idle pull (`policies.pull_ready`). */
 export const POLICY_SWITCH_OF: Readonly<Record<string, string>> = {
   idle_pulls_next: "pull_ready",
 };

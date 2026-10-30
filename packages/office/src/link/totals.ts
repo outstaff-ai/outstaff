@@ -3,7 +3,7 @@ import type { EventFilter, LinkStore } from "./link.types.js";
 
 /** Whether any filter has to look inside the traces; without one the store can count by event time alone. */
 const looksInside = (f: EventFilter) =>
-  [f.source, f.person, f.ticket, f.pr, f.differs].some((v) => v !== undefined);
+  [f.source, f.person, f.ticket, f.pr].some((v) => v !== undefined);
 
 /** How many events match the filters, however a request pages them: `before` and `limit` do not count. */
 export async function countEvents(store: LinkStore, f: EventFilter): Promise<number> {

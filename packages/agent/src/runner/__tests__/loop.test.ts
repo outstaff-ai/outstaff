@@ -1090,7 +1090,7 @@ describe("work loop", () => {
       expect(chatRun.tools.map((t) => t.name)).toContain("ticket_create");
       expect(chatRun.tools.map((t) => t.name)).toContain("work_queue");
       expect(chatRun.tools.map((t) => t.name)).not.toContain("pr_open");
-      expect(chatRun.tools.map((t) => t.name)).not.toContain("work_move");
+      expect(chatRun.tools.map((t) => t.name)).toContain("work_move");
       expect(workRun.tools.map((t) => t.name)).toContain("pr_open");
 
       releaseWork?.();

@@ -5,7 +5,7 @@ import type { Policy } from "./policy.types.js";
 
 export type { ReadyTicket } from "#/workstate/index.js";
 
-/** The world a policy is judged against: the workflow rules' state plus what the pipeline adds. */
+/** The world a policy is judged against: the office's work state as conditions read it, plus what the pipeline adds. */
 export interface PipelineState extends WorkflowState {
   /** Ready tickets assigned to the agent that it has not picked up yet, in any order. */
   readyTickets(person: string): ReadyTicket[];

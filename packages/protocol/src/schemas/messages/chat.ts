@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { MAX_CHAT_FILES } from "#/constants.js";
-import { chatFileSchema, linkSchema } from "#/schemas/common.js";
+import { chatFileSchema } from "#/schemas/common.js";
 import { itemId, message, reportWhere } from "#/schemas/fields.js";
-import { queuedReportSchema, workSummarySchema } from "#/schemas/work.js";
+import { queuedReportSchema } from "#/schemas/work.js";
 
 export const chatMessages = [
   message(
@@ -36,22 +36,7 @@ export const chatMessages = [
   message(
     "chat_message_result",
     z.strictObject({
-      disposition: z
-        .enum(["received", "started", "limited", "joined", "placed", "asked_pm", "unclear"])
-        .describe(
-          "What the office did: `received` the message as an event its pipeline decides on (`office.pipeline: live`); with the chat desk, `started` a chat session for the message, or held it as `limited` until a chat session is free, `joined` an item of the thread, `placed` the item waiting for its place, `asked_pm` to prioritize it, or could not read the answer (`unclear`).",
-        ),
-      repeated: z.boolean().describe("True when the office already handled this message."),
-      item: workSummarySchema
-        .optional()
-        .describe("The item the message belongs to; absent for `received`, which queues later."),
-      links: z
-        .array(linkSchema)
-        .describe("What the office created for the request, for example the ticket."),
-      work: z
-        .array(workSummarySchema)
-        .describe("The person's other open items in the order they run, for `unclear`."),
-      placement: z.string().optional().describe("For `placed`: where the item goes, in words."),
+      repeated: z.boolean().describe("True when the office already took this message in."),
     }),
   ),
   message(

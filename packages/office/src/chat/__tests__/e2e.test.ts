@@ -31,6 +31,7 @@ import { manualClock } from "#/clock.js";
 import { createOffice } from "#/office.js";
 import type { Office } from "#/office.types.js";
 import { PENDING_REPORT_SUBJECT } from "#/chat/pending.js";
+import { readFeedback } from "#/work-feedback.js";
 import { openStore, type Store } from "#/store/index.js";
 
 const DANA = "U0DANA0001";
@@ -58,6 +59,8 @@ function team(): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
+    // Each message wakes the agent at once: the test's clock is manual.
+    pipeline: { wake: { coalesce_seconds: 0 } },
   });
 
   if (!result.ok) {
@@ -379,7 +382,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     await until(async () => (await store.getItem(main.id))!.status === "done");
   });
 
-  it("asks where work goes when the agent is busy, and puts it where the requester says", async () => {
+  it("asks where work goes when the agent is busy, and the agent moves it with the verb", async () => {
     const main = await office.parts.scheduler.enqueue({
       person: "sam",
       kind: "ticket",
@@ -435,19 +438,14 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
         .toSorted((a, b) => a.priority - b.priority || a.position - b.position)
         .map((i) => i.title);
 
-    // The filed work waits last until the requester says.
+    // The filed work waits last until the requester says; their answer reaches a chat session, which moves it.
     expect(await titles()).toEqual(["Search page", expect.stringContaining("ACME-")]);
-
-    await dana("next please", sent.id);
-    await until(() => agentChat.posts.length === 2);
-    expect(agentChat.posts[1]!.text).toContain("this goes next");
-    expect((await titles())[0]).toContain("ACME-");
-
-    // The agent can move it too, with the verb.
     const filed = (await store.listItems({ person: "sam", status: "queued" })).find(
       (i) => i.kind === "assigned",
     )!;
 
+    await runVerb(findVerb("work.move")!, env, { id: filed.id, position: "next" });
+    expect((await titles())[0]).toContain("ACME-");
     await runVerb(findVerb("work.move")!, env, { id: filed.id, position: "last" });
     expect((await titles()).at(-1)).toContain("ACME-");
     await expect(
@@ -457,17 +455,20 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     releaseMain?.();
   });
 
-  it("adds a reply in the thread to the item and ignores people who are not trusted", async () => {
+  it("answers a reply in the thread in a chat session of its own and ignores people who are not trusted", async () => {
     const sent = await dana("please add a search page");
     await until(async () => (await store.listItems({ person: "sam" })).length === 1);
-    const [item] = await store.listItems({ person: "sam" });
 
     await dana("and make it dark", sent.id);
-    const journal = async () => (await store.readJournal(item!.id)).map((j) => j.text).join("\n");
-    // The fake chat resolves once the agent handled the message, including the office's answer.
-    expect(await journal()).toContain("make it dark");
-    // The item is running, so the reply gets a chat session beside it.
-    expect(await store.listItems({ person: "sam" })).toHaveLength(2);
+    await until(async () => (await store.listItems({ person: "sam" })).length === 2);
+    const reply = (await store.listItems({ person: "sam" })).find(
+      (i) => i.subject?.ref === `${DM}:${sent.id}`,
+    )!;
+
+    // The wake's instruction is in the session's journal; the message is its feedback.
+    const journal = (await store.readJournal(reply.id)).map((j) => j.text).join("\n");
+    expect(journal).toContain("wrote to you in chat");
+    expect((await readFeedback(store, reply.id)).map((f) => f.body)).toEqual(["and make it dark"]);
     expect(agentChat.posts).toHaveLength(0);
 
     await agentChat.seed.inbound({
@@ -478,7 +479,6 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       thread: sent.id,
     });
 
-    expect(await journal()).not.toContain("delete production");
     expect(await store.listItems({ person: "sam" })).toHaveLength(2);
   });
 

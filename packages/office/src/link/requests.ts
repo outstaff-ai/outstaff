@@ -1,6 +1,5 @@
 import type { LinkErrorCode, LinkMethod, LinkRequest, LinkResponse } from "@outstaff/protocol";
 import type { Trace } from "#/pipeline/trace.types.js";
-import { compareRange } from "#/pipeline/compare/summary.js";
 import { countActivity } from "./activity.js";
 import { findEvents } from "./events.js";
 import { findItem } from "./item.js";
@@ -9,12 +8,6 @@ import type { OfficeLinkOptions } from "./link.types.js";
 import { listPeople } from "./people.js";
 import { present } from "./present.js";
 import { countEvents } from "./totals.js";
-
-/** The office store's traces, as the comparison reads them. */
-const storeTraces = (store: OfficeLinkOptions["store"]) => ({
-  list: async (q?: { before?: string; limit?: number }) =>
-    (await store.listTraces(q)).map((r) => r.data as Trace),
-});
 
 const error = (id: string, code: LinkErrorCode, message: string): LinkResponse => ({
   id,
@@ -61,15 +54,6 @@ const items = async (
   result: await findItems(opts.store, params ?? {}),
 });
 
-const compare = async (
-  opts: OfficeLinkOptions,
-  id: string,
-  params: Params<"compare">,
-): Promise<LinkResponse> => ({
-  id,
-  result: await compareRange(storeTraces(opts.store), params ?? {}),
-});
-
 const activity = async (
   opts: OfficeLinkOptions,
   id: string,
@@ -105,7 +89,6 @@ const HANDLERS: { [M in LinkMethod]: Handler<M> } = {
   events: (opts, r) => events(opts, r.id, r.params),
   event: (opts, r) => event(opts, r.id, r.params.id),
   items: (opts, r) => items(opts, r.id, r.params),
-  compare: (opts, r) => compare(opts, r.id, r.params),
   activity: (opts, r) => activity(opts, r.id, r.params),
   item: (opts, r) => item(opts, r.id, r.params.id),
   health: (opts, r) => health(opts, r.id, r.params?.run === true),

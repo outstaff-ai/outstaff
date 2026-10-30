@@ -24,5 +24,6 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0013](/decisions/0013-subprocess-sandbox-opt-in/)        | The subprocess sandbox is opt-in                                              |
 | [0014](/decisions/0014-bubblewrap-sandbox-containers/)    | What the bubblewrap sandbox needs from a container                            |
 | [0015](/decisions/0015-allow-by-default-in-the-sandbox/)  | Allow by default inside the sandbox, with a short list of hard denies         |
-| [0016](/decisions/0016-event-pipeline/)                   | One event pipeline with three decisions (proposed)                            |
+| [0016](/decisions/0016-event-pipeline/)                   | One event pipeline with three decisions                                       |
 | [0017](/decisions/0017-no-bespoke-protocol-verbs/)        | Network and identity are the boundary, not verbs per protocol                 |
+| [0018](/decisions/0018-pipeline-only/)                    | The event pipeline is the only way the office decides                         |

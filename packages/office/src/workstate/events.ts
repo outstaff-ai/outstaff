@@ -1,5 +1,5 @@
 import type { PrRef, PrVerdict, WorkflowEvent } from "@outstaff/core";
-import { awaitsReview } from "#/engine/feedback.js";
+import { awaitsReview } from "#/work-feedback.js";
 import type {
   DocOps,
   Fresh,
@@ -106,7 +106,7 @@ export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & Reque
     }
   };
 
-  // Our own synthetic events and the ones for the engine only have no handler.
+  // Our own synthetic events and the ones only the pipeline judges have no handler.
   const bySubject: Partial<Record<WorkflowEvent["type"], typeof onPr>> = {
     "pr.opened": onPr,
     "pr.comment": onPr,

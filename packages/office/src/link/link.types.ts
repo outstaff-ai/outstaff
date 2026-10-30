@@ -84,9 +84,6 @@ export interface EventFilter {
   person?: string | undefined;
   ticket?: string | undefined;
   pr?: string | undefined;
-
-  /** Only events where the engine and the pipeline differ. */
-  differs?: true | undefined;
 }
 
 export interface ItemFilter {

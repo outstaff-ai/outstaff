@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { parseTeamConfig } from "#/config/parse.js";
-import { resolveWorkflow } from "#/workflow/resolve.js";
 import { describePolicies } from "#/policies/describe.js";
 import { POLICY_SWITCHES, blockedNotify, policyOn, policyValue } from "#/policies/switches.js";
 
@@ -25,9 +24,8 @@ const config = (extra: Record<string, unknown> = {}) => {
 
 const report = (extra: Record<string, unknown> = {}) => {
   const c = config(extra);
-  const w = resolveWorkflow(c.workflow, c.humans, c.policies);
   return Object.fromEntries(
-    describePolicies(c, w, extra["policies"]).map((r) => [r.switch.path, [r.value, r.source]]),
+    describePolicies(c, extra["policies"]).map((r) => [r.switch.path, [r.value, r.source]]),
   );
 };
 
@@ -46,27 +44,22 @@ describe("policy switches", () => {
       "acknowledge.chat": [true, "default"],
       "acknowledge.vcs": [false, "team.yaml"],
       "chat.profile": [true, "default"],
-      "hand_back.reassign": ["requester", "default"],
-      "conflicts.follow_up": [true, "default"],
+      "feedback.follow_up_round": [true, "default"],
+      "tickets.prs_per_ticket": ["one", "default"],
     });
   });
 
-  it("names the preset when it has no rule for a switch", () => {
-    expect(report({ workflow: { preset: "minimal" } })).toMatchObject({
-      "conflicts.follow_up": [false, "preset"],
-      "hand_back.reassign": ["none", "preset"],
-    });
-  });
-
-  it("names workflow.rules when an explicit rule wins over the switch", () => {
-    const r = report({
-      policies: { conflicts: { follow_up: false } },
-      workflow: {
-        rules: [{ id: "conflict-back-to-author", on: "pr.conflicted", do: [{ move: "active" }] }],
-      },
-    });
-
-    expect(r["conflicts.follow_up"]).toEqual([true, "workflow.rules"]);
+  it("has no switch for what the pipeline's policies decide", () => {
+    const paths = POLICY_SWITCHES.map((s) => s.path);
+    for (const gone of [
+      "feedback.merged_prs",
+      "hand_back.reassign",
+      "conflicts.follow_up",
+      "retry.on_signal",
+      "tickets.start_moves_active",
+    ]) {
+      expect(paths).not.toContain(gone);
+    }
   });
 });
 
@@ -94,12 +87,8 @@ describe("blockedNotify", () => {
 });
 
 describe("describePolicies for the blocked_notify switch", () => {
-  const value = (c: ReturnType<typeof config>) => {
-    const w = resolveWorkflow(c.workflow, c.humans, c.policies);
-    return describePolicies(c, w, undefined).find(
-      (r) => r.switch.path === "hand_back.blocked_notify",
-    )!;
-  };
+  const value = (c: ReturnType<typeof config>) =>
+    describePolicies(c, undefined).find((r) => r.switch.path === "hand_back.blocked_notify")!;
 
   it("shows agent with a note when the team has no PM", () => {
     expect(value(config())).toMatchObject({ value: "agent", note: "no pm role on the team" });

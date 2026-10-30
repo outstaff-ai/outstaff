@@ -158,12 +158,13 @@ export const MESSAGE_META = {
   chat_message: {
     from: "agent",
     summary:
-      "A message from a trusted human in chat. The office starts a chat session for it at once, beside the person's active item, or adds it to the item of the thread. Delivered at least once; the office recognizes a message it handled.",
+      "A message from a trusted human in chat. The office takes it in as a `chat.message` event, which its pipeline decides on (by default it wakes the person in a chat session). Delivered at least once; the office recognizes a message it took in already.",
     replies: ["chat_message_result", "error"],
   },
   chat_message_result: {
     from: "office",
-    summary: "What the office did with the message, and what the agent should answer.",
+    summary:
+      "The office took the message in; the agent answers nothing until the work it starts does.",
     replies: [],
   },
   chat_report: {

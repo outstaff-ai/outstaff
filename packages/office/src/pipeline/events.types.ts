@@ -29,7 +29,7 @@ export interface PipelineSubject {
 
 /**
  * One event, from any source. `data` carries what the event type says: `body`, `mentions` and `state` as intake
- * fills them for the workflow rules, `addressed` (an agent's handle) for `chat.message`, `cause` (a `MergeCause`) on
+ * fills them for the conditions, `addressed` (an agent's handle) for `chat.message`, `cause` (a `MergeCause`) on
  * the merge-derived types, `status` and `kind` on `agent.handed_back`.
  */
 export interface PipelineEvent {

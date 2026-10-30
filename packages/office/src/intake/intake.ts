@@ -1,4 +1,4 @@
-import { createStatusMap, parseRepoUrl, policyOn, PortError } from "@outstaff/core";
+import { createStatusMap, parseRepoUrl, PortError } from "@outstaff/core";
 import type { RepoRef } from "@outstaff/core";
 import { DEFAULT_BACKOFF } from "./backoff.js";
 import { createDelivery } from "./delivery.js";
@@ -51,10 +51,8 @@ export function createIntake(opts: IntakeOptions): Intake {
     ...defined({ ttlMs: opts.trustTtlMs, resolveAgent: opts.resolveAgent }),
   });
 
-  // A trusted person's @mention of an agent in a comment; with the switch off nobody is mentioned.
-  const mentions = policyOn(team.policies, "feedback.mentions")
-    ? agentMentionResolver(team)
-    : undefined;
+  // A trusted person's @mention of an agent in a comment.
+  const mentions = agentMentionResolver(team);
 
   let running = false;
   const isRunning = () => running;

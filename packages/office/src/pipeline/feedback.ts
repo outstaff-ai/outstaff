@@ -1,5 +1,5 @@
 import type { Feedback } from "@outstaff/protocol";
-import { feedbackOf } from "#/engine/feedback.js";
+import { feedbackOf } from "#/work-feedback.js";
 import type { PipelineEvent } from "./events.types.js";
 
 /** What a woken agent is shown of the event: the review, comment or chat message it carries. */

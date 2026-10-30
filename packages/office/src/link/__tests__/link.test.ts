@@ -35,7 +35,7 @@ describe("the office link", () => {
         ticket: (key: string) => `https://tracker.acme.example/issue/${key}`,
         pr: (pr: { number: number }) => `https://github.com/acme-example/shop/pull/${pr.number}`,
       },
-      identity: { team: "acme", version: "1.2.3", pipelineMode: "shadow" as const },
+      identity: { team: "acme", version: "1.2.3" },
       connected: () => online,
       doctor: {
         run: async () => {
@@ -112,7 +112,7 @@ describe("the office link", () => {
     ]);
 
     expect(dash.of("hello").map((m) => m.payload)).toEqual([
-      { office: { team: "acme", version: "1.2.3", pipelineMode: "shadow" } },
+      { office: { team: "acme", version: "1.2.3" } },
     ]);
 
     expect(await dash.request({ method: "people" })).toMatchObject({
@@ -202,16 +202,6 @@ describe("the office link", () => {
           { seconds: 86400, since: "2026-10-04T10:00:00.000Z", events: 2, items: 1 },
         ],
       },
-    });
-
-    expect(await dash.request({ method: "compare" })).toMatchObject({
-      result: { events: 2, compared: 0, agree: 0, differ: 0, differing: [] },
-    });
-
-    expect(
-      await dash.request({ method: "compare", params: { since: "2026-10-05T09:01:00.000Z" } }),
-    ).toMatchObject({
-      result: { since: "2026-10-05T09:01:00.000Z", events: 1 },
     });
 
     expect(await dash.request({ method: "item", params: { id: "nope" } })).toMatchObject({

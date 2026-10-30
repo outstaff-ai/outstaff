@@ -50,8 +50,6 @@ export const LINK_METHOD_META: Record<LinkMethod, string> = {
   event: "One event's trace, by event id. `not_found` when the office has none.",
   items:
     "Work items, newest first by when they were created, optionally of one status or person, with the `total` that match. Page with `before` = `nextBefore`.",
-  compare:
-    "How the engine and the pipeline compare over the events in a range, as `ost explain --compare` sums it up: totals, differences by kind and by policy, and the events that differ. Only events traced in shadow mode are compared.",
   item: "One work item with its runs, the end of its journal and the traces of the events that queued or joined it. `not_found` when there is no such item.",
   activity:
     "How much happened in each of the last few windows of time (default the last hour and the last day): events that happened and work items created. Exact, since the office counts them in its store.",

@@ -97,7 +97,6 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         return undefined;
       }
 
-      await opts.onStarted?.(started.item);
       await store.upsertSubject(OFFER_SUBJECT, item.id, { accepted: false });
       return offerOf(started.item);
     },
