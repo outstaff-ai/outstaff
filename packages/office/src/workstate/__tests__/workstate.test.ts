@@ -425,6 +425,31 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(ws.stackedOn(REPO, "feat/a").map((p) => p.ref.number)).toEqual([b.number]);
       expect(await store.queryLinks({ relation: "stacked_on" })).toEqual([]);
     });
+
+    it("raises pr.base_merged once for the pull requests stacked on the merged one, naming the merge", async () => {
+      const a = await pr({ title: "a", head: { ref: "feat/a" } });
+      const b = await pr({ title: "b", head: { ref: "feat/b" }, base: { ref: "feat/a" } });
+      const other = await pr({ title: "other", head: { ref: "feat/x" } });
+      for (const n of [a.number, b.number, other.number]) {
+        await ws.apply(prEvent("pr.opened", n), meta());
+      }
+
+      await vcs.seed.merge(REPO, a.number, "dana");
+      await ws.apply(prEvent("pr.merged", a.number), meta());
+      await ws.apply(prEvent("pr.merged", a.number), meta("again"));
+      expect(types()).toEqual([`pr.base_merged#${b.number}`]);
+      expect(seen[0]!.data).toMatchObject({
+        base: "feat/a",
+        cause: { pr: prRef(a.number), title: "a" },
+      });
+
+      expect(
+        ws
+          .repoPrs(REPO)
+          .map((p) => p.ref.number)
+          .toSorted(),
+      ).toEqual([a.number, b.number, other.number].toSorted());
+    });
   });
 
   describe("conflicts", () => {
@@ -532,7 +557,36 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       await ws.rescan();
       await vcs.seed.check(REPO, pushed.head.sha, { name: "build", status: "failure" });
       await ws.rescan();
+      const failed = seen.filter((e) => e.type === "pr.ci_failed");
+      expect(failed.map((e) => e.data["sha"])).toEqual([p.head.sha, pushed.head.sha]);
+    });
+
+    it("emits pr.ci_passed once when checks turn green, and again after a push turns them green", async () => {
+      const p = await pr({ title: "p" });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      await vcs.seed.check(REPO, p.head.sha, { name: "build", status: "pending" });
+      await ws.rescan();
+      expect(seen).toEqual([]);
+
+      await vcs.seed.check(REPO, p.head.sha, { name: "build", status: "success" });
+      await ws.rescan();
+      await ws.rescan();
+      expect(types()).toEqual([`pr.ci_passed#${p.number}`]);
+      expect(seen[0]!.data).toMatchObject({ passing: ["build"], sha: p.head.sha });
+
+      const pushed = await vcs.seed.push(REPO, p.number, SAM);
+      await vcs.seed.check(REPO, pushed.head.sha, { name: "build", status: "pending" });
+      await ws.rescan();
+      await vcs.seed.check(REPO, pushed.head.sha, { name: "build", status: "success" });
+      await ws.rescan();
       expect(seen.map((e) => e.data["sha"])).toEqual([p.head.sha, pushed.head.sha]);
+    });
+
+    it("raises nothing for a pull request first seen green in a rescan", async () => {
+      const p = await pr({ title: "p" });
+      await vcs.seed.check(REPO, p.head.sha, { name: "build", status: "success" });
+      await ws.rescan();
+      expect(seen).toEqual([]);
     });
 
     it("delivers what a rescan raised even when the rest of the rescan fails", async () => {

@@ -1,13 +1,17 @@
-import type { Logger, Tracker, Vcs } from "@outstaff/core";
+import type { Logger, RepoRef, Tracker, Vcs } from "@outstaff/core";
 import type { ContextLimits } from "#/pipeline/context/index.js";
 import type { TraceStore } from "#/pipeline/trace.types.js";
 import type { Store } from "#/store/types.js";
+import type { PrRecord } from "#/workstate/index.js";
 
 /** What the office reads to hand over a wake's context. The ports are read with the office's own credentials. */
 export interface ContextReaders {
   store: Store;
   tracker?: Pick<Tracker, "getIssue" | "listComments"> | undefined;
-  vcs?: Pick<Vcs, "reviewThreads" | "links"> | undefined;
+  vcs?: Pick<Vcs, "reviewThreads" | "links" | "checks" | "changedFiles"> | undefined;
+
+  /** The pull requests of a repository the work state keeps, for a merge's context. */
+  prs?: ((repo: RepoRef) => PrRecord[]) | undefined;
 }
 
 /** The references the walk found around an item, before their data is read. */

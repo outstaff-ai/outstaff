@@ -90,6 +90,18 @@ function setup(person: string, over: { pull?: Record<string, unknown>; threads?:
       },
     },
     {
+      method: "GET",
+      path: "/repos/acme/app/pulls/7/files",
+      handler: (r) => {
+        seen.auth["files"] = r.headers.get("authorization")!;
+        return [
+          { filename: "src/a.ts" },
+          { filename: "src/b.ts", previous_filename: "src/old-b.ts" },
+          { filename: "src/a.ts" },
+        ];
+      },
+    },
+    {
       method: "PATCH",
       path: "/repos/acme/app/pulls/7",
       handler: (r) => {
@@ -357,6 +369,12 @@ describe("reviews, replies and diffs", () => {
 
     expect(seen.reactions).toEqual([]);
     expect(vcs).toBeDefined();
+  });
+
+  it("lists the files a pull request changes with the office's own token, a rename by both paths", async () => {
+    const { vcs, seen } = setup("lee");
+    expect(await vcs.changedFiles!(REPO, 7)).toEqual(["src/a.ts", "src/b.ts", "src/old-b.ts"]);
+    expect(seen.auth["files"]).toBe("Bearer ghs_1");
   });
 
   it("reads the diff with the diff media type and a read grant", async () => {

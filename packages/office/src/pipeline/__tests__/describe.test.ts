@@ -231,6 +231,45 @@ describe("formatTrace", () => {
     expect(formatTrace({ ...trace, context: {} })).not.toContain("Context handed over");
   });
 
+  it("says what a merge's context named", () => {
+    const limits = { comments: 5, messages: 10, threads: 5, items: 2, bodyChars: 1500 };
+    const merge = {
+      pr: "acme/app#12",
+      base: { ref: "main", ci: "success" },
+      others: [
+        { ref: "acme/app#13", relation: ["stacked_on_it"] },
+        { ref: "acme/app#14", relation: [] },
+      ],
+      moreOthers: 3,
+      recentMerges: ["acme/app#9"],
+    };
+
+    const trace: Trace = {
+      event: event("pr.ci_passed", { id: "workstate:1", subject: {} }),
+      policies: [],
+      aggregation: [],
+      decisions: [],
+      context: { "item-1": { itemId: "item-1", omitted: 0, limits, entries: [], merge } },
+    };
+
+    expect(formatTrace(trace).split("\n").slice(-4)).toEqual([
+      "  work item item-1: 0 linked",
+      "    merge of acme/app#12: base main CI success",
+      "    other open pull requests: acme/app#13 (stacked_on_it), acme/app#14 (unrelated), 3 more",
+      "    recent merges into main: acme/app#9",
+    ]);
+
+    const alone = { ...merge, others: [], moreOthers: 0, recentMerges: [] };
+    const quiet = formatTrace({
+      ...trace,
+      context: { "item-1": { ...trace.context!["item-1"]!, merge: alone } },
+    });
+
+    expect(quiet).toContain(
+      "    other open pull requests: none\n    recent merges into main: none",
+    );
+  });
+
   it("says what every policy proposed and what the aggregation made of it", () => {
     const move = { op: "move" as const, ticket: "ACME-1", to: "review" as const };
     const trace: Trace = {

@@ -16,8 +16,14 @@ export interface ChecksOptions {
 
 /** The scheduler's reads of the store and its policy checks, shared by its operations. */
 export interface Checks {
-  /** Whether the person has room to start the item: a chat session needs a free session, other work an idle lane. */
-  hasRoom(item: Pick<WorkItem, "person" | "kind">): Promise<boolean>;
+  /**
+   * Whether the person has room to start the item: a chat session needs a free session, other work an idle lane, and a
+   * merge also no other merge running in its repository.
+   */
+  hasRoom(item: Pick<WorkItem, "id" | "person" | "kind" | "subject">): Promise<boolean>;
+
+  /** Another item's merge running in the repository of a merge item, which it waits for. */
+  mergeRunning(item: Pick<WorkItem, "id" | "kind" | "subject">): Promise<WorkItem | undefined>;
   backingOff(item: Pick<WorkItem, "notBefore">): boolean;
   getWindows(person: string): Promise<UsageWindow[]>;
   pauseBlock(person: string): Promise<RunBlock | null>;

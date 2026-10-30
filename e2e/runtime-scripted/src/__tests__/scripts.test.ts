@@ -835,4 +835,36 @@ describe("merge", () => {
       { type: "tool", tool: "pr_merge", input: { repo: ctx.repo, number: 7 } },
     ]);
   });
+
+  const other = (number: number, relation: string, approved = true) => ({
+    number,
+    relation,
+    approved,
+  });
+
+  const decide = async (others: ReturnType<typeof other>[], mergeable = "clean") =>
+    play(merge({ ...ctx, kind: "merge", pr: 7, merge: { mergeable, others } }), () => "");
+
+  it("merges when nothing in the context is in the way", async () => {
+    const { seen, text } = await decide([
+      other(9, "changes the same files"),
+      other(3, "same base, changes the same files", false),
+      other(4, "stacked on it"),
+    ]);
+
+    expect(seen).toHaveLength(1);
+    expect(text).toBe("Ran pr merge.");
+  });
+
+  it("waits for the pull request it is stacked on, an older approved one changing the same files, and a rebase", async () => {
+    expect((await decide([other(5, "it is stacked on this one", false)])).text).toBe(
+      "Waiting: #5 merges first.",
+    );
+
+    const overlap = await decide([other(3, "same base, changes the same files")]);
+    expect(overlap).toEqual({ seen: [], text: "Waiting: #3 merges first." });
+    expect((await decide([], "conflicting")).text).toBe(
+      "Waiting: #7 conflicts with its base, so it is rebased first.",
+    );
+  });
 });

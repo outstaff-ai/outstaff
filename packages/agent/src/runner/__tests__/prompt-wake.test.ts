@@ -172,6 +172,118 @@ describe("buildWorkPrompt wake context", () => {
     );
   });
 
+  it("renders what a merge is decided with: the pull request, its base, the other open pull requests, the latest merges", () => {
+    const merge: NonNullable<WakeContext["merge"]> = {
+      pr: {
+        ref: "acme/app#12",
+        number: 12,
+        title: "Coupons",
+        url: "https://git.acme.example/acme/app/pull/12",
+        head: "feat/coupons",
+        base: "main",
+        draft: false,
+        approvedBy: ["ada-admin"],
+        changesRequestedBy: [],
+        ci: "success",
+        failing: [],
+        mergeable: "clean",
+        unresolvedThreads: 1,
+      },
+      base: {
+        ref: "main",
+        ci: "failure",
+        failing: [{ name: "build", url: "https://ci/1" }, { name: "e2e" }],
+      },
+      others: [
+        {
+          ref: "acme/app#13",
+          number: 13,
+          title: "Cart",
+          url: "https://git.acme.example/acme/app/pull/13",
+          author: "kofi",
+          draft: false,
+          approved: true,
+          ci: "success",
+          mergeable: "clean",
+          relation: ["same_base", "overlapping_files"],
+          files: ["src/cart.ts"],
+        },
+        {
+          ref: "acme/app#14",
+          number: 14,
+          title: "Docs",
+          author: "grace-lead",
+          draft: true,
+          approved: false,
+          ci: "none",
+          mergeable: "unknown",
+          relation: [],
+          files: [],
+        },
+      ],
+      moreOthers: 2,
+      recentMerges: [
+        {
+          ref: "acme/app#9",
+          number: 9,
+          title: "Search",
+          author: "sam",
+          at: "2026-10-01T09:00:00.000Z",
+        },
+      ],
+    };
+
+    const text = buildWorkPrompt(offer({ tickets: [], prs: [], docs: [], chats: [], merge }), {
+      resumed: false,
+    });
+
+    expect(text).toContain(
+      [
+        "For the merge decision, as the office knows it now:",
+        "  Pull request acme/app#12: Coupons https://git.acme.example/acme/app/pull/12",
+        "    feat/coupons -> main. approved by ada-admin. CI success. Mergeable: clean. 1 unresolved review thread.",
+        "  Base main: CI failure (failing: build https://ci/1, e2e).",
+        "  Other open pull requests in the repository (2 more not shown):",
+        "  - acme/app#13 by kofi: Cart https://git.acme.example/acme/app/pull/13",
+        "    same base, changes the same files. Ready, approved, CI success, mergeable: clean. Files both change: src/cart.ts.",
+        "  - acme/app#14 by grace-lead: Docs",
+        "    no relation found. Draft, not approved, CI none, mergeable: unknown.",
+        "  Latest merges into main, latest first:",
+        "  - acme/app#9 by sam (2026-10-01T09:00:00.000Z): Search",
+      ].join("\n"),
+    );
+
+    const alone = {
+      ...merge,
+      pr: {
+        ...merge.pr,
+        draft: true,
+        approvedBy: [],
+        changesRequestedBy: ["grace-lead"],
+        unresolvedThreads: 0,
+      },
+      base: { ref: "main", ci: "success" as const, failing: [] },
+      others: [],
+      recentMerges: [],
+    };
+
+    const quiet = buildWorkPrompt(
+      offer({ tickets: [], prs: [], docs: [], chats: [], merge: alone }),
+      {
+        resumed: false,
+      },
+    );
+
+    expect(quiet).toContain(
+      [
+        "    feat/coupons -> main, draft. no approval, changes requested by grace-lead. CI success. Mergeable: clean. 0 unresolved review threads.",
+        "  Base main: CI success.",
+        "  No other open pull requests in the repository.",
+        "  No recent merges into main the office knows of.",
+      ].join("\n"),
+    );
+  });
+
   it("adds nothing without a bundle", () => {
     expect(buildWorkPrompt(offer(), { resumed: false })).not.toContain("What the office knows");
     expect(

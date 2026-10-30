@@ -121,6 +121,9 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
       const s = need(repo, number);
       return `diff --git a/${s.pr.head.ref}.txt b/${s.pr.head.ref}.txt\n--- a/${s.pr.head.ref}.txt\n+++ b/${s.pr.head.ref}.txt\n@@ -1 +1 @@\n-old\n+new\n`;
     },
+    async changedFiles(repo, number) {
+      return [`${need(repo, number).pr.head.ref}.txt`];
+    },
     async permission(repo, login) {
       return perms.get(`${key(repo)}:${login}`) ?? "none";
     },

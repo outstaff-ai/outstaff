@@ -12,7 +12,7 @@ modes:
   - name: review-feedback
     when: A pull request you own has new review threads.
   - name: merge
-    when: A work item asks you to merge a pull request you own (a team's own workflow rule).
+    when: A pull request you own is approved and may be ready to merge; decide whether to merge it now, wait, or coordinate first.
   - name: rebase
     when: A branch has a conflict or its parent in a stack merged.
   - name: ci-fix

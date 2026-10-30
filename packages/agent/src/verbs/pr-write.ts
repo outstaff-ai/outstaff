@@ -1,7 +1,6 @@
 import { PortError, policyValue } from "@outstaff/core";
 import { z } from "zod";
 import { repoLabel, requireVcs } from "./support.js";
-import { autoMergeWhenReady } from "./auto-merge.js";
 import { defineVerb, result } from "./define.js";
 import type { AgentEnv } from "./types.js";
 import { currentBranch, repoOrWorktree } from "./worktree.js";
@@ -42,7 +41,7 @@ export const prOpen = defineVerb({
   name: "pr.open",
   summary: "Open a pull request from a pushed branch.",
   description:
-    "Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. A pull request opened ready gets the host's auto-merge (or the merge queue) when the team lets agents merge, as with pr update --ready. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.",
+    "Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. Opening it ready does not set it to merge: when the team lets agents merge, you are woken to decide once it is approved. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.",
   input: z.strictObject({
     repo,
     head: z
@@ -82,12 +81,10 @@ export const prOpen = defineVerb({
     });
 
     const url = vcs.links.pr(ref, pr.number);
-    const merging = await autoMergeWhenReady(env, vcs, ref, pr);
     return result(
       [
         `Opened ${repoLabel(ref)}#${pr.number}${pr.draft ? " (draft)" : ""}: ${pr.title}`,
         `${pr.head.ref} -> ${pr.base.ref}`,
-        ...(merging ? [merging] : []),
         url,
       ],
       { pr },
@@ -120,7 +117,7 @@ export const prUpdate = defineVerb({
   name: "pr.update",
   summary: "Change the title, body, base or draft state of a pull request.",
   description:
-    "Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review. When the team lets agents merge (policies.merge.on_approval), ready also turns on the host's auto-merge, or adds the pull request to the merge queue where the repository has one: the repository's required approvals and checks decide when it merges, and no further run of yours is needed. If that fails, the pull request is still ready; report why and do not merge it another way.",
+    "Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review. Marking it ready does not set it to merge: when the team lets agents merge (policies.merge.on_approval), you are woken to decide once it is approved and its checks pass.",
   input: z.strictObject({
     repo,
     number,
@@ -148,12 +145,10 @@ export const prUpdate = defineVerb({
     const ref = await repoOrWorktree(env, ctx, input.repo);
     const pr = await vcs.updatePullRequest(ref, input.number, changes);
     const url = vcs.links.pr(ref, input.number);
-    const merging = input.ready ? await autoMergeWhenReady(env, vcs, ref, pr) : undefined;
     return result(
       [
         `Updated ${repoLabel(ref)}#${pr.number}${pr.draft ? " (draft)" : ""}: ${pr.title}`,
         `${pr.head.ref} -> ${pr.base.ref}`,
-        ...(merging ? [merging] : []),
         url,
       ],
       { pr },

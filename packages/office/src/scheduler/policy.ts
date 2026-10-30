@@ -21,6 +21,20 @@ export const PRIORITY = {
 } as const;
 
 export const CHAT_KIND = "chat";
+
+/** A merge is decided on its own: one runs per repository at a time, and only merge wakes fold into it. */
+export const MERGE_KIND = "merge";
+
+/**
+ * The repository a merge item decides on, from its pull request subject (`<repository>#<number>`); undefined for any
+ * other item. One merge runs per repository at a time.
+ */
+export function mergeRepo(item: Pick<WorkItem, "kind" | "subject">): string | undefined {
+  const ref = item.kind === MERGE_KIND && item.subject?.type === "pr" ? item.subject.ref : "";
+  const at = ref.lastIndexOf("#");
+  return at > 0 ? ref.slice(0, at).toLowerCase() : undefined;
+}
+
 export const HOUR_MS = 60 * 60 * 1000;
 
 /** Priority class of new work: by trigger, and human chat ahead of other human work. */

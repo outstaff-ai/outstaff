@@ -283,6 +283,9 @@ export interface Vcs {
   /** The unified diff of the pull request (read grant). */
   diff(repo: RepoRef, number: number): Promise<string>;
 
+  /** The paths a pull request changes (a rename by both), with the office's credentials; optional. */
+  changedFiles?(repo: RepoRef, number: number): Promise<string[]>;
+
   /** For the trust model. */
   permission(repo: RepoRef, login: string): Promise<VcsPermission>;
   events(repos: RepoRef[], cursor?: string): Promise<EventPage<VcsEvent>>;

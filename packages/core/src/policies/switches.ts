@@ -87,7 +87,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     kind: "agent",
     needs: "vcs.merge",
     behaviour:
-      "Let agents turn on the code host's auto-merge on their pull requests: when an agent marks its pull request ready for review (or opens it ready), the same verb turns on auto-merge, or adds it to the merge queue where the repository has one. The repository's own rules (required approvals and checks) decide when it merges, with the repository's merge method; no agent runs for the merge, and the office only sees it merge. Limited to policies.merge.repos when set. Off: nothing is turned on and people merge.",
+      "Let agents merge their own approved pull requests. When an agent's open, ready pull request may be ready to merge (an allowed approver approves it with its checks green, its checks turn green while it is approved, or the pull request it was stacked on merges), the office wakes its author with the merge context, and the agent decides: merge it with ost pr merge, wait, or coordinate first. One merge runs per repository at a time. Limited to policies.merge.repos when set. Off: no one is woken to merge and people merge.",
   },
 ];
 

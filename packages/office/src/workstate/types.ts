@@ -3,6 +3,7 @@ import type {
   Logger,
   PrRef,
   PrVerdict,
+  RepoRef,
   TeamConfig,
   Tracker,
   Vcs,
@@ -143,7 +144,7 @@ export interface WorkState extends WorkflowState {
   /** Idempotent; register as an intake handler. */
   apply(event: WorkflowEvent, meta: IntakeMeta | WorkstateMeta): Promise<void>;
 
-  /** Receives the synthetic events (`pr.conflicted`, `pr.ci_failed`) the work state derives. */
+  /** Receives the synthetic events (`pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`) the work state derives. */
   onEvent(handler: WorkstateHandler): void;
 
   /** Re-reads every open pull request and live ticket through the ports; losing the store only costs this. */
@@ -178,6 +179,9 @@ export interface WorkState extends WorkflowState {
 
   /** The pull requests with this number, in any state, from every repository. */
   pullRequests(number: number): PrRecord[];
+
+  /** The pull requests of a repository the state keeps, in any state: open ones, and recently finished ones. */
+  repoPrs(repo: RepoRef): PrRecord[];
 
   /** The pull requests linked to the ticket, in any state. */
   prsOfTicket(ticket: string): PrRecord[];

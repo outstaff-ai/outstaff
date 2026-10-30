@@ -453,7 +453,7 @@ ost pr resolve shop 42 PRT_abc123
 
 Open a pull request from a pushed branch.
 
-Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. A pull request opened ready gets the host's auto-merge (or the merge queue) when the team lets agents merge, as with pr update --ready. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.
+Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. Opening it ready does not set it to merge: when the team lets agents merge, you are woken to decide once it is approved. A ticket takes one pull request: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has one, open or merged; split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.
 
 ```
 ost pr open [--repo <repo>] [--head <head>] [--base <base>] --title <title> [--body <body>] [--body-file <bodyFile>] [--draft]
@@ -482,7 +482,7 @@ ost pr open --repo shop --head feat/coupons --title "feat(cart): add coupons" --
 
 Change the title, body, base or draft state of a pull request.
 
-Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review. When the team lets agents merge (policies.merge.on_approval), ready also turns on the host's auto-merge, or adds the pull request to the merge queue where the repository has one: the repository's required approvals and checks decide when it merges, and no further run of yours is needed. If that fails, the pull request is still ready; report why and do not merge it another way.
+Updates a pull request as you. Pass only what changes. draft turns it into a draft, ready marks a draft ready for review. Marking it ready does not set it to merge: when the team lets agents merge (policies.merge.on_approval), you are woken to decide once it is approved and its checks pass.
 
 ```
 ost pr update <number> [--repo <repo>] [--title <title>] [--body <body>] [--body-file <bodyFile>] [--base <base>] [--draft] [--ready]
@@ -618,7 +618,7 @@ ost pr diff 42
 
 Merge your own approved pull request, or put it in the merge queue.
 
-Merges your own pull request after an allowed approver approved it (policies.merge.approvers). Refused outright unless the team turned on policies.merge.on_approval. The code checks every condition and lists each one that fails: the pull request is yours, open, not a draft and mergeable; an allowed approver approved its current head and none has requested changes or still has a review pending; the required checks passed. Then it puts the pull request in the host's merge queue, or merges it with policies.merge.method (when that is unset, with what the repository has: its merge queue, else a method its settings allow). It never bypasses branch protection or rulesets: when the host refuses, report why and stop; do not merge another way.
+Merges your own pull request after an allowed approver approved it (policies.merge.approvers), once you decided it should merge now: the office wakes you to decide when it may be ready. Refused outright unless the team turned on policies.merge.on_approval. The code checks every condition and lists each one that fails: the pull request is yours, open, not a draft and mergeable; an allowed approver approved its current head and none has requested changes or still has a review pending; the required checks passed. Then it puts the pull request in the host's merge queue (where the repository has one, merging means joining it), or merges it with policies.merge.method (when that is unset, with what the repository has: its merge queue, else a method its settings allow). It never bypasses branch protection or rulesets: when the host refuses, report why and stop; do not merge another way.
 
 ```
 ost pr merge <number> [--repo <repo>]

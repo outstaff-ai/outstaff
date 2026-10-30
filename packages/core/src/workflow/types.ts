@@ -58,6 +58,9 @@ export interface WorkflowPr {
 
   /** Latest decisive review of each reviewer the office trusts. */
   verdicts?: PrVerdict[];
+
+  /** Combined state of its checks on the current head, when the office has read them. */
+  ci?: "none" | "pending" | "success" | "failure";
 }
 
 /** Read-only snapshot of the office's world, taken after the event happened. */

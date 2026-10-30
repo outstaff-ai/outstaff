@@ -173,6 +173,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     store,
     team,
     ports: { ...tracker, vcs: ports.vcs },
+    workState,
     roles,
     traces,
     logger: log,

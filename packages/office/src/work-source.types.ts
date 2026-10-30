@@ -4,6 +4,7 @@ import type { RosterOptions } from "./messaging/index.js";
 import type { BlockNotice, Scheduler } from "./scheduler/index.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { TraceStore } from "./pipeline/trace.types.js";
+import type { WorkState } from "./workstate/index.js";
 
 export interface HandBackResult {
   summary: string;
@@ -16,6 +17,9 @@ export interface WorkSourceOptions {
   store: Store;
   team: Pick<TeamConfig, "people" | "humans"> & Partial<Pick<TeamConfig, "pipeline">>;
   ports?: { tracker?: Tracker; vcs?: Vcs };
+
+  /** The work state, whose pull requests a merge's context names. */
+  workState?: Pick<WorkState, "repoPrs">;
   roles?: RosterOptions["roles"];
 
   /** Where the event pipeline keeps its traces; what each wake's bundle carried is added to them. */

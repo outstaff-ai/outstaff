@@ -5,6 +5,7 @@ import {
   HOUR_MS,
   isLoopGuarded,
   loopGuardVerdict,
+  mergeRepo,
   planMove,
   usageVerdict,
 } from "./policy.js";
@@ -20,11 +21,24 @@ export const personScope = (person: string) => `person:${person}`;
 export function createChecks(opts: ChecksOptions): Checks {
   const { store, team, clock, log, usage, maxRuns, chatSessions } = opts;
 
-  const hasRoom = async (item: Pick<WorkItem, "person" | "kind">) => {
+  /** The active merge of another item in the item's repository, if there is one. */
+  const mergeRunning = async (item: Pick<WorkItem, "id" | "kind" | "subject">) => {
+    const repo = mergeRepo(item);
+    if (!repo) {
+      return undefined;
+    }
+
+    const active = await store.listItems({ status: "active" });
+    return active.find((i) => i.id !== item.id && mergeRepo(i) === repo);
+  };
+
+  const hasRoom = async (item: Pick<WorkItem, "id" | "person" | "kind" | "subject">) => {
     const active = await store.listItems({ person: item.person, status: "active" });
-    return item.kind === CHAT_KIND
-      ? active.filter((i) => i.kind === CHAT_KIND).length < chatSessions
-      : !active.some((i) => i.kind !== CHAT_KIND);
+    if (item.kind === CHAT_KIND) {
+      return active.filter((i) => i.kind === CHAT_KIND).length < chatSessions;
+    }
+
+    return !active.some((i) => i.kind !== CHAT_KIND) && !(await mergeRunning(item));
   };
 
   const backingOff = (item: Pick<WorkItem, "notBefore">) =>
@@ -127,6 +141,7 @@ export function createChecks(opts: ChecksOptions): Checks {
 
   return {
     hasRoom,
+    mergeRunning,
     backingOff,
     getWindows,
     pauseBlock,

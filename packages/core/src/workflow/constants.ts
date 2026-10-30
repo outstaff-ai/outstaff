@@ -6,6 +6,8 @@ export const WORKFLOW_EVENT_TYPES = [
   "pr.comment",
   "pr.conflicted",
   "pr.ci_failed",
+  "pr.ci_passed",
+  "pr.base_merged",
   "ticket.assigned",
   "ticket.moved",
   "ticket.commented",

@@ -1,8 +1,9 @@
 import { addFeedback } from "#/work-feedback.js";
 import { triggerRefs } from "#/refs/index.js";
-import { priorityFor } from "#/scheduler/index.js";
+import { MERGE_KIND, priorityFor } from "#/scheduler/index.js";
 import { chatTitle, joinChatSession, messageOf, openChatSession } from "#/chat/session.js";
 import type { WorkItem, WorkItemTrigger } from "#/store/types.js";
+import { coalesceKey } from "#/pipeline/coalesce.js";
 import type { Wake } from "#/pipeline/decisions.types.js";
 import type { PipelineEvent } from "@outstaff/policy";
 import type { LiveOptions, WakeReason } from "./live.types.js";
@@ -13,8 +14,11 @@ export const WAKE_SUBJECT = "pipeline_wake";
 export const ITEM_EVENTS_SUBJECT = "pipeline_item_events";
 const LIVE = new Set(["queued", "active"]);
 
-/** A running chat session sees no later message, so a message joins only a session that has not started. */
-const CHAT_LIVE = new Set(["queued"]);
+/**
+ * A running chat session sees no later message, so a message joins only a session that has not started. A merge
+ * decided on facts that changed since gets a run of its own, too.
+ */
+const QUEUED = new Set(["queued"]);
 
 /** An idle agent's pull is the office's own doing: automatic work, like the scheduler's. */
 const triggerOf = (event: PipelineEvent): WorkItemTrigger =>
@@ -112,8 +116,8 @@ async function init(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 
 /**
  * Queues the run a wake asks for. A wake for an item of the same kind and subject that is queued or running joins that
- * item (a chat message only one that is queued: a running session does not see it); a wake for the same person and
- * subject within its window (`coalesceMs`, which the aggregation set) of the first is folded into the item the first
+ * item (a chat message or a merge only one that is queued: a running session does not see it, and a running merge
+ * decided on older facts); a wake for the same person and subject (a merge only with a merge) within its window (`coalesceMs`, which the aggregation set) of the first is folded into the item the first
  * queued, which is held until then. A chat wake has no window: its item is offered at once. `folded` lists the events
  * of the item it joined, this one last.
  */
@@ -123,7 +127,7 @@ export async function enqueueWake(
   opts: LiveOptions,
 ): Promise<{ itemId: string; folded?: string[] }> {
   const subject = itemSubject(event, wake, opts);
-  const joinable = wake.subject.type === "chat" ? CHAT_LIVE : LIVE;
+  const joinable = wake.subject.type === "chat" || wake.kind === MERGE_KIND ? QUEUED : LIVE;
   const live = (await opts.store.listItems({ person: wake.person })).find(
     (i) =>
       joinable.has(i.status) &&
@@ -149,7 +153,7 @@ export async function enqueueWake(
     refs: triggerRefs(event.subject, event.id, opts.workState.prSubject),
     init: (created) => init(created, wake, event, opts),
     coalesce: {
-      key: JSON.stringify([wake.person, subject.type, subject.ref]),
+      key: coalesceKey(wake.person, subject, wake.kind),
       at: event.at,
       windowMs: wake.coalesceMs,
       fold: async (into) => {

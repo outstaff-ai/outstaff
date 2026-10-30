@@ -42,6 +42,14 @@ export function pullRoutes(s: GithubStore, auth: GithubAuth, repo: string): Rout
     },
     {
       method: "GET",
+      path: `${pulls}/:n/files`,
+      handler: async (r) => {
+        const pr = pullOf(s, r.params["n"]);
+        return pr ? filesOf(await s.backend.diff(pr.base.ref, pr.head.ref)) : NOT_FOUND;
+      },
+    },
+    {
+      method: "GET",
       path: `${pulls}/:n`,
       handler: async (r) => {
         const pr = pullOf(s, r.params["n"]);
@@ -55,6 +63,13 @@ export function pullRoutes(s: GithubStore, auth: GithubAuth, repo: string): Rout
       },
     },
   ];
+}
+
+/** The files of a pull request as GitHub lists them, from its diff: a rename by its new and its earlier path. */
+function filesOf(diff: string) {
+  return [...diff.matchAll(/^diff --git a\/(\S+) b\/(\S+)$/gm)].map(([, from, to]) =>
+    from === to ? { filename: to } : { filename: to, previous_filename: from },
+  );
 }
 
 interface NewPull {

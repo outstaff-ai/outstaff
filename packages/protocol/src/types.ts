@@ -17,6 +17,9 @@ import type {
 import type {
   contextChatSchema,
   contextDocSchema,
+  contextMergeOtherSchema,
+  contextMergeSchema,
+  contextMergeSelfSchema,
   contextNoteSchema,
   contextPrSchema,
   contextTicketSchema,
@@ -55,6 +58,9 @@ export type ConversationEntry = z.infer<typeof conversationEntrySchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WakeContext = z.infer<typeof wakeContextSchema>;
 export type ContextWhy = z.infer<typeof contextWhySchema>;
+export type ContextMerge = z.infer<typeof contextMergeSchema>;
+export type ContextMergeSelf = z.infer<typeof contextMergeSelfSchema>;
+export type ContextMergeOther = z.infer<typeof contextMergeOtherSchema>;
 export type ContextNote = z.infer<typeof contextNoteSchema>;
 export type ContextTicket = z.infer<typeof contextTicketSchema>;
 export type ContextPr = z.infer<typeof contextPrSchema>;

@@ -37,6 +37,15 @@ export interface ItemContext {
 
   /** The answer a PM's `Unblocked: <answer>` comment gives, among the ticket comments the wake carries. */
   unblocked?: string;
+
+  /** For a merge: what the office handed over to decide with. */
+  merge?: MergeView;
+}
+
+/** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
+export interface MergeView {
+  mergeable: string;
+  others: { number: number; relation: string; approved: boolean }[];
 }
 
 export interface Feedback {
@@ -219,6 +228,24 @@ function parseUnblocked(prompt: string): Pick<ItemContext, "unblocked"> {
   return answer ? { unblocked: answer } : {};
 }
 
+// "For the merge decision, ..." then the pull request ("Mergeable: <state>.") and each other open pull request as
+// "  - <ref> by <author>: <title>" over "    <relation>. <Draft|Ready>, <approved|not approved>, ...".
+function parseMerge(prompt: string): Pick<ItemContext, "merge"> {
+  const at = prompt.indexOf("For the merge decision, as the office knows it now:");
+  if (at < 0) {
+    return {};
+  }
+
+  const block = prompt.slice(at);
+  const others = [
+    ...block.matchAll(
+      /^ {2}- \S*#(\d+) by [^\n]*\n {4}(.*?)\. (?:Draft|Ready), (approved|not approved),/gm,
+    ),
+  ].map((m) => ({ number: Number(m[1]), relation: m[2]!, approved: m[3] === "approved" }));
+
+  return { merge: { mergeable: /Mergeable: (\w+)\./.exec(block)?.[1] ?? "unknown", others } };
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {
@@ -246,5 +273,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseConversation(prompt),
     ...parseAbout(prompt),
     ...parseUnblocked(prompt),
+    ...parseMerge(prompt),
   };
 }

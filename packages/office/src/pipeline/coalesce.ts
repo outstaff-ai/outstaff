@@ -1,12 +1,23 @@
+import { MERGE_KIND } from "#/scheduler/policy.js";
 import type { CoalescedWake, PendingWake } from "./coalesce.types.js";
 
-const keyOf = (w: PendingWake) =>
-  JSON.stringify([w.wake.person, w.wake.subject.type, w.wake.subject.ref]);
+/**
+ * What wakes fold together by: the person and the subject, whatever the kind, except that a merge keeps a run of its
+ * own, with its own context and its place in the repository's one-merge-at-a-time line.
+ */
+export const coalesceKey = (
+  person: string,
+  subject: { type: string; ref: string },
+  kind: string,
+): string =>
+  JSON.stringify([person, subject.type, subject.ref, ...(kind === MERGE_KIND ? [kind] : [])]);
+
+const keyOf = (w: PendingWake) => coalesceKey(w.wake.person, w.wake.subject, w.wake.kind);
 
 const addNew = <T>(list: T[], item: T) => (list.includes(item) ? list : [...list, item]);
 
 /**
- * Folds wakes for the same person and subject into one run, as the scheduler does: a wake with a window joins the run of
+ * Folds wakes for the same person and subject into one run (a merge only with a merge), as the scheduler does: a wake with a window joins the run of
  * the first, while that one's window (`coalesceMs`) is open. A batch of review comments, or quick follow-ups. Oldest
  * first by event time; a wake with no window, a chat message's, folds into nothing and opens none.
  */

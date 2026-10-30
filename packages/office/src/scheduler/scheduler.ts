@@ -59,6 +59,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
   const {
     hasRoom,
+    mergeRunning,
     backingOff,
     getWindows,
     pauseBlock,
@@ -87,6 +88,19 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     holds.add(cancel);
   };
 
+  /** Why the person has no room for the item: a full lane, or another merge running in the repository. */
+  const busyDetail = async (item: WorkItem): Promise<string> => {
+    if (item.kind === CHAT_KIND) {
+      return `${item.person} already runs ${chatSessions} chat sessions.`;
+    }
+
+    const own = await store.listItems({ person: item.person, status: "active" });
+    const merging = own.some((i) => i.kind !== CHAT_KIND) ? undefined : await mergeRunning(item);
+    return merging
+      ? `${merging.person} is merging in the same repository (${merging.subject!.ref}); one merge runs per repository at a time.`
+      : `${item.person} already has an active item.`;
+  };
+
   /** Why the item cannot start now: it is not queued, its person has no room, or it backs off after a failure. */
   const notReady = async (item: WorkItem): Promise<StartResult | undefined> => {
     if (item.status !== "queued") {
@@ -94,12 +108,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     }
 
     if (!(await hasRoom(item))) {
-      const detail =
-        item.kind === CHAT_KIND
-          ? `${item.person} already runs ${chatSessions} chat sessions.`
-          : `${item.person} already has an active item.`;
-
-      return { started: false, reason: "busy", detail };
+      return { started: false, reason: "busy", detail: await busyDetail(item) };
     }
 
     return backingOff(item)

@@ -33,6 +33,7 @@ export const toWorkflowPr = (p: PrRecord): WorkflowPr => ({
   state: p.state,
   author: { ...p.author },
   ...(p.verdicts?.length ? { verdicts: p.verdicts } : {}),
+  ci: p.ci,
 });
 
 export const openPrs = (core: WorkstateCore, repo?: RepoRef) =>
