@@ -26,10 +26,10 @@ Each event has an actor (a human, an agent or automation). An event from an untr
 
 ## Three decisions
 
-A policy decides one of three things, and nothing else:
+A policy decides one of three things, and nothing else (an act can be followed by a wake):
 
 - **wake** an agent: queue a work item for it with an instruction and the context. The instruction says what is expected ("address each point, answer in its thread and push"); the agent decides how, following the repository's conventions.
-- **act** for an agent: make a tracker change (move a ticket, assign it, comment, set its parent) or comment on a document, without a model run. The office makes it with its own tracker and knowledge accounts and posts a note naming the agent it was for, so the ticket's history says who the change served. With no agent to act for, the act is dropped.
+- **act** for an agent: make a tracker change (move a ticket, assign it, comment, set its parent) or comment on a document, without a model run. The office makes it with its own tracker and knowledge accounts and posts a note naming the agent it was for, so the ticket's history says who the change served. With no agent to act for, the act is dropped. An act can be followed by a wake of the agent it was for, as when a ticket is assigned back to an agent; it then posts no note, and the policy's instruction is the wake's.
 - **drop** the event, with a reason.
 
 The office's write scope is tracker coordination metadata: status, assignee, labels, parent and those notes. On the code host it is strictly read-only. It never merges and never messages people; every message a person reads in chat comes from an agent.
@@ -38,8 +38,8 @@ The office's write scope is tracker coordination metadata: status, assignee, lab
 
 The office ships a default set, listed with each policy's conditions and instruction in the generated [pipeline policies reference](/reference/pipeline-policies/). In short:
 
-- **Wakes.** A chat message wakes the agent it was written to; a human's review or comment wakes the pull request's author; a conflict or failing checks wake the author; a ticket assigned to an agent by someone else, a comment on it, or a human moving it to active wakes the agent; a comment on a document wakes the agent it mentions, else its author; an idle agent is woken with its next ready ticket.
-- **Acts.** A pull request opened for review moves its ticket to review; a merge into the default branch, with no other pull request of the ticket open, moves it to done; a hand-back moves the ticket to review (done) or blocked (blocked) and assigns it to the person who asked. This is bookkeeping agents do not do themselves. With the pipeline off or in shadow mode the workflow rules make the same moves, except in the `minimal` preset, which moves no tickets; the agents' instructions say which applies.
+- **Wakes.** A chat message wakes the agent it was written to; a human's review or comment wakes the pull request's author; a conflict or failing checks wake the author; a ticket assigned to an agent by someone else, a comment on it, or a human moving it to active wakes the agent; a human's comment on a ticket an agent handed back (assigned to a human, in review or blocked, mentioning no agent) wakes the agent who last worked on it, to answer, and to take the ticket back only if it needs more work; a comment on a document wakes the agent it mentions, else its author; an idle agent is woken with its next ready ticket.
+- **Acts.** A pull request opened for review moves its ticket to review; a merge into the default branch, with no other pull request of the ticket open, moves it to done; a hand-back moves the ticket to review (done) or blocked (blocked) and assigns it to the person who asked; a human moving a ticket they hold to active, without the needs-human label, assigns it back to the agent who last worked on it and wakes them. This is bookkeeping agents do not do themselves. With the pipeline off or in shadow mode the workflow rules make the same moves, except in the `minimal` preset, which moves no tickets; the agents' instructions say which applies.
 
 Every policy is evaluated for every event, in order, and every one that matches contributes its decision. Change one under `pipeline.policies.<id>`:
 
@@ -66,7 +66,7 @@ pipeline:
 | `shadow`        | the workflow rules and the switches, as in off | judges every event before the rules apply anything, and records its decisions, what the rules did for the same event, and how the two compare. It changes nothing |
 | `live`          | the pipeline                                   | judges every event instead of the workflow rules, queues its wakes and makes its acts                                                                             |
 
-Live replaces the workflow rules, and with them the switches that only edit rules (see [Switches and workflow rules](#switches-and-workflow-rules)); the office's own mechanics still run in every mode: moving a ticket to active when its work starts (`tickets.start_moves_active`), follow-up rounds for feedback that came in late (`feedback.follow_up_round`), and routing an item the scheduler blocked. Some of what the rules do is not in the default set yet: the PM's `unblock` round on a blocked hand-back, a mention handing a ticket to the agent mentioned, a human taking a ticket back by moving it to active, and retrying a blocked item on a human's signal (`retry.on_signal`). Look for them in shadow mode before going live.
+Live replaces the workflow rules, and with them the switches that only edit rules (see [Switches and workflow rules](#switches-and-workflow-rules)); the office's own mechanics still run in every mode: moving a ticket to active when its work starts (`tickets.start_moves_active`), follow-up rounds for feedback that came in late (`feedback.follow_up_round`), and routing an item the scheduler blocked. Some of what the rules do is not in the default set yet: the PM's `unblock` round on a blocked hand-back, a mention handing a ticket to the agent mentioned, and retrying a blocked item on a human's signal (`retry.on_signal`). Look for them in shadow mode before going live.
 
 ### From off to shadow to live
 

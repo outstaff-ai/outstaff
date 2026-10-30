@@ -36,7 +36,8 @@ function instructionLines(p: Policy): string[] {
     return [];
   }
 
-  const label = "wake" in p.decide ? "Instruction:" : "Note posted with the change:";
+  const wakes = "wake" in p.decide || ("act" in p.decide && p.decide.act.wake);
+  const label = wakes ? "Instruction:" : "Note posted with the change:";
   return ["", label, "", "```text", p.instruction, "```"];
 }
 

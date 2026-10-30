@@ -14,9 +14,17 @@ const policy = (spec: DecideSpec, instruction?: string): Policy => ({
   ...(instruction === undefined ? {} : { instruction }),
 });
 
-const run = (p: Policy, e: PipelineEvent, world: World = {}, opts: PipelineOptions = OPTS) => {
+/** Every decision of a policy. */
+const runAll = (p: Policy, e: PipelineEvent, world: World = {}, opts: PipelineOptions = OPTS) => {
   const state = stateOf(world);
   return decide(p, { event: e, ctx: createEvaluationContext(e, state, opts), state, opts });
+};
+
+/** The one decision of a policy that decides one thing. */
+const run = (p: Policy, e: PipelineEvent, world: World = {}, opts: PipelineOptions = OPTS) => {
+  const ds = runAll(p, e, world, opts);
+  expect(ds).toHaveLength(1);
+  return ds[0];
 };
 
 const onTicket = (status: "active" | "review" = "active", assignee = "sam") => ({
@@ -238,6 +246,64 @@ describe("decide: act", () => {
       policy: "p",
       reason: "no agent to act for: pull request has no agent author",
     });
+  });
+});
+
+describe("decide: an act, then a wake", () => {
+  const takeBack = policy(
+    { act: { as: "last_worker", ops: [{ assign: "self" }], wake: { kind: "assigned" } } },
+    "{{ticket}} is yours again, {{person}}.",
+  );
+
+  const moved = event("ticket.moved", { subject: { ticket: "ACME-1" }, data: { to: "active" } });
+  const handedBack = (assignee: string) => ({
+    tickets: {
+      "ACME-1": {
+        status: "active" as const,
+        lastWorker: "sam",
+        assignee: {
+          id: assignee,
+          kind: assignee === "sam" ? ("agent" as const) : ("human" as const),
+        },
+      },
+    },
+  });
+
+  it("acts for the agent without a note, then wakes them with the policy's instruction", () => {
+    expect(runAll(takeBack, moved, handedBack("grace"))).toEqual([
+      {
+        type: "act",
+        policy: "p",
+        as: "sam",
+        ops: [{ op: "assign", ticket: "ACME-1", to: { kind: "agent", id: "sam" } }],
+      },
+      {
+        type: "wake",
+        policy: "p",
+        person: "sam",
+        kind: "assigned",
+        instruction: "ACME-1 is yours again, sam.",
+        feedback: [],
+        subject: { type: "ticket", ref: "ACME-1" },
+      },
+    ]);
+  });
+
+  it("still wakes the agent when nothing is left to change", () => {
+    expect(runAll(takeBack, moved, handedBack("sam"))).toMatchObject([
+      { type: "wake", person: "sam", kind: "assigned" },
+    ]);
+  });
+
+  it("drops both when no agent has worked on the ticket", () => {
+    const world = { tickets: { "ACME-1": { status: "active" as const } } };
+    expect(runAll(takeBack, moved, world)).toEqual([
+      {
+        type: "drop",
+        policy: "p",
+        reason: "no agent to act for: no agent has worked on the ticket yet",
+      },
+    ]);
   });
 });
 

@@ -3,14 +3,16 @@ import type { PipelineEventType } from "./events.types.js";
 
 /**
  * A person a decision names. `author` (of the pull request), `assignee` (of the ticket), `mentioned` (the first agent
- * the comment names), `doc_author`, `role:<role>`, as the workflow rules resolve them; plus `actor` (the agent who
- * caused the event) and `addressed` (the agent a chat message was written to).
+ * the comment names), `doc_author`, `last_worker` (the agent who last worked on the ticket), `role:<role>`, as the
+ * workflow rules resolve them; plus `actor` (the agent who caused the event) and `addressed` (the agent a chat message
+ * was written to).
  */
 export type PersonRef =
   | "author"
   | "assignee"
   | "mentioned"
   | "doc_author"
+  | "last_worker"
   | "actor"
   | "addressed"
   | `role:${string}`;
@@ -19,7 +21,7 @@ export type PersonRef =
 export type PersonSpec = PersonRef | readonly PersonRef[];
 
 /** A condition only the pipeline knows: the event's actor is that person (for example the assignee themselves). */
-export type PipelineLeaf = { actor_is: "assignee" | "author" | "doc_author" };
+export type PipelineLeaf = { actor_is: "assignee" | "author" | "doc_author" | "last_worker" };
 
 /** A workflow rule condition, a pipeline leaf, or a combination of them. */
 export type PipelineCondition =
@@ -42,7 +44,10 @@ export type OpSpec =
 
 export type DecideSpec =
   | { wake: { person: PersonSpec; kind: string; subject?: "event" | "next_ready_ticket" } }
-  | { act: { as: PersonSpec; ops: OpSpec[] } }
+  | {
+      /** `wake`: then wake the agent acted for, with the policy's instruction; the act posts no note. */
+      act: { as: PersonSpec; ops: OpSpec[]; wake?: { kind: string } | undefined };
+    }
   | { drop: { reason: string } };
 
 export interface Policy {
@@ -56,7 +61,7 @@ export interface Policy {
 
   /**
    * A template with {{variable}} placeholders: for a wake, the instruction the agent is given; for an act, the comment
-   * the office posts with its changes, saying whom they are for.
+   * the office posts with its changes, saying whom they are for; for an act that then wakes, the wake's instruction.
    */
   instruction?: string | undefined;
 

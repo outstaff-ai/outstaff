@@ -53,7 +53,8 @@ describe("default policies", () => {
   it("are listed once each; wakes have an instruction and acts a note naming the agent", () => {
     expect(new Set(DEFAULT_POLICIES.map((p) => p.id)).size).toBe(DEFAULT_POLICIES.length);
     expect(DEFAULT_POLICIES.filter((p) => p.instruction === undefined)).toEqual([]);
-    const acts = DEFAULT_POLICIES.filter((p) => "act" in p.decide);
+    // An act that then wakes the agent gives the instruction to the wake and posts no note.
+    const acts = DEFAULT_POLICIES.filter((p) => "act" in p.decide && !p.decide.act.wake);
     expect(acts.filter((p) => !p.instruction!.includes("for {{person}}"))).toEqual([]);
   });
 
@@ -273,6 +274,112 @@ describe("default policies", () => {
     expect(judge("moved_active_to_assignee", moved("review"), world)).toEqual({
       failed: { moved_to: ["active"] },
     });
+  });
+
+  it("ticket_comment_to_last_worker: a human's comment on a ticket an agent handed back", () => {
+    const handedBack = (
+      status: StaticTicket["status"] = "review",
+      assignee = "ada.admin",
+      lastWorker: string | undefined = "sam",
+    ) => ({
+      tickets: { "ACME-1": t(status, assignee, lastWorker ? { lastWorker } : {}) },
+    });
+
+    const comment = (data: Record<string, unknown> = {}, actor = ADA) =>
+      event("ticket.commented", {
+        subject: { ticket: "ACME-1" },
+        actor,
+        data: { body: "Why this way?", ...data },
+      });
+
+    const judged = (e: PipelineEvent, world: World) =>
+      judge("ticket_comment_to_last_worker", e, world);
+
+    expect(judged(comment(), handedBack())).toEqual(["wake sam (ticket_comment) on ticket ACME-1"]);
+    expect(judged(comment(), handedBack("blocked"))).toEqual([
+      "wake sam (ticket_comment) on ticket ACME-1",
+    ]);
+
+    const trace = evaluatePipeline(comment(), stateOf(handedBack()), DEFAULT_POLICIES, OPTS);
+    expect(trace.decisions).toMatchObject([
+      {
+        type: "wake",
+        policy: "ticket_comment_to_last_worker",
+        instruction:
+          "ada-admin commented on ACME-1, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work.",
+      },
+    ]);
+
+    expect(judged(comment({}, SAM), handedBack())).toEqual({ failed: { actor_kind: "human" } });
+    expect(judged(comment({ mentions: ["mira"] }), handedBack())).toEqual({
+      failed: { not: { agent_mentioned: true } },
+    });
+
+    expect(judged(comment(), handedBack("review", "sam"))).toEqual({
+      failed: { assignee_kind: "human" },
+    });
+
+    for (const status of ["done", "canceled", "active"] as const) {
+      expect(judged(comment(), handedBack(status))).toEqual({
+        failed: { ticket_status: ["review", "blocked"] },
+      });
+    }
+
+    expect(judged(comment(), handedBack("review", "ada.admin", ""))).toEqual([
+      "drop: no one to wake: no agent has worked on the ticket yet",
+    ]);
+
+    expect(judged(comment(), handedBack("review", "ada.admin", "someone-else"))).toEqual([
+      "drop: no one to wake: someone-else (last_worker) is not an agent on the team",
+    ]);
+  });
+
+  // `moved_to` compares the tracker's status name with canonical statuses, so live it does not match yet (#425).
+  // These events carry the canonical status, as the other `moved_to` tests do; they do not cover that bug.
+  it("moved_active_to_last_worker: a human moving a ticket an agent handed back to active", () => {
+    const handedBack = (
+      assignee = "ada.admin",
+      extra: Partial<StaticTicket> = { lastWorker: "sam" },
+    ) => ({
+      tickets: { "ACME-1": t("active", assignee, extra) },
+    });
+
+    const moved = (to = "active", actor = ADA) =>
+      event("ticket.moved", { subject: { ticket: "ACME-1" }, actor, data: { to } });
+
+    const judged = (e: PipelineEvent, world: World) =>
+      judge("moved_active_to_last_worker", e, world);
+
+    expect(judged(moved(), handedBack())).toEqual([
+      "act for sam: assign ACME-1 to agent sam",
+      "wake sam (assigned) on ticket ACME-1",
+    ]);
+
+    const trace = evaluatePipeline(moved(), stateOf(handedBack()), DEFAULT_POLICIES, OPTS);
+    expect(trace.decisions).toMatchObject([
+      { type: "act", policy: "moved_active_to_last_worker", as: "sam" },
+      {
+        type: "wake",
+        policy: "moved_active_to_last_worker",
+        instruction:
+          "ada-admin moved ACME-1 to active and it is assigned to you again. Pick the work up.",
+      },
+    ]);
+
+    expect(trace.decisions[0]).not.toHaveProperty("note");
+    expect(judged(moved("active", SAM), handedBack())).toEqual({
+      failed: { actor_kind: "human" },
+    });
+
+    expect(judged(moved("review"), handedBack())).toEqual({ failed: { moved_to: ["active"] } });
+    expect(judged(moved(), handedBack("sam"))).toEqual({ failed: { assignee_kind: "human" } });
+    expect(
+      judged(moved(), handedBack("ada.admin", { lastWorker: "sam", labels: ["needs-human"] })),
+    ).toEqual({ failed: { not: { has_label: "$needs_human" } } });
+
+    expect(judged(moved(), handedBack("ada.admin", {}))).toEqual([
+      "drop: no agent to act for: no agent has worked on the ticket yet",
+    ]);
   });
 
   it("doc_comment_to_agent: a human's comment wakes the agent mentioned, else the author", () => {
