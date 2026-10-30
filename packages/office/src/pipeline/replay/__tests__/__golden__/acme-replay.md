@@ -107,9 +107,9 @@ How to read it:
 | # | Event | Decisions |
 | - | - | - |
 | 43 | `pr.opened` acme-example/shop#62 by sam | (drop: no policy matched) |
-| 44 | `pr.opened` acme-example/shop#63 by grace-lead | (drop: no agent to act for: pull request has no agent author) |
+| 44 | `pr.opened` acme-example/shop#63 by grace-lead | move ACME-131 to review (for sam) |
 | 45 | `pr.closed` acme-example/shop#62 by ada-admin | (drop: no policy matched) |
-| 46 | `pr.merged` acme-example/shop#55 by grace-lead | (drop: no agent to act for: pull request has no agent author) |
+| 46 | `pr.merged` acme-example/shop#55 by grace-lead | (drop: no agent to act for: pull request has no agent author; ticket is not assigned to an agent; no agent has worked on the ticket yet) |
 | 47 | `pr.merged` acme-example/shop#56 by ada-admin | (drop: no policy matched) |
 | 48 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merged_feedback): _ada-admin commented on your merged pull request #41 (Search API). Answer there. If they ask for a change, open a follow-up pull request._ |
 | 49 | `pr.comment` acme-example/shop#60 by ines | (drop: no policy matched) |
