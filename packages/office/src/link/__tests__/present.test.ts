@@ -1,3 +1,4 @@
+import { traceSchema } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
 import { present, sourceOf } from "#/link/present.js";
 import { trace } from "./support.js";
@@ -30,6 +31,22 @@ describe("present", () => {
         doc: "https://docs.acme.example/doc-7",
       },
     });
+  });
+
+  it("leaves out what only the office keeps, so the link's schema reads it", () => {
+    const t = trace("vcs:1", "2026-10-05T09:00:00.000Z", { ticket: "ACME-1", wake: "dev" });
+    t.context = {
+      "item-1": {
+        itemId: "item-1",
+        entries: [{ type: "ticket", ref: "ACME-1", why: { role: "trigger", source: "event" } }],
+        omitted: 0,
+        limits: { comments: 10, messages: 20, threads: 10, items: 8, bodyChars: 4000 },
+      },
+    };
+
+    const presented = present(t, links);
+    expect(presented).not.toHaveProperty("context");
+    expect(traceSchema.safeParse(presented).success).toBe(true);
   });
 
   it("links a chat message to itself, and leaves out what it cannot link", () => {

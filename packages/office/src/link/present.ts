@@ -33,11 +33,20 @@ function urlsOf(trace: Trace, links: SubjectLinks): LinkTrace["urls"] {
   return Object.fromEntries(Object.entries(urls).filter(([, url]) => url !== undefined));
 }
 
-/** A trace as the office link sends it: with where its event came from and links to its subject. */
+/**
+ * A trace as the office link sends it: with where its event came from and links to its subject. Only the link's own
+ * fields: the trace also keeps what is the office's alone (each wake's context manifest), which the link's strict
+ * schema rejects, so a client could read no page with such a trace on it.
+ */
 export function present(trace: Trace, links: SubjectLinks): LinkTrace {
+  const { policies, decisions, results, engine, comparison } = trace;
   return {
-    ...trace,
     event: { ...trace.event, source: sourceOf(trace.event.id) },
     urls: urlsOf(trace, links),
+    policies,
+    decisions,
+    results,
+    engine,
+    comparison,
   } as LinkTrace;
 }
