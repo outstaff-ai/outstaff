@@ -401,9 +401,9 @@ describe("kanban preset", () => {
 
   it("a human moving a ticket to active returns it to the last worker", () => {
     const state = world({ status: "active", ticket: { assignee: { id: "grace", kind: "human" } } });
-    expect(
-      run(ev("ticket.moved", { ...tk, data: { from: "ready", to: "active" } }), state),
-    ).toEqual([
+    // As intake hands it on: canonical statuses, with the tracker's names beside them.
+    const data = { from: "ready", fromName: "Up Next", to: "active", toName: "In Progress" };
+    expect(run(ev("ticket.moved", { ...tk, data }), state)).toEqual([
       { type: "assign", ticket: "ACME-1", to: { kind: "agent", id: "ada" } },
       { type: "schedule", person: "ada", kind: "assigned", priority: "normal", ticket: "ACME-1" },
     ]);
@@ -443,6 +443,12 @@ describe("kanban preset", () => {
     const e = ev("ticket.moved", { ...tk, data: { to: "active" } });
     expect(evaluateWorkflow(e, state, kanban, { needsHumanLabel: "hold" })).toEqual([]);
     expect(evaluateWorkflow(e, state, kanban)).toHaveLength(2);
+  });
+
+  it("an automation's move to active takes nothing back", () => {
+    const state = world({ status: "active", ticket: { assignee: { id: "grace", kind: "human" } } });
+    const e = ev("ticket.moved", { ...tk, actor: automation, data: { to: "active" } });
+    expect(evaluateWorkflow(e, state, kanban)).toEqual([]);
   });
 
   it("take-back with no previous worker only skips the unresolvable actions", () => {
@@ -926,6 +932,28 @@ describe("explain", () => {
 
     const none = explainWorkflow(ev("pr.merged", { subject: { pr: ref(99) } }), world(), kanban);
     expect(none.rules.find((r) => r.id === "pr-merged-done")?.reason).toContain("no linked ticket");
+  });
+
+  it("names the tracker's status and the canonical one a move went to, or that it is unmapped", () => {
+    const state = world({ status: "active", ticket: { assignee: { id: "grace", kind: "human" } } });
+    const takeback = (data: Record<string, unknown>) =>
+      explainWorkflow(ev("ticket.moved", { ...tk, data }), state, kanban).rules.find(
+        (r) => r.id === "active-human-takeback",
+      );
+
+    expect(takeback({ to: "review", toName: "In Review" })).toMatchObject({
+      matched: false,
+      reason: "moved to In Review (review) in [active]",
+    });
+
+    expect(takeback({ toName: "Doing" })).toMatchObject({
+      matched: false,
+      reason: "moved to Doing (unmapped) in [active]",
+    });
+
+    expect(takeback({ to: "review" })?.reason).toBe("moved to review in [active]");
+    expect(takeback({})?.reason).toBe("moved to none in [active]");
+    expect(takeback({ to: "active", toName: "In Progress" })).toMatchObject({ matched: true });
   });
 
   it("reports a move that is already in effect", () => {

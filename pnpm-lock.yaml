@@ -525,6 +525,9 @@ importers:
       '@outstaff/agent':
         specifier: workspace:*
         version: link:../agent
+      '@outstaff/testing.itsaplan':
+        specifier: workspace:*
+        version: link:../../testing/itsaplan
       '@outstaff/testing.office':
         specifier: workspace:*
         version: link:../../testing/office

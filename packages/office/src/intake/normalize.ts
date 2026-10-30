@@ -5,6 +5,7 @@ import type {
   VcsEvent,
   WorkflowEvent,
   WorkflowEventType,
+  WorkflowStatusMap,
 } from "@outstaff/core";
 import type { Actor } from "./types.js";
 
@@ -120,5 +121,34 @@ export function resolveMentions(
     event.data["mentions"] = handles;
   } else {
     delete event.data["mentions"];
+  }
+}
+
+/**
+ * Turns the tracker's status names in `data.from` and `data.to` of a `ticket.moved` into canonical statuses, so every
+ * reader sees the statuses the workflow speaks in. The tracker's names stay in `data.fromName` and `data.toName`; a
+ * name `workflow.statuses` does not map leaves only the name.
+ */
+export function resolveStatuses(event: WorkflowEvent, statuses: WorkflowStatusMap): void {
+  if (event.type !== "ticket.moved") {
+    return;
+  }
+
+  for (const [key, nameKey] of [
+    ["from", "fromName"],
+    ["to", "toName"],
+  ] as const) {
+    const name = event.data[key];
+    if (typeof name !== "string") {
+      continue;
+    }
+
+    const status = statuses.toCanonical(name);
+    event.data[nameKey] = name;
+    if (status) {
+      event.data[key] = status;
+    } else {
+      delete event.data[key];
+    }
   }
 }

@@ -85,17 +85,19 @@ A failed poll never stops the loop.
 
 ### Normalized events
 
-| Source event                               | Event                                                                                            |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| pull request opened, merged, closed        | `pr.opened`, `pr.merged`, `pr.closed`                                                            |
-| review submitted                           | `pr.review_submitted` (`data.state`)                                                             |
-| pull request comment                       | `pr.comment` (`data.kind`: `comment` or `review_comment`)                                        |
-| ticket created, assigned, moved, commented | `ticket.created`, `ticket.assigned`, `ticket.moved` (`data.from`, `data.to`), `ticket.commented` |
-| comment or reply on a document             | `doc.commented` (`data.docId`, `data.anchorText`, `data.commentId`)                              |
+| Source event                               | Event                                                                                                                            |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| pull request opened, merged, closed        | `pr.opened`, `pr.merged`, `pr.closed`                                                                                            |
+| review submitted                           | `pr.review_submitted` (`data.state`)                                                                                             |
+| pull request comment                       | `pr.comment` (`data.kind`: `comment` or `review_comment`)                                                                        |
+| ticket created, assigned, moved, commented | `ticket.created`, `ticket.assigned`, `ticket.moved` (`data.from`, `data.to`, `data.fromName`, `data.toName`), `ticket.commented` |
+| comment or reply on a document             | `doc.commented` (`data.docId`, `data.anchorText`, `data.commentId`)                                                              |
 
 An inline comment that belongs to a review (`data.reviewId`) is recorded but neither starts work nor changes the work state: GitHub announces each comment of a batch review as it is written, while the review is still pending and invisible to everyone but its author. The review starts the round when it is submitted, and intake reads its inline comments with their review thread ids (the port's `reviewComments`) into `data.comments`, so the `review_feedback` item carries all of them and a review with inline comments is never taken for a bare sign-off. GitHub also creates a submitted review for a single comment or a thread reply, so the review event covers every inline case. Comments on the conversation (`kind: comment`) start work as before.
 
 Document comments have no webhook and are not in the tracker's feed, so the office polls them from the knowledge base, in poll and webhook mode alike. It reads the comments of the documents agents wrote for open work (`ost doc create` and `ost doc update` tell the office which work item a document belongs to; the work state keeps the document, its author and its ticket), at most 25 documents per poll, the most recently active first, with the same overlap and de-duplication as the other feeds. It needs a `knowledge` integration whose adapter can read them and the switch `policies.feedback.doc_comments`; otherwise nothing is read.
+
+A move carries canonical statuses: intake turns the tracker's status names into them through `workflow.statuses`, so `data.from` and `data.to` are, for example, `ready` and `active`, and the names stay in `data.fromName` and `data.toName` (`Ready`, `In Progress`). A name the map does not know leaves only the name, so a `moved_to` condition does not hold for it and says the status is unmapped.
 
 Pushes to a pull request are not forwarded; `pr.conflicted` and `pr.ci_failed` come from the work state, not from intake. Every event carries `data.at`, the time the source reported.
 
