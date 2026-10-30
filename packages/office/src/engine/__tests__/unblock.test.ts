@@ -13,9 +13,10 @@ const people = [
     handle: "sam",
     name: "Sam",
     role: "developer",
+    model: "sonnet",
     identities: { vcs: "acme-sam[bot]", tracker: "u-sam" },
   },
-  { handle: "pat", name: "Pat", role: "pm", identities: { tracker: "u-pat" } },
+  { handle: "pat", name: "Pat", role: "pm", model: "sonnet", identities: { tracker: "u-pat" } },
 ];
 
 const team = (policies: Record<string, unknown> = {}, withPm = true): TeamConfig =>

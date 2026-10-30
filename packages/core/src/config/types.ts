@@ -13,6 +13,12 @@ export type AdapterPort = (typeof ADAPTER_PORTS)[number];
 
 export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];
 
+/**
+ * Keys that are gone, by the parent key and the key, with what to do instead. They fail validation like any unknown
+ * key, with this message.
+ */
+export type RemovedKeys = Record<string, string>;
+
 export type ConfigIssue = {
   path: (string | number)[];
   code: string;

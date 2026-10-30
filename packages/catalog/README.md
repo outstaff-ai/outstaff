@@ -7,7 +7,7 @@ The catalog of agent roles and skills that ship with Outstaff, as plain content 
 ```
 roles/<role>/role.yaml   name, title, summary, toolset (base|code|infra),
                          permissions (readonly|docs|code|infra), needs,
-                         optional_needs, default_model, modes[{name, when}],
+                         optional_needs, modes[{name, when}],
                          extends[], files {skill: SKILL.md}
 roles/<role>/SKILL.md    the role's skill (the renderer adds name + description front matter; a description in the file wins over the role summary)
 process/*.md  references/*.md  templates/*.md

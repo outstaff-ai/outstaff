@@ -37,8 +37,9 @@ describe("adapter definition", () => {
     }
   });
 
-  it("validates options and defaults the model", () => {
-    expect(claudeAgentSdk.options.parse({})).toEqual({ model: "sonnet", sandbox: "off" });
+  it("validates options and has no model option", () => {
+    expect(claudeAgentSdk.options.parse({})).toEqual({ sandbox: "off" });
+    expect(() => claudeAgentSdk.options.parse({ model: "sonnet" })).toThrow(/model/);
     expect(claudeAgentSdk.options.parse({ sandbox: "bubblewrap" })).toMatchObject({
       sandbox: "bubblewrap",
     });

@@ -33,7 +33,7 @@ export function addPerson(yaml: string, person: NewPerson): string {
       name,
       pronouns,
       role,
-      ...(model ? { model } : {}),
+      model,
       repos,
       ...(avatar ? { avatar } : {}),
     }),

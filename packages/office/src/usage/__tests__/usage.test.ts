@@ -14,9 +14,9 @@ function team(shared?: string[][]): TeamConfig {
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "git.acme.example/acme/app", kind: "primary" }],
     people: [
-      { handle: "sam", name: "Sam", role: "developer" },
-      { handle: "kim", name: "Kim", role: "developer" },
-      { handle: "mira", name: "Mira", role: "architect" },
+      { handle: "sam", name: "Sam", role: "developer", model: "sonnet" },
+      { handle: "kim", name: "Kim", role: "developer", model: "sonnet" },
+      { handle: "mira", name: "Mira", role: "architect", model: "sonnet" },
     ],
     integrations: {
       chat: { adapter: "fake" },

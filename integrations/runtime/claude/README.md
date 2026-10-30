@@ -7,7 +7,6 @@ adapters:
   runtime:
     name: claude-agent-sdk
     options:
-      model: sonnet
       maxTurns: 60
 ```
 
@@ -15,10 +14,11 @@ adapters:
 
 | Option           | Default                         | Meaning                                                                                                      |
 | ---------------- | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `model`          | `sonnet`                        | Model alias or id, used when a run request names none.                                                       |
 | `claudeCodePath` | the binary bundled with the SDK | Path to a pinned Claude Code binary (`pathToClaudeCodeExecutable`). Authentication is unchanged.             |
 | `maxTurns`       | none                            | Upper bound on turns per run. A run request's `maxTurns` takes precedence.                                   |
 | `sandbox`        | `off`                           | `off` or `bubblewrap`: whether the agent's commands can read the Claude credential. See [Sandbox](#sandbox). |
+
+There is no model option and no default model: each run uses the model of its request, which is the person's `model` from `team.yaml`. A run without one finishes with an error and starts no session.
 
 The SDK version is pinned exactly in `package.json`. Pin the binary as well when you need a fixed Claude Code version, and re-check that skills, settings, agents and hooks load after every upgrade (the runtime upgrade test below does).
 

@@ -20,6 +20,7 @@ people:
   - handle: kofi
     name: Kofi Mensah
     role: devops
+    model: sonnet
     runtime:
       adapter: claude-agent-sdk
       sandbox: bubblewrap
@@ -29,10 +30,10 @@ integrations:
 ```
 
 - `people[].runtime` has the same shape as `integrations.runtime`: `adapter` and that adapter's options. It replaces the team's runtime for that person as a whole; options are not merged, so repeat any team option the person should keep. `ost validate` checks the options against the adapter's own schema and reports a wrong one at the person's line (`integrations.invalid_options`).
-- `people[].model` picks the model. Without it the role's default model applies, and without that the runtime adapter's own default (for `claude-agent-sdk`, its `model` option). The model is independent of where the runtime comes from: a person on the team's runtime can still have a model of their own.
+- `people[].model` is the model the person runs on, and every person needs one: there is no default model, neither in the role nor in the runtime adapter. `ost validate` names a person without one (`people.missing_model`). The model is independent of where the runtime comes from: people on the same runtime can run on different models.
 - `ost team` shows the runtime and the model of each person.
 
-The agent logs the choice at start, for example `runtime selected {"person":"kofi","runtime":"claude-agent-sdk","model":"the runtime's default"}`.
+The agent logs the choice at start, for example `runtime selected {"person":"kofi","runtime":"claude-agent-sdk","model":"sonnet"}`.
 
 ## What is checked per person
 

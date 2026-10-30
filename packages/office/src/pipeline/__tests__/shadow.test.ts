@@ -16,7 +16,7 @@ function team(pipeline?: unknown): TeamConfig {
     team: { name: "acme" },
     catalog: { version: "1.0.0" },
     repos: [{ name: "shop", url: "github.com/acme-example/shop", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer" }],
+    people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     integrations: {
       chat: { adapter: "slack" },
       vcs: { adapter: "github" },

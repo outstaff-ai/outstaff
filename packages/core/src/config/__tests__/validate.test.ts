@@ -58,6 +58,7 @@ const config = (mutate: (c: any) => void = () => {}) => {
         handle: "ada",
         name: "Ada",
         role: "developer",
+        model: "sonnet",
         identities: { vcs: "acme-ada[bot]", chat: "U0ADA", tracker: "ada" },
         repos: { app: "write" },
       },
@@ -65,6 +66,7 @@ const config = (mutate: (c: any) => void = () => {}) => {
         handle: "marcus",
         name: "Marcus",
         role: "architect",
+        model: "sonnet",
         identities: { vcs: "acme-marcus[bot]", chat: "U0MARCUS", tracker: "marcus" },
         repos: { app: "read" },
       },
@@ -476,7 +478,7 @@ describe("validateTeam: design.canvas", () => {
 
   const team = () =>
     config((c) => {
-      c.people = [{ handle: "dina", name: "Dina", role: "designer", repos: {} }];
+      c.people = [{ handle: "dina", name: "Dina", role: "designer", model: "sonnet", repos: {} }];
       delete c.integrations.tracker;
     });
 

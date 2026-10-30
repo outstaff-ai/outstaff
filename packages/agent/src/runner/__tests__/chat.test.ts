@@ -18,8 +18,8 @@ function team(withPm = true, policies?: Record<string, unknown>): TeamConfig {
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "git.acme.example/acme/app", kind: "primary" }],
     people: [
-      { handle: "sam", name: "Sam", role: "developer" },
-      ...(withPm ? [{ handle: "pat", name: "Pat", role: "pm" }] : []),
+      { handle: "sam", name: "Sam", role: "developer", model: "sonnet" },
+      ...(withPm ? [{ handle: "pat", name: "Pat", role: "pm", model: "sonnet" }] : []),
     ],
     integrations: {
       chat: { adapter: "fake" },

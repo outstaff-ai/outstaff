@@ -28,7 +28,7 @@ catalog: { version: 0.0.0 }
 repos:
   - { name: shop, url: github.com/acme-example/shop, kind: primary }
 people:
-  - { handle: sam, name: Sam Duarte, pronouns: they/them, role: developer, repos: { shop: write } }
+  - { handle: sam, name: Sam Duarte, pronouns: they/them, role: developer, model: sonnet, repos: { shop: write } }
 integrations:
   chat: { adapter: fake }
   vcs: { adapter: fake }
@@ -143,8 +143,8 @@ describe("prepareAgent", () => {
       http: [{ name: hub, url: "https://hub.acme.example" }]
 people:`,
     ).replace(
-      "role: developer, repos: { shop: write } }",
-      `role: developer, repos: { shop: write }, network: { http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }] } }`,
+      "role: developer, model: sonnet, repos: { shop: write } }",
+      `role: developer, model: sonnet, repos: { shop: write }, network: { http: [{ name: home, url: "https://home.acme.example", token: HOME_TOKEN }] } }`,
     );
 
     const { home, options } = setup({ HOME_TOKEN: "home-token-value-123" }, granted);
@@ -231,7 +231,7 @@ people:`,
   it("starts a person without repository grants with no vcs port", async () => {
     const team = TEAM.replace(
       "integrations:",
-      "  - { handle: leo, name: Leo Fischer, pronouns: he/him, role: designer }\nintegrations:",
+      "  - { handle: leo, name: Leo Fischer, pronouns: he/him, role: designer, model: sonnet }\nintegrations:",
     );
 
     const { options } = setup({ OUTSTAFF_PERSON: "leo" }, team);
@@ -261,7 +261,7 @@ people:`,
     const withLeo = (team = TEAM) =>
       team.replace(
         "integrations:",
-        "  - { handle: leo, name: Leo Fischer, pronouns: he/him, role: designer }\nintegrations:",
+        "  - { handle: leo, name: Leo Fischer, pronouns: he/him, role: designer, model: sonnet }\nintegrations:",
       );
 
     it("gives the designer the artifact tool and a persistent artifacts folder", async () => {

@@ -31,8 +31,8 @@ repos:
 people:
   - { handle: sam, name: Sam Duarte, role: developer, model: acme-large, runtime: { adapter: acme-alt, tier: fast } }
   - { handle: noor, name: Noor Haddad, role: developer, model: acme-small }
-  - { handle: leo, name: Leo Fischer, role: designer, runtime: { adapter: acme-alt } }
-  - { handle: kofi, name: Kofi Mensah, role: developer, runtime: { adapter: acme-loose } }
+  - { handle: leo, name: Leo Fischer, role: designer, model: sonnet, runtime: { adapter: acme-alt } }
+  - { handle: kofi, name: Kofi Mensah, role: developer, model: sonnet, runtime: { adapter: acme-loose } }
 integrations:
   chat: { adapter: fake }
   vcs: { adapter: fake }

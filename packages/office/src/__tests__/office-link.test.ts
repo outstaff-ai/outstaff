@@ -15,7 +15,7 @@ function team(link?: string, pipeline?: "shadow"): TeamConfig {
     team: { name: "acme" },
     catalog: { version: "1.0.0" },
     repos: [{ name: "shop", url: "git.acme.example/acme/shop", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer" }],
+    people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     integrations: {
       chat: { adapter: "fake" },
       vcs: { adapter: "fake" },

@@ -61,7 +61,7 @@ function peopleLines(config: TeamConfig): string[] {
       p.name,
       [p.role, ...(p.extends ?? [])].join("+"),
       runtimeOf(config, p).adapter,
-      p.model ?? "default",
+      p.model,
       pairs(p.repos) || "none",
     ]),
   );

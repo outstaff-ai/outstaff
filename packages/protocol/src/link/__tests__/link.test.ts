@@ -286,13 +286,13 @@ describe("the office link messages", () => {
     }
   });
 
-  it("needs each person's configured runtime, and takes a null model", () => {
+  it("needs each person's configured runtime and model", () => {
     const person = {
       handle: "sam",
       name: "Sam Duarte",
       role: "developer",
       runtime: "claude",
-      model: null,
+      model: "sonnet",
       connected: false,
       counts: { queued: 0, running: 0 },
       current: null,
@@ -305,6 +305,9 @@ describe("the office link messages", () => {
     expect(decodeLinkMessage(frame(person))).toMatchObject({ ok: true });
     const { runtime: _runtime, ...withoutRuntime } = person;
     expect(decodeLinkMessage(frame(withoutRuntime))).toMatchObject({ ok: false });
+    expect(decodeLinkMessage(frame({ ...person, model: null }))).toMatchObject({ ok: false });
+    const { model: _model, ...withoutModel } = person;
+    expect(decodeLinkMessage(frame(withoutModel))).toMatchObject({ ok: false });
   });
 
   it("says what is wrong with a frame, and keeps a request's id so it can be answered", () => {

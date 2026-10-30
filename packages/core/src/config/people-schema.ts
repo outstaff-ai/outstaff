@@ -39,8 +39,11 @@ export const peopleSchema = z
     model: z
       .string()
       .min(1)
-      .optional()
-      .meta(d("LLM model for this agent; the runtime adapter's default when omitted.")),
+      .meta(
+        d(
+          'LLM model this agent runs on, as the runtime adapter names it, for example "sonnet". Required: there is no default model.',
+        ),
+      ),
     runtime: adapterRefSchema
       .optional()
       .meta(

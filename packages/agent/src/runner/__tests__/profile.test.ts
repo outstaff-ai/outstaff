@@ -20,7 +20,7 @@ function team(humans: boolean): TeamConfig {
       : {}),
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "git.acme.example/acme/app", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer" }],
+    people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     integrations: {
       chat: { adapter: "fake" },
       vcs: { adapter: "fake" },
@@ -198,7 +198,7 @@ describe("profile publisher", () => {
       chat: failing,
       office: { work: async () => items },
       team: team(true),
-      who: { name: "Sam", role: "Developer" },
+      who: { name: "Sam", role: "Developer", model: "sonnet" },
       log: { debug() {}, info() {}, warn, error() {} } as never,
       now: () => clock,
     });

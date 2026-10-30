@@ -63,7 +63,7 @@ export async function listPeople(deps: Deps): Promise<LinkPerson[]> {
         name: p.name,
         role: p.role,
         runtime: runtimeOf(deps.team, p).adapter,
-        model: p.model ?? null,
+        model: p.model,
         connected: online.has(p.handle),
         counts: { queued: queued.length, running: active.length },
         current: await currentOf(deps, active[0]),

@@ -23,7 +23,7 @@ const toPerson = (p: TeamConfig["people"][number], roles: RoleInfo[]): PersonCon
     role: p.role,
     role_title: info?.title ?? "",
     role_summary: info?.summary ?? "",
-    model: p.model ?? "",
+    model: p.model,
   };
 };
 

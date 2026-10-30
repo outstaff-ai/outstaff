@@ -28,7 +28,7 @@ describe("the office link", () => {
       token: TOKEN,
       team: {
         integrations: { runtime: { adapter: "claude" } },
-        people: [{ handle: "sam", name: "Sam Duarte", role: "developer" }],
+        people: [{ handle: "sam", name: "Sam Duarte", role: "developer", model: "sonnet" }],
       } as never,
       store,
       links: {
@@ -103,7 +103,7 @@ describe("the office link", () => {
         name: "Sam Duarte",
         role: "developer",
         runtime: "claude",
-        model: null,
+        model: "sonnet",
         connected: true,
         counts: { queued: 0, running: 0 },
         current: null,

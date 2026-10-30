@@ -44,6 +44,7 @@ function team(mode: Mode): TeamConfig {
         handle: "kofi",
         name: "Kofi",
         role: "developer",
+        model: "sonnet",
         identities: { vcs: KOFI_LOGIN, tracker: "u-3" },
       },
     ],
@@ -155,7 +156,7 @@ async function next(kofi: OfficeConnection): Promise<Offer> {
     throw new Error("no offer");
   }
 
-  await kofi.accept(r.value.workItem.id, { runtime: "claude" });
+  await kofi.accept(r.value.workItem.id, { runtime: "claude", model: "sonnet" });
   return r.value;
 }
 

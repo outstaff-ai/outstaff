@@ -221,7 +221,7 @@ describe("options passed to the SDK", () => {
   it("sets directories, prompt, session, model, turns and isolation", async () => {
     const { query, calls } = fakeQuery(() => [init("s1"), result()]);
     const rt = createAgentSdkRuntime({
-      options: agentSdkOptions.parse({ model: "opus", maxTurns: 9, claudeCodePath: "/opt/claude" }),
+      options: agentSdkOptions.parse({ maxTurns: 9, claudeCodePath: "/opt/claude" }),
       query,
       env: { PATH: "/bin", ANTHROPIC_API_KEY: "secret" },
     });
@@ -232,6 +232,7 @@ describe("options passed to the SDK", () => {
           addDirs: ["/work/memory"],
           sessionId: "prev",
           systemPrompt: "Be brief.",
+          model: "opus",
           maxTurns: 3,
         }),
       ),
@@ -274,7 +275,17 @@ describe("options passed to the SDK", () => {
     expect(o.additionalDirectories).toEqual(["/work/repos", "/work/worktrees"]);
   });
 
-  it("falls back to the configured model and turns, and omits resume for a new session", async () => {
+  it("finishes with an error and starts no session when the run names no model", async () => {
+    const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+    const events = await collect(createAgentSdkRuntime({ options, query }).run(req({ model: "" })));
+
+    expect(calls).toHaveLength(0);
+    expect(events).toEqual([
+      { type: "finished", ok: false, text: "", error: expect.stringMatching(/names no model/) },
+    ]);
+  });
+
+  it("runs the request's model, falls back to the configured turns, and omits resume for a new session", async () => {
     const { query, calls } = fakeQuery(() => [init("s1"), result()]);
     await collect(
       createAgentSdkRuntime({ options: agentSdkOptions.parse({ maxTurns: 9 }), query }).run(req()),

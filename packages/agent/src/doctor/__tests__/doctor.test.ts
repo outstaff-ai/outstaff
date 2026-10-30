@@ -8,7 +8,13 @@ import { toolStatusChecks } from "#/doctor/tools.js";
 const GIB = 1024 ** 3;
 const volume = (used: number) => async () => ({ used: used * GIB, total: 100 * GIB });
 
-const sam = { handle: "sam", name: "Sam", role: "developer" } as TeamConfig["people"][number];
+const sam = {
+  handle: "sam",
+  name: "Sam",
+  role: "developer",
+  model: "sonnet",
+} as TeamConfig["people"][number];
+
 const team = { people: [sam] } as unknown as TeamConfig;
 
 describe("the agent's startup checks", () => {

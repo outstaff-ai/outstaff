@@ -25,7 +25,7 @@ describe("which runtime and model ran an item", () => {
     await store.close();
   });
 
-  async function finished(person: string, on: { runtime: string; model?: string }, seen?: string) {
+  async function finished(person: string, on: { runtime: string; model: string }, seen?: string) {
     const scheduler = createScheduler({ store, team, clock: manualClock() });
     const source = schedulerWorkSource({ scheduler, store, team });
     const queued = await scheduler.enqueue({ person, kind: "task", title: "t", trigger: "human" });
@@ -37,16 +37,16 @@ describe("which runtime and model ran an item", () => {
     return (await findItem(store, offer!.workItem.id))!.item.runs;
   }
 
-  it("tells Kofi on one runtime and model from Sam on another runtime's default", async () => {
+  it("tells Kofi on one runtime and model from Sam on another runtime and model", async () => {
     const kofi = await finished("kofi", { runtime: "claude", model: "opus" }, "claude-opus-4-1");
-    const sam = await finished("sam", { runtime: "scripted" });
+    const sam = await finished("sam", { runtime: "scripted", model: "sonnet" });
 
     expect(kofi).toEqual([
       expect.objectContaining({ outcome: "ok", runtime: "claude", model: "claude-opus-4-1" }),
     ]);
 
     expect(sam).toEqual([
-      expect.objectContaining({ outcome: "ok", runtime: "scripted", model: null }),
+      expect.objectContaining({ outcome: "ok", runtime: "scripted", model: "sonnet" }),
     ]);
   });
 

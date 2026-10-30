@@ -29,6 +29,7 @@ export function sampleRunRequest(overrides: Partial<RunRequest> = {}): RunReques
     }),
     tools: [],
     builtinTools: ["read"],
+    model: "sonnet",
     ...overrides,
   };
 }

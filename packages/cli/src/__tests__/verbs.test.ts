@@ -201,7 +201,7 @@ repos:
   - { name: infra, url: github.com/acme-example/infra, kind: infra }
   - { name: design-system, url: github.com/acme-example/design-system, kind: baseline }
 people:
-  - { handle: sam, name: Sam Duarte, role: ${role}, repos: { shop: write, "kind:baseline": read } }
+  - { handle: sam, name: Sam Duarte, role: ${role}, model: sonnet, repos: { shop: write, "kind:baseline": read } }
 integrations:
   chat: { adapter: fake }
   vcs: { adapter: fake }

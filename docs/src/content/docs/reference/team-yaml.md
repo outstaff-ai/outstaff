@@ -69,6 +69,7 @@ people:
     name: Priya Raman
     pronouns: she/her
     role: pm
+    model: sonnet
     identities:
       vcs: acme-priya[bot]
       chat: U0PRIYA03
@@ -80,6 +81,7 @@ people:
     name: Tomas Novak
     pronouns: he/him
     role: product
+    model: sonnet
     identities:
       vcs: acme-tomas[bot]
       chat: U0TOMAS04
@@ -91,6 +93,7 @@ people:
     name: Mira Okafor
     pronouns: she/her
     role: architect
+    model: opus
     extends: [developer]
     identities:
       vcs: acme-mira[bot]
@@ -103,6 +106,7 @@ people:
     name: Leo Fischer
     pronouns: he/him
     role: designer
+    model: sonnet
     identities:
       chat: U0LEO0006
       tracker: leo.fischer
@@ -110,6 +114,7 @@ people:
     name: Sam Duarte
     pronouns: they/them
     role: developer
+    model: sonnet
     identities:
       vcs: acme-sam[bot]
       chat: U0SAM0007
@@ -121,6 +126,7 @@ people:
     name: Noor Haddad
     pronouns: she/her
     role: developer
+    model: sonnet
     identities:
       vcs: acme-noor[bot]
       chat: U0NOOR008
@@ -132,6 +138,7 @@ people:
     name: Ines Varga
     pronouns: she/her
     role: reviewer
+    model: sonnet
     identities:
       vcs: acme-ines[bot]
       chat: U0INES009
@@ -142,6 +149,7 @@ people:
     name: Kofi Mensah
     pronouns: he/him
     role: devops
+    model: sonnet
     identities:
       vcs: acme-kofi[bot]
       chat: U0KOFI010
@@ -520,10 +528,10 @@ Extra catalog roles or skill bundles layered on top of the role.
 
 ### people[].model
 
-LLM model for this agent; the runtime adapter's default when omitted.
+LLM model this agent runs on, as the runtime adapter names it, for example "sonnet". Required: there is no default model.
 
 - Type: `string`
-- Optional
+- Required
 - Minimum length 1
 
 ### people[].runtime

@@ -19,9 +19,16 @@ export function teamConfig(extra: Record<string, unknown> = {}): TeamConfig {
         handle: "sam",
         name: "Sam",
         role: "developer",
+        model: "sonnet",
         identities: { vcs: "acme-sam[bot]", tracker: "u-sam" },
       },
-      { handle: "noor", name: "Noor", role: "reviewer", identities: { vcs: "Acme-Noor[bot]" } },
+      {
+        handle: "noor",
+        name: "Noor",
+        role: "reviewer",
+        model: "sonnet",
+        identities: { vcs: "Acme-Noor[bot]" },
+      },
     ],
     integrations: {
       chat: { adapter: "slack" },

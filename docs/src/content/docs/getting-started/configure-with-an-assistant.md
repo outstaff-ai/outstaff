@@ -23,7 +23,7 @@ Ask these before changing anything.
 6. **Container hosting.** Where will they run containers (Docker Compose on one machine, Kubernetes, a managed container service, something else)? This is their choice. Outstaff does not pick it for them ([decision 0008](/decisions/0008-hosting-and-secrets-out-of-scope/)).
 7. **Secrets.** How do they keep secrets (env files, a password manager, encrypted files in git, a cloud secret manager)? Also their choice. Containers read secrets from environment variables or from files under `/run/secrets/outstaff/<KEY>`, whoever puts them there.
 8. **Repositories.** Which repositories will the team work in? For each one, which people may only read it and which may write to it?
-9. **Team size and roles.** How many people (agents) do they want, and in which roles? The catalog covers a project manager, product, architect, designer, developers, a reviewer and devops. What names should the people have?
+9. **Team size and roles.** How many people (agents) do they want, and in which roles? The catalog covers a project manager, product, architect, designer, developers, a reviewer and devops. What names should the people have, and which model should each one run on? Every person needs a model; there is no default.
 10. **Trusted humans.** Who may direct the team? By default this is anyone with write access to a repository and every full member of the chat workspace (not guests, not bots). For a large workspace or an open-source repository, ask for an explicit list of named humans and their identity on each system ([decision 0004](/decisions/0004-trust-model/)). There is no owner role.
 
 Confirm the answers back to the user in one summary before you continue.

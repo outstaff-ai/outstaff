@@ -17,6 +17,7 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "repos.duplicate_name": "Two repos share the same name.",
   "repos.multiple_primary": "More than one repo has kind primary.",
   "people.duplicate_handle": "Two people share the same handle.",
+  "people.missing_model": "A person has no model; every person names the model they run on.",
   "people.invalid_grant_key": "A repo grant key is not a repo name, kind:<kind> or *.",
   "people.unknown_repo": "A repo grant names a repo that is not listed in repos.",
   "email.missing_placeholder": "email.pattern does not contain {handle}.",

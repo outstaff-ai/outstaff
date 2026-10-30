@@ -20,8 +20,14 @@ function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConf
     humans: [{ name: "Dana", identities: { chat: "U0DANA0001" } }],
     repos: [{ name: "app", url: "git.acme.example/acme/app", kind: "primary" }],
     people: [
-      { handle: "sam", name: "Sam", role: "developer", identities: { tracker: "u-2" } },
-      ...(withPm ? [{ handle: "pat", name: "Pat", role: "pm" }] : []),
+      {
+        handle: "sam",
+        name: "Sam",
+        role: "developer",
+        model: "sonnet",
+        identities: { tracker: "u-2" },
+      },
+      ...(withPm ? [{ handle: "pat", name: "Pat", role: "pm", model: "sonnet" }] : []),
     ],
     integrations: {
       chat: { adapter: "fake" },

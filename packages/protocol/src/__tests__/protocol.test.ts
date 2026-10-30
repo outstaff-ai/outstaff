@@ -33,7 +33,7 @@ describe("protocol", () => {
     const m = {
       id: "1",
       type: "accept",
-      payload: { workItemId: "w1", runtime: "claude" },
+      payload: { workItemId: "w1", runtime: "claude", model: "sonnet" },
     } as const;
 
     expect(decode(encode(m))).toEqual({ ok: true, message: m });

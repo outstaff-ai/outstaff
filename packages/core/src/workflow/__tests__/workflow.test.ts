@@ -19,7 +19,7 @@ const baseConfig = () => ({
   humans: [{ name: "Ada", identities: { tracker: "Ada" } }],
   catalog: { version: "1.0.0" },
   repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-  people: [{ handle: "ada", name: "Ada", role: "r" }],
+  people: [{ handle: "ada", name: "Ada", role: "r", model: "sonnet" }],
   integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
 });
 
@@ -775,7 +775,7 @@ describe("overrides", () => {
       team: { name: "acme" },
       catalog: { version: "1.0.0" },
       repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-      people: [{ handle: "ada", name: "Ada", role: "r" }],
+      people: [{ handle: "ada", name: "Ada", role: "r", model: "sonnet" }],
       integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
     };
 
@@ -833,7 +833,7 @@ describe("config validation", () => {
     team: { name: "acme" },
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-    people: [{ handle: "ada", name: "Ada", role: "r" }],
+    people: [{ handle: "ada", name: "Ada", role: "r", model: "sonnet" }],
     integrations: { chat: { adapter: "a" }, vcs: { adapter: "b" }, runtime: { adapter: "c" } },
   };
 

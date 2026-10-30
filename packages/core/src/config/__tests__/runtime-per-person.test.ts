@@ -61,11 +61,11 @@ function team(people: Record<string, unknown>[], extra: Record<string, unknown> 
     humans: [{ name: "Alex", identities: { vcs: "alex" } }],
     catalog: { version: "1.0.0" },
     repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-    people: people.map((p) => ({ name: String(p["handle"]), repos: {}, ...p })),
+    people: people.map((p) => ({ name: String(p["handle"]), model: "sonnet", repos: {}, ...p })),
     integrations: {
       chat: { adapter: "slack" },
       vcs: { adapter: "github" },
-      runtime: { adapter: "claude-agent-sdk", model: "sonnet" },
+      runtime: { adapter: "claude-agent-sdk", maxTurns: 60 },
     },
     ...extra,
   };
@@ -92,7 +92,7 @@ describe("runtimeOf", () => {
   ]);
 
   it("is the person's own runtime, else the team's", () => {
-    expect(runtimeOf(t, t.people[0])).toEqual({ adapter: "claude-agent-sdk", model: "sonnet" });
+    expect(runtimeOf(t, t.people[0])).toEqual({ adapter: "claude-agent-sdk", maxTurns: 60 });
     expect(runtimeOf(t, t.people[1])).toEqual({ adapter: "acme-lite", tier: "fast" });
     expect(runtimeOf(t, undefined).adapter).toBe("claude-agent-sdk");
   });
@@ -236,7 +236,7 @@ describe("policies.usage.shared and runtimes", () => {
       team: { name: "acme" },
       catalog: { version: "1.0.0" },
       repos: [{ name: "app", url: "github.com/acme/app", kind: "primary" }],
-      people: people.map((p) => ({ name: p.handle, ...p })),
+      people: people.map((p) => ({ name: p.handle, model: "sonnet", ...p })),
       integrations: {
         chat: { adapter: "slack" },
         vcs: { adapter: "github" },
@@ -287,6 +287,46 @@ describe("adapter options of a person's runtime", () => {
         path: ["people", 1, "runtime", "tier"],
         code: "integrations.invalid_options",
         message: expect.any(String),
+      },
+    ]);
+  });
+
+  it("say a runtime's model option was removed, on the team and on a person: every person names their model", () => {
+    registerAdapterOptions(
+      "runtime",
+      "claude-agent-sdk",
+      z.strictObject({ maxTurns: z.number().optional() }),
+    );
+
+    const t = team([
+      { handle: "sam", role: "developer" },
+      {
+        handle: "noor",
+        role: "developer",
+        runtime: { adapter: "claude-agent-sdk", model: "opus" },
+      },
+    ]);
+
+    const removed = expect.stringMatching(/model option was removed.*people\[\]\.model/);
+    expect(validateAdapterOptions(t)).toEqual([
+      {
+        path: ["people", 1, "runtime", "model"],
+        code: "integrations.invalid_options",
+        message: removed,
+      },
+    ]);
+
+    t.integrations.runtime = { adapter: "claude-agent-sdk", model: "sonnet" };
+    expect(validateAdapterOptions(t)).toEqual([
+      {
+        path: ["integrations", "runtime", "model"],
+        code: "integrations.invalid_options",
+        message: removed,
+      },
+      {
+        path: ["people", 1, "runtime", "model"],
+        code: "integrations.invalid_options",
+        message: removed,
       },
     ]);
   });

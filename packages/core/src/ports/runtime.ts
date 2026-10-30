@@ -23,7 +23,9 @@ export interface RunRequest {
   policy: Policy;
   tools: RuntimeTool[];
   builtinTools: ToolKind[];
-  model?: string;
+
+  /** The model the person is configured with. There is no default: an adapter refuses a run without one. */
+  model: string;
   maxTurns?: number;
   signal?: AbortSignal;
 }
@@ -42,7 +44,7 @@ export type RuntimeEvent =
       type: "started";
       sessionId: string;
 
-      /** The concrete model the session runs, when the runtime tells (also when it picked its default). */
+      /** The concrete model id the session runs, when the runtime tells (an alias in `RunRequest.model` resolved). */
       model?: string;
     }
   | { type: "text"; text: string }

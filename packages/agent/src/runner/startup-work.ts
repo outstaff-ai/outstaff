@@ -194,7 +194,7 @@ export function workLoop({ team, log }: StartupContext, parts: LoopParts): WorkL
     repos,
     workspaces: parts.workspaces,
     addDirs: parts.addDirs,
-    ...(model ? { model } : {}),
+    model,
     ...(team.policies ? { policies: team.policies } : {}),
     log,
   });

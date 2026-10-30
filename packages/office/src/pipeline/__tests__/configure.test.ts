@@ -10,7 +10,7 @@ function team(extra: Record<string, unknown> = {}): TeamConfig {
     catalog: { version: "1.0.0" },
     humans: [{ name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "ada.admin" } }],
     repos: [{ name: "shop", url: "github.com/acme-example/shop", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer" }],
+    people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     integrations: {
       chat: { adapter: "slack" },
       vcs: { adapter: "github" },

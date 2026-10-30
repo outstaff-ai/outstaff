@@ -20,7 +20,15 @@ function team(): TeamConfig {
     catalog: { version: "1.0.0" },
     humans: [{ name: "Rio Park", identities: { tracker: "rio" } }],
     repos: [{ name: "shop", url: "git.acme.example/acme-example/shop", kind: "primary" }],
-    people: [{ handle: "sam", name: "Sam", role: "developer", identities: { tracker: "u-sam" } }],
+    people: [
+      {
+        handle: "sam",
+        name: "Sam",
+        role: "developer",
+        model: "sonnet",
+        identities: { tracker: "u-sam" },
+      },
+    ],
     integrations: {
       chat: { adapter: "fake" },
       vcs: { adapter: "fake" },

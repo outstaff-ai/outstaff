@@ -21,6 +21,8 @@ import { builtinToolNames, disallowedToolNames, OST_SERVER, ostServer } from "./
 import type { AgentSdkRuntimeConfig, MapState, QueryFn } from "./types.js";
 
 const PROBE_MODEL = "haiku";
+const NO_MODEL =
+  "The run names no model, and the Claude runtime has no default one. Set the person's model (people[].model in team.yaml).";
 
 export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
   const query: QueryFn = config.query ?? sdkQuery;
@@ -122,7 +124,7 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
       skills: renderedSkillNames(req.workdir),
       additionalDirectories: req.addDirs,
       systemPrompt: { type: "preset", preset: "claude_code", append: req.systemPrompt },
-      model: req.model ?? config.options.model,
+      model: req.model,
       ...(req.sessionId ? { resume: req.sessionId } : {}),
       ...(maxTurns ? { maxTurns } : {}),
       abortController: abort,
@@ -138,6 +140,11 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
   async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
     if (req.signal?.aborted) {
       yield { type: "finished", ok: false, text: "", interrupted: true };
+      return;
+    }
+
+    if (!req.model) {
+      yield { type: "finished", ok: false, text: "", error: NO_MODEL };
       return;
     }
 

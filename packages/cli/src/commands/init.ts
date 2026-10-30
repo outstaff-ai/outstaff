@@ -83,7 +83,8 @@ ${repoNote.replace(/^/gm, "  ")}
     kind: primary
 
 # No people yet. Add agents with \`ost hire\`, or list them here with a handle,
-# name, role and repo grants (for example \`${i.repoName}: write\`).
+# name, role, model (required, for example \`model: sonnet\`) and repo grants
+# (for example \`${i.repoName}: write\`).
 people: []
 
 integrations:

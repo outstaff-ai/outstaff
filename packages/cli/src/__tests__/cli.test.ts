@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   ACME_TEAM_FILE,
   DUPLICATE_HANDLE_TEAM,
+  MISSING_MODEL_TEAM,
   MISSING_REPOS_TEAM,
   UNKNOWN_REPO_GRANT_TEAM,
   YAML_SYNTAX_ERROR_TEAM,
@@ -248,6 +249,7 @@ describe("ost validate", () => {
     ["unknown repo grant", UNKNOWN_REPO_GRANT_TEAM],
     ["yaml syntax", YAML_SYNTAX_ERROR_TEAM],
     ["missing repos", MISSING_REPOS_TEAM],
+    ["a person without a model", MISSING_MODEL_TEAM],
   ])("exits 1 with file:line for %s", async (_name, team) => {
     const r = await ost(project(undefined, team), ["validate"]);
     expect(r.code).toBe(1);

@@ -12,7 +12,7 @@ import { scopeChecks } from "#/doctor/scope.js";
 
 const team = {
   team: { name: "acme" },
-  people: [{ handle: "sam", name: "Sam", role: "developer" }],
+  people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
   integrations: {
     tracker: { adapter: "fake" },
     knowledge: { adapter: "fake" },

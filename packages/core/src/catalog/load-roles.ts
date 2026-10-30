@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { toConfigIssues } from "#/config/issues.js";
+import { REMOVED_ROLE_KEYS } from "#/config/removed-keys.js";
 import { parseYaml } from "#/config/locate.js";
 import { CATALOG_CODES } from "./codes.js";
 import type { Loading } from "./loading.js";
@@ -91,7 +92,7 @@ function readRole(
     return { role: result.data, locate: parsed.locate };
   }
 
-  for (const issue of toConfigIssues(result.error)) {
+  for (const issue of toConfigIssues(result.error, [], REMOVED_ROLE_KEYS)) {
     l.add(
       `catalog.${issue.code.replace(/^schema\./, "")}`,
       `${issue.path.join(".") || "role"}: ${issue.message}`,

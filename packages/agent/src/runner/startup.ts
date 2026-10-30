@@ -73,12 +73,8 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     ...(role ? { role: { title: role.title, summary: role.summary } } : {}),
   });
 
-  const model = me.model ?? role?.default_model;
-  log.info("runtime selected", {
-    person,
-    runtime: team.integrations.runtime.adapter,
-    model: model ?? "the runtime's default",
-  });
+  const { model } = me;
+  log.info("runtime selected", { person, runtime: team.integrations.runtime.adapter, model });
 
   const usage = usageReporter(ctx, connection, runtime);
   const started = startChat(connection, { env, team, me, role, model, person, log });

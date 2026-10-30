@@ -12,6 +12,7 @@ export const CONFIG_CODES = {
   reposDuplicateName: "repos.duplicate_name",
   reposMultiplePrimary: "repos.multiple_primary",
   peopleDuplicateHandle: "people.duplicate_handle",
+  peopleMissingModel: "people.missing_model",
   peopleInvalidGrantKey: "people.invalid_grant_key",
   peopleUnknownRepo: "people.unknown_repo",
   emailMissingPlaceholder: "email.missing_placeholder",

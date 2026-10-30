@@ -10,7 +10,7 @@ import type { OfficeDoctor } from "#/doctor/types.js";
 const team = (dailyAt?: string, skip?: string[]) =>
   ({
     team: { name: "acme" },
-    people: [{ handle: "sam", name: "Sam", role: "developer" }],
+    people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     integrations: { chat: { adapter: "fake", workspace: "acme" } },
     ...(dailyAt || skip
       ? { office: { doctor: { daily_at: dailyAt ?? "06:00", ...(skip ? { skip } : {}) } } }

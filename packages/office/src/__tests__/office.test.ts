@@ -40,9 +40,10 @@ function team(): TeamConfig {
         handle: "sam",
         name: "Sam",
         role: "developer",
+        model: "sonnet",
         identities: { vcs: SAM_LOGIN, tracker: "u-2" },
       },
-      { handle: "mira", name: "Mira", role: "architect" },
+      { handle: "mira", name: "Mira", role: "architect", model: "sonnet" },
     ],
     integrations: {
       chat: { adapter: "fake" },
@@ -165,7 +166,7 @@ describe("createOffice", () => {
     expect(offer.context.subjects[0]).toMatchObject({ type: "ticket", title: "Search page" });
     expect(offer.context.links[0]!.url).toContain(issue.key);
 
-    await sam.accept(offer.workItem.id, { runtime: "claude" });
+    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
     await sam.handBack(offer.workItem.id, {
       summary: "Built the search page.",
       links: [{ url: "https://git.acme.example/acme/app/pull/1", title: "PR" }],
@@ -203,7 +204,7 @@ describe("createOffice", () => {
       subject: { type: "ticket", ref: first.key },
     });
 
-    await sam.accept(offer.workItem.id, { runtime: "claude" });
+    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
     await sam.handBack(offer.workItem.id, { summary: "Done.", status: "done" });
     const after = await next(sam);
     expect(after.workItem.subject).toEqual({ type: "ticket", ref: second.key });
@@ -293,7 +294,7 @@ describe("createOffice", () => {
     });
 
     const own = await next(sam);
-    await sam.accept(own.workItem.id, { runtime: "claude" });
+    await sam.accept(own.workItem.id, { runtime: "claude", model: "sonnet" });
     const asked = await runVerb(
       findVerb("ask")!,
       envOf(sam, "sam"),
@@ -311,7 +312,7 @@ describe("createOffice", () => {
     expect(question.workItem).toMatchObject({ kind: "question", parentId: own.workItem.id });
     const text = question.context.journal.map((j) => j.text).join("\n");
     const id = /ost answer (\S+) "/.exec(text)![1]!;
-    await mira.accept(question.workItem.id, { runtime: "claude" });
+    await mira.accept(question.workItem.id, { runtime: "claude", model: "sonnet" });
     await runVerb(
       findVerb("question.answer")!,
       envOf(mira, "mira"),
@@ -393,7 +394,7 @@ describe("createOffice", () => {
 
     const offer = await next(sam);
     expect(offer.workItem).toMatchObject({ kind: "chat", trigger: "human" });
-    await sam.accept(offer.workItem.id, { runtime: "claude" });
+    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
     await sam.handBack(offer.workItem.id, { summary: "Answered.", status: "done" });
 
     // The automatic item is still held, and says why.
@@ -428,7 +429,7 @@ describe("createOffice", () => {
     });
 
     const offer = await next(sam);
-    await sam.accept(offer.workItem.id, { runtime: "claude" });
+    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
     await sam.stop();
 
     const again = connect("sam");
@@ -447,7 +448,7 @@ describe("createOffice", () => {
     });
 
     const offer = await next(sam);
-    await sam.accept(offer.workItem.id, { runtime: "claude" });
+    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
     await sam.session(offer.workItem.id, "sess-1");
     const before = await office.parts.scheduler.next("sam");
     expect(before).toBeNull();

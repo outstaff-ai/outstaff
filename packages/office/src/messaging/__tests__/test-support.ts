@@ -10,7 +10,12 @@ import { createMessaging } from "#/messaging/messaging.js";
 import type { MessagingOptions } from "#/messaging/types.js";
 import { readRoster } from "#/messaging/roster.js";
 
-const person = (handle: string, role: string) => ({ handle, name: handle.toUpperCase(), role });
+const person = (handle: string, role: string) => ({
+  handle,
+  name: handle.toUpperCase(),
+  role,
+  model: "sonnet",
+});
 
 export function teamConfig(office?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({
