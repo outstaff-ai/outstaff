@@ -99,6 +99,9 @@ export interface IntakeOptions {
   /** Warn when a polled source has had no successful poll for this long. Default 10 minutes; `office.poll_warn_after_minutes`. */
   stalePollMinutes?: number;
 
+  /** Overrides `office.poll_interval_seconds`, below its minimum too (`OUTSTAFF_POLL_INTERVAL_MS`, for tests). */
+  pollIntervalMs?: number;
+
   /** Delivery attempts before an event is given up on and marked processed with an error. Default 5. */
   maxAttempts?: number;
 
@@ -120,9 +123,24 @@ export interface Intake {
   /** Poll mode: run one pass over every source now, outside the timer schedule. */
   pollOnce(): Promise<void>;
 
+  /** The scheduled polls that succeeded so far, per source; a source with none yet is absent. */
+  polls(): SourcePolls;
+
   /** Webhook mode: where the receiver listens, once started. */
   address(): { host: string; port: number } | undefined;
 }
+
+/**
+ * A source's successful polls since the office started: how many, and when the last one began. Every event the
+ * source had before `last` has been read and handed to the handlers, since a poll ends only once its events are
+ * delivered.
+ */
+export interface PollCount {
+  count: number;
+  last: Date;
+}
+
+export type SourcePolls = Partial<Record<PollSource["name"], PollCount>>;
 
 /** What intake records for an event: the raw identity, the normalized event, and whether to trust it. */
 export interface StoredPayload {
@@ -212,6 +230,9 @@ export interface Poller {
 
   /** Counts the sources' quiet time from now. */
   reset(sources: readonly PollSource[]): void;
+
+  /** The successful polls so far, per source. */
+  polls(): SourcePolls;
 
   /** Cancels the timers and waits for the polls in flight. */
   stop(): Promise<void>;

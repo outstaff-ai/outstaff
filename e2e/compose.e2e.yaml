@@ -77,6 +77,11 @@ services:
     environment:
       OUTSTAFF_TEAM_FILE: /team/team.yaml
       OUTSTAFF_STORE_URL: postgres://outstaff:${POSTGRES_PASSWORD}@postgres:5432/outstaff
+      # A testing knob: poll the stubs every second instead of the config minimum of ten (the team file keeps 10).
+      OUTSTAFF_POLL_INTERVAL_MS: "1000"
+    # The health answer counts the office's polls; the run reads it to know an event was seen and handled.
+    ports:
+      - "127.0.0.1:${E2E_OFFICE_HEALTH_PORT:-19081}:8081"
     volumes:
       - { type: bind, source: "${E2E_DIR}/team", target: /team, read_only: true }
       - office-data:/var/lib/outstaff

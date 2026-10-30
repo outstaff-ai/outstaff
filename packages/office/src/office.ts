@@ -79,6 +79,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     team,
     clock,
     logger: log,
+    ...defined({ pollIntervalMs: o.pollIntervalMs }),
     ...(webhook ? webhookOptions(o) : {}),
   });
 

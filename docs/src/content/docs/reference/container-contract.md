@@ -87,6 +87,8 @@ The runtime adapter needs no credential of its own and declares both runtime key
 | `OUTSTAFF_WEBHOOK_PORT` | `8082`                                 | Port of the webhook receiver, used when the team's `office.events` is `webhook`.    |
 | `OUTSTAFF_SECRETS_DIR`  | `/run/secrets/outstaff`                | Directory of secret files.                                                          |
 
+For tests only, `OUTSTAFF_POLL_INTERVAL_MS` (milliseconds, a positive whole number) overrides `office.poll_interval_seconds`, below its minimum of 10 seconds too, so that an end-to-end run does not wait seconds for each event. The office logs a warning when it is set. Leave it unset for a real team: the code host and the tracker limit how often they may be asked.
+
 If none of the team variables is set, the office looks for `.outstaff/team.yaml` or `team.yaml` in its working directory. A store URL with a password is a secret too: prefer a platform feature that fills the variable from a secret store over writing it into a manifest.
 
 ### Agent
@@ -135,6 +137,7 @@ The office answers on the health port with JSON such as `{ "ok": true, "state": 
 
 - `GET /healthz` is liveness: 200 while the office is starting or running with its parts up (store, agent connection, work state, intake, scheduler), 503 once a part fails or the office is stopping. Let the platform restart the container on 503.
 - `GET /readyz` is readiness: 200 only while the office is running. Send traffic when it is 200.
+- `components.intake.polls` has, per polled source (`vcs`, `tracker`, `knowledge`), the successful polls since the office started and when the last one began, for example `{ "vcs": { "count": 42, "last": "2026-05-04T09:30:00.000Z" } }`. Every event the source had before `last` has been read and handed on, since a poll ends only once its events are. A `last` that stops moving means the source is failing; the office also logs a warning after `office.poll_warn_after_minutes`.
 - `GET /doctor` answers with the stored [doctor checks](/guides/doctor/#the-office-runs-the-checks-itself); `POST /doctor` runs the office's checks first. A failing check never changes `/healthz` or `/readyz`.
 
 The liveness endpoint answers while the office starts, so a slow first rescan is not mistaken for a hang; give the startup probe a generous window.

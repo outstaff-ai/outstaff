@@ -11,6 +11,15 @@ import type { WorkState } from "./workstate/index.js";
 
 type State = OfficeHealth["state"];
 
+/** The intake's polls, with times as ISO strings, as the health answer shows them. */
+const pollsOf = (intake: Intake) =>
+  Object.fromEntries(
+    Object.entries(intake.polls()).map(([source, p]) => [
+      source,
+      { count: p.count, last: p.last.toISOString() },
+    ]),
+  );
+
 /**
  * Starting, stopping and the health of the office's parts. `scheduler` is the scheduler itself, whose housekeeping
  * runs between start and stop.
@@ -123,7 +132,7 @@ export function officeLifecycle(deps: {
           ...(up.server ? { detail: `${protocol.connected().length} connected` } : {}),
         },
         workState: { ok: up.workState },
-        intake: { ok: up.intake },
+        intake: { ok: up.intake, polls: pollsOf(intake) },
         scheduler: { ok: up.scheduler },
         // Visible, never fatal: an office without its link still works, so the probes stay green.
         ...(link ? { link: linkHealth(link) } : {}),

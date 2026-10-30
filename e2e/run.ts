@@ -28,6 +28,7 @@ const started = Date.now();
 const deadline = started + Number(process.env["E2E_TIMEOUT_MS"] ?? 600_000);
 const project = `outstaff-e2e-${process.pid}`;
 const port = process.env["E2E_STUB_PORT"] ?? String(18_000 + (process.pid % 1000));
+const officePort = process.env["E2E_OFFICE_HEALTH_PORT"] ?? String(19_000 + (process.pid % 1000));
 const work = mkdtempSync(join(tmpdir(), "outstaff-e2e-"));
 chmodSync(work, 0o755);
 
@@ -66,25 +67,62 @@ const stub = async (method: string, path: string, body?: unknown): Promise<Json>
 
 const state = () => stub("GET", "/_test/state");
 
-/** Polls until `check` returns a value that is not undefined or false; the failure says what was waited for. */
-async function until<T>(
+/** The office's health answer, whose `components.intake.polls` counts each source's successful polls. */
+const officeHealth = async (): Promise<Json> =>
+  (await fetch(`http://127.0.0.1:${officePort}/healthz`)).json() as Promise<Json>;
+
+/**
+ * Reads with `read` until `check` returns a value that is not undefined or false; the failure says what was waited
+ * for and shows what was read last.
+ */
+async function waitFor<T>(
   what: string,
+  read: () => Promise<Json>,
   check: (s: Json) => T | undefined | false,
   ms = 150_000,
 ): Promise<T> {
   const limit = Math.min(Date.now() + ms, deadline);
   let s: Json = {};
   while (Date.now() < limit) {
-    s = await state();
+    s = await read();
     const hit = check(s);
     if (hit !== undefined && hit !== false) {
       return hit;
     }
 
-    await sleep(1_000);
+    await sleep(300);
   }
 
-  throw new Error(`Timed out waiting for: ${what}\nstub state: ${JSON.stringify(s, null, 2)}`);
+  throw new Error(`Timed out waiting for: ${what}\nlast read: ${JSON.stringify(s, null, 2)}`);
+}
+
+/** Polls the stubs until `check` holds. */
+const until = <T>(what: string, check: (s: Json) => T | undefined | false, ms?: number) =>
+  waitFor(what, state, check, ms);
+
+/** The successful polls of each source the office polls, from its health answer. */
+const pollCounts = (h: Json): Record<string, number> =>
+  Object.fromEntries(
+    Object.entries(h.components.intake.polls as Record<string, { count: number }>).map(
+      ([source, p]) => [source, p.count],
+    ),
+  );
+
+/** Whether the agent's chat profile for the trusted human says it is idle. */
+const idle = (s: Json) =>
+  s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle";
+
+/**
+ * Waits until every source the office polls has had two more successful polls. A poll in flight now may have begun
+ * before what just happened; the one after it began later, and a poll ends only once the events it read were
+ * handled. So whatever happened before this call has been seen and judged by the office: the evidence a negative
+ * check needs, instead of a fixed sleep.
+ */
+async function officePolledTwice(what: string) {
+  const before = pollCounts(await officeHealth());
+  await waitFor(`two office polls of every source since ${what}`, officeHealth, (h) =>
+    Object.entries(before).every(([source, n]) => (pollCounts(h)[source] ?? 0) >= n + 2),
+  );
 }
 
 const dc = (...args: string[]) =>
@@ -443,6 +481,7 @@ async function main() {
     E2E_DIR: work,
     E2E_PROJECT: project,
     E2E_STUB_PORT: port,
+    E2E_OFFICE_HEALTH_PORT: officePort,
     POSTGRES_PASSWORD: randomBytes(12).toString("hex"),
     STUB_APPS: "100=acme-office,201=acme-sam",
     STUB_TRACKER_KEYS: `${keys.office}=office,${keys.sam}=sam`,
@@ -1490,9 +1529,13 @@ async function main() {
     `doc comment: a comment on ${design}'s design document reached its author, who updated the document, replied and resolved the thread`,
   );
 
-  // The agent's own reply is a comment on the document too; it must not start another round.
-  await sleep(25_000);
-  const docQuiet = (await state()).docs.find((d: Json) => d.id === written.doc.id);
+  // The agent's own reply is a comment on the document too; it must not start another round. Once the agent is idle,
+  // two office polls show the reply was read and judged, and the agent is still idle after them.
+  await until("the agent idle after the document comment", (s) => idle(s) || undefined);
+  await officePolledTwice("the agent's reply on the document");
+  const afterReply = await state();
+  assertEq(idle(afterReply), true, "the agent is still idle after its own reply was read");
+  const docQuiet = afterReply.docs.find((d: Json) => d.id === written.doc.id);
   assertEq(
     docQuiet.version,
     docAnswered.doc.version,

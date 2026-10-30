@@ -23,6 +23,9 @@ export interface OfficeOptions {
   heartbeatMs?: number;
   pollMs?: number;
 
+  /** Overrides `office.poll_interval_seconds`, below its minimum too (`OUTSTAFF_POLL_INTERVAL_MS`, for tests). */
+  pollIntervalMs?: number;
+
   /** How often the work state rescans open pull requests. */
   refreshIntervalMs?: number;
   staleAfterMinutes?: number;
@@ -54,6 +57,9 @@ export interface CreateOfficeInput {
 export interface ComponentHealth {
   ok: boolean;
   detail?: string;
+
+  /** Intake only: per polled source, its successful polls since the start and when the last one began. */
+  polls?: Record<string, { count: number; last: string }>;
 }
 
 export interface OfficeHealth {
