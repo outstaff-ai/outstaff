@@ -29,10 +29,10 @@ Each event has an actor (a human, an agent or automation). An event from an untr
 A policy decides one of three things, and nothing else (an act can be followed by a wake):
 
 - **wake** an agent: queue a work item for it with an instruction and the context. The instruction says what is expected ("address each point, answer in its thread and push"); the agent decides how, following the repository's conventions.
-- **act** for an agent: make a tracker change (move a ticket, assign it, comment, set its parent) or comment on a document, without a model run. The office makes it with its own tracker and knowledge accounts and posts a note naming the agent it was for, so the ticket's history says who the change served. With no agent to act for, the act is dropped. An act can be followed by a wake of the agent it was for, as when a ticket is assigned back to an agent; it then posts no note, and the policy's instruction is the wake's.
+- **act** for an agent: make a tracker change (move a ticket, assign it, comment, set its parent) or comment on a document, without a model run. The agent's own process makes it, with the agent's tracker and knowledge accounts, so the ticket's history shows the agent; the policy's instruction, if any, is a note the agent posts with it. An agent that is offline makes it when it connects again. With no agent to act for, the act is dropped. An act can be followed by a wake of the agent it was for, as when a ticket is assigned back to an agent; it then posts no note, and the policy's instruction is the wake's.
 - **drop** the event, with a reason.
 
-The office's write scope is tracker coordination metadata: status, assignee, labels, parent and those notes. On the code host it is strictly read-only. It never merges and never messages people; every message a person reads in chat comes from an agent. Making each act with the agent's own tracker account, so the office's tracker account can be read-only, is planned ([decision 0018](/decisions/0018-pipeline-only/)).
+The office writes nothing to the tracker, the knowledge base or the code host: its accounts there only read, and every change is made by an agent as itself ([decision 0019](/decisions/0019-agents-make-their-acts/)). It never merges and never messages people; every message a person reads in chat comes from an agent.
 
 ## The default policies
 

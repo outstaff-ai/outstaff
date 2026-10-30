@@ -10,7 +10,7 @@ export const MESSAGE_META = {
   welcome: {
     from: "office",
     summary:
-      "The connection is accepted. Carries the team config the agent works from, and lists accepted items to resume and the reports to requesters the agent was offline for; the agent posts those itself and confirms each.",
+      "The connection is accepted. Carries the team config the agent works from, and lists accepted items to resume, the reports to requesters the agent was offline for and the acts it has not answered; the agent posts and makes those itself and confirms each.",
     replies: [],
   },
   offer: {
@@ -188,6 +188,18 @@ export const MESSAGE_META = {
     from: "agent",
     summary:
       "Confirms the agent posted a queued report. Only then does the office stop sending it, so a crash while posting sends it again.",
+    replies: ["ack", "error"],
+  },
+  act: {
+    from: "office",
+    summary:
+      "Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments and parents. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.",
+    replies: [],
+  },
+  act_result: {
+    from: "agent",
+    summary:
+      "What the agent's changes for an act did. Only then does the office stop sending the act; it records the result on the event's trace and reads the tickets changed again, so later decisions see the change.",
     replies: ["ack", "error"],
   },
   doc_link: {

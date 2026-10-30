@@ -1,5 +1,6 @@
 import type { DoctorCheck, TeamConfig } from "@outstaff/core";
 import type { ToolStatus } from "#/tools/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 
 /** How the network checks reach services; defaults to the real thing (the override is for tests). */
 export interface NetworkProbes {
@@ -21,6 +22,9 @@ export interface StartupChecksInput extends NetworkProbes {
 
   /** How each declared tool fared at start. */
   tools: ToolStatus[];
+
+  /** The ports the agent started with; the acts the office sends are made with its tracker port. */
+  ports?: Pick<AgentEnv, "tracker" | "unavailable"> | undefined;
 
   /** Reads the usage of the volume a path is on. Defaults to statfs. */
   volume?: ((path: string) => Promise<VolumeUsage>) | undefined;

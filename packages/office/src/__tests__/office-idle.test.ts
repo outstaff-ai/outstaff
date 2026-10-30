@@ -41,7 +41,7 @@ describe("the idle pull", () => {
       store,
       workState: ws,
       scheduler,
-      ports: {},
+      push: () => false,
       clock,
       logger,
     });

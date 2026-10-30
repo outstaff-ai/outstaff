@@ -5,7 +5,7 @@ sidebar:
   order: 18
 ---
 
-**Status:** accepted. Makes [0016](/decisions/0016-event-pipeline/) the office's only decision path and replaces the rules, presets and templates of [0011](/decisions/0011-configurable-workflow/); the status mapping of 0011 stays.
+**Status:** accepted. Makes [0016](/decisions/0016-event-pipeline/) the office's only decision path and replaces the rules, presets and templates of [0011](/decisions/0011-configurable-workflow/); the status mapping of 0011 stays. [0019](/decisions/0019-agents-make-their-acts/) has agents make their acts.
 
 ## Context
 

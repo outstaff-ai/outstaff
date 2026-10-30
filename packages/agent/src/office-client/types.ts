@@ -5,6 +5,7 @@ import type {
   Message,
   MessageType,
   PayloadOf,
+  QueuedAct,
   QueuedReport,
   WorkState,
 } from "@outstaff/protocol";
@@ -96,6 +97,16 @@ export interface OfficeConnection extends OfficeClient {
    * arrive before it is set wait for it.
    */
   onReports?(handler: (reports: QueuedReport[]) => void): void;
+
+  /**
+   * Acts for the agent to make as itself: the office hands over the unanswered ones each time the connection is
+   * established and sends new ones while it is up, and repeats each until `actResult`. Acts that arrive before the
+   * handler is set wait for it.
+   */
+  onActs(handler: (acts: QueuedAct[]) => void): void;
+
+  /** Answers an act with what its changes did; the office stops sending it. */
+  actResult(result: PayloadOf<"act_result">): Promise<void>;
 
   /** Takes the offer, saying which runtime adapter runs it and the model the person is configured with, if any. */
   accept(workItemId: string, on: RunOn): Promise<void>;
@@ -193,6 +204,7 @@ export type OfficeMethods = Omit<
   | "offers"
   | "resume"
   | "onReports"
+  | "onActs"
   | "teamConfig"
   | "onTeamConfigChange"
 >;

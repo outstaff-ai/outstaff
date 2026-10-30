@@ -7,10 +7,12 @@ import {
   type Message,
   type MessageType,
   type PayloadOf,
+  type QueuedAct,
   type QueuedReport,
 } from "@outstaff/protocol";
 import { WebSocket } from "ws";
 import { FATAL, unavailable } from "./errors.js";
+import { heldFor } from "./held.js";
 import { officeMethods } from "./methods.js";
 import { createOfferQueue } from "./offers.js";
 import { createRequests } from "./requests.js";
@@ -58,8 +60,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   let counter = 0;
   let rejected: { code: ErrorCode; message: string } | undefined;
   let resumeIds: string[] = [];
-  let reportHandler: ((reports: QueuedReport[]) => void) | undefined;
-  let heldReports: QueuedReport[] = [];
+  const reports = heldFor<QueuedReport>();
+  const acts = heldFor<QueuedAct>();
   let team: Team | undefined;
   let teamHandler: ((team: Team) => void) | undefined;
   // A change that came before anyone listened; handed to the handler when it is set.
@@ -76,14 +78,6 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     hasSocket: () => socket !== undefined,
     send: (type, payload) => rawSend(type, payload),
   });
-
-  function deliverReports(list: QueuedReport[]) {
-    if (reportHandler) {
-      reportHandler(list);
-    } else {
-      heldReports.push(...list);
-    }
-  }
 
   function rawSend<T extends MessageType>(type: T, payload: PayloadOf<T>, replyTo?: string) {
     const id = `a${++counter}`;
@@ -133,7 +127,11 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     state = "connected";
     resumeIds = welcome.resume;
     if (welcome.reports?.length) {
-      deliverReports(welcome.reports);
+      reports.deliver(welcome.reports);
+    }
+
+    if (welcome.acts?.length) {
+      acts.deliver(welcome.acts);
     }
 
     scheduleBeat(welcome.heartbeatMs);
@@ -152,6 +150,29 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       rejected = error;
     } else {
       log.warn("error from the office", error);
+    }
+  }
+
+  /** Handles a message the office sends on its own; false for anything else. */
+  function pushed(m: Message): boolean {
+    switch (m.type) {
+      case "welcome":
+        welcomed(m.payload);
+        return true;
+      case "offer":
+        offers.push(m.payload);
+        return true;
+      case "reports":
+        reports.deliver(m.payload.reports);
+        return true;
+      case "act":
+        acts.deliver([m.payload]);
+        return true;
+      case "ping":
+        rawSend("pong", {}, m.id);
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -177,27 +198,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
 
       const m = decoded.message;
-      if (m.type === "welcome") {
-        welcomed(m.payload);
-        return;
-      }
-
-      if (m.type === "offer") {
-        offers.push(m.payload);
-        return;
-      }
-
-      if (m.type === "reports") {
-        deliverReports(m.payload.reports);
-        return;
-      }
-
-      if (m.type === "ping") {
-        rawSend("pong", {}, m.id);
-        return;
-      }
-
-      if (settle(m)) {
+      if (pushed(m) || settle(m)) {
         return;
       }
 
@@ -271,14 +272,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
     },
 
-    onReports(handler) {
-      reportHandler = handler;
-      if (heldReports.length) {
-        const held = heldReports;
-        heldReports = [];
-        handler(held);
-      }
-    },
+    onReports: (handler) => reports.listen(handler),
+    onActs: (handler) => acts.listen(handler),
 
     whenConnected,
     offers: () => offers.iterable(() => state === "stopped" || state === "rejected"),

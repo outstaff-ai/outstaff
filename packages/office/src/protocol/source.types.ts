@@ -1,4 +1,5 @@
 import type {
+  QueuedAct,
   QueuedReport,
   AnswerState,
   Attached,
@@ -160,4 +161,13 @@ export interface Messaging {
 
   /** The team as agents see it, including the trusted humans. Without it the work source's members are shown. */
   roster?(): Promise<{ members: Member[]; humans: Human[] }>;
+}
+
+/** The acts the event pipeline decided for agents, which each agent makes as itself (`act`, `act_result`). */
+export interface AgentActs {
+  /** The person's unanswered acts, for the `welcome`; recorded as delivered. */
+  deliver(person: string): Promise<QueuedAct[]>;
+
+  /** The agent's answer to an act: the office stops sending it and records what it did. An unknown id is ignored. */
+  result(person: string, result: PayloadOf<"act_result">): Promise<void>;
 }

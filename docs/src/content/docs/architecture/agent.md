@@ -69,6 +69,10 @@ Every surface shows that the agent took a request before it answers, with the sa
 
 The agent runner adds the code host reaction when it accepts the offer, before the run starts, not the model, so it always happens and costs no tokens. It acts as the person, with the agent's own `Vcs` port (the person's own App, which has Pull requests and Issues write); the office's App is read-only. The comment ids come from the feedback in the offer. The same reaction is never added twice to one comment, and a failure (for example a comment that was deleted meanwhile) is logged as a warning and never blocks the round.
 
+## Acts
+
+The office's [event pipeline](/concepts/automation/) decides tracker changes for an agent without waking it: a ticket moved to review and handed to its requester after a done hand-back, moved to done when the agent's pull request merges, a question mirrored on the asker's ticket. The office sends each as an `act` message; the agent's process makes the changes itself, with the person's own tracker and knowledge ports, so the ticket's history shows the agent. No model runs and no work item starts: acts are made one at a time beside any running item, and each is answered with `act_result`, one line per change and the error that stopped it. An act sent again, because its answer was lost, is answered again without being made twice. An agent that was offline gets the acts it missed in the next `welcome` and makes them then ([decision 0019](/decisions/0019-agents-make-their-acts/)).
+
 ## Usage
 
 The runtime knows how close the person's LLM subscription is to its limits; the office does not. The agent forwards that to the office with the `usage` message so the [usage policy](/architecture/office/#usage-policy) can hold automatic work:

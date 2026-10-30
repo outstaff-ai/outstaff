@@ -1,4 +1,5 @@
 import { silentLogger, type WorkflowEvent } from "@outstaff/core";
+import type { QueuedAct } from "@outstaff/protocol";
 import { createChatDesk } from "./chat/index.js";
 import { createIntake } from "./intake/index.js";
 import { createMessaging, type RoleInfo } from "./messaging/index.js";
@@ -111,8 +112,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
   // The event pipeline decides what the office does with every event (decision 0018). An error propagates, so the
   // event is delivered again; its trace, its wakes and its acts are idempotent per event.
-  const pipelineOptions = { team, store, workState, scheduler, ports, clock, logger: log };
-  const { runner: pipeline, traces } = createOfficePipeline(pipelineOptions);
+  // Its acts go to the agents they are for, which make them as themselves; the office's tracker account only reads.
+  const push = (person: string, act: QueuedAct) => server?.act(person, act) ?? false;
+  const pipelineOptions = { team, store, workState, scheduler, push, clock, logger: log };
+  const { runner: pipeline, traces, acts } = createOfficePipeline(pipelineOptions);
   const judge = (event: WorkflowEvent, meta: { source: string; externalId: string }) =>
     track(pipeline.handle(event, meta));
 
@@ -185,8 +188,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     humans,
     usage: (person) => usage.summary(person),
     notify,
+    acts,
     ...defined({ chat: ports.chat }),
-    ...tracker,
   });
 
   const refs = itemRefs(store, { vcs: ports.vcs, ...tracker });
@@ -222,6 +225,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     chat: { ...chatDesk, message: chatEntry.message },
     docs: officeDocLinks({ store, workState, log }),
     tickets: officeTicketPrs({ workState, log }),
+    acts,
     onConnected: (person) => void track(idle.check(person)),
     auth: agentAuthFromSecrets(
       input.secrets,

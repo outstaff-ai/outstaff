@@ -63,12 +63,12 @@ export function createMessaging(
   const mirrorOpts = {
     chat: opts.chat,
     channel,
-    tracker: opts.tracker,
+    acts: opts.acts,
     logger: log,
   };
 
-  const mirrorTo = async (asker: WorkItem, text: string) => {
-    const where = await mirror(mirrorOpts, asker, text);
+  const mirrorTo = async (asker: WorkItem, id: string, text: string) => {
+    const where = await mirror(mirrorOpts, asker, { id, text });
     return MIRRORED[where]!;
   };
 
@@ -150,6 +150,7 @@ export function createMessaging(
 
       const where = await mirrorTo(
         asker,
+        `question:${conversation.id}`,
         `${from} asks ${target} (question ${conversation.id}): ${q.question}`,
       );
 
@@ -192,6 +193,7 @@ export function createMessaging(
 
       const where = await mirrorTo(
         asker,
+        `answer:${questionId}`,
         `${from} answers ${asker.person} (question ${questionId}): ${text}`,
       );
 

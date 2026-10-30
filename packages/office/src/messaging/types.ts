@@ -1,7 +1,8 @@
-import type { Chat, Logger, TeamConfig, Tracker } from "@outstaff/core";
+import type { Chat, Logger, TeamConfig } from "@outstaff/core";
 import type { Human, Member, MemberUsage } from "@outstaff/protocol";
 import type { Scheduler } from "#/scheduler/types.js";
 import type { Store } from "#/store/types.js";
+import type { ActDesk } from "#/pipeline/act/act.types.js";
 
 export interface MessagingOptions {
   store: Store;
@@ -9,7 +10,9 @@ export interface MessagingOptions {
   team: Pick<TeamConfig, "people" | "humans" | "office">;
   logger?: Logger;
   chat?: Chat;
-  tracker?: Tracker;
+
+  /** Where a mirror to the ticket goes: a comment the asker's agent posts as itself. */
+  acts?: Pick<ActDesk, "send">;
 
   /** Channel for mirroring; defaults to `office.channel` of team.yaml. */
   channel?: string;
@@ -27,8 +30,14 @@ export interface MessagingOptions {
 export interface MirrorOptions {
   chat?: Chat | undefined;
   channel?: string | undefined;
-  tracker?: Tracker | undefined;
+  acts?: Pick<ActDesk, "send"> | undefined;
   logger?: Logger | undefined;
+}
+
+/** What is mirrored, and the id of the act that posts it on a ticket, so it is posted once. */
+export interface Mirrored {
+  id: string;
+  text: string;
 }
 
 export type MirrorWhere = "channel" | "ticket" | "journal";

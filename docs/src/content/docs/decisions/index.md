@@ -27,3 +27,4 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0016](/decisions/0016-event-pipeline/)                   | One event pipeline with three decisions                                       |
 | [0017](/decisions/0017-no-bespoke-protocol-verbs/)        | Network and identity are the boundary, not verbs per protocol                 |
 | [0018](/decisions/0018-pipeline-only/)                    | The event pipeline is the only way the office decides                         |
+| [0019](/decisions/0019-agents-make-their-acts/)           | Agents make the pipeline's acts as themselves                                 |

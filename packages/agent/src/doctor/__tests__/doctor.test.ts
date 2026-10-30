@@ -1,6 +1,7 @@
 import { tmpdir } from "node:os";
 import { silentLogger, type Logger, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
+import { actsCheck } from "#/doctor/acts.js";
 import { diskCheck, volumeUsage } from "#/doctor/disk.js";
 import { reportAgentChecks, reportStartupChecks, startupChecks } from "#/doctor/startup.js";
 import { toolStatusChecks } from "#/doctor/tools.js";
@@ -15,7 +16,7 @@ const sam = {
   model: "sonnet",
 } as TeamConfig["people"][number];
 
-const team = { people: [sam] } as unknown as TeamConfig;
+const team = { people: [sam], integrations: {} } as unknown as TeamConfig;
 
 describe("the agent's startup checks", () => {
   it("reports each tool that did not install, or that all did", () => {
@@ -110,6 +111,28 @@ describe("the agent's startup checks", () => {
     await reportStartupChecks({ ...input, tools: [] }, () => Promise.reject("down"));
   });
 
+  it("checks that the tracker port the agent makes its acts with started", () => {
+    const withTracker = { integrations: { tracker: { adapter: "itsaplan" } } } as TeamConfig;
+    expect(actsCheck(team, {})).toEqual([]);
+    expect(actsCheck(withTracker, { tracker: {} as never })).toMatchObject([
+      { name: "Tracker acts", status: "ok" },
+    ]);
+
+    expect(
+      actsCheck(withTracker, { unavailable: { tracker: "ITSAPLAN_API_KEY is missing" } }),
+    ).toEqual([
+      {
+        name: "Tracker acts",
+        status: "fail",
+        detail:
+          "The tracker port did not start (ITSAPLAN_API_KEY is missing), so every act the office sends this agent fails.",
+        fix: "Run `ost doctor` for the person to check the tracker integration and its secrets, then restart the agent.",
+      },
+    ]);
+
+    expect(actsCheck(withTracker, {})[0]?.detail).toContain("(no reason given)");
+  });
+
   it("reports a prepared agent's checks over its connection", async () => {
     const sent: unknown[] = [];
     await reportAgentChecks(
@@ -118,6 +141,7 @@ describe("the agent's startup checks", () => {
         person: "sam",
         tools: [{ name: "jq", version: "1.7.1", state: "installed" }],
         connection: { doctorReport: async (checks: unknown) => void sent.push(checks) } as never,
+        env: { person: "sam", team },
       },
       {},
       tmpdir(),

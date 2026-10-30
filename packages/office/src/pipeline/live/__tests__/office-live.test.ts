@@ -1,8 +1,9 @@
-import { createOfficeConnection, type OfficeConnection } from "@outstaff/agent";
+import { createActMaker, createOfficeConnection, type OfficeConnection } from "@outstaff/agent";
 import {
   AdapterRegistry,
   envSecretSource,
   parseTeamConfig,
+  silentLogger,
   type Member,
   type PortName,
   type TeamConfig,
@@ -103,11 +104,11 @@ describe("the office with the event pipeline live", () => {
 
     await office.start();
     await office.parts.intake.pollOnce();
-    return { tracker, config, ada, sam };
+    return { tracker, config, ada, sam, registry };
   }
 
-  /** Sam's agent process: its connection to the office. */
-  function agent() {
+  /** Sam's agent process: its connection to the office, which makes sam's acts with sam's own tracker account. */
+  function agent(tracker: FakeTracker, config: TeamConfig, sam: Member) {
     const c = createOfficeConnection({
       url: `ws://127.0.0.1:${office!.agentPort()}/agent`,
       person: "sam",
@@ -116,6 +117,13 @@ describe("the office with the event pipeline live", () => {
       clock,
     });
 
+    const acts = createActMaker({
+      env: { team: config, tracker: tracker.as(sam) },
+      office: c,
+      log: silentLogger,
+    });
+
+    c.onActs((list) => void acts.make(list));
     c.start();
     return c;
   }
@@ -128,13 +136,13 @@ describe("the office with the event pipeline live", () => {
 
   const traces = async () => (await store.listTraces({ limit: 200 })).map((t) => t.data as Trace);
 
-  it("wakes the assignee, and makes the hand-back's changes as the office, with a comment saying whom they are for", async () => {
-    const { tracker, ada, sam } = await start();
-    conn = agent();
+  it("wakes the assignee, and has sam's own process make the hand-back's changes as sam", async () => {
+    const { tracker, config, ada, sam } = await start();
+    conn = agent(tracker, config, sam);
     await conn.whenConnected();
 
     // In backlog: a ready ticket created for sam would be pulled at once, before Ada's assignment is judged.
-    const issue = await tracker.createIssue({
+    const issue = await tracker.as(ada).createIssue({
       title: "Search",
       body: "",
       status: "backlog",
@@ -152,33 +160,61 @@ describe("the office with the event pipeline live", () => {
 
     await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
     await conn.handBack(item.id, { summary: "Built it.", status: "done" });
-    await until(async () => (await tracker.getIssue(issue.key)).status.canonical === "review");
+    const resultOf = async () => {
+      const back = (await traces()).find((t) => t.event.type === "agent.handed_back");
+      return back?.results?.[`${back.event.id}:hand_back_done`];
+    };
+
+    await until(async () => (await resultOf())?.status === "done");
+    expect(await resultOf()).toMatchObject({
+      status: "done",
+      results: [
+        `moved ${issue.key} to review`,
+        `assigned ${issue.key} to ${ada.id}`,
+        `commented on ${issue.key}`,
+      ],
+    });
 
     const done = await tracker.getIssue(issue.key);
     expect(done.status.canonical).toBe("review");
     expect(done.assignee?.id).toBe(ada.id);
     const history = (await tracker.events()).events.filter((e) => e.key === issue.key);
     const toReview = history.filter((e) => e.type === "moved" && e.data["to"] === "review");
-    expect(toReview.map((e) => e.actor.id)).toEqual([OFFICE_ACCOUNT.id]);
-    await until(async () => (await tracker.listComments(issue.key)).length > 0);
-    expect((await tracker.listComments(issue.key)).map((c) => [c.author.id, c.body])).toEqual([
-      [
-        OFFICE_ACCOUNT.id,
-        "Moved to review and assigned to the requester for sam, who handed the work back as done.",
-      ],
-    ]);
+    expect(toReview.map((e) => e.actor.id)).toEqual([sam.id]);
+    expect((await tracker.listComments(issue.key)).map((c) => c.author.id)).toEqual([sam.id]);
+    expect(history.some((e) => e.actor.id === OFFICE_ACCOUNT.id)).toBe(false);
 
-    await until(async () => (await traces()).some((t) => t.results !== undefined));
-    const back = (await traces()).find((t) => t.event.type === "agent.handed_back")!;
-    expect(back.results).toEqual({
-      [`${back.event.id}:hand_back_done`]: {
-        ok: true,
-        results: [
-          `moved ${issue.key} to review`,
-          `assigned ${issue.key} to ${ada.id}`,
-          `commented on ${issue.key}`,
-        ],
-      },
+    // The office read the ticket again from the answer: its state has the move before the tracker's feed says so.
+    expect(office!.parts.workState.ticketStatus(issue.key)).toBe("review");
+  });
+
+  it("queues the act of an offline agent and has it made once the agent connects", async () => {
+    const { tracker, config, sam } = await start();
+    const issue = await tracker.createIssue({ title: "Cart", body: "", status: "active" });
+    await office!.parts.intake.pollOnce();
+    await office!.parts.pipeline.judge({
+      id: "office:handed_back:1",
+      type: "agent.handed_back",
+      at: clock.now().toISOString(),
+      subject: { ticket: issue.key },
+      actor: { kind: "agent", id: "sam" },
+      data: { workItem: "w-1", kind: "assigned", status: "done" },
     });
+
+    const recordOf = async () =>
+      (await traces()).find((t) => t.event.id === "office:handed_back:1")?.results?.[
+        "office:handed_back:1:hand_back_done"
+      ];
+
+    expect((await recordOf())?.status).toBe("queued");
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("active");
+
+    conn = agent(tracker, config, sam);
+    await conn.whenConnected();
+    await until(async () => (await recordOf())?.status === "done");
+    expect(await recordOf()).toMatchObject({ status: "done" });
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
+    const moves = (await tracker.events()).events.filter((e) => e.type === "moved");
+    expect(moves.map((e) => e.actor.id)).toEqual([sam.id]);
   });
 });

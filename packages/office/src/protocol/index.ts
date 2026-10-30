@@ -3,6 +3,7 @@ export { CLOSE_AUTH, CLOSE_REPLACED, CLOSE_VERSION } from "./constants.js";
 export { ProtocolError } from "./errors.js";
 export { createProtocolServer } from "./server.js";
 export type {
+  AgentActs,
   ChatDesk,
   DocLinks,
   Messaging,

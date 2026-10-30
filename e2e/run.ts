@@ -1649,6 +1649,30 @@ async function main() {
     `merge on approval: #${made.pr.number} approved -> auto-merge queued it, merged by the queue, ${made.t.key} done`,
   );
 
+  // ---- 13. every change in the tracker and the knowledge base was made by the agent or a human, as themselves: the
+  // office's account only reads (decision 0019)
+  const authors = await state();
+  const by = [
+    ...authors.tickets.flatMap((t: Json) => [
+      ...t.moves.map((m: Json) => [`${t.key} ${m.from}>${m.to}`, m.by]),
+      ...t.comments.map((c: Json) => [`a comment on ${t.key}`, c.author]),
+    ]),
+    ...authors.docs.flatMap((d: Json) =>
+      d.comments.map((c: Json) => [`a comment on ${d.title}`, c.author]),
+    ),
+  ] as [string, string | null][];
+
+  const others = by.filter(([, who]) => who !== "sam" && who !== "ada.admin");
+  assertEq(
+    others.map(([what, who]) => `${what} by ${who}`).join("; "),
+    "",
+    "every tracker and document change is made by sam or a human",
+  );
+
+  step(
+    `authors: all ${by.length} moves and comments were made by sam or a human, none by the office`,
+  );
+
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
 

@@ -369,27 +369,42 @@ describe("mirroring", () => {
     expect(h.chat.posts[0]?.channel).toBe("C-team");
   });
 
-  it("comments on the ticket when there is no channel", async () => {
+  it("has the asker's agent comment on the ticket when there is no channel", async () => {
     const h = await harness();
-    const issue = await h.tracker.createIssue({ title: "Cart", body: "" });
+    const sent: { person: string; act: unknown }[] = [];
     const m = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
       scheduler: h.scheduler,
       team: h.team,
       chat: h.chat,
-      tracker: h.tracker,
+      acts: { send: async (person, act) => void sent.push({ person, act }) },
     });
 
-    const item = await h.startItem("sam", { type: "ticket", ref: issue.key });
+    const item = await h.startItem("sam", { type: "ticket", ref: "ACME-7" });
     const q = await m.ask("sam", { to: "mira", question: "Which queue?", workItemId: item.id });
     await m.answer("mira", q.id, "The fast one.");
-    const comments = await h.tracker.listComments(issue.key);
-    expect(comments.map((c) => c.body)).toEqual([
-      `sam asks mira (question ${q.id}): Which queue?`,
-      `mira answers sam (question ${q.id}): The fast one.`,
+    const comment = (body: string) => [{ op: "comment", on: { ticket: "ACME-7" }, body }];
+    expect(sent).toEqual([
+      {
+        person: "sam",
+        act: {
+          id: `question:${q.id}`,
+          ops: comment(`sam asks mira (question ${q.id}): Which queue?`),
+        },
+      },
+      {
+        person: "sam",
+        act: {
+          id: `answer:${q.id}`,
+          ops: comment(`mira answers sam (question ${q.id}): The fast one.`),
+        },
+      },
     ]);
 
     expect(h.chat.posts).toEqual([]);
+    expect((await h.store.readJournal(item.id)).at(-1)?.text).toBe(
+      "Answer mirrored to the ticket.",
+    );
   });
 
   it("falls back to the journal, and says where the text went", async () => {
@@ -400,9 +415,9 @@ describe("mirroring", () => {
     expect(journal.at(-1)?.text).toContain("Mirrored to the work journal only.");
   });
 
-  it("falls through when the channel or the tracker fails", async () => {
+  it("falls through when the channel or the act cannot be queued", async () => {
     const h = await harness();
-    const issue = await h.tracker.createIssue({ title: "Cart", body: "" });
+    const sent: string[] = [];
     const failing = { ...h.chat, post: () => Promise.reject(new Error("down")) };
     const m = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
@@ -410,21 +425,20 @@ describe("mirroring", () => {
       team: h.team,
       chat: failing,
       channel: "C-team",
-      tracker: h.tracker,
+      acts: { send: async (_person, act) => void sent.push(act.id) },
     });
 
-    const item = await h.startItem("sam", { type: "ticket", ref: issue.key });
-    await m.ask("sam", { to: "mira", question: "Q?", workItemId: item.id });
-    expect(await h.tracker.listComments(issue.key)).toHaveLength(1);
-    const brokenTracker = { ...h.tracker, comment: () => Promise.reject(new Error("down")) };
+    const item = await h.startItem("sam", { type: "ticket", ref: "ACME-7" });
+    const q = await m.ask("sam", { to: "mira", question: "Q?", workItemId: item.id });
+    expect(sent).toEqual([`question:${q.id}`]);
     const m2 = (await import("#/messaging/messaging.js")).createMessaging({
       store: h.store,
       scheduler: h.scheduler,
       team: h.team,
-      tracker: brokenTracker,
+      acts: { send: () => Promise.reject(new Error("store down")) },
     });
 
-    const item2 = await h.startItem("kit", { type: "ticket", ref: issue.key });
+    const item2 = await h.startItem("kit", { type: "ticket", ref: "ACME-7" });
     await expect(
       m2.ask("kit", { to: "noor", question: "Q2?", workItemId: item2.id }),
     ).resolves.toMatchObject({ to: "noor" });
