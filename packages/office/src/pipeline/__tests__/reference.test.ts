@@ -42,6 +42,14 @@ describe("the pipeline policies reference", () => {
       "act for `actor`, else `author`: assign it to the agent acted for, comment, set its parent",
     );
 
+    expect(
+      decisionText({
+        act: { as: "last_worker", ops: [{ assign: "self" }], wake: { kind: "assigned" } },
+      }),
+    ).toBe(
+      "act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`)",
+    );
+
     expect(conditionLines({ any: [{ pr_draft: true }, { actor_is: "assignee" }] })).toEqual([
       "- any of:",
       "  - `pr_draft: true`",

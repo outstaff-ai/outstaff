@@ -41,7 +41,7 @@ function eventSubject(event: PipelineEvent): WakeSubject | undefined {
 
 /** The subject of a wake: the event's, or for an idle pull the agent's oldest ready ticket. */
 function wakeSubject(
-  spec: WakeSpec,
+  spec: Omit<WakeSpec, "person">,
   person: string,
   input: DecideInput,
 ): Resolved<{ subject: WakeSubject; next?: string | undefined }> {
@@ -58,19 +58,20 @@ function wakeSubject(
     : { skip: `no ready ticket is assigned to ${person}` };
 }
 
-function wake(policy: Policy, spec: WakeSpec, input: DecideInput): Decision {
+/** A wake of an agent already resolved. */
+function wakeOf(
+  policy: Policy,
+  spec: Omit<WakeSpec, "person">,
+  person: string,
+  input: DecideInput,
+): Decision {
   const drop = (reason: string): Decision => ({ type: "drop", policy: policy.id, reason });
-  const person = resolveSpec(spec.person, input.ctx, input.opts);
-  if ("skip" in person) {
-    return drop(`no one to wake: ${person.skip}`);
-  }
-
-  const target = wakeSubject(spec, person.value, input);
+  const target = wakeSubject(spec, person, input);
   if ("skip" in target) {
     return drop(target.skip);
   }
 
-  const vars = instructionVariables(input.ctx, { person: person.value, next: target.value.next });
+  const vars = instructionVariables(input.ctx, { person, next: target.value.next });
   const instruction = render(policy.instruction ?? "", vars);
   if ("skip" in instruction) {
     return drop(`the instruction cannot be rendered: ${instruction.skip}`);
@@ -79,12 +80,19 @@ function wake(policy: Policy, spec: WakeSpec, input: DecideInput): Decision {
   return {
     type: "wake",
     policy: policy.id,
-    person: person.value,
+    person,
     kind: spec.kind,
     instruction: instruction.value,
     feedback: feedbackFor(input.event),
     subject: target.value.subject,
   };
+}
+
+function wake(policy: Policy, spec: WakeSpec, input: DecideInput): Decision {
+  const person = resolveSpec(spec.person, input.ctx, input.opts);
+  return "skip" in person
+    ? { type: "drop", policy: policy.id, reason: `no one to wake: ${person.skip}` }
+    : wakeOf(policy, spec, person.value, input);
 }
 
 type Op<K extends string> = Extract<OpSpec, Record<K, unknown>>;
@@ -176,11 +184,31 @@ function actOps(
   };
 }
 
-function act(policy: Policy, spec: ActSpec, input: DecideInput): Decision {
-  const drop = (reason: string): Decision => ({ type: "drop", policy: policy.id, reason });
+/**
+ * An act, then the wake of the agent it was for: the policy's instruction is the wake's, and the act posts no note,
+ * since the agent's own run follows. With nothing to change the agent is still woken.
+ */
+function actThenWake(
+  policy: Policy,
+  spec: ActSpec,
+  then: { kind: string },
+  as: string,
+  input: DecideInput,
+): Decision[] {
+  const { ops } = actOps(spec, as, input);
+  const woken = wakeOf(policy, then, as, input);
+  return ops.length > 0 ? [{ type: "act", policy: policy.id, as, ops }, woken] : [woken];
+}
+
+function act(policy: Policy, spec: ActSpec, input: DecideInput): Decision[] {
+  const drop = (reason: string): Decision[] => [{ type: "drop", policy: policy.id, reason }];
   const as = resolveSpec(spec.as, input.ctx, input.opts);
   if ("skip" in as) {
     return drop(`no agent to act for: ${as.skip}`);
+  }
+
+  if (spec.wake) {
+    return actThenWake(policy, spec, spec.wake, as.value, input);
   }
 
   const { ops, skipped } = actOps(spec, as.value, input);
@@ -197,23 +225,25 @@ function act(policy: Policy, spec: ActSpec, input: DecideInput): Decision {
     return drop(`the note cannot be rendered: ${note.skip}`);
   }
 
-  return {
-    type: "act",
-    policy: policy.id,
-    as: as.value,
-    ops,
-    ...(note.value ? { note: note.value } : {}),
-  };
+  return [
+    {
+      type: "act",
+      policy: policy.id,
+      as: as.value,
+      ops,
+      ...(note.value ? { note: note.value } : {}),
+    },
+  ];
 }
 
-/** The decision of a policy that matched the event. */
-export function decide(policy: Policy, input: DecideInput): Decision {
+/** The decisions of a policy that matched the event: one, or an act and then the wake of the agent it was for. */
+export function decide(policy: Policy, input: DecideInput): Decision[] {
   const d = policy.decide;
   if ("wake" in d) {
-    return wake(policy, d.wake, input);
+    return [wake(policy, d.wake, input)];
   }
 
   return "act" in d
     ? act(policy, d.act, input)
-    : { type: "drop", policy: policy.id, reason: d.drop.reason };
+    : [{ type: "drop", policy: policy.id, reason: d.drop.reason }];
 }

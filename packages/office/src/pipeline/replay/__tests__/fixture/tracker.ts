@@ -78,7 +78,6 @@ export const assignments: ReplayScenario = {
           "ACME-154": ticket("active", "ada.admin", { lastWorker: "sam" }),
         },
       },
-      note: "regression: moving a ticket a human holds to active no longer gives it back to the agent that last worked on it; not in the plan's table",
     },
     {
       event: ev("s4-moved-review", "ticket.moved", "ada.admin", { ticket: "ACME-150" }, at(206), {
@@ -119,7 +118,7 @@ export const ticketComments: ReplayScenario = {
         },
       ),
       world: working,
-      note: "regression: feedback on a ticket the agent handed back to a human no longer goes back to that agent; not in the plan's table",
+      note: "intended fix: the agent who last worked on the ticket is woken to answer, but the ticket stays with the human until the agent takes it back for more work; the comment is often only a question",
     },
     {
       event: ev("s10-agent-comment", "ticket.commented", "sam", { ticket: "ACME-150" }, at(213), {

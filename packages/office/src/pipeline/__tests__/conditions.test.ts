@@ -137,4 +137,24 @@ describe("evaluateCondition", () => {
         .detail,
     ).toBe("actor mira is not the doc author (mira)");
   });
+
+  it("knows whether the actor is the agent who last worked on the ticket", () => {
+    const worked = { tickets: { "ACME-1": { status: "review" as const, lastWorker: "sam" } } };
+    const by = (id: string, ticket?: string) =>
+      ctxOf(
+        event("ticket.moved", {
+          subject: ticket ? { ticket } : {},
+          actor: { kind: "agent", id },
+        }),
+        worked,
+      );
+
+    expect(evaluateCondition({ actor_is: "last_worker" }, by("sam", "ACME-1"))).toEqual({
+      ok: true,
+      detail: "actor sam is the last worker (sam)",
+    });
+
+    expect(evaluateCondition({ actor_is: "last_worker" }, by("noor", "ACME-1")).ok).toBe(false);
+    expect(evaluateCondition({ actor_is: "last_worker" }, by("sam")).ok).toBe(false);
+  });
 });

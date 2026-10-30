@@ -33,6 +33,15 @@ describe("resolveSpec", () => {
     });
   });
 
+  it("names the agent who last worked on the ticket", () => {
+    const comment = event("ticket.commented", { subject: { ticket: "ACME-1" } });
+    const worked = { tickets: { "ACME-1": { status: "review" as const, lastWorker: "sam" } } };
+    expect(resolveSpec("last_worker", ctxOf(comment, worked), OPTS)).toEqual({ value: "sam" });
+    expect(resolveSpec("last_worker", ctxOf(comment), OPTS)).toEqual({
+      skip: "no agent has worked on the ticket yet",
+    });
+  });
+
   it("tries a list in order and says why none resolved", () => {
     const mentioned = ctxOf(event("ticket.commented", { data: { mentions: ["mira"] } }));
     expect(resolveSpec(["mentioned", "assignee"], mentioned, OPTS)).toEqual({ value: "mira" });

@@ -41,7 +41,7 @@ function judge(
     return { ...base, reason: c.detail, failed: c.failed };
   }
 
-  return { ...base, matched: true, reason: c.detail, decisions: [decide(policy, input)] };
+  return { ...base, matched: true, reason: c.detail, decisions: decide(policy, input) };
 }
 
 /**

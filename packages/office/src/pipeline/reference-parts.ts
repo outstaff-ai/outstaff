@@ -27,7 +27,9 @@ export function decisionText(d: DecideSpec): string {
   }
 
   if ("act" in d) {
-    return `act for ${personText(d.act.as)}: ${d.act.ops.map(opText).join(", ")}`;
+    const { as, ops, wake } = d.act;
+    const then = wake ? `, then wake them (kind ${code(wake.kind)})` : "";
+    return `act for ${personText(as)}: ${ops.map(opText).join(", ")}${then}`;
   }
 
   return `drop: ${d.drop.reason}`;

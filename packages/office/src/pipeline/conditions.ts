@@ -16,6 +16,7 @@ const WHO: Record<PipelineLeaf["actor_is"], Who> = {
     const doc = ctx.event.subject.doc;
     return doc ? ctx.state.docAuthor(doc) : undefined;
   },
+  last_worker: (ctx) => (ctx.ticket ? ctx.state.lastWorker(ctx.ticket) : undefined),
 };
 
 function actorIs(c: PipelineLeaf, ctx: EvaluationContext): ConditionResult {

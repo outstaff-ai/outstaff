@@ -116,12 +116,46 @@ export const DEFAULT_POLICIES: readonly Policy[] = [
     instruction: "{{actor.id}} commented on {{ticket}}. Read the comment and act on it.",
   },
   {
+    id: "ticket_comment_to_last_worker",
+    summary:
+      "A human's comment, mentioning no agent, on a ticket handed back to a human (in review or blocked) wakes the agent who last worked on it.",
+    on: ["ticket.commented"],
+    when: {
+      all: [
+        HUMAN,
+        { not: { agent_mentioned: true } },
+        { assignee_kind: "human" },
+        { ticket_status: ["review", "blocked"] },
+      ],
+    },
+    decide: { wake: { person: "last_worker", kind: "ticket_comment" } },
+    instruction:
+      "{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work.",
+  },
+  {
     id: "moved_active_to_assignee",
     summary: "A human moving a ticket to active wakes the agent assigned.",
     on: ["ticket.moved"],
     when: { all: [HUMAN, { moved_to: ["active"] }, { assignee_kind: "agent" }] },
     decide: { wake: { person: "assignee", kind: "assigned" } },
     instruction: "{{actor.id}} moved {{ticket}} to active. Pick the work up.",
+  },
+  {
+    id: "moved_active_to_last_worker",
+    summary:
+      "A human moving a ticket assigned to a human to active, without the needs-human label, gives it back to the agent who last worked on it and wakes them.",
+    on: ["ticket.moved"],
+    when: {
+      all: [
+        HUMAN,
+        { moved_to: ["active"] },
+        { assignee_kind: "human" },
+        { not: { has_label: "$needs_human" } },
+      ],
+    },
+    decide: { act: { as: "last_worker", ops: [{ assign: "self" }], wake: { kind: "assigned" } } },
+    instruction:
+      "{{actor.id}} moved {{ticket}} to active and it is assigned to you again. Pick the work up.",
   },
   {
     id: "doc_comment_to_agent",

@@ -22,7 +22,9 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`opened_to_review`](#opened_to_review) | `pr.opened` | act for `author`: move the ticket to `review` |
 | [`assigned_to_assignee`](#assigned_to_assignee) | `ticket.assigned`, `ticket.created` | wake `assignee` (kind `assigned`) |
 | [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `mentioned`, else `assignee` (kind `ticket_comment`) |
+| [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
+| [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester |
 | [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester |
@@ -216,6 +218,27 @@ Instruction:
 {{actor.id}} commented on {{ticket}}. Read the comment and act on it.
 ```
 
+### ticket_comment_to_last_worker
+
+A human's comment, mentioning no agent, on a ticket handed back to a human (in review or blocked) wakes the agent who last worked on it.
+
+Listens to `ticket.commented`. Decides: wake `last_worker` (kind `ticket_comment`).
+
+When:
+
+- all of:
+  - `actor_kind: human`
+  - not:
+    - `agent_mentioned: true`
+  - `assignee_kind: human`
+  - `ticket_status: review, blocked`
+
+Instruction:
+
+```text
+{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work.
+```
+
 ### moved_active_to_assignee
 
 A human moving a ticket to active wakes the agent assigned.
@@ -233,6 +256,27 @@ Instruction:
 
 ```text
 {{actor.id}} moved {{ticket}} to active. Pick the work up.
+```
+
+### moved_active_to_last_worker
+
+A human moving a ticket assigned to a human to active, without the needs-human label, gives it back to the agent who last worked on it and wakes them.
+
+Listens to `ticket.moved`. Decides: act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`).
+
+When:
+
+- all of:
+  - `actor_kind: human`
+  - `moved_to: active`
+  - `assignee_kind: human`
+  - not:
+    - `has_label: $needs_human`
+
+Instruction:
+
+```text
+{{actor.id}} moved {{ticket}} to active and it is assigned to you again. Pick the work up.
 ```
 
 ### doc_comment_to_agent

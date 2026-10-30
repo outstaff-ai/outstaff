@@ -10,7 +10,7 @@ How to read it:
 - A merge re-checks the repository's other open pull requests. Today raises `pr.conflicted` only for a pull request that turned conflicting; the pipeline raises `pr.conflicted`, `pr.behind_base` or `pr.base_merged` for every pull request the merge changed something under.
 - Every difference has a note: an intended fix or a regression.
 
-**49 events** (5 derived from merges): 30 decided the same, 19 differently (11 intended fixes, 8 regressions).
+**49 events** (5 derived from merges): 31 decided the same, 18 differently (12 intended fixes, 6 regressions).
 
 ## A stacked pull request series merges
 
@@ -54,7 +54,7 @@ How to read it:
 | 21 | `ticket.created` ACME-152 by ada.admin | wake noor (assigned) | wake noor (assigned): _ACME-152 is assigned to you. Work on it the way the repository asks._ | same |
 | 22 | `ticket.assigned` ACME-153 by ada.admin | - | (drop: no policy matched) | same |
 | 23 | `ticket.moved` ACME-150 by ada.admin | - | wake sam (assigned): _ada.admin moved ACME-150 to active. Pick the work up._ | intended fix: a human moving an agent's ticket to active wakes the agent; today only a ticket a human holds is taken back |
-| 24 | `ticket.moved` ACME-154 by ada.admin | assign ACME-154 to agent sam (as the office)<br>wake sam (assigned) | (drop: no policy matched) | regression: moving a ticket a human holds to active no longer gives it back to the agent that last worked on it; not in the plan's table |
+| 24 | `ticket.moved` ACME-154 by ada.admin | assign ACME-154 to agent sam (as the office)<br>wake sam (assigned) | assign ACME-154 to agent sam (for sam)<br>wake sam (assigned): _ada.admin moved ACME-154 to active and it is assigned to you again. Pick the work up._ | same |
 | 25 | `ticket.moved` ACME-150 by ada.admin | - | (drop: no policy matched) | same |
 
 ## Comments on tickets
@@ -63,7 +63,7 @@ How to read it:
 | - | - | - | - | - |
 | 26 | `ticket.commented` ACME-150 by ada.admin | wake sam (ticket_comment) | wake sam (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ | same |
 | 27 | `ticket.commented` ACME-150 by ada.admin | assign ACME-150 to agent mira (as the office)<br>wake mira (ticket_comment) | wake mira (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ | regression: a mention wakes mira but no longer hands her the ticket; the plan's table leaves that to the agent |
-| 28 | `ticket.commented` ACME-154 by ada.admin | assign ACME-154 to agent sam (as the office)<br>move ACME-154 to active (as the office)<br>wake sam (ticket_comment) | (drop: no policy matched) | regression: feedback on a ticket the agent handed back to a human no longer goes back to that agent; not in the plan's table |
+| 28 | `ticket.commented` ACME-154 by ada.admin | assign ACME-154 to agent sam (as the office)<br>move ACME-154 to active (as the office)<br>wake sam (ticket_comment) | wake sam (ticket_comment): _ada.admin commented on ACME-154, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work._ | intended fix: the agent who last worked on the ticket is woken to answer, but the ticket stays with the human until the agent takes it back for more work; the comment is often only a question |
 | 29 | `ticket.commented` ACME-150 by sam | - | (drop: no policy matched) | same |
 | 30 | `ticket.commented` ACME-123 by ada.admin | - | (drop: no policy matched) | same |
 
@@ -118,6 +118,6 @@ How to read it:
 
 ## Coalescing
 
-The pipeline's 19 wakes become 17 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 21 wakes become 19 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)
