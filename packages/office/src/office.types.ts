@@ -1,4 +1,5 @@
 import type { AdapterRegistry, Logger, SecretSource, TeamConfig } from "@outstaff/core";
+import type { ConfiguredPolicy } from "@outstaff/policy";
 import type { OfficeDoctor } from "./doctor/index.js";
 import type { Intake } from "./intake/index.js";
 import type { ProtocolServer } from "./protocol/index.js";
@@ -51,6 +52,9 @@ export interface CreateOfficeInput {
 
   /** The merged catalog (stock plus ejected); only the role titles and summaries are read. */
   catalog?: { roles: Record<string, { title: string; summary: string }> };
+
+  /** The team's custom policies (`policies.custom`), loaded and checked; they run after the built-in ones. */
+  policies?: readonly ConfiguredPolicy[];
   options?: OfficeOptions;
 }
 

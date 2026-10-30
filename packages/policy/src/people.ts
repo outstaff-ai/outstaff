@@ -1,6 +1,5 @@
 import { resolvePerson, type EvaluationContext, type Resolved } from "@outstaff/core";
-import type { PersonRef, PersonSpec } from "./policy.types.js";
-import type { PipelineOptions } from "./state.types.js";
+import type { PersonRef, PersonSpec, PolicyOptions } from "./policy.types.js";
 
 function one(ref: PersonRef, ctx: EvaluationContext): Resolved<string> {
   if (ref === "actor") {
@@ -24,7 +23,7 @@ function one(ref: PersonRef, ctx: EvaluationContext): Resolved<string> {
 export function resolveSpec(
   spec: PersonSpec,
   ctx: EvaluationContext,
-  opts: PipelineOptions,
+  opts: PolicyOptions,
 ): Resolved<string> {
   const refs: readonly PersonRef[] = typeof spec === "string" ? [spec] : spec;
   const skips: string[] = [];

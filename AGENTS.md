@@ -13,6 +13,7 @@ Outstaff is an open-source TypeScript framework for running a team of AI agents 
 | `packages/cli`                 | The `outstaff` command line (alias `ost`): creates and validates the team config, hires people, sets up credentials.                                                 |
 | `packages/office`              | The office: one container per team. Event intake, work state, event pipeline, scheduler, store (Postgres or SQLite).                                                 |
 | `packages/agent`               | `ost-agent`: one container per person. Connects out to the office and runs work items through a runtime adapter.                                                     |
+| `packages/policy`              | `@outstaff/policy`: the SDK for event pipeline policies (`definePolicy`, the proposal and context types, the replay harness) and the custom policy loader.           |
 | `packages/protocol`            | The agent connection protocol: zod schemas and types shared by the office and the agent.                                                                             |
 | `integrations/<port>/<vendor>` | One adapter package per integration, published as `@outstaff/integration.<port>.<vendor>`. Code two adapters of a vendor share is in `integrations/shared/<vendor>`. |
 | `testing/<name>`               | Private test kits shared between packages (`@outstaff/testing.<name>`): fixtures, the GitHub and Its a Plan stand-ins (also served by `e2e/stubs`). Never published. |

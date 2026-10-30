@@ -1,13 +1,16 @@
 import { agentRegistry } from "@outstaff/agent";
 import {
+  CONFIG_CODES,
   formatIssue,
   validateAdapterOptions,
   validateTeam,
   type ConfigWarning,
   type AdapterPort,
+  type ConfigIssue,
   type LocatedIssue,
   type TeamConfig,
 } from "@outstaff/core";
+import { loadCustomPolicies } from "@outstaff/policy";
 import { adapterSecretKeys } from "#/secret-keys.js";
 import { catalogIssue, loadCatalogs, roleRegistry } from "#/catalogs.js";
 import { defineCommand } from "#/define.js";
@@ -27,6 +30,16 @@ const OPTION_SCHEMAS: Record<AdapterPort, () => Promise<unknown>> = {
 async function loadOptionSchemas(config: TeamConfig): Promise<void> {
   const ports = Object.keys(config.integrations) as AdapterPort[];
   await Promise.all(ports.map((port) => OPTION_SCHEMAS[port]?.()));
+}
+
+/** Loads each custom policy as the office will, and checks it against the SDK's schema. */
+async function customPolicyIssues(config: TeamConfig, dir: string): Promise<ConfigIssue[]> {
+  const { issues } = await loadCustomPolicies(config.policies?.custom ?? [], dir);
+  return issues.map((i) => ({
+    path: ["policies", "custom", i.index],
+    code: CONFIG_CODES.policiesCustomInvalid,
+    message: i.message,
+  }));
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -55,7 +68,11 @@ async function findIssues(ctx: Context, loaded: Loaded): Promise<Findings> {
   });
 
   return {
-    errors: [...report.errors, ...validateAdapterOptions(loaded.config)].map(loaded.locate),
+    errors: [
+      ...report.errors,
+      ...validateAdapterOptions(loaded.config),
+      ...(await customPolicyIssues(loaded.config, loaded.source.dir)),
+    ].map(loaded.locate),
     warnings: report.warnings.map((w: ConfigWarning) => ({
       ...loaded.locate(w),
       consequence: w.consequence,
@@ -80,7 +97,7 @@ export const validate = defineCommand({
   name: "validate",
   summary: "Check the team config for errors and warnings.",
   description:
-    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written, but the options of adapters this build ships are checked against that adapter's schema. Network grants (`network`, per person or under `roles`) are checked for origin-only URLs, unique names, a port or wireless pairing for each device, and tokens that do not reuse a secret an integration reads; whether a token secret exists is checked by `ost doctor`. The installed adapters check the identities they own (a Slack member id, a GitHub login or App bot login) and warn about malformed ones.",
+    "Loads the team file, checks it against the schema and cross-field rules, and lists every problem with its file, line and column. Warnings describe what will not work as written. Roles are checked against the stock catalog plus the team's ejected catalog (catalog.path); adapter names are not checked yet and are accepted as written, but the options of adapters this build ships are checked against that adapter's schema. Network grants (`network`, per person or under `roles`) are checked for origin-only URLs, unique names, a port or wireless pairing for each device, and tokens that do not reuse a secret an integration reads; whether a token secret exists is checked by `ost doctor`. The installed adapters check the identities they own (a Slack member id, a GitHub login or App bot login) and warn about malformed ones. Custom policies (`policies.custom`) are loaded as the office loads them and checked against the `@outstaff/policy` schema.",
   options: [],
   examples: ["ost validate", "ost validate --team ../acme-team", "ost validate --json"],
   exitCodes: [

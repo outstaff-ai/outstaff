@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { cpSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Absolute path of the synthetic acme team file shipped in the repository. */
@@ -15,6 +16,13 @@ export const STOCK_CATALOG_DIR = fileURLToPath(
 export const EXAMPLE_CATALOG_DIR = fileURLToPath(new URL("./example-catalog", import.meta.url));
 
 export const readAcmeTeam = (): string => readFileSync(ACME_TEAM_FILE, "utf8");
+
+/** The acme team's custom policies, which its team file loads from `./policies`. */
+export const ACME_POLICIES_DIR = join(ACME_TEAM_FILE, "..", "policies");
+
+/** Copies the acme team's custom policies next to a copy of its team file, so `ost validate` can load them. */
+export const copyAcmePolicies = (outstaffDir: string): void =>
+  cpSync(ACME_POLICIES_DIR, join(outstaffDir, "policies"), { recursive: true });
 
 const acme = readAcmeTeam();
 

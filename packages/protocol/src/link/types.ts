@@ -1,11 +1,6 @@
 import type { z } from "zod";
-import type {
-  itemSchema,
-  itemSummarySchema,
-  personSchema,
-  scheduledBySchema,
-  traceSchema,
-} from "./entities.js";
+import type { itemSchema, itemSummarySchema, personSchema, scheduledBySchema } from "./entities.js";
+import type { traceSchema } from "./trace.js";
 import type { healthCheckSchema, healthSchema } from "./health.js";
 import type {
   LINK_ERROR_CODES,

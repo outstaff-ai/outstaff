@@ -2,7 +2,7 @@ import { createStaticWorkflowState } from "@outstaff/core";
 import { coalesceWakes } from "#/pipeline/coalesce.js";
 import type { PendingWake } from "#/pipeline/coalesce.types.js";
 import { evaluatePipeline } from "#/pipeline/evaluate.js";
-import type { PipelineEvent } from "#/pipeline/events.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import type { PipelineState } from "#/pipeline/state.types.js";
 import { decisionLines } from "./decision-lines.js";
 import { derivedEvents } from "./merge.js";
@@ -44,7 +44,7 @@ export function runReplay(scenarios: readonly ReplayScenario[], setup: ReplaySet
     ]),
   }));
 
-  const coalesced = coalesceWakes(wakes, setup.coalesceMs).map((c) => ({
+  const coalesced = coalesceWakes(wakes).map((c) => ({
     person: c.person,
     subject: `${c.subject.type} ${c.subject.ref}`,
     kind: c.kind,

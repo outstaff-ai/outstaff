@@ -1,4 +1,5 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
+import type { ConfiguredPolicy } from "@outstaff/policy";
 import type { QueuedAct } from "@outstaff/protocol";
 import type { Clock } from "#/types.js";
 import type { Scheduler } from "#/scheduler/index.js";
@@ -18,6 +19,9 @@ export interface OfficePipelineOptions {
   push(person: string, act: QueuedAct): boolean;
   clock: Clock;
   logger: Logger;
+
+  /** The team's custom policies, loaded; they run after the built-in ones. */
+  policies?: readonly ConfiguredPolicy[] | undefined;
 }
 
 /**

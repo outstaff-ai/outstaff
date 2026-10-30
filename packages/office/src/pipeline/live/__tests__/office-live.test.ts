@@ -181,7 +181,11 @@ describe("the office with the event pipeline live", () => {
     const history = (await tracker.events()).events.filter((e) => e.key === issue.key);
     const toReview = history.filter((e) => e.type === "moved" && e.data["to"] === "review");
     expect(toReview.map((e) => e.actor.id)).toEqual([sam.id]);
-    expect((await tracker.listComments(issue.key)).map((c) => c.author.id)).toEqual([sam.id]);
+    await until(async () => (await tracker.listComments(issue.key)).length > 0);
+    expect((await tracker.listComments(issue.key)).map((c) => [c.author.id, c.body])).toEqual([
+      [sam.id, "Moved to review and assigned to the requester: I handed the work back as done."],
+    ]);
+
     expect(history.some((e) => e.actor.id === OFFICE_ACCOUNT.id)).toBe(false);
 
     // The office read the ticket again from the answer: its state has the move before the tracker's feed says so.

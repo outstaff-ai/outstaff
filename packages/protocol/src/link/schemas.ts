@@ -1,16 +1,11 @@
 import { z } from "zod";
-import {
-  itemSchema,
-  itemSubjectSchema,
-  itemSummarySchema,
-  personSchema,
-  traceSchema,
-} from "./entities.js";
+import { itemSchema, itemSubjectSchema, itemSummarySchema, personSchema } from "./entities.js";
+import { traceSchema } from "./trace.js";
 import { time } from "./fields.js";
 import { healthSchema } from "./health.js";
 
 /** Version of the office link; the office sends it as the `Outstaff-Link-Version` header. */
-export const LINK_VERSION = 1;
+export const LINK_VERSION = 2;
 
 export const LINK_ERROR_CODES = [
   "unknown_method",

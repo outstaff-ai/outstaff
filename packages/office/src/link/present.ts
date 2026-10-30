@@ -39,11 +39,13 @@ function urlsOf(trace: Trace, links: SubjectLinks): LinkTrace["urls"] {
  * schema rejects, so a client could read no page with such a trace on it.
  */
 export function present(trace: Trace, links: SubjectLinks): LinkTrace {
-  const { policies, decisions, results } = trace;
+  const { policies, aggregation, decisions, results } = trace;
   return {
     event: { ...trace.event, source: sourceOf(trace.event.id) },
     urls: urlsOf(trace, links),
     policies,
+    // A trace recorded before the aggregation layer has none.
+    aggregation: aggregation ?? [],
     decisions,
     results,
   } as LinkTrace;

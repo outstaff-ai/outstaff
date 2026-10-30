@@ -22,6 +22,7 @@ export function trace(
       data: {},
     },
     policies: [],
+    aggregation: [],
     decisions: [
       ...(o.wake
         ? [
@@ -33,6 +34,7 @@ export function trace(
               instruction: "Do it.",
               feedback: [],
               subject: { type: "ticket" as const, ref: "ACME-1" },
+              coalesceMs: 60_000,
             },
           ]
         : []),

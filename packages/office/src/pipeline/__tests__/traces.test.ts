@@ -9,6 +9,7 @@ import { event } from "./support.js";
 const trace = (id: string, at: string): Trace => ({
   event: event("ticket.assigned", { id, at, subject: { ticket: "ACME-1" } }),
   policies: [],
+  aggregation: [],
   decisions: [{ type: "drop", reason: "no policy matched" }],
 });
 
@@ -108,7 +109,7 @@ describe("the in-memory trace store", () => {
     await traces.record(t);
     t.decisions.length = 0;
     const got = (await traces.get("a"))!;
-    got.policies.push({ policy: "x", matched: false, reason: "", decisions: [] });
+    got.policies.push({ policy: "x", matched: false, reason: "", proposals: [] });
     expect(await traces.get("a")).toEqual(trace("a", "2026-10-05T09:00:00.000Z"));
   });
 });

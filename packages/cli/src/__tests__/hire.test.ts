@@ -10,7 +10,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { ACME_TEAM_FILE } from "@outstaff/testing.core";
+import { ACME_TEAM_FILE, copyAcmePolicies } from "@outstaff/testing.core";
 import type { Context } from "#/types.js";
 import { run } from "#/program.js";
 import { addPerson, removePerson } from "#/teamfile.js";
@@ -25,6 +25,7 @@ function project(team = original, ignored = [".env", "secrets/"]) {
   const dir = join(root, `p${n++}`);
   mkdirSync(join(dir, ".outstaff"), { recursive: true });
   writeFileSync(join(dir, ".outstaff", "team.yaml"), team);
+  copyAcmePolicies(join(dir, ".outstaff"));
   writeFileSync(join(dir, ".gitignore"), `${ignored.join("\n")}\n`);
   execFileSync("git", ["init", "-q"], { cwd: dir });
   return dir;

@@ -5,7 +5,14 @@ import type { PendingWake } from "#/pipeline/coalesce.types.js";
 const wake = (
   eventId: string,
   at: string,
-  o: { person?: string; ref?: string; instruction?: string; policy?: string; kind?: string } = {},
+  o: {
+    person?: string;
+    ref?: string;
+    instruction?: string;
+    policy?: string;
+    kind?: string;
+    coalesceMs?: number;
+  } = {},
 ): PendingWake => ({
   eventId,
   at: `2026-10-05T09:${at}.000Z`,
@@ -17,19 +24,17 @@ const wake = (
     instruction: o.instruction ?? "Address the feedback.",
     feedback: [{ actor: "ada-admin", kind: "comment", body: eventId }],
     subject: { type: "pr", ref: o.ref ?? "acme-example/shop#60" },
+    coalesceMs: o.coalesceMs ?? 60_000,
   },
 });
 
 describe("coalesceWakes", () => {
   it("folds wakes for one person and subject within the window into one run, oldest first", () => {
-    const runs = coalesceWakes(
-      [
-        wake("c", "00:45", { instruction: "Also this." }),
-        wake("a", "00:00"),
-        wake("b", "00:20", { policy: "other_policy", kind: "merge" }),
-      ],
-      60_000,
-    );
+    const runs = coalesceWakes([
+      wake("c", "00:45", { instruction: "Also this." }),
+      wake("a", "00:00"),
+      wake("b", "00:20", { policy: "other_policy", kind: "merge" }),
+    ]);
 
     expect(runs).toEqual([
       {
@@ -46,23 +51,33 @@ describe("coalesceWakes", () => {
   });
 
   it("keeps other people, other subjects and wakes after the window apart", () => {
-    const runs = coalesceWakes(
-      [
-        wake("a", "00:00"),
-        wake("b", "00:10", { person: "noor" }),
-        wake("c", "00:20", { ref: "acme-example/shop#61" }),
-        wake("d", "01:00"),
-        wake("e", "01:30"),
-      ],
-      60_000,
-    );
+    const runs = coalesceWakes([
+      wake("a", "00:00"),
+      wake("b", "00:10", { person: "noor" }),
+      wake("c", "00:20", { ref: "acme-example/shop#61" }),
+      wake("d", "01:00"),
+      wake("e", "01:30"),
+    ]);
 
     expect(runs.map((r) => r.events)).toEqual([["a"], ["b"], ["c"], ["d", "e"]]);
   });
 
-  it("folds nothing with a window of 0", () => {
-    expect(coalesceWakes([wake("a", "00:00"), wake("b", "00:00")], 0).map((r) => r.events)).toEqual(
-      [["a"], ["b"]],
-    );
+  it("folds nothing into or from a wake with no window, as a chat message's", () => {
+    const now = (id: string) => wake(id, "00:00", { coalesceMs: 0 });
+    expect(coalesceWakes([now("a"), now("b")]).map((r) => r.events)).toEqual([["a"], ["b"]]);
+    expect(coalesceWakes([wake("a", "00:00"), now("b")]).map((r) => r.events)).toEqual([
+      ["a"],
+      ["b"],
+    ]);
+  });
+
+  it("closes the window the first wake opened, whatever the later ones' windows", () => {
+    const runs = coalesceWakes([
+      wake("a", "00:00", { coalesceMs: 10_000 }),
+      wake("b", "00:05"),
+      wake("c", "00:30"),
+    ]);
+
+    expect(runs.map((r) => r.events)).toEqual([["a", "b"], ["c"]]);
   });
 });

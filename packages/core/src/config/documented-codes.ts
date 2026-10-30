@@ -76,6 +76,8 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
     "A person's vcs identity is not a GitHub App bot login (<slug>[bot]), so the agent's own activity is not recognized.",
   "identities.tracker_empty": "A tracker identity is blank.",
   "policies.merge_unknown_repo": "policies.merge.repos names a repo that is not listed in repos.",
+  "policies.custom_invalid":
+    "A policies.custom entry cannot be loaded, exports no policy, or is not a policy by the @outstaff/policy schema.",
   "policies.capability_missing":
     "A policies switch is on, but the configured adapter lacks the capability it needs.",
 };

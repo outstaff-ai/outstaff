@@ -43,6 +43,7 @@
     "@outstaff/integration.knowledge.itsaplan": "workspace:*",
     "@outstaff/integration.tracker.itsaplan": "workspace:*",
     "@outstaff/integration.vcs.github": "workspace:*",
+    "@outstaff/policy": "workspace:*",
     "@outstaff/protocol": "workspace:*",
     "kysely": "0.29.7",
     "pg": "8.23.1",

@@ -33,6 +33,7 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `people.unknown_role` | A person's role is not in the catalog. |
 | `people.write_without_vcs` | A person has a write grant but no vcs integration supports pull requests. |
 | `policies.command_program` | A policies.commands entry names git, which repository grants govern. |
+| `policies.custom_invalid` | A policies.custom entry cannot be loaded, exports no policy, or is not a policy by the @outstaff/policy schema. |
 | `policies.merge_unknown_repo` | policies.merge.repos names a repo that is not listed in repos. |
 | `policies.retry_backoff_order` | base_minutes is higher than cap_minutes. |
 | `policies.usage_shared_mixed_runtime` | A policies.usage.shared group has people on different runtimes; a group shares one credential, so one runtime. |

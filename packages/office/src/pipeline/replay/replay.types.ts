@@ -1,7 +1,8 @@
 import type { MergeRequirements, StaticWorkflowData } from "@outstaff/core";
-import type { PipelineEvent } from "#/pipeline/events.types.js";
-import type { Policy } from "#/pipeline/policy.types.js";
-import type { PipelineOptions, ReadyTicket } from "#/pipeline/state.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
+import type { ConfiguredPolicy } from "@outstaff/policy";
+import type { ReadyTicket } from "@outstaff/policy";
+import type { PipelineOptions } from "#/pipeline/state.types.js";
 
 /** The world after an event: the office's static state plus the agents' ready tickets. */
 export interface ReplayWorld extends StaticWorkflowData {
@@ -32,9 +33,10 @@ export interface ReplayScenario {
 
 /** What the pipeline runs with. */
 export interface ReplaySetup {
-  policies: readonly Policy[];
+  policies: readonly ConfiguredPolicy[];
+
+  /** The team's options, `coalesceMs` among them: how long wakes wait for related ones. */
   pipelineOptions: PipelineOptions;
-  coalesceMs: number;
 }
 
 export interface ReplayRow {

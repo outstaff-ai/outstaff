@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveSpec } from "#/pipeline/people.js";
+import { resolveSpec } from "#/people.js";
 import { ctxOf, event, OPTS, pr, prRef } from "./support.js";
 
 describe("resolveSpec", () => {

@@ -1,25 +1,25 @@
+import type { ConfiguredPolicy } from "@outstaff/policy";
 import { describe, expect, it } from "vitest";
 import { evaluatePipeline } from "#/pipeline/evaluate.js";
-import type { Policy } from "#/pipeline/policy.types.js";
 import { event, OPTS, stateOf } from "./support.js";
 
-const wakeAssignee: Policy = {
+const wakeAssignee: ConfiguredPolicy = {
   id: "wake_assignee",
   summary: "test",
   on: ["ticket.assigned"],
   when: { assignee_kind: "agent" },
-  decide: { wake: { person: "assignee", kind: "assigned" } },
   instruction: "Do {{ticket}}.",
+  decide: (_e, ctx) => ctx.wake({ person: "assignee", kind: "assigned" }),
 };
 
-const always: Policy = {
+const always: ConfiguredPolicy = {
   id: "always",
   summary: "test",
   on: ["ticket.assigned"],
-  decide: { drop: { reason: "seen" } },
+  decide: () => [{ type: "drop", reason: "seen" }],
 };
 
-const off: Policy = { ...always, id: "off", enabled: false };
+const off: ConfiguredPolicy = { ...always, id: "off", enabled: false };
 const world = {
   tickets: {
     "ACME-1": { status: "ready" as const, assignee: { id: "sam", kind: "agent" as const } },
@@ -27,7 +27,7 @@ const world = {
 };
 
 describe("evaluatePipeline", () => {
-  it("evaluates every policy in order and collects the decisions of those that match", () => {
+  it("hands the event to every policy, records what each proposed, and aggregates the proposals into the decisions", () => {
     const e = event("ticket.assigned", { subject: { ticket: "ACME-1" } });
     const trace = evaluatePipeline(e, stateOf(world), [off, wakeAssignee, always], OPTS);
     expect(trace.event).toBe(e);
@@ -37,7 +37,34 @@ describe("evaluatePipeline", () => {
       ["always", true, "no condition"],
     ]);
 
-    expect(trace.decisions.map((d) => d.type)).toEqual(["wake", "drop"]);
+    expect(trace.policies[1]!.proposals).toEqual([
+      {
+        type: "wake",
+        person: "sam",
+        kind: "assigned",
+        instruction: "Do ACME-1.",
+        reason: "assignee is agent, wanted agent",
+      },
+    ]);
+
+    expect(trace.aggregation).toEqual([
+      { policy: "wake_assignee", proposal: 0, outcome: "kept", decision: 0 },
+      { policy: "always", proposal: 0, outcome: "kept", decision: 1 },
+    ]);
+
+    expect(trace.decisions).toEqual([
+      {
+        type: "wake",
+        policy: "wake_assignee",
+        person: "sam",
+        kind: "assigned",
+        instruction: "Do ACME-1.",
+        feedback: [],
+        subject: { type: "ticket", ref: "ACME-1" },
+        coalesceMs: 60_000,
+      },
+      { type: "drop", policy: "always", reason: "seen" },
+    ]);
   });
 
   it("records the failing condition of a policy that listens but does not match", () => {
@@ -49,7 +76,7 @@ describe("evaluatePipeline", () => {
         matched: false,
         reason: "assignee is none, wanted agent",
         failed: { assignee_kind: "agent" },
-        decisions: [],
+        proposals: [],
       },
     ]);
 
@@ -66,6 +93,7 @@ describe("evaluatePipeline", () => {
     expect(evaluatePipeline(untrusted, stateOf(), [always], OPTS)).toEqual({
       event: untrusted,
       policies: [],
+      aggregation: [],
       decisions: [
         {
           type: "drop",
@@ -80,6 +108,31 @@ describe("evaluatePipeline", () => {
         type: "drop",
         reason: "an inline comment of a review still pending: the submitted review brings it",
       },
+    ]);
+  });
+
+  it("contains a policy that throws: the others still decide, and the trace says so", () => {
+    const throws: ConfiguredPolicy = {
+      ...always,
+      id: "throws",
+      decide: () => {
+        throw new Error("boom");
+      },
+    };
+
+    const e = event("ticket.assigned", { subject: { ticket: "ACME-1" } });
+    const trace = evaluatePipeline(e, stateOf(world), [throws, wakeAssignee], OPTS);
+    expect(trace.policies[0]!.proposals).toEqual([{ type: "error", reason: "threw: boom" }]);
+    expect(trace.aggregation[0]).toEqual({
+      policy: "throws",
+      proposal: 0,
+      outcome: "error",
+      reason: "threw: boom",
+    });
+
+    expect(trace.decisions.map((d) => d.type)).toEqual(["wake"]);
+    expect(evaluatePipeline(e, stateOf(world), [throws], OPTS).decisions).toEqual([
+      { type: "drop", reason: "no policy proposed anything" },
     ]);
   });
 });

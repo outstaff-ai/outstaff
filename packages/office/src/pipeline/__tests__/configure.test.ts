@@ -1,7 +1,8 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
+import type { ConfiguredPolicy } from "@outstaff/policy";
 import { describe, expect, it } from "vitest";
 import { configurePipeline } from "#/pipeline/configure.js";
-import { DEFAULT_POLICIES } from "#/pipeline/defaults.js";
+import { BUILT_IN_POLICIES } from "#/pipeline/policies/index.js";
 
 function team(extra: Record<string, unknown> = {}): TeamConfig {
   const r = parseTeamConfig({
@@ -32,7 +33,7 @@ const byId = <T extends { id: string }>(policies: T[], id: string): T =>
 describe("configurePipeline", () => {
   it("keeps the defaults in order, all on", () => {
     const { policies, options, issues } = configurePipeline(team());
-    expect(policies.map((p) => p.id)).toEqual(DEFAULT_POLICIES.map((p) => p.id));
+    expect(policies.map((p) => p.id)).toEqual(BUILT_IN_POLICIES.map((p) => p.id));
     expect(policies.every((p) => p.enabled)).toBe(true);
     expect(options).toMatchObject({
       people: ["sam"],
@@ -72,7 +73,7 @@ describe("configurePipeline", () => {
       instruction: "Answer {{actor.id}} on #{{pr.number}}.",
       when: {
         all: [
-          DEFAULT_POLICIES.find((p) => p.id === "review_to_author")!.when,
+          BUILT_IN_POLICIES.find((p) => p.id === "review_to_author")!.when,
           { not: { has_label: "$needs_human" } },
         ],
       },
@@ -100,10 +101,42 @@ describe("configurePipeline", () => {
     ]);
 
     expect(byId(policies, "review_to_author").instruction).toBe(
-      DEFAULT_POLICIES.find((p) => p.id === "review_to_author")!.instruction,
+      BUILT_IN_POLICIES.find((p) => p.id === "review_to_author")!.instruction,
     );
 
     // An act's instruction is the note the office posts with its changes.
     expect(byId(policies, "merged_closes_ticket").instruction).toBe("Closed for {{person}}.");
+  });
+
+  it("runs the custom policies after the built-in ones, with the team's changes, and skips one whose id is taken", () => {
+    const custom = (id: string): ConfiguredPolicy => ({
+      id,
+      summary: "custom",
+      on: ["ticket.assigned"],
+      decide: () => [],
+      settings: { until: "2026-12-01" },
+    });
+
+    const { policies, issues } = configurePipeline(
+      team({ pipeline: { policies: { release_freeze: { enabled: false } } } }),
+      [custom("release_freeze"), custom("chat_to_addressed"), custom("release_freeze")],
+    );
+
+    expect(policies.map((p) => p.id)).toEqual([
+      ...BUILT_IN_POLICIES.map((p) => p.id),
+      "release_freeze",
+    ]);
+
+    expect(policies.at(-1)).toMatchObject({ enabled: false, settings: { until: "2026-12-01" } });
+    expect(issues).toEqual([
+      "policies.custom: the id chat_to_addressed is taken by another policy; this one is not loaded",
+      "policies.custom: the id release_freeze is taken by another policy; this one is not loaded",
+    ]);
+  });
+
+  it("takes the wake window from pipeline.wake.coalesce_seconds", () => {
+    expect(configurePipeline(team()).options.coalesceMs).toBeUndefined();
+    const set = configurePipeline(team({ pipeline: { wake: { coalesce_seconds: 5 } } }));
+    expect(set.options.coalesceMs).toBe(5000);
   });
 });

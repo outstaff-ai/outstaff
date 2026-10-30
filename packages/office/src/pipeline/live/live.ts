@@ -12,7 +12,7 @@ import { enqueueWake } from "./wake.js";
  */
 export function createLivePipeline(opts: LiveOptions): PipelineRunner {
   const { traces, clock, logger, executor, workState: state } = opts;
-  const { policies, options, issues } = configurePipeline(opts.team);
+  const { policies, options, issues } = configurePipeline(opts.team, opts.policies);
   for (const issue of issues) {
     logger.warn(`pipeline: ${issue}`);
   }
@@ -35,7 +35,6 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
 
         if (d.type === "wake") {
           const { itemId, folded } = await enqueueWake(d, event, opts);
-          // The same decision object sits in its policy's trace too, so both show the item.
           d.itemId = itemId;
           if (folded) {
             d.folded = folded;

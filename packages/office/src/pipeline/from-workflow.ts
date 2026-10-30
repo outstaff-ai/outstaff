@@ -1,6 +1,6 @@
 import type { WorkflowEvent } from "@outstaff/core";
-import { PIPELINE_EVENT_TYPES } from "./events.js";
-import type { PipelineEvent, PipelineEventType } from "./events.types.js";
+import { PIPELINE_EVENT_TYPES } from "@outstaff/policy";
+import type { PipelineEvent, PipelineEventType } from "@outstaff/policy";
 
 const TYPES: ReadonlySet<string> = new Set(PIPELINE_EVENT_TYPES);
 

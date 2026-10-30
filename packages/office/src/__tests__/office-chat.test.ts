@@ -168,9 +168,8 @@ describe("Sam DMs Kofi about a ticket", { timeout: 30_000 }, () => {
     const text = `can you look at ${issue.key}?`;
     expect(await h.kofi.chatMessage(dm("1700.1", text))).toEqual({ repeated: false });
 
-    // The run is held for the coalescing window, then offered.
+    // A chat message waits for no window: it is offered at once.
     await until(async () => (await h.store.listItems({ person: "kofi" })).length > 0);
-    await pass(h, 60_000);
     return { issue, text, offer: await next(h.kofi) };
   }
 
@@ -220,36 +219,48 @@ describe("Sam DMs Kofi about a ticket", { timeout: 30_000 }, () => {
   });
 });
 
-describe("wakes coalesce", { timeout: 30_000 }, () => {
+describe("wakes coalesce, except chat", { timeout: 30_000 }, () => {
   const h = harness();
 
-  it("runs three messages Sam sends Kofi within 20 seconds as one chat session", async () => {
-    const texts = ["the checkout is broken", "it drops the coupon", "on reload only"];
-    for (const [i, text] of texts.entries()) {
-      await h.kofi.chatMessage(dm(`1700.${i + 1}`, text));
-      await until(async () => (await traces(h.store)).length === i + 1);
-      await pass(h, 10_000);
+  it("offers a chat message at once: a chat wake waits for no window", async () => {
+    await h.kofi.chatMessage(dm("1700.1", "the checkout is broken"));
+    await until(async () => (await h.store.listItems({ person: "kofi" })).length === 1);
+    const [item] = await h.store.listItems({ person: "kofi" });
+    expect(item).toMatchObject({ kind: "chat", notBefore: null });
+
+    // No time passes: the message is offered as soon as it is queued.
+    const offer = await next(h.kofi);
+    expect(offer.workItem.id).toBe(item!.id);
+    expect(offer.context.feedback?.map((f) => f.body)).toEqual(["the checkout is broken"]);
+    const [trace] = await traces(h.store);
+    expect(trace!.decisions).toMatchObject([{ type: "wake", kind: "chat", coalesceMs: 0 }]);
+  });
+
+  it("runs two messages Sam sends in a row, before the session starts, as one chat session", async () => {
+    // Kofi's two chat sessions are taken, so the next one waits in the queue.
+    for (const channel of ["D-ONE", "D-TWO"]) {
+      await h.kofi.chatMessage({ ...dm(`1600.${channel}`, "hi"), channel });
+      await next(h.kofi);
     }
 
-    const items = await h.store.listItems({ person: "kofi" });
-    expect(items).toMatchObject([
-      { kind: "chat", status: "queued", notBefore: expect.any(String) },
-    ]);
+    const texts = ["the checkout is broken", "it drops the coupon"];
+    for (const [i, text] of texts.entries()) {
+      await h.kofi.chatMessage(dm(`1700.${i + 1}`, text));
+      await until(async () => (await traces(h.store)).length === i + 3);
+    }
 
-    expect((await readFeedback(h.store, items[0]!.id)).map((f) => f.body)).toEqual(texts);
+    const queued = (await h.store.listItems({ person: "kofi" })).filter(
+      (i) => i.status === "queued",
+    );
 
-    // Nothing is offered until the window of the first message closes.
-    await pass(h, 30_000);
-    const offer = await next(h.kofi);
-    expect(offer.workItem.id).toBe(items[0]!.id);
-    expect(offer.context.feedback?.map((f) => f.body)).toEqual(texts);
-
-    const last = (await traces(h.store)).find((t) => t.event.id === `chat:kofi:${DM}:1700.3`)!;
+    expect(queued).toMatchObject([{ kind: "chat", notBefore: null }]);
+    expect((await readFeedback(h.store, queued[0]!.id)).map((f) => f.body)).toEqual(texts);
+    const last = (await traces(h.store)).find((t) => t.event.id === `chat:kofi:${DM}:1700.2`)!;
     expect(last.decisions).toMatchObject([
       {
         type: "wake",
-        itemId: items[0]!.id,
-        folded: [1, 2, 3].map((n) => `chat:kofi:${DM}:1700.${n}`),
+        itemId: queued[0]!.id,
+        folded: [1, 2].map((n) => `chat:kofi:${DM}:1700.${n}`),
       },
     ]);
   });

@@ -2,6 +2,7 @@ import type { IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
   decodeLinkMessage,
+  LINK_VERSION,
   encodeLinkMessage,
   type LinkMessage,
   type LinkRequest,
@@ -58,7 +59,7 @@ export class FakeService {
     link.ws.send(encodeLinkMessage(m));
   }
 
-  welcome(version = 1, link = this.last) {
+  welcome(version = LINK_VERSION, link = this.last) {
     this.send({ type: "welcome", payload: { version, office: { id: "acme" } } }, link);
   }
 

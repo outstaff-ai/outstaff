@@ -12,6 +12,33 @@ import {
 } from "./policies-work-schema.js";
 import { d } from "./schema-meta.js";
 
+const settings = z
+  .record(z.string(), z.unknown())
+  .optional()
+  .meta(d("Values the policy reads as `ctx.settings`; what it accepts is up to the policy."));
+
+/** One custom policy: a module of the team's repository, or an npm package. */
+const customPolicySchema = z
+  .union([
+    z.strictObject({
+      module: z
+        .string()
+        .min(1)
+        .meta(
+          d("Path of the module, relative to this file, for example ./policies/release-freeze.ts."),
+        ),
+      settings,
+    }),
+    z.strictObject({
+      package: z
+        .string()
+        .min(1)
+        .meta(d("Name of an installed npm package, for example @acme/outstaff-policy-oncall.")),
+      settings,
+    }),
+  ])
+  .meta(d("A custom policy to load: `module` or `package`, and its settings."));
+
 /** `humans`, `human:<id>`, `role:<role>` or an agent or login handle. */
 const APPROVER = /^(humans|human:\S+|role:[a-z][a-z0-9-]*|[A-Za-z0-9][A-Za-z0-9._[\]-]*)$/;
 
@@ -165,5 +192,13 @@ export const policiesSchema = z
       .default({ parallel_sessions: 2, profile: true })
       .meta(d("How agents take chat messages, and what they show in chat.")),
     commands: teamCommandsSchema.optional(),
+    custom: z
+      .array(customPolicySchema)
+      .optional()
+      .meta(
+        d(
+          "Event pipeline policies of the team's own, which run after the built-in ones: each a module of the team's repository or an npm package that exports `policy` (or a `policies` list). They run in the office process, as trusted as this repository. `ost validate` and the office load and check each one.",
+        ),
+      ),
   })
   .meta(d("Team-wide guardrails, message style and switches for what outstaff does on its own."));

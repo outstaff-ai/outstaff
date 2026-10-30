@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { decodeLinkMessage, encodeLinkMessage } from "#/link/codec.js";
 import { renderLinkReference } from "#/link/docs.js";
 import { LINK_MESSAGE_META, LINK_METHOD_META } from "#/link/meta.js";
-import { linkMessageSchema, requestSchema } from "#/link/schemas.js";
+import { LINK_VERSION, linkMessageSchema, requestSchema } from "#/link/schemas.js";
 import type { LinkMessage } from "#/link/types.js";
 
 const TRACE = {
@@ -24,14 +24,42 @@ const TRACE = {
     pr: "https://github.com/acme-example/shop/pull/9",
   },
   policies: [
-    { policy: "review_to_author", matched: false, reason: "listens to pr.comment", decisions: [] },
+    { policy: "review_to_author", matched: false, reason: "listens to pr.comment", proposals: [] },
     {
       policy: "hand_back_blocked",
       matched: false,
       reason: "hand-back status done in [blocked]",
       failed: { hand_back_status: ["blocked"] },
-      decisions: [],
+      proposals: [],
     },
+    {
+      policy: "hand_back_done",
+      matched: true,
+      reason: "all conditions hold",
+      proposals: [
+        {
+          type: "act",
+          as: "sam",
+          ops: [{ op: "move", ticket: "ACME-1", to: "review" }],
+          note: "Moved to review: I handed the work back as done.",
+          reason: "all conditions hold",
+        },
+        { type: "suppress", person: "sam", kind: "merge", reason: "already merging" },
+        { type: "drop", reason: "nothing else" },
+        { type: "error", reason: "threw: boom" },
+      ],
+    },
+  ],
+  aggregation: [
+    { policy: "hand_back_done", proposal: 0, outcome: "kept", decision: 1 },
+    {
+      policy: "hand_back_done",
+      proposal: 1,
+      outcome: "kept",
+      reason: "no wake of sam to suppress",
+    },
+    { policy: "hand_back_done", proposal: 2, outcome: "kept", decision: 2 },
+    { policy: "hand_back_done", proposal: 3, outcome: "error", reason: "threw: boom" },
   ],
   decisions: [
     {
@@ -42,14 +70,16 @@ const TRACE = {
       instruction: "Merge it.",
       feedback: [{ actor: "ada-admin", kind: "comment", body: "ok" }],
       subject: { type: "pr", ref: "acme-example/shop#9" },
+      coalesceMs: 60_000,
       itemId: "item-1",
+      folded: ["vcs:c-1", "workstate:handed_back:w1:r1"],
     },
     {
       type: "act",
       policy: "hand_back_done",
       as: "sam",
       ops: [{ op: "move", ticket: "ACME-1", to: "review" }],
-      note: "Moved to review for sam.",
+      note: "Moved to review: I handed the work back as done.",
     },
     { type: "drop", reason: "no policy matched" },
   ],
@@ -98,7 +128,7 @@ const ITEM = {
 describe("the office link messages", () => {
   it("round-trip through the codec: requests, responses and notifications", () => {
     const messages = [
-      { type: "welcome", payload: { version: 1, office: { id: "acme", name: "Acme" } } },
+      { type: "welcome", payload: { version: LINK_VERSION, office: { id: "acme", name: "Acme" } } },
       {
         type: "hello",
         payload: { office: { team: "acme", version: "1.2.3" } },

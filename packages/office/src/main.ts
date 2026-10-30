@@ -7,6 +7,7 @@ import { githubVcs } from "@outstaff/integration.vcs.github";
 import { itsaplanKnowledge } from "@outstaff/integration.knowledge.itsaplan";
 import { itsaplanTracker } from "@outstaff/integration.tracker.itsaplan";
 import { slackChat } from "@outstaff/integration.chat.slack";
+import { loadCustomPolicies } from "@outstaff/policy";
 import {
   AdapterRegistry,
   envSecretSource,
@@ -146,6 +147,35 @@ async function openStoreOf(env: Env) {
   return openStore(url);
 }
 
+/** The test-only poll interval from the environment, said out loud when it is set. */
+function pollingOf(env: Env, log: Logger): ReturnType<typeof pollInterval> {
+  const polling = pollInterval(env);
+  if (polling.pollIntervalMs !== undefined) {
+    log.warn(
+      "OUTSTAFF_POLL_INTERVAL_MS overrides office.poll_interval_seconds; it is meant for tests",
+      { pollIntervalMs: polling.pollIntervalMs },
+    );
+  }
+
+  return polling;
+}
+
+/** The team config and its custom policies; the office does not start with either broken (`ost validate` names the same). */
+async function loadTeam(env: Env) {
+  const loaded = await loadTeamConfig({ env });
+  if (!loaded.ok) {
+    throw new Error(`team.yaml is not valid:\n${loaded.issues.map(formatIssue).join("\n")}`);
+  }
+
+  const custom = await loadCustomPolicies(loaded.config.policies?.custom ?? [], loaded.source.dir);
+  if (custom.issues.length > 0) {
+    const lines = custom.issues.map((i) => `policies.custom[${i.index}]: ${i.message}`);
+    throw new Error(`a custom policy cannot be loaded:\n${lines.join("\n")}`);
+  }
+
+  return { loaded, custom };
+}
+
 /**
  * Environment in, running office out.
  *
@@ -160,20 +190,8 @@ export async function startOffice(
   deps: StartDeps = {},
 ): Promise<RunningOffice> {
   const log = deps.logger ?? jsonLogger(undefined, logLevel(env));
-  const polling = pollInterval(env);
-  if (polling.pollIntervalMs !== undefined) {
-    log.warn(
-      "OUTSTAFF_POLL_INTERVAL_MS overrides office.poll_interval_seconds; it is meant for tests",
-      {
-        pollIntervalMs: polling.pollIntervalMs,
-      },
-    );
-  }
-
-  const loaded = await loadTeamConfig({ env });
-  if (!loaded.ok) {
-    throw new Error(`team.yaml is not valid:\n${loaded.issues.map(formatIssue).join("\n")}`);
-  }
+  const polling = pollingOf(env, log);
+  const { loaded, custom } = await loadTeam(env);
 
   const store = await openStoreOf(env);
   const office: Office = await orUndo(
@@ -186,6 +204,7 @@ export async function startOffice(
         clock: systemClock,
         logger: log,
         catalog: loadRoles(loaded.config, loaded.source.dir, log, deps.stockCatalogDir),
+        policies: custom.policies,
         options: {
           agentPort: port(env, "OUTSTAFF_AGENT_PORT", 8080),
           webhookPort: port(env, "OUTSTAFF_WEBHOOK_PORT", 8082),
