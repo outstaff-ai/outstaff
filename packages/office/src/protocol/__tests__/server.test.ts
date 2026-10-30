@@ -8,7 +8,7 @@ import { createProtocolServer } from "#/protocol/server.js";
 import { ProtocolError } from "#/protocol/errors.js";
 import type { ChatDesk, Messaging } from "#/protocol/source.types.js";
 import { createFakeSource, fakeTeam, type FakeSource } from "@outstaff/testing.office";
-import type { ProtocolServer } from "#/protocol/types.js";
+import type { ProtocolServer, ProtocolServerOptions } from "#/protocol/types.js";
 
 class Agent {
   readonly inbox: Message[] = [];
@@ -196,6 +196,66 @@ describe("protocol server", () => {
       const b = await connect();
       await b.hello("ada", tokens.ada);
       expect((await b.next("welcome")).payload).not.toHaveProperty("reports");
+    });
+  });
+
+  describe("acts", () => {
+    const act = {
+      id: "e:p",
+      ops: [{ op: "move" as const, ticket: "ACME-1", to: "review" as const }],
+    };
+
+    const withActs = async (acts?: ProtocolServerOptions["acts"]) => {
+      await server.stop();
+      server = createProtocolServer({
+        source,
+        team: fakeTeam(),
+        auth: createAgentAuth(tokens),
+        clock,
+        port: 0,
+        host: "127.0.0.1",
+        heartbeatMs: 1000,
+        ...(acts ? { acts } : {}),
+      });
+
+      await server.start();
+    };
+
+    it("hands the unanswered ones over in the welcome, sends new ones at once, and takes the answers", async () => {
+      const answers: unknown[] = [];
+      await withActs({
+        deliver: async (person) => (person === "ada" ? [act] : []),
+        result: async (person, r) => void answers.push([person, r]),
+      });
+
+      expect(server.act("ada", act)).toBe(false);
+      const a = await connect();
+      await a.hello("ada", tokens.ada);
+      expect((await a.next("welcome")).payload).toMatchObject({ acts: [act] });
+
+      expect(server.act("ada", { ...act, id: "f:p" })).toBe(true);
+      expect((await a.next("act")).payload).toEqual({ ...act, id: "f:p" });
+      a.send("act_result", { id: "e:p", ok: true, results: ["moved ACME-1 to review"] });
+      await a.next("ack");
+      expect(answers).toEqual([
+        ["ada", { id: "e:p", ok: true, results: ["moved ACME-1 to review"] }],
+      ]);
+    });
+
+    it("welcomes the agent without acts when there are none or they cannot be read, and refuses answers without a desk", async () => {
+      await withActs({
+        deliver: () => Promise.reject(new Error("store down")),
+        result: async () => {},
+      });
+
+      const a = await connect();
+      await a.hello("ada", tokens.ada);
+      expect((await a.next("welcome")).payload).not.toHaveProperty("acts");
+
+      await withActs();
+      const b = await login();
+      b.send("act_result", { id: "e:p", ok: true, results: [] });
+      expect((await b.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
   });
 

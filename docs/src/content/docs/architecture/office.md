@@ -18,8 +18,8 @@ code host, tracker, docs --> intake --> work state --+    chat.message (passed o
                    +---------------------------------+------------------------------+
                    v                                 v                              v
                  wake                               act                           drop
-       the scheduler queues a work      the office changes the tracker        the reason is on
-       item (coalesced)                 for the agent, with a note            the trace
+       the scheduler queues a work      the agent's process changes the       the reason is on
+       item (coalesced)                 tracker as itself, no model run       the trace
                    |
                    v
        the agent connection offers the item with its journal and wake context
@@ -269,7 +269,7 @@ Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`)
 
 **Answering.** Only the target of a question can answer it, once. The answer is stored, written to the journal of the asker's original item, and the item is resumed: a waiting item goes back to the queue and continues its session with the answer in its journal, a finished item gets a follow-up item that takes over its session, and a queued or blocked item keeps its place and sees the answer on its next run. If the asker is still running when the answer comes, the answer is stored as not yet delivered; when the asker hands back as waiting (or done), the office queues the item again (or starts the follow-up) with the answers in its journal and marks them delivered, so an answer cannot be missed by a race. The protocol server calls `messaging.onHandBack` after every hand-back for this.
 
-**Mirroring.** Every question and answer is mirrored to humans. If the chat adapter exists and `office.channel` is set, the office posts to that channel. Otherwise it comments on the ticket of the asker's item when it has one. The asker's journal always records where the text went, so nothing is invisible. A failing channel or tracker falls through to the next option and never fails the question.
+**Mirroring.** Every question and answer is mirrored to humans. If the chat adapter exists and `office.channel` is set, the office posts to that channel. Otherwise the asker's agent comments on the ticket of the asker's item, when it has one, as itself: the office sends it a comment [act](#acts), which an offline agent makes when it connects. The asker's journal always records where the text went, so nothing is invisible. A failing channel, or an act that cannot be queued, falls through to the next option and never fails the question.
 
 **Roster.** `ost team` (`ost roster`) shows the people with role title, busy or idle (or paused), what they work on, and the trusted humans. Titles and summaries come from the catalog when the office has it; otherwise the role id is shown.
 
@@ -316,8 +316,14 @@ The pipeline (`packages/office/src/pipeline`, [decision 0016](/decisions/0016-ev
 **What it does.**
 
 - A **wake** queues a work item for the person through the scheduler, with the trigger of the event's actor (an idle pull is `automation`), the event's feedback, its references, and the instruction as the item's first journal line, written by `office`. Wakes for the same person and subject [coalesce](#coalescing). A chat wake queues a chat session with the thread's origin.
-- An **act** is made by the office with its own tracker and knowledge ports, for the agent it names: the changes, then the policy's note as a comment on the ticket, saying whom they were for. Each act is made once per event and policy; its result goes on the trace, so a redelivered event does not repeat it. Making each act with the agent's own tracker account instead is planned ([decision 0018](/decisions/0018-pipeline-only/)).
+- An **act** is made by the agent it names, as itself ([decision 0019](/decisions/0019-agents-make-their-acts/)): the changes, then the policy's note, if any, as a comment on the ticket. See [Acts](#acts). Each act is handed over once per event and policy, so a redelivered event does not repeat it.
 - Errors propagate, so intake delivers the event again; the trace, the queue and the acts are idempotent per event.
+
+### Acts
+
+The office sends an act to the agent it is for as an `act` message, `{id, ops}`, with the id `<event id>:<policy>`. The agent's process (`ost-agent`, not a model run) makes the changes in order with its own tracker and knowledge ports, stops at the first that fails, and answers `act_result` with one line per change made and the error. Acts are kept per person in the store until the agent answers: one for an agent that is not connected waits, and the `welcome` of its next connection carries every act it has not answered. The agent answers an id it already made without making it again, so a lost answer costs nothing; an agent that crashes between the changes and its answer makes them again.
+
+On the answer the office reads the tickets the act moved, assigned or re-parented again (`refreshTicket`), so the next decision sees the change before the tracker's feed reports it. The trace of the event records each act: `queued`, `delivered` once it was sent, then `done` or `failed` with the agent's lines, the error, and when each step happened.
 
 **Outside the decisions.** After a hand-back the office does its own bookkeeping, which decides nothing and changes nothing outside the office: feedback that reached an item after its offer gets one follow-up round in the same threads (`policies.feedback.follow_up_round`), and the person's earlier blocked items on a ticket the finished work settled are closed. Everything else on the ticket is the woken agent's: it assigns the ticket to itself and moves it to active when it starts.
 
@@ -326,7 +332,7 @@ The pipeline (`packages/office/src/pipeline`, [decision 0016](/decisions/0016-ev
 The office acts under its own name on every system it uses, named `<team>-outstaff-office`:
 
 - **Code host:** a read-only GitHub App (`GH_OFFICE_APP_*`). All reads go through it, and agents hold it too to clone read-granted repositories.
-- **Tracker:** its own member account (`ITSAPLAN_API_KEY` in the office scope), so its comments and assignments are visibly the office's. Live, the pipeline's acts are made with it too, each with a note naming the agent it was for. This is the office's only write scope: ticket status, assignment, labels, parent links and those notes.
+- **Tracker:** its own member account (`ITSAPLAN_API_KEY` in the office scope), for reading only: tickets, members and the activity feed. The office writes nothing to the tracker or the knowledge base; the pipeline's acts and the mirror of questions on a ticket are made by agents, as themselves.
 - **Chat:** none, unless the team sets `office.channel`. The office posts to no person; the only thing it ever writes to chat is the mirror of agent-to-agent questions and answers in that team channel, through its own Slack app (`SLACK_OFFICE_BOT_TOKEN`), which has no app-level token because the office never listens to chat. Without `office.channel` the office has no chat port and needs no chat app; with it, `createOffice` creates the port in office scope and stops at startup with an error naming `SLACK_OFFICE_BOT_TOKEN` when the token is missing.
 
 **Why per-team apps.** Outstaff hosts no shared keys. A shared app would hold every team's installation behind one credential, and revoking or auditing one team would touch all. With one app per team, the team owns the credential, its permissions and its audit trail, and can remove it at will.

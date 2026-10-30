@@ -8,6 +8,7 @@ import {
   type Message,
   type MessageType,
   type PayloadOf,
+  type QueuedAct,
 } from "@outstaff/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import { CLOSE_AUTH } from "./constants.js";
@@ -109,6 +110,16 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       .catch((err: unknown) => {
         log.warn("could not send the queued reports of an agent", { person, error: String(err) });
       });
+  }
+
+  function sendAct(person: string, act: QueuedAct): boolean {
+    const c = conns.get(person);
+    if (!c || c.ws.readyState !== c.ws.OPEN) {
+      return false;
+    }
+
+    send(c, "act", act);
+    return true;
   }
 
   const connected = (person: string) => {
@@ -254,5 +265,6 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     connected: () => [...conns.keys()],
     notify: (person) => deliver(person),
     reports: (person) => pushReports(person),
+    act: sendAct,
   };
 }

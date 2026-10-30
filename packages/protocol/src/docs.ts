@@ -72,6 +72,7 @@ export function renderProtocolReference(): string {
     "4. While working the agent sends `heartbeat` at least every `heartbeatMs`, `progress` and `journal` as it goes, and finally `handback` or `fail`. The office then offers the next item.",
     "5. A person has one connection. A new connection with valid credentials replaces the old one, which closes with code 4409.",
     "6. After a disconnect the agent reconnects with backoff and sends `hello` again. `welcome.resume` lists accepted items still unfinished, and unaccepted offers are delivered again.",
+    "7. At any time, also during a run, the office may send `act`: tracker and knowledge-base changes the event pipeline decided for the person. The agent's process makes them with the person's own credentials, without a model run, and answers `act_result`. An act it has not answered comes again in the next `welcome.acts`, so an offline agent makes it when it connects.",
     "",
     "Delivery is at least once and idempotent by work item id: an offer may arrive twice, and `accept`, `handback` and the other item messages may be repeated safely.",
     "",

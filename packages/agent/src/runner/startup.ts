@@ -1,6 +1,7 @@
 import { effectiveTools } from "@outstaff/core";
 import type { StartupOptions, PreparedAgent } from "./startup.types.js";
 import { createAgentEnv } from "#/verbs/env.js";
+import { createActMaker } from "./acts.js";
 import { buildIdentityPrompt } from "./identity.js";
 import { agentLayout } from "./layout.js";
 import { loadCatalogs, loadToolsets } from "./catalogs.js";
@@ -38,6 +39,10 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     office: connection,
     log,
   });
+
+  // Acts the office decided for this person are made here, as the person, without a model run.
+  const acts = createActMaker({ env, office: connection, log });
+  connection.onActs((list) => void acts.make(list));
 
   const layout = agentLayout(opts.home, opts.env["OUTSTAFF_SECRETS_DIR"] ?? DEFAULT_SECRETS_DIR);
 

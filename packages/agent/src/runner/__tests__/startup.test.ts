@@ -75,7 +75,8 @@ policies:`,
 function setup(extra: Record<string, string> = {}, team = TEAM) {
   const dir = mkdtempSync(join(tmpdir(), "ost-agent-"));
   const home = join(dir, "home");
-  const connection = officeWithTeam(team, extra["OUTSTAFF_PERSON"] ?? "sam").connect();
+  const office = officeWithTeam(team, extra["OUTSTAFF_PERSON"] ?? "sam");
+  const connection = office.connect();
 
   const options = {
     env: {
@@ -97,10 +98,27 @@ function setup(extra: Record<string, string> = {}, team = TEAM) {
     },
   };
 
-  return { dir, home, options };
+  return { dir, home, options, office };
 }
 
 describe("prepareAgent", () => {
+  it("makes the acts the office sends with the person's own tracker, without a model run, and answers them", async () => {
+    const { options, office } = setup();
+    await prepareAgent(options);
+    const socket = office.sockets.at(-1)!;
+    const ops = [{ op: "move", ticket: "ACME-404", to: "review" }];
+    socket.receive({ id: "o5", type: "act", payload: { id: "e:p", ops } });
+
+    await vi.waitFor(() =>
+      expect(socket.sentOf("act_result")[0]?.payload).toEqual({
+        id: "e:p",
+        ok: false,
+        results: [],
+        error: expect.stringContaining("move ACME-404"),
+      }),
+    );
+  });
+
   it("renders the workdir through the runtime's layout and builds the policy and identity", async () => {
     const { home, options } = setup();
     const agent = await prepareAgent(options);

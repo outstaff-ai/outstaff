@@ -1,4 +1,5 @@
 import {
+  createActMaker,
   createOfficeConnection,
   findVerb,
   runVerb,
@@ -9,6 +10,7 @@ import {
   AdapterRegistry,
   envSecretSource,
   parseTeamConfig,
+  silentLogger,
   type PortName,
   type RepoRef,
   type TeamConfig,
@@ -81,6 +83,15 @@ describe("createOffice", () => {
       clock,
     });
 
+    // The agent's process makes its acts with its own tracker account: sam is member u-2.
+    const own = tracker.as({ id: person === "sam" ? "u-2" : person, name: person, kind: "agent" });
+    const acts = createActMaker({
+      env: { team: team(), tracker: own },
+      office: c,
+      log: silentLogger,
+    });
+
+    c.onActs((list) => void acts.make(list));
     c.start();
     conns.push(c);
     return c;
@@ -175,8 +186,14 @@ describe("createOffice", () => {
       status: "done",
     });
 
-    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
+    // Sam's own process made the changes, as sam.
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review"),
+    );
+
     expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1");
+    const moved = (await tracker.events()).events.filter((e) => e.type === "moved");
+    expect(moved.map((e) => e.actor.id)).toEqual(["u-2"]);
     expect(chat.posts).toEqual([]);
 
     // A retried hand-back is harmless.
@@ -198,7 +215,10 @@ describe("createOffice", () => {
     const first = await next(sam);
     await sam.accept(first.workItem.id, { runtime: "claude", model: "sonnet" });
     await sam.handBack(first.workItem.id, { summary: "Built it.", status: "done" });
-    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1"),
+    );
+
     // The office has read the ticket in review, assigned to the requester.
     await office.parts.intake.pollOnce();
 
@@ -218,8 +238,11 @@ describe("createOffice", () => {
     await self.transition(issue.key, "active");
     await sam.handBack(round.workItem.id, { summary: "Answered.", status: "done" });
 
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1"),
+    );
+
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
-    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1");
   });
 
   it("has an idle agent start the ready tickets it assigned to itself: on connect, then after the hand-back", async () => {

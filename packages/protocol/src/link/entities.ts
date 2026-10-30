@@ -102,12 +102,14 @@ const decisionSchema = z.discriminatedUnion("type", [
     policy: z.string(),
     as: z
       .string()
-      .describe("The agent the changes are made for; the office makes them with its own account."),
+      .describe(
+        "The agent who makes the changes, through its own process and with its own account.",
+      ),
     ops: z.array(actOpSchema),
     note: z
       .string()
       .optional()
-      .describe("The comment the office posts with the changes, naming the agent."),
+      .describe("A comment the agent posts on the ticket after the changes."),
   }),
   z.strictObject({ type: z.literal("drop"), policy: z.string().optional(), reason: z.string() }),
 ]);
@@ -168,13 +170,25 @@ export const traceSchema = z.strictObject({
     .record(
       z.string(),
       z.strictObject({
-        ok: z.boolean(),
-        results: z.array(z.string()),
-        error: z.string().optional(),
+        status: z
+          .enum(["queued", "delivered", "done", "failed"])
+          .describe(
+            "`queued` until the agent is sent the act (it waits while the agent is offline), `delivered` once it is, then `done` or `failed` from the agent's answer.",
+          ),
+        queuedAt: time,
+        deliveredAt: time.optional().describe("When the act was last sent to the agent."),
+        finishedAt: time.optional().describe("When the agent's answer came."),
+        results: z.array(z.string()).describe("One line per change the agent made, in order."),
+        error: z
+          .string()
+          .optional()
+          .describe("The change that failed and why; the changes after it were not tried."),
       }),
     )
     .optional()
-    .describe("What each executed act did, by act id (`<event id>:<policy>`)."),
+    .describe(
+      "Each act's progress, by act id (`<event id>:<policy>`): the agent it is for makes the changes, so an act for an offline agent waits until it connects.",
+    ),
 });
 
 /** One work item in full: what it is, its runs, and the end of its journal. */

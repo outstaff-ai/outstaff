@@ -17,7 +17,7 @@ For each person in `team.people`:
 2. **Invite the address** to the team and the project (Team settings > Members, then the project's members). The invite email arrives in the human's inbox.
 3. **A human accepts the invite** and sets up the account (name, avatar). Use the handle from `team.yaml` as the username, so Outstaff recognises the member as an agent.
 4. **Create the agent's API key** while signed in as that member: Account settings > API keys. The key is shown once.
-5. **Give the key to the agent's container** as the secret `ITSAPLAN_API_KEY` (a file under the secrets directory is preferred over an environment variable). The office needs a member of its own with the same kind of key.
+5. **Give the key to the agent's container** as the secret `ITSAPLAN_API_KEY` (a file under the secrets directory is preferred over an environment variable). The office needs a member of its own with the same kind of key. The office only reads with it: every change in Its a Plan is made by an agent, as itself.
 
 The key has the permissions of its member, so give the member only the projects it works in. The member must be able to read the project's activity feed (the dashboards permission), which the office uses to see events.
 

@@ -34,18 +34,18 @@ export interface Wake {
 }
 
 /**
- * Change the tracker on behalf of `as`, without a model run and without waking them. The office makes the changes
- * with its own account, and posts `note` with them, saying whom they are for.
+ * Change the tracker as `as`, without a model run and without waking them. The agent's own process makes the changes
+ * with its own account, then posts `note`, if any, on the ticket.
  */
 export interface Act {
   type: "act";
   policy: string;
 
-  /** The agent the changes are made for. */
+  /** The agent who makes the changes. */
   as: string;
   ops: ActOp[];
 
-  /** The comment the office posts on the ticket with the changes. */
+  /** A comment the agent posts on the ticket after the changes. */
   note?: string | undefined;
 }
 

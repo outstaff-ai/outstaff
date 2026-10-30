@@ -59,7 +59,7 @@ async function make() {
     store,
     workState: { ...createStaticWorkflowState({}), readyTickets: () => [] } as never,
     scheduler: { enqueue: () => Promise.reject(new Error("not in this test")) },
-    ports: {},
+    push: () => false,
     clock: manualClock(),
     logger: silentLogger,
   });

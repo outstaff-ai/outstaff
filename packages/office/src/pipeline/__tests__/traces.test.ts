@@ -44,7 +44,13 @@ describe.each(kinds)("traces %s", (_name, make) => {
     const traces = await make();
     const done = {
       ...trace("e", "2026-10-05T09:00:00.000Z"),
-      results: { "e:p": { ok: true, results: ["moved"] } },
+      results: {
+        "e:p": {
+          status: "done" as const,
+          queuedAt: "2026-10-05T09:00:00.000Z",
+          results: ["moved"],
+        },
+      },
     };
 
     await traces.record(done);

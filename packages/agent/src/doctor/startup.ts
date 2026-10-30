@@ -1,14 +1,19 @@
 import { silentLogger, type DoctorCheck, type Logger } from "@outstaff/core";
 import type { PreparedAgent } from "#/runner/startup.types.js";
+import { actsCheck } from "./acts.js";
 import { diskCheck } from "./disk.js";
 import { networkChecks } from "./network.js";
 import { toolStatusChecks } from "./tools.js";
 import type { DoctorReporter, StartupChecksInput } from "./types.js";
 
-/** What only the agent's own container can tell: its tools installed, its services and devices answer, its disk. */
+/**
+ * What only the agent's own container can tell: its tools installed, its tracker port ready for acts, its services
+ * and devices answer, its disk.
+ */
 export async function startupChecks(input: StartupChecksInput): Promise<DoctorCheck[]> {
   return [
     ...toolStatusChecks(input.tools),
+    ...(input.ports ? actsCheck(input.team, input.ports) : []),
     ...(await networkChecks(input, input.team, input.person, true)),
     await diskCheck(input.home, input.volume),
   ];
@@ -36,14 +41,14 @@ export async function reportStartupChecks(
 
 /** A started agent's report: its checks, sent once it is connected. Never throws. */
 export function reportAgentChecks(
-  agent: Pick<PreparedAgent, "team" | "person" | "tools" | "connection">,
+  agent: Pick<PreparedAgent, "team" | "person" | "tools" | "connection" | "env">,
   env: NodeJS.ProcessEnv,
   home: string,
   log?: Logger,
 ): Promise<void> {
   const person = agent.team.people.find((p) => p.handle === agent.person)!;
   return reportStartupChecks(
-    { env, home, team: agent.team, person, tools: agent.tools },
+    { env, home, team: agent.team, person, tools: agent.tools, ports: agent.env },
     (checks) => agent.connection.doctorReport(checks),
     log,
   );

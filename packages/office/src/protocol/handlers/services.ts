@@ -12,7 +12,7 @@ function required<T>(service: T | undefined, refusal: string): T {
 
 const NO_QUESTIONS = "This office does not route questions.";
 
-/** The optional services: usage and doctor reports, questions between people, documents, and tickets with their pull requests. */
+/** The optional services: usage and doctor reports, questions between people, documents, act results, and tickets with their pull requests. */
 export const serviceHandlers: RequestHandlers = {
   async usage({ ctx, person, payload, reply }) {
     const usage = required(ctx.opts.usage, "This office does not take usage reports.");
@@ -42,6 +42,10 @@ export const serviceHandlers: RequestHandlers = {
   async doc_link({ ctx, person, payload, reply }) {
     const docs = required(ctx.opts.docs, "This office does not track documents.");
     await docs.link(person, payload.workItemId, payload.doc);
+    reply("ack", {});
+  },
+  async act_result({ ctx, person, payload, reply }) {
+    await required(ctx.opts.acts, "This office sends no acts.").result(person, payload);
     reply("ack", {});
   },
   async ticket_prs({ ctx, payload, reply }) {

@@ -40,3 +40,15 @@ export const actOpSchema = z.discriminatedUnion("op", [
     parent: ticket.describe("Key of the parent ticket."),
   }),
 ]);
+
+/** Tracker or knowledge-base changes for the agent to make as itself, without a model run. */
+export const queuedActSchema = z.strictObject({
+  id: z
+    .string()
+    .min(1)
+    .max(400)
+    .describe(
+      "Id of the act. The office sends it again until the agent answers with `act_result`, so the agent makes an id's changes once and only answers again.",
+    ),
+  ops: z.array(actOpSchema).min(1).max(20).describe("The changes, made in order."),
+});

@@ -105,6 +105,7 @@ export class FakeSocket implements ClientSocket {
       heartbeatMs?: number;
       resume?: string[];
       reports?: PayloadOf<"welcome">["reports"];
+      acts?: PayloadOf<"welcome">["acts"];
       team?: PayloadOf<"welcome">["team"];
     } = {},
   ) {
@@ -119,6 +120,7 @@ export class FakeSocket implements ClientSocket {
         resume: opts.resume ?? [],
         team: opts.team ?? {},
         ...(opts.reports ? { reports: opts.reports } : {}),
+        ...(opts.acts ? { acts: opts.acts } : {}),
       },
     });
   }

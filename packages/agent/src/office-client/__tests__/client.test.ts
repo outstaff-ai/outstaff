@@ -104,6 +104,36 @@ describe("office connection", () => {
     await done;
   });
 
+  it("hands the acts for the agent to the handler, also when they came before it was set, and answers them", async () => {
+    const act = (id: string) => ({
+      id,
+      ops: [{ op: "move" as const, ticket: "ACME-1", to: "review" as const }],
+    });
+
+    await connectUp({ acts: [act("e1:p")] });
+    const seen: unknown[] = [];
+    conn.onActs((a) => seen.push(a));
+    expect(seen).toEqual([[act("e1:p")]]);
+
+    // The office sends new ones while the connection is up, and a welcome without any brings none.
+    current().receive({ id: "o9", type: "act", payload: act("e2:p") });
+    current().terminate();
+    clock.advance(30_000);
+    current().open();
+    current().welcome();
+    expect(seen).toEqual([[act("e1:p")], [act("e2:p")]]);
+
+    const done = conn.actResult({ id: "e1:p", ok: true, results: ["moved ACME-1 to review"] });
+    const sent = current().sent.at(-1)!;
+    expect(sent).toMatchObject({
+      type: "act_result",
+      payload: { id: "e1:p", ok: true, results: ["moved ACME-1 to review"] },
+    });
+
+    current().reply(sent, "ack");
+    await done;
+  });
+
   it("keeps the team of the last welcome and reports a changed one after a reconnect", async () => {
     expect(conn.teamConfig()).toBeUndefined();
     await connectUp({ team: { team: { name: "acme" } } });

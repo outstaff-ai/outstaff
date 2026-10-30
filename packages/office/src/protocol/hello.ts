@@ -2,6 +2,23 @@ import { PROTOCOL_VERSION, type MessageOf } from "@outstaff/protocol";
 import { CLOSE_AUTH, CLOSE_REPLACED, CLOSE_VERSION } from "./constants.js";
 import type { Connection, HelloContext } from "./types.js";
 
+/**
+ * What the agent was offline for, handed to it in the `welcome`: the reports it posts and the acts it makes, as itself.
+ * Either list is empty when it cannot be read; the agent gets it on its next connection.
+ */
+async function queuedFor(ctx: HelloContext, person: string) {
+  const { opts, log } = ctx;
+  const none = (what: string) => (err: unknown) => {
+    log.warn(`could not collect the queued ${what} of an agent`, { person, error: String(err) });
+    return [];
+  };
+
+  return {
+    reports: (await opts.chat?.queued(person).catch(none("reports"))) ?? [],
+    acts: (await opts.acts?.deliver(person).catch(none("acts"))) ?? [],
+  };
+}
+
 /** Authenticates a new connection, replaces an older one of the same person and sends the `welcome`. */
 export async function handleHello(
   ctx: HelloContext,
@@ -44,12 +61,7 @@ export async function handleHello(
 
   armIdle(c, heartbeatMs * 3);
   const outstanding = await source.outstanding(person);
-  // Reports the agent was offline for are handed to it here, once; it posts them as itself.
-  const reports = await opts.chat?.queued(person).catch((err: unknown) => {
-    log.warn("could not collect the queued reports of an agent", { person, error: String(err) });
-    return [];
-  });
-
+  const { reports, acts } = await queuedFor(ctx, person);
   send(
     c,
     "welcome",
@@ -58,7 +70,8 @@ export async function handleHello(
       heartbeatMs,
       team: opts.team,
       resume: outstanding.filter((o) => o.accepted).map((o) => o.offer.workItem.id),
-      ...(reports?.length ? { reports } : {}),
+      ...(reports.length ? { reports } : {}),
+      ...(acts.length ? { acts } : {}),
     },
     m.id,
   );

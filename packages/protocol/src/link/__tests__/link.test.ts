@@ -54,7 +54,13 @@ const TRACE = {
     { type: "drop", reason: "no policy matched" },
   ],
   results: {
-    "workstate:handed_back:w1:r1:hand_back_done": { ok: true, results: ["moved ACME-1 to review"] },
+    "workstate:handed_back:w1:r1:hand_back_done": {
+      status: "done",
+      queuedAt: "2026-10-05T09:00:00.000Z",
+      deliveredAt: "2026-10-05T09:00:00.000Z",
+      finishedAt: "2026-10-05T09:00:02.000Z",
+      results: ["moved ACME-1 to review"],
+    },
   },
 };
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { queuedActSchema } from "#/acts.js";
 import { linkSchema, workItemSchema } from "#/schemas/common.js";
 import { offerContextSchema } from "#/schemas/feedback.js";
 import { itemId, message, text } from "#/schemas/fields.js";
@@ -33,6 +34,12 @@ export const sessionMessages = [
         .optional()
         .describe(
           "Reports to a requester that the agent did not post when its item ended, because it was offline. The agent posts each one now, as itself; the office does not send them again.",
+        ),
+      acts: z
+        .array(queuedActSchema)
+        .optional()
+        .describe(
+          "Acts the agent has not answered yet, for example because it was offline when the office decided them. The agent makes each one's changes now, as itself, and answers with `act_result`.",
         ),
     }),
   ),

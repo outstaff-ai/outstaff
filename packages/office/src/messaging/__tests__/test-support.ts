@@ -1,5 +1,5 @@
 import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
-import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
+import { createFakeChat } from "@outstaff/core/fakes";
 import { manualClock } from "#/clock.js";
 import { ProtocolError } from "#/protocol/errors.js";
 import type { Offer, WorkSource } from "#/protocol/source.types.js";
@@ -149,7 +149,6 @@ export async function harness(
 
   const scheduler = createScheduler({ store, team, clock });
   const chat = createFakeChat();
-  const tracker = createFakeTracker();
   const notified: string[] = [];
   const messaging = createMessaging({
     store,
@@ -177,5 +176,5 @@ export async function harness(
     return r.item;
   };
 
-  return { clock, store, team, scheduler, chat, tracker, messaging, notified, startItem };
+  return { clock, store, team, scheduler, chat, messaging, notified, startItem };
 }

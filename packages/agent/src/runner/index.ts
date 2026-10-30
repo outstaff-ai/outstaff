@@ -23,3 +23,5 @@ export { agentRegistry } from "./registry.js";
 export { installedRuntimes, selectRuntime } from "./runtime-select.js";
 export { createChatRelay } from "./chat.js";
 export type { ChatOffice, ChatRelay, ChatRelayOptions } from "./chat.types.js";
+export { createActMaker } from "./acts.js";
+export type { ActMaker, ActMakerOptions } from "./acts.types.js";

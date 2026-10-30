@@ -1,8 +1,15 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
-import type { ErrorCode, MessageType, PayloadOf } from "@outstaff/protocol";
+import type { ErrorCode, MessageType, PayloadOf, QueuedAct } from "@outstaff/protocol";
 import type { WebSocket } from "ws";
 import type { Clock } from "#/types.js";
-import type { ChatDesk, DocLinks, Messaging, TicketPrs, WorkSource } from "./source.types.js";
+import type {
+  AgentActs,
+  ChatDesk,
+  DocLinks,
+  Messaging,
+  TicketPrs,
+  WorkSource,
+} from "./source.types.js";
 
 export interface AgentAuth {
   /** True only when the person has a token and `token` matches it. Takes the same time either way. */
@@ -29,6 +36,9 @@ export interface ProtocolServerOptions {
 
   /** Takes `doc_link`. Without it the request is refused as unsupported. */
   docs?: DocLinks;
+
+  /** Hands agents their acts and takes `act_result`. Without it a result is refused as unsupported. */
+  acts?: AgentActs;
 
   /** Called once an agent's connection is authenticated, before its work is offered. */
   onConnected?: (person: string) => void;
@@ -64,6 +74,9 @@ export interface ProtocolServer {
 
   /** Sends the person's queued reports to its agent now, if it is connected; otherwise the next `welcome` carries them. */
   reports(person: string): void;
+
+  /** Sends an act to the person's agent now; false when it is not connected, and the next `welcome` carries it. */
+  act(person: string, act: QueuedAct): boolean;
 }
 
 /** One agent socket, authenticated once `person` is set. */

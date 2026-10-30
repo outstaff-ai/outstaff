@@ -1,4 +1,5 @@
 import {
+  createActMaker,
   createChatRelay,
   createOfficeConnection,
   createWorkLoop,
@@ -15,6 +16,7 @@ import {
   buildPolicy,
   envSecretSource,
   parseTeamConfig,
+  silentLogger,
   type PortName,
   type Runtime,
   type TeamConfig,
@@ -190,6 +192,8 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
 
     await relay.start();
     conn.onReports?.((reports) => void relay.postQueued(reports));
+    const acts = createActMaker({ env, office: conn, log: silentLogger });
+    conn.onActs((list) => void acts.make(list));
   });
 
   afterEach(async () => {

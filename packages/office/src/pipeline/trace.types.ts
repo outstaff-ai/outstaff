@@ -1,8 +1,25 @@
-import type { ActOutcome } from "@outstaff/core";
 import type { ContextManifest } from "./context/context.types.js";
 import type { Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { PipelineCondition } from "./policy.types.js";
+
+/** Where an act stands: the agent it is for makes its changes, so it waits while that agent is offline. */
+export interface ActRecord {
+  status: "queued" | "delivered" | "done" | "failed";
+  queuedAt: string;
+
+  /** When the act was last sent to the agent. */
+  deliveredAt?: string | undefined;
+
+  /** When the agent's answer came. */
+  finishedAt?: string | undefined;
+
+  /** One line per change the agent made, in order. */
+  results: string[];
+
+  /** The change that failed and why; the changes after it were not tried. */
+  error?: string | undefined;
+}
 
 /** How one policy judged one event. */
 export interface PolicyTrace {
@@ -23,8 +40,8 @@ export interface Trace {
   policies: PolicyTrace[];
   decisions: Decision[];
 
-  /** What each executed act did, by act id (`<event id>:<policy>`), once its result is in. */
-  results?: Record<string, ActOutcome> | undefined;
+  /** Each act's progress and, once the agent answered, what it did; by act id (`<event id>:<policy>`). */
+  results?: Record<string, ActRecord> | undefined;
 
   /** What the bundle of each wake the event started carried, by work item id, once the item was offered. */
   context?: Record<string, ContextManifest> | undefined;
