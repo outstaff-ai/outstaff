@@ -102,37 +102,32 @@ describe("golden output per acme person", () => {
     expect(git).toContain("If the repository says nothing on a point, use these defaults");
   });
 
-  it("leaves the ticket moves the office makes to the office, unless the preset moves nothing", () => {
+  it("leaves the ticket moves the office makes to the office, and starting a ticket to the agent", () => {
     for (const person of acme.people) {
       const text = dump(renderPerson({ team: acme, handle: person.handle, catalog: real }).files);
       expect(text).not.toMatch(
-        /move the item to `review`|move it here at hand-back|assign it to yourself|comes back to you as `?active/i,
+        /move the item to `review`|move it here at hand-back|comes back to you as `?active/i,
       );
     }
 
     const files = (team: TeamConfig) => renderPerson({ team, handle: "sam", catalog: real }).files;
 
-    const kanban = files(acme);
-    expect(kanban.get("process/hand-back.md")).toContain(
+    const sam = files(acme);
+    expect(sam.get("process/hand-back.md")).toContain(
       "The office moves the ticket from that status for you",
     );
 
-    expect(kanban.get("process/ticket-lifecycle.md")).toContain(
+    expect(sam.get("process/ticket-lifecycle.md")).toContain(
       "Do not make these moves or assignments yourself",
     );
 
-    expect(kanban.get("process/work-items.md")).toContain(
-      "the instruction it wrote in the journal",
-    );
+    expect(sam.get("process/work-items.md")).toContain("the instruction it wrote in the journal");
 
-    expect(kanban.get("process/work-items.md")).toContain(
-      "do not look up again what it already says",
-    );
+    expect(sam.get("process/work-items.md")).toContain("do not look up again what it already says");
 
-    const minimal = files({ ...acme, workflow: { ...acme.workflow, preset: "minimal" } });
-    expect(minimal.get("process/hand-back.md")).toContain("Move the ticket to match first");
-    expect(minimal.get("process/ticket-lifecycle.md")).toContain("workflow does not move tickets");
-    expect(minimal.get("process/hand-back.md")).not.toContain("The office moves the ticket");
+    expect(sam.get("process/ticket-lifecycle.md")).toContain(
+      "assign it to yourself if it went to someone else",
+    );
   });
 
   it("renders the conventions a team states for a repo into the git reference", () => {

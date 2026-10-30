@@ -30,7 +30,7 @@ const KOFI_LOGIN = "acme-kofi[bot]";
 const SAM_CHAT = "U-SAM";
 const DM = "D-SAM";
 
-function team(pipeline: "off" | "shadow" | "live"): TeamConfig {
+function team(): TeamConfig {
   const result = parseTeamConfig({
     version: 1,
     team: { name: "acme" },
@@ -55,7 +55,6 @@ function team(pipeline: "off" | "shadow" | "live"): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
-    office: { pipeline },
     // These scenarios are about what a wake carries; coalescing has its own.
     pipeline: { wake: { coalesce_seconds: 0 } },
   });
@@ -67,10 +66,10 @@ function team(pipeline: "off" | "shadow" | "live"): TeamConfig {
   return result.config;
 }
 
-describe.each(["off", "shadow", "live"] as const)(
-  "every wake carries the linked tickets, pull requests and chat (office.pipeline: %s)",
+describe(
+  "every wake carries the linked tickets, pull requests and chat",
   { timeout: 30_000 },
-  (mode) => {
+  () => {
     const clock = manualClock();
     let office: Office;
     let store: Store;
@@ -118,7 +117,7 @@ describe.each(["off", "shadow", "live"] as const)(
       await vcs.seed.permission(REPO, "sam", "write");
       store = await openStore("sqlite::memory:", { now: () => clock.now() });
       office = await createOffice({
-        team: team(mode),
+        team: team(),
         registry,
         secrets: envSecretSource({ OUTSTAFF_AGENT_TOKEN_KOFI: "kofi-token" }, "/nonexistent"),
         store,
@@ -252,14 +251,10 @@ describe.each(["off", "shadow", "live"] as const)(
       );
 
       const id = offer.workItem.id;
-      expect(carried).toEqual(
-        mode === "off"
-          ? []
-          : [
-              [id, "ticket", issue.key, issue.url],
-              [id, "chat_thread", `${DM}:1700.1`, undefined],
-            ],
-      );
+      expect(carried).toEqual([
+        [id, "ticket", issue.key, issue.url],
+        [id, "chat_thread", `${DM}:1700.1`, undefined],
+      ]);
     });
 
     it("hands a ticket comment the open PR's CI state, mergeability, unresolved threads and stack", async () => {

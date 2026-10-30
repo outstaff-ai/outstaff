@@ -1,6 +1,6 @@
 import { CAPABILITY_PORT } from "#/capabilities.js";
 import { POLICY_SWITCHES, policyOn, policyValue } from "#/policies/switches.js";
-import type { PolicySwitch } from "#/policies/switches.js";
+import type { PolicySwitch } from "#/policies/types.js";
 import type { AdapterInfo, ConfigWarning, TeamConfig } from "./types.js";
 import { LACKING } from "./lacking.js";
 import { adapterKey } from "./validate-capabilities.js";

@@ -1,15 +1,10 @@
 import type { TeamConfig } from "#/config/types.js";
 import type { CanonicalStatus, RepoRef } from "#/ports/types.js";
-import type { WORKFLOW_EVENT_TYPES } from "./constants.js";
-import type { WorkflowPreset } from "./presets.js";
-import type { HAND_BACK_STATUSES } from "./rules.js";
+import type { HAND_BACK_STATUSES, WORKFLOW_EVENT_TYPES } from "./constants.js";
 
 export type WorkflowEventType = (typeof WORKFLOW_EVENT_TYPES)[number];
 
-/**
- * Events the office takes in that the workflow rules do not listen to: chat messages, which only the office's event
- * pipeline judges.
- */
+/** Every event the office takes in: the workflow events and chat messages. */
 export type OfficeEventType = WorkflowEventType | "chat.message";
 
 export type ActorKind = "human" | "agent" | "automation";
@@ -104,7 +99,7 @@ export interface WorkflowState {
 
 /**
  * What a condition reads of an event: its subject, actor and data. The type is not read, so the office's event
- * pipeline can check conditions on event types the workflow rules do not know.
+ * pipeline can check conditions on event types of its own (`agent.idle`, the merge-derived events).
  */
 export interface ConditionEvent {
   type: string;
@@ -128,27 +123,7 @@ export interface ConditionCheck {
   detail: string;
 }
 
-export type EffectTarget = { kind: "agent" | "human"; id: string };
-export type Priority = "low" | "normal" | "high";
-
-export type Effect =
-  | { type: "move"; ticket: string; to: CanonicalStatus }
-  | { type: "assign"; ticket: string; to: EffectTarget | null }
-  | { type: "comment"; on: { ticket: string } | { pr: PrRef }; template: string; body: string }
-  | {
-      type: "schedule";
-      person: string;
-      kind: string;
-      priority: Priority;
-      ticket?: string;
-      pr?: PrRef;
-      doc?: string;
-    };
-
 export interface WorkflowOptions {
-  /** Extra templates by id; they override built-ins with the same id. */
-  templates?: Record<string, string>;
-
   /** Label meaning "leave this to a human". Default `needs-human`. */
   needsHumanLabel?: string;
 
@@ -190,22 +165,6 @@ export type Condition =
 
 export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
 
-export type Action =
-  | { move: CanonicalStatus }
-  | { assign: string }
-  | { comment: string | { template: string; on?: "ticket" | "pr" } }
-  | { schedule: { person: string; kind: string; priority: "low" | "normal" | "high" } };
-
-export type Rule = {
-  id: string;
-  on: WorkflowEventType | WorkflowEventType[];
-  if?: Condition | undefined;
-  do: Action[];
-  disabled?: boolean | undefined;
-};
-
-export type RuleInput = Rule | { id: string; disabled: true };
-
 export interface StaticTicket {
   status: CanonicalStatus;
   assignee?: { id: string; kind: "human" | "agent" };
@@ -238,31 +197,4 @@ export interface WorkflowStatusMap {
 
   /** Canonical status for a tracker name (case-insensitive), or undefined if unmapped. */
   toCanonical(name: string): CanonicalStatus | undefined;
-}
-
-export interface WorkflowConfigShape {
-  preset: WorkflowPreset;
-  statuses?: Partial<Record<string, string>> | undefined;
-  rules?: unknown[] | undefined;
-  templates?: Record<string, string> | undefined;
-}
-
-export interface RuleExplanation {
-  id: string;
-  matched: boolean;
-
-  /** Why the rule did or did not fire. */
-  reason: string;
-  effects: Effect[];
-
-  /** Actions that matched but produced nothing, with the reason. */
-  skipped: string[];
-}
-
-export interface WorkflowExplanation {
-  event: WorkflowEvent;
-  rules: RuleExplanation[];
-
-  /** Final ordered, deduplicated effects. */
-  effects: Effect[];
 }

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { comparisonSummarySchema } from "./comparison.js";
 import {
   itemSchema,
   itemSubjectSchema,
@@ -71,10 +70,6 @@ export const requestSchema = z.discriminatedUnion("method", [
           .min(1)
           .optional()
           .describe("Only events about this pull request: `owner/name#number`."),
-        differs: z
-          .literal(true)
-          .optional()
-          .describe("Only events where the engine and the pipeline differ (shadow mode)."),
       })
       .optional(),
   }),
@@ -94,16 +89,6 @@ export const requestSchema = z.discriminatedUnion("method", [
           .optional()
           .describe("Only items created before this time: the cursor for the next page."),
         limit,
-      })
-      .optional(),
-  }),
-  z.strictObject({
-    id: requestId,
-    method: z.literal("compare"),
-    params: z
-      .strictObject({
-        since: time.optional().describe("Only events from this time on."),
-        until: time.optional().describe("Only events before this time."),
       })
       .optional(),
   }),
@@ -167,7 +152,6 @@ const results = {
       .optional()
       .describe("Pass as `before` for the next page; absent when there are no more items."),
   }),
-  compare: comparisonSummarySchema,
   activity: z.strictObject({
     at: time.describe("The office's time of the count; each window ends here."),
     windows: z
@@ -197,7 +181,6 @@ export const responseSchema = z.union([
       results.people,
       results.events,
       results.event,
-      results.compare,
       results.activity,
       results.items,
       results.item,
@@ -233,7 +216,6 @@ export const linkMessageSchema = z.discriminatedUnion("type", [
         .strictObject({
           team: z.string().describe("The team's name from its team file."),
           version: z.string().describe("The office's version."),
-          pipelineMode: z.enum(["off", "shadow", "live"]).describe("`office.pipeline`."),
         })
         .describe("Which office this is."),
     }),

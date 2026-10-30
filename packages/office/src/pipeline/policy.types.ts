@@ -4,7 +4,7 @@ import type { PipelineEventType } from "./events.types.js";
 /**
  * A person a decision names. `author` (of the pull request), `assignee` (of the ticket), `mentioned` (the first agent
  * the comment names), `doc_author`, `last_worker` (the agent who last worked on the ticket), `role:<role>`, as the
- * workflow rules resolve them; plus `actor` (the agent who caused the event) and `addressed` (the agent a chat message
+ * conditions' evaluator resolves them; plus `actor` (the agent who caused the event) and `addressed` (the agent a chat message
  * was written to).
  */
 export type PersonRef =
@@ -23,7 +23,7 @@ export type PersonSpec = PersonRef | readonly PersonRef[];
 /** A condition only the pipeline knows: the event's actor is that person (for example the assignee themselves). */
 export type PipelineLeaf = { actor_is: "assignee" | "author" | "doc_author" | "last_worker" };
 
-/** A workflow rule condition, a pipeline leaf, or a combination of them. */
+/** A condition, a pipeline leaf, or a combination of them. */
 export type PipelineCondition =
   | Condition
   | PipelineLeaf

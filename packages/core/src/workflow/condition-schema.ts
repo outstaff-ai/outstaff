@@ -1,17 +1,13 @@
 import { z } from "zod";
 import { CANONICAL_STATUSES } from "#/ports/status.js";
 import type { CanonicalStatus } from "#/ports/types.js";
-import { WORKFLOW_EVENT_TYPES } from "./constants.js";
-import type { Action, Condition } from "./types.js";
+import { HAND_BACK_STATUSES } from "./constants.js";
+import type { Condition } from "./types.js";
 
 const d = (description: string) => ({ description });
 
 const status = z.enum(CANONICAL_STATUSES as readonly [CanonicalStatus, ...CanonicalStatus[]]);
-const SLUG = /^[a-z][a-z0-9_-]*$/;
-const ROLE = "role:[a-z][a-z0-9-]*";
 
-/** How an agent ended its turn on a work item: finished, waiting for an answer, or unable to continue. */
-export const HAND_BACK_STATUSES = ["done", "waiting", "blocked"] as const;
 export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
   z.union([
     z.strictObject({ all: z.array(conditionSchema).min(1) }).meta(d("Every condition must hold.")),
@@ -120,69 +116,3 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       ),
   ]),
 );
-
-const templateId = z.string().regex(SLUG, "Use lowercase letters, digits, dashes and underscores.");
-
-export const actionSchema: z.ZodType<Action> = z.union([
-  z.strictObject({ move: status }).meta(d("Move the ticket to a canonical status.")),
-  z
-    .strictObject({
-      assign: z
-        .string()
-        .regex(
-          new RegExp(`^(author|last_worker|requester|mentioned|none|human:\\S+|${ROLE})$`),
-          "Use author, last_worker, requester, mentioned, none, human:<id> or role:<role>.",
-        )
-        .meta(d("Assign the ticket.")),
-    })
-    .meta(d("Assign the ticket.")),
-  z
-    .strictObject({
-      comment: z.union([
-        templateId,
-        z.strictObject({ template: templateId, on: z.enum(["ticket", "pr"]).optional() }),
-      ]),
-    })
-    .meta(d("Post a rendered template as a comment (on the ticket by default).")),
-  z
-    .strictObject({
-      schedule: z.strictObject({
-        person: z
-          .string()
-          .regex(
-            new RegExp(
-              `^(author|assignee|last_worker|doc_author|mentioned|other_mentioned|${ROLE})$`,
-            ),
-            "Use author, assignee, last_worker, doc_author, mentioned, other_mentioned or role:<role>.",
-          ),
-        kind: z.string().regex(SLUG, "Use lowercase letters, digits, dashes and underscores."),
-        priority: z.enum(["low", "normal", "high"]).default("normal"),
-      }),
-    })
-    .meta(d("Schedule a work item for an agent.")),
-]) as z.ZodType<Action>;
-
-const eventType = z.enum(WORKFLOW_EVENT_TYPES);
-const ruleId = z
-  .string()
-  .regex(SLUG, "Use lowercase letters, digits, dashes and underscores.")
-  .max(64);
-
-export const ruleSchema = z
-  .strictObject({
-    id: ruleId.meta(d("Unique id. A rule with the same id as a preset rule replaces it.")),
-    on: z
-      .union([eventType, z.array(eventType).min(1)])
-      .meta(d("Event type or types that trigger the rule.")),
-    if: conditionSchema.optional().meta(d("Condition that must hold.")),
-    do: z.array(actionSchema).min(1).meta(d("Actions, run in order.")),
-    disabled: z.boolean().optional().meta(d("Set to true to remove the rule.")),
-  })
-  .meta(d("A workflow rule."));
-
-export const ruleDisableSchema = z
-  .strictObject({ id: ruleId, disabled: z.literal(true) })
-  .meta(d("Removes the preset rule with this id."));
-
-/** One entry of `workflow.rules` as written in team.yaml. */
-export const ruleInputSchema = z.union([ruleSchema, ruleDisableSchema]);

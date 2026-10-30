@@ -1,5 +1,4 @@
 import { subjectLabel } from "#/log.js";
-import { formatEngine } from "./compare/describe.js";
 import type { ActOp, Decision } from "./decisions.types.js";
 import type { PipelineEvent } from "./events.types.js";
 import type { ContextManifest, ManifestEntry } from "./context/context.types.js";
@@ -114,7 +113,6 @@ export function formatTrace(trace: Trace): string {
       : []),
     "Decisions:",
     ...decisionLines(trace.decisions),
-    ...(trace.engine ? ["", ...formatEngine(trace.engine, trace.comparison)] : []),
     ...contextLines(trace.context),
   ].join("\n");
 }

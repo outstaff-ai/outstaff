@@ -1,5 +1,6 @@
 import type { Capability } from "#/types.js";
-import { POLICY_SWITCHES, policyOn, type PolicyConfig } from "./switches.js";
+import { POLICY_SWITCHES, policyOn } from "./switches.js";
+import type { PolicyConfig } from "./types.js";
 
 /**
  * Whether the team leaves a capability on: it is off only when a policy switch named like the capability exists and

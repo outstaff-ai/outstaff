@@ -24,11 +24,8 @@ export interface WorkSourceOptions {
   /** Where a wake whose context could not be built is reported. */
   logger?: Pick<Logger, "warn">;
 
-  /** Called after the item left `active` because of a hand-back, so the workflow can react (move the ticket, notify). */
+  /** Called after the item left `active` because of a hand-back, so the office can react (judge it, report it). */
   onHandedBack?: (item: WorkItem, result: HandBackResult) => Promise<void>;
-
-  /** Called after an item started, before it is offered. */
-  onStarted?: (item: WorkItem) => Promise<void>;
 
   /** Called after the scheduler blocked an item on its own (repeated failures, loop guard), so the requester hears of it. */
   onBlocked?: (notice: BlockNotice) => void | Promise<void>;

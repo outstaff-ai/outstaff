@@ -35,7 +35,7 @@ A work item is one unit of work the office schedules for a person: a ticket, a n
 
 ## Office
 
-The office is the single container that runs a team. It takes in events by polling GitHub and the tracker or by receiving webhooks, keeps the work state, decides what to do about each event (with the workflow engine, or the proposed [event pipeline](/concepts/automation/) when it is live), schedules work for each person, routes questions between agents, and stores its state in Postgres or SQLite. Email is an office feature, not an adapter port.
+The office is the single container that runs a team. It takes in events by polling GitHub and the tracker or by receiving webhooks, keeps the work state, decides what to do about each event with its [event pipeline](/concepts/automation/), schedules work for each person, routes questions between agents, and stores its state in Postgres or SQLite. Email is an office feature, not an adapter port.
 
 ## Integration and adapter
 
@@ -43,4 +43,4 @@ An integration connects Outstaff to one external tool through a port: tracker, k
 
 ## Workflow
 
-The workflow decides what happens when something changes: which status a ticket moves to, who is woken up, which message is sent. It starts from a preset (`kanban`, `scrum` or `minimal`), maps canonical statuses to your tracker's names, and can add, replace or disable rules.
+The event pipeline decides what happens when something changes: who is woken up, with what instruction, and which routine ticket change is made for an agent. Its default policies can be turned off, narrowed or given another instruction under `pipeline.policies`; `workflow` maps the canonical statuses to your tracker's names. See [What outstaff does on its own](/concepts/automation/).

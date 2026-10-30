@@ -21,11 +21,10 @@
     },
     {
       "files": [
-        "packages/core/src/policies/switches.ts",
-        "packages/core/src/workflow/presets.ts",
-        "packages/core/src/workflow/resolve.ts",
-        "packages/office/src/chat/desk.ts",
-        "packages/office/src/engine/**"
+        "packages/office/src/chat/desk-attach.ts",
+        "packages/office/src/chat/desk-reports.ts",
+        "packages/office/src/chat/desk-resolve.ts",
+        "packages/office/src/work-feedback.ts"
       ],
       "rules": {
         "eslint/complexity": "off",

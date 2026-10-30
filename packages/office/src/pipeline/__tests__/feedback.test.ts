@@ -23,7 +23,7 @@ describe("feedbackFor", () => {
     ]);
   });
 
-  it("carries reviews and comments as the engine does, and nothing for other events", () => {
+  it("carries reviews and comments, and nothing for other events", () => {
     expect(
       feedbackFor(event("ticket.commented", { data: { body: "Please add a test." } })),
     ).toEqual([{ actor: "ada-admin", kind: "ticket_comment", body: "Please add a test." }]);

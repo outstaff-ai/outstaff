@@ -69,8 +69,6 @@ export type RenderOptions = { file?: string };
  *                  adapters fill them later. issue, pr and doc always exist.
  *   policies.messages.{max_lines,always_link,omit[]}
  *   policies.tickets.many_prs (true when policies.tickets.prs_per_ticket is many)
- *   policies.tickets.office_moves (true unless the workflow preset is minimal, which
- *                  never moves tickets; the office then makes the routine moves)
  *   policies.design.canvas (true unless policies.design.canvas is switched off)
  */
 export type RepoContext = {
@@ -120,7 +118,7 @@ export type CatalogContext = {
   links: Record<string, string>;
   policies: {
     messages: { max_lines: number; always_link: boolean; omit: string[] };
-    tickets: { many_prs: boolean; office_moves: boolean };
+    tickets: { many_prs: boolean };
     design: { canvas: boolean };
   };
 };

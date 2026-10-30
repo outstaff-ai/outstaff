@@ -1,5 +1,5 @@
 import type { Logger, TeamConfig, WorkflowEvent } from "@outstaff/core";
-import type { OfficePipeline } from "./pipeline/office-pipeline.types.js";
+import type { PipelineRunner } from "./pipeline/runner.types.js";
 import type { Scheduler } from "./scheduler/index.js";
 import type { Store } from "./store/types.js";
 import type { Clock } from "./types.js";
@@ -7,12 +7,12 @@ import type { WorkState } from "./workstate/index.js";
 
 export interface IdlePullOptions {
   team: Pick<TeamConfig, "people" | "policies">;
-  store: Pick<Store, "listItems" | "appendJournal">;
+  store: Pick<Store, "listItems">;
   workState: Pick<WorkState, "refreshWorkers" | "readyTickets" | "assignee" | "ticketStatus">;
 
-  /** The office's scheduler, so a pulled item gets its recipe and the agent hears of it. */
-  scheduler: Pick<Scheduler, "enqueue" | "isPausedFor">;
-  pipeline: Pick<OfficePipeline, "idle">;
+  /** The office's scheduler, which says whether the agent's automatic work is held. */
+  scheduler: Pick<Scheduler, "isPausedFor">;
+  pipeline: Pick<PipelineRunner, "judge">;
   clock: Clock;
   logger: Logger;
 }

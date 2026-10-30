@@ -1,5 +1,5 @@
 import { createEvaluationContext } from "@outstaff/core";
-import { awaitsReview } from "#/engine/feedback.js";
+import { awaitsReview } from "#/work-feedback.js";
 import { evaluateCondition } from "./conditions.js";
 import { decide } from "./decide.js";
 import type { Decision } from "./decisions.types.js";
@@ -8,7 +8,7 @@ import type { Policy } from "./policy.types.js";
 import type { PipelineOptions, PipelineState } from "./state.types.js";
 import type { PolicyTrace, Trace } from "./trace.types.js";
 
-/** Why an event is not judged at all, or undefined. Both are what the engine skips today. */
+/** Why an event is not judged at all, or undefined: it is recorded, and nothing is decided on it. */
 function gate(event: PipelineEvent): string | undefined {
   if (event.data["untrusted"] === true) {
     return "the event comes from someone who is not trusted: recorded, never acted on";

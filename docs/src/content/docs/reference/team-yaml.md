@@ -176,9 +176,8 @@ integrations:
     adapter: dicebear
     style: notionists
 
-# How work moves through the team.
+# How the tracker's statuses and labels map onto outstaff's.
 workflow:
-  preset: kanban
   statuses:
     backlog: Backlog
     ready: Ready
@@ -200,20 +199,10 @@ policies:
     canvas: true
   feedback:
     follow_up_round: true
-    merged_prs: true
-    doc_comments: true
-    ticket_comments: true
-    mentions: true
   hand_back:
-    reassign: requester
     fallback: first_human
   tickets:
     prs_per_ticket: one
-    start_moves_active: true
-  conflicts:
-    follow_up: true
-  retry:
-    on_signal: true
   messages:
     max_lines: 3
 ```
@@ -844,7 +833,7 @@ Address pattern for agents, for example "{handle}@acme.example".
 
 ## office
 
-Office settings: event intake, the pipeline and the doctor checks.
+Office settings: event intake and the doctor checks.
 
 - Type: `object`
 - Optional
@@ -884,14 +873,6 @@ Team chat channel where the office mirrors agent-to-agent questions and answers,
 - Type: `string`
 - Optional
 - Minimum length 1
-
-### office.pipeline
-
-Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.
-
-- Type: `string`
-- Optional
-- Allowed values: `off`, `shadow`, `live`
 
 ### office.doctor
 
@@ -1061,19 +1042,10 @@ Key of a secret in this person's secrets; sent as `Authorization: Bearer <value>
 
 ## workflow
 
-How work moves through the team.
+How the tracker's statuses and labels map onto outstaff's.
 
 - Type: `object`
 - Optional
-
-### workflow.preset
-
-Built-in workflow to start from.
-
-- Type: `string`
-- Optional
-- Default: `kanban`
-- Allowed values: `kanban`, `scrum`, `minimal`
 
 ### workflow.statuses
 
@@ -1082,304 +1054,6 @@ Maps canonical statuses to the status names used in your tracker.
 - Type: `map`
 - Optional
 - Allowed keys: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
-
-### workflow.rules
-
-Rules added to the preset. A rule with a preset rule's id replaces it; { id, disabled: true } removes it.
-
-- Type: `list of object`
-- Optional
-
-### workflow.rules[]
-
-- Type: `object`
-- Optional
-
-#### workflow.rules[].id
-
-Unique id. A rule with the same id as a preset rule replaces it.
-
-- Type: `string`
-- Required
-- Maximum length 64
-- Must match `^[a-z][a-z0-9_-]*$`
-
-#### workflow.rules[].on
-
-Event type or types that trigger the rule.
-
-- Type: `string or list of string`
-- Required
-- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `doc.commented`, `agent.handed_back`, `agent.asked`, `schedule.cron`
-
-#### workflow.rules[].on[]
-
-- Type: `string`
-- Optional
-- Allowed values: `pr.opened`, `pr.merged`, `pr.closed`, `pr.review_submitted`, `pr.comment`, `pr.conflicted`, `pr.ci_failed`, `ticket.assigned`, `ticket.moved`, `ticket.commented`, `ticket.created`, `doc.commented`, `agent.handed_back`, `agent.asked`, `schedule.cron`
-
-#### workflow.rules[].if
-
-Condition that must hold.
-
-- Type: `object`
-- Optional
-
-#### workflow.rules[].if.all
-
-- Type: `list of condition`
-- Required
-- Minimum items 1
-
-#### workflow.rules[].if.all[]
-
-- Type: `condition`
-- Optional
-
-#### workflow.rules[].if.any
-
-- Type: `list of condition`
-- Required
-- Minimum items 1
-
-#### workflow.rules[].if.any[]
-
-- Type: `condition`
-- Optional
-
-#### workflow.rules[].if.not
-
-- Type: `condition`
-- Required
-
-#### workflow.rules[].if.ticket_status
-
-- Type: `list of string`
-- Required
-- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
-- Minimum items 1
-
-#### workflow.rules[].if.ticket_status[]
-
-- Type: `string`
-- Optional
-- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
-
-#### workflow.rules[].if.moved_to
-
-- Type: `list of string`
-- Required
-- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
-- Minimum items 1
-
-#### workflow.rules[].if.moved_to[]
-
-- Type: `string`
-- Optional
-- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
-
-#### workflow.rules[].if.actor_kind
-
-- Type: `string`
-- Required
-- Allowed values: `human`, `agent`, `automation`
-
-#### workflow.rules[].if.assignee_kind
-
-- Type: `string`
-- Required
-- Allowed values: `human`, `agent`, `none`
-
-#### workflow.rules[].if.has_label
-
-- Type: `string`
-- Required
-- Minimum length 1
-
-#### workflow.rules[].if.pr_author_kind
-
-- Type: `string`
-- Required
-- Allowed values: `human`, `agent`, `bot`
-
-#### workflow.rules[].if.approver
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.pr_draft
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.pr_open
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.pr_merged
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.pr_base_default
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.has_body
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.agent_mentioned
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.review_state
-
-- Type: `list of string`
-- Required
-- Minimum items 1
-
-#### workflow.rules[].if.review_state[]
-
-- Type: `string`
-- Optional
-- Minimum length 1
-
-#### workflow.rules[].if.hand_back_status
-
-- Type: `list of string`
-- Required
-- Allowed values: `done`, `waiting`, `blocked`
-- Minimum items 1
-
-#### workflow.rules[].if.hand_back_status[]
-
-- Type: `string`
-- Optional
-- Allowed values: `done`, `waiting`, `blocked`
-
-#### workflow.rules[].if.hand_back_kind
-
-- Type: `list of string`
-- Required
-- Minimum items 1
-
-#### workflow.rules[].if.hand_back_kind[]
-
-- Type: `string`
-- Optional
-- Minimum length 1
-
-#### workflow.rules[].if.pr_approved
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.ticket_prs_all_closed
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.ticket_prs_open
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.ticket_prs_several
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].if.ticket_handed_back
-
-- Type: `boolean`
-- Required
-
-#### workflow.rules[].do
-
-Actions, run in order.
-
-- Type: `list of object`
-- Required
-- Minimum items 1
-
-#### workflow.rules[].do[]
-
-- Type: `object`
-- Optional
-
-#### workflow.rules[].do[].move
-
-- Type: `string`
-- Required
-- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
-
-#### workflow.rules[].do[].assign
-
-Assign the ticket.
-
-- Type: `string`
-- Required
-- Must match `^(author|last_worker|requester|mentioned|none|human:\S+|role:[a-z][a-z0-9-]*)$`
-
-#### workflow.rules[].do[].comment
-
-- Type: `string or object`
-- Required
-
-#### workflow.rules[].do[].comment.template
-
-- Type: `string`
-- Required
-- Must match `^[a-z][a-z0-9_-]*$`
-
-#### workflow.rules[].do[].comment.on
-
-- Type: `string`
-- Optional
-- Allowed values: `ticket`, `pr`
-
-#### workflow.rules[].do[].schedule
-
-- Type: `object`
-- Required
-
-#### workflow.rules[].do[].schedule.person
-
-- Type: `string`
-- Required
-- Must match `^(author|assignee|last_worker|doc_author|mentioned|other_mentioned|role:[a-z][a-z0-9-]*)$`
-
-#### workflow.rules[].do[].schedule.kind
-
-- Type: `string`
-- Required
-- Must match `^[a-z][a-z0-9_-]*$`
-
-#### workflow.rules[].do[].schedule.priority
-
-- Type: `string`
-- Optional
-- Default: `normal`
-- Allowed values: `low`, `normal`, `high`
-
-#### workflow.rules[].disabled
-
-Set to true to remove the rule.
-
-- Type: `boolean`
-- Optional
-
-### workflow.templates
-
-Comment and notification templates by id, with {{variable}} placeholders. They override built-in templates with the same id.
-
-- Type: `map`
-- Optional
 
 ### workflow.needs_human_label
 
@@ -1391,7 +1065,7 @@ Ticket label that keeps work with a human. Default "needs-human".
 
 ## pipeline
 
-Proposed (decision 0016): the event pipeline's policies, read in the office's shadow and live modes (office.pipeline), and the context every wake carries, in every mode.
+The event pipeline, which decides what the office does with every event (decision 0018): changes to its default policies, how wakes are batched, and the context every wake carries.
 
 - Type: `object`
 - Optional
@@ -1615,7 +1289,7 @@ How wakes are batched.
 
 #### pipeline.wake.coalesce_seconds
 
-Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes (office.pipeline: live). Default 60; 0 turns it off.
+Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. Default 60; 0 turns it off.
 
 - Type: `integer`
 - Optional
@@ -1790,43 +1464,11 @@ How agents act on feedback from trusted people beyond the first round.
 
 - Type: `object`
 - Optional
-- Default: `{"follow_up_round":true,"merged_prs":true,"doc_comments":true,"ticket_comments":true,"mentions":true}`
+- Default: `{"follow_up_round":true}`
 
 #### policies.feedback.follow_up_round
 
 Start another round when feedback arrived after the agent was offered its work. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
-
-#### policies.feedback.merged_prs
-
-Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
-
-#### policies.feedback.doc_comments
-
-Schedule the author of a knowledge document to answer a trusted person's comments on it. Switches the preset rule doc-feedback-to-author. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
-
-#### policies.feedback.ticket_comments
-
-Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
-
-#### policies.feedback.mentions
-
-Hand a ticket to the agent a trusted person mentions in a comment on it (assign, move to active, start a round), and start a round for an agent mentioned in a document comment. Switches the preset rules mention-assigns-agent, doc-mention-feedback and doc-mention-assigns-ticket. Default on.
 
 - Type: `boolean`
 - Optional
@@ -1838,20 +1480,11 @@ What happens to a ticket when an agent hands its work back.
 
 - Type: `object`
 - Optional
-- Default: `{"reassign":"requester","blocked_notify":"pm","fallback":"first_human"}`
-
-#### policies.hand_back.reassign
-
-Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.
-
-- Type: `string`
-- Optional
-- Default: `requester`
-- Allowed values: `requester`, `none`
+- Default: `{"blocked_notify":"pm","fallback":"first_human"}`
 
 #### policies.hand_back.blocked_notify
 
-Who deals with a blocked hand-back: pm schedules an unblock round for the team's PM, who messages the requester only if a human is needed; agent has the blocked agent tell the requester itself, in its own direct message. Without a PM role the agent always does. The office never posts to people. Default pm.
+Who tells the requester about blocked work that did not come from chat: agent has the blocked agent tell them itself, in its own direct message; pm leaves it to the team's PM, and the blocked agent sends nothing (the hand-back still gives the ticket to the requester). Without a PM role the agent always does. The office never posts to people. Default pm.
 
 - Type: `string`
 - Optional
@@ -1873,24 +1506,16 @@ How tickets and pull requests relate.
 
 - Type: `object`
 - Optional
-- Default: `{"prs_per_ticket":"one","start_moves_active":true}`
+- Default: `{"prs_per_ticket":"one"}`
 
 #### policies.tickets.prs_per_ticket
 
-How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.
+How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket; many: several are allowed. Either way the ticket moves to done when its last open pull request merges into the default branch. Default one.
 
 - Type: `string`
 - Optional
 - Default: `one`
 - Allowed values: `one`, `many`
-
-#### policies.tickets.start_moves_active
-
-Move a ticket to active when a work item about it starts (assigned, ticket comment), if it is in backlog, ready, review or blocked. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and the minimal preset never moves tickets. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
 
 ### policies.pull_ready
 
@@ -1900,37 +1525,13 @@ Let an agent with nothing queued or running start its next ready ticket: assigne
 - Optional
 - Default: `true`
 
-### policies.conflicts
-
-Merge conflicts between pull requests.
-
-- Type: `object`
-- Optional
-- Default: `{"follow_up":true}`
-
-#### policies.conflicts.follow_up
-
-Send a pull request that starts to conflict with its base, for example after another one merged, back to its agent author to rebase. Switches the preset rule conflict-back-to-author. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
-
 ### policies.retry
 
-How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.
+How a failing work item is retried: exponential backoff, then blocked.
 
 - Type: `object`
 - Optional
-- Default: `{"on_signal":true,"base_minutes":1,"cap_minutes":30,"max_failures":3}`
-
-#### policies.retry.on_signal
-
-Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread. Default on.
-
-- Type: `boolean`
-- Optional
-- Default: `true`
+- Default: `{"base_minutes":1,"cap_minutes":30,"max_failures":3}`
 
 #### policies.retry.base_minutes
 

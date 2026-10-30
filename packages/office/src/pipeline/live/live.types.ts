@@ -16,7 +16,14 @@ export interface LiveOptions {
   team: TeamConfig;
   store: Pick<
     Store,
-    "listItems" | "upsertSubject" | "getSubject" | "appendJournal" | "addItemRefs"
+    | "listItems"
+    | "upsertSubject"
+    | "getSubject"
+    | "appendJournal"
+    | "addItemRefs"
+    | "getItem"
+    | "updateItem"
+    | "listItemRefs"
   >;
   workState: WorkState;
   scheduler: Pick<Scheduler, "enqueue">;

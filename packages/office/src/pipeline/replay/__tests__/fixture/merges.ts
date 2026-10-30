@@ -51,12 +51,7 @@ export const stackedMerge: ReplayScenario = {
         prs: [{ ...searchApi, state: "merged" }, searchPage],
         links: stackLinks,
       },
-      merge: {
-        notes: {
-          "derived:pr.base_merged:acme-example/shop#42:after:acme-example/shop#41":
-            "intended fix: sam hears at once that #42's base merged, naming #41; today nothing happens until #42 conflicts",
-        },
-      },
+      merge: {},
     },
   ],
 };
@@ -90,14 +85,6 @@ export const unrelatedConflict: ReplayScenario = {
           requiredChecks: ["ci"],
           requiredApprovals: 1,
           upToDate: true,
-        },
-        notes: {
-          "derived:pr.conflicted:acme-example/shop#51:after:acme-example/shop#50":
-            "intended fix: sam is woken and told #50 caused it; reassigning and moving ACME-131 is left to sam, and nothing is commented",
-          "derived:pr.conflicted:acme-example/shop#52:after:acme-example/shop#50":
-            "intended fix: #52 conflicted already, but against an older main; today the new conflict is ignored",
-          "derived:pr.behind_base:acme-example/shop#53:after:acme-example/shop#50":
-            "intended fix: the repository requires up-to-date branches, so mira is told to update #53; today she finds out when the merge is refused",
         },
       },
     },

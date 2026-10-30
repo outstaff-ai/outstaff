@@ -131,6 +131,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     },
 
     refreshWorkers: () => locked(refreshWorkers),
+    refreshTicket: (key) => locked(() => ticketOps.refreshTicket(key)),
 
     async catchUp() {
       const ctx: RefreshCtx = { fresh: [] };

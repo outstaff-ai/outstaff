@@ -21,7 +21,6 @@ const FILTERS: ((t: Trace, f: EventFilter) => boolean)[] = [
   (t, f) => f.person === undefined || involves(t, f.person),
   (t, f) => f.ticket === undefined || t.event.subject.ticket === f.ticket,
   (t, f) => f.pr === undefined || prOf(t) === f.pr,
-  (t, f) => f.differs === undefined || t.comparison?.agree === false,
 ];
 
 export const matches = (t: Trace, f: EventFilter) => FILTERS.every((test) => test(t, f));

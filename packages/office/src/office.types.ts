@@ -1,6 +1,5 @@
 import type { AdapterRegistry, Logger, SecretSource, TeamConfig } from "@outstaff/core";
 import type { OfficeDoctor } from "./doctor/index.js";
-import type { Engine } from "./engine/index.js";
 import type { Intake } from "./intake/index.js";
 import type { ProtocolServer } from "./protocol/index.js";
 import type { Scheduler } from "./scheduler/index.js";
@@ -78,14 +77,13 @@ export interface Office {
   readonly parts: {
     intake: Intake;
     workState: WorkState;
-    engine: Engine;
     scheduler: Scheduler;
     usage: UsageTracker;
     server: ProtocolServer;
     ports: OfficePorts;
 
-    /** The event pipeline in shadow or live mode (`office.pipeline`); absent when it is off. */
-    pipeline?: PipelineRunner | undefined;
+    /** The event pipeline, which decides what the office does with every event. */
+    pipeline: PipelineRunner;
 
     /** The office link to a monitoring or management service (`link.url` and `OUTSTAFF_LINK_TOKEN`); absent without them. */
     link?: OfficeLink | undefined;

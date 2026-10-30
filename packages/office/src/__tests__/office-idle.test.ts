@@ -36,15 +36,25 @@ describe("the idle pull", () => {
 
   const pull = (over: Partial<IdlePullOptions> & { policies?: Record<string, unknown> } = {}) => {
     const team = teamConfig(over.policies ? { policies: over.policies } : {});
+    const { runner } = createOfficePipeline({
+      team,
+      store,
+      workState: ws,
+      scheduler,
+      ports: {},
+      clock,
+      logger,
+    });
+
     return createIdlePull({
       team,
       store,
       workState: ws,
       scheduler,
       pipeline: {
-        async idle(event, run) {
+        judge(event) {
           raised.push(event);
-          return run();
+          return runner.judge(event);
         },
       },
       clock,
@@ -111,7 +121,7 @@ describe("the idle pull", () => {
     ]);
 
     expect((await store.readJournal(item!.id)).map((j) => j.text)).toContain(
-      `sam had nothing queued, so the office started ${first.key}, the next ready ticket assigned to them.`,
+      `You have nothing queued. Start ${first.key}, the next ready ticket assigned to you. Work on it the way the repository asks.`,
     );
 
     // Busy: nothing more is pulled, and nothing is raised.
@@ -258,39 +268,5 @@ describe("the idle pull", () => {
     broken = false;
     await idle.check("sam");
     expect(await items()).toHaveLength(1);
-  });
-
-  it("traces the pull in shadow mode and leaves it to the pipeline when live", async () => {
-    const first = await ready("Search page");
-    await ws.rescan();
-    const office = (pipeline: string) =>
-      createOfficePipeline({
-        team: teamConfig({ office: { pipeline } }),
-        store,
-        workState: ws,
-        scheduler,
-        ports: {},
-        clock,
-        logger,
-      });
-
-    const shadow = office("shadow");
-    await pull({ pipeline: shadow }).check("sam");
-    const [traced] = await shadow.traces.list();
-    expect(traced?.decisions).toMatchObject([
-      { type: "wake", policy: "idle_pulls_next", subject: { ref: first.key } },
-    ]);
-
-    expect((await items()).map((i) => i.trigger)).toEqual(["automation"]);
-    await scheduler.markActive((await items())[0]!.id);
-    await scheduler.finish((await items())[0]!.id, { outcome: "done" });
-
-    const second = await ready("Wishlist");
-    await ws.rescan();
-    await pull({ pipeline: office("live") }).check("sam");
-    expect((await items()).map((i) => [i.subject?.ref, i.trigger])).toEqual([
-      [first.key, "automation"],
-      [second.key, "automation"],
-    ]);
   });
 });

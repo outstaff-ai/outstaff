@@ -169,6 +169,21 @@ async function* takeTicket(
   return undefined;
 }
 
+/**
+ * Takes the ticket back at the start of a round on it, as the catalog asks: assigned to the agent and moved to active,
+ * unless it is active already or finished. The office no longer does this for the agent.
+ */
+async function* resume(key: string): AsyncGenerator<Action, void, string> {
+  const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+  const status = /^Status: .*\((\w+)\)$/m.exec(shown)?.[1];
+  if (status === undefined || ["active", "done", "canceled"].includes(status)) {
+    return;
+  }
+
+  yield { type: "tool", tool: "ticket_assign", input: { key, to: "me" } };
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "active" } };
+}
+
 /** The toolset works in the worktree, ordinary shell work runs in the sandbox, and the hard denies still hold. */
 async function* checkSandbox(cwd: string): AsyncGenerator<Action, void, string> {
   // The toolset's tools work in the worktree: the mise shim has a version set, not just an install behind it.
@@ -548,6 +563,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   const number = need(ctx.pr, "the pull request");
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
+  yield* resume(key);
   // The driver can hold a review round here to talk to the agent while it is under way.
   yield { type: "gate", name: "review" };
   const branch = yield* branchOf(ctx, key);
@@ -659,7 +675,7 @@ export async function* docFeedback(ctx: ItemContext): Script {
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const feedback = need(ctx.feedback[0], "the comment");
-  yield { type: "tool", tool: "ticket_show", input: { key } };
+  yield* resume(key);
   yield {
     type: "tool",
     tool: "ticket_comment",
@@ -765,6 +781,7 @@ export async function* conflict(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const number = need(ctx.pr, "the pull request");
   const cwd = need(ctx.worktree, "the worktree");
+  yield* resume(key);
   const branch = yield* branchOf(ctx, key);
   const lease = (yield {
     type: "shell",
@@ -829,11 +846,22 @@ async function* describeWork(): AsyncGenerator<Action, string, string> {
   return `Greetings live in greeting.txt on the main branch. Right now I am on: ${first}`;
 }
 
+/**
+ * Whether the agent's question about where a request goes is still its last word in the thread, so the human's reply
+ * answers it; a message after a settled question is something new.
+ */
+const awaitsAnswer = (talk: Message[]) => QUESTION.test(talk.findLast((m) => m.agent)?.text ?? "");
+
 /** A reply in the thread of running or finished work: an instruction is attached to that work, a question is answered. */
 async function* replyAboutWork(
   ctx: ItemContext,
+  talk: Message[],
   latest: string,
 ): AsyncGenerator<Action, string, string> {
+  if (awaitsAnswer(talk)) {
+    return yield* attachToPr(talk, latest);
+  }
+
   const target = ctx.ticket ?? (ctx.pr === undefined ? undefined : String(ctx.pr));
   // A session that goes on with the thread's conversation has no history in its prompt: the reply is in the journal.
   const said =
@@ -948,7 +976,7 @@ export async function* chat(ctx: ItemContext): Script {
   }
 
   if (ctx.about) {
-    return yield* replyAboutWork(ctx, latest);
+    return yield* replyAboutWork(ctx, talk, latest);
   }
 
   const filed = yield* fileRequest(ctx, latest);
@@ -968,6 +996,7 @@ export async function* ciFailed(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const number = need(ctx.pr, "the pull request");
   const repo = need(ctx.repo, "the repository");
+  yield* resume(key);
   const shown = yield { type: "tool", tool: "pr_status", input: { repo, number } };
   yield {
     type: "tool",
@@ -989,7 +1018,7 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   merge,
   doc_feedback: docFeedback,
   ticket_comment: ticketComment,
-  conflict,
+  rebase: conflict,
   ci_failed: ciFailed,
   chat,
 };

@@ -1,38 +1,11 @@
 import { createOfficeActExecutor } from "./act/office-executor.js";
-import type { EngineRecord } from "./compare/compare.types.js";
 import { createLivePipeline } from "./live/live.js";
 import type { OfficePipeline, OfficePipelineOptions } from "./office-pipeline.types.js";
-import { createShadowPipeline } from "./shadow.js";
 import { createStoreTraceStore } from "./store-traces.js";
 
-type Traces = OfficePipeline["traces"];
-
-function shadow(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
-  const { team, clock, logger } = opts;
-  const runner = createShadowPipeline({ team, state: opts.workState, traces, clock, logger });
-  return {
-    mode: "shadow",
-    runner,
-    traces,
-    async route(event, meta, engine) {
-      await runner.handle(event, meta);
-      const outcomes = await engine();
-      await runner.engineDid(meta, outcomes);
-      return outcomes;
-    },
-    async idle(event, pull) {
-      await runner.judge(event);
-      return pull();
-    },
-    async chat(event, meta) {
-      await runner.handle(event, meta);
-      const desk = event.data["desk"] as EngineRecord | undefined;
-      return desk ? runner.compare(meta, () => desk) : undefined;
-    },
-  };
-}
-
-function live(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
+/** The event pipeline as the office runs it (decision 0018): it decides on every event, and its acts are carried out. */
+export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipeline {
+  const traces = createStoreTraceStore(opts.store);
   const executor = createOfficeActExecutor({
     team: opts.team,
     tracker: opts.ports.tracker,
@@ -40,30 +13,5 @@ function live(opts: OfficePipelineOptions, traces: Traces): OfficePipeline {
     traces,
   });
 
-  const runner = createLivePipeline({ ...opts, executor, traces });
-  return {
-    mode: "live",
-    runner,
-    traces,
-    route: (event, meta) => runner.handle(event, meta),
-    idle: (event) => runner.judge(event),
-    chat: (event, meta) => runner.handle(event, meta),
-  };
-}
-
-/** Proposed (decision 0016): the event pipeline beside the engine, off unless `office.pipeline` says otherwise. */
-export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipeline {
-  const traces = createStoreTraceStore(opts.store);
-  const mode = opts.team.office?.pipeline ?? "off";
-  if (mode === "off") {
-    return {
-      mode,
-      traces,
-      route: (_event, _meta, engine) => engine(),
-      idle: (_event, pull) => pull(),
-      chat: async () => undefined,
-    };
-  }
-
-  return mode === "shadow" ? shadow(opts, traces) : live(opts, traces);
+  return { runner: createLivePipeline({ ...opts, executor, traces }), traces };
 }

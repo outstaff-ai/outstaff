@@ -38,19 +38,6 @@ describe("mentions in a ticket comment", () => {
     expect(tracked(events)[0]).toMatchObject({ actor: { kind: "agent", id: "sam" } });
     expect(tracked(events)[0]?.data).not.toHaveProperty("mentions");
   });
-
-  it("are dropped when policies.feedback.mentions is off", async () => {
-    const { tracker, intake, events } = await setup({
-      trackerActor: human("u1", "dana"),
-      teamExtra: { policies: { feedback: { mentions: false } } },
-    });
-
-    const issue = await tracker.createIssue({ title: "Search", body: "" });
-    await tracker.comment(issue.key, "@noor please review");
-    await intake.pollOnce();
-
-    expect(tracked(events)[0]?.data).not.toHaveProperty("mentions");
-  });
 });
 
 describe("mentions in a document comment", () => {

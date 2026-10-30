@@ -5,7 +5,7 @@ sidebar:
   order: 16
 ---
 
-**Status:** proposed. Would replace the rule engine of [0011](/decisions/0011-configurable-workflow/); the status mapping stays.
+**Status:** accepted. Replaces the rule engine of [0011](/decisions/0011-configurable-workflow/); the status mapping stays. Since [0018](/decisions/0018-pipeline-only/) the pipeline is the only way the office decides, and the off and shadow modes below are gone.
 
 ## Context
 

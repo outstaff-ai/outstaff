@@ -648,7 +648,7 @@ describe("pr write verbs", () => {
         ...f.env.team,
         policies: {
           ...f.env.team.policies!,
-          tickets: { prs_per_ticket: "many", start_moves_active: true },
+          tickets: { prs_per_ticket: "many" },
         },
       };
 

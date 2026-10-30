@@ -51,6 +51,8 @@ function team(): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
+    // An agent is woken at once: the test's clock is manual.
+    pipeline: { wake: { coalesce_seconds: 0 } },
   });
 
   if (!result.ok) {
@@ -182,6 +184,44 @@ describe("createOffice", () => {
     expect(chat.posts).toEqual([]);
   });
 
+  it("moves a ticket the agent took back during its round to review on a done hand-back, before the next poll", async () => {
+    const sam = connect("sam");
+    await sam.whenConnected();
+    const issue = await tracker.createIssue({
+      title: "Search page",
+      body: "",
+      status: "ready",
+      assignee: "u-2",
+    });
+
+    await office.parts.intake.pollOnce();
+    const first = await next(sam);
+    await sam.accept(first.workItem.id, { runtime: "claude", model: "sonnet" });
+    await sam.handBack(first.workItem.id, { summary: "Built it.", status: "done" });
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
+    // The office has read the ticket in review, assigned to the requester.
+    await office.parts.intake.pollOnce();
+
+    // A later round on the ticket: Sam takes it back with its own tracker calls, which the office has not polled yet.
+    await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "ticket_comment",
+      title: "comment",
+      trigger: "human",
+      subject: { type: "ticket", ref: issue.key },
+    });
+
+    const round = await next(sam);
+    await sam.accept(round.workItem.id, { runtime: "claude", model: "sonnet" });
+    const self = tracker.as({ id: "u-2", name: "Sam", kind: "agent" });
+    await self.assign(issue.key, "u-2");
+    await self.transition(issue.key, "active");
+    await sam.handBack(round.workItem.id, { summary: "Answered.", status: "done" });
+
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
+    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1");
+  });
+
   it("has an idle agent start the ready tickets it assigned to itself: on connect, then after the hand-back", async () => {
     const self = tracker.as({ id: "u-2", name: "Sam", kind: "agent" });
     const own = (title: string) =>
@@ -235,7 +275,7 @@ describe("createOffice", () => {
     });
   });
 
-  it("offers a conflicted stacked pull request to its author with the rebase recipe", async () => {
+  it("wakes the author of a conflicted stacked pull request to rebase it, and leaves the ticket alone", async () => {
     const sam = connect("sam");
     await sam.whenConnected();
 
@@ -264,11 +304,11 @@ describe("createOffice", () => {
     await office.parts.intake.pollOnce();
 
     const offer = await next(sam);
-    expect(offer.workItem).toMatchObject({ kind: "conflict", trigger: "automation" });
+    expect(offer.workItem).toMatchObject({ kind: "rebase", trigger: "automation" });
     expect(offer.workItem.subject?.type).toBe("pr");
     const journal = offer.context.journal.map((j) => j.text).join("\n");
-    expect(journal).toContain("git rebase origin/feat/a");
-    expect(journal).toContain("--onto");
+    expect(journal).toContain(`Your pull request #${b.number} (Cart on top)`);
+    expect(journal).toContain("Bring it up to date with `feat/a`");
     expect(offer.context.subjects.map((s) => s.title)).toContain("Cart on top");
     expect(offer.context.subjects[0]).toMatchObject({
       type: "pr",
@@ -278,7 +318,7 @@ describe("createOffice", () => {
       own: true,
     });
 
-    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-2");
+    expect((await tracker.getIssue(issue.key)).assignee).toBeUndefined();
   });
 
   it("routes a question to the architect and brings the answer back to the asker", async () => {

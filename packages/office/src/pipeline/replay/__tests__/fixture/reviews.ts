@@ -15,9 +15,6 @@ const reworking: ReplayWorld = {
   links,
 };
 
-const NO_REACTIVATION =
-  "regression: nothing moves ACME-140 back to active or gives it back to sam; the plan makes ticket moves explicit act policies with the act path (phase 2), not in this set";
-
 export const reviewRound: ReplayScenario = {
   title: "A review round: pending comments, a batch of feedback, approval and merge",
   steps: [
@@ -36,7 +33,6 @@ export const reviewRound: ReplayScenario = {
         comments: [{ path: "src/wishlist.ts", line: 12, body: "This hook does two things." }],
       }),
       world: inReview,
-      note: NO_REACTIVATION,
     },
     {
       event: ev("s3-comment-1", "pr.comment", "ada-admin", { pr: 60 }, at(100, 20), {
@@ -58,7 +54,6 @@ export const reviewRound: ReplayScenario = {
         body: "Looks good. One nit: drop the console.log.",
       }),
       world: { ...inReview, prs: [{ ...wishlist, verdicts: [approved()] }] },
-      note: NO_REACTIVATION,
     },
     {
       event: ev("s3-untrusted", "pr.review_submitted", "outside-contributor", { pr: 60 }, at(141), {
@@ -102,7 +97,6 @@ export const ciFailure: ReplayScenario = {
         prs: [savedSearches],
         links: { 61: "ACME-141" },
       },
-      note: "intended fix: sam is woken with the failing checks; reassigning and moving ACME-141 is left to sam",
     },
     {
       event: ev("s9-ci-54", "pr.ci_failed", "office", { pr: 54 }, at(171), { failing: ["lint"] }),
@@ -143,7 +137,6 @@ export const otherPrEvents: ReplayScenario = {
         prs: [checkout, second],
         links: { 51: "ACME-131", 63: "ACME-131" },
       },
-      note: "intended fix: a human's pull request leaves the ticket to that human (there is no agent to act for), and one pull request per ticket is the repository's practice, not the office's",
     },
     {
       event: ev("s11-closed", "pr.closed", "ada-admin", { pr: 62, ticket: "ACME-162" }, at(182)),
@@ -152,7 +145,6 @@ export const otherPrEvents: ReplayScenario = {
         prs: [{ ...drafts, state: "closed" }],
         links: { 62: "ACME-162" },
       },
-      note: "regression: closing a pull request unmerged no longer moves its ticket back to ready; not in the plan's table",
     },
     {
       event: ev(
@@ -167,7 +159,6 @@ export const otherPrEvents: ReplayScenario = {
         prs: [legal],
         links: { 55: "ACME-135" },
       },
-      note: "intended fix: there is no agent to act for, so closing the ticket is left to the human who merged",
     },
     {
       event: ev(

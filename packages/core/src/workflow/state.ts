@@ -3,7 +3,7 @@ import type { PrRef, StaticWorkflowData, WorkflowState } from "./types.js";
 
 const k = (r: PrRef) => `${r.repo.owner}/${r.repo.name}#${r.number}`;
 
-/** A WorkflowState backed by plain data; used by tests and by `ost workflow explain` fixtures. */
+/** A WorkflowState backed by plain data; used by tests and by the replay of acme events. */
 export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowState {
   const prs = data.prs ?? [];
   return {

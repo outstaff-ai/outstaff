@@ -801,7 +801,7 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
         team: {
           policies: {
             ...team.policies!,
-            retry: { on_signal: true, base_minutes: 4, cap_minutes: 5, max_failures: 5 },
+            retry: { base_minutes: 4, cap_minutes: 5, max_failures: 5 },
           },
         },
         clock,

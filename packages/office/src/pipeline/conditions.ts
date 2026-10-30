@@ -56,8 +56,8 @@ function leaf(c: PipelineCondition, ctx: EvaluationContext): ConditionResult {
 }
 
 /**
- * Whether a condition holds. Combinations are walked here so pipeline leaves can sit inside them; workflow leaves are
- * checked by the workflow rules' own evaluator.
+ * Whether a condition holds. Combinations are walked here so pipeline leaves can sit inside them; the other leaves are
+ * checked by the shared condition evaluator.
  */
 export function evaluateCondition(c: PipelineCondition, ctx: EvaluationContext): ConditionResult {
   if ("all" in c) {

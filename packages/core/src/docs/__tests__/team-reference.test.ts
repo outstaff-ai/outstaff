@@ -17,7 +17,7 @@ describe("team.yaml reference", () => {
     expect(page).toContain("### people[].repos");
     expect(page).toContain("policies.messages.max_lines");
     expect(page).toContain("- Default: `3`");
-    expect(page).toContain("`kanban`, `scrum`, `minimal`");
+    expect(page).toContain("`one`, `many`");
     expect(page).toContain("# Who the team is.");
   });
 });

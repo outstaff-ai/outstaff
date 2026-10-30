@@ -1,81 +1,9 @@
-import type { Capability } from "#/types.js";
-import type { Condition, Rule } from "#/workflow/types.js";
-
-/** A switch holds `true`/`false`, or one of a few named choices; `none` always means off. */
-export type PolicyValue = boolean | string;
-
-export interface PolicySwitch {
-  /** Dotted path under `policies` in team.yaml. */
-  path: string;
-
-  /** Value when team.yaml says nothing. Everything that happens today is on by default. */
-  default: PolicyValue;
-
-  /** The value that turns the behaviour off (or, for a limit, lifts it). */
-  off: false | "none" | "many" | "agent";
-
-  /** What outstaff does while the switch is on, for `ost policies` and the docs. */
-  behaviour: string;
-
-  /** Who carries the behaviour out: a preset workflow rule, or code in the agent or the office. */
-  kind: "rule" | "agent" | "office" | "option";
-
-  /** The preset workflow rules the switch governs, by id. */
-  rules?: readonly string[];
-
-  /**
-   * How a governed rule changes when the switch is not at its default. Return `undefined` to remove the rule.
-   * Without it, a switch that is off removes its rules.
-   */
-  rewrite?: (rule: Rule, value: PolicyValue) => Rule | undefined;
-
-  /** The capability the configured adapter needs for the switch to do anything; `validate` warns when it lacks it. */
-  needs?: Capability;
-}
-
-/** `tickets.prs_per_ticket: many`: the ticket is done when the agent says so and every pull request is settled. */
-function manyPrs(rule: Rule): Rule {
-  const settled: Condition = { ticket_prs_all_closed: true };
-  switch (rule.id) {
-    case "pr-merged-done":
-      // Whichever of the three happens last closes the ticket: the last merge or close, or the hand-back.
-      return {
-        ...rule,
-        on: ["pr.merged", "pr.closed", "agent.handed_back"],
-        if: {
-          all: [
-            { ticket_status: ["backlog", "ready", "active", "review", "blocked"] },
-            settled,
-            { any: [{ hand_back_status: ["done"] }, { ticket_handed_back: true }] },
-          ],
-        },
-      };
-    case "pr-closed-ready":
-      // Only the last pull request closed unmerged sends the ticket back: none other open, none merged.
-      return {
-        ...rule,
-        if: {
-          all: [
-            ...(rule.if ? [rule.if] : []),
-            { not: { ticket_prs_open: true } },
-            { not: settled },
-          ],
-        },
-      };
-    case "hand-back-to-requester":
-      // The hand-back that settles the ticket closes it instead of asking the requester to review.
-      return { ...rule, if: { all: [...(rule.if ? [rule.if] : []), { not: settled }] } };
-    case "second-pr-comment":
-      return { ...rule, do: [{ comment: "second_pr_many" }] };
-    default:
-      return rule;
-  }
-}
+import type { PolicyConfig, PolicySwitch, PolicyValue } from "./types.js";
 
 /**
- * Every automated behaviour a team can switch, in the order `ost policies` and the docs list them. Adding a
- * switch (merge on approval, reviewer agents) is one entry here plus the schema key; the CLI, the docs page,
- * `ost workflow explain` and validation read this table.
+ * Every automated behaviour a team can switch outside the event pipeline's policies, in the order `ost policies` and
+ * the docs list them. Adding a switch is one entry here plus the schema key; the CLI, the docs page and validation
+ * read this table.
  */
 export const POLICY_SWITCHES: readonly PolicySwitch[] = [
   {
@@ -121,63 +49,12 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "Start another round when feedback arrived after the agent was offered its work, so nothing written during a round is lost.",
   },
   {
-    path: "feedback.merged_prs",
-    default: true,
-    off: false,
-    kind: "rule",
-    rules: ["merged-feedback-follow-up"],
-    behaviour:
-      "Schedule the author to answer a trusted person's review or comment on an already merged pull request, and to open a follow-up pull request if a change is asked for.",
-  },
-  {
-    path: "feedback.doc_comments",
-    default: true,
-    off: false,
-    kind: "rule",
-    rules: ["doc-feedback-to-author"],
-    behaviour:
-      "Schedule the agent who wrote a knowledge document to answer a trusted person's comment or reply on it: it reads the open comments, updates the document, replies to each and resolves a thread only when the last word is its own. The office polls the comments of documents agents wrote for open work.",
-    needs: "knowledge.docs",
-  },
-  {
-    path: "feedback.ticket_comments",
-    default: true,
-    off: false,
-    kind: "rule",
-    rules: ["ticket-comment-to-assignee", "ticket-comment-reactivates-ticket"],
-    behaviour:
-      "Start a round for the assigned agent when a trusted person comments on its ticket. On a ticket the agent handed back (assigned to a person, in review or blocked) the comment counts as feedback: the ticket goes back to the agent who last worked on it and moves to active. Comments by agents and by the office never start anything.",
-  },
-  {
-    path: "feedback.mentions",
-    default: true,
-    off: false,
-    kind: "rule",
-    rules: ["mention-assigns-agent", "doc-mention-feedback", "doc-mention-assigns-ticket"],
-    behaviour:
-      "A trusted person who mentions a team agent (`@username`) in a ticket comment hands that agent the ticket: it is assigned to the agent, moved to active when it is in backlog, ready, review or blocked, and the agent gets a round with the comment. When several agents are mentioned, the first takes the ticket and the others get a round to answer on it. A mention in a document comment gives the agent a round on the document, and its ticket goes to the agent when nobody or only a person has it. Comments by agents and by the office never mention anyone, and a done or canceled ticket is left alone. A mention goes to the agent mentioned, not to the assignee or the agent who last worked on the ticket.",
-  },
-  {
-    path: "hand_back.reassign",
-    default: "requester",
-    off: "none",
-    kind: "rule",
-    rules: ["hand-back-to-requester", "hand-back-blocked-to-requester"],
-    behaviour:
-      "When an agent hands work back, move the ticket to review (done), or to blocked (blocked), and assign it to the person who asked for it. A waiting hand-back changes nothing. With none the ticket still moves but keeps its assignee.",
-    rewrite: (rule, value) =>
-      value === "none" ? { ...rule, do: rule.do.filter((a) => !("assign" in a)) } : rule,
-  },
-  {
     path: "hand_back.blocked_notify",
     default: "pm",
     off: "agent",
-    kind: "rule",
-    rules: ["hand-back-blocked-to-requester"],
+    kind: "agent",
     behaviour:
-      "Who deals with a blocked hand-back before a human is pulled in. With pm (the default when the team has a PM role) the office schedules an unblock round for the PM, who tries to unblock it and messages the requester only if a human is needed. With agent, or when the team has no PM, the blocked agent tells the requester itself, in its own direct message with the ticket linked. The thread of a chat item always gets its agent's reply. Items the scheduler blocks are routed the same way. The office never posts to people.",
-    rewrite: (rule, value) =>
-      value === "agent" ? { ...rule, do: rule.do.filter((a) => !("schedule" in a)) } : rule,
+      "Who tells the requester about blocked work that did not come from chat. With agent, or when the team has no PM role, the blocked agent tells the requester itself, in its own direct message with the ticket linked. With pm the blocked agent sends nothing and leaves it to the PM; the hand-back still gives the ticket to the requester. The thread of a chat item always gets its agent's reply. Items the scheduler blocks are handled the same way. The office never posts to people.",
   },
   {
     path: "hand_back.fallback",
@@ -185,27 +62,15 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     off: "none",
     kind: "option",
     behaviour:
-      "When a ticket has no known requester, hand it back to the first human in `humans`. With none, a rule that needs a requester is skipped when the ticket has none.",
+      "When a ticket has no known requester, hand it back to the first human in `humans`. With none, an act that assigns the requester is dropped when the ticket has none.",
   },
   {
     path: "tickets.prs_per_ticket",
     default: "one",
     off: "many",
-
-    // The verb enforces it whatever the preset; the rules only follow it, so a preset without them is no reason to call it off.
     kind: "agent",
-    rules: ["pr-merged-done", "pr-closed-ready", "hand-back-to-requester", "second-pr-comment"],
     behaviour:
-      "One pull request per ticket, because the ticket moves to done when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is): `ost pr open` refuses a second pull request for a ticket (open or merged) and points to `ost ticket create --parent`, and a second pull request a person opens gets a comment on the ticket that says which merge closes it. With many, several pull requests are allowed and the ticket moves to done only when the agent hands its work back as done and every pull request linked to it is closed with at least one merged; a merge alone does not close it.",
-    rewrite: manyPrs,
-  },
-  {
-    path: "tickets.start_moves_active",
-    default: true,
-    off: false,
-    kind: "office",
-    behaviour:
-      "When a work item about a ticket starts, the office moves the ticket to active if it is in backlog, ready or review, so the board shows the work without the agent having to say so. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and neither does the minimal preset, which never moves tickets. A blocked ticket stays blocked until the agent moves it: a retry that is still blocked leaves it blocked. Work that starts on an open pull request moves a ticket closed early (done) back to active. The agent still keeps the ticket accurate as it goes.",
+      "One pull request per ticket: `ost pr open` refuses a second pull request for a ticket (open or merged) and points to `ost ticket create --parent`. With many, several pull requests are allowed. Either way the ticket moves to done when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is).",
   },
   {
     path: "pull_ready",
@@ -224,29 +89,9 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     behaviour:
       "Let agents turn on the code host's auto-merge on their pull requests: when an agent marks its pull request ready for review (or opens it ready), the same verb turns on auto-merge, or adds it to the merge queue where the repository has one. The repository's own rules (required approvals and checks) decide when it merges, with the repository's merge method; no agent runs for the merge, and the office only sees it merge. Limited to policies.merge.repos when set. Off: nothing is turned on and people merge.",
   },
-  {
-    path: "conflicts.follow_up",
-    default: true,
-    off: false,
-    kind: "rule",
-    rules: ["conflict-back-to-author"],
-    behaviour:
-      "When an open pull request starts to conflict with its base, for example after another one merged, send it back to its agent author to rebase, whatever the status of its ticket (a done ticket goes back to active; a canceled one is left alone).",
-  },
-  {
-    path: "retry.on_signal",
-    default: true,
-    off: false,
-    kind: "office",
-    behaviour:
-      "Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread.",
-  },
 ];
 
 export const POLICY_SWITCH_PATHS = POLICY_SWITCHES.map((s) => s.path);
-
-/** The shape of `policies` the switches read; a parsed team config satisfies it. */
-export type PolicyConfig = { [group: string]: unknown } | undefined;
 
 export function policySwitch(path: string): PolicySwitch {
   const found = POLICY_SWITCHES.find((s) => s.path === path);
@@ -274,14 +119,9 @@ export function policyValue(policies: PolicyConfig, path: string): PolicyValue {
 export const policyOn = (policies: PolicyConfig, path: string): boolean =>
   policyValue(policies, path) !== policySwitch(path).off;
 
-/** The switch that governs a preset rule, if any. */
-export function switchOfRule(ruleId: string): PolicySwitch | undefined {
-  return POLICY_SWITCHES.find((s) => s.rules?.includes(ruleId));
-}
-
 /**
- * Who deals with a blocked hand-back: the PM when the team has one and the switch says so, else the blocked agent
- * itself. A team without a PM role cannot route to one, whatever the switch says.
+ * Who tells the requester about blocked work: the PM when the team has one and the switch says so, else the blocked
+ * agent itself. A team without a PM role cannot leave it to one, whatever the switch says.
  */
 export function blockedNotify(team: {
   people: readonly { role: string }[];

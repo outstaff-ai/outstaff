@@ -53,7 +53,6 @@ export function createLinkForOffice(deps: {
     identity: {
       team: team.team.name,
       version: input.options?.officeVersion ?? "unknown",
-      pipelineMode: team.office?.pipeline ?? "off",
     },
     doctor,
     connected: () => protocol.connected(),

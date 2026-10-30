@@ -1,5 +1,4 @@
 import type { Logger, WorkflowEvent } from "@outstaff/core";
-import type { EngineMeta } from "./engine/index.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { PrRecord, WorkState } from "./workstate/index.js";
 
@@ -33,8 +32,8 @@ export function createHandedBack(deps: {
   store: Store;
   workState: WorkState;
 
-  /** Has the event judged: by the engine, and in shadow mode by the pipeline too. */
-  judge: (event: WorkflowEvent, meta: EngineMeta) => Promise<unknown>;
+  /** Has the event judged by the pipeline. */
+  judge: (event: WorkflowEvent, meta: { source: string; externalId: string }) => Promise<unknown>;
   log: Logger;
 }) {
   const { store, workState, judge, log } = deps;
@@ -56,15 +55,18 @@ export function createHandedBack(deps: {
       data: { workItem: item.id, kind: item.kind, status: item.status },
     };
 
-    // The rules read whether the ticket was handed back as done from the state, so it is refreshed first.
-    await workState.refreshWorkers().catch((error: unknown) => {
-      log.warn("refreshing who worked on what failed", { error: String(error) });
+    // The policies read who last worked on the ticket, and the ticket itself, from the state. The agent may have moved or
+    // assigned the ticket during the round, after the tracker was last polled, so both are re-read first.
+    await Promise.all([
+      workState.refreshWorkers(),
+      ...(subject.ticket ? [workState.refreshTicket(subject.ticket)] : []),
+    ]).catch((error: unknown) => {
+      log.warn("refreshing the state before a hand-back failed", { error: String(error) });
     });
 
     await judge(event, {
       source: "workstate",
       externalId: `handed_back:${item.id}:${runs.at(-1)?.id ?? "0"}`,
-      trusted: true,
     });
 
     log.info(handedBackText(item), { person: item.person });

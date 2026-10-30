@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { renderReplayReport } from "#/pipeline/replay/report.js";
-import { effectKey } from "#/pipeline/replay/today.js";
 import { runReplay } from "#/pipeline/replay/replay.js";
 import type { ReplayScenario, ReplayStep } from "#/pipeline/replay/replay.types.js";
 import { acmeSetup } from "./acme.js";
@@ -14,88 +13,35 @@ const assigned: ReplayStep = {
   world: { tickets: { "ACME-1": ticket("ready", "sam") } },
 };
 
-const moved: ReplayStep = {
-  event: ev("moved", "ticket.moved", "ada.admin", { ticket: "ACME-1" }, at(1), { to: "active" }),
-  world: { tickets: { "ACME-1": ticket("active", "sam") } },
-};
-
-describe("effectKey", () => {
-  it("keys every effect of today's engine", () => {
-    expect(effectKey({ type: "assign", ticket: "ACME-1", to: null })).toBe("unassign ACME-1");
-    expect(
-      effectKey({
-        type: "comment",
-        on: {
-          pr: { repo: { host: "github.com", owner: "acme-example", name: "shop" }, number: 4 },
-        },
-        template: "t",
-        body: "b",
-      }),
-    ).toBe("comment on #4");
-  });
-});
-
 describe("runReplay", () => {
-  it("requires a note exactly where the two sides differ, starting with what kind of difference it is", () => {
-    const unexplained = runReplay([one(moved)], setup);
-    expect(unexplained.problems).toEqual([
-      "replay:moved: the two sides decide differently and there is no note",
-    ]);
-
-    // A difference without a note gets an empty note cell, so the gap shows in the report too.
-    expect(renderReplayReport(unexplained)).toContain("Pick the work up._ |  |\n");
-
-    expect(runReplay([one({ ...assigned, note: "intended fix: x" })], setup).problems).toEqual([
-      "replay:assigned: has a note, but both sides decide the same",
-    ]);
-
-    expect(runReplay([one({ ...moved, note: "fixed it" })], setup).problems).toEqual([
-      'replay:moved: a note starts with "intended fix: " or "regression: "',
+  it("lists what the pipeline decides for each event", () => {
+    const row = runReplay([one(assigned)], setup).scenarios[0]!.rows[0]!;
+    expect(row.derived).toBe(false);
+    expect(row.decisions).toEqual([
+      "wake sam (assigned): _ACME-1 is assigned to you. Work on it the way the repository asks._",
     ]);
   });
 
-  it("skips, as the engine does, a schedule for someone who is not on the team", () => {
-    const ghost: ReplayStep = {
-      ...assigned,
-      world: {
-        tickets: { "ACME-1": { status: "ready", assignee: { id: "ghost", kind: "agent" } } },
-      },
-    };
-
-    const row = runReplay([one(ghost)], setup).scenarios[0]!.rows[0]!;
-    expect(row.today).toEqual(["(wake ghost (assigned): skipped, ghost is not on the team)"]);
-    expect(row.same).toBe(true);
-  });
-
-  it("lists an event only today raises after a merge, and escapes table cells", () => {
+  it("runs the events a merge derives, shows a drop, and escapes table cells", () => {
     const base = pr(41, "Base", { by: "sam", head: "sam/a", state: "merged" });
     const top = pr(42, "Top | stacked", { by: "sam", head: "sam/b", base: "sam/a" });
     const merge: ReplayStep = {
       event: ev("merge", "pr.merged", "ada-admin", { pr: 41 }, at(2)),
       world: { prs: [base, { ...top, url: undefined } as never] },
-      merge: {
-        after: { 42: "conflicting" },
-        notes: {
-          "derived:pr.conflicted:acme-example/shop#42:after:acme-example/shop#41":
-            "intended fix: the pipeline raises base_merged | instead",
-          "derived:pr.base_merged:acme-example/shop#42:after:acme-example/shop#41":
-            "intended fix: the pipeline raises base_merged instead",
-        },
-      },
+      merge: { after: { 42: "conflicting" } },
     };
 
     const result = runReplay([one(merge)], setup);
-    expect(result.problems).toEqual([]);
     const rows = result.scenarios[0]!.rows;
-    expect(rows.map((r) => [r.event.type, r.today[0], r.pipeline[0]?.slice(0, 18)])).toEqual([
-      ["pr.merged", undefined, "(drop: no policy m"],
-      ["pr.base_merged", "(not raised today)", "wake sam (rebase):"],
-      ["pr.conflicted", "wake sam (rebase)", "(not raised)"],
+    expect(rows.map((r) => [r.event.type, r.derived, r.decisions[0]?.slice(0, 18)])).toEqual([
+      ["pr.merged", false, "(drop: no policy m"],
+      ["pr.base_merged", true, "wake sam (rebase):"],
     ]);
 
     const report = renderReplayReport(result);
-    expect(report).toContain("| 1 | `pr.merged` acme-example/shop#41 by ada-admin | - |");
-    expect(report).toContain("raises base_merged \\| instead");
+    expect(report).toContain("| 1 | `pr.merged` acme-example/shop#41 by ada-admin | (drop: ");
+    expect(report).toContain("| 2 | derived `pr.base_merged`");
+    expect(report).toContain("Top \\| stacked");
   });
 
   it("folds wakes in the report's coalescing section", () => {
@@ -115,5 +61,16 @@ describe("runReplay", () => {
     expect(report).toContain(
       "- sam, assigned on ticket ACME-1: 2 events (replay:assigned, replay:again)",
     );
+  });
+
+  it("shows a dash for an event with no decision line", () => {
+    const report = renderReplayReport({
+      scenarios: [
+        { title: "Empty", rows: [{ event: assigned.event, derived: false, decisions: [] }] },
+      ],
+      coalesced: [],
+    });
+
+    expect(report).toContain("| 1 | `ticket.assigned` ACME-1 by ada.admin | - |");
   });
 });

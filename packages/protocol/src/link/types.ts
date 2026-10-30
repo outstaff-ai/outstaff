@@ -1,5 +1,4 @@
 import type { z } from "zod";
-import type { comparisonSummarySchema } from "./comparison.js";
 import type {
   itemSchema,
   itemSummarySchema,
@@ -37,5 +36,3 @@ export interface LinkMessageMeta {
   from: "office" | "service" | "both";
   summary: string;
 }
-
-export type LinkComparisonSummary = z.infer<typeof comparisonSummarySchema>;

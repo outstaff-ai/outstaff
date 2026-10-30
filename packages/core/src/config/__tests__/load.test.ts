@@ -286,12 +286,12 @@ describe("issue positions", () => {
   });
 
   it("invalid enum value points at the value", async () => {
-    const text = acme.replace("preset: kanban", "preset: waterfall");
+    const text = acme.replace("prs_per_ticket: one", "prs_per_ticket: several");
     const [i] = await load(text);
     expect(i).toMatchObject({
       code: "schema.invalid_value",
-      line: lineOf(text, "preset:"),
-      column: 11,
+      line: lineOf(text, "prs_per_ticket:"),
+      column: 21,
     });
   });
 

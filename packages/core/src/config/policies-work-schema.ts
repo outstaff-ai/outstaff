@@ -91,64 +91,18 @@ export const feedbackSchema = z
           "Start another round when feedback arrived after the agent was offered its work. Default on.",
         ),
       ),
-    merged_prs: z
-      .boolean()
-      .default(true)
-      .meta(
-        d(
-          "Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.",
-        ),
-      ),
-    doc_comments: z
-      .boolean()
-      .default(true)
-      .meta(
-        d(
-          "Schedule the author of a knowledge document to answer a trusted person's comments on it. Switches the preset rule doc-feedback-to-author. Default on.",
-        ),
-      ),
-    ticket_comments: z
-      .boolean()
-      .default(true)
-      .meta(
-        d(
-          "Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.",
-        ),
-      ),
-    mentions: z
-      .boolean()
-      .default(true)
-      .meta(
-        d(
-          "Hand a ticket to the agent a trusted person mentions in a comment on it (assign, move to active, start a round), and start a round for an agent mentioned in a document comment. Switches the preset rules mention-assigns-agent, doc-mention-feedback and doc-mention-assigns-ticket. Default on.",
-        ),
-      ),
   })
-  .default({
-    follow_up_round: true,
-    merged_prs: true,
-    doc_comments: true,
-    ticket_comments: true,
-    mentions: true,
-  })
+  .default({ follow_up_round: true })
   .meta(d("How agents act on feedback from trusted people beyond the first round."));
 
 export const handBackSchema = z
   .strictObject({
-    reassign: z
-      .enum(["requester", "none"])
-      .default("requester")
-      .meta(
-        d(
-          "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.",
-        ),
-      ),
     blocked_notify: z
       .enum(["pm", "agent"])
       .default("pm")
       .meta(
         d(
-          "Who deals with a blocked hand-back: pm schedules an unblock round for the team's PM, who messages the requester only if a human is needed; agent has the blocked agent tell the requester itself, in its own direct message. Without a PM role the agent always does. The office never posts to people. Default pm.",
+          "Who tells the requester about blocked work that did not come from chat: agent has the blocked agent tell them itself, in its own direct message; pm leaves it to the team's PM, and the blocked agent sends nothing (the hand-back still gives the ticket to the requester). Without a PM role the agent always does. The office never posts to people. Default pm.",
         ),
       ),
     fallback: z
@@ -160,7 +114,7 @@ export const handBackSchema = z
         ),
       ),
   })
-  .default({ reassign: "requester", blocked_notify: "pm", fallback: "first_human" })
+  .default({ blocked_notify: "pm", fallback: "first_human" })
   .meta(d("What happens to a ticket when an agent hands its work back."));
 
 export const ticketsSchema = z
@@ -170,17 +124,9 @@ export const ticketsSchema = z
       .default("one")
       .meta(
         d(
-          "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.",
-        ),
-      ),
-    start_moves_active: z
-      .boolean()
-      .default(true)
-      .meta(
-        d(
-          "Move a ticket to active when a work item about it starts (assigned, ticket comment), if it is in backlog, ready, review or blocked. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and the minimal preset never moves tickets. Default on.",
+          "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket; many: several are allowed. Either way the ticket moves to done when its last open pull request merges into the default branch. Default one.",
         ),
       ),
   })
-  .default({ prs_per_ticket: "one", start_moves_active: true })
+  .default({ prs_per_ticket: "one" })
   .meta(d("How tickets and pull requests relate."));

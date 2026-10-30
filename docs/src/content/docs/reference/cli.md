@@ -380,7 +380,7 @@ OUTSTAFF_OFFICE_HEALTH_URL=http://localhost:8081 ost doctor --via-office
 
 List what outstaff does on its own, with each switch's value and where it comes from.
 
-Prints every switch under `policies` in team.yaml with its effective value and its source: `default` (team.yaml says nothing), `team.yaml`, `preset` (the workflow preset has no rule for it, so the switch cannot do anything) or `workflow.rules` (an explicit rule with the same id wins over the switch). Nothing is applied. See `ost workflow explain` for what the rules do with an event.
+Prints every switch under `policies` in team.yaml with its effective value and its source: `default` (team.yaml says nothing) or `team.yaml`. Nothing is applied. What the office does with each event is decided by the event pipeline's policies (`pipeline.policies`); `ost explain` shows what they decided for an event.
 
 ```
 ost policies
@@ -398,37 +398,11 @@ ost policies
 ost policies --json
 ```
 
-## ost workflow explain
-
-Show which workflow rules an event triggers, and why.
-
-Runs the team's workflow (its preset and rule overrides) against one event and a static snapshot of the world, and prints for every rule whether it matched, why, and what it would do. Nothing is applied. The event is JSON with a type, an optional subject, actor and data; the snapshot (--state) is JSON with tickets, prs, links and roles, and defaults to an empty world, in which most rules report that no ticket is linked. A pull request entry needs its state (open, closed or merged) and author kind; feedback on an open agent pull request is scheduled for the author whatever the ticket status, and the ticket is only moved when it is in review or blocked.
-
-```
-ost workflow explain <event-json> [options]
-```
-
-| Option | Description |
-| --- | --- |
-| `--state <json>` | World snapshot as JSON: {"tickets": {"ACME-1": {"status": "review"}}, "prs": [{"ref": {"repo": {"owner": "acme", "name": "app"}, "number": 10}, "title": "Add search", "headRef": "sam/acme-1", "baseRef": "main", "draft": false, "state": "open", "author": {"login": "acme-sam[bot]", "kind": "agent", "person": "sam"}}], "links": {"10": "ACME-1"}, "roles": {}}. |
-
-Exit codes:
-
-- 0: the event was explained (whether or not any rule matched)
-- 1: the team config could not be loaded, or the event or state is malformed
-
-Examples:
-
-```sh
-ost workflow explain '{"type":"pr.comment","subject":{"pr":{"repo":{"owner":"acme","name":"app"},"number":10}},"actor":{"kind":"human","id":"dana"},"data":{"body":"please add a test"}}' --state '{"prs":[{"ref":{"repo":{"owner":"acme","name":"app"},"number":10},"title":"Add search","headRef":"sam/acme-1","baseRef":"main","draft":false,"state":"open","author":{"login":"acme-sam[bot]","kind":"agent","person":"sam"}}]}'
-ost workflow explain '{"type":"ticket.assigned","subject":{"ticket":"ACME-1"},"actor":{"kind":"human","id":"dana"}}' --state '{"tickets":{"ACME-1":{"status":"ready","assignee":{"id":"sam","kind":"agent"}}}}'
-```
-
 ## ost explain
 
 Show what the event pipeline decided for an event, and why.
 
-Proposed (decision 0016). Reads the trace the office recorded for one event while running the event pipeline in shadow mode (office.pipeline: shadow) and prints every policy that listens to the event: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop, and in shadow mode what the engine applied for the same event and how the two compare. --compare sums that up over many events: how many agree and differ, the differences by kind and by policy, and the events that differ. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.
+Reads the trace the office recorded for one event and prints every policy of the event pipeline that listens to it: whether it matched, why, and for one that did not, its first failing condition. Then the decisions: wake, act or drop, with what each act did and what each wake's bundle carried. The event id is the office's <source>:<external-id>, as the office logs it; --recent lists the latest traced events with their ids. Nothing is changed, and the store is not migrated.
 
 ```
 ost explain [event-id] [options]
@@ -438,20 +412,17 @@ ost explain [event-id] [options]
 | --- | --- |
 | `--store <url>` | The office store: postgres://..., sqlite:///path/office.db. Defaults to OUTSTAFF_STORE_URL. |
 | `--recent <n>` | List the n latest traced events instead. |
-| `--compare` | Compare the engine and the pipeline over the traced events instead. |
-| `--since <when>` | With --compare: only events since then, a duration back from now (30m, 24h, 7d) or an ISO-8601 time. |
 
 Exit codes:
 
-- 0: the trace, the list or the comparison was printed
-- 1: no store is given or it cannot be read, no event id is given, the event has no trace, or --since is not a time
+- 0: the trace or the list was printed
+- 1: no store is given or it cannot be read, no event id is given, or the event has no trace
 
 Examples:
 
 ```sh
 ost explain vcs:pr.merged:acme-example/shop#41 --store sqlite:///var/lib/outstaff/office.db
 ost explain --recent 20
-ost explain --compare --since 24h
 ```
 
 ## ost git-credential

@@ -1,10 +1,9 @@
-import type { MergeRequirements, Rule, StaticWorkflowData, WorkflowOptions } from "@outstaff/core";
-import type { Outcome } from "#/pipeline/compare/compare.types.js";
+import type { MergeRequirements, StaticWorkflowData } from "@outstaff/core";
 import type { PipelineEvent } from "#/pipeline/events.types.js";
 import type { Policy } from "#/pipeline/policy.types.js";
 import type { PipelineOptions, ReadyTicket } from "#/pipeline/state.types.js";
 
-/** The world after an event: the workflow rules' static state plus the agents' ready tickets. */
+/** The world after an event: the office's static state plus the agents' ready tickets. */
 export interface ReplayWorld extends StaticWorkflowData {
   ready?: Record<string, ReadyTicket[]>;
 }
@@ -17,19 +16,12 @@ export interface ReplayMerge {
 
   /** What the code host requires of the default branch, as the vcs port reads it; nothing when not given. */
   requirements?: MergeRequirements;
-
-  /** Why a derived event is decided differently, by its id. */
-  notes?: Record<string, string>;
 }
 
-/**
- * One event and the world after it. `note` explains why today's engine and the pipeline decide differently: it starts
- * with "intended fix:" or "regression:", and is required exactly when they do.
- */
+/** One event and the world after it. */
 export interface ReplayStep {
   event: PipelineEvent;
   world: ReplayWorld;
-  note?: string;
   merge?: ReplayMerge;
 }
 
@@ -38,15 +30,10 @@ export interface ReplayScenario {
   steps: ReplayStep[];
 }
 
-/** What both sides run with. */
+/** What the pipeline runs with. */
 export interface ReplaySetup {
-  rules: readonly Rule[];
-  workflowOptions: WorkflowOptions;
   policies: readonly Policy[];
   pipelineOptions: PipelineOptions;
-
-  /** The team's agents, for the engine's check that a schedule names one. */
-  people: readonly string[];
   coalesceMs: number;
 }
 
@@ -55,10 +42,9 @@ export interface ReplayRow {
 
   /** Raised by the merge re-check, not by a source. */
   derived: boolean;
-  today: string[];
-  pipeline: string[];
-  same: boolean;
-  note?: string | undefined;
+
+  /** What the pipeline decided, for people: the wakes, the tracker changes and the drops. */
+  decisions: string[];
 }
 
 export interface ReplayResult {
@@ -66,22 +52,4 @@ export interface ReplayResult {
 
   /** Every wake the pipeline decided, folded as the scheduler would. */
   coalesced: { person: string; subject: string; kind: string; events: string[] }[];
-
-  /** Notes missing for a difference, or present without one; empty when the fixture is consistent. */
-  problems: string[];
-}
-
-/** A merge-derived event, and which side raises it. */
-export interface Derived {
-  event: PipelineEvent;
-  today: boolean;
-  pipeline: boolean;
-}
-
-export interface Side {
-  /** What it does, for people: identity and detail. */
-  shown: string[];
-
-  /** What is compared: the wakes and tracker changes. */
-  outcomes: Outcome[];
 }

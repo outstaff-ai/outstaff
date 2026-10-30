@@ -19,8 +19,6 @@ export function createFakeOffice(
     humans?: { name: string }[];
     answer?: (to: string, question: string) => string | undefined;
 
-    /** What the office answers a chat message; by default it starts an item. */
-    chatMessage?: (m: ChatMessageRequest) => ChatMessageResult;
     chatReport?: (workItemId: string, kind: ChatReportKind) => ChatReportResult;
     currentWork?: string;
 
@@ -115,19 +113,11 @@ export function createFakeOffice(
       placed.push({ workItemId, placement });
       return { id: workItemId, title: workItemId, status: "queued" };
     },
-    async chatMessage(m) {
+    async chatMessage(m): Promise<ChatMessageResult> {
       chatMessages.push(m);
       const repeated = seen.has(m.messageId);
       seen.add(m.messageId);
-      const result = opts.chatMessage?.(m) ?? {
-        disposition: "started" as const,
-        repeated: false,
-        item: { id: `chat-${chatMessages.length}`, title: m.text, status: "queued" },
-        links: [],
-        work: [],
-      };
-
-      return { ...result, repeated };
+      return { repeated };
     },
     async reportPosted(workItemId, id) {
       reportsPosted.push({ workItemId, id });

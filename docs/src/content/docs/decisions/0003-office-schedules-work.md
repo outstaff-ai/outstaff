@@ -26,7 +26,7 @@ Each team runs one **office** container.
 
 **Work state.** It keeps current state for every ticket, pull request, CI run, review and stack, linked to the people involved.
 
-**Workflow engine.** Rules decide what each event means (see [0011](/decisions/0011-configurable-workflow/)).
+**Workflow engine.** Rules decide what each event means (see [0011](/decisions/0011-configurable-workflow/); since [0018](/decisions/0018-pipeline-only/) the event pipeline does).
 
 **Work items.** Anything that needs a person becomes a **work item**: an assignment, a review round, a conflict, failing CI, a question from another agent, a chat request, or a scheduled job.
 

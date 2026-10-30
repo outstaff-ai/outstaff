@@ -1,9 +1,9 @@
 import type { WorkflowPr } from "@outstaff/core";
 import { prLabel } from "#/log.js";
-import { derivedId, deriveAfterMerge, sameRepo } from "#/pipeline/derive.js";
+import { deriveAfterMerge } from "#/pipeline/derive.js";
 import type { PrSnapshot } from "#/pipeline/derive.types.js";
 import type { PipelineEvent } from "#/pipeline/events.types.js";
-import type { Derived, ReplayStep } from "./replay.types.js";
+import type { ReplayStep } from "./replay.types.js";
 
 const snapshots = (step: ReplayStep, mergeable: Record<number, "clean" | "conflicting"> = {}) =>
   step.world.prs!.map((p: WorkflowPr): PrSnapshot => ({
@@ -17,51 +17,16 @@ const snapshots = (step: ReplayStep, mergeable: Record<number, "clean" | "confli
     ...(step.world.links?.[p.ref.number] ? { ticket: step.world.links[p.ref.number] } : {}),
   }));
 
-/**
- * What today's work state raises after a merge: `pr.conflicted` for each other open pull request of the repository
- * that turned conflicting in the re-check (workstate.ts raises it only on a change into conflicting).
- */
-function today(merged: PrSnapshot, before: PrSnapshot[], after: PrSnapshot[], at: string) {
-  const was = new Map(before.map((p) => [prLabel(p.ref), p.mergeable]));
-  return after
-    .filter(
-      (p) =>
-        p.state === "open" &&
-        sameRepo(p, merged) &&
-        p.mergeable === "conflicting" &&
-        was.get(prLabel(p.ref)) !== "conflicting",
-    )
-    .map((p): PipelineEvent => ({
-      id: derivedId("pr.conflicted", p, merged),
-      type: "pr.conflicted",
-      at,
-      subject: { pr: p.ref, ...(p.ticket ? { ticket: p.ticket } : {}) },
-      actor: { kind: "automation", id: "workstate" },
-      data: { base: p.baseRef },
-    }));
-}
-
-/** The events a merge step raises on each side, the pipeline's first, then those only today raises. */
-export function derivedEvents(step: ReplayStep): Derived[] {
+/** The events a merge step raises for the repository's other open pull requests. */
+export function derivedEvents(step: ReplayStep): PipelineEvent[] {
   const merge = step.merge!;
-  const before = snapshots(step, merge.before);
   const after = snapshots(step, merge.after);
   const merged = after.find((p) => prLabel(p.ref) === prLabel(step.event.subject.pr!))!;
-  const now = deriveAfterMerge({
+  return deriveAfterMerge({
     merged,
-    before,
+    before: snapshots(step, merge.before),
     after,
     requirements: merge.requirements ?? { branch: merged.baseRef, upToDate: false },
     at: step.event.at,
   });
-
-  const old = today(merged, before, after, step.event.at);
-  const oldIds = new Set(old.map((e) => e.id));
-  const newIds = new Set(now.map((e) => e.id));
-  return [
-    ...now.map((event) => ({ event, today: oldIds.has(event.id), pipeline: true })),
-    ...old
-      .filter((e) => !newIds.has(e.id))
-      .map((event) => ({ event, today: true, pipeline: false })),
-  ];
 }

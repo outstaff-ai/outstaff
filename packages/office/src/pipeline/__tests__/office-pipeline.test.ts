@@ -9,7 +9,7 @@ import { manualClock } from "#/clock.js";
 import { openStore, type Store } from "#/store/index.js";
 import { createOfficePipeline } from "#/pipeline/office-pipeline.js";
 
-function team(office: Record<string, unknown>): TeamConfig {
+function team(): TeamConfig {
   const r = parseTeamConfig({
     version: 1,
     team: { name: "acme" },
@@ -21,7 +21,6 @@ function team(office: Record<string, unknown>): TeamConfig {
       vcs: { adapter: "github" },
       runtime: { adapter: "claude-agent-sdk" },
     },
-    office,
   });
 
   if (!r.ok) {
@@ -53,10 +52,10 @@ const idle = {
   data: {},
 };
 
-async function make(office: Record<string, unknown>) {
+async function make() {
   store = await openStore("sqlite::memory:");
   return createOfficePipeline({
-    team: team(office),
+    team: team(),
     store,
     workState: { ...createStaticWorkflowState({}), readyTickets: () => [] } as never,
     scheduler: { enqueue: () => Promise.reject(new Error("not in this test")) },
@@ -67,76 +66,26 @@ async function make(office: Record<string, unknown>) {
 }
 
 describe("createOfficePipeline", () => {
-  it("leaves every event to the engine when off", async () => {
-    const p = await make({});
-    expect([p.mode, p.runner]).toEqual(["off", undefined]);
-    expect(await p.route(assigned, { source: "t", externalId: "1" }, async () => [])).toEqual([]);
+  it("judges an event and records its trace", async () => {
+    const p = await make();
+    const trace = await p.runner.handle(
+      { ...assigned, subject: {} },
+      { source: "t", externalId: "2" },
+    );
 
-    expect(await p.traces.list()).toEqual([]);
+    expect(trace?.event.id).toBe("t:2");
+    expect(await p.traces.get("t:2")).toBeDefined();
   });
 
-  it("traces first, lets the engine judge, and adds what the engine applied to the trace in shadow mode", async () => {
-    const p = await make({ pipeline: "shadow" });
-    const order: string[] = [];
-    const applied = [
-      {
-        effect: { type: "move" as const, ticket: "ACME-1", to: "active" as const },
-        status: "applied" as const,
-        note: "moved",
-        at: "2026-10-05T09:00:00.000Z",
-      },
-    ];
-
-    const result = await p.route(assigned, { source: "t", externalId: "1" }, async () => {
-      order.push((await p.traces.get("t:1")) ? "traced, then engine" : "engine first");
-      return applied;
-    });
-
-    expect([p.mode, result, order]).toEqual(["shadow", applied, ["traced, then engine"]]);
-    expect(await p.traces.get("t:1")).toMatchObject({
-      engine: { effects: [{ type: "move", ticket: "ACME-1", to: "active", as: "office" }] },
-      comparison: { agree: false, differences: [{ kind: "missing_in_pipeline" }] },
-    });
-  });
-
-  it("judges without the engine when live", async () => {
-    const live = await make({ pipeline: "live" });
-    expect(live.mode).toBe("live");
-    let engine = false;
-    await live.route({ ...assigned, subject: {} }, { source: "t", externalId: "2" }, async () => {
-      engine = true;
-      return [];
-    });
-
-    expect(engine).toBe(false);
-    expect(await live.traces.get("t:2")).toBeDefined();
-  });
-
-  it("leaves an idle agent to the scheduler's pull when off, traces it first in shadow mode", async () => {
-    const off = await make({});
-    expect(await off.idle(idle, async () => "pulled")).toBe("pulled");
-    expect(await off.traces.list()).toEqual([]);
-
-    const shadow = await make({ pipeline: "shadow" });
-    const order: string[] = [];
-    await shadow.idle(idle, async () => {
-      order.push((await shadow.traces.get(idle.id)) ? "traced, then pulled" : "pulled first");
-    });
-
-    expect(order).toEqual(["traced, then pulled"]);
-  });
-
-  it("judges an idle agent without the scheduler's pull when live", async () => {
-    const live = await make({ pipeline: "live" });
-    let pulled = false;
-    await live.idle(idle, async () => (pulled = true));
-    expect(pulled).toBe(false);
-    expect((await live.traces.get(idle.id))?.decisions).toEqual([
+  it("judges an idle agent", async () => {
+    const p = await make();
+    await p.runner.judge(idle);
+    expect((await p.traces.get(idle.id))?.decisions).toEqual([
       { type: "drop", policy: "idle_pulls_next", reason: "no ready ticket is assigned to sam" },
     ]);
   });
 
-  it("judges a chat message: not at all when off, against what the desk did in shadow mode, alone when live", async () => {
+  it("queues the wake a chat message decides, through the scheduler", async () => {
     const message = {
       type: "chat.message" as const,
       subject: { chat: { channel: "D-1" } },
@@ -144,26 +93,13 @@ describe("createOfficePipeline", () => {
       data: { body: "hi", addressed: "sam" },
     };
 
-    const meta = (n: string) => ({ source: "chat", externalId: n });
-    const off = await make({});
-    expect(await off.chat(message, meta("1"))).toBeUndefined();
-    expect(await off.traces.list()).toEqual([]);
+    const p = await make();
+    await expect(p.runner.handle(message, { source: "chat", externalId: "4" })).rejects.toThrow(
+      "not in this test",
+    );
 
-    const shadow = await make({ pipeline: "shadow" });
-    const wake = { type: "wake" as const, person: "sam", kind: "chat" };
-    const desk = { effects: [{ ...wake, subject: { type: "chat", ref: "D-1" } }] };
-    await shadow.chat({ ...message, data: { ...message.data, desk } }, meta("2"));
-    expect(await shadow.traces.get("chat:2")).toMatchObject({
-      engine: desk,
-      comparison: { agree: true, differences: [] },
-    });
-
-    // Without the desk's record there is nothing to compare.
-    await shadow.chat(message, meta("3"));
-    expect((await shadow.traces.get("chat:3"))?.comparison).toBeUndefined();
-
-    const live = await make({ pipeline: "live" });
-    await expect(live.chat(message, meta("4"))).rejects.toThrow("not in this test");
-    expect((await live.traces.get("chat:4"))?.decisions).toMatchObject([wake]);
+    expect((await p.traces.get("chat:4"))?.decisions).toMatchObject([
+      { type: "wake", person: "sam", kind: "chat" },
+    ]);
   });
 });

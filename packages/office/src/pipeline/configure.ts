@@ -1,4 +1,4 @@
-import { policyOn, resolveWorkflow, type TeamConfig } from "@outstaff/core";
+import { policyOn, workflowOptions, type TeamConfig } from "@outstaff/core";
 import { DEFAULT_POLICIES, POLICY_SWITCH_OF } from "./defaults.js";
 import { instructionProblem } from "./instructions.js";
 import type { Policy } from "./policy.types.js";
@@ -76,6 +76,6 @@ export function configurePipeline(team: Team): ConfiguredPipeline {
     applyOverride(base, overrides[base.id], switchedOn(base.id), issues),
   );
 
-  const { options } = resolveWorkflow(team.workflow, team.humans, team.policies);
+  const options = workflowOptions(team);
   return { policies, options: { ...options, people: team.people.map((p) => p.handle) }, issues };
 }

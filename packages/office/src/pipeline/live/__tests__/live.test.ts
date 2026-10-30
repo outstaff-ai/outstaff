@@ -7,7 +7,7 @@ import {
 } from "@outstaff/core";
 import { afterEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
-import { readFeedback } from "#/engine/feedback.js";
+import { readFeedback } from "#/work-feedback.js";
 import { createScheduler, type EnqueueInput } from "#/scheduler/index.js";
 import { openStore, type Store } from "#/store/index.js";
 import type { Act } from "#/pipeline/decisions.types.js";
@@ -30,7 +30,6 @@ function team(pipeline?: unknown): TeamConfig {
       vcs: { adapter: "github" },
       runtime: { adapter: "claude-agent-sdk" },
     },
-    office: { pipeline: "live" },
     ...(pipeline ? { pipeline } : {}),
   });
 

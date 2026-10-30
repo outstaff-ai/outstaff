@@ -1,6 +1,6 @@
 import type { PrRef } from "@outstaff/core";
 
-/** What an event is about, as the engine and the event pipeline both describe it. */
+/** What an event is about, as the event pipeline describes it. */
 export interface EventSubject {
   ticket?: string | undefined;
   pr?: PrRef | undefined;

@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { actOpSchema } from "#/acts.js";
 import { feedbackSchema } from "#/schemas/index.js";
-import { comparisonSchema, engineSchema } from "./comparison.js";
 import { time } from "./fields.js";
 
 export const itemSubjectSchema = z
@@ -176,12 +175,6 @@ export const traceSchema = z.strictObject({
     )
     .optional()
     .describe("What each executed act did, by act id (`<event id>:<policy>`)."),
-  engine: engineSchema
-    .optional()
-    .describe("In shadow mode: what the engine did for the same event."),
-  comparison: comparisonSchema
-    .optional()
-    .describe("In shadow mode: how the engine's outcome and the pipeline's compare."),
 });
 
 /** One work item in full: what it is, its runs, and the end of its journal. */

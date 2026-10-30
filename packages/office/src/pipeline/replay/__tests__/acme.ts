@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { parseTeamConfig, parseYaml, resolveWorkflow, type TeamConfig } from "@outstaff/core";
+import { parseTeamConfig, parseYaml, type TeamConfig } from "@outstaff/core";
 import { configurePipeline } from "#/pipeline/configure.js";
 import type { ReplaySetup } from "#/pipeline/replay/replay.types.js";
 
@@ -21,14 +21,6 @@ export function acmeTeam(): TeamConfig {
 
 export function acmeSetup(): ReplaySetup {
   const team = acmeTeam();
-  const workflow = resolveWorkflow(team.workflow, team.humans, team.policies);
   const pipeline = configurePipeline(team);
-  return {
-    rules: workflow.rules,
-    workflowOptions: workflow.options,
-    policies: pipeline.policies,
-    pipelineOptions: pipeline.options,
-    people: team.people.map((p) => p.handle),
-    coalesceMs: 60_000,
-  };
+  return { policies: pipeline.policies, pipelineOptions: pipeline.options, coalesceMs: 60_000 };
 }

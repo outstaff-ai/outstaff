@@ -5,7 +5,7 @@ import type { Store } from "#/store/types.js";
 
 /**
  * The subject type that keeps the feedback of a review round, keyed by work item id: a list, because feedback that
- * arrives while the item is queued or running is attached to it. Only the engine writes it.
+ * arrives while the item is queued or running is attached to it.
  */
 export const FEEDBACK_SUBJECT = "work_feedback";
 

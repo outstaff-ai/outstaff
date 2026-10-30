@@ -111,7 +111,7 @@ const rows: Row[] = [
     "deny",
     "ost.verbs",
   ],
-  ["chat may not move work", "chat", { kind: "ost", command: "work.move" }, "deny", "ost.verbs"],
+  ["chat may place queued work", "chat", { kind: "ost", command: "work.move" }, "allow"],
   ["chat needs a verb name", "chat", { kind: "ost" }, "deny", "ost.verbs"],
   // read paths: anything but credentials
   ["read a file in a worktree", "readonly", { kind: "read", path: `${APP}/src/a.ts` }, "allow"],

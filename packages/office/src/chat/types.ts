@@ -1,4 +1,5 @@
 import type { ChatOrigin, Link } from "@outstaff/protocol";
+import type { PrRecord, TicketRecord } from "#/workstate/index.js";
 
 export interface ChatOriginRecord extends ChatOrigin {
   /**
@@ -48,23 +49,16 @@ export interface ReportQueue {
   settle(person: string, itemId: string, key: string): Promise<void>;
 }
 
-export type ParsedPlacement =
-  | { type: "next" }
-  | { type: "last" }
-  | { type: "pm" }
-  | { type: "after"; itemIds: string[] };
-
-/** One line of the list the requester saw: a piece of work and the ids of all its items. */
-export interface Candidate {
-  ids: string[];
-  title: string;
-  ticketKey?: string | undefined;
-}
-
 /** One message of a chat thread as the office received it. The text is data from its author. */
 export interface ChatLogEntry {
   messageId: string;
   author: { id: string; name?: string | undefined };
   at: string;
   text: string;
+}
+
+/** The existing work of a person that a verb argument names: a ticket, a pull request, or both. */
+export interface OwnWork {
+  ticket?: TicketRecord;
+  pr?: PrRecord;
 }

@@ -64,7 +64,6 @@ export const assignments: ReplayScenario = {
         to: "active",
       }),
       world: working,
-      note: "intended fix: a human moving an agent's ticket to active wakes the agent; today only a ticket a human holds is taken back",
     },
     {
       event: ev("s4-moved-takeback", "ticket.moved", "ada.admin", { ticket: "ACME-154" }, at(205), {
@@ -104,7 +103,6 @@ export const ticketComments: ReplayScenario = {
         mentions: ["mira"],
       }),
       world: working,
-      note: "regression: a mention wakes mira but no longer hands her the ticket; the plan's table leaves that to the agent",
     },
     {
       event: ev(
@@ -118,7 +116,6 @@ export const ticketComments: ReplayScenario = {
         },
       ),
       world: working,
-      note: "intended fix: the agent who last worked on the ticket is woken to answer, but the ticket stays with the human until the agent takes it back for more work; the comment is often only a question",
     },
     {
       event: ev("s10-agent-comment", "ticket.commented", "sam", { ticket: "ACME-150" }, at(213), {

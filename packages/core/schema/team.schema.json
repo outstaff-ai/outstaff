@@ -880,7 +880,7 @@
       "additionalProperties": false
     },
     "office": {
-      "description": "Office settings: event intake, the pipeline and the doctor checks.",
+      "description": "Office settings: event intake and the doctor checks.",
       "type": "object",
       "properties": {
         "events": {
@@ -909,15 +909,6 @@
           "description": "Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.",
           "type": "string",
           "minLength": 1
-        },
-        "pipeline": {
-          "description": "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.",
-          "type": "string",
-          "enum": [
-            "off",
-            "shadow",
-            "live"
-          ]
         },
         "doctor": {
           "description": "When the office runs the doctor checks itself, and which it leaves out.",
@@ -1411,16 +1402,6 @@
     "workflow": {
       "type": "object",
       "properties": {
-        "preset": {
-          "default": "kanban",
-          "description": "Built-in workflow to start from.",
-          "type": "string",
-          "enum": [
-            "kanban",
-            "scrum",
-            "minimal"
-          ]
-        },
         "statuses": {
           "description": "Maps canonical statuses to the status names used in your tracker.",
           "type": "object",
@@ -1441,246 +1422,6 @@
             "minLength": 1
           }
         },
-        "rules": {
-          "description": "Rules added to the preset. A rule with a preset rule's id replaces it; { id, disabled: true } removes it.",
-          "type": "array",
-          "items": {
-            "anyOf": [
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "maxLength": 64,
-                    "pattern": "^[a-z][a-z0-9_-]*$",
-                    "description": "Unique id. A rule with the same id as a preset rule replaces it."
-                  },
-                  "on": {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "pr.opened",
-                          "pr.merged",
-                          "pr.closed",
-                          "pr.review_submitted",
-                          "pr.comment",
-                          "pr.conflicted",
-                          "pr.ci_failed",
-                          "ticket.assigned",
-                          "ticket.moved",
-                          "ticket.commented",
-                          "ticket.created",
-                          "doc.commented",
-                          "agent.handed_back",
-                          "agent.asked",
-                          "schedule.cron"
-                        ]
-                      },
-                      {
-                        "minItems": 1,
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "enum": [
-                            "pr.opened",
-                            "pr.merged",
-                            "pr.closed",
-                            "pr.review_submitted",
-                            "pr.comment",
-                            "pr.conflicted",
-                            "pr.ci_failed",
-                            "ticket.assigned",
-                            "ticket.moved",
-                            "ticket.commented",
-                            "ticket.created",
-                            "doc.commented",
-                            "agent.handed_back",
-                            "agent.asked",
-                            "schedule.cron"
-                          ]
-                        }
-                      }
-                    ],
-                    "description": "Event type or types that trigger the rule."
-                  },
-                  "if": {
-                    "description": "Condition that must hold.",
-                    "allOf": [
-                      {
-                        "$ref": "#/definitions/__schema0"
-                      }
-                    ]
-                  },
-                  "do": {
-                    "minItems": 1,
-                    "type": "array",
-                    "items": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "move": {
-                              "type": "string",
-                              "enum": [
-                                "backlog",
-                                "ready",
-                                "active",
-                                "review",
-                                "blocked",
-                                "done",
-                                "canceled"
-                              ]
-                            }
-                          },
-                          "required": [
-                            "move"
-                          ],
-                          "additionalProperties": false,
-                          "description": "Move the ticket to a canonical status."
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "assign": {
-                              "type": "string",
-                              "pattern": "^(author|last_worker|requester|mentioned|none|human:\\S+|role:[a-z][a-z0-9-]*)$",
-                              "description": "Assign the ticket."
-                            }
-                          },
-                          "required": [
-                            "assign"
-                          ],
-                          "additionalProperties": false,
-                          "description": "Assign the ticket."
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "comment": {
-                              "anyOf": [
-                                {
-                                  "type": "string",
-                                  "pattern": "^[a-z][a-z0-9_-]*$"
-                                },
-                                {
-                                  "type": "object",
-                                  "properties": {
-                                    "template": {
-                                      "type": "string",
-                                      "pattern": "^[a-z][a-z0-9_-]*$"
-                                    },
-                                    "on": {
-                                      "type": "string",
-                                      "enum": [
-                                        "ticket",
-                                        "pr"
-                                      ]
-                                    }
-                                  },
-                                  "required": [
-                                    "template"
-                                  ],
-                                  "additionalProperties": false
-                                }
-                              ]
-                            }
-                          },
-                          "required": [
-                            "comment"
-                          ],
-                          "additionalProperties": false,
-                          "description": "Post a rendered template as a comment (on the ticket by default)."
-                        },
-                        {
-                          "type": "object",
-                          "properties": {
-                            "schedule": {
-                              "type": "object",
-                              "properties": {
-                                "person": {
-                                  "type": "string",
-                                  "pattern": "^(author|assignee|last_worker|doc_author|mentioned|other_mentioned|role:[a-z][a-z0-9-]*)$"
-                                },
-                                "kind": {
-                                  "type": "string",
-                                  "pattern": "^[a-z][a-z0-9_-]*$"
-                                },
-                                "priority": {
-                                  "default": "normal",
-                                  "type": "string",
-                                  "enum": [
-                                    "low",
-                                    "normal",
-                                    "high"
-                                  ]
-                                }
-                              },
-                              "required": [
-                                "person",
-                                "kind"
-                              ],
-                              "additionalProperties": false
-                            }
-                          },
-                          "required": [
-                            "schedule"
-                          ],
-                          "additionalProperties": false,
-                          "description": "Schedule a work item for an agent."
-                        }
-                      ]
-                    },
-                    "description": "Actions, run in order."
-                  },
-                  "disabled": {
-                    "description": "Set to true to remove the rule.",
-                    "type": "boolean"
-                  }
-                },
-                "required": [
-                  "id",
-                  "on",
-                  "do"
-                ],
-                "additionalProperties": false,
-                "description": "A workflow rule."
-              },
-              {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string",
-                    "maxLength": 64,
-                    "pattern": "^[a-z][a-z0-9_-]*$"
-                  },
-                  "disabled": {
-                    "type": "boolean",
-                    "const": true
-                  }
-                },
-                "required": [
-                  "id",
-                  "disabled"
-                ],
-                "additionalProperties": false,
-                "description": "Removes the preset rule with this id."
-              }
-            ]
-          }
-        },
-        "templates": {
-          "description": "Comment and notification templates by id, with {{variable}} placeholders. They override built-in templates with the same id.",
-          "type": "object",
-          "propertyNames": {
-            "type": "string",
-            "pattern": "^[a-z][a-z0-9_-]*$"
-          },
-          "additionalProperties": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
         "needs_human_label": {
           "description": "Ticket label that keeps work with a human. Default \"needs-human\".",
           "type": "string",
@@ -1688,7 +1429,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "How work moves through the team."
+      "description": "How the tracker's statuses and labels map onto outstaff's."
     },
     "pipeline": {
       "type": "object",
@@ -1730,7 +1471,7 @@
           "type": "object",
           "properties": {
             "coalesce_seconds": {
-              "description": "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes (office.pipeline: live). Default 60; 0 turns it off.",
+              "description": "Wakes for the same person and subject within this many seconds of the first become one run, which starts when the window closes. Default 60; 0 turns it off.",
               "type": "integer",
               "minimum": 0,
               "maximum": 3600
@@ -1777,7 +1518,7 @@
         }
       },
       "additionalProperties": false,
-      "description": "Proposed (decision 0016): the event pipeline's policies, read in the office's shadow and live modes (office.pipeline), and the context every wake carries, in every mode."
+      "description": "The event pipeline, which decides what the office does with every event (decision 0018): changes to its default policies, how wakes are batched, and the context every wake carries."
     },
     "link": {
       "type": "object",
@@ -1874,11 +1615,7 @@
         },
         "feedback": {
           "default": {
-            "follow_up_round": true,
-            "merged_prs": true,
-            "doc_comments": true,
-            "ticket_comments": true,
-            "mentions": true
+            "follow_up_round": true
           },
           "description": "How agents act on feedback from trusted people beyond the first round.",
           "type": "object",
@@ -1887,51 +1624,21 @@
               "default": true,
               "description": "Start another round when feedback arrived after the agent was offered its work. Default on.",
               "type": "boolean"
-            },
-            "merged_prs": {
-              "default": true,
-              "description": "Schedule the author to answer feedback on a merged pull request. Switches the preset rule merged-feedback-follow-up. Default on.",
-              "type": "boolean"
-            },
-            "doc_comments": {
-              "default": true,
-              "description": "Schedule the author of a knowledge document to answer a trusted person's comments on it. Switches the preset rule doc-feedback-to-author. Default on.",
-              "type": "boolean"
-            },
-            "ticket_comments": {
-              "default": true,
-              "description": "Start a round for the assigned agent when a trusted person comments on its ticket, and send a handed-back ticket back to its last worker. Switches the preset rules ticket-comment-to-assignee and ticket-comment-reactivates-ticket. Default on.",
-              "type": "boolean"
-            },
-            "mentions": {
-              "default": true,
-              "description": "Hand a ticket to the agent a trusted person mentions in a comment on it (assign, move to active, start a round), and start a round for an agent mentioned in a document comment. Switches the preset rules mention-assigns-agent, doc-mention-feedback and doc-mention-assigns-ticket. Default on.",
-              "type": "boolean"
             }
           },
           "additionalProperties": false
         },
         "hand_back": {
           "default": {
-            "reassign": "requester",
             "blocked_notify": "pm",
             "fallback": "first_human"
           },
           "description": "What happens to a ticket when an agent hands its work back.",
           "type": "object",
           "properties": {
-            "reassign": {
-              "default": "requester",
-              "description": "Who an agent's hand-back assigns the ticket to: the requester, or none to leave the assignee alone (the ticket still moves: to review when done, to blocked when blocked). Edits the preset rules hand-back-to-requester and hand-back-blocked-to-requester. Default requester.",
-              "type": "string",
-              "enum": [
-                "requester",
-                "none"
-              ]
-            },
             "blocked_notify": {
               "default": "pm",
-              "description": "Who deals with a blocked hand-back: pm schedules an unblock round for the team's PM, who messages the requester only if a human is needed; agent has the blocked agent tell the requester itself, in its own direct message. Without a PM role the agent always does. The office never posts to people. Default pm.",
+              "description": "Who tells the requester about blocked work that did not come from chat: agent has the blocked agent tell them itself, in its own direct message; pm leaves it to the team's PM, and the blocked agent sends nothing (the hand-back still gives the ticket to the requester). Without a PM role the agent always does. The office never posts to people. Default pm.",
               "type": "string",
               "enum": [
                 "pm",
@@ -1952,25 +1659,19 @@
         },
         "tickets": {
           "default": {
-            "prs_per_ticket": "one",
-            "start_moves_active": true
+            "prs_per_ticket": "one"
           },
           "description": "How tickets and pull requests relate.",
           "type": "object",
           "properties": {
             "prs_per_ticket": {
               "default": "one",
-              "description": "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket and the ticket moves to done when its pull request merges; many: several are allowed and the ticket moves to done when the agent hands its work back as done and every pull request linked to it is closed with at least one merged. Edits the preset rules pr-merged-done, pr-closed-ready, hand-back-to-requester and second-pr-comment. Default one.",
+              "description": "How many pull requests a ticket may have. one: ost pr open refuses a second one for a ticket; many: several are allowed. Either way the ticket moves to done when its last open pull request merges into the default branch. Default one.",
               "type": "string",
               "enum": [
                 "one",
                 "many"
               ]
-            },
-            "start_moves_active": {
-              "default": true,
-              "description": "Move a ticket to active when a work item about it starts (assigned, ticket comment), if it is in backlog, ready, review or blocked. Rounds that only answer something (asked, document feedback) and chat sessions never move it, and the minimal preset never moves tickets. Default on.",
-              "type": "boolean"
             }
           },
           "additionalProperties": false
@@ -1980,36 +1681,15 @@
           "description": "Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.",
           "type": "boolean"
         },
-        "conflicts": {
-          "default": {
-            "follow_up": true
-          },
-          "description": "Merge conflicts between pull requests.",
-          "type": "object",
-          "properties": {
-            "follow_up": {
-              "default": true,
-              "description": "Send a pull request that starts to conflict with its base, for example after another one merged, back to its agent author to rebase. Switches the preset rule conflict-back-to-author. Default on.",
-              "type": "boolean"
-            }
-          },
-          "additionalProperties": false
-        },
         "retry": {
           "default": {
-            "on_signal": true,
             "base_minutes": 1,
             "cap_minutes": 30,
             "max_failures": 3
           },
-          "description": "How a failing work item is retried: exponential backoff, then blocked; and whether a human's signal brings a blocked item back.",
+          "description": "How a failing work item is retried: exponential backoff, then blocked.",
           "type": "object",
           "properties": {
-            "on_signal": {
-              "default": true,
-              "description": "Retry a blocked work item when a trusted human moves its ticket, assigns it, reviews or comments on its pull request, or replies in its chat thread. Default on.",
-              "type": "boolean"
-            },
             "base_minutes": {
               "default": 1,
               "description": "Wait after the first failed run of a work item; doubles with each failure.",

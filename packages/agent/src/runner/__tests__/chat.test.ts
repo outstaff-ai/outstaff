@@ -5,7 +5,7 @@ import { basename, join } from "node:path";
 import { createFakeChat, createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createFakeOffice } from "#/verbs/office.js";
-import type { ChatMessageResult, FakeOffice } from "#/verbs/office.types.js";
+import type { FakeOffice } from "#/verbs/office.types.js";
 import type { Offer } from "#/office-client/index.js";
 import { createChatRelay } from "#/runner/chat.js";
 import { REPLY_SAFETY_LINES } from "#/runner/chat-text.js";
@@ -274,7 +274,7 @@ describe("chat relay", () => {
     expect(text).toContain("busy");
     expect(text).toContain(`1. [ACME-1 Checkout bug](${tracker.links.issue("ACME-1")}) (running)`);
     expect(text).toContain("2. [Search page](https://git.acme.example/acme/app/pull/4)");
-    expect(text).toMatch(/next, after one of these \(say its number\), last, or ask the PM/);
+    expect(text).toMatch(/next, after one of these \(say its number\), or last\?/);
     expect(text).toContain("waits at the end");
   });
 
@@ -314,25 +314,8 @@ describe("chat relay", () => {
     );
   });
 
-  it("says so briefly when all chat sessions are taken, and posts no busy reply otherwise", async () => {
-    await setup({
-      chatMessage: () => ({
-        disposition: "limited",
-        repeated: false,
-        item: { id: "c1", title: "Chat: x", status: "queued" },
-        links: [],
-        work: [],
-      }),
-    });
-
-    await dana("a question");
-    expect(chat.posts).toHaveLength(1);
-    expect(chat.posts[0]!.text).toContain("next in line");
-    expect(chat.posts[0]!.text).not.toContain("busy");
-  });
-
-  it("offers the PM only when the team has one", async () => {
-    await setup(undefined, false);
+  it("never offers the PM where filed work goes", async () => {
+    await setup();
     await relay.acknowledge(
       offerOf(),
       { title: "Fix the footer" },
@@ -347,39 +330,10 @@ describe("chat relay", () => {
     expect(chat.posts[0]!.text).not.toContain("PM");
   });
 
-  it.each<[ChatMessageResult["disposition"], Partial<ChatMessageResult>, string]>([
-    ["placed", { placement: "next" }, "this goes next"],
-    ["asked_pm", {}, "asked the PM"],
-    ["unclear", { work: [{ id: "w1", title: "Checkout bug", status: "active" }] }, "Say next"],
-  ])("answers a %s reply in the thread", async (disposition, extra, expected) => {
-    await setup({
-      chatMessage: () => ({
-        disposition,
-        repeated: false,
-        item: { id: "c1", title: "x", status: "queued" },
-        links: [],
-        work: [],
-        ...extra,
-      }),
-    });
-
-    await dana("next", "m1");
-    expect(chat.posts[0]!.text).toContain(expected);
-    expect(chat.posts[0]!.thread).toBe("m1");
-  });
-
-  it("only reacts when the message joins an item", async () => {
-    await setup({
-      chatMessage: () => ({
-        disposition: "joined",
-        repeated: false,
-        item: { id: "c1", title: "x", status: "active" },
-        links: [],
-        work: [],
-      }),
-    });
-
+  it("only reacts to a message: the reply comes with the work the office starts", async () => {
+    await setup();
     await dana("also add a clear button", "m1");
+    expect(office.chatMessages).toHaveLength(1);
     expect(chat.posts).toEqual([]);
     expect(chat.reactions).toHaveLength(1);
   });
@@ -415,16 +369,8 @@ describe("chat relay", () => {
     expect(chat.reactions).toEqual([]);
   });
 
-  it("does not answer a message the office already handled (redelivery)", async () => {
-    await setup({
-      chatMessage: () => ({
-        disposition: "limited",
-        repeated: false,
-        item: { id: "c1", title: "x", status: "queued" },
-        links: [],
-        work: [],
-      }),
-    });
+  it("passes a redelivered message on again, and answers neither", async () => {
+    await setup();
 
     const message: ChatMessage = {
       id: "dup1",
@@ -437,7 +383,7 @@ describe("chat relay", () => {
     await handler(message);
     await handler(message);
     expect(office.chatMessages).toHaveLength(2);
-    expect(chat.posts).toHaveLength(1);
+    expect(chat.posts).toEqual([]);
   });
 
   it("says so in the thread when the office cannot be reached", async () => {

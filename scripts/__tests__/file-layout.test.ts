@@ -24,8 +24,7 @@ describe("file layout", () => {
   });
 
   it("exempts listed files and folders", () => {
-    expect(exemption("packages/office/src/engine/engine.ts")).toMatch(/redesign/);
-    expect(exemption("packages/core/src/workflow/presets.ts")).toMatch(/redesign/);
+    expect(exemption("e2e/run.ts")).toMatch(/harness/);
     expect(exemption("packages/core/src/workflow/evaluate.ts")).toBeUndefined();
   });
 
@@ -59,7 +58,7 @@ describe("file layout", () => {
       "packages/core/src/long.ts": long,
       "packages/core/src/mixed.ts": mixed,
       "packages/core/src/index.ts": mixed,
-      "packages/office/src/engine/engine.ts": long + mixed,
+      "e2e/run.ts": long + mixed,
     };
 
     const problems = layoutProblems(Object.keys(files), (file: string) => files[file]);

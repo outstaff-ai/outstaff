@@ -1,10 +1,8 @@
 import { policyOn, type WorkflowEvent } from "@outstaff/core";
 import type { IdlePull, IdlePullOptions } from "./office-idle.types.js";
-import { nextReadyTicket } from "./pipeline/idle.js";
 import type { PipelineEvent } from "./pipeline/events.types.js";
-import { CHAT_KIND, priorityFor } from "./scheduler/index.js";
+import { CHAT_KIND } from "./scheduler/index.js";
 
-const KIND = "assigned";
 const TRIGGER = "automation";
 const BUSY = new Set(["queued", "active"]);
 
@@ -15,11 +13,10 @@ const TICKET_CHANGES = new Set(["ticket.created", "ticket.assigned", "ticket.mov
  * The idle pull (`policies.pull_ready`): an agent with no work item queued or running starts its next ready ticket.
  * Checked when a ticket change gives the agent a ready ticket, after a hand-back, on the scheduler's tick and when the
  * agent connects. The office raises `agent.idle` only when there is a ready ticket to start, so an idle team leaves no
- * trace every tick. With the pipeline off the pull is the scheduler's own; in shadow mode it is traced first; live,
- * the `idle_pulls_next` policy decides it.
+ * trace every tick; the `idle_pulls_next` policy decides what it starts.
  */
 export function createIdlePull(opts: IdlePullOptions): IdlePull {
-  const { team, store, workState, scheduler, pipeline, clock, logger } = opts;
+  const { team, workState, scheduler, pipeline, clock, logger } = opts;
   const agents = new Set(team.people.map((p) => p.handle));
 
   // Checks never overlap: a tick, a hand-back and a connect may all ask at once.
@@ -31,37 +28,9 @@ export function createIdlePull(opts: IdlePullOptions): IdlePull {
   };
 
   const busy = async (person: string) =>
-    (await store.listItems({ person })).some((i) => BUSY.has(i.status) && i.kind !== CHAT_KIND);
-
-  const pull = async (person: string) => {
-    const next = nextReadyTicket(workState.readyTickets(person));
-    if (!next) {
-      return;
-    }
-
-    const title = next.title?.includes(next.key) ? next.title : `${next.key} ${next.title ?? ""}`;
-    const item = await scheduler.enqueue({
-      person,
-      kind: KIND,
-      title: `${KIND}: ${title.trim()}`,
-      trigger: TRIGGER,
-      priority: priorityFor(TRIGGER, KIND),
-      subject: { type: "ticket", ref: next.key },
-      init: async (created) => {
-        await store.appendJournal(
-          created.id,
-          "office",
-          `${person} had nothing queued, so the office started ${next.key}, the next ready ticket assigned to them.`,
-        );
-      },
-    });
-
-    logger.info(`idle pull: queued work item ${item.id} for ${person} on ${next.key}`, {
-      person,
-      item: item.id,
-      ticket: next.key,
-    });
-  };
+    (await opts.store.listItems({ person })).some(
+      (i) => BUSY.has(i.status) && i.kind !== CHAT_KIND,
+    );
 
   /** Whether the person is an agent with nothing to do and a ready ticket to start, and may start it now. */
   const shouldPull = async (person: string): Promise<boolean> => {
@@ -96,7 +65,7 @@ export function createIdlePull(opts: IdlePullOptions): IdlePull {
       data: {},
     };
 
-    await pipeline.idle(event, () => pull(person));
+    await pipeline.judge(event);
   };
 
   // Never throws: a failed check is logged, and the next hand-back, tick or connect checks again.

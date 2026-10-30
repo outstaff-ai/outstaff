@@ -9,7 +9,7 @@ import type { ProtocolServer } from "#/protocol/index.js";
 import { openStore } from "#/store/index.js";
 import type { OfficePorts } from "#/types.js";
 
-function team(link?: string, pipeline?: "shadow"): TeamConfig {
+function team(link?: string): TeamConfig {
   const r = parseTeamConfig({
     version: 1,
     team: { name: "acme" },
@@ -22,7 +22,6 @@ function team(link?: string, pipeline?: "shadow"): TeamConfig {
       runtime: { adapter: "fake" },
     },
     ...(link ? { link: { url: link } } : {}),
-    ...(pipeline ? { office: { pipeline } } : {}),
   });
 
   if (!r.ok) {
@@ -85,9 +84,7 @@ describe("office link wiring", () => {
     expect(make(team(), "t")).toBeUndefined();
     expect(make(team("ws://127.0.0.1:1/link"))).toBeUndefined();
     expect(make(team("ws://127.0.0.1:1/link"), "t")?.status().state).toBe("idle");
-    expect(make(team("ws://127.0.0.1:1/link", "shadow"), "t", "1.2.3")?.status().state).toBe(
-      "idle",
-    );
+    expect(make(team("ws://127.0.0.1:1/link"), "t", "1.2.3")?.status().state).toBe("idle");
 
     await store.close();
   });

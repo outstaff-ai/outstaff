@@ -103,14 +103,6 @@ export const teamConfigSchema = z
               "Team chat channel where the office mirrors agent-to-agent questions and answers, so humans can follow them. Without it they go to the ticket of the asking work item, or only to its journal.",
             ),
           ),
-        pipeline: z
-          .enum(["off", "shadow", "live"])
-          .optional()
-          .meta(
-            d(
-              "Proposed (decision 0016): shadow runs every event through the event pipeline as well and only records its decisions, for `ost explain`; live lets the pipeline decide instead of the workflow rules, queueing its wakes and making its tracker changes as the office, on behalf of the agent each is for. Default off.",
-            ),
-          ),
         doctor: z
           .strictObject({
             daily_at: z
@@ -135,7 +127,7 @@ export const teamConfigSchema = z
           .meta(d("When the office runs the doctor checks itself, and which it leaves out.")),
       })
       .optional()
-      .meta(d("Office settings: event intake, the pipeline and the doctor checks.")),
+      .meta(d("Office settings: event intake and the doctor checks.")),
     tools: toolsSchema
       .optional()
       .meta(d("Tools every agent of the team installs at start, with the commands they may run.")),

@@ -19,7 +19,6 @@ export const team = {
     tracker: { adapter: "itsaplan", url: "https://tracker.acme.example", project: "SHOP" },
   },
   workflow: {
-    preset: "kanban",
     statuses: {
       backlog: "Backlog",
       ready: "Ready",
