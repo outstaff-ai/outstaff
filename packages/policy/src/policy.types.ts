@@ -1,5 +1,6 @@
 import type {
   CanonicalStatus,
+  Capability,
   Condition,
   Resolved,
   WorkflowOptions,
@@ -75,17 +76,25 @@ export interface PolicyOptions extends WorkflowOptions {
    * repository when unset.
    */
   mergeRepos?: readonly string[] | undefined;
+
+  /**
+   * What the team's integrations can do: the capabilities of the adapters the team file configures, such as
+   * `tracker.development`. Unknown, and so none, when unset.
+   */
+  capabilities?: readonly Capability[] | undefined;
 }
 
 /**
  * One bookkeeping change of an act. `assign: requester` is the human who asked for the work (else the team's first
  * human), `assign: self` the agent acted for, and any other person reference (`role:pm`, for example) the agent it
- * names; `set_parent` sets the parent ticket the event names in `data.parent`.
+ * names; `set_parent` sets the parent ticket the event names in `data.parent`; `link_pr` shows the event's pull
+ * request on the ticket (the tracker's `tracker.development`).
  */
 export type OpSpec =
   | { move: CanonicalStatus }
   | { assign: "requester" | "self" | PersonRef }
-  | { set_parent: true };
+  | { set_parent: true }
+  | { link_pr: true };
 
 /** What `ctx.wake` wakes: a person, the kind of run, and its subject (the event's, or the agent's next ready ticket). */
 export interface WakeSpec {

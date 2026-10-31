@@ -153,6 +153,33 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       });
     });
 
+    it("raises pr.linked once when an open pull request is first linked after it was opened", async () => {
+      const p = await pr({ title: "ACME-1: search" });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      expect(ws.ticketForPr(prRef(p.number))).toBeUndefined();
+
+      const issue = await tracker.createIssue({ title: "Search", body: "" });
+      await ws.apply(ticketEvent("ticket.created", issue.key), meta("created"));
+      await ws.rescan();
+      await ws.rescan();
+      expect(issue.key).toBe("ACME-1");
+      expect(types()).toEqual([`pr.linked#${p.number}`]);
+      expect(seen[0]).toMatchObject({
+        subject: { pr: prRef(p.number), ticket: issue.key },
+        actor: { kind: "automation", id: "workstate" },
+        data: { ticket: issue.key },
+      });
+    });
+
+    it("raises no pr.linked for a pull request linked when it is opened", async () => {
+      const issue = await tracker.createIssue({ title: "Search", body: "" });
+      const p = await pr({ title: `${issue.key}: search` });
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      await ws.rescan();
+      expect(ws.ticketForPr(prRef(p.number))).toBe(issue.key);
+      expect(seen).toEqual([]);
+    });
+
     it("uses a closing reference in the body and the title, and skips keys the tracker does not know", async () => {
       const a = await tracker.createIssue({ title: "A", body: "" });
       const b = await tracker.createIssue({ title: "B", body: "" });

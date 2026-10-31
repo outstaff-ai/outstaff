@@ -1,4 +1,10 @@
-import { parseRepoUrl, policyOn, workflowOptions, type TeamConfig } from "@outstaff/core";
+import {
+  parseRepoUrl,
+  policyOn,
+  workflowOptions,
+  type Capability,
+  type TeamConfig,
+} from "@outstaff/core";
 import { instructionProblem, type ConfiguredPolicy, type Policy } from "@outstaff/policy";
 import { BUILT_IN_POLICIES, POLICY_SWITCH_OF } from "./policies/index.js";
 import type { ConfiguredPipeline, PipelineOptions } from "./state.types.js";
@@ -82,14 +88,18 @@ function mergeReposOf(team: Team): string[] | undefined {
     .map((r) => `${r.owner}/${r.name}`.toLowerCase());
 }
 
-/** What the team's config tells the policies, and how long a wake waits for related ones. */
-function optionsOf(team: Team): PipelineOptions {
+/**
+ * What the team's config, and what its integrations can do, tell the policies; and how long a wake waits for related
+ * ones.
+ */
+function optionsOf(team: Team, capabilities: readonly Capability[] | undefined): PipelineOptions {
   const seconds = team.pipeline?.wake?.coalesce_seconds;
   const mergeRepos = mergeReposOf(team);
   return {
     ...workflowOptions(team),
     people: team.people.map((p) => p.handle),
     ...(mergeRepos ? { mergeRepos } : {}),
+    ...(capabilities ? { capabilities } : {}),
     ...(seconds === undefined ? {} : { coalesceMs: seconds * 1000 }),
   };
 }
@@ -97,11 +107,13 @@ function optionsOf(team: Team): PipelineOptions {
 /**
  * The team's policies: the built-in ones in order, then the custom ones `policies.custom` loaded, with
  * `pipeline.policies.<id>` applied. `enabled` turns one on or off, `instruction` replaces a wake's instruction or an
- * act's note, and `when` narrows it: both its own condition and the team's must hold.
+ * act's note, and `when` narrows it: both its own condition and the team's must hold. `capabilities` are what the
+ * team's integrations can do, for the policies that need one.
  */
 export function configurePipeline(
   team: Team,
   custom: readonly ConfiguredPolicy[] = [],
+  capabilities?: readonly Capability[],
 ): ConfiguredPipeline {
   const overrides = team.pipeline?.policies ?? {};
   const issues: string[] = [];
@@ -122,5 +134,5 @@ export function configurePipeline(
     applyOverride(base, overrides[base.id], switchedOn(base.id), issues),
   );
 
-  return { policies, options: optionsOf(team), issues };
+  return { policies, options: optionsOf(team, capabilities), issues };
 }

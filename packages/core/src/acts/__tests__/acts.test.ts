@@ -97,6 +97,55 @@ describe("applyActOps", () => {
   });
 });
 
+describe("applyActOps: link_pr", () => {
+  const pr = {
+    repo: { owner: "acme", name: "shop" },
+    number: 7,
+    url: "https://git.acme.example/7",
+  };
+
+  it("links a pull request once, and says when it was linked already", async () => {
+    const tracker = createFakeTracker();
+    await tracker.seed.repository!(pr.repo, [7]);
+    const issue = await tracker.createIssue({ title: "t", body: "" });
+    const op = { op: "link_pr" as const, ticket: issue.key, pr };
+    expect(await applyActOps([op, op], { tracker }, async (t) => t.id)).toEqual({
+      ok: true,
+      results: [
+        `linked acme/shop#7 on ${issue.key}`,
+        `acme/shop#7 was already linked on ${issue.key}`,
+      ],
+    });
+
+    expect(tracker.development.get(issue.key)).toEqual([{ ...pr, by: "u-bot" }]);
+  });
+
+  it("fails, saying how to fix it, for a repository not connected to the tracker", async () => {
+    const tracker = createFakeTracker();
+    const issue = await tracker.createIssue({ title: "t", body: "" });
+    expect(
+      await applyActOps([{ op: "link_pr", ticket: issue.key, pr }], { tracker }, async (t) => t.id),
+    ).toEqual({
+      ok: false,
+      results: [],
+      error: `link_pr ${issue.key}: acme/shop is not connected to the tracker; connect the repository in the tracker's integrations`,
+    });
+  });
+
+  it("needs a tracker that links pull requests", async () => {
+    const { linkPullRequest: _link, ...plain } = createFakeTracker();
+    expect(
+      await applyActOps(
+        [{ op: "link_pr", ticket: "ACME-1", pr }],
+        { tracker: plain },
+        async (t) => t.id,
+      ),
+    ).toMatchObject({
+      error: "link_pr ACME-1: the tracker cannot link pull requests (tracker.development)",
+    });
+  });
+});
+
 describe("trackerMemberOf", () => {
   const team = {
     people: [{ handle: "sam", identities: { tracker: "sam.duarte" } }, { handle: "noor" }],

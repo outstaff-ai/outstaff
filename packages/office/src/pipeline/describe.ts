@@ -15,6 +15,8 @@ export function describeOp(op: ActOp): string {
       return `comment on ${"ticket" in op.on ? op.on.ticket : `doc ${op.on.doc}`}`;
     case "set_parent":
       return `set the parent of ${op.ticket} to ${op.parent}`;
+    case "link_pr":
+      return `link ${op.pr.repo.owner}/${op.pr.repo.name}#${op.pr.number} on ${op.ticket}`;
   }
 }
 

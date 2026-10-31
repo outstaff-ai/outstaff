@@ -837,7 +837,7 @@ Sent by: agent. Answered by: `ack`, `error`.
 
 ### `act`
 
-Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments and parents. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.
+Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments, parents and pull request links. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.
 
 Sent by: office.
 

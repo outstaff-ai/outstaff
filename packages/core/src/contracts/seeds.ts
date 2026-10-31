@@ -18,6 +18,9 @@ import type {
 export interface TrackerSeed {
   /** Add a person who can be assigned. */
   member(m: { name: string; kind?: Member["kind"] }): Promise<Member>;
+
+  /** Connect a code repository to the tracker, with pull requests numbered `pullRequests` in it. */
+  repository?(repo: RepoRef, pullRequests: number[]): Promise<void>;
   forbiddenCall?(): Promise<unknown>;
 }
 

@@ -14,8 +14,8 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 1 | `pr.opened` acme-example/shop#41 by sam | move ACME-123 to review (for sam) |
-| 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (for sam) |
+| 1 | `pr.opened` acme-example/shop#41 by sam | move ACME-123 to review (for sam)<br>link acme-example/shop#41 on ACME-123 (for sam) |
+| 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (for sam)<br>link acme-example/shop#42 on ACME-124 (for sam) |
 | 3 | `pr.merged` acme-example/shop#43 by ada-admin | (drop: no policy matched) |
 | 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merge): _#41 (Search API) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
 | 5 | `pr.merged` acme-example/shop#41 by sam | move ACME-123 to done (for sam) |
@@ -106,8 +106,8 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 43 | `pr.opened` acme-example/shop#62 by sam | (drop: no policy matched) |
-| 44 | `pr.opened` acme-example/shop#63 by grace-lead | move ACME-131 to review (for sam) |
+| 43 | `pr.opened` acme-example/shop#62 by sam | link acme-example/shop#62 on ACME-162 (for sam) |
+| 44 | `pr.opened` acme-example/shop#63 by grace-lead | move ACME-131 to review (for sam)<br>(drop: no agent to act for: pull request has no agent author) |
 | 45 | `pr.closed` acme-example/shop#62 by ada-admin | (drop: no policy matched) |
 | 46 | `pr.merged` acme-example/shop#55 by grace-lead | (drop: no agent to act for: pull request has no agent author; ticket is not assigned to an agent; no agent has worked on the ticket yet) |
 | 47 | `pr.merged` acme-example/shop#56 by ada-admin | (drop: no policy matched) |

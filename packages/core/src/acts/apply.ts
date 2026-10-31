@@ -51,6 +51,26 @@ const setParent: Make<"set_parent"> = async (op, ports) => {
   return `set the parent of ${op.ticket} to ${op.parent}`;
 };
 
+const linkPr: Make<"link_pr"> = async (op, ports) => {
+  const tracker = need(ports.tracker, "tracker");
+  if (!tracker.linkPullRequest) {
+    throw new Error("the tracker cannot link pull requests (tracker.development)");
+  }
+
+  const { repo, number } = op.pr;
+  const pr = `${repo.owner}/${repo.name}#${number}`;
+  switch (await tracker.linkPullRequest(op.ticket, op.pr)) {
+    case "linked":
+      return `linked ${pr} on ${op.ticket}`;
+    case "already_linked":
+      return `${pr} was already linked on ${op.ticket}`;
+    case "not_connected":
+      throw new Error(
+        `${repo.owner}/${repo.name} is not connected to the tracker; connect the repository in the tracker's integrations`,
+      );
+  }
+};
+
 function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
   switch (op.op) {
     case "move":
@@ -61,6 +81,8 @@ function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
       return comment(op, ports, member);
     case "set_parent":
       return setParent(op, ports, member);
+    case "link_pr":
+      return linkPr(op, ports, member);
   }
 }
 

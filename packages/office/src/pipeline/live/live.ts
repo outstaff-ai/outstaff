@@ -12,7 +12,12 @@ import { enqueueWake } from "./wake.js";
  */
 export function createLivePipeline(opts: LiveOptions): PipelineRunner {
   const { traces, clock, logger, executor, workState: state } = opts;
-  const { policies, options, issues } = configurePipeline(opts.team, opts.policies);
+  const { policies, options, issues } = configurePipeline(
+    opts.team,
+    opts.policies,
+    opts.capabilities,
+  );
+
   for (const issue of issues) {
     logger.warn(`pipeline: ${issue}`);
   }

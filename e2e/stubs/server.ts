@@ -69,6 +69,20 @@ const github = createGithubE2e({
   permissions: { "ada-admin": "write", "grace-lead": "write" },
 });
 
+/** acme/shop's pull requests as the tracker reads them from the code host; acme/ops is not connected. */
+const shopPulls = async () =>
+  (await github.state()).pulls.map((p) => ({
+    number: p.number,
+    title: p.title,
+    url: `https://github.acme.example/acme/shop/pull/${p.number}`,
+    state: p.state as "open" | "merged" | "closed",
+    draft: false,
+    sourceBranch: p.head.ref,
+    targetBranch: "main",
+    headSha: p.head.sha,
+    updatedAt: new Date().toISOString(),
+  }));
+
 const tracker = createItsaplanE2e({
   projectKey: "SHOP",
   teamRef: "acme",
@@ -92,6 +106,15 @@ const tracker = createItsaplanE2e({
     Object.entries(pairs(env("STUB_TRACKER_KEYS"))).map(([k, user]) => [k, `u-${user}`]),
   ),
   human: "ada.admin",
+  repositories: [
+    {
+      id: 1,
+      provider: "github",
+      fullName: "acme/shop",
+      webUrl: "https://github.acme.example/acme/shop",
+    },
+  ],
+  pullRequests: shopPulls,
 });
 
 const chat = createChat();

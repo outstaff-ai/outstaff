@@ -3,7 +3,7 @@ import { PIPELINE_EVENT_TYPES } from "./events.js";
 import { instructionProblem } from "./instructions.js";
 
 /** The ops an act may make: bookkeeping only. Anything that needs judgement is a wake. */
-export const BOOKKEEPING_OPS = ["move", "assign", "set_parent"] as const;
+export const BOOKKEEPING_OPS = ["move", "assign", "set_parent", "link_pr"] as const;
 
 /** A policy id: lowercase letters, digits and underscores, starting with a letter. */
 export const POLICY_ID = /^[a-z][a-z0-9_]*$/;
@@ -40,6 +40,15 @@ const op = z.union([
   z.strictObject({ op: z.literal("move"), ticket: text, to: z.enum(STATUSES) }),
   z.strictObject({ op: z.literal("assign"), ticket: text, to: target.nullable() }),
   z.strictObject({ op: z.literal("set_parent"), ticket: text, parent: text }),
+  z.strictObject({
+    op: z.literal("link_pr"),
+    ticket: text,
+    pr: z.strictObject({
+      repo: z.strictObject({ owner: text, name: text, host: text.optional() }),
+      number: z.int().positive(),
+      url: text.optional(),
+    }),
+  }),
   z.looseObject({
     op: z.string().refine((o) => !(BOOKKEEPING_OPS as readonly string[]).includes(o)),
   }),

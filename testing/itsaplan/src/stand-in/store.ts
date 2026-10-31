@@ -1,5 +1,11 @@
 import type { StandInReply } from "@outstaff/testing.http";
-import type { ColumnSpec, ItsaplanStore, StandInOptions, StoredMember } from "./types.js";
+import type {
+  ColumnSpec,
+  ItsaplanStore,
+  PullRequestSource,
+  StandInOptions,
+  StoredMember,
+} from "./types.js";
 
 /** The Title Case statuses that match the canonical workflow. */
 export const DEFAULT_COLUMNS: ColumnSpec[] = [
@@ -29,6 +35,18 @@ export function tickingClock(): () => string {
   return () => new Date(Date.UTC(2026, 0, 1, 0, 0, 0) + ++tick * 1000).toISOString();
 }
 
+/** The development section's data: the connected repositories, their pull requests and the links made. */
+function development(opts: StandInOptions) {
+  const pullRequests: ItsaplanStore["pullRequests"] = new Map();
+  const own: PullRequestSource = (repo) => pullRequests.get(repo.id) ?? [];
+  return {
+    repositories: [...(opts.repositories ?? [])],
+    pullRequests,
+    pullRequestsOf: opts.pullRequests ?? own,
+    development: [],
+  };
+}
+
 export function createStore(opts: StandInOptions): ItsaplanStore {
   const key = opts.projectKey ?? "SHOP";
   const teamRef = opts.teamRef ?? "acme";
@@ -55,6 +73,7 @@ export function createStore(opts: StandInOptions): ItsaplanStore {
     served: [],
     docs: [],
     docComments: [],
-    counters: { activity: 100, label: 500, doc: 0, comment: 0 },
+    ...development(opts),
+    counters: { activity: 100, label: 500, doc: 0, comment: 0, link: 0 },
   };
 }

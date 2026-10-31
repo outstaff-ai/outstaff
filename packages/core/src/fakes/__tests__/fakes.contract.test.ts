@@ -20,7 +20,12 @@ trackerContract("fake", async () => {
   return {
     subject,
     seed: subject.seed,
-    capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments"],
+    capabilities: [
+      "tracker.issues",
+      "tracker.assign",
+      "tracker.attachments",
+      "tracker.development",
+    ],
   };
 });
 

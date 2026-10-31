@@ -14,7 +14,7 @@ catalog: { version: 1.0.0 }
 repos:
   - { name: app, url: git.acme.example/acme/app, kind: primary }
 people:
-  - { handle: sam, name: Sam, role: developer, model: sonnet }
+  - { handle: sam, name: Sam, role: developer, model: sonnet, repos: { app: write } }
 integrations:
   chat: { adapter: fake }
   vcs: { adapter: fake }
@@ -59,7 +59,11 @@ describe("startOffice", () => {
     expect(ran.status).toBe(200);
     expect(await ran.json()).toMatchObject({
       lastRun: expect.any(String),
-      checks: [{ scope: "office", name: "OUTSTAFF_AGENT_TOKEN_SAM present", status: "ok" }],
+      checks: [
+        // The fake tracker links pull requests, and the team's repository is not connected to it.
+        { scope: "office", name: "Tracker link of app", status: "warn" },
+        { scope: "office", name: "OUTSTAFF_AGENT_TOKEN_SAM present", status: "ok" },
+      ],
     });
 
     expect((await fetch(`${base}/doctor`)).status).toBe(200);

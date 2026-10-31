@@ -13,6 +13,8 @@ import type {
   Knowledge,
   Member,
   NewAttachment,
+  PullRequestToLink,
+  RepoRef,
   RunRequest,
   Runtime,
   StatusMap,
@@ -103,6 +105,12 @@ export interface FakeTracker extends Tracker {
 
   /** Every file attached, by ticket key. */
   attached: Map<string, NewAttachment[]>;
+
+  /** The pull requests linked on each ticket with `linkPullRequest`, by ticket key, with the member id who linked each. */
+  development: Map<string, (PullRequestToLink & { by: string })[]>;
+
+  /** The code repositories connected to the tracker; `seed.repository` adds one. */
+  connected: RepoRef[];
 }
 
 export interface FakeVcsOptions {

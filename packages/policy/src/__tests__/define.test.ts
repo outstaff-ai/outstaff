@@ -50,6 +50,11 @@ describe("checkProposals", () => {
           { op: "move", ticket: "ACME-1", to: "review" },
           { op: "assign", ticket: "ACME-1", to: null },
           { op: "set_parent", ticket: "ACME-1", parent: "ACME-0" },
+          {
+            op: "link_pr",
+            ticket: "ACME-1",
+            pr: { repo: { owner: "acme", name: "shop" }, number: 7, url: "https://x.example/7" },
+          },
           { op: "comment", on: { ticket: "ACME-1" }, body: "x" },
         ],
         note: "n",

@@ -7,6 +7,15 @@ import { policyOn } from "#/policies/switches.js";
 import { plural } from "./check.js";
 import type { MergeGateGap, RepoEntry } from "./types.js";
 
+/** The repos of the team file some person can write to, by name, kind or `*`. */
+export function writableRepos(config: Pick<TeamConfig, "repos" | "people">): RepoEntry[] {
+  return config.repos.filter((repo) =>
+    config.people.some((p) =>
+      [repo.name, `kind:${repo.kind}`, "*"].some((key) => p.repos[key] === "write"),
+    ),
+  );
+}
+
 /**
  * The repos whose pull requests agents may merge: `policies.merge.repos`, else every repo an agent can write to.
  * None while `policies.merge.on_approval` is off.
@@ -17,12 +26,7 @@ export function mergeRepos(config: TeamConfig): RepoEntry[] {
   }
 
   const scope = config.policies?.merge.repos;
-  const writable = (repo: RepoEntry) =>
-    config.people.some((p) =>
-      [repo.name, `kind:${repo.kind}`, "*"].some((key) => p.repos[key] === "write"),
-    );
-
-  return config.repos.filter((repo) => (scope ? scope.includes(repo.name) : writable(repo)));
+  return scope ? config.repos.filter((repo) => scope.includes(repo.name)) : writableRepos(config);
 }
 
 /** What the host requires, in words. */

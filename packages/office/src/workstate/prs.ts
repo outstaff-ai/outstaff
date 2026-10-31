@@ -30,11 +30,12 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
   const { ensureTicket } = ticketOps;
   const synthetic = async (
     ctx: RefreshCtx,
-    type: "pr.conflicted" | "pr.ci_failed" | "pr.ci_passed" | "pr.base_merged",
+    type: "pr.conflicted" | "pr.ci_failed" | "pr.ci_passed" | "pr.base_merged" | "pr.linked",
     rec: PrRecord,
     data: Record<string, unknown>,
+    once = rec.headSha,
   ) => {
-    const externalId = `${type}:${prSubject(rec.ref)}:${rec.headSha}`;
+    const externalId = `${type}:${prSubject(rec.ref)}:${once}`;
     const event: WorkflowEvent = {
       type,
       subject: { pr: rec.ref, ...(rec.ticket ? { ticket: rec.ticket } : {}) },
@@ -186,6 +187,11 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
 
     if (turned(rec, prev, "ci", "success")) {
       await synthetic(ctx, "pr.ci_passed", rec, { passing: rec.checks.map((c) => c.name) });
+    }
+
+    // A pull request linked on first sight is linked by its `pr.opened`; a later link has no event of its own.
+    if (prev && rec.ticket && rec.ticket !== prev.ticket) {
+      await synthetic(ctx, "pr.linked", rec, { ticket: rec.ticket }, rec.ticket);
     }
   };
 

@@ -71,6 +71,30 @@ describe("the act maker", () => {
     expect(h.logged).toEqual(["made an act"]);
   });
 
+  it("links a pull request on its ticket with the agent's own tracker account", async () => {
+    const tracker = createFakeTracker({ actor: { id: "u-office", name: "Office", kind: "agent" } });
+    const sam = await tracker.seed.member({ name: "Sam", kind: "agent" });
+    const repo = { owner: "acme", name: "shop" };
+    await tracker.seed.repository!(repo, [7]);
+    const issue = await tracker.createIssue({ title: "Search", body: "" });
+    const h = harness();
+    const maker = createActMaker({
+      env: { team: teamOf(sam.id), tracker: tracker.as(sam) },
+      office: h.office,
+      log: h.log,
+    });
+
+    await maker.make([
+      { id: "e:link", ops: [{ op: "link_pr", ticket: issue.key, pr: { repo, number: 7 } }] },
+    ]);
+
+    expect(h.answers).toEqual([
+      { id: "e:link", ok: true, results: [`linked acme/shop#7 on ${issue.key}`] },
+    ]);
+
+    expect(tracker.development.get(issue.key)).toEqual([{ repo, number: 7, by: sam.id }]);
+  });
+
   it("answers a change that failed, and keeps the answer for the next delivery when sending it fails", async () => {
     const h = harness(() => Promise.reject(new Error("connection lost")));
     const maker = createActMaker({ env: { team: teamOf("u-sam") }, office: h.office, log: h.log });

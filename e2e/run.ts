@@ -552,6 +552,17 @@ async function main() {
   );
 
   assertIncludes(moved, "In Progress>In Review", "the ticket went to review");
+  const linked = await until("the pull request linked on its ticket in the tracker", (s) => {
+    const t = s.tickets.find((x: Json) => x.key === first);
+    return t.development.length > 0 ? t.development : undefined;
+  });
+
+  assertEq(
+    JSON.stringify(linked),
+    JSON.stringify([{ repository: "acme/shop", number: pr1.pr.number, by: "sam" }]),
+    "the agent linked its pull request on the ticket, with its own tracker account",
+  );
+
   step(
     `assignment: ${first} -> sam cloned, committed, pushed and opened pull request #${pr1.pr.number}; ticket in review`,
   );

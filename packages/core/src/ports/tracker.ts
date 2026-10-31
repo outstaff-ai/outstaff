@@ -1,6 +1,6 @@
 import type { EventPage } from "./events.js";
 import type { Links } from "./links.js";
-import type { CanonicalStatus } from "./types.js";
+import type { CanonicalStatus, RepoRef } from "./types.js";
 
 export interface Member {
   id: string;
@@ -71,6 +71,21 @@ export interface NewAttachment {
   data: Uint8Array;
 }
 
+/** A pull request to show on a ticket. */
+export interface PullRequestToLink {
+  repo: { owner: string; name: string; host?: string | undefined };
+  number: number;
+
+  /** Its page on the code host, when known. */
+  url?: string | undefined;
+}
+
+/**
+ * What linking a pull request to a ticket did: linked it now, found it linked already, or could not, because the
+ * pull request's repository is not connected to the tracker.
+ */
+export type PullRequestLinkOutcome = "linked" | "already_linked" | "not_connected";
+
 export interface Tracker {
   links: Pick<Links, "issue" | "comment">;
 
@@ -113,6 +128,16 @@ export interface Tracker {
 
   /** Capability `tracker.attachments`. The bytes of a file `attachments` listed. */
   download?(attachment: TicketAttachment): Promise<Uint8Array>;
+
+  /**
+   * Capability `tracker.development`. Shows the pull request on the ticket (its "Development" section), once: a pull
+   * request already linked is left as it is. Only a repository connected to the tracker can be linked; for any other,
+   * the outcome is `not_connected` and nothing changes.
+   */
+  linkPullRequest?(key: string, pr: PullRequestToLink): Promise<PullRequestLinkOutcome>;
+
+  /** Capability `tracker.development`. The code repositories connected to the tracker, whose pull requests it can link. */
+  connectedRepositories?(): Promise<RepoRef[]>;
   events(cursor?: string): Promise<EventPage<TrackerEvent>>;
 
   /** Webhook mode; same contract as `Vcs.parseWebhook`. */

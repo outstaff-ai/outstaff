@@ -1,4 +1,4 @@
-import { silentLogger, type WorkflowEvent } from "@outstaff/core";
+import { configuredAdapters, silentLogger, type WorkflowEvent } from "@outstaff/core";
 import type { QueuedAct } from "@outstaff/protocol";
 import { createChatDesk } from "./chat/index.js";
 import { createIntake } from "./intake/index.js";
@@ -124,6 +124,9 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     push,
     clock,
     logger: log,
+    capabilities: configuredAdapters(team, input.registry, "office").found.flatMap(
+      (a) => a.def.capabilities,
+    ),
     ...defined({ policies: input.policies }),
   };
 
@@ -230,7 +233,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
   const chatEntry = createChatEntry({ intake, store, clock });
 
-  const doctor = doctorForOffice(input, ports.vcs, log);
+  const doctor = doctorForOffice(input, ports, log);
   server = createProtocolServer({
     source,
     team,

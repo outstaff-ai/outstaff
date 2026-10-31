@@ -115,6 +115,8 @@ export function createItsaplanE2e(opts: ItsaplanE2eOptions) {
     teamRef: opts.teamRef,
     basePath: "/tracker",
     documents: { listing: "all" },
+    ...(opts.repositories ? { repositories: opts.repositories } : {}),
+    ...(opts.pullRequests ? { pullRequests: opts.pullRequests } : {}),
   });
 
   const human = memberNamed(store, opts.human)!.userId;

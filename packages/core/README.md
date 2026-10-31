@@ -10,7 +10,7 @@ An adapter is a package that implements one port for one product (for example a 
 
 | Port        | What it does                                                                  | Capabilities                                                                                           |
 | ----------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `tracker`   | issues, comments, assignment, status moves, events                            | `tracker.issues`, `tracker.assign`, `tracker.webhooks`, `tracker.attachments`                          |
+| `tracker`   | issues, comments, assignment, status moves, events                            | `tracker.issues`, `tracker.assign`, `tracker.webhooks`, `tracker.attachments`, `tracker.development`   |
 | `knowledge` | documents, search, comments                                                   | `knowledge.docs`                                                                                       |
 | `vcs`       | pull requests, checks, review threads, repo credentials, permissions, events  | `vcs.pullRequests`, `vcs.reviewThreads`, `vcs.workflows`, `vcs.reactions`, `vcs.merge`, `vcs.webhooks` |
 | `chat`      | inbound messages (trust-filtered), posting, reactions, history, agent profile | `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`                                     |

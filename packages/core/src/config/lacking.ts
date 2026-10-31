@@ -6,6 +6,7 @@ export const LACKING: Record<Capability, string> = {
   "tracker.assign": "be assigned tickets",
   "tracker.webhooks": "react to ticket changes instantly",
   "tracker.attachments": "attach files to tickets",
+  "tracker.development": "link its pull requests on their tickets",
   "knowledge.docs": "write design docs",
   "vcs.pullRequests": "open or update pull requests",
   "vcs.reviewThreads": "reply to review threads",
