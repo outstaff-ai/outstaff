@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, realpathSync, statSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -22,6 +22,7 @@ import { createOffice } from "./office.js";
 import type { CreateOfficeInput, Office } from "./office.types.js";
 import { openStore } from "./store/index.js";
 import type { LogLevel, RunningOffice, StartDeps } from "./types.js";
+import { officeVersion } from "./version.js";
 
 export const DEFAULT_STORE_URL = "sqlite:///var/lib/outstaff/office.db";
 
@@ -184,6 +185,7 @@ async function loadTeam(env: Env) {
  * - `OUTSTAFF_AGENT_PORT` (8080), `OUTSTAFF_WEBHOOK_PORT` (8082), `OUTSTAFF_HEALTH_PORT` (8081)
  * - `OUTSTAFF_LOG_LEVEL`: `debug`, `info` (default), `warn` or `error`
  * - `OUTSTAFF_POLL_INTERVAL_MS`: for tests, overrides `office.poll_interval_seconds`
+ * - `OUTSTAFF_VERSION`: the version the office reports, set by the image build; else the package's
  */
 export async function startOffice(
   env: Env = process.env,
@@ -209,6 +211,7 @@ export async function startOffice(
           agentPort: port(env, "OUTSTAFF_AGENT_PORT", 8080),
           webhookPort: port(env, "OUTSTAFF_WEBHOOK_PORT", 8082),
           ...polling,
+          officeVersion: officeVersion(env),
           ...(env["OUTSTAFF_SECRETS_DIR"] ? { secretsDir: env["OUTSTAFF_SECRETS_DIR"] } : {}),
         },
       }),
@@ -233,17 +236,9 @@ export async function startOffice(
   };
 }
 
-function packageVersion(): string {
-  const manifest = JSON.parse(
-    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
-  ) as { version: string };
-
-  return manifest.version;
-}
-
 async function main() {
   if (process.argv.slice(2).some((a) => a === "--version" || a === "-v")) {
-    process.stdout.write(`${packageVersion()}\n`);
+    process.stdout.write(`${officeVersion(process.env)}\n`);
     return;
   }
 

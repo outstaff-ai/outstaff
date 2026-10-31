@@ -374,6 +374,7 @@ The office acts under its own name on every system it uses, named `<team>-outsta
 | `OUTSTAFF_HEALTH_PORT`                           | Port of the health endpoints. Default 8081.                                                                                                                                                            |
 | `OUTSTAFF_AGENT_TOKEN_<HANDLE>`                  | One token per person, as a secret.                                                                                                                                                                     |
 | `OUTSTAFF_SECRETS_DIR`                           | Directory of secret files, default `/run/secrets/outstaff`; the environment is the fallback.                                                                                                           |
+| `OUTSTAFF_VERSION`                               | The version the office reports on `--version` and its link. The images set it to their release version; unset or empty, the package version.                                                           |
 | Adapter secrets (for example `GH_OFFICE_APP_ID`) | Whatever the configured adapters declare for the office scope.                                                                                                                                         |
 
 The SQLite file's folder is created when missing; mount a volume there. Use Postgres to run the office on a platform without persistent disks. Migrations run on start.

@@ -3,6 +3,7 @@
 #   images/smoke.sh <repository-prefix> <tag> [image...]
 # Example: images/smoke.sh ost dev agent office   (images default to all four)
 # Images run with a read-only root filesystem and only /tmp and HOME writable, as the docs advise.
+# SMOKE_VERSION, when set, is the OUTSTAFF_VERSION build argument the images were built with: --version must print it.
 # The agent check installs pnpm and yarn from the code toolset with mise, so it needs outbound HTTPS to the tool sources.
 set -euo pipefail
 
@@ -14,6 +15,13 @@ if [ "${#images[@]}" -eq 0 ]; then images=(agent office); fi
 
 fail() { echo "FAIL: $*" >&2; exit 1; }
 ref() { echo "${prefix}/$1:${tag}"; }
+
+# What --version must print: exactly SMOKE_VERSION when set, else a package version.
+if [ -n "${SMOKE_VERSION:-}" ]; then
+  version_pattern="^$(sed 's/[.+]/\\&/g' <<<"$SMOKE_VERSION")\$"
+else
+  version_pattern='^[0-9]+\.[0-9]+\.[0-9]+'
+fi
 
 # Runs a command in an image with the hardened settings; prints its output.
 run() {
@@ -39,8 +47,8 @@ expect() { # expect <image> <pattern> <command...>
 
 smoke_agent() {
   local image="$1"
-  expect "$image" '^[0-9]+\.[0-9]+\.[0-9]+' ost-agent --version
-  expect "$image" '^[0-9]+\.[0-9]+\.[0-9]+' ost --version
+  expect "$image" "$version_pattern" ost-agent --version
+  expect "$image" "$version_pattern" ost --version
   smoke_runtimes "$image"
   expect "$image" '^[1-9][0-9]*$' id -u
   expect "$image" 'git version' git --version
@@ -99,7 +107,7 @@ smoke_toolset() {
 
 smoke_office() {
   local image=office name="ost-smoke-office-$$" dir
-  expect "$image" '^[0-9]+\.[0-9]+\.[0-9]+' outstaff-office --version
+  expect "$image" "$version_pattern" outstaff-office --version
   # The office carries no agent tooling.
   expect "$image" '^none$' sh -c 'for c in mise gh claude bwrap socat; do command -v "$c" >/dev/null && { echo "$c on PATH"; exit 1; }; done; echo none'
 

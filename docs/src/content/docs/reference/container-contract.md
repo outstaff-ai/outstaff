@@ -76,16 +76,17 @@ The runtime adapter needs no credential of its own and declares both runtime key
 
 ### Office
 
-| Variable                | Default                                | Meaning                                                                             |
-| ----------------------- | -------------------------------------- | ----------------------------------------------------------------------------------- |
-| `OUTSTAFF_TEAM_FILE`    | none                                   | Path to `team.yaml`, or the folder holding it. Wins over `OUTSTAFF_TEAM_REPO`.      |
-| `OUTSTAFF_TEAM_REPO`    | none                                   | Git URL of the repository that holds `.outstaff/team.yaml`.                         |
-| `OUTSTAFF_TEAM_REF`     | the default branch                     | Branch, tag or commit of `OUTSTAFF_TEAM_REPO`.                                      |
-| `OUTSTAFF_STORE_URL`    | `sqlite:///var/lib/outstaff/office.db` | `postgres://user:pass@host/db`, `sqlite:///path` or `sqlite::memory:` (tests only). |
-| `OUTSTAFF_AGENT_PORT`   | `8080`                                 | Port agents connect to, path `/agent`.                                              |
-| `OUTSTAFF_HEALTH_PORT`  | `8081`                                 | Port of the health endpoints.                                                       |
-| `OUTSTAFF_WEBHOOK_PORT` | `8082`                                 | Port of the webhook receiver, used when the team's `office.events` is `webhook`.    |
-| `OUTSTAFF_SECRETS_DIR`  | `/run/secrets/outstaff`                | Directory of secret files.                                                          |
+| Variable                | Default                                | Meaning                                                                                                               |
+| ----------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `OUTSTAFF_TEAM_FILE`    | none                                   | Path to `team.yaml`, or the folder holding it. Wins over `OUTSTAFF_TEAM_REPO`.                                        |
+| `OUTSTAFF_TEAM_REPO`    | none                                   | Git URL of the repository that holds `.outstaff/team.yaml`.                                                           |
+| `OUTSTAFF_TEAM_REF`     | the default branch                     | Branch, tag or commit of `OUTSTAFF_TEAM_REPO`.                                                                        |
+| `OUTSTAFF_STORE_URL`    | `sqlite:///var/lib/outstaff/office.db` | `postgres://user:pass@host/db`, `sqlite:///path` or `sqlite::memory:` (tests only).                                   |
+| `OUTSTAFF_AGENT_PORT`   | `8080`                                 | Port agents connect to, path `/agent`.                                                                                |
+| `OUTSTAFF_HEALTH_PORT`  | `8081`                                 | Port of the health endpoints.                                                                                         |
+| `OUTSTAFF_WEBHOOK_PORT` | `8082`                                 | Port of the webhook receiver, used when the team's `office.events` is `webhook`.                                      |
+| `OUTSTAFF_SECRETS_DIR`  | `/run/secrets/outstaff`                | Directory of secret files.                                                                                            |
+| `OUTSTAFF_VERSION`      | the image's release version            | The version the office reports on `--version` and its link. The image sets it; when it is empty, the package version. |
 
 For tests only, `OUTSTAFF_POLL_INTERVAL_MS` (milliseconds, a positive whole number) overrides `office.poll_interval_seconds`, below its minimum of 10 seconds too, so that an end-to-end run does not wait seconds for each event. The office logs a warning when it is set. Leave it unset for a real team: the code host and the tracker limit how often they may be asked.
 
@@ -93,12 +94,13 @@ If none of the team variables is set, the office looks for `.outstaff/team.yaml`
 
 ### Agent
 
-| Variable               | Default                 | Meaning                                                            |
-| ---------------------- | ----------------------- | ------------------------------------------------------------------ |
-| `OUTSTAFF_PERSON`      | required                | Handle of the person this container runs as.                       |
-| `OUTSTAFF_OFFICE_URL`  | required                | WebSocket URL of the office, for example `ws://office:8080/agent`. |
-| `OUTSTAFF_SECRETS_DIR` | `/run/secrets/outstaff` | Directory of secret files.                                         |
-| `HOME`                 | the user's home         | Root of the agent's directories, see [volumes](#volumes).          |
+| Variable               | Default                     | Meaning                                                                                                                    |
+| ---------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `OUTSTAFF_PERSON`      | required                    | Handle of the person this container runs as.                                                                               |
+| `OUTSTAFF_OFFICE_URL`  | required                    | WebSocket URL of the office, for example `ws://office:8080/agent`.                                                         |
+| `OUTSTAFF_SECRETS_DIR` | `/run/secrets/outstaff`     | Directory of secret files.                                                                                                 |
+| `HOME`                 | the user's home             | Root of the agent's directories, see [volumes](#volumes).                                                                  |
+| `OUTSTAFF_VERSION`     | the image's release version | The version the agent reports on `--version` and in its `hello`. The image sets it; when it is empty, the package version. |
 
 The agent takes no team location: only the office loads the team file, and each agent receives the team config from the office when it connects (see [The agent](/architecture/agent/#startup)). Mount the team file into the office container only.
 

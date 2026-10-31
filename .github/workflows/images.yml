@@ -42,10 +42,12 @@ jobs:
           platforms: linux/amd64
           load: true
           tags: local/${{ matrix.image }}:ci
+          # a stand-in release version, which the smoke test expects --version to print
+          build-args: OUTSTAFF_VERSION=0.0.0-ci
           cache-from: type=gha,scope=${{ matrix.image }}
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}
       - name: Smoke test
-        run: images/smoke.sh local ci ${{ matrix.image }}
+        run: SMOKE_VERSION=0.0.0-ci images/smoke.sh local ci ${{ matrix.image }}
 
   # Proves arm64 builds and starts, on a native arm64 runner: every night, by hand, and before a release publishes.
   arm64:
@@ -69,10 +71,12 @@ jobs:
           platforms: linux/arm64
           load: true
           tags: local/${{ matrix.image }}:ci
+          # a stand-in release version, which the smoke test expects --version to print
+          build-args: OUTSTAFF_VERSION=0.0.0-ci
           cache-from: type=gha,scope=${{ matrix.image }}-arm64
           cache-to: type=gha,mode=max,scope=${{ matrix.image }}-arm64
       - name: Smoke test
-        run: images/smoke.sh local ci ${{ matrix.image }}
+        run: SMOKE_VERSION=0.0.0-ci images/smoke.sh local ci ${{ matrix.image }}
 
   publish:
     name: publish (${{ matrix.image }})
@@ -110,6 +114,8 @@ jobs:
           target: ${{ matrix.image }}
           platforms: linux/amd64,linux/arm64
           push: true
+          # v0.1.0-rc.20 -> 0.1.0-rc.20: the version the office and agents report (package.json is not bumped)
+          build-args: OUTSTAFF_VERSION=${{ steps.meta.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: |

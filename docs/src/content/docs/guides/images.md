@@ -35,7 +35,7 @@ If you want instant starts, or a machine without outbound access to the tool hos
   - the office: `/var/lib/outstaff` (the SQLite database, unless you use Postgres through `OUTSTAFF_STORE_URL`) and `/tmp`.
 - **No secrets inside.** Secrets come from files under `/run/secrets/outstaff`, or from the environment as a fallback ([0008](/decisions/0008-hosting-and-secrets-out-of-scope/)).
 - **Health.** The office image has a `HEALTHCHECK` that calls `/healthz` on `OUTSTAFF_HEALTH_PORT` (default 8081). Use `/readyz` for readiness. The agent has no port; it exits when the office rejects it, so let your platform restart it.
-- **Versions.** `ost-agent --version`, `ost --version` and `outstaff-office --version` print the package version.
+- **Versions.** `ost-agent --version`, `ost --version` and `outstaff-office --version` print the image's release version, which the image sets as `OUTSTAFF_VERSION` from the build argument of the same name (the release workflow passes the tag's version). The office reports it on its link and the agents in their `hello`. Built without the argument, they print the package version.
 - **Runtimes.** `ost-agent --runtimes` prints the runtime adapters the agent image carries, the same list as its `work.outstaff.runtimes` label.
 
 ## Extending an image
@@ -85,4 +85,4 @@ docker build -f images/Dockerfile --target office -t outstaff/office:dev .
 images/smoke.sh outstaff dev
 ```
 
-`images/smoke.sh` starts each image with a read-only root, checks the version commands (including `mise --version`), checks that the agent's `work.outstaff.runtimes` label matches `ost-agent --runtimes`, installs pnpm and yarn from the code toolset with mise and runs `pnpm --version` and `yarn --version` in an unrelated directory (this needs egress to the tool sources), and starts the office on SQLite with a minimal team file until its health check passes. The `Images` workflow does the same on every pull request and in the merge queue for `linux/amd64`, and for `linux/arm64` on a native arm64 runner every night and on `v*` tags before it publishes.
+`images/smoke.sh` starts each image with a read-only root, checks the version commands (including `mise --version`; with `SMOKE_VERSION` set, `--version` must print exactly that, the `OUTSTAFF_VERSION` build argument the images were built with), checks that the agent's `work.outstaff.runtimes` label matches `ost-agent --runtimes`, installs pnpm and yarn from the code toolset with mise and runs `pnpm --version` and `yarn --version` in an unrelated directory (this needs egress to the tool sources), and starts the office on SQLite with a minimal team file until its health check passes. The `Images` workflow does the same on every pull request and in the merge queue for `linux/amd64`, and for `linux/arm64` on a native arm64 runner every night and on `v*` tags before it publishes.
