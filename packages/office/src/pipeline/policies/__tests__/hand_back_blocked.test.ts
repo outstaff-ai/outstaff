@@ -2,15 +2,16 @@ import type { StaticTicket } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { event, judge, SAM, t } from "./support.js";
 
-const back = (status: string) =>
+const back = (status: string, actor = SAM) =>
   event("agent.handed_back", {
     subject: { ticket: "ACME-1" },
-    actor: SAM,
+    actor,
     data: { status, kind: "assigned" },
   });
 
-const world = (status: StaticTicket["status"]) => ({
+const world = (status: StaticTicket["status"], roles: Record<string, string> = {}) => ({
   tickets: { "ACME-1": t(status, "sam", { requester: "ada.admin" }) },
+  roles,
 });
 
 describe("hand_back_blocked", () => {
@@ -26,5 +27,16 @@ describe("hand_back_blocked", () => {
     expect(judge("hand_back_blocked", back("waiting"), world("active"))).toMatchObject({
       failed: { any: expect.any(Array) },
     });
+  });
+
+  it("leaves the ticket to the team's PM, unless the PM is the blocked agent", () => {
+    expect(judge("hand_back_blocked", back("blocked"), world("active", { pm: "priya" }))).toEqual([
+      "drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them",
+    ]);
+
+    const priya = { kind: "agent" as const, id: "priya" };
+    expect(
+      judge("hand_back_blocked", back("blocked", priya), world("active", { pm: "priya" })),
+    ).toEqual(["act for priya: move ACME-1 to blocked, assign ACME-1 to human ada.admin"]);
   });
 });

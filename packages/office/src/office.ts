@@ -186,7 +186,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       }
 
       await chatDesk.handedBack(item, result);
-      await handedBack(item);
+      await handedBack(item, result);
       await track(rounds.settle(item));
       await track(rounds.followUp(item.id));
       await track(idle.check(item.person));

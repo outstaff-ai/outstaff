@@ -1,6 +1,7 @@
 import type { ActOp } from "@outstaff/core";
 import type { QueuedAct } from "@outstaff/protocol";
 import type { ActDesk, ActDeskOptions, PendingAct } from "./act.types.js";
+import { createActEchoes } from "./echoes.js";
 import { createActQueue } from "./pending.js";
 import { actRecords } from "./results.js";
 
@@ -19,6 +20,7 @@ const wire = (act: PendingAct): QueuedAct => ({ id: act.id, ops: act.ops });
 export function createActDesk(opts: ActDeskOptions): ActDesk {
   const { clock, logger: log } = opts;
   const queue = createActQueue(opts.store);
+  const echoes = createActEchoes(opts.store, clock);
   const update = actRecords(opts.traces);
   const now = () => clock.now().toISOString();
 
@@ -33,6 +35,8 @@ export function createActDesk(opts: ActDeskOptions): ActDesk {
   return {
     async send(person, act) {
       await queue.add(person, act);
+      // Expected back before the agent has it: the tracker may report a change before the agent answers.
+      await echoes.expect(person, act);
       if (act.event) {
         await update(
           act.event,
@@ -83,5 +87,7 @@ export function createActDesk(opts: ActDeskOptions): ActDesk {
         log.warn(`act ${act.id} of ${person} failed`, { error: r.error });
       }
     },
+
+    echoOf: echoes.of,
   };
 }

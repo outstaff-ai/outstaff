@@ -75,6 +75,43 @@ describe("the invariants", () => {
     expect(idle.decisions).toMatchObject([{ type: "wake", person: "sam", coalesceMs: 0 }]);
   });
 
+  it("wakes no one for the tracker's echo of an office act, the assignment an act made included", () => {
+    const sam = { kind: "agent" as const, id: "sam" };
+    const echo = aggregated(
+      [
+        proposing("p", [
+          wake("noor"),
+          { type: "act", as: "sam", ops: [move("review")], reason: "r" },
+        ]),
+      ],
+      event("ticket.assigned", {
+        subject: { ticket: "ACME-1" },
+        actor: sam,
+        data: { echo: "workstate:handed_back:w1:1:hand_back_blocked_to_pm" },
+      }),
+    );
+
+    expect(echo.aggregation[0]).toEqual({
+      policy: "p",
+      proposal: 0,
+      outcome: "rejected",
+      reason:
+        "the echo of act workstate:handed_back:w1:1:hand_back_blocked_to_pm, which the office decided: the event that caused the act already decided whom to wake",
+      decision: 0,
+    });
+
+    // Only the wakes: an act on the echo is judged as on any event.
+    expect(echo.decisions[1]).toMatchObject({ type: "act", as: "sam" });
+
+    // The same assignment made by the agent itself, not by an act, wakes the assignee.
+    const own = aggregated(
+      [proposing("p", [wake("noor")])],
+      event("ticket.assigned", { subject: { ticket: "ACME-1" }, actor: sam }),
+    );
+
+    expect(own.decisions).toMatchObject([{ type: "wake", person: "noor" }]);
+  });
+
   it("guards against loops: a bot's event wakes no one, the office's own events do", () => {
     const bot = { kind: "automation" as const, id: "renovate[bot]" };
     const byBot = aggregated(

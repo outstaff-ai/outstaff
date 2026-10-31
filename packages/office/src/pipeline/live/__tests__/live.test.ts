@@ -198,6 +198,33 @@ describe("createLivePipeline", () => {
     expect(acts).toHaveLength(1);
   });
 
+  it("marks the tracker's echo of an office act, which wakes no one", async () => {
+    const { opts, store: s } = await setup();
+    const seen: string[] = [];
+    const live = createLivePipeline({
+      ...opts,
+      echoOf: async (event) => {
+        seen.push(event.id);
+        return event.id === "tracker:e-2" ? "workstate:hb-1:hand_back_blocked_to_pm" : undefined;
+      },
+    });
+
+    await live.handle(assigned, { source: "tracker", externalId: "e-1" });
+    expect(await s.listItems({ person: "sam" })).toHaveLength(1);
+
+    const echo = await live.handle(assigned, { source: "tracker", externalId: "e-2" });
+    expect(echo?.event.data["echo"]).toBe("workstate:hb-1:hand_back_blocked_to_pm");
+    expect(echo?.decisions).toMatchObject([
+      {
+        type: "drop",
+        policy: "assigned_to_assignee",
+        reason: expect.stringMatching(/^the echo of act/),
+      },
+    ]);
+
+    expect(seen).toEqual(["tracker:e-1", "tracker:e-2"]);
+  });
+
   it("logs configuration issues", async () => {
     const warned: string[] = [];
     const { opts } = await setup({

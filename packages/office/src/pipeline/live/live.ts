@@ -20,7 +20,13 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
   const runner: PipelineRunner = {
     async handle(raw, meta) {
       const event = toPipelineEvent(raw, meta, clock.now().toISOString());
-      return event ? runner.judge(event) : undefined;
+      if (!event) {
+        return undefined;
+      }
+
+      // The tracker's echo of an office act carries the act's id, and wakes no one (see the invariants).
+      const echo = await opts.echoOf?.(event, state);
+      return runner.judge(echo ? { ...event, data: { ...event.data, echo } } : event);
     },
 
     async judge(event) {

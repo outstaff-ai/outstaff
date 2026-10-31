@@ -5,7 +5,8 @@ import {
   instructionVariables,
   renderInstruction,
 } from "#/instructions.js";
-import { ctxOf, event, pr, prRef } from "./support.js";
+import { createEvaluationContext } from "@outstaff/core";
+import { ctxOf, event, OPTS, pr, prRef, stateOf } from "./support.js";
 
 describe("instruction variables", () => {
   it("names the merge that caused a derived event and what is wrong with the pull request", () => {
@@ -45,6 +46,17 @@ describe("instruction variables", () => {
       "cause.title": "",
       "next.ticket": "ACME-161",
     });
+  });
+
+  it("names the requester of the ticket, else the team's first human", () => {
+    const e = event("agent.handed_back", { subject: { ticket: "ACME-9" } });
+    const asked = { tickets: { "ACME-9": { status: "blocked" as const, requester: "grace" } } };
+    expect(instructionVariables(ctxOf(e, asked), {}).requester).toBe("grace");
+    expect(instructionVariables(ctxOf(e), {}).requester).toBe("ada.admin");
+    expect(instructionVariables(ctxOf(event("agent.idle")), {}).requester).toBe("ada.admin");
+    const { fallbackRequester: _, ...noHuman } = OPTS;
+    const none = createEvaluationContext(e, stateOf(), noHuman);
+    expect(instructionVariables(none, {}).requester).toBe("");
   });
 
   it("titles a document by the event's title, else its id", () => {

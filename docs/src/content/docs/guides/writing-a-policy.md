@@ -87,7 +87,7 @@ And helpers, all pure:
 - `ctx.person(spec)`: the agent a name such as `assignee`, `author`, `last_worker`, `mentioned` or `role:pm` refers to, or why there is none (`{ skip }`).
 - `ctx.render(template, { person, next })`: a template with the event's variables.
 - `ctx.wake({ person, kind })`: a wake with the policy's instruction, or a drop saying why no one can be woken.
-- `ctx.act({ as, ops, wake })`: bookkeeping changes for an agent (`{ move }`, `{ assign: "self" | "requester" }`, `{ set_parent: true }`), only those still needed, then the wake of that agent if asked; or a drop saying why.
+- `ctx.act({ as, ops, wake, note })`: bookkeeping changes for an agent (`{ move }`, `{ assign: "self" | "requester" }` or `{ assign }` with a person such as `role:pm`, `{ set_parent: true }`), only those still needed, then the wake of that agent if asked; or a drop saying why. The note posted with the changes is `note` when given, else the policy's instruction, so a policy that both acts and wakes someone else can give each its own text.
 
 ## Proposals
 
@@ -105,6 +105,7 @@ The aggregation layer makes the decisions from the proposals of every policy, in
 1. **Invariants**, the same for every policy. A proposal that breaks one is rejected, and dropped with the reason:
    - an act for, or a wake or suppression of, anyone who is not an agent on the team: the office never acts as itself;
    - a wake of the agent who caused the event: an agent is never woken for its own action (the office's idle pull for an agent is the exception);
+   - an act's echo: the tracker's report of a change an act made (marked `echo` in the event's data) wakes no one, since the event that caused the act already decided whom to wake;
    - the loop guard: an event a bot caused wakes no one, except the office's own merge, conflict and CI checks;
    - an act with an op other than move, assign or set parent;
    - a second act of the same policy for the event: return one act with every change.

@@ -54,7 +54,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     off: "agent",
     kind: "agent",
     behaviour:
-      "Who tells the requester about blocked work that did not come from chat. With agent, or when the team has no PM role, the blocked agent tells the requester itself, in its own direct message with the ticket linked. With pm the blocked agent sends nothing and leaves it to the PM; the hand-back still gives the ticket to the requester. The thread of a chat item always gets its agent's reply. Items the scheduler blocks are handled the same way. The office never posts to people.",
+      "Who tells the requester about blocked work that did not come from chat. With agent, or when the team has no PM role, the blocked agent tells the requester itself, in its own direct message with the ticket linked. With pm the blocked agent sends nothing and leaves it to the PM, who gives the ticket to the requester, saying exactly what is needed, only when it cannot unblock it. Whichever the value, a blocked ticket goes to the team's PM to unblock when the team has one other than the blocked agent (the hand_back_blocked_to_pm policy); the switch only decides who sends the chat message. The thread of a chat item always gets its agent's reply. Items the scheduler blocks are handled the same way. The office never posts to people.",
   },
   {
     path: "hand_back.fallback",

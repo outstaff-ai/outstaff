@@ -26,9 +26,15 @@ const untouchedBlocked = (
   );
 
 /**
+ * Work on a teammate's blocked ticket: it is blocked when the round starts and stays so until the teammate picks it up
+ * again, so only the agent moving it to blocked makes the hand-back blocked.
+ */
+const ON_BLOCKED_WORK = new Set(["unblock"]);
+
+/**
  * What a finished run is handed back as. An open question makes it wait. A ticket the agent left blocked, or a ticket
  * that is blocked in the tracker at the end of a run that moved nothing, was not got past: a blocked hand-back,
- * whatever the final message says.
+ * whatever the final message says. A round to unblock a teammate's ticket counts only the agent's own move.
  */
 export async function handBackStatus(
   { opts, log }: WorkerContext,
@@ -46,7 +52,11 @@ export async function handBackStatus(
     return "blocked";
   }
 
-  if (last === undefined && (await untouchedBlocked(opts.env.tracker, offered, item.moved))) {
+  if (
+    last === undefined &&
+    !ON_BLOCKED_WORK.has(offer.workItem.kind) &&
+    (await untouchedBlocked(opts.env.tracker, offered, item.moved))
+  ) {
     log.warn("the agent left its blocked ticket blocked; handing back as blocked", { workItemId });
     return "blocked";
   }

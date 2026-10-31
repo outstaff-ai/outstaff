@@ -164,6 +164,22 @@ describe("ctx.act", () => {
     ]);
   });
 
+  it("assigns the agent a person reference names, or says why nobody", () => {
+    const spec: ActSpec = { as: "actor", ops: [{ assign: "role:pm" }] };
+    const e = event("agent.handed_back", { subject: { ticket: "ACME-1" }, actor: sam });
+    const world = { ...onTicket(), roles: { pm: "priya" } };
+    expect(act(spec, e, world)).toMatchObject([
+      {
+        type: "act",
+        ops: [{ op: "assign", ticket: "ACME-1", to: { kind: "agent", id: "priya" } }],
+      },
+    ]);
+
+    expect(act(spec, e, onTicket())).toEqual([
+      { type: "drop", reason: "nothing to change: assign: no agent plays role:pm" },
+    ]);
+  });
+
   it("needs a ticket for every change, and an agent to act as", () => {
     expect(act(handBack, event("agent.handed_back", { actor: sam }))).toEqual([
       {
@@ -198,6 +214,11 @@ describe("ctx.act", () => {
 
     expect(act(move, e, world, "{{nope}}")).toEqual([
       { type: "drop", reason: 'the note cannot be rendered: Unknown template variable "nope".' },
+    ]);
+
+    const noted: ActSpec = { ...move, note: "Moved for {{person}}." };
+    expect(act(noted, e, world, "The wake's instruction.")).toMatchObject([
+      { type: "act", note: "Moved for sam." },
     ]);
   });
 });

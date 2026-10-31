@@ -86,6 +86,7 @@ const tracker = createItsaplanE2e({
     { userId: "u-office", name: "Acme Office", username: "acme-office", kind: "agent" },
     { userId: "u-sam", name: "Sam Duarte", username: "sam", kind: "agent" },
     { userId: "u-mira", name: "Mira Okafor", username: "mira", kind: "agent" },
+    { userId: "u-pia", name: "Pia Novak", username: "pia", kind: "agent" },
   ],
   keys: Object.fromEntries(
     Object.entries(pairs(env("STUB_TRACKER_KEYS"))).map(([k, user]) => [k, `u-${user}`]),

@@ -13,5 +13,9 @@ export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipelin
   const acts = createActDesk({ ...opts, traces });
   const executor = createAgentActExecutor({ traces, acts });
 
-  return { runner: createLivePipeline({ ...opts, executor, traces }), traces, acts };
+  return {
+    runner: createLivePipeline({ ...opts, executor, traces, echoOf: acts.echoOf }),
+    traces,
+    acts,
+  };
 }

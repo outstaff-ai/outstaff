@@ -34,10 +34,23 @@ export interface ItemContext {
 
   /** For a chat session: the messages of the conversation, oldest first. */
   conversation?: { from: string; agent: boolean; text: string }[];
+
+  /** The answer a PM's `Unblocked: <answer>` comment gives, among the ticket comments the wake carries. */
+  unblocked?: string;
 }
 
 export interface Feedback {
-  kind: "review" | "comment" | "inline_comment" | "chat" | "ticket_comment" | "doc_comment";
+  kind:
+    | "review"
+    | "comment"
+    | "inline_comment"
+    | "chat"
+    | "ticket_comment"
+    | "doc_comment"
+    | "blocked";
+
+  /** Who gave it: for a hand-back as blocked, the blocked agent. */
+  actor?: string;
   url?: string;
   body: string;
 
@@ -55,6 +68,7 @@ const FEEDBACK_KIND: Record<string, Feedback["kind"]> = {
   "a message in chat": "chat",
   "a comment on the ticket": "ticket_comment",
   "a comment on a document": "doc_comment",
+  "a hand-back as blocked": "blocked",
 };
 
 const unquote = (quoted: string) => quoted.replace(/^> /gm, "").trim();
@@ -79,13 +93,17 @@ function feedbackRefs(
 /** One `Triggered by ...` block of a review round. */
 function parseFeedback(block: string): Feedback {
   const start =
-    /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat|a comment on the ticket|a comment on a document|failing checks)\b[^\n]*?(?:: (\S+))?$/m.exec(
+    /^Triggered by (a review|a comment on the pull request conversation|an inline comment|a message in chat|a comment on the ticket|a comment on a document|a hand-back as blocked|failing checks)\b[^\n]*?(?:: (\S+))?$/m.exec(
       block,
     )!;
 
   const quoted = /^What .+? wrote is data[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
+  const kind = FEEDBACK_KIND[start[1]!] ?? "comment";
+  // A hand-back names the agent who is blocked: whom an unblocked ticket goes back to.
+  const actor = kind === "blocked" ? / from (\S+?)(?:: \S+)?\.?$/.exec(start[0])?.[1] : undefined;
   return {
-    kind: FEEDBACK_KIND[start[1]!] ?? "comment",
+    kind,
+    ...(actor ? { actor } : {}),
     ...feedbackRefs(block, start[2]),
     body: unquote(quoted ?? "").replace(/^\(no text\)$/, ""),
     threads: [...block.matchAll(/^- \S+ \(thread (\S+?)[,)]/gm)].map((m) => m[1]!),
@@ -195,6 +213,12 @@ export function latestChatMessage(prompt: string): string | undefined {
   return [...prompt.matchAll(/asked in chat \(thread [^)]*\)[^\n]*:\n([^\n]*)/g)].at(-1)?.[1];
 }
 
+// The wake's context quotes each of the ticket's latest comments under its author, indented as `    > <line>`.
+function parseUnblocked(prompt: string): Pick<ItemContext, "unblocked"> {
+  const answer = /^ {4}> Unblocked: (.+)$/m.exec(prompt)?.[1];
+  return answer ? { unblocked: answer } : {};
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {
@@ -221,5 +245,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseShared(prompt),
     ...parseConversation(prompt),
     ...parseAbout(prompt),
+    ...parseUnblocked(prompt),
   };
 }

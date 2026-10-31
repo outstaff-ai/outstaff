@@ -26,7 +26,7 @@ The tracker is the shared record. The office keeps the routine changes for you, 
 - you start a round on it (the work, review feedback, a comment, a rebase or failing checks), also on a ticket you handed back: it is assigned to you and moves to `active`, unless it is `done` or `canceled`;
 - you open its pull request for review (not as a draft): it moves to `review`;
 - its last open pull request merges into the default branch: it moves to `done`;
-- you hand back as `done`: it moves to `review` and goes to the person who asked; as `blocked`: it moves to `blocked` and goes to them.
+- you hand back as `done`: it moves to `review` and goes to the person who asked; as `blocked`: it moves to `blocked` and goes to the team's PM to unblock, or to the person who asked when there is no PM or you are the PM. When the PM unblocks it, the PM assigns it back to you with the answer in a comment.
 
 Do not make these moves or assignments yourself, not even when your round starts: the ticket is already yours and `active` when you first look at it. Hand back with the status that says where the work is (`process/hand-back.md`). Change a ticket yourself for what the office cannot see, the moment it happens: you cancel it, or you file, split or re-parent tickets. Comment with `ost ticket` on anything a reader would not see from the status.
 

@@ -39,6 +39,13 @@ function team(): TeamConfig {
         model: "sonnet",
         identities: { tracker: "u-sam" },
       },
+      {
+        handle: "pia",
+        name: "Pia",
+        role: "pm",
+        model: "sonnet",
+        identities: { tracker: "u-pia" },
+      },
     ],
     integrations: {
       chat: { adapter: "fake" },
@@ -61,7 +68,8 @@ function team(): TeamConfig {
 async function seedMembers(tracker: FakeTracker) {
   const ada = await tracker.seed.member({ name: "Ada Admin", kind: "human" });
   const sam = await tracker.seed.member({ name: "Sam", kind: "agent" });
-  return { ada, sam };
+  const pia = await tracker.seed.member({ name: "Pia", kind: "agent" });
+  return { ada, sam, pia };
 }
 
 describe("the office with the event pipeline live", () => {
@@ -80,10 +88,11 @@ describe("the office with the event pipeline live", () => {
   async function start() {
     const vcs = createFakeVcs({ now: clock.now });
     const tracker = createFakeTracker({ now: clock.now, actor: OFFICE_ACCOUNT });
-    const { ada, sam } = await seedMembers(tracker);
+    const { ada, sam, pia } = await seedMembers(tracker);
     const config = team();
     config.humans![0]!.identities.tracker = ada.id;
     config.people[0]!.identities!.tracker = sam.id;
+    config.people[1]!.identities!.tracker = pia.id;
     const chat = createFakeChat({ now: clock.now });
     const stock = createFakeAdapterRegistry();
     const instances = { vcs, tracker, chat } as Record<string, unknown>;
@@ -104,7 +113,7 @@ describe("the office with the event pipeline live", () => {
 
     await office.start();
     await office.parts.intake.pollOnce();
-    return { tracker, config, ada, sam, registry };
+    return { tracker, config, ada, sam, pia, registry };
   }
 
   /** Sam's agent process: its connection to the office, which makes sam's acts with sam's own tracker account. */
@@ -244,5 +253,69 @@ describe("the office with the event pipeline live", () => {
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
     const moves = (await tracker.events()).events.filter((e) => e.type === "moved");
     expect(moves.map((e) => e.actor.id)).toEqual([sam.id]);
+  });
+
+  it("wakes the PM once for a blocked hand-back: the echo of the assignment sam's process made wakes no one", async () => {
+    const { tracker, config, ada, sam, pia } = await start();
+    conn = agent(tracker, config, sam);
+    await conn.whenConnected();
+    const issue = await tracker.as(ada).createIssue({
+      title: "Rotate the staging key",
+      body: "",
+      status: "backlog",
+      assignee: sam.id,
+    });
+
+    await tracker.as(ada).assign(issue.key, sam.id);
+    await office!.parts.intake.pollOnce();
+    const offer = await conn.offers()[Symbol.asyncIterator]().next();
+    const item = offer.value!.workItem;
+    await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
+    await until(async () => office!.parts.workState.ticketStatus(issue.key) === "active");
+    await conn.handBack(item.id, {
+      summary: "The staging credentials are missing.",
+      status: "blocked",
+    });
+
+    const resultOf = async () => {
+      const back = (await traces()).find((t) => t.event.type === "agent.handed_back");
+      return back?.results?.[`${back.event.id}:hand_back_blocked_to_pm`];
+    };
+
+    await until(async () => (await resultOf())?.status === "done");
+    const blocked = await tracker.getIssue(issue.key);
+    expect([blocked.status.canonical, blocked.assignee?.id]).toEqual(["blocked", pia.id]);
+
+    // The tracker reports the act's changes as sam's: "assigned to pia by sam". They are the act's echo.
+    await office!.parts.intake.pollOnce();
+    const echo = (await traces()).find(
+      (t) => t.event.type === "ticket.assigned" && t.event.actor.id === "sam",
+    )!;
+
+    const back = (await traces()).find((t) => t.event.type === "agent.handed_back")!;
+    expect(echo.event.data["echo"]).toBe(`${back.event.id}:hand_back_blocked_to_pm`);
+    expect(echo.aggregation).toMatchObject([
+      {
+        policy: "assigned_to_assignee",
+        outcome: "rejected",
+        reason: expect.stringMatching(/^the echo of act /),
+      },
+    ]);
+
+    // Pia has one item for the hand-back: the unblock.
+    const items = await store.listItems({ person: "pia" });
+    expect(items.map((i) => i.kind)).toEqual(["unblock"]);
+
+    // Pia's own assignment back to sam is not an echo: it wakes him.
+    await tracker.as(pia).assign(issue.key, sam.id);
+    await office!.parts.intake.pollOnce();
+    const answer = (await traces()).find(
+      (t) => t.event.type === "ticket.assigned" && t.event.actor.id === "pia",
+    )!;
+
+    expect(answer.event.data["echo"]).toBeUndefined();
+    expect(answer.decisions).toMatchObject([
+      { type: "wake", person: "sam", policy: "assigned_to_assignee" },
+    ]);
   });
 });
