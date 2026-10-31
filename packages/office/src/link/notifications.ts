@@ -59,7 +59,7 @@ export function createNotifier(opts: OfficeLinkOptions, send: (m: LinkMessage) =
         for (const item of next.items) {
           send({
             type: "trace",
-            payload: { recordedAt: item.recordedAt, trace: present(item.trace, opts.links) },
+            payload: { recordedAt: item.recordedAt, trace: present(item.trace, opts) },
           });
         }
 
