@@ -38,11 +38,7 @@ export const NAMES = [
   "Esme Haverford",
 ];
 
-const ascii = (s: string): string =>
-  s
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase();
+const ascii = (s: string): string => s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
 /** The first name as a handle: lowercase ASCII letters and digits, starting with a letter. */
 export function baseHandle(name: string): string {
