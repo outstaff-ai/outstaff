@@ -62,7 +62,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     off: "none",
     kind: "option",
     behaviour:
-      "When a ticket has no known requester, hand it back to the first human in `humans`. With none, an act that assigns the requester is dropped when the ticket has none.",
+      "When a ticket has no known requester, hand it back to the first human in `humans` with a tracker identity. With none, an act that assigns the requester is dropped when the ticket has none.",
   },
   {
     path: "tickets.prs_per_ticket",

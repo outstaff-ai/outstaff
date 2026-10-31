@@ -1647,7 +1647,7 @@
             },
             "fallback": {
               "default": "first_human",
-              "description": "Who stands in when a ticket has no known requester: the first human in humans, or none to skip. Default first_human.",
+              "description": "Who stands in when a ticket has no known requester: the first human in humans with a tracker identity, or none to skip. Default first_human.",
               "type": "string",
               "enum": [
                 "first_human",

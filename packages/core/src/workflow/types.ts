@@ -133,7 +133,7 @@ export interface WorkflowOptions {
   /** The team's `humans`, for matching `human:<id>` approvers. */
   humans?: TeamConfig["humans"];
 
-  /** Who a ticket goes back to when no requester is known: the tracker identity of the first listed human. */
+  /** Who a ticket goes back to when no requester is known: the tracker identity of the first listed human who has one. */
   fallbackRequester?: string;
 }
 

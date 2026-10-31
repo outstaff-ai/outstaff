@@ -29,16 +29,21 @@ const handsOver = (event: WorkflowEvent, ticket: TicketRecord) =>
 const waitsOnHuman = (ticket: TicketRecord) =>
   ticket.assignee?.kind === "human" && HANDED_BACK.has(ticket.status);
 
-/** Who a ticket goes back to: the trusted human whose feedback reactivated it. */
+/**
+ * Who a ticket goes back to: the trusted human whose feedback reactivated it, when the tracker can assign them. Tracker
+ * events name tracker members already; a pull request's reviewer counts only with a tracker identity.
+ */
 export function createRequesters(core: WorkstateCore, ticketOps: TicketOps): RequesterOps {
-  const { team, tickets, prs, prSubject } = core;
+  const { team, logger, tickets, prs, prSubject } = core;
   const { ensureTicket, saveTicket, withRequester } = ticketOps;
 
-  /** What the tracker knows the human as: pull request actors are code host logins, so map them through `humans:`. */
-  const trackerIdentity = (login: string): string => {
+  /**
+   * What the tracker knows the human as: pull request actors are code host logins, so map them through `humans:`. A
+   * human with no tracker identity cannot be assigned the ticket, so they are no requester.
+   */
+  const trackerIdentity = (login: string): string | undefined => {
     const lower = login.toLowerCase();
-    const human = team.humans?.find((h) => h.identities.vcs?.toLowerCase() === lower);
-    return human?.identities.tracker ?? login;
+    return team.humans?.find((h) => h.identities.vcs?.toLowerCase() === lower)?.identities.tracker;
   };
 
   /** A trusted human's feedback that sends a ticket back to its agent (as `human-feedback-reactivates-ticket` does). */
@@ -54,9 +59,22 @@ export function createRequesters(core: WorkstateCore, ticketOps: TicketOps): Req
     }
 
     const ticket = tickets.get(key)!;
-    if (HANDED_BACK.has(ticket.status)) {
-      await saveTicket(withRequester(ticket, trackerIdentity(login), event));
+    if (!HANDED_BACK.has(ticket.status)) {
+      return;
     }
+
+    const person = trackerIdentity(login);
+    if (!person) {
+      logger.info("feedback from a human with no tracker identity: the requester stays", {
+        ticket: key,
+        login,
+        requester: ticket.requester,
+      });
+
+      return;
+    }
+
+    await saveTicket(withRequester(ticket, person, event));
   };
 
   /**

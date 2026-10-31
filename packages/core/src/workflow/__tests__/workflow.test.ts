@@ -307,10 +307,10 @@ describe("template variables", () => {
 });
 
 describe("options", () => {
-  it("take the label, the approvers, the humans and the first human as the fallback requester", () => {
+  it("take the label, the approvers, the humans and the first human the tracker knows as the fallback requester", () => {
     const humans = [
+      { name: "Linus", identities: { vcs: "linus" } },
       { name: "Grace", identities: { tracker: "grace.t" } },
-      { name: "Linus", identities: {} },
     ];
 
     expect(workflowOptions({ humans })).toEqual({
@@ -320,7 +320,7 @@ describe("options", () => {
       fallbackRequester: "grace.t",
     });
 
-    expect(workflowOptions({ humans: [humans[1]!] }).fallbackRequester).toBe("Linus");
+    expect(workflowOptions({ humans: [humans[0]!] }).fallbackRequester).toBeUndefined();
     expect(workflowOptions({}).fallbackRequester).toBeUndefined();
   });
 

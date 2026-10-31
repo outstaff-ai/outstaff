@@ -110,7 +110,7 @@ export const handBackSchema = z
       .default("first_human")
       .meta(
         d(
-          "Who stands in when a ticket has no known requester: the first human in humans, or none to skip. Default first_human.",
+          "Who stands in when a ticket has no known requester: the first human in humans with a tracker identity, or none to skip. Default first_human.",
         ),
       ),
   })

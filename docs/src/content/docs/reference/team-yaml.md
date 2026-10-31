@@ -1499,7 +1499,7 @@ Who tells the requester about blocked work that did not come from chat: agent ha
 
 #### policies.hand_back.fallback
 
-Who stands in when a ticket has no known requester: the first human in humans, or none to skip. Default first_human.
+Who stands in when a ticket has no known requester: the first human in humans with a tracker identity, or none to skip. Default first_human.
 
 - Type: `string`
 - Optional
