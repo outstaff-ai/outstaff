@@ -109,6 +109,12 @@ const pollCounts = (h: Json): Record<string, number> =>
   );
 
 /** Whether the agent's chat profile for the trusted human says it is idle. */
+/** How many notes of a done hand-back sam posted on the ticket; the note comes after the move and the assignment. */
+const handBackNotes = (t: Json): number =>
+  t.comments.filter(
+    (c: Json) => c.author === "sam" && c.body.includes("I handed the work back as done."),
+  ).length;
+
 const idle = (s: Json) =>
   s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle";
 
@@ -630,10 +636,12 @@ async function main() {
 
   step("chat: a status question is answered with the pull request and its checks");
 
+  // The hand-back after the round moves the ticket, assigns it and then posts its note: wait for all three.
+  const notesBefore = handBackNotes(during.tickets.find((x: Json) => x.key === first));
   await stub("POST", "/_test/gates/review/open");
 
   const fixed = await until(
-    "a fix pushed, the thread answered and resolved, the ticket back in review",
+    "a fix pushed, the thread answered and resolved, the ticket back in review and handed back",
     (s) => {
       const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
       const t = s.tickets.find((x: Json) => x.key === first);
@@ -641,10 +649,18 @@ async function main() {
       return pr.head.sha !== before &&
         thread?.resolved &&
         thread.comments.length > 1 &&
-        t.status === "In Review"
+        t.status === "In Review" &&
+        handBackNotes(t) > notesBefore
         ? { pr, t, thread, github: s.github }
         : undefined;
     },
+  );
+
+  // The reviewer, grace-lead, has no tracker identity: the ticket goes back to its earlier requester.
+  assertEq(
+    fixed.t.assignee,
+    "ada.admin",
+    "the hand-back after the review gave the ticket to the requester the tracker can assign",
   );
 
   const strays = Object.keys(fixed.github.branches).filter((b) => /^review[-_]feedback\//.test(b));

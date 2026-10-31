@@ -69,14 +69,27 @@ function moveOp(to: Extract<OpSpec, { move: unknown }>["move"], ticket: string, 
     : { value: { op: "move" as const, ticket, to } };
 }
 
-/** Who an assignment goes to: the agent acted for, else the requester or the team's first human. */
+/** A change still needed, with why it goes where it goes when that is a choice; or why it is not needed. */
+type OpResult = { value: BookkeepingOp } | { value: BookkeepingOp; why: string } | { skip: string };
+
+/** Who an assignment goes to: the agent acted for, else the requester or the fallback human, and why. */
 function assignee(spec: { assign: "requester" | "self" }, as: string, ticket: string, ctx: Ctx) {
   if (spec.assign === "self") {
-    return { kind: "agent", id: as } satisfies ActTarget;
+    return { to: { kind: "agent", id: as } satisfies ActTarget };
   }
 
-  const human = ctx.state.requester(ticket) ?? ctx.options.fallbackRequester;
-  return human ? ({ kind: "human", id: human } satisfies ActTarget) : undefined;
+  const requester = ctx.state.requester(ticket);
+  if (requester) {
+    return { to: { kind: "human", id: requester } satisfies ActTarget, why: "its requester" };
+  }
+
+  const fallback = ctx.options.fallbackRequester;
+  return fallback
+    ? {
+        to: { kind: "human", id: fallback } satisfies ActTarget,
+        why: "the fallback (hand_back.fallback), as no requester is known",
+      }
+    : undefined;
 }
 
 function assignOp(
@@ -84,15 +97,21 @@ function assignOp(
   as: string,
   ticket: string,
   ctx: Ctx,
-): Resolved<BookkeepingOp> {
-  const to = assignee(spec, as, ticket, ctx);
-  if (!to) {
-    return { skip: `assign: ${ticket} has no known requester and the team lists no human` };
+): OpResult {
+  const chosen = assignee(spec, as, ticket, ctx);
+  if (!chosen) {
+    return {
+      skip: `assign: ${ticket} has no known requester and the team lists no human with a tracker identity`,
+    };
   }
 
-  return ctx.state.assignee(ticket)?.id === to.id
-    ? { skip: `assign: ${ticket} is already assigned to ${to.id}` }
-    : { value: { op: "assign", ticket, to } };
+  const { to, why } = chosen;
+  if (ctx.state.assignee(ticket)?.id === to.id) {
+    return { skip: `assign: ${ticket} is already assigned to ${to.id}` };
+  }
+
+  const op = { op: "assign" as const, ticket, to };
+  return why ? { value: op, why: `assign: ${ticket} to ${to.id}, ${why}` } : { value: op };
 }
 
 function parentOp(ticket: string, ctx: Ctx): Resolved<BookkeepingOp> {
@@ -102,7 +121,7 @@ function parentOp(ticket: string, ctx: Ctx): Resolved<BookkeepingOp> {
     : { skip: "set_parent: the event names no parent ticket" };
 }
 
-function op(spec: OpSpec, as: string, ctx: Ctx): Resolved<BookkeepingOp> {
+function op(spec: OpSpec, as: string, ctx: Ctx): OpResult {
   const ticket = ctx.ticket;
   if (!ticket) {
     return { skip: `${Object.keys(spec)[0]}: the event has no linked ticket` };
@@ -115,11 +134,16 @@ function op(spec: OpSpec, as: string, ctx: Ctx): Resolved<BookkeepingOp> {
   return "assign" in spec ? assignOp(spec, as, ticket, ctx) : parentOp(ticket, ctx);
 }
 
-/** The changes an act makes, and why each other one is not needed. */
-function actOps(spec: ActSpec, as: string, ctx: Ctx) {
+/**
+ * The changes an act makes, its reason with who each assignment goes to and why, and why each other change is not
+ * needed.
+ */
+function actOps(spec: ActSpec, as: string, ctx: Ctx, reason: string) {
   const results = spec.ops.map((item) => op(item, as, ctx));
+  const whys = results.flatMap((r) => ("why" in r ? [r.why] : []));
   return {
     ops: results.flatMap((r) => ("value" in r ? [r.value] : [])),
+    reason: [reason, ...whys].join("; "),
     skipped: results.flatMap((r) => ("skip" in r ? [r.skip] : [])),
   };
 }
@@ -129,9 +153,11 @@ function actOps(spec: ActSpec, as: string, ctx: Ctx) {
  * since the agent's own run follows. With nothing to change the agent is still woken.
  */
 function actThenWake(spec: ActSpec, then: { kind: string }, as: string, ctx: Ctx, reason: string) {
-  const { ops } = actOps(spec, as, ctx);
+  const act = actOps(spec, as, ctx, reason);
   const woken = wakeOf(then, as, ctx, reason);
-  return ops.length > 0 ? [{ type: "act" as const, as, ops, reason }, woken] : [woken];
+  return act.ops.length > 0
+    ? [{ type: "act" as const, as, ops: act.ops, reason: act.reason }, woken]
+    : [woken];
 }
 
 /** `ctx.act`: the changes for the agent the spec names, then its wake if asked; or a drop saying why there are none. */
@@ -145,7 +171,7 @@ export function proposeAct(ctx: Ctx, spec: ActSpec, reason = ctx.matched): Propo
     return actThenWake(spec, spec.wake, as.value, ctx, reason);
   }
 
-  const { ops, skipped } = actOps(spec, as.value, ctx);
+  const { ops, skipped, reason: why } = actOps(spec, as.value, ctx, reason);
   if (ops.length === 0) {
     return [drop(`nothing to change: ${skipped.join("; ")}`)];
   }
@@ -155,5 +181,7 @@ export function proposeAct(ctx: Ctx, spec: ActSpec, reason = ctx.matched): Propo
     return [drop(`the note cannot be rendered: ${note.skip}`)];
   }
 
-  return [{ type: "act", as: as.value, ops, ...(note.value ? { note: note.value } : {}), reason }];
+  return [
+    { type: "act", as: as.value, ops, ...(note.value ? { note: note.value } : {}), reason: why },
+  ];
 }

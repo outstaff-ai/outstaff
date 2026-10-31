@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
 import type { ManualClock } from "#/types.js";
 import { createIntake } from "#/intake/index.js";
+import { configurePipeline } from "#/pipeline/configure.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
 import { REPO, teamConfig } from "#/intake/__tests__/test-support.js";
 import { openStore } from "#/store/open.js";
 import type { Store } from "#/store/types.js";
@@ -695,6 +697,123 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(ws.requester(issue.key)).toBe("grace.h");
     });
 
+    it("keeps the earlier requester when the reviewer has no tracker identity", async () => {
+      await ws.stop();
+      await build(
+        teamConfig({
+          humans: [
+            { name: "Ada", identities: { vcs: "ada-admin", tracker: "ada.admin" } },
+            { name: "Grace", identities: { vcs: "grace-lead" } },
+          ],
+        }),
+      );
+
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      await ws.apply(
+        ticketEvent("ticket.created", issue.key, { kind: "human", id: "ada.admin" }),
+        meta(),
+      );
+
+      await tracker.transition(issue.key, "review");
+      await ws.apply(
+        ticketEvent("ticket.moved", issue.key, { kind: "agent", id: "sam" }),
+        meta("e2"),
+      );
+
+      const p = await pr({ title: "a", head: { ref: `sam/${issue.key}` } });
+      await ws.apply(prEvent("pr.opened", p.number), meta("e3"));
+
+      // A reviewer the team file knows only on the code host, and one it does not list at all.
+      for (const [id, n] of [
+        ["grace-lead", 4],
+        ["linus", 5],
+      ] as const) {
+        await ws.apply(
+          prEvent(
+            "pr.review_submitted",
+            p.number,
+            { state: "changes_requested", body: "Fix it" },
+            { kind: "human", id },
+          ),
+          meta(`e${n}`),
+        );
+      }
+
+      expect(ws.requester(issue.key)).toBe("ada.admin");
+    });
+
+    it("hands a ticket back to its earlier requester, else the fallback, after a review by a human with only a code host identity", async () => {
+      await ws.stop();
+      const team = teamConfig({
+        humans: [
+          { name: "Grace", identities: { vcs: "grace-lead" } },
+          { name: "Ada", identities: { vcs: "ada-admin", tracker: "ada.admin" } },
+        ],
+      });
+
+      await build(team);
+      const sam = { kind: "agent" as const, id: "sam" };
+      const reviewed = async (createdBy: WorkflowEvent["actor"], n: number) => {
+        const issue = await tracker.createIssue({ title: `T${n}`, body: "" });
+        await ws.apply(ticketEvent("ticket.created", issue.key, createdBy), meta(`c${n}`));
+        await tracker.transition(issue.key, "review");
+        await ws.apply(ticketEvent("ticket.moved", issue.key, sam), meta(`m${n}`));
+        const p = await pr({ title: "a", head: { ref: `sam/${issue.key}` } });
+        await ws.apply(prEvent("pr.opened", p.number), meta(`o${n}`));
+        await ws.apply(
+          prEvent(
+            "pr.review_submitted",
+            p.number,
+            { state: "changes_requested", body: "Fix it" },
+            { kind: "human", id: "grace-lead" },
+          ),
+          meta(`r${n}`),
+        );
+
+        // The review sends the ticket back to the agent, who works on it and hands it back as done.
+        await tracker.transition(issue.key, "active");
+        await ws.apply(ticketEvent("ticket.moved", issue.key, sam), meta(`a${n}`));
+        return issue.key;
+      };
+
+      const { policies, options } = configurePipeline(team);
+      const handBack = (key: string) => {
+        const event = {
+          id: `office:handed_back:${key}`,
+          type: "agent.handed_back" as const,
+          at: clock.now().toISOString(),
+          subject: { ticket: key },
+          actor: sam,
+          data: { status: "done", kind: "review" },
+        };
+
+        // The decision has the changes; the policy's proposal in the trace says who was chosen and why.
+        const trace = evaluatePipeline(event, ws, policies, options);
+        const act = trace.decisions.find((d) => d.type === "act" && d.policy === "hand_back_done");
+        const run = trace.policies.find((r) => r.policy === "hand_back_done");
+        return { ...act, reason: run?.proposals[0]?.reason };
+      };
+
+      const asked = await reviewed({ kind: "human", id: "ada.admin" }, 1);
+      expect(handBack(asked)).toMatchObject({
+        ops: [
+          { op: "move", ticket: asked, to: "review" },
+          { op: "assign", ticket: asked, to: { kind: "human", id: "ada.admin" } },
+        ],
+        reason: expect.stringContaining(`assign: ${asked} to ada.admin, its requester`),
+      });
+
+      const unasked = await reviewed(sam, 2);
+      expect(ws.requester(unasked)).toBeUndefined();
+      expect(handBack(unasked)).toMatchObject({
+        ops: [
+          { op: "move", ticket: unasked, to: "review" },
+          { op: "assign", ticket: unasked, to: { kind: "human", id: "ada.admin" } },
+        ],
+        reason: expect.stringContaining(`assign: ${unasked} to ada.admin, the fallback`),
+      });
+    });
+
     it("ignores feedback on a ticket that is not waiting for review", async () => {
       const issue = await tracker.createIssue({ title: "A", body: "", status: "active" });
       const p = await pr({ title: "a", head: { ref: `sam/${issue.key}` } });
@@ -704,6 +823,11 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
     });
 
     it("replaces the requester with the latest trusted human to assign or send back, by time", async () => {
+      await ws.stop();
+      await build(
+        teamConfig({ humans: [{ name: "Dana", identities: { vcs: "dana", tracker: "dana" } }] }),
+      );
+
       const issue = await tracker.createIssue({ title: "A", body: "" });
       const at = (s: number) => ({ at: new Date(Date.UTC(2026, 0, 1, 0, 0, s)).toISOString() });
       const by = (id: string): WorkflowEvent["actor"] => ({ kind: "human", id });

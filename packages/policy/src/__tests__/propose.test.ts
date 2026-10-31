@@ -104,7 +104,7 @@ describe("ctx.act", () => {
           { op: "move", ticket: "ACME-1", to: "review" },
           { op: "assign", ticket: "ACME-1", to: { kind: "human", id: "grace" } },
         ],
-        reason: "it matched",
+        reason: "it matched; assign: ACME-1 to grace, its requester",
       },
     ]);
   });
@@ -113,14 +113,18 @@ describe("ctx.act", () => {
     const e = event("agent.handed_back", { subject: { ticket: "ACME-9" }, actor: sam });
     const world = { tickets: { "ACME-9": { status: "review" as const } } };
     expect(act(handBack, e, world)).toMatchObject([
-      { ops: [{ op: "assign", ticket: "ACME-9", to: { kind: "human", id: "ada.admin" } }] },
+      {
+        ops: [{ op: "assign", ticket: "ACME-9", to: { kind: "human", id: "ada.admin" } }],
+        reason:
+          "it matched; assign: ACME-9 to ada.admin, the fallback (hand_back.fallback), as no requester is known",
+      },
     ]);
 
     expect(ctxFor(e, world, undefined, { people: OPTS.people }).act(handBack)).toEqual([
       {
         type: "drop",
         reason:
-          "nothing to change: move: ACME-9 is already review; assign: ACME-9 has no known requester and the team lists no human",
+          "nothing to change: move: ACME-9 is already review; assign: ACME-9 has no known requester and the team lists no human with a tracker identity",
       },
     ]);
 
