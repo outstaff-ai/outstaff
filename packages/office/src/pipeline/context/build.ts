@@ -13,6 +13,7 @@ import type {
   GraphTicket,
   ManifestEntry,
 } from "./context.types.js";
+import { isOpen } from "#/workstate/open.js";
 import { walkGraph } from "./walk.js";
 
 /** Text cut to the limit, saying so: the link has the rest. */
@@ -100,9 +101,7 @@ const pr: Filler = (graph, node, limits) => {
     threads: threads.map((t) => ({ ...t, body: cut(t.body, limits.bodyChars) })),
     ...(p.ticket ? { ticket: p.ticket } : {}),
     ...(p.stackedOn ? { stackedOn: p.stackedOn } : {}),
-    stackedBy: graph.prs
-      .filter((x) => x.stackedOn === p.ref && x.state === "open")
-      .map((x) => x.ref),
+    stackedBy: graph.prs.filter((x) => x.stackedOn === p.ref && isOpen(x)).map((x) => x.ref),
     why: node.why,
   };
 

@@ -1,6 +1,7 @@
 import type { PrRef, WorkflowEvent } from "@outstaff/core";
 import type { RequesterOps, TicketOps, WorkstateCore } from "./core.types.js";
 import { isTerminal } from "./derive.js";
+import { isOpen } from "./open.js";
 import { trustedHuman } from "./tickets.js";
 import type { PrRecord, TicketRecord } from "./types.js";
 
@@ -19,7 +20,7 @@ const signsOff = (event: WorkflowEvent) =>
 
 /** The ticket of an open pull request an agent wrote; feedback on other pull requests goes to no ticket. */
 const agentPrTicket = (rec: PrRecord | undefined) =>
-  rec?.state === "open" && rec.author.kind === "agent" ? rec.ticket : undefined;
+  rec && isOpen(rec) && rec.author.kind === "agent" ? rec.ticket : undefined;
 
 /** A comment that mentions an agent hands the ticket to it, so the next hand-back goes to who wrote the comment. */
 const handsOver = (event: WorkflowEvent, ticket: TicketRecord) =>

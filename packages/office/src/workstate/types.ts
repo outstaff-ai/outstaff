@@ -93,6 +93,12 @@ export interface PrRecord {
 
   /** Subject ref of the open pull request this one is stacked on. */
   stackedOn?: string;
+
+  /**
+   * When the code host answered that the pull request is not there or not ours to read (not found or forbidden). It is
+   * not refreshed again until an event names it or the host lists it again.
+   */
+  goneAt?: string;
   updatedAt: string;
 }
 
@@ -177,13 +183,13 @@ export interface WorkState extends WorkflowState {
   /** Subject ref of a pull request in the store (also what work items use as `subject.ref`). */
   prSubject(pr: PrRef): string;
 
-  /** The pull requests with this number, in any state, from every repository. */
+  /** The pull requests with this number, in any state, from every repository; never a gone one. */
   pullRequests(number: number): PrRecord[];
 
-  /** The pull requests of a repository the state keeps, in any state: open ones, and recently finished ones. */
+  /** The pull requests of a repository the state keeps, in any state: open ones, and recently finished ones; never a gone one. */
   repoPrs(repo: RepoRef): PrRecord[];
 
-  /** The pull requests linked to the ticket, in any state. */
+  /** The pull requests linked to the ticket, in any state; never a gone one. */
   prsOfTicket(ticket: string): PrRecord[];
 
   /** The ticket a pull request about to be opened would link to, by the rule that links the ones that exist. */

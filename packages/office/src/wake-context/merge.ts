@@ -3,6 +3,7 @@ import type { ContextMerge, ContextMergeOther } from "@outstaff/protocol";
 import { ciOf } from "#/workstate/derive.js";
 import type { PrRecord } from "#/workstate/index.js";
 import type { ContextReaders } from "./types.js";
+import { isOpen } from "#/workstate/open.js";
 
 /** The latest merges into the base the context names. */
 export const RECENT_MERGES = 5;
@@ -126,9 +127,7 @@ export async function mergeContextOf(
   }
 
   const all = r.prs(rec.ref.repo);
-  const open = all
-    .filter((p) => p.state === "open" && p.ref.number !== rec.ref.number)
-    .toSorted(newest);
+  const open = all.filter((p) => isOpen(p) && p.ref.number !== rec.ref.number).toSorted(newest);
 
   const files = await filesOf(r, rec.ref.repo, [rec, ...open.slice(0, FILES_READ)]);
   const mine = files.get(rec.ref.number) ?? new Set<string>();

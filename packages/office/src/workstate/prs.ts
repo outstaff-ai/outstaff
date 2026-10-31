@@ -1,6 +1,13 @@
-import type { PrRef, PrVerdict, PullRequest, RepoRef, WorkflowEvent } from "@outstaff/core";
-import type { PrLive, PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
-import { notFound, openPrs } from "./derive.js";
+import type { PrRef, PullRequest, RepoRef, WorkflowEvent } from "@outstaff/core";
+import type {
+  PrLive,
+  PrOps,
+  RefreshCtx,
+  RefreshPrOptions,
+  TicketOps,
+  WorkstateCore,
+} from "./core.types.js";
+import { openPrs, prGone, teamRepo } from "./derive.js";
 import { ticketCandidates } from "./infer.js";
 import { inferStackRefs, inferTicketRefs } from "./item-refs.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
@@ -112,12 +119,49 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     }
   };
 
-  const fetchPr = async (ref: PrRef, wait = false): Promise<PullRequest | undefined> => {
+  /**
+   * The code host lost the pull request or stopped letting the office read it: say so once, take it out of the open
+   * set and its stack, and keep the record for when an event names it or the host lists it again. One the state never held only gets the warning.
+   */
+  const markGone = async (ref: PrRef, known: PrRecord | undefined) => {
+    const key = prSubject(ref);
+    if (!known) {
+      logger.warn("pull request not found", { pr: key });
+      return;
+    }
+
+    if (known.goneAt) {
+      return;
+    }
+
+    logger.warn("pull request gone, no longer refreshing it", { pr: key });
+    const at = clock.now().toISOString();
+    const { stackedOn, ...rest } = known;
+    const rec: PrRecord = { ...rest, goneAt: at, updatedAt: at };
+    prs.set(key, rec);
+    await store.upsertSubject("pr", key, rec);
+    await relink(store, prNode(key), "stacked_on", stackedOn ? prNode(stackedOn) : undefined);
+    await restack(ref.repo);
+  };
+
+  /**
+   * The pull request as the code host has it; undefined outside the team's repositories or when the host lost it.
+   * A gone one is out of the open set, so only an event or the host listing it again reads it.
+   */
+  const fetchPr = async (
+    ref: PrRef,
+    known: PrRecord | undefined,
+    o: RefreshPrOptions,
+  ): Promise<PullRequest | undefined> => {
+    if (!teamRepo(core, ref.repo)) {
+      return undefined;
+    }
+
     try {
-      return await vcs.getPullRequest(ref.repo, ref.number, { waitForMergeable: wait });
+      return await vcs.getPullRequest(ref.repo, ref.number, { waitForMergeable: o.wait ?? false });
     } catch (error) {
-      if (notFound(error)) {
-        logger.warn("pull request not found", { pr: prSubject(ref) });
+      if (prGone(error)) {
+        await markGone(ref, known);
         return undefined;
       }
 
@@ -173,10 +217,10 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
   const refreshPr = async (
     ctx: RefreshCtx,
     ref: PrRef,
-    o: { baseline?: boolean; wait?: boolean; review?: string; verdict?: PrVerdict } = {},
+    o: RefreshPrOptions = {},
   ): Promise<void> => {
     const known = prs.get(prSubject(ref));
-    const pr = await fetchPr(ref, o.wait);
+    const pr = await fetchPr(ref, known, o);
     if (!pr) {
       return;
     }

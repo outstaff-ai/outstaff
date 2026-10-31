@@ -105,12 +105,21 @@ export interface PrFacts {
   verdict: PrVerdict | undefined;
 }
 
+/** How a pull request is refreshed. */
+export interface RefreshPrOptions {
+  /** A pull request seen for the first time sets the baseline instead of raising events. */
+  baseline?: boolean;
+
+  /** Wait for the code host to work out mergeability. */
+  wait?: boolean;
+
+  review?: string;
+  verdict?: PrVerdict;
+}
+
 export interface PrOps {
-  refreshPr(
-    ctx: RefreshCtx,
-    ref: PrRef,
-    o?: { baseline?: boolean; wait?: boolean; review?: string; verdict?: PrVerdict },
-  ): Promise<void>;
+  /** Reads the pull request again; one outside the team's repositories is left alone. */
+  refreshPr(ctx: RefreshCtx, ref: PrRef, o?: RefreshPrOptions): Promise<void>;
   ticketOfDraft(
     draft: { headRef: string; title: string; body?: string },
     prev?: PrRecord,

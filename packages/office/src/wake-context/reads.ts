@@ -7,6 +7,7 @@ import type {
   GraphTicket,
 } from "#/pipeline/context/index.js";
 import { readChatLog } from "#/chat/log.js";
+import { isOpen } from "#/workstate/open.js";
 import type { DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
 import type { ContextReaders } from "./types.js";
 
@@ -65,7 +66,7 @@ async function threadsOf(
   rec: PrRecord,
 ): Promise<GraphPr["threads"] | undefined> {
   const vcs = r.vcs;
-  if (!vcs || rec.state !== "open") {
+  if (!vcs || !isOpen(rec)) {
     return undefined;
   }
 
@@ -104,6 +105,7 @@ export async function readPr(r: ContextReaders, key: string): Promise<GraphPr | 
     threads: threads ?? [],
     ticket: rec.ticket,
     stackedOn: rec.stackedOn,
+    goneAt: rec.goneAt,
   };
 }
 

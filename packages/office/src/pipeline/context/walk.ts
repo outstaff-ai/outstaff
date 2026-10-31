@@ -1,4 +1,5 @@
 import type { ContextWhy } from "@outstaff/protocol";
+import { isOpen } from "#/workstate/open.js";
 import type { ContextGraph, ContextNode } from "./context.types.js";
 
 type NodeType = ContextNode["type"];
@@ -57,7 +58,7 @@ const NEIGHBOURS: Record<NodeType, (graph: ContextGraph, ref: string) => Context
       ...(pr?.ticket ? [linked("ticket", pr.ticket, `implemented by ${ref}`)] : []),
       ...(pr?.stackedOn ? [linked("pr", pr.stackedOn, `${ref} is stacked on it`)] : []),
       ...graph.prs
-        .filter((p) => p.stackedOn === ref && p.state === "open")
+        .filter((p) => p.stackedOn === ref && isOpen(p))
         .map((p) => linked("pr", p.ref, `stacked on ${ref}`)),
       ...chatsVia(graph, "pr", ref),
     ];

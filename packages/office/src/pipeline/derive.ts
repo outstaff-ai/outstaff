@@ -1,4 +1,5 @@
 import { prLabel } from "#/log.js";
+import { isOpen } from "#/workstate/open.js";
 import type { PrSnapshot, MergeChange } from "./derive.types.js";
 import type { MergeDerivedType, PipelineEvent } from "@outstaff/policy";
 
@@ -17,9 +18,7 @@ const mustBeUpToDate = ({ requirements }: MergeChange, pr: PrSnapshot): boolean 
 const affected = (change: MergeChange): PrSnapshot[] =>
   change.after.filter(
     (pr) =>
-      pr.state === "open" &&
-      sameRepo(pr, change.merged) &&
-      prLabel(pr.ref) !== prLabel(change.merged.ref),
+      isOpen(pr) && sameRepo(pr, change.merged) && prLabel(pr.ref) !== prLabel(change.merged.ref),
   );
 
 const conflicting = (pr: PrSnapshot | undefined) => pr?.mergeable === "conflicting";
