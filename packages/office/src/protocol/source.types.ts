@@ -14,6 +14,9 @@ import type {
 
 export type Offer = PayloadOf<"offer">;
 
+/** A ticket a chat session filed for someone else: the ticket, the request it files, and who it is for. */
+export type FiledFor = Omit<PayloadOf<"work_file_for">, "workItemId">;
+
 /** What an accepted item runs on, as the agent reports it. */
 export type RunOn = Omit<PayloadOf<"accept">, "workItemId">;
 
@@ -108,6 +111,12 @@ export interface ChatDesk {
    * when the person is idle and otherwise waits last until the requester says where it goes.
    */
   linkTicket(person: string, workItemId: string, ticket: string, request: string): Promise<Filed>;
+
+  /**
+   * Records the ticket a chat session created for someone else against the session: a `created` ticket ref, and the
+   * request counts as filed. No work item is created; the assignment wakes the assignee. Refused like `linkTicket`.
+   */
+  fileFor(person: string, workItemId: string, filing: FiledFor): Promise<void>;
 
   /**
    * Refuses, before anything is created in the tracker, a filing the office would refuse afterwards: a caller that is

@@ -84,6 +84,15 @@ export interface OfficeClient {
   /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same request twice. */
   linkTicket(workItemId: string, ticket: string, request: string): Promise<Filed>;
 
+  /**
+   * Records a ticket a chat session created for someone else against the session: no work item for the caller, and
+   * the assignment wakes the assignee. Refused like `linkTicket`.
+   */
+  fileFor(
+    workItemId: string,
+    filing: { ticket: string; request: string; assignee: string },
+  ): Promise<void>;
+
   /** Asks whether a chat session may file this request, before anything is created. Refused when it may not. */
   checkFiling(workItemId: string, request: string): Promise<void>;
 
@@ -102,6 +111,7 @@ export interface FakeOffice extends OfficeClient {
   answered: { questionId: string; answer: string }[];
   placed: { workItemId: string; placement: Placement }[];
   linked: { workItemId: string; ticket: string; request: string }[];
+  filedFor: { workItemId: string; ticket: string; request: string; assignee: string }[];
   checked: { workItemId: string; request: string }[];
   queued: { workItemId: string; title: string; body: string }[];
   attached: { workItemId: string; target: string; confirmed: boolean; request?: string }[];

@@ -22,6 +22,15 @@ describe("assigned_to_assignee", () => {
       "wake sam (assigned) on ticket ACME-1",
     ]);
 
+    // A ticket another agent filed for sam, from a chat session: created already assigned to sam.
+    expect(
+      judge(
+        "assigned_to_assignee",
+        assigned({ kind: "agent", id: "noor" }, "ticket.created"),
+        world,
+      ),
+    ).toEqual(["wake sam (assigned) on ticket ACME-1"]);
+
     expect(judge("assigned_to_assignee", assigned(SAM), world)).toEqual({
       failed: { not: { actor_is: "assignee" } },
     });

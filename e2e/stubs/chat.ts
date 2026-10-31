@@ -1,14 +1,18 @@
 import type { Route } from "@outstaff/testing.http";
 
 /**
- * A chat workspace for the end-to-end test: the agent's chat adapter polls it (e2e/runtime-scripted/src/chat.ts), and
- * the driver speaks in it as a trusted human of the acme team. Gates hold a scripted round until the driver opens
- * them, so the test can talk to the agent while a round is still running.
+ * A chat workspace for the end-to-end test: each agent's chat adapter polls it for the messages written to that agent
+ * (e2e/runtime-scripted/src/chat.ts), and the driver speaks in it as a trusted human of the acme team, to sam unless
+ * it names another agent. Each agent has its own direct message with the human. Gates hold a scripted round until
+ * the driver opens them, so the test can talk to the agent while a round is still running.
  */
 
 interface Message {
   seq: number;
   id: string;
+
+  /** The agent the message is written to. */
+  to: string;
   channel: string;
   thread?: string;
   authorId: string;
@@ -19,13 +23,31 @@ interface Message {
 }
 
 export const HUMAN = { id: "U0ADA00001", name: "Ada Admin" };
-export const DIRECT = "D-U0ADA00001";
+
+/** The direct message of the human with an agent. */
+export const directWith = (agent: string) => `D-${agent}-${HUMAN.id}`;
+
+/** An agent's bot user, as the chat history shows it. */
+const botOf = (agent: string) => ({
+  id: `U0${agent.toUpperCase()}00001`,
+  name: agent.charAt(0).toUpperCase() + agent.slice(1),
+});
 
 export function createChat() {
   const messages: Message[] = [];
-  const posts: { id: string; channel: string; thread?: string; text: string; at: string }[] = [];
+  const posts: {
+    id: string;
+    agent: string;
+    channel: string;
+    thread?: string;
+    text: string;
+    at: string;
+  }[] = [];
+
   const reactions: { channel: string; messageId: string; name: string }[] = [];
-  const profiles: { userId: string; profile: Record<string, any>; at: string }[] = [];
+  const profiles: { agent: string; userId: string; profile: Record<string, any>; at: string }[] =
+    [];
+
   const files = new Map<string, { mimetype: string; data: Buffer }>();
   const gates = new Map<string, { open: boolean; arrived: boolean }>();
   let counter = 0;
@@ -45,7 +67,10 @@ export function createChat() {
       method: "GET",
       path: "/chat/inbox",
       handler: (r) => ({
-        messages: messages.filter((m) => m.seq > Number(r.query.get("after") ?? 0)),
+        messages: messages.filter(
+          (m) =>
+            m.seq > Number(r.query.get("after") ?? 0) && m.to === (r.query.get("agent") ?? "sam"),
+        ),
       }),
     },
     {
@@ -54,6 +79,7 @@ export function createChat() {
       handler: (r) => {
         const post = {
           id: id(),
+          agent: r.json.agent ?? "sam",
           channel: r.json.channel,
           ...(r.json.thread ? { thread: r.json.thread } : {}),
           text: r.json.text,
@@ -77,6 +103,7 @@ export function createChat() {
       path: "/chat/profile",
       handler: (r) => {
         profiles.push({
+          agent: r.json.agent ?? "sam",
           userId: r.json.userId,
           profile: r.json.profile,
           at: new Date().toISOString(),
@@ -105,7 +132,7 @@ export function createChat() {
             id: p.id,
             channel: p.channel,
             ...(p.thread ? { thread: p.thread } : {}),
-            author: { id: "U0SAM00001", name: "Sam", trusted: false, bot: true },
+            author: { ...botOf(p.agent), trusted: false, bot: true },
             text: p.text,
             at: p.at,
           })),
@@ -121,10 +148,12 @@ export function createChat() {
       method: "POST",
       path: "/_test/chat/say",
       handler: (r) => {
+        const to = r.json.to ?? "sam";
         const message: Message = {
           seq: messages.length + 1,
           id: id(),
-          channel: DIRECT,
+          to,
+          channel: directWith(to),
           ...(r.json.thread ? { thread: r.json.thread } : {}),
           authorId: HUMAN.id,
           authorName: HUMAN.name,

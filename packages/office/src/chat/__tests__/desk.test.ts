@@ -451,6 +451,61 @@ describe("chat requests", () => {
       ).rejects.toMatchObject({ code: "invalid" });
     });
 
+    it("records a ticket filed for someone else against the request, with no work item for the caller", async () => {
+      const session = (await say("Rotate the staging keys")).item;
+      await scheduler.markActive(session.id);
+      const filing = { ticket: "ACME-8", request: "Rotate the staging keys", assignee: "pat" };
+      await desk.fileFor("sam", session.id, filing);
+
+      expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([]);
+      expect(notified).toEqual([]);
+      expect(await store.listItemRefs(session.id)).toContainEqual(
+        expect.objectContaining({
+          type: "ticket",
+          ref: "ACME-8",
+          url: tracker.links.issue("ACME-8"),
+          role: "created",
+          source: "work_file_for",
+        }),
+      );
+
+      // The session still answers the requester itself: it filed no work of its own.
+      const origin = await readOrigin(store, session.id);
+      expect(origin?.filed).toBeUndefined();
+      expect(origin?.requests).toEqual(["rotate the staging keys"]);
+      expect((await store.readJournal(session.id)).map((j) => j.text).join("\n")).toContain(
+        "Filed ACME-8 for pat",
+      );
+
+      // Filing the same request again is refused, for anyone.
+      await expect(desk.fileFor("sam", session.id, filing)).rejects.toMatchObject({
+        code: "invalid",
+      });
+
+      await expect(
+        desk.linkTicket("sam", session.id, "ACME-9", "Rotate the staging keys"),
+      ).rejects.toMatchObject({ code: "invalid" });
+    });
+
+    it("refuses to record a ticket for someone else from anything but the caller's chat session", async () => {
+      const r = await say("Rotate the staging keys");
+      const filing = { ticket: "ACME-8", request: "Rotate the staging keys", assignee: "pat" };
+      await expect(desk.fileFor("pat", r.item.id, filing)).rejects.toMatchObject({
+        code: "unknown_item",
+      });
+
+      const plain = await scheduler.enqueue({
+        person: "sam",
+        kind: "ticket",
+        title: "x",
+        trigger: "human",
+      });
+
+      await expect(desk.fileFor("sam", plain.id, filing)).rejects.toMatchObject({
+        code: "invalid",
+      });
+    });
+
     it("files work without a tracker as a request", async () => {
       const { filed } = await fileWork("Add a search page");
       expect(filed.url).toBeUndefined();

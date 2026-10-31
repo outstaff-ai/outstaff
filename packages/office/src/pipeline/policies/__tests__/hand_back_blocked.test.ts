@@ -9,8 +9,12 @@ const back = (status: string, actor = SAM) =>
     data: { status, kind: "assigned" },
   });
 
-const world = (status: StaticTicket["status"], roles: Record<string, string> = {}) => ({
-  tickets: { "ACME-1": t(status, "sam", { requester: "ada.admin" }) },
+const world = (
+  status: StaticTicket["status"],
+  roles: Record<string, string> = {},
+  assignee = "sam",
+) => ({
+  tickets: { "ACME-1": t(status, assignee, { requester: "ada.admin" }) },
   roles,
 });
 
@@ -36,7 +40,17 @@ describe("hand_back_blocked", () => {
 
     const priya = { kind: "agent" as const, id: "priya" };
     expect(
-      judge("hand_back_blocked", back("blocked", priya), world("active", { pm: "priya" })),
+      judge("hand_back_blocked", back("blocked", priya), world("active", { pm: "priya" }, "priya")),
     ).toEqual(["act for priya: move ACME-1 to blocked, assign ACME-1 to human ada.admin"]);
+  });
+
+  it("never undoes a hand-over: a ticket the agent gave to someone else during the work stays with them", () => {
+    expect(judge("hand_back_blocked", back("blocked"), world("active", {}, "noor"))).toEqual([
+      "drop: sam handed ACME-1 over to agent noor during the work, and a hand-back does not undo a hand-over",
+    ]);
+
+    expect(judge("hand_back_blocked", back("blocked"), world("active", {}, "ada.admin"))).toEqual([
+      "act for sam: move ACME-1 to blocked",
+    ]);
   });
 });

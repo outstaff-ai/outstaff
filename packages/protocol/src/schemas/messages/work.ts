@@ -69,6 +69,19 @@ export const workMessages = [
   ),
   message("work_link_result", filedSchema),
   message(
+    "work_file_for",
+    z.strictObject({
+      workItemId: itemId,
+      ticket: z.string().min(1).max(200).describe("Key of the ticket the agent created."),
+      request: z.string().min(1).max(300).describe("Title of the request the ticket files."),
+      assignee: z
+        .string()
+        .min(1)
+        .max(200)
+        .describe("Who the ticket was filed for, as the tracker names them."),
+    }),
+  ),
+  message(
     "work_queue",
     z.strictObject({
       workItemId: itemId,
