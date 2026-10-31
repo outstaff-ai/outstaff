@@ -5,6 +5,8 @@
 #
 # Every input is pinned: the base image by version and digest, tools by version and sha256,
 # npm packages by the lockfile (which also pins the Claude Code binary, see the agent stage).
+# OUTSTAFF_VERSION is not a build input but metadata: the release version the processes report (a release tag builds the
+# images without bumping package.json). The release workflow passes it; empty, they report their package's version.
 
 # node:24.22.1-slim (Debian 12), multi-arch index digest.
 ARG NODE_IMAGE=node:24.22.1-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205
@@ -87,6 +89,8 @@ RUN chmod 0755 /opt/outstaff/dist/cli.js \
  && ln -s /opt/outstaff/dist/cli.js /usr/local/bin/outstaff \
  && claude="$(ls /opt/outstaff/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-*/node_modules/@anthropic-ai/claude-agent-sdk-linux-*/claude)" \
  && "$claude" --version
+ARG OUTSTAFF_VERSION=
+ENV OUTSTAFF_VERSION=${OUTSTAFF_VERSION}
 USER outstaff
 VOLUME ["/home/outstaff", "/tmp"]
 CMD ["ost-agent"]
@@ -96,9 +100,11 @@ FROM base AS office
 COPY --from=builder /out/office /opt/outstaff
 RUN ln -s /opt/outstaff/dist/main.js /usr/local/bin/outstaff-office \
  && chmod 0755 /opt/outstaff/dist/main.js
+ARG OUTSTAFF_VERSION=
 USER outstaff
 ENV OUTSTAFF_STORE_URL=sqlite:///var/lib/outstaff/office.db \
-    OUTSTAFF_HEALTH_PORT=8081
+    OUTSTAFF_HEALTH_PORT=8081 \
+    OUTSTAFF_VERSION=${OUTSTAFF_VERSION}
 EXPOSE 8080 8081 8082
 VOLUME ["/var/lib/outstaff", "/tmp"]
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \

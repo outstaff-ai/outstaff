@@ -84,6 +84,20 @@ describe("ost --version", () => {
   it("prints the package version", async () => {
     expect(await ost(root, ["--version"])).toMatchObject({ code: 0, out: `${version}\n` });
   });
+
+  it("prints the image's version, OUTSTAFF_VERSION, when it is set", async () => {
+    let out = "";
+    const ctx: Context = {
+      cwd: root,
+      env: { OUTSTAFF_VERSION: "0.1.0-rc.20" },
+      out: (t) => void (out += t),
+      err: () => {},
+      gitOrigin: () => undefined,
+    };
+
+    expect(await run(["--version"], ctx)).toBe(0);
+    expect(out).toBe("0.1.0-rc.20\n");
+  });
 });
 
 describe("ost validate", () => {

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Logger } from "@outstaff/core";
+import { runningVersion, type Logger } from "@outstaff/core";
 import {
   StartupError,
   agentRegistry,
@@ -23,11 +23,15 @@ const log: Logger = {
   error: write("error"),
 };
 
-const version = (
-  JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
-    version: string;
-  }
-).version;
+// The image's release version when the image build set it, else the package's; the office reports the same.
+const version = runningVersion(
+  process.env,
+  (
+    JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+      version: string;
+    }
+  ).version,
+);
 
 if (process.argv.slice(2).some((a) => a === "--version" || a === "-v")) {
   process.stdout.write(`${version}\n`);

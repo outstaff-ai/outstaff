@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { createInterface } from "node:readline/promises";
 import { Command, CommanderError } from "@commander-js/extra-typings";
+import { runningVersion } from "@outstaff/core";
 import { commands, groupSummaries } from "./commands/index.js";
 import type { Context, GlobalOptions } from "./types.js";
 
@@ -64,7 +65,7 @@ export function nodeContext(): Context {
 export function buildProgram(ctx: Context, setExit: (code: number) => void) {
   const program = new Command("ost")
     .description("Run a team of AI agents like an outsourcing agency.")
-    .version(version, "-v, --version", "Print the version.")
+    .version(runningVersion(ctx.env, version), "-v, --version", "Print the version.")
     .option(
       "--team <path|git-url>",
       "Team config: a file, a directory, or a git URL with an optional #ref.",
