@@ -62,6 +62,8 @@ export function httpBackend(root: string, req: GitHttpRequest): Promise<GitHttpR
       });
     });
 
+    // git can answer and exit before it reads the body; its answer is whole, so a broken pipe here is not an error.
+    child.stdin.on("error", () => undefined);
     child.stdin.end(req.body);
   });
 }
