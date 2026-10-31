@@ -13,6 +13,10 @@ updates:
       # @types/node follows the pinned Node.js major (devEngines.runtime); bump both together by hand
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # @dicebear/core's next major needs @dicebear/collection's (the avatar styles), which has none yet: a group
+      # would still bump core alone. Lift this when the collection publishes the same major, and migrate then.
+      - dependency-name: "@dicebear/*"
+        update-types: ["version-update:semver-major"]
     groups:
       # The avatar styles (@dicebear/collection) must match @dicebear/core's major: bump them together.
       dicebear:
