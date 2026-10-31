@@ -71,6 +71,25 @@ describe("deriveAfterMerge", () => {
     expect(events[1]!.subject).toEqual({ pr: prRef(52) });
   });
 
+  it("raises nothing for a pull request the code host answered as gone", () => {
+    const gone = { goneAt: "2026-10-05T09:00:00.000Z" };
+    const after = [
+      merged,
+      snap(51, { mergeable: "conflicting", ...gone }),
+      snap(54, { baseRef: "branch-50", ...gone }),
+    ];
+
+    const events = deriveAfterMerge({
+      merged,
+      before: [],
+      after,
+      requirements: UP_TO_DATE,
+      at: AT,
+    });
+
+    expect(events).toEqual([]);
+  });
+
   it("raises no behind-base event unless the host requires branches into that base to be up to date", () => {
     const events = deriveAfterMerge({
       merged,

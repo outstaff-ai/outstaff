@@ -1,6 +1,7 @@
 import { PortError } from "@outstaff/core";
 import type { RepoRef, WorkflowPr } from "@outstaff/core";
 import type { WorkstateCore } from "./core.types.js";
+import { isOpen } from "./open.js";
 import type { CiState, CurrentWork, DocRecord, PrRecord } from "./types.js";
 
 export const TERMINAL = new Set(["done", "canceled"]);
@@ -23,6 +24,14 @@ export const ciOf = (checks: PrRecord["checks"]): CiState => {
 export const notFound = (error: unknown) =>
   error instanceof PortError && error.code === "not_found";
 
+/** The code host does not have the pull request, or no longer lets the office read it. */
+export const prGone = (error: unknown) =>
+  error instanceof PortError && (error.code === "not_found" || error.code === "forbidden");
+
+/** Whether the repository is one the team lists. */
+export const teamRepo = (core: WorkstateCore, repo: RepoRef) =>
+  core.repos.some((r) => core.sameRepo(r, repo));
+
 export const toWorkflowPr = (p: PrRecord): WorkflowPr => ({
   ref: p.ref,
   title: p.title,
@@ -37,9 +46,7 @@ export const toWorkflowPr = (p: PrRecord): WorkflowPr => ({
 });
 
 export const openPrs = (core: WorkstateCore, repo?: RepoRef) =>
-  [...core.prs.values()].filter(
-    (p) => p.state === "open" && (!repo || core.sameRepo(p.ref.repo, repo)),
-  );
+  [...core.prs.values()].filter((p) => isOpen(p) && (!repo || core.sameRepo(p.ref.repo, repo)));
 
 export const docOpen = (core: WorkstateCore, rec: DocRecord): boolean => {
   const ticket = rec.ticket ? core.tickets.get(rec.ticket) : undefined;

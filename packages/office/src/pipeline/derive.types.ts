@@ -4,7 +4,7 @@ import type { PrRecord } from "#/workstate/index.js";
 /** What deriving needs of a pull request in the work state. */
 export type PrSnapshot = Pick<
   PrRecord,
-  "ref" | "title" | "url" | "headRef" | "baseRef" | "state" | "mergeable" | "ticket"
+  "ref" | "title" | "url" | "headRef" | "baseRef" | "state" | "mergeable" | "ticket" | "goneAt"
 >;
 
 export interface MergeChange {

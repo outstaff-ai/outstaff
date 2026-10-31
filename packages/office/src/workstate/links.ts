@@ -29,3 +29,10 @@ export async function relink(
     await store.link(from, next, relation);
   }
 }
+
+/** Removes every edge that leaves `from`. */
+export async function unlinkAll(store: Store, from: Ref): Promise<void> {
+  for (const link of await store.queryLinks({ from })) {
+    await store.unlink(from, link.to, link.relation);
+  }
+}

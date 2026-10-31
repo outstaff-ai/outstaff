@@ -55,6 +55,9 @@ export interface GraphPr {
   threads: GraphThread[];
   ticket?: string | undefined;
   stackedOn?: string | undefined;
+
+  /** When the code host answered the pull request as not found or forbidden; a gone one counts as not open. */
+  goneAt?: string | undefined;
 }
 
 export interface GraphDoc {

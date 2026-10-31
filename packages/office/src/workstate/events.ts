@@ -10,6 +10,7 @@ import type {
   WorkstateCore,
 } from "./core.types.js";
 import { openPrs } from "./derive.js";
+import { isOpen } from "./open.js";
 
 const VERDICTS = new Set<string>(["approved", "changes_requested", "dismissed"]);
 
@@ -78,7 +79,7 @@ export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & Reque
 
       await refreshPr(ctx, other.ref, { wait: true });
       const now = core.prs.get(prSubject(other.ref));
-      if (done?.state === "merged" && now?.state === "open" && now.baseRef === done.headRef) {
+      if (done?.state === "merged" && now && isOpen(now) && now.baseRef === done.headRef) {
         await raiseBaseMerged(ctx, now, done);
       }
     }

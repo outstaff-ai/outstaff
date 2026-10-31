@@ -2,8 +2,9 @@ import type { TeamConfig } from "@outstaff/core";
 import type { Ref, WorkItem } from "#/store/index.js";
 import type { PrRecord, TicketRecord } from "./types.js";
 import type { PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
-import { docOpen, isTerminal, openPrs } from "./derive.js";
-import { docNode, prNode, ROOT, ticketNode } from "./links.js";
+import { docOpen, isTerminal, openPrs, teamRepo } from "./derive.js";
+import { docNode, prNode, ROOT, ticketNode, unlinkAll } from "./links.js";
+import { isOpen } from "./open.js";
 import { addPickup } from "./ready.js";
 
 type Latest = Map<string, { at: string; person: string; done: boolean }>;
@@ -46,7 +47,7 @@ const trackerIds = (team: TeamConfig) =>
 
 /** Rebuilds the records: from the store on open, and from the ports on a rescan. */
 export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
-  const { store, vcs, tracker, team, clock, retentionMs, repos, prs, tickets, docs } = core;
+  const { store, vcs, tracker, team, clock, logger, retentionMs, repos, prs, tickets, docs } = core;
   const { workers, handedBack, pickups, prSubject } = core;
   const { refreshPr, refreshTicket, saveTicket, toTicket } = ops;
   const refreshPickups = (items: WorkItem[]) => {
@@ -90,7 +91,7 @@ export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
   const prune = async () => {
     const cutoff = clock.now().getTime() - retentionMs;
     const old = (at: string) => Date.parse(at) < cutoff;
-    await forget(prs, prNode, (p) => p.state !== "open" && old(p.updatedAt));
+    await forget(prs, prNode, (p) => !isOpen(p) && old(p.updatedAt));
     await forget(
       tickets,
       ticketNode,
@@ -148,6 +149,22 @@ export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
     ["doc", docs],
   ]);
 
+  /** The pull requests of repositories the team no longer lists are dropped with their links, said once. */
+  const dropUntracked = async () => {
+    const dropped = [...prs.keys()].filter((key) => !teamRepo(core, prs.get(key)!.ref.repo));
+    for (const key of dropped) {
+      prs.delete(key);
+      await store.unlink(ROOT, prNode(key), "tracks");
+      await unlinkAll(store, prNode(key));
+    }
+
+    if (dropped.length > 0) {
+      logger.info("dropped pull requests of repositories the team no longer lists", {
+        prs: dropped,
+      });
+    }
+  };
+
   const load = async () => {
     for (const link of await store.queryLinks({ from: ROOT, relation: "tracks" })) {
       const subject = await store.getSubject(link.to.type, link.to.ref);
@@ -156,6 +173,7 @@ export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
       }
     }
 
+    await dropUntracked();
     await refreshWorkers();
   };
 

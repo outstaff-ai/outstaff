@@ -100,6 +100,29 @@ describe("the wake context builder", () => {
     expect(context.tickets[0]?.why.role).toBe("trigger");
   });
 
+  it("does not count a PR the code host answered as gone as open in the stack", () => {
+    const { context } = buildWakeContext(
+      graph({
+        refs: [ref({ type: "pr", ref: "acme/app#12", role: "subject", source: "vcs:review-1" })],
+        tickets: [ticket41()],
+        prs: [
+          pr12(),
+          pr12({
+            ref: "acme/app#13",
+            number: 13,
+            ticket: undefined,
+            stackedOn: "acme/app#12",
+            goneAt: "2026-10-01T09:30:00.000Z",
+          }),
+        ],
+      }),
+      limits,
+    );
+
+    expect(context.prs.map((p) => p.ref)).toEqual(["acme/app#12"]);
+    expect(context.prs[0]).toMatchObject({ stackedBy: [] });
+  });
+
   it("hands a chat message naming a ticket that ticket and its PRs", () => {
     const { context } = buildWakeContext(
       graph({

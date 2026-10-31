@@ -5,6 +5,7 @@ import type { RefreshCtx, WorkstateCore } from "./core.types.js";
 import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
+import { visible } from "./open.js";
 import { createPrs } from "./prs.js";
 import { readyTickets } from "./ready.js";
 import { createRequesters } from "./requesters.js";
@@ -89,6 +90,9 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
   const { refreshWorkers, doRescan, load } = createRescan(core, { ...ticketOps, ...prOps });
 
+  /** The pull requests the office can still read: a gone one is left out of every answer. */
+  const seen = () => [...prs.values()].filter(visible);
+
   let timer: Cancel | undefined;
   let running = false;
 
@@ -170,12 +174,15 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     assignee: (t) => tickets.get(t)?.assignee,
     pullRequest(pr) {
       const rec = prs.get(prSubject(pr));
-      return rec && toWorkflowPr(rec);
+      return rec && visible(rec) ? toWorkflowPr(rec) : undefined;
     },
-    pullRequests: (number) => [...prs.values()].filter((p) => p.ref.number === number),
-    repoPrs: (repo) => [...prs.values()].filter((p) => sameRepo(p.ref.repo, repo)),
-    pullRequestsOf: (t) => [...prs.values()].filter((p) => p.ticket === t).map(toWorkflowPr),
-    prsOfTicket: (t) => [...prs.values()].filter((p) => p.ticket === t),
+    pullRequests: (number) => seen().filter((p) => p.ref.number === number),
+    repoPrs: (repo) => seen().filter((p) => sameRepo(p.ref.repo, repo)),
+    pullRequestsOf: (t) =>
+      seen()
+        .filter((p) => p.ticket === t)
+        .map(toWorkflowPr),
+    prsOfTicket: (t) => seen().filter((p) => p.ticket === t),
     ticketForDraft: (draft) => locked(() => ticketOfDraft(draft)),
     handedBack: (t) => handedBack.has(t),
     ticket: (key) => tickets.get(key),
