@@ -34,14 +34,14 @@ async function events(
 
   return {
     id,
-    result: { ...found, total, events: found.events.map((t) => present(t, opts.links)) },
+    result: { ...found, total, events: found.events.map((t) => present(t, opts)) },
   };
 }
 
 async function event(opts: OfficeLinkOptions, id: string, eventId: string): Promise<LinkResponse> {
   const found = await opts.store.getTrace(eventId);
   return found
-    ? { id, result: { trace: present(found.data as Trace, opts.links) } }
+    ? { id, result: { trace: present(found.data as Trace, opts) } }
     : error(id, "not_found", `No trace for event ${eventId}.`);
 }
 
@@ -66,7 +66,7 @@ const activity = async (
 async function item(opts: OfficeLinkOptions, id: string, itemId: string): Promise<LinkResponse> {
   const found = await findItem(opts.store, itemId);
   return found
-    ? { id, result: { item: found.item, traces: found.traces.map((t) => present(t, opts.links)) } }
+    ? { id, result: { item: found.item, traces: found.traces.map((t) => present(t, opts)) } }
     : error(id, "not_found", `No work item ${itemId}.`);
 }
 
