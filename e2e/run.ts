@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver makes the author put its pull request in the merge queue (merge on approval), the host merges it and the ticket is done, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -320,9 +320,9 @@ office:
 pipeline:
   wake: { coalesce_seconds: 0 }
 policies:
-  # Agents turn on auto-merge when a pull request is ready; the stub's ruleset needs one approval, which only the
-  # last step gives.
-  merge: { on_approval: true }
+  # Only this approver's approval wakes an author to merge: the other steps approve nothing, and a human here changes
+  # none of them. The stub's ruleset needs one approval and its merge queue merges what joins it.
+  merge: { on_approval: true, approvers: [human:merge-approver] }
 `;
 
 /**
@@ -1810,24 +1810,16 @@ async function main() {
   const t2 = final.tickets.find((x: Json) => x.key === second);
   assertEq(t2.status, "In Review", "the second ticket waits in review");
 
-  // ---- 12. merge on approval (policies.merge.on_approval): the author turned on auto-merge when it opened the pull
-  // request, so a human's approval meets the ruleset, the host queues and merges it with no agent run, and the
-  // ticket is done
+  // ---- 12. merge on approval (policies.merge.on_approval): the approval wakes the author to decide (kind `merge`),
+  // with the merge context; nothing else is approved, so it merges: `ost pr merge` joins the merge queue, the queue
+  // merges it and the ticket is done
   const before12 = (await state()).github.pulls.find((p: Json) => p.number === made.pr.number);
-  assertEq(
-    before12.autoMerge,
-    true,
-    "the author turned on auto-merge when it opened the pull request",
-  );
-
+  assertEq(before12.autoMerge, false, "marking the pull request ready set nothing to merge");
+  assertEq(before12.queued, false, "nothing joined the merge queue before the approval");
   const head12 = before12.head.sha;
 
-  await stub("POST", `/_test/pulls/${made.pr.number}/review`, {
-    state: "approved",
-    actor: "merge-approver",
-  });
-
-  const queued = await until(`#${made.pr.number} put in the merge queue by the host`, (s) =>
+  await approve(made.pr.number);
+  const queued = await until(`#${made.pr.number} put in the merge queue by its author`, (s) =>
     s.github.pulls.find((p: Json) => p.number === made.pr.number && p.queued),
   );
 
@@ -1843,10 +1835,65 @@ async function main() {
 
   assertEq(done12.state, "merged", "the pull request merged");
   step(
-    `merge on approval: #${made.pr.number} approved -> auto-merge queued it, merged by the queue, ${made.t.key} done`,
+    `merge on approval: #${made.pr.number} approved -> its author woken to merge, it joined the queue, merged, ${made.t.key} done`,
   );
 
-  // ---- 13. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
+  // ---- 13. two approved pull requests that change the same file: one merge at a time. The older one merges; the
+  // newer one's merge wake sees it in the merge context (approved, changing the same file) and waits; once the older
+  // one merged, the newer one conflicts, is rebased, approved again and merges.
+  const pair = [
+    await stub("POST", "/_test/tickets", { title: "Add a morning greeting", assignee: "sam" }),
+    await stub("POST", "/_test/tickets", { title: "Add an evening greeting", assignee: "sam" }),
+  ].map((t: Json) => t.key as string);
+
+  const opened = await until("pull requests for both greetings, in review", (s) => {
+    const prs = pair.map((key) =>
+      s.github.pulls.find((p: Json) => p.body.includes(`Closes ${key}`)),
+    );
+
+    const reviewed = pair.every(
+      (key) => s.tickets.find((x: Json) => x.key === key).status === "In Review",
+    );
+
+    return prs.every(Boolean) && reviewed ? prs : undefined;
+  });
+
+  const [older, newer] = opened.toSorted((a: Json, b: Json) => a.number - b.number);
+  await approve(older.number);
+  await approve(newer.number);
+  const first13 = await until(`#${older.number} merged first`, (s) => {
+    const o = s.github.pulls.find((p: Json) => p.number === older.number);
+    const n = s.github.pulls.find((p: Json) => p.number === newer.number);
+    return o.state === "merged" ? n : undefined;
+  });
+
+  assertEq(
+    first13.queued,
+    false,
+    `#${newer.number} waited: it did not join the queue beside #${older.number}`,
+  );
+
+  const rebased13 = await until(
+    `#${newer.number} rebased on main after #${older.number} merged`,
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === newer.number);
+      return pr.forcePushes > 0 && pr.containsMain && pr.mergeable === true ? pr : undefined;
+    },
+  );
+
+  // A push needs a new approval: the rebased head is approved again, which wakes its author to merge.
+  await approve(newer.number);
+  const second13 = await until(`#${newer.number} merged after its rebase`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.number === newer.number);
+    return pr.state === "merged" ? pr : undefined;
+  });
+
+  assertEq(second13.head.sha, rebased13.head.sha, "the rebased head is what merged");
+  step(
+    `merge order: #${older.number} and #${newer.number} change the same file -> #${older.number} merged, #${newer.number} waited, rebased, merged`,
+  );
+
+  // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
   const authors = await state();
   const by = [
@@ -1871,6 +1918,14 @@ async function main() {
   );
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
+
+/** The merge approver approves the pull request's current head. */
+async function approve(number: number) {
+  await stub("POST", `/_test/pulls/${number}/review`, {
+    state: "approved",
+    actor: "merge-approver",
+  });
 }
 
 function assertEq(actual: unknown, expected: unknown, what: string) {

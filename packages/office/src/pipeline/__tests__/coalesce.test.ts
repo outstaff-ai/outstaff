@@ -33,7 +33,7 @@ describe("coalesceWakes", () => {
     const runs = coalesceWakes([
       wake("c", "00:45", { instruction: "Also this." }),
       wake("a", "00:00"),
-      wake("b", "00:20", { policy: "other_policy", kind: "merge" }),
+      wake("b", "00:20", { policy: "other_policy", kind: "ci_failed" }),
     ]);
 
     expect(runs).toEqual([
@@ -47,6 +47,20 @@ describe("coalesceWakes", () => {
         events: ["a", "b", "c"],
         at: "2026-10-05T09:00:00.000Z",
       },
+    ]);
+  });
+
+  it("keeps a merge in a run of its own, folding only merges into it", () => {
+    const runs = coalesceWakes([
+      wake("a", "00:00"),
+      wake("b", "00:10", { kind: "merge", policy: "merge_ready" }),
+      wake("c", "00:20", { kind: "merge", policy: "merge_ready" }),
+      wake("d", "00:30"),
+    ]);
+
+    expect(runs.map((r) => [r.kind, r.events])).toEqual([
+      ["review_feedback", ["a", "d"]],
+      ["merge", ["b", "c"]],
     ]);
   });
 

@@ -35,6 +35,23 @@ export function vcsPullRequestCases({ get, repoOf }: VcsCases): void {
     expect(await s.subject.listPullRequests(repo, { author: "someone-else" })).toEqual([]);
   });
 
+  it("lists the files a pull request changes, when the adapter can", async (t) => {
+    const s = get();
+    requireCapability(t, s, "vcs.pullRequests");
+    const list = s.subject.changedFiles?.bind(s.subject);
+    if (!list) {
+      t.skip();
+      return;
+    }
+
+    const repo = repoOf(t, s);
+    const open = requireSeed(t, s.seed, "pullRequest");
+    const pr = await open(repo, { title: "Files", author: { login: "sam", kind: "agent" } });
+    const files = await list(repo, pr.number);
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.every((f) => typeof f === "string" && f !== "")).toBe(true);
+  });
+
   it("reports not_found for an unknown pull request", async (t) => {
     expect.hasAssertions();
     const s = get();

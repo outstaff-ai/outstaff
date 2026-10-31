@@ -5,7 +5,7 @@ sidebar:
   order: 16
 ---
 
-**Status:** accepted. Replaces the rule engine of [0011](/decisions/0011-configurable-workflow/); the status mapping stays. Since [0018](/decisions/0018-pipeline-only/) the pipeline is the only way the office decides, and the off and shadow modes below are gone. Since [0019](/decisions/0019-agents-make-their-acts/) the agent an act is for makes it, as itself.
+**Status:** accepted. Replaces the rule engine of [0011](/decisions/0011-configurable-workflow/); the status mapping stays. Since [0018](/decisions/0018-pipeline-only/) the pipeline is the only way the office decides, and the off and shadow modes below are gone. Since [0019](/decisions/0019-agents-make-their-acts/) the agent an act is for makes it, as itself. [0021](/decisions/0021-merging-is-the-agents-decision/) replaces its merge decision: merging is the agent's decision, woken when its pull request may be ready.
 
 ## Context
 

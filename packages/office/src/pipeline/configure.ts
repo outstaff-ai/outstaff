@@ -1,9 +1,9 @@
-import { policyOn, workflowOptions, type TeamConfig } from "@outstaff/core";
+import { parseRepoUrl, policyOn, workflowOptions, type TeamConfig } from "@outstaff/core";
 import { instructionProblem, type ConfiguredPolicy, type Policy } from "@outstaff/policy";
 import { BUILT_IN_POLICIES, POLICY_SWITCH_OF } from "./policies/index.js";
 import type { ConfiguredPipeline, PipelineOptions } from "./state.types.js";
 
-type Team = Pick<TeamConfig, "pipeline" | "policies" | "humans" | "workflow" | "people">;
+type Team = Pick<TeamConfig, "pipeline" | "policies" | "humans" | "workflow" | "people" | "repos">;
 
 type Override = NonNullable<NonNullable<Team["pipeline"]>["policies"]>[string];
 
@@ -69,12 +69,27 @@ function customOf(custom: readonly ConfiguredPolicy[], issues: string[]): Config
   });
 }
 
+/** The repositories `policies.merge.repos` names, as lowercase `owner/name`; undefined when it names none. */
+function mergeReposOf(team: Team): string[] | undefined {
+  const names = team.policies?.merge.repos;
+  if (!names) {
+    return undefined;
+  }
+
+  return team.repos
+    .filter((r) => names.includes(r.name))
+    .map((r) => parseRepoUrl(r.url))
+    .map((r) => `${r.owner}/${r.name}`.toLowerCase());
+}
+
 /** What the team's config tells the policies, and how long a wake waits for related ones. */
 function optionsOf(team: Team): PipelineOptions {
   const seconds = team.pipeline?.wake?.coalesce_seconds;
+  const mergeRepos = mergeReposOf(team);
   return {
     ...workflowOptions(team),
     people: team.people.map((p) => p.handle),
+    ...(mergeRepos ? { mergeRepos } : {}),
     ...(seconds === undefined ? {} : { coalesceMs: seconds * 1000 }),
   };
 }

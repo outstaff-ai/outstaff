@@ -1,7 +1,7 @@
 import { subjectLabel } from "#/log.js";
 import type { ActOp, Decision } from "./decisions.types.js";
 import type { ErrorProposal, PipelineEvent, Proposal } from "@outstaff/policy";
-import type { ContextManifest, ManifestEntry } from "./context/context.types.js";
+import type { ContextManifest, ManifestEntry, MergeManifest } from "./context/context.types.js";
 import type { Trace } from "./trace.types.js";
 
 /** One tracker change, in words. */
@@ -112,6 +112,20 @@ function entryLine(e: ManifestEntry): string {
   return `    ${e.type} ${e.ref} (${e.why.role}: ${e.why.source}${counted})${e.url ? ` ${e.url}` : ""}`;
 }
 
+/** What a merge's context named. */
+function mergeLines(m: MergeManifest | undefined): string[] {
+  if (!m) {
+    return [];
+  }
+
+  const others = m.others.map((o) => `${o.ref} (${o.relation.join(", ") || "unrelated"})`);
+  return [
+    `    merge of ${m.pr}: base ${m.base.ref} CI ${m.base.ci}`,
+    `    other open pull requests: ${others.join(", ") || "none"}${m.moreOthers ? `, ${m.moreOthers} more` : ""}`,
+    `    recent merges into ${m.base.ref}: ${m.recentMerges.join(", ") || "none"}`,
+  ];
+}
+
 /** What each wake the event started was handed, item by item. */
 function contextLines(context: Trace["context"]): string[] {
   const manifests: ContextManifest[] = Object.values(context ?? {});
@@ -125,6 +139,7 @@ function contextLines(context: Trace["context"]): string[] {
     ...manifests.flatMap((m) => [
       `  work item ${m.itemId}: ${m.entries.length} linked${m.omitted ? `, ${m.omitted} left out by pipeline.context.items` : ""}`,
       ...m.entries.map(entryLine),
+      ...mergeLines(m.merge),
     ]),
   ];
 }

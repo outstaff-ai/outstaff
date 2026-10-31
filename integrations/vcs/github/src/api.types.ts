@@ -1,5 +1,13 @@
 // The shapes of the GitHub REST and GraphQL responses the adapter reads.
 
+/** One file of `GET /pulls/{n}/files`. */
+export interface RestPullFile {
+  filename: string;
+
+  /** The file's earlier path, for a rename. */
+  previous_filename?: string;
+}
+
 export interface RestPull {
   number: number;
   node_id?: string;

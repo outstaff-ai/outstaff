@@ -91,6 +91,7 @@ export type VcsReads = Pick<
   | "mergeOptions"
   | "mergeRequirements"
   | "diff"
+  | "changedFiles"
   | "permission"
   | "events"
 >;

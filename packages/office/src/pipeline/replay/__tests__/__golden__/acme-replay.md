@@ -17,7 +17,7 @@ How to read it:
 | 1 | `pr.opened` acme-example/shop#41 by sam | move ACME-123 to review (for sam) |
 | 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (for sam) |
 | 3 | `pr.merged` acme-example/shop#43 by ada-admin | (drop: no policy matched) |
-| 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | (drop: no policy matched) |
+| 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merge): _#41 (Search API) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
 | 5 | `pr.merged` acme-example/shop#41 by sam | move ACME-123 to done (for sam) |
 | 6 | derived `pr.base_merged` acme-example/shop#42 after #41 | wake sam (rebase): _Your pull request #42 (Search page) is stacked on a branch that was just merged after #41 (Search API) merged. Bring it up to date with `sam/acme-123` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
 
@@ -39,7 +39,7 @@ How to read it:
 | 13 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
 | 14 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
 | 15 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
-| 16 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
+| 16 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._<br>wake sam (merge): _#60 (Wishlist) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
 | 17 | `pr.review_submitted` acme-example/shop#60 by outside-contributor | (drop: the event comes from someone who is not trusted: recorded, never acted on) |
 | 18 | `agent.handed_back` acme-example/shop#60 by sam | move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam) |
 
@@ -116,6 +116,6 @@ How to read it:
 
 ## Coalescing
 
-The pipeline's 23 wakes become 21 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 25 wakes become 23 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

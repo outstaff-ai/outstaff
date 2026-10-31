@@ -94,6 +94,7 @@ describe("gathering what the office knows around an item", () => {
         throw new PortError("unavailable", "down");
       },
       links: { thread: () => "", pr: () => "", commit: () => "" },
+      checks: async () => [],
     };
 
     const graph = await gatherGraph({ store, tracker: failing, vcs }, it1.id, 16);

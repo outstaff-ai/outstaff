@@ -173,6 +173,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       return rec && toWorkflowPr(rec);
     },
     pullRequests: (number) => [...prs.values()].filter((p) => p.ref.number === number),
+    repoPrs: (repo) => [...prs.values()].filter((p) => sameRepo(p.ref.repo, repo)),
     pullRequestsOf: (t) => [...prs.values()].filter((p) => p.ticket === t).map(toWorkflowPr),
     prsOfTicket: (t) => [...prs.values()].filter((p) => p.ticket === t),
     ticketForDraft: (draft) => locked(() => ticketOfDraft(draft)),

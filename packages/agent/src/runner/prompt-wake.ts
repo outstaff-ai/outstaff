@@ -1,6 +1,8 @@
 import type {
   ContextChat,
   ContextDoc,
+  ContextMerge,
+  ContextMergeOther,
   ContextPr,
   ContextTicket,
   ContextWhy,
@@ -108,6 +110,61 @@ function chatLines(c: ContextChat): string[] {
   ];
 }
 
+const RELATION: Record<ContextMergeOther["relation"][number], string> = {
+  stacked_on_it: "stacked on it",
+  under_it: "it is stacked on this one",
+  same_base: "same base",
+  overlapping_files: "changes the same files",
+};
+
+const checksOf = (failing: ContextMerge["base"]["failing"]) =>
+  failing.length ? ` (failing: ${failing.map((c) => `${c.name}${link(c.url)}`).join(", ")})` : "";
+
+function mergeSelfLines(p: ContextMerge["pr"]): string[] {
+  const reviews = [
+    p.approvedBy.length ? `approved by ${p.approvedBy.join(", ")}` : "no approval",
+    ...(p.changesRequestedBy.length
+      ? [`changes requested by ${p.changesRequestedBy.join(", ")}`]
+      : []),
+  ];
+
+  return [
+    `  Pull request ${p.ref}: ${p.title}${link(p.url)}`,
+    `    ${p.head} -> ${p.base}${p.draft ? ", draft" : ""}. ${reviews.join(", ")}. CI ${p.ci}${checksOf(p.failing)}. Mergeable: ${p.mergeable}. ${p.unresolvedThreads} unresolved review thread${p.unresolvedThreads === 1 ? "" : "s"}.`,
+  ];
+}
+
+function otherLine(o: ContextMergeOther): string[] {
+  const relation = o.relation.map((r) => RELATION[r]).join(", ") || "no relation found";
+  const files = o.files.length ? ` Files both change: ${o.files.join(", ")}.` : "";
+  return [
+    `  - ${o.ref} by ${o.author}: ${o.title}${link(o.url)}`,
+    `    ${relation}. ${o.draft ? "Draft" : "Ready"}, ${o.approved ? "approved" : "not approved"}, CI ${o.ci}, mergeable: ${o.mergeable}.${files}`,
+  ];
+}
+
+/** What a merge is decided with: the pull request, its base, the other open pull requests and the latest merges. */
+function mergeLines(m: ContextMerge | undefined): string[] {
+  if (!m) {
+    return [];
+  }
+
+  return [
+    "",
+    "For the merge decision, as the office knows it now:",
+    ...mergeSelfLines(m.pr),
+    `  Base ${m.base.ref}: CI ${m.base.ci}${checksOf(m.base.failing)}.`,
+    m.others.length
+      ? `  Other open pull requests in the repository${m.moreOthers ? ` (${m.moreOthers} more not shown)` : ""}:`
+      : "  No other open pull requests in the repository.",
+    ...m.others.flatMap(otherLine),
+    m.recentMerges.length
+      ? `  Latest merges into ${m.base.ref}, latest first:`
+      : `  No recent merges into ${m.base.ref} the office knows of.`,
+    ...m.recentMerges.map((r) => `  - ${r.ref} by ${r.author} (${r.at}): ${r.title}${link(r.url)}`),
+  ];
+}
+
 /** The context bundle the office handed over with the wake, its text quoted as data. */
 export function wakeLines(wake: WakeContext | undefined): string[] {
   if (!wake) {
@@ -121,6 +178,7 @@ export function wakeLines(wake: WakeContext | undefined): string[] {
     ...wake.prs.flatMap(prLines),
     ...wake.docs.flatMap(docLines),
     ...wake.chats.flatMap(chatLines),
+    ...mergeLines(wake.merge),
     ...(wake.omitted
       ? ["", `${wake.omitted} more linked items were left out to keep this short.`]
       : []),

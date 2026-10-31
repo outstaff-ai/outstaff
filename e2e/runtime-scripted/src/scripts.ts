@@ -971,10 +971,37 @@ export async function* chat(ctx: ItemContext): Script {
   return filed ?? (yield* attachToPr(talk, latest));
 }
 
-/** An allowed approver approved the pull request: run the verb and report; a refusal is the answer. */
+/**
+ * Why the pull request should not merge yet, from the merge context: the one it is stacked on merges first, of two
+ * approved pull requests that change the same files the older one goes first (the scripts' pull requests are the same
+ * size), and one that conflicts is rebased first.
+ */
+function waitFor(ctx: ItemContext, number: number): string | undefined {
+  const m = ctx.merge;
+  const first = m?.others.find(
+    (o) =>
+      o.relation.includes("it is stacked on this one") ||
+      (o.approved && o.relation.includes("changes the same files") && o.number < number),
+  );
+
+  if (first) {
+    return `Waiting: #${first.number} merges first.`;
+  }
+
+  return m?.mergeable === "conflicting"
+    ? `Waiting: #${number} conflicts with its base, so it is rebased first.`
+    : undefined;
+}
+
+/** The pull request may be ready to merge: decide from the merge context, then run the verb or wait. */
 export async function* merge(ctx: ItemContext): Script {
   const number = need(ctx.pr, "the pull request");
   const repo = need(ctx.repo, "the repository");
+  const wait = waitFor(ctx, number);
+  if (wait) {
+    return wait;
+  }
+
   yield { type: "tool", tool: "pr_merge", input: { repo, number } };
   return "Ran pr merge.";
 }

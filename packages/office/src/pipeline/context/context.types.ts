@@ -109,10 +109,22 @@ export interface ManifestEntry {
 /** A linked item of the bundle, before it is filled in. */
 export type ContextNode = Pick<ManifestEntry, "type" | "ref" | "url" | "why">;
 
+/** What a merge's context named: the pull request, the base's checks, the other open pull requests, the merges. */
+export interface MergeManifest {
+  pr: string;
+  base: { ref: string; ci: string };
+
+  /** The other open pull requests it named, each with how it relates. */
+  others: { ref: string; relation: string[] }[];
+  moreOthers: number;
+  recentMerges: string[];
+}
+
 /** What went into one wake's bundle, recorded in the trace of the event that woke the item. */
 export interface ContextManifest {
   itemId: string;
   entries: ManifestEntry[];
   omitted: number;
   limits: ContextLimits;
+  merge?: MergeManifest | undefined;
 }

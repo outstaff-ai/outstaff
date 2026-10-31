@@ -69,6 +69,12 @@ export interface PolicyState extends WorkflowState {
 export interface PolicyOptions extends WorkflowOptions {
   /** The handles of the team's agents; a proposal for anyone else is rejected. */
   people: readonly string[];
+
+  /**
+   * The repositories whose pull requests agents may merge (`policies.merge.repos`), as lowercase `owner/name`; every
+   * repository when unset.
+   */
+  mergeRepos?: readonly string[] | undefined;
 }
 
 /**

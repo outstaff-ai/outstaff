@@ -29,4 +29,5 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0018](/decisions/0018-pipeline-only/)                    | The event pipeline is the only way the office decides                         |
 | [0019](/decisions/0019-agents-make-their-acts/)           | Agents make the pipeline's acts as themselves                                 |
 | [0020](/decisions/0020-office-marks-work-started/)        | The office marks a ticket active for the agent when its work starts           |
+| [0021](/decisions/0021-merging-is-the-agents-decision/)   | Merging is the agent's decision, woken when its pull request may be ready     |
 | [0022](/decisions/0022-act-echoes-wake-no-one/)           | The tracker's echo of an act wakes no one                                     |

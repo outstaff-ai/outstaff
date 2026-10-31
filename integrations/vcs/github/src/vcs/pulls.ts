@@ -6,11 +6,14 @@ import {
   type Vcs,
 } from "@outstaff/core";
 import { toPullRequest } from "#/mapping.js";
-import type { RestPull, RestRepo } from "#/api.types.js";
+import type { RestPull, RestPullFile, RestRepo } from "#/api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 
 const MERGEABLE_BACKOFF_MS = [500, 1_000, 2_000, 3_000, 5_000];
+
+/** GitHub lists at most 3000 files of a pull request, 100 a page. */
+const CHANGED_FILE_PAGES = 30;
 const MERGE_QUEUE_QUERY = `query($owner:String!,$name:String!,$branch:String!){repository(owner:$owner,name:$name){mergeQueue(branch:$branch){id}}}`;
 const READY_MUTATION = `mutation($id:ID!){markPullRequestReadyForReview(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
 const DRAFT_MUTATION = `mutation($id:ID!){convertPullRequestToDraft(input:{pullRequestId:$id}){pullRequest{id isDraft}}}`;
@@ -23,7 +26,8 @@ type PullOperations =
   | "commentOnPullRequest"
   | "mergeOptions"
   | "mergePullRequest"
-  | "diff";
+  | "diff"
+  | "changedFiles";
 
 /** Reading, opening, updating and merging pull requests. */
 export function pullOperations(c: GithubContext): Pick<Vcs, PullOperations> {
@@ -191,6 +195,21 @@ export function pullOperations(c: GithubContext): Pick<Vcs, PullOperations> {
       });
 
       return { outcome: "merged" };
+    },
+
+    async changedFiles(repo, number) {
+      const files = await http.paginate<RestPullFile[], RestPullFile>(
+        `${repoPath(repo)}/pulls/${number}/files`,
+        { token: await apiToken(repo), query: { per_page: 100 } },
+        (d) => d,
+        CHANGED_FILE_PAGES,
+      );
+
+      return [
+        ...new Set(
+          files.flatMap((f) => [f.filename, ...(f.previous_filename ? [f.previous_filename] : [])]),
+        ),
+      ];
     },
 
     async diff(repo, number) {

@@ -9,7 +9,11 @@ import type { Offer } from "./protocol/index.js";
 import { INTERRUPTED } from "./scheduler/index.js";
 import { contextLimits } from "./pipeline/context/index.js";
 import type { Store, WorkItem } from "./store/types.js";
-import { wakeContextOf, type WakeContextOptions } from "./wake-context/index.js";
+import {
+  wakeContextOf,
+  type ContextReaders,
+  type WakeContextOptions,
+} from "./wake-context/index.js";
 
 const sameRef = (a: Ref, b: Ref) => a.type === b.type && a.ref === b.ref;
 
@@ -39,11 +43,14 @@ function offeredItem(item: WorkItem, origin: ChatOriginRecord | undefined): Offe
 export function offerBuilder(
   store: Store,
   ports?: { tracker?: Tracker; vcs?: Vcs },
-  opts: Omit<WakeContextOptions, "limits"> & { team?: Pick<TeamConfig, "pipeline"> } = {},
+  opts: Omit<WakeContextOptions, "limits"> & {
+    team?: Pick<TeamConfig, "pipeline">;
+    prs?: ContextReaders["prs"];
+  } = {},
 ) {
   const { subjectsOf } = itemRefs(store, ports);
   const wakeOf = wakeContextOf(
-    { store, tracker: ports?.tracker, vcs: ports?.vcs },
+    { store, tracker: ports?.tracker, vcs: ports?.vcs, prs: opts.prs },
     { ...opts, limits: contextLimits(opts.team ?? {}) },
   );
 

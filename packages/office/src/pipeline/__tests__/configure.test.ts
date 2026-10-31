@@ -31,17 +31,35 @@ const byId = <T extends { id: string }>(policies: T[], id: string): T =>
   policies.find((p) => p.id === id)!;
 
 describe("configurePipeline", () => {
-  it("keeps the defaults in order, all on", () => {
+  it("keeps the defaults in order, all on but the merge wake, which policies.merge.on_approval turns on", () => {
     const { policies, options, issues } = configurePipeline(team());
     expect(policies.map((p) => p.id)).toEqual(BUILT_IN_POLICIES.map((p) => p.id));
-    expect(policies.every((p) => p.enabled)).toBe(true);
+    expect(policies.filter((p) => !p.enabled).map((p) => p.id)).toEqual(["merge_ready"]);
     expect(options).toMatchObject({
       people: ["sam"],
       fallbackRequester: "ada.admin",
       approvers: ["humans"],
     });
 
+    expect(options.mergeRepos).toBeUndefined();
     expect(issues).toEqual([]);
+
+    const on = configurePipeline(team({ policies: { merge: { on_approval: true } } }));
+    expect(byId(on.policies, "merge_ready").enabled).toBe(true);
+  });
+
+  it("names the repositories of policies.merge.repos by owner and name", () => {
+    const scoped = configurePipeline(
+      team({
+        repos: [
+          { name: "shop", url: "github.com/Acme-Example/Shop", kind: "primary" },
+          { name: "ops", url: "github.com/acme-example/ops", kind: "infra" },
+        ],
+        policies: { merge: { on_approval: true, repos: ["shop"] } },
+      }),
+    );
+
+    expect(scoped.options.mergeRepos).toEqual(["acme-example/shop"]);
   });
 
   it("follows policies.pull_ready for the idle pull", () => {

@@ -8,6 +8,7 @@ import { policy as handBackBlockedToPm } from "./hand_back_blocked_to_pm.js";
 import { policy as handBackDone } from "./hand_back_done.js";
 import { policy as idlePullsNext } from "./idle_pulls_next.js";
 import { policy as mergedClosesTicket } from "./merged_closes_ticket.js";
+import { policy as mergeReady } from "./merge_ready.js";
 import { policy as mergedFeedbackToAuthor } from "./merged_feedback_to_author.js";
 import { policy as movedActiveToAssignee } from "./moved_active_to_assignee.js";
 import { policy as movedActiveToLastWorker } from "./moved_active_to_last_worker.js";
@@ -26,6 +27,8 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   mergedClosesTicket,
   rebaseToAuthor,
   ciFailedToAuthor,
+  // After the rebase: on a merged base the author first brings the pull request up to date, then decides the merge.
+  mergeReady,
   openedToReview,
   assignedToAssignee,
   ticketCommentToAgent,
@@ -40,7 +43,11 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   idlePullsNext,
 ];
 
-/** Built-in policies that are on only while a `policies` switch is: the idle pull (`policies.pull_ready`). */
+/**
+ * Built-in policies that are on only while a `policies` switch is: the merge wake (`policies.merge.on_approval`) and the
+ * idle pull (`policies.pull_ready`).
+ */
 export const POLICY_SWITCH_OF: Readonly<Record<string, string>> = {
+  merge_ready: "merge.on_approval",
   idle_pulls_next: "pull_ready",
 };

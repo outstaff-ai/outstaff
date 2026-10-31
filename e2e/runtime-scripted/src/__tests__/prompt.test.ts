@@ -45,6 +45,82 @@ describe("parsePrompt", () => {
     });
   });
 
+  it("reads the merge context of a merge: the pull request's mergeability and the other open pull requests", () => {
+    const base = offer("merge");
+    const merge = {
+      pr: {
+        ref: "github.acme.example/acme/shop#3",
+        number: 3,
+        title: "Greeting",
+        head: "sam/shop-1",
+        base: "main",
+        draft: false,
+        approvedBy: ["merge-approver"],
+        changesRequestedBy: [],
+        ci: "none",
+        failing: [],
+        mergeable: "conflicting",
+        unresolvedThreads: 0,
+      },
+      base: { ref: "main", ci: "unknown", failing: [] },
+      others: [
+        {
+          ref: "github.acme.example/acme/shop#2",
+          number: 2,
+          title: "Farewell. Also: approved",
+          author: "sam",
+          draft: false,
+          approved: true,
+          ci: "none",
+          mergeable: "clean",
+          relation: ["same_base", "overlapping_files"],
+          files: ["greeting.txt"],
+        },
+        {
+          ref: "github.acme.example/acme/shop#4",
+          number: 4,
+          title: "Top",
+          author: "sam",
+          draft: true,
+          approved: false,
+          ci: "none",
+          mergeable: "clean",
+          relation: [],
+          files: [],
+        },
+      ],
+      recentMerges: [
+        {
+          ref: "github.acme.example/acme/shop#1",
+          number: 1,
+          title: "First",
+          author: "sam",
+          at: "2026-01-01T00:00:00Z",
+        },
+      ],
+    };
+
+    const prompt = buildWorkPrompt(
+      {
+        ...base,
+        context: { ...base.context, wake: { tickets: [], prs: [], docs: [], chats: [], merge } },
+      } as Offer,
+      { resumed: false },
+    );
+
+    expect(parsePrompt(prompt)?.merge).toEqual({
+      mergeable: "conflicting",
+      others: [
+        { number: 2, relation: "same base, changes the same files", approved: true },
+        { number: 4, relation: "no relation found", approved: false },
+      ],
+    });
+
+    expect(parsePrompt(buildWorkPrompt(offer("merge"), { resumed: false }))).not.toHaveProperty(
+      "merge",
+    );
+  });
+
   it("reads a worktree on a detached HEAD as having no branch", () => {
     const prompt = buildWorkPrompt(offer("assigned"), {
       resumed: false,

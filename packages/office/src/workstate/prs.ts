@@ -9,13 +9,21 @@ import type { PrRecord } from "./types.js";
 
 const ACTOR = { kind: "automation", id: "workstate" } as const;
 
+/** Whether a field of the record took the value just now: it has it, and the previous record did not. */
+const turned = <K extends "mergeable" | "ci">(
+  rec: PrRecord,
+  prev: PrRecord | undefined,
+  field: K,
+  value: PrRecord[K],
+) => rec[field] === value && prev?.[field] !== value;
+
 /** Pull request records: read from the code host, linked to tickets and stacks, and the events they raise. */
 export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
   const { store, vcs, tracker, clock, logger, prs, vcsPeople, prSubject, ticketLinks } = core;
   const { ensureTicket } = ticketOps;
   const synthetic = async (
     ctx: RefreshCtx,
-    type: "pr.conflicted" | "pr.ci_failed",
+    type: "pr.conflicted" | "pr.ci_failed" | "pr.ci_passed" | "pr.base_merged",
     rec: PrRecord,
     data: Record<string, unknown>,
   ) => {
@@ -117,19 +125,23 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     }
   };
 
-  /** The events a change of an open pull request raises: it started to conflict, or its CI started to fail. */
+  /** The events a change of an open pull request raises: it started to conflict, or its CI started to fail or turned green. */
   const raiseEvents = async (
     ctx: RefreshCtx,
     rec: PrRecord,
     prev: PrRecord | undefined,
     links: PrLive["links"],
   ) => {
-    if (rec.mergeable === "conflicting" && prev?.mergeable !== "conflicting") {
+    if (turned(rec, prev, "mergeable", "conflicting")) {
       await synthetic(ctx, "pr.conflicted", rec, { base: rec.baseRef });
     }
 
-    if (rec.ci === "failure" && prev?.ci !== "failure") {
+    if (turned(rec, prev, "ci", "failure")) {
       await synthetic(ctx, "pr.ci_failed", rec, ciFailure(rec.checks, links));
+    }
+
+    if (turned(rec, prev, "ci", "success")) {
+      await synthetic(ctx, "pr.ci_passed", rec, { passing: rec.checks.map((c) => c.name) });
     }
   };
 
@@ -190,5 +202,16 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     await save(key, rec, prev);
   };
 
-  return { refreshPr, ticketOfDraft };
+  /** The pull request was stacked on the branch of one that just merged: its base is gone from under it. */
+  const raiseBaseMerged = async (ctx: RefreshCtx, rec: PrRecord, merged: PrRecord) => {
+    const cause = {
+      pr: merged.ref,
+      title: merged.title,
+      ...(merged.url ? { url: merged.url } : {}),
+    };
+
+    await synthetic(ctx, "pr.base_merged", rec, { cause, base: rec.baseRef });
+  };
+
+  return { refreshPr, ticketOfDraft, raiseBaseMerged };
 }

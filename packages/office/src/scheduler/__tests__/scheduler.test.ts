@@ -229,6 +229,49 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
     });
   });
 
+  describe("one merge per repository", () => {
+    const merge = (person: string, ref: string) =>
+      sched.enqueue({
+        person,
+        kind: "merge",
+        title: `merge ${ref}`,
+        trigger: "human",
+        subject: { type: "pr", ref },
+      });
+
+    it("runs one merge item per repository at a time; the others wait, whoever they belong to", async () => {
+      const first = await merge("ann", "github.com/acme/shop#1");
+      const second = await merge("bob", "github.com/Acme/Shop#2");
+      const elsewhere = await merge("cy", "github.com/acme/ops#3");
+      expect(await sched.markActive(first.id)).toMatchObject({ started: true });
+
+      expect(await sched.next("bob")).toBeNull();
+      expect(await sched.markActive(second.id)).toEqual({
+        started: false,
+        reason: "busy",
+        detail:
+          "ann is merging in the same repository (github.com/acme/shop#1); one merge runs per repository at a time.",
+      });
+
+      expect((await sched.next("cy"))?.id).toBe(elsewhere.id);
+      await sched.finish(first.id, { outcome: "merged" });
+      expect((await sched.next("bob"))?.id).toBe(second.id);
+    });
+
+    it("does not hold other work, and reports the person's own active item first", async () => {
+      const first = await merge("ann", "github.com/acme/shop#1");
+      await sched.markActive(first.id);
+      const task = await add("task", "human", { person: "bob" });
+      expect((await sched.next("bob"))?.id).toBe(task.id);
+      await sched.markActive(task.id);
+      const second = await merge("bob", "github.com/acme/shop#2");
+      expect(await sched.markActive(second.id)).toMatchObject({
+        reason: "busy",
+        detail: "bob already has an active item.",
+      });
+    });
+  });
+
   describe("human chat and move", () => {
     it("starts chat immediately when the person is idle", async () => {
       const chat = await add("chat", "human", { kind: "chat" });

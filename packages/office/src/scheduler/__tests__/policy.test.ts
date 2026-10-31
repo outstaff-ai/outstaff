@@ -5,6 +5,7 @@ import {
   isLoopGuarded,
   backoffMs,
   loopGuardVerdict,
+  mergeRepo,
   orderQueue,
   peakWindow,
   planMove,
@@ -25,6 +26,20 @@ const q = (
   priority,
   position,
   createdAt,
+});
+
+describe("mergeRepo", () => {
+  it("is the repository of a merge item's pull request, and nothing for anything else", () => {
+    const pr = (ref: string) => ({ type: "pr", ref });
+    expect(mergeRepo({ kind: "merge", subject: pr("github.com/Acme/Shop#12") })).toBe(
+      "github.com/acme/shop",
+    );
+
+    expect(mergeRepo({ kind: "merge", subject: pr("no-number") })).toBeUndefined();
+    expect(mergeRepo({ kind: "merge", subject: { type: "ticket", ref: "A-1" } })).toBeUndefined();
+    expect(mergeRepo({ kind: "merge", subject: null })).toBeUndefined();
+    expect(mergeRepo({ kind: "rebase", subject: pr("github.com/acme/shop#12") })).toBeUndefined();
+  });
 });
 
 describe("priorityFor", () => {

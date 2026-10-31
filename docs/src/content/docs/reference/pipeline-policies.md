@@ -19,6 +19,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merged` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done` |
 | [`rebase_to_author`](#rebase_to_author) | `pr.conflicted`, `pr.behind_base`, `pr.base_merged` | wake `author` (kind `rebase`) |
 | [`ci_failed_to_author`](#ci_failed_to_author) | `pr.ci_failed` | wake `author` (kind `ci_failed`) |
+| [`merge_ready`](#merge_ready) | `pr.review_submitted`, `pr.ci_passed`, `pr.base_merged` | wake `author` (kind `merge`) with the merge context, when its checks are green and the repository is in `policies.merge.repos` |
 | [`opened_to_review`](#opened_to_review) | `pr.opened` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `review` |
 | [`assigned_to_assignee`](#assigned_to_assignee) | `ticket.assigned`, `ticket.created` | wake `assignee` (kind `assigned`) |
 | [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `mentioned`, else `assignee` (kind `ticket_comment`) |
@@ -154,6 +155,31 @@ Instruction:
 
 ```text
 Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}. The failing checks are in the feedback. Fix them and push.
+```
+
+### merge_ready
+
+An agent's approved pull request that may be ready to merge wakes its author to decide (policies.merge.on_approval): an allowed approver approves it with its checks green, its checks turn green, or the pull request it was stacked on merges. Not while an allowed approver's request for changes is outstanding.
+
+Listens to `pr.review_submitted`, `pr.ci_passed`, `pr.base_merged`. Decides: wake `author` (kind `merge`) with the merge context, when its checks are green and the repository is in `policies.merge.repos`.
+
+On only while `policies.merge.on_approval` is on.
+
+When:
+
+- all of:
+  - all of:
+    - `pr_author_kind: agent`
+    - `pr_open: true`
+    - not:
+      - `ticket_status: canceled`
+  - `pr_draft: false`
+  - `pr_approved: true`
+
+Instruction:
+
+```text
+#{{pr.number}} ({{pr.title}}) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging.
 ```
 
 ### opened_to_review
@@ -409,6 +435,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `pr.closed`
 - `pr.conflicted`
 - `pr.ci_failed`
+- `pr.ci_passed`
 - `pr.behind_base`
 - `pr.base_merged`
 - `ticket.commented`

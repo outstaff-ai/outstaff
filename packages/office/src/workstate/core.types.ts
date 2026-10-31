@@ -116,6 +116,9 @@ export interface PrOps {
     prev?: PrRecord,
     repo?: RepoRef,
   ): Promise<string | undefined>;
+
+  /** Raises `pr.base_merged` for an open pull request that was stacked on the branch of the merged one. */
+  raiseBaseMerged(ctx: RefreshCtx, rec: PrRecord, merged: PrRecord): Promise<void>;
 }
 
 export interface RequesterOps {

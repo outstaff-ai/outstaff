@@ -37,8 +37,14 @@ function verdictOf(event: WorkflowEvent, review: string | undefined): PrVerdict 
 /** Applies events to the records, and delivers the synthetic events that raises. */
 export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & RequesterOps & DocOps) {
   const { store, logger, handlers, prSubject } = core;
-  const { refreshPr, refreshTicket, recordFeedbackRequester, recordCommentRequester, touchDoc } =
-    ops;
+  const {
+    refreshPr,
+    raiseBaseMerged,
+    refreshTicket,
+    recordFeedbackRequester,
+    recordCommentRequester,
+    touchDoc,
+  } = ops;
 
   const deliver = async (list: Fresh[]) => {
     if (handlers.length === 0) {
@@ -62,10 +68,18 @@ export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & Reque
     }
   };
 
+  /** After a merge: every other open pull request of the repository is read again; one stacked on it lost its base. */
   const refreshSiblings = async (ctx: RefreshCtx, merged: PrRef) => {
+    const done = core.prs.get(prSubject(merged));
     for (const other of openPrs(core, merged.repo)) {
-      if (prSubject(other.ref) !== prSubject(merged)) {
-        await refreshPr(ctx, other.ref, { wait: true });
+      if (prSubject(other.ref) === prSubject(merged)) {
+        continue;
+      }
+
+      await refreshPr(ctx, other.ref, { wait: true });
+      const now = core.prs.get(prSubject(other.ref));
+      if (done?.state === "merged" && now?.state === "open" && now.baseRef === done.headRef) {
+        await raiseBaseMerged(ctx, now, done);
       }
     }
   };
