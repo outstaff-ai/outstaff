@@ -3,10 +3,15 @@ import { BUILT_IN_POLICIES, POLICY_SWITCH_OF } from "#/pipeline/policies/index.j
 import { event, prRef, prWorld, SAM, traceOf } from "./support.js";
 
 describe("the built-in policies", () => {
-  it("are listed once each, every one with an instruction and what it decides", () => {
+  it("are listed once each, every one with what it decides and an instruction, unless it is a silent act", () => {
     const ids = BUILT_IN_POLICIES.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(BUILT_IN_POLICIES.filter((p) => !p.instruction || !p.decides)).toEqual([]);
+    // Linking a pull request posts no note: the ticket shows the link itself.
+    const silent = ["link_pr_on_ticket"];
+    expect(
+      BUILT_IN_POLICIES.filter((p) => !p.decides || (!p.instruction && !silent.includes(p.id))),
+    ).toEqual([]);
+
     expect(Object.keys(POLICY_SWITCH_OF).every((id) => ids.includes(id))).toBe(true);
   });
 
@@ -16,13 +21,13 @@ describe("the built-in policies", () => {
     );
 
     expect(acts.length).toBeGreaterThan(0);
-    expect(acts.filter((p) => p.instruction!.includes("{{person}}"))).toEqual([]);
+    expect(acts.filter((p) => p.instruction?.includes("{{person}}"))).toEqual([]);
     const trace = traceOf(
       event("pr.opened", { subject: { pr: prRef(9) }, actor: SAM }),
       prWorld({}, "active"),
     );
 
-    expect(trace.decisions).toMatchObject([
+    expect(trace.decisions.filter((d) => d.type === "act")).toMatchObject([
       {
         type: "act",
         as: "sam",

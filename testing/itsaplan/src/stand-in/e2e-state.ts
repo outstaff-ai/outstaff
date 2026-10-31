@@ -17,6 +17,13 @@ function ticketState(s: ItsaplanStore, i: StoredIssue) {
     assignee: usernameOf(s, i.assigneeUserId),
     parent: s.issues.find((p) => p.id === i.parentId)?.identifier ?? null,
     links: s.links.filter((l) => l.from === i.identifier),
+    development: s.development
+      .filter((l) => l.issueId === i.id)
+      .map((l) => ({
+        repository: s.repositories.find((r) => r.id === l.repositoryId)?.fullName,
+        number: l.number,
+        by: usernameOf(s, l.by),
+      })),
     attachments: s.attachments
       .filter((a) => a.issueId === i.id)
       .map((a) => ({

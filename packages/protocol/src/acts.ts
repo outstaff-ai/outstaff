@@ -39,6 +39,26 @@ export const actOpSchema = z.discriminatedUnion("op", [
     ticket,
     parent: ticket.describe("Key of the parent ticket."),
   }),
+  z.strictObject({
+    op: z.literal("link_pr"),
+    ticket,
+    pr: z
+      .strictObject({
+        repo: z.strictObject({
+          owner: z.string().min(1).max(200).describe("Owner of the repository."),
+          name: z.string().min(1).max(200).describe("Name of the repository."),
+          host: z.string().min(1).max(200).optional().describe("Host of the code host."),
+        }),
+        number: z.int().positive().describe("Number of the pull request."),
+        url: z
+          .string()
+          .min(1)
+          .max(2000)
+          .optional()
+          .describe("The pull request's page on the code host."),
+      })
+      .describe("The pull request to show in the ticket's development section."),
+  }),
 ]);
 
 /** Tracker or knowledge-base changes for the agent to make as itself, without a model run. */

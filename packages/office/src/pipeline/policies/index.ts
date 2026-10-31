@@ -7,6 +7,7 @@ import { policy as handBackBlocked } from "./hand_back_blocked.js";
 import { policy as handBackBlockedToPm } from "./hand_back_blocked_to_pm.js";
 import { policy as handBackDone } from "./hand_back_done.js";
 import { policy as idlePullsNext } from "./idle_pulls_next.js";
+import { policy as linkPrOnTicket } from "./link_pr_on_ticket.js";
 import { policy as mergedClosesTicket } from "./merged_closes_ticket.js";
 import { policy as mergeReady } from "./merge_ready.js";
 import { policy as mergedFeedbackToAuthor } from "./merged_feedback_to_author.js";
@@ -30,6 +31,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   // After the rebase: on a merged base the author first brings the pull request up to date, then decides the merge.
   mergeReady,
   openedToReview,
+  linkPrOnTicket,
   assignedToAssignee,
   ticketCommentToAgent,
   ticketCommentToLastWorker,

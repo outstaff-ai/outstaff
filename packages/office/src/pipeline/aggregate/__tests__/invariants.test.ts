@@ -153,7 +153,7 @@ describe("the invariants", () => {
       [
         "judges",
         "rejected",
-        "an act is bookkeeping only: comment is not one of move, assign, set_parent; anything that needs judgement is a wake",
+        "an act is bookkeeping only: comment is not one of move, assign, set_parent, link_pr; anything that needs judgement is a wake",
       ],
       ["twice", "kept", undefined],
       ["twice", "rejected", "one act per policy and event: return one act with every change"],

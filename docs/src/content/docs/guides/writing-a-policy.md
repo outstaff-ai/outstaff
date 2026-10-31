@@ -75,7 +75,7 @@ The fields:
 
 - `ctx.event`: the event, as the trace shows it (`type`, `at`, `subject`, `actor`, `data`).
 - `ctx.state`: the work state after the event: tickets with their status, assignee, labels, requester and last worker; pull requests, their links to tickets and their stacks; documents and their authors; each agent's ready tickets. It answers questions; it changes nothing.
-- `ctx.options`: what the team file tells the policies: the team's agents (`people`), its humans, the needs-human label, who approves merges.
+- `ctx.options`: what the team file tells the policies: the team's agents (`people`), its humans, the needs-human label, who approves merges, and what the team's integrations can do (`capabilities`, such as `tracker.development`).
 - `ctx.ticket` and `ctx.pr`: the ticket the event is about (or the one its pull request is linked to), and the event's pull request.
 - `ctx.settings`: the entry's `settings`.
 - `ctx.instruction`: the policy's instruction, the team's replacement if it set one.
@@ -87,14 +87,14 @@ And helpers, all pure:
 - `ctx.person(spec)`: the agent a name such as `assignee`, `author`, `last_worker`, `mentioned` or `role:pm` refers to, or why there is none (`{ skip }`).
 - `ctx.render(template, { person, next })`: a template with the event's variables.
 - `ctx.wake({ person, kind })`: a wake with the policy's instruction, or a drop saying why no one can be woken.
-- `ctx.act({ as, ops, wake, note })`: bookkeeping changes for an agent (`{ move }`, `{ assign: "self" | "requester" }` or `{ assign }` with a person such as `role:pm`, `{ set_parent: true }`), only those still needed, then the wake of that agent if asked; or a drop saying why. The note posted with the changes is `note` when given, else the policy's instruction, so a policy that both acts and wakes someone else can give each its own text.
+- `ctx.act({ as, ops, wake, note })`: bookkeeping changes for an agent (`{ move }`, `{ assign: "self" | "requester" }` or `{ assign }` with a person such as `role:pm`, `{ set_parent: true }`, `{ link_pr: true }` to link the event's pull request on its ticket), only those still needed, then the wake of that agent if asked; or a drop saying why. The note posted with the changes is `note` when given, else the policy's instruction, so a policy that both acts and wakes someone else can give each its own text.
 
 ## Proposals
 
 A policy proposes; it never decides alone. Each proposal has a `reason`:
 
 - `wake`: wake an agent with an instruction. Its subject is the event's unless it names one; its feedback is the event's.
-- `act`: change the tracker for an agent, without a model run: move a ticket, assign it, set its parent. Nothing else: anything that needs judgement is a wake.
+- `act`: change the tracker for an agent, without a model run: move a ticket, assign it, set its parent, link a pull request on it. Nothing else: anything that needs judgement is a wake.
 - `drop`: nothing to do, recorded so it can be explained.
 - `suppress`: keep another policy's wake of an agent from happening, narrowed by `subject` and `kind` when given.
 

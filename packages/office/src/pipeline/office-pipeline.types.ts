@@ -1,4 +1,4 @@
-import type { Logger, TeamConfig } from "@outstaff/core";
+import type { Capability, Logger, TeamConfig } from "@outstaff/core";
 import type { ConfiguredPolicy } from "@outstaff/policy";
 import type { QueuedAct } from "@outstaff/protocol";
 import type { Clock } from "#/types.js";
@@ -22,6 +22,9 @@ export interface OfficePipelineOptions {
 
   /** The team's custom policies, loaded; they run after the built-in ones. */
   policies?: readonly ConfiguredPolicy[] | undefined;
+
+  /** What the team's integrations can do: the capabilities of the adapters it configures. None known when unset. */
+  capabilities?: readonly Capability[] | undefined;
 }
 
 /**

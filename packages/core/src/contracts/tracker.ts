@@ -59,6 +59,30 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       await expectPortError(s.subject.attachments!("NOPE-99999"), "not_found");
     });
 
+    it("links a pull request of a connected repository to an issue once", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues", "tracker.development");
+      const repo = { owner: "acme", name: "shop" };
+      await requireSeed(t, s.seed, "repository")(repo, [7]);
+      const issue = await s.subject.createIssue({ title: "Show my pull request", body: "" });
+      const pr = { repo, number: 7, url: "https://git.acme.example/acme/shop/pull/7" };
+      expect(await s.subject.linkPullRequest!(issue.key, pr)).toBe("linked");
+      expect(await s.subject.linkPullRequest!(issue.key, pr)).toBe("already_linked");
+      const shouted = { repo: { owner: "ACME", name: "Shop" }, number: 7 };
+      expect(await s.subject.linkPullRequest!(issue.key, shouted)).toBe("already_linked");
+      const names = (await s.subject.connectedRepositories!()).map((r) => `${r.owner}/${r.name}`);
+      expect(names.map((n) => n.toLowerCase())).toContain("acme/shop");
+      await expectPortError(s.subject.linkPullRequest!("NOPE-99999", pr), "not_found");
+    });
+
+    it("links no pull request of a repository that is not connected", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues", "tracker.development");
+      const issue = await s.subject.createIssue({ title: "Elsewhere", body: "" });
+      const pr = { repo: { owner: "acme", name: "not-connected" }, number: 1 };
+      expect(await s.subject.linkPullRequest!(issue.key, pr)).toBe("not_connected");
+    });
+
     it("reports not_found for an unknown key", async (t) => {
       expect.hasAssertions();
       const s = get();

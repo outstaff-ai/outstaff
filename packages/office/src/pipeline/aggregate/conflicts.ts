@@ -6,8 +6,16 @@ import type { Slot } from "./aggregate.types.js";
 /** The ticket field an op sets. */
 const FIELD: Record<string, string> = { move: "status", assign: "assignee", set_parent: "parent" };
 
-/** Acts are bookkeeping only by now: the invariants rejected any other op. */
-const fieldOf = (op: ActOp) => `${(op as BookkeepingOp).ticket} ${FIELD[op.op]}`;
+/**
+ * Acts are bookkeeping only by now: the invariants rejected any other op. Linking a pull request adds to the ticket's
+ * development section rather than setting a field, so each pull request is one of its own.
+ */
+function fieldOf(op: ActOp): string {
+  const o = op as BookkeepingOp;
+  return o.op === "link_pr"
+    ? `${o.ticket} development ${o.pr.repo.owner}/${o.pr.repo.name}#${o.pr.number}`.toLowerCase()
+    : `${o.ticket} ${FIELD[o.op]}`;
+}
 
 const same = (a: ActOp, b: ActOp) => JSON.stringify(a) === JSON.stringify(b);
 

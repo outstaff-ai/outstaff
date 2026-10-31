@@ -28,6 +28,26 @@ const trackerSeed = (s: ItsaplanStore): TrackerSeed => ({
     s.members.push({ userId, name: m.name, username: m.name.toLowerCase(), kind: "member" });
     return { id: userId, name: m.name, kind: m.kind ?? "human" } satisfies Member;
   },
+  async repository(repo, numbers) {
+    const id = s.repositories.length + 1;
+    const fullName = `${repo.owner}/${repo.name}`;
+    const webUrl = `https://git.acme.example/${fullName}`;
+    s.repositories.push({ id, provider: "github", fullName, webUrl });
+    s.pullRequests.set(
+      id,
+      numbers.map((number) => ({
+        number,
+        title: `Change ${number}`,
+        url: `${webUrl}/pull/${number}`,
+        state: "open",
+        draft: false,
+        sourceBranch: `change-${number}`,
+        targetBranch: "main",
+        headSha: null,
+        updatedAt: s.now(),
+      })),
+    );
+  },
   forbiddenCall: () => Promise.reject(new Error("bound by the test")),
 });
 
@@ -66,6 +86,7 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
 
   const stub = createStubFetch([...forbidden, ...routes]);
   const { issues, activity, columns, labels, members, attachments, docs, docComments } = store;
+  const { repositories, pullRequests, development } = store;
   return {
     fetch: stub.fetch,
     calls: stub.calls,
@@ -79,6 +100,9 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
       attachments,
       docs,
       docComments,
+      repositories,
+      pullRequests,
+      development,
     },
     trackerSeed: trackerSeed(store),
     knowledgeSeed: knowledgeSeed(store, markdown),

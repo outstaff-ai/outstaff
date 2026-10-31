@@ -17,7 +17,12 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "tracker",
         name: "fake",
-        capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments"],
+        capabilities: [
+          "tracker.issues",
+          "tracker.assign",
+          "tracker.attachments",
+          "tracker.development",
+        ],
         options,
         secrets: none,
         create: (ctx) =>

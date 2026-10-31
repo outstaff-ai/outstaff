@@ -19,7 +19,7 @@ export const trackerOptions = connectionOptions;
 export const itsaplanTracker = defineAdapter({
   port: "tracker",
   name: "itsaplan",
-  capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments"],
+  capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments", "tracker.development"],
   options: trackerOptions,
   secrets: itsaplanSecrets,
   create: (ctx) => createItsaplanTracker(ctx),

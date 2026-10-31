@@ -150,7 +150,7 @@ export interface WorkState extends WorkflowState {
   /** Idempotent; register as an intake handler. */
   apply(event: WorkflowEvent, meta: IntakeMeta | WorkstateMeta): Promise<void>;
 
-  /** Receives the synthetic events (`pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`) the work state derives. */
+  /** Receives the synthetic events (`pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`, `pr.base_merged`, `pr.linked`) the work state derives. */
   onEvent(handler: WorkstateHandler): void;
 
   /** Re-reads every open pull request and live ticket through the ports; losing the store only costs this. */

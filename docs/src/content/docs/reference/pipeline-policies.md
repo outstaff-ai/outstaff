@@ -21,6 +21,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`ci_failed_to_author`](#ci_failed_to_author) | `pr.ci_failed` | wake `author` (kind `ci_failed`) |
 | [`merge_ready`](#merge_ready) | `pr.review_submitted`, `pr.ci_passed`, `pr.base_merged` | wake `author` (kind `merge`) with the merge context, when its checks are green and the repository is in `policies.merge.repos` |
 | [`opened_to_review`](#opened_to_review) | `pr.opened` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `review` |
+| [`link_pr_on_ticket`](#link_pr_on_ticket) | `pr.opened`, `pr.linked` | act for `author`: link the pull request on the ticket, when the tracker can link pull requests (`tracker.development`) |
 | [`assigned_to_assignee`](#assigned_to_assignee) | `ticket.assigned`, `ticket.created` | wake `assignee` (kind `assigned`) |
 | [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `mentioned`, else `assignee` (kind `ticket_comment`) |
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
@@ -200,6 +201,14 @@ Note posted with the change:
 ```text
 Moved to review: pull request #{{pr.number}} by {{pr.author}} is open for review.
 ```
+
+### link_pr_on_ticket
+
+An agent's pull request opened for a ticket, or linked to one after it was opened, is shown on the ticket in the tracker (its development section), by the author with its own tracker account. Bookkeeping: it wakes no one.
+
+Listens to `pr.opened`, `pr.linked`. Decides: act for `author`: link the pull request on the ticket, when the tracker can link pull requests (`tracker.development`).
+
+When: always.
 
 ### assigned_to_assignee
 
@@ -438,6 +447,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `pr.ci_passed`
 - `pr.behind_base`
 - `pr.base_merged`
+- `pr.linked`
 - `ticket.commented`
 - `ticket.assigned`
 - `ticket.moved`

@@ -130,6 +130,19 @@ function parentOp(ticket: string, ctx: Ctx): Resolved<BookkeepingOp> {
     : { skip: "set_parent: the event names no parent ticket" };
 }
 
+/** The event's pull request, to show on its ticket. */
+function linkOp(ticket: string, ctx: Ctx): Resolved<BookkeepingOp> {
+  const pr = ctx.pr;
+  if (!pr) {
+    return { skip: "link_pr: the event has no pull request" };
+  }
+
+  const { repo, number } = pr.ref;
+  return {
+    value: { op: "link_pr", ticket, pr: { repo, number, ...(pr.url ? { url: pr.url } : {}) } },
+  };
+}
+
 function op(spec: OpSpec, as: string, ctx: Ctx): OpResult {
   const ticket = ctx.ticket;
   if (!ticket) {
@@ -138,6 +151,10 @@ function op(spec: OpSpec, as: string, ctx: Ctx): OpResult {
 
   if ("move" in spec) {
     return moveOp(spec.move, ticket, ctx);
+  }
+
+  if ("link_pr" in spec) {
+    return linkOp(ticket, ctx);
   }
 
   return "assign" in spec ? assignOp(spec, as, ticket, ctx) : parentOp(ticket, ctx);

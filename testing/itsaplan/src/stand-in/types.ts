@@ -2,6 +2,8 @@ import type {
   ApiActivityItem,
   ApiAssignee,
   ApiColumn,
+  ApiDevPullRequest,
+  ApiDevRepository,
   ApiIssue,
   ApiLabel,
   ApiDoc,
@@ -62,6 +64,26 @@ export interface StoredLink {
   kind: string;
 }
 
+/** A code repository connected to the team. */
+export type StoredRepository = ApiDevRepository;
+
+/** A pull request of a connected repository, as the code host has it; whether it is linked is the store's to say. */
+export type StoredPullRequest = Omit<ApiDevPullRequest, "linked">;
+
+/** A pull request linked on an issue (`POST /issues/:id/development`), and the member who linked it. */
+export interface StoredDevelopmentLink {
+  id: number;
+  issueId: number;
+  repositoryId: number;
+  number: number;
+  by: string;
+}
+
+/** The pull requests of a connected repository: the store's own, or, end to end, the code host stand-in's. */
+export type PullRequestSource = (
+  repo: StoredRepository,
+) => StoredPullRequest[] | Promise<StoredPullRequest[]>;
+
 export interface ColumnSpec {
   name: string;
   stateType: string;
@@ -107,6 +129,12 @@ export interface StandInOptions {
   /** Prefix of every route, such as `/tracker`. Default none. */
   basePath?: string;
   documents?: DocumentRules;
+
+  /** The code repositories connected to the team. Default none; the seed connects more. */
+  repositories?: StoredRepository[];
+
+  /** Where the pull requests of a connected repository come from; default the store's `pullRequests`. */
+  pullRequests?: PullRequestSource;
 }
 
 /** The stand-in's data, shared by its routes. */
@@ -130,7 +158,13 @@ export interface ItsaplanStore {
   served: string[];
   docs: StoredDoc[];
   docComments: StoredDocComment[];
-  counters: { activity: number; label: number; doc: number; comment: number };
+  repositories: StoredRepository[];
+
+  /** Pull requests of the connected repositories, by repository id, for the default source. */
+  pullRequests: Map<number, StoredPullRequest[]>;
+  pullRequestsOf: PullRequestSource;
+  development: StoredDevelopmentLink[];
+  counters: { activity: number; label: number; doc: number; comment: number; link: number };
 }
 
 /** A route handler; `actor` is the userId the request's API key acts as. */

@@ -24,7 +24,7 @@ function opText(op: OpSpec): string {
       : `assign it to ${code(op.assign)}`;
   }
 
-  return "set its parent";
+  return "link_pr" in op ? "link the pull request on the ticket" : "set its parent";
 }
 
 type Decides = Pick<PolicyDefinition, "decides" | "decide">;

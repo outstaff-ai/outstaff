@@ -131,3 +131,45 @@ export interface ApiDocComment {
   resolvedAt?: string | null;
   createdAt: string;
 }
+
+// Development: the code repositories connected to the team, and the pull requests linked on an issue.
+
+export interface ApiDevRepository {
+  id: number;
+  provider: "github" | "gitlab";
+
+  /** `owner/name`. */
+  fullName: string;
+  webUrl: string;
+}
+
+export interface ApiDevPullRequest {
+  number: number;
+  title: string;
+  url: string | null;
+  state: "open" | "merged" | "closed";
+  draft: boolean;
+  sourceBranch: string | null;
+  targetBranch: string;
+  headSha: string | null;
+  updatedAt: string;
+
+  /** Whether it is linked on the issue the listing was asked for. */
+  linked: boolean;
+}
+
+export interface ApiDevPullRequestPage {
+  pullRequests: ApiDevPullRequest[];
+  nextPage: number | null;
+}
+
+/** A pull request linked on an issue, as `POST /issues/{id}/development` answers. */
+export interface ApiDevLink {
+  id: number;
+  provider: string;
+  repository: string;
+  kind: "pull_request" | "branch";
+  number: number | null;
+  title: string;
+  url: string | null;
+}

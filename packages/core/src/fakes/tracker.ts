@@ -1,6 +1,7 @@
 import { PortError, type CanonicalStatus } from "#/ports/index.js";
 import type { Comment, Issue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
+import { fakeDevelopment } from "./tracker-development.js";
 import type { FakeTracker, FakeTrackerOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
 
@@ -61,11 +62,15 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       `${base}/issue/${encodeURIComponent(key)}#comment-${encodeURIComponent(id)}`,
   };
 
+  const { connected, development, ...developmentMethods } = fakeDevelopment(need, () => actor.id);
   const tracker: FakeTracker = {
     links,
     relations,
     parents,
     attached,
+    connected,
+    development,
+    ...developmentMethods,
     as(identity) {
       return new Proxy(tracker, {
         get(target, prop) {
@@ -96,6 +101,9 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
         members.set(created.id, created);
         return created;
+      },
+      async repository(repo) {
+        connected.push({ ...repo });
       },
       forbiddenCall: () => Promise.reject(new PortError("forbidden", "Forbidden.")),
     },

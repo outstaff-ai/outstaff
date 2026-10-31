@@ -36,6 +36,8 @@ export type {
   Member,
   NewAttachment,
   NewIssue,
+  PullRequestLinkOutcome,
+  PullRequestToLink,
   TicketAttachment,
   Tracker,
   TrackerEvent,

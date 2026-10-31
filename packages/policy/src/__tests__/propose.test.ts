@@ -164,6 +164,29 @@ describe("ctx.act", () => {
     ]);
   });
 
+  it("links the event's pull request on its ticket, or says why not", () => {
+    const spec: ActSpec = { as: "author", ops: [{ link_pr: true }] };
+    const opened = event("pr.opened", { subject: { pr: prRef(9) } });
+    const url = "https://git.acme.example/acme-example/shop/pull/9";
+    expect(act(spec, opened, { prs: [pr(9, { url })], links: { 9: "ACME-1" } })).toEqual([
+      {
+        type: "act",
+        as: "sam",
+        ops: [{ op: "link_pr", ticket: "ACME-1", pr: { repo: prRef(9).repo, number: 9, url } }],
+        reason: "it matched",
+      },
+    ]);
+
+    expect(act(spec, opened, { prs: [pr(9)], links: { 9: "ACME-1" } })).toMatchObject([
+      { ops: [{ op: "link_pr", pr: { repo: prRef(9).repo, number: 9 } }] },
+    ]);
+
+    const onTicketOnly = event("ticket.moved", { subject: { ticket: "ACME-1" }, actor: sam });
+    expect(act({ as: "actor", ops: [{ link_pr: true }] }, onTicketOnly, onTicket())).toEqual([
+      { type: "drop", reason: "nothing to change: link_pr: the event has no pull request" },
+    ]);
+  });
+
   it("assigns the agent a person reference names, or says why nobody", () => {
     const spec: ActSpec = { as: "actor", ops: [{ assign: "role:pm" }] };
     const e = event("agent.handed_back", { subject: { ticket: "ACME-1" }, actor: sam });
