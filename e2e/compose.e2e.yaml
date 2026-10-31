@@ -148,8 +148,8 @@ services:
           target: /run/secrets/outstaff/GH_OFFICE_APP_PRIVATE_KEY,
         }
 
-  # The PM: no repositories, so no GitHub keys; only the tracker. It has no chat in this run (E2E_CHAT=off), so it
-  # does not read the stub workspace that sam answers.
+  # The PM: no repositories, so no GitHub keys; only the tracker. It reads the messages written to it in the stub
+  # workspace, in its own direct message with the human.
   pia:
     <<: *hardening
     image: ${OUTSTAFF_AGENT_E2E_IMAGE:-outstaff/agent-e2e:local}
@@ -163,7 +163,6 @@ services:
       OUTSTAFF_OFFICE_URL: ws://office:8080/agent
       OUTSTAFF_PERSON: pia
       E2E_STUB_URL: http://tracker.acme.example:8081
-      E2E_CHAT: "off"
     volumes:
       - pia-home:/home/outstaff
     networks: [default]

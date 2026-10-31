@@ -122,6 +122,12 @@ export const MESSAGE_META = {
       "Files the ticket a chat session created as work: the office creates a work item for it, in the thread the session answers in. Refused for an item that is not a chat session.",
     replies: ["work_link_result", "error"],
   },
+  work_file_for: {
+    from: "agent",
+    summary:
+      "Records the ticket a chat session created for someone else against the chat request: no work item is created, and the session's own work is not tied to the ticket. The assignee is woken by the assignment, like any other. Refused like `work_link`.",
+    replies: ["ack", "error"],
+  },
   work_check: {
     from: "agent",
     summary:

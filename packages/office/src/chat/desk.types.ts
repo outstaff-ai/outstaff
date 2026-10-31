@@ -78,4 +78,7 @@ export interface DeskFiling {
   /** Two filings are the same request when their wording is, ignoring case and spacing. */
   requestKey(request: string): string;
   file(person: string, sessionId: string, spec: FileSpec): Promise<Filed>;
+
+  /** Notes a request the session filed for someone else, so it is not filed twice; no work item is created. */
+  record(person: string, sessionId: string, request: string): Promise<void>;
 }

@@ -61,6 +61,7 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
       call("chat_report", { workItemId, kind }, "chat_report_result"),
     linkTicket: (workItemId, ticket, request) =>
       call("work_link", { workItemId, ticket, request }, "work_link_result"),
+    fileFor: (workItemId, filing) => ack("work_file_for", { workItemId, ...filing }),
     checkFiling: (workItemId, request) => ack("work_check", { workItemId, request }),
     attachWork: (workItemId, request) =>
       call("work_attach", { workItemId, ...request }, "work_attach_result"),

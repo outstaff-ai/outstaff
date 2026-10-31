@@ -118,5 +118,17 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
     };
   }
 
-  return { sessionOf, requestKey, file };
+  /**
+   * Notes a request the session filed for someone else: filing it again is refused, but the session still answers
+   * the requester itself, so it is not marked as having filed its own work.
+   */
+  async function record(person: string, sessionId: string, request: string): Promise<void> {
+    const { session, origin } = await sessionOf(person, sessionId, request);
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, {
+      ...origin,
+      requests: [...(origin.requests ?? []), requestKey(request)],
+    });
+  }
+
+  return { sessionOf, requestKey, file, record };
 }

@@ -868,6 +868,17 @@ async function* replyAboutWork(
   return yield* describeWork();
 }
 
+/** Work for a teammate: the ticket is theirs, and the session tells the requester who has it. */
+async function* fileFor(assignee: string, title: string): AsyncGenerator<Action, string, string> {
+  const created = yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: { title, body: title, assignee },
+  };
+
+  return `Filed ${/Created (\S+)\./.exec(created)?.[1] ?? "it"} for ${assignee}; it is theirs.`;
+}
+
 /**
  * New work is filed as a ticket, which the office turns into the work; a message with pictures is a request to file,
  * and the ticket gets the files, which the agent attaches itself. Returns undefined when the message asks for neither.
@@ -880,6 +891,11 @@ async function* fileRequest(
   if (filed) {
     yield { type: "tool", tool: "ticket_create", input: { title: filed, body: filed } };
     return "Filed.";
+  }
+
+  const forOther = /^new work for (\w+): (.+)$/i.exec(latest);
+  if (forOther) {
+    return yield* fileFor(forOther[1] ?? "", forOther[2] ?? "");
   }
 
   if (!ctx.files?.length) {

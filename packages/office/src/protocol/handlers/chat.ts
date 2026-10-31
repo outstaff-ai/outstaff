@@ -23,6 +23,11 @@ export const chatHandlers: RequestHandlers = {
     const { workItemId, ticket, request } = payload;
     reply("work_link_result", await desk(ctx.opts).linkTicket(person, workItemId, ticket, request));
   },
+  async work_file_for({ ctx, person, payload, reply }) {
+    const { workItemId, ...filing } = payload;
+    await desk(ctx.opts).fileFor(person, workItemId, filing);
+    reply("ack", {});
+  },
   async work_check({ ctx, person, payload, reply }) {
     await desk(ctx.opts).checkFiling(person, payload.workItemId, payload.request);
     reply("ack", {});

@@ -12,6 +12,17 @@ import type { ChatDeskOptions, ChatRequests } from "./desk.types.js";
 export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
   const { store } = opts;
   const filing = createFiling(opts);
+
+  /** The ticket a session created, among its refs; returns the ticket's link. */
+  const recordCreated = async (workItemId: string, ticket: string, source: string) => {
+    const url = opts.tracker?.links.issue(ticket);
+    await store.addItemRefs(workItemId, [
+      { type: "ticket", ref: ticket, url, role: "created", source },
+    ]);
+
+    return url;
+  };
+
   return {
     ...createReports(opts),
     attachWork: createAttach(opts, filing),
@@ -34,12 +45,18 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
         source: "work_link",
       });
 
-      const url = opts.tracker?.links.issue(ticket);
-      await store.addItemRefs(workItemId, [
-        { type: "ticket", ref: ticket, url, role: "created", source: "work_link" },
-      ]);
-
+      const url = await recordCreated(workItemId, ticket, "work_link");
       return { ...filed, ...(url ? { url } : {}) };
+    },
+
+    async fileFor(person, workItemId, { ticket, request, assignee }) {
+      await filing.record(person, workItemId, request);
+      await recordCreated(workItemId, ticket, "work_file_for");
+      await store.appendJournal(
+        workItemId,
+        "office",
+        `Filed ${ticket} for ${assignee}: their work, not yours. The assignment wakes them; this session is not tied to it.`,
+      );
     },
 
     queueWork(person, workItemId, request) {

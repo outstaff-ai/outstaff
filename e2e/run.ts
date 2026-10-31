@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -116,7 +116,8 @@ const handBackNotes = (t: Json): number =>
   ).length;
 
 const idle = (s: Json) =>
-  s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle";
+  s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+    .status === "idle";
 
 /**
  * Waits until every source the office polls has had two more successful polls. A poll in flight now may have begun
@@ -594,6 +595,7 @@ async function main() {
   const published = await until("a chat profile with the active item", (s) =>
     s.chat.profiles.findLast(
       (p: Json) =>
+        p.agent === "sam" &&
         p.userId === "U0ADA00001" &&
         p.profile.status === "working" &&
         p.profile.current?.title.includes(first),
@@ -897,7 +899,8 @@ async function main() {
   // by a chat session beside the round; an instruction is attached to the round and leads to one follow-up round.
   const sha5 = added.pr.head.sha;
   await until("the agent idle again after the attached round", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
       ? true
       : undefined,
   );
@@ -1364,7 +1367,8 @@ async function main() {
   );
 
   await until("the agent idle", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
       ? true
       : undefined,
   );
@@ -1445,7 +1449,8 @@ async function main() {
   );
 
   await until("the agent idle", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
       ? true
       : undefined,
   );
@@ -1494,7 +1499,8 @@ async function main() {
   );
 
   await until("the agent idle", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
       ? true
       : undefined,
   );
@@ -1519,7 +1525,8 @@ async function main() {
   assertEq(asks.asked.body.includes("`shop`"), true, "the question names the first candidate");
   assertEq(asks.asked.body.includes("`ops`"), true, "the question names the second candidate");
   await until("the agent idle", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
       ? true
       : undefined,
   );
@@ -1573,7 +1580,8 @@ async function main() {
   });
 
   await until("the agent idle", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.userId === "U0ADA00001")?.profile.status === "idle"
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
       ? true
       : undefined,
   );
@@ -1891,6 +1899,49 @@ async function main() {
   assertEq(second13.head.sha, rebased13.head.sha, "the rebased head is what merged");
   step(
     `merge order: #${older.number} and #${newer.number} change the same file -> #${older.number} merged, #${newer.number} waited, rebased, merged`,
+  );
+
+  // ---- 13b. a human asks the PM in chat to file a ticket for sam: the ticket is sam's from the start, sam is woken on
+  // it, and the PM's chat session neither works on it nor hands it to the requester
+  const piaBefore13b = piaWakes().length;
+  const forSam = "Add a status page";
+  const asked13b = await stub("POST", "/_test/chat/say", {
+    to: "pia",
+    text: `New work for sam: ${forSam}`,
+  });
+
+  const reply13b = await until(
+    "pia's reply in her thread, naming the ticket she filed for sam",
+    (s) =>
+      s.chat.posts.find(
+        (p: Json) => p.agent === "pia" && p.thread === asked13b.id && /for sam/.test(p.text),
+      ),
+  );
+
+  const filed13b = (await state()).tickets.find((t: Json) => t.title === forSam);
+  assertEq(!!filed13b, true, "pia created the ticket");
+  assertEq(reply13b.text.includes(filed13b.key), true, "pia's reply names the ticket");
+  const pr13b = await until(`sam's pull request for ${filed13b.key}, handed back`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${filed13b.key}`));
+    const t = s.tickets.find((x: Json) => x.key === filed13b.key);
+    return pr && t.status === "In Review" ? { pr, t } : undefined;
+  });
+
+  assertEq(pr13b.pr.author, "acme-sam[bot]", "sam opened the pull request");
+  assertEq(
+    JSON.stringify(pr13b.t.moves.map((m: Json) => `${m.from}>${m.to} by ${m.by}`)),
+    JSON.stringify(["Ready>In Progress by sam", "In Progress>In Review by sam"]),
+    "only sam's own work moved the ticket: the PM's chat session neither started nor handed it back",
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore13b)),
+    JSON.stringify(["chat"]),
+    "pia ran only the chat session: no work item of hers was filed for the ticket",
+  );
+
+  step(
+    `file for a teammate: pia filed ${filed13b.key} for sam from chat -> sam was woken and opened #${pr13b.pr.number}; pia never worked on it`,
   );
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as

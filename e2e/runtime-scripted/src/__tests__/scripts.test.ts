@@ -599,6 +599,23 @@ describe("chat", () => {
     expect(text).toContain("greeting.txt");
   });
 
+  it("files new work for a teammate as theirs, and says who has it", async () => {
+    const { seen, text } = await play(
+      chat(talk([false, "New work for sam: Add a status page"])),
+      () => "Created SHOP-9.",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "ticket_create",
+        input: { title: "Add a status page", body: "Add a status page", assignee: "sam" },
+      },
+    ]);
+
+    expect(text).toBe("Filed SHOP-9 for sam; it is theirs.");
+  });
+
   it("answers a question in the thread of running work without attaching", async () => {
     const { seen, text } = await play(
       chat({

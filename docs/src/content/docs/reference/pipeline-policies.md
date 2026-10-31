@@ -28,9 +28,9 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
-| [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester |
-| [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it |
-| [`hand_back_blocked_to_pm`](#hand_back_blocked_to_pm) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent |
+| [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else |
+| [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else |
+| [`hand_back_blocked_to_pm`](#hand_back_blocked_to_pm) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else |
 | [`idle_pulls_next`](#idle_pulls_next) | `agent.idle` | wake `actor` (kind `assigned`), with its next ready ticket |
 
 ## Policies
@@ -344,9 +344,9 @@ Assigned to me and moved to active: I started work on it.
 
 ### hand_back_done
 
-A hand-back as done moves the ticket to review and gives it to the requester, for the agent.
+A hand-back as done moves the ticket to review and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `review`, assign it to the requester.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else.
 
 When:
 
@@ -363,9 +363,9 @@ Moved to review and assigned to the requester: I handed the work back as done.
 
 ### hand_back_blocked
 
-A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with no PM to unblock it (none, or the PM is the blocked agent), moves the ticket to blocked and gives it to the requester, for the agent.
+A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with no PM to unblock it (none, or the PM is the blocked agent), moves the ticket to blocked and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else.
 
 When:
 
@@ -386,9 +386,9 @@ Moved to blocked and assigned to the requester: I handed the work back as blocke
 
 ### hand_back_blocked_to_pm
 
-A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with a PM other than the blocked agent, moves the ticket to blocked and gives it to the PM, for the agent, then wakes the PM to unblock it.
+A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with a PM other than the blocked agent, moves the ticket to blocked and gives it to the PM, for the agent, then wakes the PM to unblock it; unless the agent handed the ticket over to someone other than the PM during the work.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else.
 
 When:
 

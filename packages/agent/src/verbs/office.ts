@@ -36,6 +36,7 @@ export function createFakeOffice(
   const answered: FakeOffice["answered"] = [];
   const placed: FakeOffice["placed"] = [];
   const linked: FakeOffice["linked"] = [];
+  const filedFor: FakeOffice["filedFor"] = [];
   const checked: FakeOffice["checked"] = [];
   const queued: FakeOffice["queued"] = [];
   const attached: FakeOffice["attached"] = [];
@@ -59,6 +60,7 @@ export function createFakeOffice(
     answered,
     placed,
     linked,
+    filedFor,
     checked,
     queued,
     attached,
@@ -96,6 +98,9 @@ export function createFakeOffice(
         work: [],
         ...opts.filed,
       };
+    },
+    async fileFor(workItemId, filing) {
+      filedFor.push({ workItemId, ...filing });
     },
     async queueWork(workItemId, request) {
       queued.push({ workItemId, ...request });

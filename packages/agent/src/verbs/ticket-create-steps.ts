@@ -3,6 +3,7 @@ import { attachmentsSection, canAttach } from "./attachments.js";
 import { filedLine, requireOffice } from "./support.js";
 import { memberFor } from "./ticket-support.js";
 import type { Filed, OfficeWorkItem } from "./office.types.js";
+import type { Assignee } from "./ticket-create.types.js";
 import type { AgentEnv, Uploaded, VerbContext } from "./types.js";
 
 type Attachments = NonNullable<AgentEnv["attachments"]>;
@@ -45,18 +46,39 @@ export async function parentIssue(
   return key ? tracker.getIssue(key) : undefined;
 }
 
-/** A chat ticket is the chat session's own work; any other ticket belongs to nobody until it is given. */
+/**
+ * A chat ticket is the chat session's own work, unless it names someone else: then it is theirs. Any other ticket
+ * belongs to nobody until it is given.
+ */
 export async function assigneeFor(
   env: AgentEnv,
   tracker: Tracker,
   input: TicketCreateInput,
   chat: boolean,
-): Promise<Member | undefined> {
+): Promise<Assignee> {
   if (chat) {
-    return selfOnTracker(env, tracker);
+    return chatAssignee(env, tracker, input.assignee);
   }
 
-  return input.assignee ? memberFor(env, tracker, input.assignee) : undefined;
+  return {
+    member: input.assignee ? await memberFor(env, tracker, input.assignee) : undefined,
+    forOther: false,
+  };
+}
+
+/** The caller, unless the chat session names someone else. */
+async function chatAssignee(
+  env: AgentEnv,
+  tracker: Tracker,
+  named: string | undefined,
+): Promise<Assignee> {
+  const self = await selfOnTracker(env, tracker);
+  if (!named || named.toLowerCase() === "me") {
+    return { member: self, forOther: false };
+  }
+
+  const member = await memberFor(env, tracker, named);
+  return { member, forOther: member.id !== self?.id };
 }
 
 /** The caller as a tracker member, by the tracker identity team.yaml gives them. */
@@ -154,16 +176,45 @@ export async function noteFailedUploads(
     .catch(() => {});
 }
 
+/**
+ * Tells the office about a chat ticket: the caller's own is filed as its work; one for someone else is only recorded
+ * against the request. Returns the line that says which, and the filing for the verb's data.
+ */
+export async function fileInOffice(
+  env: AgentEnv,
+  chat: OfficeWorkItem | undefined,
+  key: string,
+  request: string,
+  to: Assignee,
+): Promise<{ line?: string; data: { filed?: Filed; filedFor?: string } }> {
+  if (!chat) {
+    return { data: {} };
+  }
+
+  const office = requireOffice(env);
+  if (!to.forOther || !to.member) {
+    const filed = await office.linkTicket(chat.id, key, request);
+    return { line: filedLine(filed), data: { filed } };
+  }
+
+  const assignee = to.member.username ?? to.member.name;
+  await office.fileFor(chat.id, { ticket: key, request, assignee });
+  return {
+    line: `Filed for ${assignee}: it is their work, and the assignment wakes them. Your chat work is not tied to it; do not work on it. Tell the requester who has it, then finish with a short note.`,
+    data: { filedFor: assignee },
+  };
+}
+
 /** The lines after the ticket's summary: its parent, how it was filed, and a reminder to name a follow-up. */
 export function closingLines(
   key: string,
   parentLine: string | undefined,
-  filed: Filed | undefined,
+  filing: string | undefined,
   followUp: boolean,
 ): string[] {
   return [
     ...(parentLine ? [parentLine] : []),
-    ...(filed ? [filedLine(filed)] : []),
+    ...(filing ? [filing] : []),
     ...(followUp ? [`Name ${key} in your hand-back.`] : []),
   ];
 }

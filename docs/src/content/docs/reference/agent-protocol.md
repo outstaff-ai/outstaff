@@ -556,6 +556,19 @@ Sent by: agent. Answered by: `work_link_result`, `error`.
 | `ticket`     | string | yes      | Key of the ticket the agent created.   |
 | `request`    | string | yes      | Title of the request the ticket files. |
 
+### `work_file_for`
+
+Records the ticket a chat session created for someone else against the chat request: no work item is created, and the session's own work is not tied to the ticket. The assignee is woken by the assignment, like any other. Refused like `work_link`.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field        | Type   | Required | Description                                              |
+| ------------ | ------ | -------- | -------------------------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                                     |
+| `ticket`     | string | yes      | Key of the ticket the agent created.                     |
+| `request`    | string | yes      | Title of the request the ticket files.                   |
+| `assignee`   | string | yes      | Who the ticket was filed for, as the tracker names them. |
+
 ### `work_check`
 
 Asks whether a chat session may file a request now, before it creates the ticket. Refused for an item that is not a chat session and for a request the message already filed, so a refused filing leaves nothing in the tracker.

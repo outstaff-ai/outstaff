@@ -69,6 +69,12 @@ describe("hand_back_blocked_to_pm", () => {
     ]);
   });
 
+  it("never undoes a hand-over to someone other than the PM: no move, no assignment and no unblock wake", () => {
+    expect(judge("hand_back_blocked_to_pm", back("blocked"), world("active", "noor"))).toEqual([
+      "drop: sam handed ACME-1 over to agent noor during the work, and a hand-back does not undo a hand-over",
+    ]);
+  });
+
   it("leaves the ticket to hand_back_blocked when the team has no PM or the PM is the blocked agent", () => {
     expect(judge("hand_back_blocked_to_pm", back("blocked"), world("active", "sam", {}))).toEqual([
       "drop: no PM to unblock it (no agent plays role:pm): hand_back_blocked gives it to the requester",

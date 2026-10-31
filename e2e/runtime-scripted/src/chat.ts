@@ -15,8 +15,11 @@ interface Inbound {
   files?: ChatFile[];
 }
 
-/** A chat for the end-to-end test: the messages of one trusted human come from the stub workspace over HTTP. */
-export function createStubChat(baseUrl: string): Chat {
+/**
+ * A chat for the end-to-end test: the messages one trusted human writes to `agent` come from the stub workspace over
+ * HTTP, and what the agent posts goes there as the agent's.
+ */
+export function createStubChat(baseUrl: string, agent: string): Chat {
   let timer: NodeJS.Timeout | undefined;
   let after = 0;
   let busy = false;
@@ -44,7 +47,7 @@ export function createStubChat(baseUrl: string): Chat {
         }
 
         busy = true;
-        void call<{ messages: Inbound[] }>(`/chat/inbox?after=${after}`)
+        void call<{ messages: Inbound[] }>(`/chat/inbox?after=${after}&agent=${agent}`)
           .then(async ({ messages }) => {
             for (const m of messages) {
               after = Math.max(after, m.seq);
@@ -74,6 +77,7 @@ export function createStubChat(baseUrl: string): Chat {
 
     post: (channel, markdown, opts) =>
       call("/chat/post", {
+        agent,
         channel,
         text: markdown,
         ...(opts?.thread ? { thread: opts.thread } : {}),
@@ -101,18 +105,18 @@ export function createStubChat(baseUrl: string): Chat {
       return new Uint8Array(await res.arrayBuffer());
     },
 
-    openDirect: async (userId) => `D-${userId}`,
+    openDirect: async (userId) => `D-${agent}-${userId}`,
 
     async setAgentProfile(userId, profile) {
-      await call("/chat/profile", { userId, profile });
+      await call("/chat/profile", { agent, userId, profile });
     },
   };
 }
 
 /**
  * Takes the place of the Slack adapter in the agent-e2e image, under its name, so the team file stays as it is.
- * `E2E_STUB_URL` is where the stub workspace listens. The workspace has one inbox for everyone, so only one agent may
- * read it: `E2E_CHAT=off` starts an agent without chat.
+ * `E2E_STUB_URL` is where the stub workspace listens; the agent reads the messages written to it (`OUTSTAFF_PERSON`).
+ * `E2E_CHAT=off` starts an agent without chat.
  */
 export const stubChat = defineAdapter({
   port: "chat",
@@ -122,5 +126,9 @@ export const stubChat = defineAdapter({
   secrets: () => [],
   unavailableFor: () =>
     process.env["E2E_CHAT"] === "off" ? "this agent has no chat in the end-to-end run" : undefined,
-  create: () => createStubChat(process.env["E2E_STUB_URL"] ?? "http://tracker.acme.example:8081"),
+  create: () =>
+    createStubChat(
+      process.env["E2E_STUB_URL"] ?? "http://tracker.acme.example:8081",
+      process.env["OUTSTAFF_PERSON"] ?? "sam",
+    ),
 });
