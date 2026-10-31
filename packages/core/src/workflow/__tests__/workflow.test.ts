@@ -144,10 +144,10 @@ describe("conditions", () => {
   it("read a hand-back's status and the kind of its item", () => {
     const back = ev("agent.handed_back", { ...tk, data: { status: "done", kind: "assigned" } });
     expect(ok({ hand_back_status: ["done"] }, back)).toBe(true);
-    expect(ok({ hand_back_kind: ["assigned"] }, back)).toBe(true);
+    expect(ok({ work_kind: ["assigned"] }, back)).toBe(true);
     const bare = ev("agent.handed_back", tk);
     expect(holds({ hand_back_status: ["done"] }, bare).detail).toContain("none");
-    expect(holds({ hand_back_kind: ["assigned"] }, bare).detail).toContain("unknown");
+    expect(holds({ work_kind: ["assigned"] }, bare).detail).toContain("unknown");
   });
 
   it("judge approvals by the allowed approvers", () => {

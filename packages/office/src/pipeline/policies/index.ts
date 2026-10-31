@@ -13,6 +13,7 @@ import { policy as movedActiveToLastWorker } from "./moved_active_to_last_worker
 import { policy as openedToReview } from "./opened_to_review.js";
 import { policy as rebaseToAuthor } from "./rebase_to_author.js";
 import { policy as reviewToAuthor } from "./review_to_author.js";
+import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
 import { policy as ticketCommentToLastWorker } from "./ticket_comment_to_last_worker.js";
 
@@ -31,6 +32,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   movedActiveToAssignee,
   movedActiveToLastWorker,
   docCommentToAgent,
+  startMarksActive,
   handBackDone,
   handBackBlocked,
   idlePullsNext,

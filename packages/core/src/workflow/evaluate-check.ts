@@ -159,11 +159,11 @@ const CHECKS: ConditionChecks = {
       detail: `hand-back status ${String(s ?? "none")} in ${list(wanted)}`,
     };
   },
-  hand_back_kind: (wanted, ctx) => {
+  work_kind: (wanted, ctx) => {
     const k = ctx.event.data["kind"];
     return {
       ok: oneOf(k, wanted),
-      detail: `hand-back is for a ${String(k ?? "unknown")} item, wanted one of ${list(wanted)}`,
+      detail: `work item kind ${String(k ?? "unknown")} in ${list(wanted)}`,
     };
   },
   pr_approved: (wanted, ctx) => {

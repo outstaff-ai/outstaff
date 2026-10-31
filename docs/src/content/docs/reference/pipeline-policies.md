@@ -26,6 +26,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
+| [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
 | [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester |
 | [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester |
 | [`idle_pulls_next`](#idle_pulls_next) | `agent.idle` | wake `actor` (kind `assigned`), with its next ready ticket |
@@ -295,6 +296,25 @@ Instruction:
 {{actor.id}} commented on the document {{doc.title}}. Answer in the document and change it if needed.
 ```
 
+### start_marks_active
+
+A round of work starting on a ticket assigns the ticket to the agent and moves it to active, for the agent.
+
+Listens to `agent.started`. Decides: act for `actor`: assign it to the agent acted for, move the ticket to `active`.
+
+When:
+
+- all of:
+  - `work_kind: assigned, review_feedback, ticket_comment, rebase, ci_failed`
+  - not:
+    - `ticket_status: done, canceled`
+
+Note posted with the change:
+
+```text
+Assigned to me and moved to active: I started work on it.
+```
+
 ### hand_back_done
 
 A hand-back as done moves the ticket to review and gives it to the requester, for the agent.
@@ -372,6 +392,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `ticket.moved`
 - `ticket.created`
 - `doc.commented`
+- `agent.started`
 - `agent.handed_back`
 - `agent.idle`
 

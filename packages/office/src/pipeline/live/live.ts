@@ -29,6 +29,7 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
       let queued = false;
       for (const d of trace.decisions) {
         if (d.type === "act") {
+          // The agent makes the act; the office reads its tickets again when the agent answers (see the act desk).
           await executor.execute(d, event.id);
           continue;
         }

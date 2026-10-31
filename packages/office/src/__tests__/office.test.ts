@@ -193,7 +193,12 @@ describe("createOffice", () => {
 
     expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1");
     const moved = (await tracker.events()).events.filter((e) => e.type === "moved");
-    expect(moved.map((e) => e.actor.id)).toEqual(["u-2"]);
+    // Starting the work made the ticket active, the hand-back moved it to review.
+    expect(moved.map((e) => [e.data["to"], e.actor.id])).toEqual([
+      ["active", "u-2"],
+      ["review", "u-2"],
+    ]);
+
     expect(chat.posts).toEqual([]);
 
     // A retried hand-back is harmless.

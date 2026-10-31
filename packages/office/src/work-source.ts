@@ -109,6 +109,8 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
       await store.upsertSubject(OFFER_SUBJECT, id, { accepted: true });
       await store.tagRun(id, on);
+      // Before the agent hears back, so its run starts on the ticket as the office left it.
+      await opts.onAccepted?.(item);
     },
 
     async decline(person, id, reason) {

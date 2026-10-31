@@ -13,14 +13,14 @@ Every event goes through one **event pipeline** ([decision 0016](/decisions/0016
 
 An event is anything that happened that the office might act on, from any source:
 
-| Source     | Events                                                                                                                                                                                             |
-| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Chat       | `chat.message`: a direct message, a mention or a thread reply to an agent, which the agent passes on to the office                                                                                 |
-| Code host  | `pr.opened`, `pr.review_submitted`, `pr.comment`, `pr.merged`, `pr.closed`                                                                                                                         |
-| Work state | `pr.conflicted` and `pr.ci_failed`, which the office raises itself when a pull request starts to conflict or its checks fail; `pr.behind_base` and `pr.base_merged` are defined but not raised yet |
-| Tracker    | `ticket.commented`, `ticket.assigned`, `ticket.moved`, `ticket.created`                                                                                                                            |
-| Docs       | `doc.commented`                                                                                                                                                                                    |
-| The office | `agent.handed_back` when an agent hands an item back, and `agent.idle` when an agent has nothing queued or running and a ready ticket to start                                                     |
+| Source     | Events                                                                                                                                                                                                    |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat       | `chat.message`: a direct message, a mention or a thread reply to an agent, which the agent passes on to the office                                                                                        |
+| Code host  | `pr.opened`, `pr.review_submitted`, `pr.comment`, `pr.merged`, `pr.closed`                                                                                                                                |
+| Work state | `pr.conflicted` and `pr.ci_failed`, which the office raises itself when a pull request starts to conflict or its checks fail; `pr.behind_base` and `pr.base_merged` are defined but not raised yet        |
+| Tracker    | `ticket.commented`, `ticket.assigned`, `ticket.moved`, `ticket.created`                                                                                                                                   |
+| Docs       | `doc.commented`                                                                                                                                                                                           |
+| The office | `agent.started` when an agent accepts an item on a ticket, `agent.handed_back` when an agent hands an item back, and `agent.idle` when an agent has nothing queued or running and a ready ticket to start |
 
 Each event has an actor (a human, an agent or automation). An event from an untrusted human is recorded, never acted on, and its trace says why. How the office reads each source, and who counts as trusted, is in [The office](/architecture/office/#intake).
 
@@ -39,9 +39,9 @@ The office writes nothing to the tracker, the knowledge base or the code host: i
 The office ships a built-in set, each policy a module of its own, listed with each policy's conditions and instruction in the generated [pipeline policies reference](/reference/pipeline-policies/). In short:
 
 - **Wakes.** A chat message wakes the agent it was written to; a human's review or comment wakes the pull request's author; a conflict or failing checks wake the author; a ticket assigned to an agent by someone else, a comment on it, or a human moving it to active wakes the agent; a human's comment on a ticket an agent handed back (assigned to a human, in review or blocked, mentioning no agent) wakes the agent who last worked on it, to answer, and to take the ticket back only if it needs more work; a comment on a document wakes the agent it mentions, else its author; an idle agent is woken with its next ready ticket.
-- **Acts.** A pull request opened for review moves its ticket to review; a merge into the default branch, with no other pull request of the ticket open, moves it to done. Both act as the pull request's author, or, for a human's pull request, as the ticket's agent: the agent it is assigned to, else the agent who last worked on it (with neither, the ticket is the human's alone and stays where it is). A hand-back moves the ticket to review (done) or blocked (blocked) and assigns it to the person who asked; a human moving a ticket they hold to active, without the needs-human label, assigns it back to the agent who last worked on it and wakes them.
+- **Acts.** A round of work starting on a ticket (an assignment, review feedback, a comment, a rebase or failing checks) assigns the ticket to the agent and moves it to active, unless it is done or canceled. A pull request opened for review moves its ticket to review; a merge into the default branch, with no other pull request of the ticket open, moves it to done. Both act as the pull request's author, or, for a human's pull request, as the ticket's agent: the agent it is assigned to, else the agent who last worked on it (with neither, the ticket is the human's alone and stays where it is). A hand-back moves the ticket to review (done) or blocked (blocked) and assigns it to the person who asked; a human moving a ticket they hold to active, without the needs-human label, assigns it back to the agent who last worked on it and wakes them.
 
-Everything else on the ticket is the agent's: a woken agent assigns the ticket to itself and moves it to active when it starts work on it, as its catalog instructions say.
+Everything else on the ticket is the agent's: blocking, canceling, filing, splitting and re-parenting tickets, as its catalog instructions say.
 
 Every policy that listens to an event receives it and proposes. Change one under `pipeline.policies.<id>`:
 

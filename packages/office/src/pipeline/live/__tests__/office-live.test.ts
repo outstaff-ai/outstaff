@@ -158,7 +158,12 @@ describe("the office with the event pipeline live", () => {
       `${issue.key} is assigned to you. Work on it the way the repository asks.`,
     );
 
+    // Accepting the item starts the work: sam's process makes the ticket active for it, and the office's state follows
+    // from the act's answer.
     await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
+    await until(async () => office!.parts.workState.ticketStatus(issue.key) === "active");
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("active");
+
     await conn.handBack(item.id, { summary: "Built it.", status: "done" });
     const resultOf = async () => {
       const back = (await traces()).find((t) => t.event.type === "agent.handed_back");
@@ -179,10 +184,16 @@ describe("the office with the event pipeline live", () => {
     expect(done.status.canonical).toBe("review");
     expect(done.assignee?.id).toBe(ada.id);
     const history = (await tracker.events()).events.filter((e) => e.key === issue.key);
-    const toReview = history.filter((e) => e.type === "moved" && e.data["to"] === "review");
-    expect(toReview.map((e) => e.actor.id)).toEqual([sam.id]);
-    await until(async () => (await tracker.listComments(issue.key)).length > 0);
+    // Every change is sam's: the start of the work and the hand-back, each with sam's note.
+    const moves = history.filter((e) => e.type === "moved");
+    expect(moves.map((e) => [e.data["to"], e.actor.id])).toEqual([
+      ["active", sam.id],
+      ["review", sam.id],
+    ]);
+
+    await until(async () => (await tracker.listComments(issue.key)).length > 1);
     expect((await tracker.listComments(issue.key)).map((c) => [c.author.id, c.body])).toEqual([
+      [sam.id, "Assigned to me and moved to active: I started work on it."],
       [sam.id, "Moved to review and assigned to the requester: I handed the work back as done."],
     ]);
 
@@ -190,6 +201,19 @@ describe("the office with the event pipeline live", () => {
 
     // The office read the ticket again from the answer: its state has the move before the tracker's feed says so.
     expect(office!.parts.workState.ticketStatus(issue.key)).toBe("review");
+
+    const begun = (await traces()).find((t) => t.event.type === "agent.started")!;
+    expect(begun.event).toMatchObject({
+      id: expect.stringMatching(new RegExp(`^workstate:started:${item.id}:`)),
+      subject: { ticket: issue.key },
+      actor: { kind: "agent", id: "sam" },
+      data: { workItem: item.id, kind: "assigned" },
+    });
+
+    expect(begun.results?.[`${begun.event.id}:start_marks_active`]).toMatchObject({
+      status: "done",
+      results: [`moved ${issue.key} to active`, `commented on ${issue.key}`],
+    });
   });
 
   it("queues the act of an offline agent and has it made once the agent connects", async () => {
