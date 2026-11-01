@@ -5,16 +5,14 @@ import type { PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.j
 import { docOpen, isTerminal, openPrs, teamRepo } from "./derive.js";
 import { docNode, prNode, ROOT, ticketNode, unlinkAll } from "./links.js";
 import { isOpen } from "./open.js";
+import { ticketWork, worksOnTicket } from "./blocked.js";
 import { addPickup } from "./ready.js";
 
 type Latest = Map<string, { at: string; person: string; done: boolean }>;
 
 /** Answering a question on a ticket, or trying to unblock it, does not make the agent the one who worked on it. */
 const workedOn = (item: WorkItem) =>
-  Boolean(item.subject) &&
-  item.status !== "queued" &&
-  item.kind !== "asked" &&
-  item.kind !== "unblock";
+  Boolean(item.subject) && item.status !== "queued" && worksOnTicket(item.kind);
 
 /** The ticket an item worked on: its own subject, or the ticket of its pull request. */
 function ticketOf(item: WorkItem, prs: Map<string, PrRecord>): string | undefined {
@@ -48,14 +46,20 @@ const trackerIds = (team: TeamConfig) =>
 /** Rebuilds the records: from the store on open, and from the ports on a rescan. */
 export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
   const { store, vcs, tracker, team, clock, logger, retentionMs, repos, prs, tickets, docs } = core;
-  const { workers, handedBack, pickups, prSubject } = core;
+  const { workers, handedBack, pickups, work, prSubject } = core;
   const { refreshPr, refreshTicket, saveTicket, toTicket } = ops;
   const refreshPickups = (items: WorkItem[]) => {
     pickups.clear();
+    work.clear();
     for (const item of items) {
       const key = ticketOf(item, prs);
+      const done = key ? ticketWork(item) : undefined;
       if (key) {
         addPickup(pickups, item, key);
+      }
+
+      if (key && done) {
+        work.set(key, [...(work.get(key) ?? []), done]);
       }
     }
   };

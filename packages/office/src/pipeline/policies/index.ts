@@ -18,6 +18,7 @@ import { policy as rebaseToAuthor } from "./rebase_to_author.js";
 import { policy as reviewToAuthor } from "./review_to_author.js";
 import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
+import { policy as ticketCommentToBlockedAgent } from "./ticket_comment_to_blocked_agent.js";
 import { policy as ticketCommentToLastWorker } from "./ticket_comment_to_last_worker.js";
 
 /** The built-in policies, one module each, in the order the trace lists them. */
@@ -34,6 +35,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   linkPrOnTicket,
   assignedToAssignee,
   ticketCommentToAgent,
+  ticketCommentToBlockedAgent,
   ticketCommentToLastWorker,
   movedActiveToAssignee,
   movedActiveToLastWorker,

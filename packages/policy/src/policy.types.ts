@@ -12,9 +12,9 @@ import type { ErrorProposal, Proposal } from "./proposal.types.js";
 
 /**
  * A person a policy names. `author` (of the pull request), `assignee` (of the ticket), `mentioned` (the first agent
- * the comment names), `doc_author`, `last_worker` (the agent who last worked on the ticket), `role:<role>`, as the
- * conditions' evaluator resolves them; plus `actor` (the agent who caused the event) and `addressed` (the agent a chat
- * message was written to).
+ * the comment names), `doc_author`, `last_worker` (the agent who last worked on the ticket), `blocked_agent` (the agent
+ * blocked on the ticket), `role:<role>`, as the conditions' evaluator resolves them; plus `actor` (the agent who caused
+ * the event) and `addressed` (the agent a chat message was written to).
  */
 export type PersonRef =
   | "author"
@@ -22,6 +22,7 @@ export type PersonRef =
   | "mentioned"
   | "doc_author"
   | "last_worker"
+  | "blocked_agent"
   | "actor"
   | "addressed"
   | `role:${string}`;
@@ -30,7 +31,9 @@ export type PersonRef =
 export type PersonSpec = PersonRef | readonly PersonRef[];
 
 /** A condition only the pipeline knows: the event's actor is that person (for example the assignee themselves). */
-export type PipelineLeaf = { actor_is: "assignee" | "author" | "doc_author" | "last_worker" };
+export type PipelineLeaf = {
+  actor_is: "assignee" | "author" | "doc_author" | "last_worker" | "blocked_agent";
+};
 
 /** A condition, a pipeline leaf, or a combination of them. */
 export type PipelineCondition =

@@ -42,6 +42,15 @@ describe("resolveSpec", () => {
     });
   });
 
+  it("names the agent blocked on the ticket", () => {
+    const comment = event("ticket.commented", { subject: { ticket: "ACME-1" } });
+    const stuck = { tickets: { "ACME-1": { status: "blocked" as const, blockedAgent: "sam" } } };
+    expect(resolveSpec("blocked_agent", ctxOf(comment, stuck), OPTS)).toEqual({ value: "sam" });
+    expect(resolveSpec("blocked_agent", ctxOf(comment), OPTS)).toEqual({
+      skip: "no agent is blocked on the ticket",
+    });
+  });
+
   it("tries a list in order and says why none resolved", () => {
     const mentioned = ctxOf(event("ticket.commented", { data: { mentions: ["mira"] } }));
     expect(resolveSpec(["mentioned", "assignee"], mentioned, OPTS)).toEqual({ value: "mira" });

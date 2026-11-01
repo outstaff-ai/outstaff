@@ -22,6 +22,14 @@ const PEOPLE = new Map<string, (ctx: Ctx) => Resolved<string>>([
         "no agent has worked on the ticket yet",
       ),
   ],
+  [
+    "blocked_agent",
+    (ctx) =>
+      agent(
+        ctx.ticket ? ctx.state.blockedAgent(ctx.ticket) : undefined,
+        "no agent is blocked on the ticket",
+      ),
+  ],
   ["mentioned", (ctx) => agent(mentionedBy(ctx.event)[0], "the comment mentions no agent")],
   [
     "doc_author",
@@ -42,7 +50,10 @@ const PEOPLE = new Map<string, (ctx: Ctx) => Resolved<string>>([
   ],
 ]);
 
-/** The agent a reference names (`author`, `assignee`, `mentioned`, `last_worker`, `doc_author`, `role:<role>`), or why there is none. */
+/**
+ * The agent a reference names (`author`, `assignee`, `mentioned`, `last_worker`, `blocked_agent`, `doc_author`,
+ * `role:<role>`), or why there is none.
+ */
 export function person(spec: string, ctx: Ctx): Resolved<string> {
   const named = PEOPLE.get(spec);
   if (named) {

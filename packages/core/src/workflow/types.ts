@@ -83,6 +83,16 @@ export interface WorkflowState {
   /** Handle of the agent who last worked on the ticket. */
   lastWorker(ticket: string): string | undefined;
 
+  /**
+   * Handle of the agent blocked on the ticket: while it is blocked, the agent whose latest work on it was handed back
+   * as blocked (or as done after the agent moved it to blocked). An unblock round or another agent's round does not
+   * change it.
+   */
+  blockedAgent(ticket: string): string | undefined;
+
+  /** Whether the agent had a round on the ticket under way at that time (ISO-8601). */
+  inRound(ticket: string, person: string, at: string): boolean;
+
   /** Id of the human who asked for the work. */
   requester(ticket: string): string | undefined;
   hasLabel(ticket: string, label: string): boolean;
@@ -164,7 +174,9 @@ export type Condition =
   | { ticket_prs_all_closed: boolean }
   | { ticket_prs_open: boolean }
   | { ticket_prs_several: boolean }
-  | { ticket_handed_back: boolean };
+  | { ticket_handed_back: boolean }
+  | { blocked_agent: boolean }
+  | { actor_in_round: boolean };
 
 export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
 
@@ -177,6 +189,19 @@ export interface StaticTicket {
 
   /** The agent's latest work on the ticket ended as a hand-back as done. */
   handedBack?: boolean;
+
+  /** The agent blocked on the ticket. */
+  blockedAgent?: string;
+
+  /** The agents' rounds on the ticket. */
+  rounds?: StaticRound[];
+}
+
+/** One agent's round on a ticket: from when it was queued until it ended (ISO-8601), still under way without `to`. */
+export interface StaticRound {
+  person: string;
+  from: string;
+  to?: string;
 }
 
 export interface StaticWorkflowData {

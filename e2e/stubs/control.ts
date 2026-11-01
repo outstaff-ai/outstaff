@@ -102,7 +102,7 @@ function trackerControls({ tracker }: World): Route[] {
       method: "POST",
       path: "/_test/tickets/:key/comment",
       handler: (r) => {
-        tracker.commentTicket(r.params["key"]!, r.json.body);
+        tracker.commentTicket(r.params["key"]!, r.json.body, r.json.as);
         return ok();
       },
     },

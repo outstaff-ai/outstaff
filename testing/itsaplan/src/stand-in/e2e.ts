@@ -13,10 +13,17 @@ import {
 import { createItsaplanStandIn } from "./stand-in.js";
 import type { ItsaplanStore } from "./types.js";
 
-/** Real time, strictly increasing, so the feed's order is the order things happened in. */
+/**
+ * Real time, strictly increasing, so the feed's order is the order things happened in. A millisecond is added only
+ * when the clock has not moved since the last reading, so it never runs ahead of the office's clock: the office
+ * compares the tracker's times with its own.
+ */
 function realClock(): () => string {
-  let tick = 0;
-  return () => new Date(Date.now() + ++tick).toISOString();
+  let last = 0;
+  return () => {
+    last = Math.max(Date.now(), last + 1);
+    return new Date(last).toISOString();
+  };
 }
 
 const columnNamed = (s: ItsaplanStore, name: string) =>
@@ -71,14 +78,14 @@ function controls(s: ItsaplanStore, human: string) {
       touch(s, issue);
     },
 
-    /** A person comments on a ticket. */
-    commentTicket(keyName: string, body: string) {
+    /** A person comments on a ticket: the human, or `actor` (a username), for example an agent posting an answer. */
+    commentTicket(keyName: string, body: string, actor?: string) {
       const issue = issueByKey(s, keyName);
       if (!issue) {
         throw new Error(`No ticket ${keyName}.`);
       }
 
-      commentIssue(s, issue, human, body);
+      commentIssue(s, issue, actor === undefined ? human : member(s, actor).userId, body);
     },
 
     /** A person comments on a document (a reply when `parentId` is given). */

@@ -9,7 +9,7 @@ import type {
   Vcs,
   WorkflowEvent,
 } from "@outstaff/core";
-import type { Store } from "#/store/index.js";
+import type { Store, WorkItem } from "#/store/index.js";
 import type { Clock } from "#/types.js";
 import type { DocRecord, PrRecord, TicketRecord, WorkstateHandler } from "./types.js";
 
@@ -20,6 +20,15 @@ export interface Pickup {
 
   /** When the latest item was created (ISO-8601). */
   at: string;
+}
+
+/** One agent's work item on a ticket, from when it was queued until it was last updated (ISO-8601). */
+export interface TicketWork {
+  person: string;
+  kind: string;
+  status: WorkItem["status"];
+  from: string;
+  to: string;
 }
 
 /** A synthetic event the work state recorded and still has to deliver. */
@@ -58,6 +67,9 @@ export interface WorkstateCore {
 
   /** Tickets whose latest work item ended as a hand-back as done. */
   handedBack: Set<string>;
+
+  /** Each ticket's work items that were offered, of every agent and kind. */
+  work: Map<string, TicketWork[]>;
 
   /** Each person's work on each ticket, by `pickupKey`. */
   pickups: Map<string, Pickup>;

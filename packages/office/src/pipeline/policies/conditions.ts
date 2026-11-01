@@ -7,6 +7,9 @@ export const UNFINISHED: CanonicalStatus[] = ["backlog", "ready", "active", "rev
 export const HUMAN: PipelineCondition = { actor_kind: "human" };
 export const NOT_CLOSED: PipelineCondition = { not: { ticket_status: ["done", "canceled"] } };
 
+/** A blocked ticket an agent is blocked on: a comment on it goes to that agent. */
+export const BLOCKED_ON_AGENT: PipelineCondition = { blocked_agent: true };
+
 /** A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a ticket still open. */
 export const BLOCKED_HAND_BACK: PipelineCondition = {
   all: [

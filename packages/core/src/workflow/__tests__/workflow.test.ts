@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTeamConfig } from "#/config/parse.js";
 import { buildTeamJsonSchema } from "#/config/json-schema.js";
-import { agent, automation, ev, pr, ref, world } from "./fixtures.js";
+import { agent, automation, ev, human, pr, ref, world } from "./fixtures.js";
 import { createStaticWorkflowState } from "#/workflow/state.js";
 import {
   checkCondition,
@@ -211,6 +211,77 @@ describe("conditions", () => {
     expect(holds({ ticket_handed_back: true }).detail).toContain("was not");
     expect(ok({ ticket_handed_back: false }, noTicket())).toBe(true);
   });
+
+  it("read the agent blocked on the ticket", () => {
+    const stuck = world({ status: "blocked", ticket: { blockedAgent: "sam" } });
+    expect(ok({ blocked_agent: true }, ev("ticket.commented", tk), stuck)).toBe(true);
+    expect(holds({ blocked_agent: true }, ev("ticket.commented", tk), stuck).detail).toBe(
+      "sam is blocked on the ticket, wanted an agent",
+    );
+
+    expect(holds({ blocked_agent: true }).detail).toBe(
+      "no agent is blocked on the ticket, wanted an agent",
+    );
+
+    expect(ok({ blocked_agent: false }, noTicket())).toBe(true);
+  });
+
+  it("read whether the actor was in a round on the ticket when the event happened", () => {
+    const rounds = world({
+      ticket: {
+        rounds: [
+          { person: "ada", from: "2026-10-05T08:00:00Z", to: "2026-10-05T08:30:00.000Z" },
+          { person: "rex", from: "2026-10-05T09:00:00.000Z" },
+        ],
+      },
+    });
+
+    const at = (time: string, actor: WorkflowEvent["actor"] = agent) =>
+      ev("ticket.commented", { ...tk, actor, data: { at: time } });
+
+    expect(ok({ actor_in_round: true }, at("2026-10-05T08:10:00.000Z"), rounds)).toBe(true);
+    expect(ok({ actor_in_round: true }, at("2026-10-05T08:00:00.000Z"), rounds)).toBe(true);
+    expect(ok({ actor_in_round: true }, at("2026-10-05T08:31:00.000Z"), rounds)).toBe(false);
+    expect(ok({ actor_in_round: true }, at("2026-10-05T07:59:00.000Z"), rounds)).toBe(false);
+    expect(
+      ok(
+        { actor_in_round: true },
+        at("2026-10-06T00:00:00.000Z", { kind: "agent", id: "rex" }),
+        rounds,
+      ),
+    ).toBe(true);
+
+    expect(holds({ actor_in_round: true }, at("2026-10-05T08:10:00.000Z"), rounds).detail).toBe(
+      "actor ada was in a round on the ticket, wanted in one",
+    );
+
+    expect(
+      holds({ actor_in_round: false }, at("2026-10-05T08:10:00.000Z", human), rounds).detail,
+    ).toBe("actor grace was not in a round on the ticket, wanted not");
+
+    // An agent's event without a time is taken as in a round: it wakes no one rather than risk a loop.
+    expect(
+      holds({ actor_in_round: true }, ev("ticket.commented", { ...tk, actor: agent }), rounds),
+    ).toEqual({
+      ok: true,
+      detail:
+        "actor ada was in a round on the ticket (the event has no time, so it is taken as in one), wanted in one",
+    });
+
+    expect(
+      ok(
+        { actor_in_round: true },
+        ev("ticket.commented", { ...tk, actor: agent, data: { at: "" } }),
+        rounds,
+      ),
+    ).toBe(true);
+
+    expect(
+      ok({ actor_in_round: true }, ev("ticket.commented", { ...tk, actor: human }), rounds),
+    ).toBe(false);
+
+    expect(ok({ actor_in_round: false }, noTicket())).toBe(true);
+  });
 });
 
 describe("people", () => {
@@ -222,6 +293,13 @@ describe("people", () => {
     expect(resolvePerson("author", ctx(ev("pr.opened")))).toEqual({ value: "ada" });
     expect(resolvePerson("assignee", ctx(ev("pr.opened"), assigned))).toEqual({ value: "sam" });
     expect(resolvePerson("last_worker", ctx(ev("pr.opened")))).toEqual({ value: "ada" });
+    expect(
+      resolvePerson(
+        "blocked_agent",
+        ctx(ev("pr.opened"), world({ ticket: { blockedAgent: "sam" } })),
+      ),
+    ).toEqual({ value: "sam" });
+
     expect(
       resolvePerson("mentioned", ctx(ev("ticket.commented", { data: { mentions: ["rex"] } }))),
     ).toEqual({ value: "rex" });
@@ -246,6 +324,10 @@ describe("people", () => {
 
     expect(resolvePerson("last_worker", ctx(none))).toEqual({
       skip: "no agent has worked on the ticket yet",
+    });
+
+    expect(resolvePerson("blocked_agent", ctx(none))).toEqual({
+      skip: "no agent is blocked on the ticket",
     });
 
     expect(resolvePerson("mentioned", ctx(none))).toEqual({
@@ -406,6 +488,8 @@ describe("static state", () => {
     expect(s.ticketForPr(ref(1))).toBeUndefined();
     expect(s.pullRequestsOf("ACME-1")).toEqual([]);
     expect(s.handedBack("ACME-1")).toBe(false);
+    expect(s.blockedAgent("ACME-1")).toBeUndefined();
+    expect(s.inRound("ACME-1", "sam", "2026-10-05T09:00:00.000Z")).toBe(false);
     expect(s.hasLabel("ACME-1", "x")).toBe(false);
     expect(s.defaultBranch(ref(1).repo)).toBe("main");
     expect(s.stackedOn(ref(1).repo, "main")).toEqual([]);

@@ -984,6 +984,92 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(ws.lastWorker(issue.key)).toBe("noor");
     });
 
+    it("finds the agent blocked on a ticket, and its rounds on it, from the work item history", async () => {
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      await ws.apply(ticketEvent("ticket.created", issue.key), meta());
+      const item = (person: string, kind: string) =>
+        store.enqueue({
+          person,
+          kind,
+          title: kind,
+          trigger: "agent",
+          subject: { type: "ticket", ref: issue.key },
+        });
+
+      const sam = await item("sam", "assigned");
+      await store.updateItem(sam.id, { status: "active" });
+      const during = clock.now().toISOString();
+      clock.advance(1000);
+      await store.updateItem(sam.id, { status: "blocked" });
+      clock.advance(5000);
+      await tracker.transition(issue.key, "blocked");
+      await ws.apply(ticketEvent("ticket.moved", issue.key, { kind: "agent", id: "sam" }), meta());
+      expect(ws.blockedAgent(issue.key)).toBe("sam");
+      expect(ws.inRound(issue.key, "sam", during)).toBe(true);
+      expect(ws.inRound(issue.key, "sam", clock.now().toISOString())).toBe(false);
+
+      const pia = await item("noor", "unblock");
+      await store.updateItem(pia.id, { status: "active" });
+      await ws.refreshWorkers();
+      expect(ws.blockedAgent(issue.key)).toBe("sam");
+      expect(ws.inRound(issue.key, "noor", clock.now().toISOString())).toBe(true);
+
+      clock.advance(1000);
+      const again = await item("sam", "ticket_comment");
+      await store.updateItem(again.id, { status: "active" });
+      await ws.refreshWorkers();
+      expect(ws.blockedAgent(issue.key)).toBeUndefined();
+      expect(ws.blockedAgent("ACME-404")).toBeUndefined();
+      expect(ws.inRound("ACME-404", "sam", during)).toBe(false);
+    });
+
+    it("wakes the blocked agent for an agent's answer, not for the comment it posted in its own short round", async () => {
+      const issue = await tracker.createIssue({ title: "A", body: "" });
+      await ws.apply(ticketEvent("ticket.created", issue.key), meta());
+      const round = async (person: string, kind: string, end: "blocked" | "done") => {
+        const item = await store.enqueue({
+          person,
+          kind,
+          title: kind,
+          trigger: "agent",
+          subject: { type: "ticket", ref: issue.key },
+        });
+
+        await store.updateItem(item.id, { status: "active" });
+        clock.advance(50);
+        await store.updateItem(item.id, { status: end });
+        return clock.now();
+      };
+
+      await round("sam", "assigned", "blocked");
+      await tracker.transition(issue.key, "blocked");
+      await ws.apply(ticketEvent("ticket.moved", issue.key, { kind: "agent", id: "sam" }), meta());
+      // The unblock round lasts 50ms and comments just before it ends; the tracker's clock is 400ms ahead.
+      const ended = await round("noor", "unblock", "done");
+      await ws.refreshWorkers();
+
+      const { policies, options } = configurePipeline(teamConfig());
+      const comment = (at: Date) => {
+        const event = {
+          id: `tracker:comment:${at.getTime()}`,
+          type: "ticket.commented" as const,
+          at: at.toISOString(),
+          subject: { ticket: issue.key },
+          actor: { kind: "agent" as const, id: "noor" },
+          data: { body: "Needs a human: the release date.", at: at.toISOString() },
+        };
+
+        return evaluatePipeline(event, ws, policies, options)
+          .decisions.filter((d) => d.type === "wake")
+          .map((d) => `${d.policy}: ${d.type === "wake" ? d.person : ""}`);
+      };
+
+      expect(comment(new Date(ended.getTime() + 400))).toEqual([]);
+      expect(comment(new Date(ended.getTime() + 60_000))).toEqual([
+        "ticket_comment_to_blocked_agent: sam",
+      ]);
+    });
+
     it("resolves roles only when exactly one person plays them", () => {
       expect(ws.personForRole("developer")).toBe("sam");
       expect(ws.personForRole("reviewer")).toBe("noor");
