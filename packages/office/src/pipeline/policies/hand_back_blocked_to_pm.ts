@@ -7,7 +7,8 @@ import { unblocker } from "./unblocker.js";
 const toPm: ActSpec = {
   as: "actor",
   ops: [{ move: "blocked" }, { assign: "role:pm" }],
-  note: "Moved to blocked and assigned to the team's PM to unblock: I handed the work back as blocked.",
+  // The policy's instruction is the PM's wake, not a note: the move and assignment show in the ticket's history.
+  note: "",
 };
 
 const unblock: WakeSpec = { person: "role:pm", kind: "unblock" };

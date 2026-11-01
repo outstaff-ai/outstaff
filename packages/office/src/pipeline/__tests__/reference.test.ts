@@ -29,6 +29,37 @@ describe("the pipeline policies reference", () => {
     expect(page).toContain("Note posted with the change:");
   });
 
+  it("says when a policy that acts posts no note", () => {
+    const page = renderPolicyReference(
+      [
+        {
+          id: "silent",
+          summary: "s",
+          on: ["agent.started"],
+          decides: "act for `actor`: move the ticket to `active`",
+          decide: () => [],
+        },
+        {
+          id: "acts_then_wakes",
+          summary: "s",
+          on: ["ticket.moved"],
+          instruction: "Pick it up.",
+          decides: "act for `last_worker`: assign it, then wake them (kind `assigned`)",
+          decide: () => [],
+        },
+      ],
+      {},
+    );
+
+    expect(page).toContain(
+      "Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.silent.instruction`.",
+    );
+
+    expect(page).toContain(
+      "Instruction:\n\n```text\nPick it up.\n```\n\nNote posted with the change: none; the instruction is the wake's.",
+    );
+  });
+
   it("words every condition shape", () => {
     expect(conditionLines({ any: [{ pr_draft: true }, { actor_is: "assignee" }] })).toEqual([
       "- any of:",

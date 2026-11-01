@@ -109,7 +109,7 @@ export interface ActSpec {
   ops: readonly OpSpec[];
   wake?: { kind: string } | undefined;
 
-  /** The note posted with the changes, a template; the policy's instruction when not given. */
+  /** The note posted with the changes, a template; the policy's instruction when not given. An empty one posts none. */
   note?: string | undefined;
 }
 
@@ -169,7 +169,8 @@ export interface PolicyDefinition {
 
   /**
    * A template with {{variable}} placeholders: for a wake, the instruction the agent is given; for an act, the note
-   * posted with its changes, in the agent's own voice. A team can replace it.
+   * posted with its changes, in the agent's own voice. An act without one posts no note. A team can replace it, or
+   * set one.
    */
   instruction?: string | undefined;
 

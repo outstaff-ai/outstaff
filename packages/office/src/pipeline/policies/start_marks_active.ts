@@ -11,6 +11,5 @@ export const policy = definePolicy({
     "A round of work starting on a ticket assigns the ticket to the agent and moves it to active, for the agent.",
   on: ["agent.started"],
   when: { all: [{ work_kind: ROUNDS }, NOT_CLOSED] },
-  instruction: "Assigned to me and moved to active: I started work on it.",
   ...acts({ as: "actor", ops: [{ assign: "self" }, { move: "active" }] }),
 });

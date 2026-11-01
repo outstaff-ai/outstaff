@@ -15,7 +15,6 @@ export const policy = definePolicy({
       { not: { ticket_status: ["blocked", "done", "canceled"] } },
     ],
   },
-  instruction: "Moved to review and assigned to the requester: I handed the work back as done.",
   decides: `${toReview.decides}, ${UNLESS_HANDED_OVER}`,
   decide: (event, ctx) => {
     const kept = handedOver(ctx, requesterOf(ctx));

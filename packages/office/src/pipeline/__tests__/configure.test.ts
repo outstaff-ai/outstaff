@@ -2,7 +2,9 @@ import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
 import type { ConfiguredPolicy } from "@outstaff/policy";
 import { describe, expect, it } from "vitest";
 import { configurePipeline } from "#/pipeline/configure.js";
+import { evaluatePipeline } from "#/pipeline/evaluate.js";
 import { BUILT_IN_POLICIES } from "#/pipeline/policies/index.js";
+import { event, OPTS, stateOf } from "./support.js";
 
 function team(extra: Record<string, unknown> = {}): TeamConfig {
   const r = parseTeamConfig({
@@ -124,6 +126,36 @@ describe("configurePipeline", () => {
 
     // An act's instruction is the note the office posts with its changes.
     expect(byId(policies, "merged_closes_ticket").instruction).toBe("Closed for {{person}}.");
+  });
+
+  it("adds a note to an act that posts none by default, from the team's instruction", () => {
+    const started = event("agent.started", {
+      subject: { ticket: "ACME-1" },
+      actor: { kind: "agent", id: "sam" },
+      data: { workItem: "w-1", kind: "assigned" },
+    });
+
+    const state = stateOf({ tickets: { "ACME-1": { status: "ready" } } });
+    const actOf = (overrides: Record<string, unknown>) => {
+      const { policies, issues } = configurePipeline(team({ pipeline: { policies: overrides } }));
+      const trace = evaluatePipeline(started, state, policies, OPTS);
+      return { issues, act: trace.decisions.find((d) => d.policy === "start_marks_active") };
+    };
+
+    const plain = actOf({});
+    expect(plain.act).toMatchObject({ type: "act", as: "sam" });
+    expect(plain.act).not.toHaveProperty("note");
+
+    const noted = actOf({ start_marks_active: { instruction: "Picked up {{ticket}}." } });
+    expect(noted.issues).toEqual([]);
+    expect(noted.act).toMatchObject({ type: "act", as: "sam", note: "Picked up ACME-1." });
+
+    const unusable = actOf({ start_marks_active: { instruction: "Hi {{nobody}}" } });
+    expect(unusable.issues).toEqual([
+      "pipeline.policies.start_marks_active.instruction: unknown variable nobody; the default is kept",
+    ]);
+
+    expect(unusable.act).not.toHaveProperty("note");
   });
 
   it("runs the custom policies after the built-in ones, with the team's changes, and skips one whose id is taken", () => {
