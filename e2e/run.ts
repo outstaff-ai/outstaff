@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -451,13 +451,18 @@ function dcOrFail(what: string, ...args: string[]) {
   }
 }
 
-/** The kind of each wake the office queued, or folded into an open item, for pia, in order: from its log. */
-const piaWakes = () =>
+/** The kind of each wake the office queued, or folded into an open item, for a person, in order: from its log. */
+const wakesOf = (person: string) =>
   [
     ...logs("office").matchAll(
-      /pipeline: (?:queued|folded the wake into) work item \S+ for pia \((\w+)\)/g,
+      new RegExp(
+        `pipeline: (?:queued|folded the wake into) work item \\S+ for ${person} \\((\\w+)\\)`,
+        "g",
+      ),
     ),
   ].map((m) => m[1]);
+
+const piaWakes = () => wakesOf("pia");
 
 const connected = (person: string) =>
   new RegExp(`"agent connected","person":"${person}"`).test(logs("office"));
@@ -1418,6 +1423,86 @@ async function main() {
   );
 
   step(`blocked: no chat message was posted about ${stuck}`);
+
+  // ---- 10, answered: the PM could not unblock this one and gave it to the human. The answer comes later, outside the
+  // office, and the PM posts it on the ticket: an agent's comment, on a ticket the human holds, wakes sam, who is
+  // blocked on it. The PM's own comments during her unblock round woke no one.
+  const piaBeforeAnswer = piaWakes().length;
+  const samBeforeAnswer = wakesOf("sam").length;
+  const { key: waiting } = await stub("POST", "/_test/tickets", {
+    title: "Ship the release notes",
+    description: "blocked: the release date is not decided",
+    assignee: "sam",
+  });
+
+  const withHuman = await until(`${waiting} handed on to the requester by the PM`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === waiting);
+    const asked = t.comments.some(
+      (c: Json) => c.author === "pia" && c.body.startsWith("Needs a human:"),
+    );
+
+    return t.status === "Blocked" && t.assignee === "ada.admin" && asked ? t : undefined;
+  });
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${waiting} went to the requester`);
+  const humanHeld = (await state()).tickets.find((x: Json) => x.key === waiting);
+  assertEq(humanHeld.status, "Blocked", "the PM's own comments did not wake sam: still blocked");
+  assertEq(humanHeld.moves.length, withHuman.moves.length, "nobody moved the ticket meanwhile");
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBeforeAnswer)),
+    JSON.stringify(["assigned"]),
+    "sam was woken once, for the assignment, and not by the PM's comments",
+  );
+
+  // The answer comes later than the PM's round: a comment within a second of an agent's round on the ticket is taken
+  // as that round's own, since the tracker's clock and the office's may differ a little.
+  await officePolledTwice(`${waiting}: the PM's round is well over`);
+  const answer = "The release date is Friday.";
+  await stub("POST", `/_test/tickets/${waiting}/comment`, { body: answer, as: "pia" });
+  const woken = await until(`${waiting}: sam woken by the answer`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === waiting);
+    const noted = t.comments.some((c: Json) => c.author === "sam" && c.body === `Noted: ${answer}`);
+    return noted && t.status === "In Review" ? t : undefined;
+  });
+
+  assertEq(
+    woken.moves
+      .slice(withHuman.moves.length)
+      .filter((m: Json) => m.from === "Blocked" && m.to === "In Progress").length,
+    1,
+    "the answer's round made the blocked ticket active once",
+  );
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${waiting} answered`);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBeforeAnswer)),
+    JSON.stringify(["assigned", "ticket_comment"]),
+    "the answer woke sam once, as a ticket comment",
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforeAnswer)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once, to unblock it, and not by her own answer",
+  );
+
+  step(
+    `answered: ${waiting} blocked -> the PM gave it to the human -> the PM posted the answer -> sam, blocked on it, was woken and carried on`,
+  );
 
   // ---- 10, unblocked: the PM can answer this blocker. She comments the answer and gives the ticket back to sam; the
   // assignment wakes sam, the office makes the ticket active for him, the wake carries her comment, and sam resumes

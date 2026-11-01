@@ -2598,6 +2598,32 @@
           ],
           "additionalProperties": false,
           "description": "The agent's latest work on the ticket ended with a hand-back as done (or, with false, did not)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "blocked_agent": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "blocked_agent"
+          ],
+          "additionalProperties": false,
+          "description": "The ticket is blocked and an agent is blocked on it: the agent whose latest work on it was handed back as blocked (or, with false, no agent is)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "actor_in_round": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "actor_in_round"
+          ],
+          "additionalProperties": false,
+          "description": "The actor is an agent that had a round of work on the ticket under way when the event happened; an agent's event without a time counts as in one (or, with false, is not)."
         }
       ]
     }

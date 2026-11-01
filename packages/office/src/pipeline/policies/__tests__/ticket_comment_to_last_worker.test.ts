@@ -49,6 +49,15 @@ describe("ticket_comment_to_last_worker", () => {
       },
     ]);
 
+    // A blocked ticket an agent is blocked on is that agent's: ticket_comment_to_blocked_agent wakes it.
+    expect(
+      judged(comment(), {
+        tickets: {
+          "ACME-1": t("blocked", "ada.admin", { lastWorker: "sam", blockedAgent: "sam" }),
+        },
+      }),
+    ).toEqual({ failed: { not: { blocked_agent: true } } });
+
     expect(judged(comment({}, SAM), handedBack())).toEqual({ failed: { actor_kind: "human" } });
     expect(judged(comment({ mentions: ["mira"] }), handedBack())).toEqual({
       failed: { not: { agent_mentioned: true } },

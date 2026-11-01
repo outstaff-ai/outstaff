@@ -209,6 +209,21 @@ const CHECKS: ConditionChecks = {
       detail: `ticket ${back ? "was" : "was not"} handed back as done, wanted ${wanted ? "handed back" : "not handed back"}`,
     };
   },
+  blocked_agent: (wanted, ctx) => {
+    const agent = ctx.ticket ? ctx.state.blockedAgent(ctx.ticket) : undefined;
+    return {
+      ok: (agent !== undefined) === wanted,
+      detail: `${agent ? `${agent} is` : "no agent is"} blocked on the ticket, wanted ${wanted ? "an agent" : "none"}`,
+    };
+  },
+  actor_in_round: (wanted, ctx) => {
+    const { actor } = ctx.event;
+    const [inRound, why] = roundOf(ctx);
+    return {
+      ok: inRound === wanted,
+      detail: `actor ${actor.id} ${inRound ? "was" : "was not"} in a round on the ticket${why}, wanted ${wanted ? "in one" : "not"}`,
+    };
+  },
   review_state: (wanted, ctx) => {
     const st = ctx.event.data["state"];
     return {
@@ -217,6 +232,23 @@ const CHECKS: ConditionChecks = {
     };
   },
 };
+
+/**
+ * Whether the event's agent had a round on the ticket under way when the event happened, and why when it is not read
+ * from the rounds. An agent's event without a time is taken as in a round: a missed wake can be recovered, a loop of
+ * agents waking each other cannot.
+ */
+function roundOf(ctx: Ctx): [boolean, string] {
+  const { actor, data } = ctx.event;
+  const at = data["at"];
+  if (actor.kind !== "agent" || ctx.ticket === undefined) {
+    return [false, ""];
+  }
+
+  return typeof at === "string" && at !== ""
+    ? [ctx.state.inRound(ctx.ticket, actor.id, at), ""]
+    : [true, " (the event has no time, so it is taken as in one)"];
+}
 
 /** Condition names in the order they are tried. */
 const CONDITION_KEYS = Object.keys(CHECKS) as ConditionKey[];

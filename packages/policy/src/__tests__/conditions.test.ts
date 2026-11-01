@@ -157,4 +157,24 @@ describe("evaluateCondition", () => {
     expect(evaluateCondition({ actor_is: "last_worker" }, by("noor", "ACME-1")).ok).toBe(false);
     expect(evaluateCondition({ actor_is: "last_worker" }, by("sam")).ok).toBe(false);
   });
+
+  it("knows whether the actor is the agent blocked on the ticket", () => {
+    const stuck = { tickets: { "ACME-1": { status: "blocked" as const, blockedAgent: "sam" } } };
+    const by = (id: string, ticket?: string) =>
+      ctxOf(
+        event("ticket.commented", {
+          subject: ticket ? { ticket } : {},
+          actor: { kind: "agent", id },
+        }),
+        stuck,
+      );
+
+    expect(evaluateCondition({ actor_is: "blocked_agent" }, by("sam", "ACME-1"))).toEqual({
+      ok: true,
+      detail: "actor sam is the blocked agent (sam)",
+    });
+
+    expect(evaluateCondition({ actor_is: "blocked_agent" }, by("noor", "ACME-1")).ok).toBe(false);
+    expect(evaluateCondition({ actor_is: "blocked_agent" }, by("sam")).ok).toBe(false);
+  });
 });

@@ -32,6 +32,7 @@ export type {
   Condition,
   StaticWorkflowData,
   StaticTicket,
+  StaticRound,
   ConditionEvent,
   EvaluationContext,
   ConditionCheck,

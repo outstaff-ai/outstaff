@@ -3,6 +3,7 @@ import type { PrRef, RepoRef } from "@outstaff/core";
 import type { Cancel } from "#/types.js";
 import type { RefreshCtx, WorkstateCore } from "./core.types.js";
 import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
+import { blockedAgent, inRound } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
 import { visible } from "./open.js";
@@ -58,6 +59,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     docs: new Map(),
     workers: new Map(),
     handedBack: new Set(),
+    work: new Map(),
     pickups: new Map(),
     notTickets: new Set(),
     handlers: [],
@@ -66,7 +68,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     ticketLinks,
   };
 
-  const { prs, tickets, docs, workers, handedBack, handlers } = core;
+  const { prs, tickets, docs, workers, handedBack, work, handlers } = core;
 
   let chain: Promise<unknown> = Promise.resolve();
   const locked = <T>(fn: () => Promise<T>): Promise<T> => {
@@ -209,6 +211,8 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
         .slice(0, limit),
 
     lastWorker: (t) => workers.get(t),
+    blockedAgent: (t) => blockedAgent(tickets.get(t), work.get(t) ?? []),
+    inRound: (t, person, at) => inRound(work.get(t) ?? [], person, at),
     requester: (t) => tickets.get(t)?.requester,
     hasLabel: (t, label) => tickets.get(t)?.labels.includes(label) ?? false,
 

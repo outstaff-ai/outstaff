@@ -14,6 +14,14 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
     pullRequestsOf: (t) => prs.filter((p) => data.links?.[p.ref.number] === t),
     handedBack: (t) => data.tickets?.[t]?.handedBack ?? false,
     lastWorker: (t) => data.tickets?.[t]?.lastWorker,
+    blockedAgent: (t) => data.tickets?.[t]?.blockedAgent,
+    inRound: (t, person, at) =>
+      (data.tickets?.[t]?.rounds ?? []).some(
+        (r) =>
+          r.person === person &&
+          Date.parse(r.from) <= Date.parse(at) &&
+          (r.to === undefined || Date.parse(at) <= Date.parse(r.to)),
+      ),
     requester: (t) => data.tickets?.[t]?.requester,
     hasLabel: (t, label) => data.tickets?.[t]?.labels?.includes(label) ?? false,
     defaultBranch: () => data.defaultBranch ?? "main",

@@ -84,7 +84,7 @@ The fields:
 And helpers, all pure:
 
 - `ctx.check(condition)`: whether a condition holds, and why. The same conditions as `when`.
-- `ctx.person(spec)`: the agent a name such as `assignee`, `author`, `last_worker`, `mentioned` or `role:pm` refers to, or why there is none (`{ skip }`).
+- `ctx.person(spec)`: the agent a name such as `assignee`, `author`, `last_worker`, `blocked_agent`, `mentioned` or `role:pm` refers to, or why there is none (`{ skip }`).
 - `ctx.render(template, { person, next })`: a template with the event's variables.
 - `ctx.wake({ person, kind })`: a wake with the policy's instruction, or a drop saying why no one can be woken.
 - `ctx.act({ as, ops, wake, note })`: bookkeeping changes for an agent (`{ move }`, `{ assign: "self" | "requester" }` or `{ assign }` with a person such as `role:pm`, `{ set_parent: true }`, `{ link_pr: true }` to link the event's pull request on its ticket), only those still needed, then the wake of that agent if asked; or a drop saying why. The note posted with the changes is `note` when given, else the policy's instruction, so a policy that both acts and wakes someone else can give each its own text; an empty `note`, or no instruction, posts none.

@@ -114,5 +114,19 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
           "The agent's latest work on the ticket ended with a hand-back as done (or, with false, did not).",
         ),
       ),
+    z
+      .strictObject({ blocked_agent: z.boolean() })
+      .meta(
+        d(
+          "The ticket is blocked and an agent is blocked on it: the agent whose latest work on it was handed back as blocked (or, with false, no agent is).",
+        ),
+      ),
+    z
+      .strictObject({ actor_in_round: z.boolean() })
+      .meta(
+        d(
+          "The actor is an agent that had a round of work on the ticket under way when the event happened; an agent's event without a time counts as in one (or, with false, is not).",
+        ),
+      ),
   ]),
 );

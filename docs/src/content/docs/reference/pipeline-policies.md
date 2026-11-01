@@ -24,6 +24,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`link_pr_on_ticket`](#link_pr_on_ticket) | `pr.opened`, `pr.linked` | act for `author`: link the pull request on the ticket, when the tracker can link pull requests (`tracker.development`) |
 | [`assigned_to_assignee`](#assigned_to_assignee) | `ticket.assigned`, `ticket.created` | wake `assignee` (kind `assigned`) |
 | [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `mentioned`, else `assignee` (kind `ticket_comment`) |
+| [`ticket_comment_to_blocked_agent`](#ticket_comment_to_blocked_agent) | `ticket.commented` | wake `blocked_agent` (kind `ticket_comment`) |
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
@@ -257,9 +258,38 @@ Instruction:
 {{actor.id}} commented on {{ticket}}. Read the comment and act on it.
 ```
 
+### ticket_comment_to_blocked_agent
+
+A comment on a blocked ticket, by a human or an agent other than the agent blocked on it, wakes the agent blocked on it; unless the ticket is with an agent (who is unblocking it), a human mentions an agent (that agent is woken), or an agent comments during its own round on the ticket.
+
+Listens to `ticket.commented`. Decides: wake `blocked_agent` (kind `ticket_comment`).
+
+When:
+
+- all of:
+  - `blocked_agent: true`
+  - not:
+    - `actor_kind: automation`
+  - not:
+    - `actor_is: blocked_agent`
+  - not:
+    - `assignee_kind: agent`
+  - not:
+    - all of:
+      - `actor_kind: human`
+      - `agent_mentioned: true`
+  - not:
+    - `actor_in_round: true`
+
+Instruction:
+
+```text
+{{actor.id}} commented on {{ticket}}, which you handed back as blocked. Read the comment. If it unblocks the work, assign the ticket to yourself, move it to active and continue. Otherwise answer on the ticket what is still missing.
+```
+
 ### ticket_comment_to_last_worker
 
-A human's comment, mentioning no agent, on a ticket handed back to a human (in review or blocked) wakes the agent who last worked on it.
+A human's comment, mentioning no agent, on a ticket handed back to a human (in review, or blocked with no agent blocked on it) wakes the agent who last worked on it.
 
 Listens to `ticket.commented`. Decides: wake `last_worker` (kind `ticket_comment`).
 
@@ -271,6 +301,8 @@ When:
     - `agent_mentioned: true`
   - `assignee_kind: human`
   - `ticket_status: review, blocked`
+  - not:
+    - `blocked_agent: true`
 
 Instruction:
 
