@@ -109,11 +109,12 @@ const pollCounts = (h: Json): Record<string, number> =>
   );
 
 /** Whether the agent's chat profile for the trusted human says it is idle. */
-/** How many notes of a done hand-back sam posted on the ticket; the note comes after the move and the assignment. */
-const handBackNotes = (t: Json): number =>
-  t.comments.filter(
-    (c: Json) => c.author === "sam" && c.body.includes("I handed the work back as done."),
-  ).length;
+/** Whether sam posted a note that only restates a move or assignment the ticket's history shows. */
+const restates = (t: Json): boolean =>
+  t.comments.some(
+    (c: Json) =>
+      c.author === "sam" && /^(Assigned to me|Moved to (review|blocked) and)/.test(c.body),
+  );
 
 const idle = (s: Json) =>
   s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
@@ -673,8 +674,7 @@ async function main() {
 
   step("chat: a status question is answered with the pull request and its checks");
 
-  // The hand-back after the round moves the ticket, assigns it and then posts its note: wait for all three.
-  const notesBefore = handBackNotes(during.tickets.find((x: Json) => x.key === first));
+  // The hand-back after the round moves the ticket, then assigns it: wait for both.
   await stub("POST", "/_test/gates/review/open");
 
   const fixed = await until(
@@ -687,7 +687,7 @@ async function main() {
         thread?.resolved &&
         thread.comments.length > 1 &&
         t.status === "In Review" &&
-        handBackNotes(t) > notesBefore
+        t.assignee === "ada.admin"
         ? { pr, t, thread, github: s.github }
         : undefined;
     },
@@ -698,6 +698,12 @@ async function main() {
     fixed.t.assignee,
     "ada.admin",
     "the hand-back after the review gave the ticket to the requester the tracker can assign",
+  );
+
+  assertEq(
+    restates(fixed.t),
+    false,
+    "the start and the hand-back of the round posted no note that restates the ticket's history",
   );
 
   const strays = Object.keys(fixed.github.branches).filter((b) => /^review[-_]feedback\//.test(b));
@@ -1362,13 +1368,9 @@ async function main() {
   });
 
   assertEq(
-    blockedAt.t.comments.some(
-      (c: Json) =>
-        c.author === "sam" &&
-        c.body.includes("assigned to the team's PM to unblock: I handed the work back as blocked"),
-    ),
-    true,
-    "the office gave the blocked ticket to the PM, as sam, and said so on the ticket",
+    restates(blockedAt.t),
+    false,
+    "giving the blocked ticket to the PM, as sam, posted no note that restates the ticket's history",
   );
 
   assertEq(

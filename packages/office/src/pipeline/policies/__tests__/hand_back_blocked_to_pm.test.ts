@@ -31,16 +31,13 @@ describe("hand_back_blocked_to_pm", () => {
     ]);
   });
 
-  it("posts its note in the agent's voice and tells the PM who is blocked, on what, and whom to ask", () => {
+  it("posts no note, and tells the PM who is blocked, on what, and whom to ask", () => {
     const decisions = traceOf(back("blocked"), world("active")).decisions.filter(
       (d) => d.policy === "hand_back_blocked_to_pm",
     );
 
     expect(decisions).toMatchObject([
-      {
-        type: "act",
-        note: "Moved to blocked and assigned to the team's PM to unblock: I handed the work back as blocked.",
-      },
+      { type: "act", as: "sam" },
       {
         type: "wake",
         person: "priya",
@@ -57,6 +54,7 @@ describe("hand_back_blocked_to_pm", () => {
       },
     ]);
 
+    expect(decisions[0]).not.toHaveProperty("note");
     const wake = decisions[1] as { instruction: string };
     expect(wake.instruction).toContain("assign it back to sam");
     expect(wake.instruction).toContain("assign it to the requester, ada.admin, with a comment");

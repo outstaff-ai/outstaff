@@ -186,7 +186,7 @@ function actThenWake(spec: ActSpec, then: { kind: string }, as: string, ctx: Ctx
     : [woken];
 }
 
-/** The note an act posts: its own, else the policy's instruction. */
+/** The note an act posts: its own, else the policy's instruction; none when that is empty or unset. */
 const noteTemplate = (spec: ActSpec, ctx: Ctx) => spec.note ?? ctx.instruction ?? "";
 
 /** `ctx.act`: the changes for the agent the spec names, then its wake if asked; or a drop saying why there are none. */

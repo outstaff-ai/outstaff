@@ -29,14 +29,31 @@ function switchLines(p: Policy, switches: Readonly<Record<string, string>>): str
 const whenLines = (p: Policy): string[] =>
   p.when ? ["", "When:", "", ...conditionLines(p.when)] : ["", "When: always."];
 
-function instructionLines(p: Policy): string[] {
-  if (!p.instruction) {
+const NO_NOTE = "Note posted with the change: none";
+
+/** For a policy that acts: that it posts no note, when it does not; an act-only policy's team can still add one. */
+function noNoteLines(p: Policy, wakes: boolean): string[] {
+  if (!(p.decides ?? "").startsWith("act for")) {
     return [];
   }
 
+  if (wakes) {
+    return ["", `${NO_NOTE}; the instruction is the wake's.`];
+  }
+
+  return p.instruction
+    ? []
+    : [
+        "",
+        `${NO_NOTE}, since the ticket shows the change. A team can add one with ${code(`pipeline.policies.${p.id}.instruction`)}.`,
+      ];
+}
+
+function instructionLines(p: Policy): string[] {
   const wakes = (p.decides ?? "").includes("wake");
   const label = wakes ? "Instruction:" : "Note posted with the change:";
-  return ["", label, "", "```text", p.instruction, "```"];
+  const text = p.instruction ? ["", label, "", "```text", p.instruction, "```"] : [];
+  return [...text, ...noNoteLines(p, wakes)];
 }
 
 function policySection(p: Policy, switches: Readonly<Record<string, string>>): string[] {

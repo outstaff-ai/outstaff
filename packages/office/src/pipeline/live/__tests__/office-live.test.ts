@@ -182,29 +182,21 @@ describe("the office with the event pipeline live", () => {
     await until(async () => (await resultOf())?.status === "done");
     expect(await resultOf()).toMatchObject({
       status: "done",
-      results: [
-        `moved ${issue.key} to review`,
-        `assigned ${issue.key} to ${ada.id}`,
-        `commented on ${issue.key}`,
-      ],
+      results: [`moved ${issue.key} to review`, `assigned ${issue.key} to ${ada.id}`],
     });
 
     const done = await tracker.getIssue(issue.key);
     expect(done.status.canonical).toBe("review");
     expect(done.assignee?.id).toBe(ada.id);
     const history = (await tracker.events()).events.filter((e) => e.key === issue.key);
-    // Every change is sam's: the start of the work and the hand-back, each with sam's note.
+    // Every change is sam's: the start of the work and the hand-back, with no note, since the history shows them.
     const moves = history.filter((e) => e.type === "moved");
     expect(moves.map((e) => [e.data["to"], e.actor.id])).toEqual([
       ["active", sam.id],
       ["review", sam.id],
     ]);
 
-    await until(async () => (await tracker.listComments(issue.key)).length > 1);
-    expect((await tracker.listComments(issue.key)).map((c) => [c.author.id, c.body])).toEqual([
-      [sam.id, "Assigned to me and moved to active: I started work on it."],
-      [sam.id, "Moved to review and assigned to the requester: I handed the work back as done."],
-    ]);
+    expect(await tracker.listComments(issue.key)).toEqual([]);
 
     expect(history.some((e) => e.actor.id === OFFICE_ACCOUNT.id)).toBe(false);
 
@@ -221,7 +213,7 @@ describe("the office with the event pipeline live", () => {
 
     expect(begun.results?.[`${begun.event.id}:start_marks_active`]).toMatchObject({
       status: "done",
-      results: [`moved ${issue.key} to active`, `commented on ${issue.key}`],
+      results: [`moved ${issue.key} to active`],
     });
   });
 

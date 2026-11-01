@@ -210,6 +210,8 @@ Listens to `pr.opened`, `pr.linked`. Decides: act for `author`: link the pull re
 
 When: always.
 
+Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.link_pr_on_ticket.instruction`.
+
 ### assigned_to_assignee
 
 A ticket assigned to an agent, by anyone but that agent, wakes the agent.
@@ -316,6 +318,8 @@ Instruction:
 {{actor.id}} moved {{ticket}} to active and it is assigned to you again. Pick the work up.
 ```
 
+Note posted with the change: none; the instruction is the wake's.
+
 ### doc_comment_to_agent
 
 A human's comment on a document wakes the agent it mentions, else the agent who wrote it.
@@ -345,11 +349,7 @@ When:
   - not:
     - `ticket_status: done, canceled`
 
-Note posted with the change:
-
-```text
-Assigned to me and moved to active: I started work on it.
-```
+Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.start_marks_active.instruction`.
 
 ### hand_back_done
 
@@ -364,11 +364,7 @@ When:
   - not:
     - `ticket_status: blocked, done, canceled`
 
-Note posted with the change:
-
-```text
-Moved to review and assigned to the requester: I handed the work back as done.
-```
+Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.hand_back_done.instruction`.
 
 ### hand_back_blocked
 
@@ -387,11 +383,7 @@ When:
   - not:
     - `ticket_status: done, canceled`
 
-Note posted with the change:
-
-```text
-Moved to blocked and assigned to the requester: I handed the work back as blocked.
-```
+Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.hand_back_blocked.instruction`.
 
 ### hand_back_blocked_to_pm
 
@@ -415,6 +407,8 @@ Instruction:
 ```text
 {{actor.id}} handed {{ticket}} back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to {{actor.id}}. Only if a human is needed, assign it to the requester, {{requester}}, with a comment that says exactly what is needed.
 ```
+
+Note posted with the change: none; the instruction is the wake's.
 
 ### idle_pulls_next
 

@@ -12,7 +12,6 @@ export const policy = definePolicy({
     "A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with no PM to unblock it (none, or the PM is the blocked agent), moves the ticket to blocked and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work.",
   on: ["agent.handed_back"],
   when: BLOCKED_HAND_BACK,
-  instruction: "Moved to blocked and assigned to the requester: I handed the work back as blocked.",
   decides: `${toRequester.decides}, when no PM unblocks it, ${UNLESS_HANDED_OVER}`,
   decide: (event, ctx) => {
     const pm = unblocker(ctx);
