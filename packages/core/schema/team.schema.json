@@ -916,9 +916,16 @@
           "properties": {
             "daily_at": {
               "default": "06:00",
-              "description": "Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start and on demand.",
+              "description": "Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start, on demand and, while one fails or warns, every `retry_minutes`.",
               "type": "string",
               "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            },
+            "retry_minutes": {
+              "default": 15,
+              "description": "Minutes between the office's re-runs of its doctor checks while one of them fails or warns, or a run could not finish. They stop once every check passes. 0 turns the re-runs off.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 1440
             },
             "skip": {
               "description": "Ports (for example chat) whose adapter's live checks the office does not run, for a provider the office cannot or should not call. Their secrets are still checked; `ost doctor` still runs them.",

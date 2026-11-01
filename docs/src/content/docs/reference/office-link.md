@@ -313,7 +313,7 @@ Result:
 
 ### `health`
 
-The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at` and on demand, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.
+The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at`, on demand and, while one fails or warns, every `office.doctor.retry_minutes`, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.
 
 Params:
 

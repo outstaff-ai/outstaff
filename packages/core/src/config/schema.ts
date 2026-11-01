@@ -111,7 +111,17 @@ export const teamConfigSchema = z
               .default("06:00")
               .meta(
                 d(
-                  "Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start and on demand.",
+                  "Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start, on demand and, while one fails or warns, every `retry_minutes`.",
+                ),
+              ),
+            retry_minutes: z
+              .int()
+              .min(0)
+              .max(1440)
+              .default(15)
+              .meta(
+                d(
+                  "Minutes between the office's re-runs of its doctor checks while one of them fails or warns, or a run could not finish. They stop once every check passes. 0 turns the re-runs off.",
                 ),
               ),
             skip: z

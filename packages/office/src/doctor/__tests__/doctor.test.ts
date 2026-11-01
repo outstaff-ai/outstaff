@@ -7,21 +7,19 @@ import type { ManualClock } from "#/types.js";
 import { createOfficeDoctor } from "#/doctor/doctor.js";
 import type { OfficeDoctor } from "#/doctor/types.js";
 
-const team = (dailyAt?: string, skip?: string[]) =>
+const team = (doctor?: { daily_at?: string; retry_minutes?: number; skip?: string[] }) =>
   ({
     team: { name: "acme" },
     people: [{ handle: "sam", name: "Sam", role: "developer", model: "sonnet" }],
     integrations: { chat: { adapter: "fake", workspace: "acme" } },
-    ...(dailyAt || skip
-      ? { office: { doctor: { daily_at: dailyAt ?? "06:00", ...(skip ? { skip } : {}) } } }
-      : {}),
+    ...(doctor ? { office: { doctor } } : {}),
   }) as unknown as TeamConfig;
 
 describe("the office's doctor", () => {
   let clock: ManualClock;
   let store: Store;
   let secrets: Record<string, string>;
-  let answer: () => Promise<{ name: string; status: "ok" | "fail"; detail: string }[]>;
+  let answer: () => Promise<{ name: string; status: "ok" | "warn" | "fail"; detail: string }[]>;
   let calls: number;
   let lines: [string, string, unknown][];
   let doctor: OfficeDoctor;
@@ -79,7 +77,7 @@ describe("the office's doctor", () => {
   });
 
   it("runs at start and daily at 06:00, flags a removed secret and clears it once it is back", async () => {
-    make();
+    make(team({ retry_minutes: 0 }));
     expect(doctor.lastRun()).toBeUndefined();
     doctor.start();
     await settle();
@@ -142,7 +140,7 @@ describe("the office's doctor", () => {
   });
 
   it("joins a run in progress, keeps agents' reports and numbers repeated names", async () => {
-    make(team("05:30"));
+    make(team({ daily_at: "05:30" }));
     let release!: () => void;
     answer = () =>
       new Promise(
@@ -174,7 +172,7 @@ describe("the office's doctor", () => {
   });
 
   it("leaves out the live checks of a skipped port and still checks the secrets", async () => {
-    make(team(undefined, ["chat"]));
+    make(team({ skip: ["chat"] }));
     await doctor.run();
     expect(calls).toBe(0);
     expect((await doctor.health()).checks.map((c) => c.name)).toEqual([
@@ -218,6 +216,101 @@ describe("the office's doctor", () => {
     expect((await doctor.health()).summary).toEqual({ ok: 2, warn: 0, fail: 0 });
   });
 
+  it("re-runs every 15 minutes while a check fails or warns, until all pass", async () => {
+    make(team({ daily_at: "23:00" }));
+    answer = async () => [{ name: "Slack token", status: "fail", detail: "503." }];
+    doctor.start();
+    await settle();
+    expect(calls).toBe(1);
+
+    clock.advance(14 * 60_000);
+    await settle();
+    expect(calls).toBe(1);
+    clock.advance(60_000);
+    await settle();
+    expect(calls).toBe(2);
+
+    answer = async () => [{ name: "Slack token", status: "warn", detail: "Rate limited." }];
+    clock.advance(15 * 60_000);
+    await settle();
+    expect(calls).toBe(3);
+    expect((await doctor.health()).summary).toEqual({ ok: 1, warn: 1, fail: 0 });
+
+    answer = async () => [{ name: "Slack token", status: "ok", detail: "Valid." }];
+    clock.advance(15 * 60_000);
+    await settle();
+    expect(calls).toBe(4);
+    expect((await doctor.health()).summary).toEqual({ ok: 2, warn: 0, fail: 0 });
+
+    clock.advance(3 * 3600_000);
+    await settle();
+    expect(calls).toBe(4);
+  });
+
+  it("re-runs at the configured interval after a run that could not finish", async () => {
+    make(team({ daily_at: "23:00", retry_minutes: 5 }), { runTimeoutMs: 1000 });
+    answer = () => new Promise(() => {});
+    doctor.start();
+    await settle();
+    clock.advance(1000);
+    await settle();
+    expect(calls).toBe(1);
+
+    answer = async () => [{ name: "Slack token", status: "ok", detail: "Valid." }];
+    clock.advance(5 * 60_000);
+    await settle();
+    expect(calls).toBe(2);
+    expect((await doctor.health()).summary).toEqual({ ok: 2, warn: 0, fail: 0 });
+  });
+
+  it("does not re-run with retry_minutes 0, nor for an on-demand run before start", async () => {
+    answer = async () => [{ name: "Slack token", status: "fail", detail: "503." }];
+    make(team({ daily_at: "23:00" }));
+    await doctor.run();
+    clock.advance(60 * 60_000);
+    await settle();
+    expect(calls).toBe(1);
+    await doctor.stop();
+
+    calls = 0;
+    make(team({ daily_at: "23:00", retry_minutes: 0 }));
+    doctor.start();
+    await settle();
+    clock.advance(60 * 60_000);
+    await settle();
+    expect(calls).toBe(1);
+  });
+
+  it("joins a run in progress when a re-run is due, and a passing on-demand run ends the re-runs", async () => {
+    make(team({ daily_at: "23:00" }));
+    answer = async () => [{ name: "Slack token", status: "fail", detail: "503." }];
+    doctor.start();
+    await settle();
+    expect(calls).toBe(1);
+
+    let release!: () => void;
+    answer = () =>
+      new Promise(
+        (r) => (release = () => r([{ name: "Slack token", status: "ok", detail: "Valid." }])),
+      );
+
+    clock.advance(14 * 60_000 + 30_000);
+    const onDemand = doctor.run();
+    await settle();
+    expect(calls).toBe(2);
+
+    // The re-run falls due while the on-demand run is still going (within its 60 s deadline): it joins it.
+    clock.advance(30_000);
+    await settle();
+    expect(calls).toBe(2);
+    release();
+    await onDemand;
+
+    clock.advance(60 * 60_000);
+    await settle();
+    expect(calls).toBe(2);
+  });
+
   it("stops its daily runs and waits for the one in progress", async () => {
     make();
     let release!: () => void;
@@ -228,6 +321,17 @@ describe("the office's doctor", () => {
     release();
     await stopped;
     clock.advance(48 * 3600_000);
+    await settle();
+    expect(calls).toBe(1);
+  });
+
+  it("clears a pending re-run on stop", async () => {
+    make();
+    answer = async () => [{ name: "Slack token", status: "fail", detail: "503." }];
+    doctor.start();
+    await settle();
+    await doctor.stop();
+    clock.advance(60 * 60_000);
     await settle();
     expect(calls).toBe(1);
   });

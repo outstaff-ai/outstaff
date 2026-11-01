@@ -889,12 +889,22 @@ When the office runs the doctor checks itself, and which it leaves out.
 
 #### office.doctor.daily_at
 
-Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start and on demand.
+Time of day (HH:MM, 24-hour, in the office's time zone: the container's TZ, UTC unless set) the office runs the doctor checks every day. It also runs them at start, on demand and, while one fails or warns, every `retry_minutes`.
 
 - Type: `string`
 - Optional
 - Default: `06:00`
 - Must match `^([01]\d|2[0-3]):[0-5]\d$`
+
+#### office.doctor.retry_minutes
+
+Minutes between the office's re-runs of its doctor checks while one of them fails or warns, or a run could not finish. They stop once every check passes. 0 turns the re-runs off.
+
+- Type: `integer`
+- Optional
+- Default: `15`
+- Minimum 0
+- Maximum 1440
 
 #### office.doctor.skip
 
