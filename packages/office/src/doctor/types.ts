@@ -33,10 +33,13 @@ export interface OfficeDoctorOptions {
 
 /** The doctor checks as the office runs and keeps them. It never throws and never posts anywhere. */
 export interface OfficeDoctor {
-  /** Runs the office's checks now and then every day at `office.doctor.daily_at`. */
+  /**
+   * Runs the office's checks now and then every day at `office.doctor.daily_at`; while one fails or warns, again every
+   * `office.doctor.retry_minutes`.
+   */
   start(): void;
 
-  /** Stops the daily runs and waits for a run in progress. */
+  /** Stops the daily runs and the retries and waits for a run in progress. */
   stop(): Promise<void>;
 
   /** Runs the office's checks now; joins a run already in progress. */

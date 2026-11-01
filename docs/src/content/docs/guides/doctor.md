@@ -60,6 +60,7 @@ The running office makes the checks it can see from its own container, so an exp
 
 - at start, once the office is running (it does not hold up readiness);
 - every day at `office.doctor.daily_at` (`HH:MM`, default `06:00`) in the office container's time zone (its `TZ`, UTC unless set);
+- while one of its checks fails or warns, or a run could not finish, again every `office.doctor.retry_minutes` (default `15`, `0` turns it off) until every check passes, so a provider that was down for a moment, for example while it restarted with the office, does not stay red until the next day;
 - on demand, with `ost doctor --via-office` or the office link's `health` request.
 
 The office checks its own scope: every office secret is present (including each person's `OUTSTAFF_AGENT_TOKEN_<HANDLE>`; file modes are left to the platform that mounts the secrets), and each configured adapter's live checks as listed above, for example the office GitHub App's repositories and permissions and the Slack office token. It also reads the code host's merge rules of every repository agents may merge, as `ost doctor office` does (see [Merging on approval](/concepts/automation/#merging-on-approval)). `office.doctor.skip` lists ports (for example `[chat]`) whose live checks the office leaves out, for a provider it cannot or should not call; their secrets are still checked, and `ost doctor` still runs them.

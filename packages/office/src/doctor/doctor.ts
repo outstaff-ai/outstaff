@@ -6,17 +6,22 @@ import type { OfficeDoctor, OfficeDoctorOptions } from "./types.js";
 
 const DEFAULT_DAILY_AT = "06:00";
 const DEFAULT_RUN_TIMEOUT_MS = 60_000;
+const DEFAULT_RETRY_MINUTES = 15;
 
 /**
  * Runs the doctor checks the office can make itself (its secrets, which include each person's agent token, each
- * configured adapter's live checks and the `extraChecks` of its own ports) at start, daily and on demand, and keeps the ones agents report. Results are
- * stored and logged; nothing is posted.
+ * configured adapter's live checks and the `extraChecks` of its own ports) at start, daily and on demand, and keeps the ones agents report. While one of
+ * them fails or warns, or a run could not finish, it runs them again every `office.doctor.retry_minutes`. Results are stored and logged; nothing is
+ * posted.
  */
 export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
   const { team, store, clock, logger: log } = opts;
   const dailyAt = team.office?.doctor?.daily_at ?? DEFAULT_DAILY_AT;
+  const retryMs = (team.office?.doctor?.retry_minutes ?? DEFAULT_RETRY_MINUTES) * 60_000;
   let running: Promise<void> | undefined;
   let cancel: Cancel | undefined;
+  let cancelRetry: Cancel | undefined;
+  let started = false;
   let stopped = false;
   let last: string | undefined;
 
@@ -71,6 +76,7 @@ export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
       extra: (await opts.extraChecks?.()) ?? [],
     });
 
+  /** Whether every check passed. */
   const once = async () => {
     const limit = deadline(opts.runTimeoutMs ?? DEFAULT_RUN_TIMEOUT_MS);
     try {
@@ -78,15 +84,34 @@ export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
 
       await record("office", checks);
       last = clock.now().toISOString();
+      return checks.every((c) => c.status === "ok");
     } catch (error) {
       log.warn("doctor: the office's checks could not run", { error: String(error) });
+      return false;
     } finally {
       limit.cancel();
     }
   };
 
-  const run = () => {
-    running ??= once().finally(() => (running = undefined));
+  /** Each run replaces the pending retry, so retries never pile up and a run that passes ends them. */
+  const retryUnless = (passed: boolean) => {
+    cancelRetry?.();
+    cancelRetry = undefined;
+    if (passed || !started || stopped || retryMs === 0) {
+      return;
+    }
+
+    cancelRetry = clock.setTimeout(() => {
+      cancelRetry = undefined;
+      void run();
+    }, retryMs);
+  };
+
+  const run = (): Promise<void> => {
+    running ??= once()
+      .then(retryUnless)
+      .finally(() => (running = undefined));
+
     return running;
   };
 
@@ -107,6 +132,7 @@ export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
 
   return {
     start() {
+      started = true;
       void run();
       schedule();
     },
@@ -114,6 +140,7 @@ export function createOfficeDoctor(opts: OfficeDoctorOptions): OfficeDoctor {
     async stop() {
       stopped = true;
       cancel?.();
+      cancelRetry?.();
       await running;
     },
 

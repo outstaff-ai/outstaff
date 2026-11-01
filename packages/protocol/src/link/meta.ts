@@ -54,5 +54,5 @@ export const LINK_METHOD_META: Record<LinkMethod, string> = {
   activity:
     "How much happened in each of the last few windows of time (default the last hour and the last day): events that happened and work items created. Exact, since the office counts them in its store.",
   health:
-    "The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at` and on demand, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.",
+    "The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at`, on demand and, while one fails or warns, every `office.doctor.retry_minutes`, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.",
 };
