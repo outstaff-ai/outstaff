@@ -1,0 +1,28 @@
+[
+  {
+    "id": 5600000001,
+    "user": { "login": "noor", "type": "User" },
+    "body": "An old review, from before the cursor.",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/acme/app/pull/8#pullrequestreview-5600000001",
+    "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "submitted_at": "2026-01-04T10:00:00Z"
+  },
+  {
+    "id": 5600000005,
+    "user": { "login": "noor", "type": "User" },
+    "body": "Please add a test for the empty case.",
+    "state": "COMMENTED",
+    "html_url": "https://github.com/acme/app/pull/8#pullrequestreview-1",
+    "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "submitted_at": "2026-01-05T10:00:00Z"
+  },
+  {
+    "id": 5600000009,
+    "user": { "login": "noor", "type": "User" },
+    "body": "",
+    "state": "PENDING",
+    "html_url": "https://github.com/acme/app/pull/8#pullrequestreview-5600000009",
+    "commit_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+]

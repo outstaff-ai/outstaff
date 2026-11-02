@@ -8,7 +8,7 @@ export const REVIEW_STATE: Record<string, string> = {
   COMMENT: "COMMENTED",
 };
 
-type Inline = Omit<StoredReviewComment, "databaseId">;
+type Inline = Omit<StoredReviewComment, "databaseId" | "at">;
 
 /** An inline comment opens a thread and is announced when it is written, while its review is still pending. */
 function addInline(s: GithubStore, pr: StoredPull, review: number, actor: string, c: Inline) {
@@ -37,7 +37,7 @@ function addInline(s: GithubStore, pr: StoredPull, review: number, actor: string
     },
   });
 
-  return { databaseId, path: c.path, line: c.line, body: c.body };
+  return { databaseId, path: c.path, line: c.line, body: c.body, at: s.now() };
 }
 
 /** A review the way GitHub reports it: the inline comments first, then the review once it is submitted. */
@@ -66,6 +66,8 @@ export async function submitReview(
     review.comments.push(addInline(s, pr, id, actor, c));
   }
 
+  // Submitted once its inline comments are written.
+  review.at = s.now();
   touch(s, pr);
   emit(s, "PullRequestReviewEvent", actor, {
     action: "submitted",

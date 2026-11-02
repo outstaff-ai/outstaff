@@ -47,6 +47,7 @@ function reviewEvent(p: Payload, base: EventBase): VcsEvent | undefined {
   const review = p["review"] ?? {};
   return {
     ...base,
+    externalId: `review:${review.id}`,
     type: "pr.review_submitted",
     number: p["pull_request"].number,
     data: {
@@ -66,6 +67,7 @@ function reviewCommentEvent(p: Payload, base: EventBase): VcsEvent | undefined {
   const comment = p["comment"] ?? {};
   return {
     ...base,
+    externalId: `review_comment:${comment.id}`,
     type: "pr.comment",
     number: p["pull_request"].number,
     data: {
@@ -90,6 +92,7 @@ function issueCommentEvent(p: Payload, base: EventBase): VcsEvent | undefined {
   const comment = p["comment"] ?? {};
   return {
     ...base,
+    externalId: `comment:${comment.id}`,
     type: "pr.comment",
     number: p["issue"].number,
     data: {
@@ -108,7 +111,11 @@ const MAPPERS = new Map<string, EventMapper>([
   ["IssueCommentEvent", issueCommentEvent],
 ]);
 
-/** Normalises one repo event; returns undefined for anything the office does not act on. */
+/**
+ * Normalises one repo event; returns undefined for anything the office does not act on. A comment or a review is
+ * keyed by the object (`comment:<id>`, `review_comment:<id>`, `review:<id>`), so the direct lists, which read the
+ * same object, record it once with the feed; other events keep the feed's event id.
+ */
 export function toVcsEvent(repo: RepoRef, e: RestEvent): VcsEvent | undefined {
   const base = { externalId: e.id, repo, actor: e.actor?.login ?? "ghost", at: e.created_at };
   return MAPPERS.get(e.type)?.(e.payload, base);

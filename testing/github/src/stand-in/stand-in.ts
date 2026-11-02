@@ -4,6 +4,7 @@ import { branchRoutes } from "./branch-routes.js";
 import { commentRoutes } from "./comment-routes.js";
 import { fakeAuth } from "./fake-auth.js";
 import { graphqlRoute } from "./graphql.js";
+import { listRoutes } from "./list-routes.js";
 import { createMemoryRepo } from "./memory-repo.js";
 import { mergeRoutes } from "./merge-routes.js";
 import { pullRoutes } from "./pull-routes.js";
@@ -52,6 +53,7 @@ export function createGithubStandIn(opts: StandInOptions) {
   const routes = [
     ...authRoutes(store, auth, api),
     ...mergeRoutes(store, auth, repo),
+    ...listRoutes(store, repo),
     ...pullRoutes(store, auth, repo),
     ...commentRoutes(store, auth, repo),
     ...reactionRoutes(store, auth, repo),

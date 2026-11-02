@@ -110,13 +110,14 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
           threadId: thread.id,
         });
 
-        emit("pr.comment", repo, number, actor, {
-          kind: "review_comment",
-          body: c.body,
-          path: c.path,
-          commentId,
-          reviewId,
-        });
+        emit(
+          "pr.comment",
+          repo,
+          number,
+          actor,
+          { kind: "review_comment", body: c.body, path: c.path, commentId, reviewId },
+          `review_comment:${commentId}`,
+        );
       }
 
       s.reviews.set(reviewId, inline);
@@ -133,7 +134,15 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
         });
       }
 
-      emit("pr.review_submitted", repo, number, actor, { state, body, reviewId });
+      emit(
+        "pr.review_submitted",
+        repo,
+        number,
+        actor,
+        { state, body, reviewId },
+        `review:${reviewId}`,
+      );
+
       settleAutoMerge(st, repo, s);
       return reviewId;
     },
@@ -156,7 +165,15 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
       const commentId = `ic${++counters.comment}`;
       conversation.set(commentId, key(repo));
       noteComment(repo, number, commentId, actor, body);
-      emit("pr.comment", repo, number, actor, { kind: "comment", body, commentId });
+      emit(
+        "pr.comment",
+        repo,
+        number,
+        actor,
+        { kind: "comment", body, commentId },
+        `comment:${commentId}`,
+      );
+
       return commentId;
     },
     async reactions(repo, target) {

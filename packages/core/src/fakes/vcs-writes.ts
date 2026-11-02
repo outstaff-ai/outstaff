@@ -129,8 +129,16 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
         });
       }
 
-      record(s, `rv${++counters.review}`, self, state);
-      emit("pr.review_submitted", repo, number, self, { state, body: review.body });
+      const reviewId = `rv${++counters.review}`;
+      record(s, reviewId, self, state);
+      emit(
+        "pr.review_submitted",
+        repo,
+        number,
+        self,
+        { state, body: review.body },
+        `review:${reviewId}`,
+      );
     },
     async mergePullRequest(repo, number, input) {
       grant(repo, "write");
@@ -166,8 +174,16 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
         throw new PortError("not_found", `Thread ${threadId} is not on ${key(repo)}#${number}.`);
       }
 
-      thread.comments.push({ id: `rc${++counters.comment}`, author: self, body });
-      emit("pr.comment", repo, number, self, { kind: "review_comment", body });
+      const commentId = `rc${++counters.comment}`;
+      thread.comments.push({ id: commentId, author: self, body });
+      emit(
+        "pr.comment",
+        repo,
+        number,
+        self,
+        { kind: "review_comment", body },
+        `review_comment:${commentId}`,
+      );
     },
     async commentOnPullRequest(repo, number, body) {
       grant(repo, "write");
@@ -175,7 +191,15 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
       const commentId = `ic${++counters.comment}`;
       conversation.set(commentId, key(repo));
       noteComment(repo, number, commentId, self, body);
-      emit("pr.comment", repo, number, self, { kind: "comment", body, commentId });
+      emit(
+        "pr.comment",
+        repo,
+        number,
+        self,
+        { kind: "comment", body, commentId },
+        `comment:${commentId}`,
+      );
+
       return { url: `${links.pr(repo, number)}#issuecomment-${commentId}` };
     },
     async react(repo, target, reaction) {

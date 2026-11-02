@@ -46,9 +46,11 @@ export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
     number: number,
     actor: string,
     data: Record<string, unknown> = {},
-  ) =>
+    externalId?: string,
+  ) => {
+    const id = `fake-vcs-${++counters.event}`;
     log.push({
-      externalId: `fake-vcs-${++counters.event}`,
+      externalId: externalId ?? id,
       type,
       repo: withHost(repo),
       number,
@@ -56,6 +58,7 @@ export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
       at: now().toISOString(),
       data,
     });
+  };
 
   const need = (repo: RepoRef, number: number): StoredPr => {
     const stored = prs.get(key(repo))?.get(number);

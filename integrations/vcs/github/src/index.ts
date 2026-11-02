@@ -19,6 +19,7 @@ export type {
   RestEvent,
   RestIssueComment,
   RestPull,
+  RestRepoReviewComment,
   RestReview,
   RestReviewComment,
   RestRule,

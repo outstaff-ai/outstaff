@@ -74,9 +74,15 @@ function controls(s: GithubStore) {
       await submitReview(s, needPull(s, n), actor, state, body, comments ?? []);
     },
 
-    /** A human comments on the pull request conversation. */
-    async comment(n: number, actor: string, body: string) {
+    /**
+     * A human comments on the pull request conversation. `inFeed: false` holds the comment out of the events feed,
+     * as a feed that lags would: only the direct comment list has it.
+     */
+    async comment(n: number, actor: string, body: string, inFeed = true) {
       addComment(s, needPull(s, n), actor, body, true);
+      if (!inFeed) {
+        s.events.shift();
+      }
     },
 
     /** A completed check run on the pull request's head commit, as a CI service would report it. */

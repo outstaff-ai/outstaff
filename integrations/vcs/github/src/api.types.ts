@@ -89,8 +89,23 @@ export interface RequiredChecksData {
   } | null;
 }
 
+/** Where the direct comment and review lists of a repository were left off. */
+export interface DirectCursor {
+  /** The newest `updated_at` (or `submitted_at`) read from the lists. */
+  since: string;
+
+  /** Where the lists started: what is at or before it is history, or the feed's (read under its event ids). */
+  after?: string;
+
+  /** ETag per list path, for `If-None-Match`. */
+  etags?: Record<string, string>;
+
+  /** Pull request number to the `updated_at` at which its reviews were last read. */
+  reviewed?: Record<string, string>;
+}
+
 export interface Cursor {
-  [repo: string]: { etag?: string; since?: string; seen?: string[] };
+  [repo: string]: { etag?: string; since?: string; seen?: string[]; direct?: DirectCursor };
 }
 
 export type ThreadNode = {
@@ -127,6 +142,17 @@ export interface RestReviewComment {
   original_line?: number | null;
   body: string;
   html_url?: string;
+}
+
+/** One review comment of `GET /repos/{owner}/{repo}/pulls/comments`, the repository-wide list. */
+export interface RestRepoReviewComment extends RestReviewComment {
+  user: { login: string } | null;
+  created_at: string;
+  updated_at: string;
+  pull_request_review_id?: number | null;
+
+  /** The API URL of the pull request, ending in its number. */
+  pull_request_url: string;
 }
 
 export interface RestIssueComment {

@@ -5,6 +5,7 @@ import type {
   RestIssueComment,
   RestPull,
   RestReview,
+  RestRepoReviewComment,
   RestReviewComment,
   RestRule,
   ThreadNode,
@@ -113,6 +114,7 @@ export type StoredThread = Pick<ThreadNode, "id"> & {
 export type StoredReviewComment = Pick<RestReviewComment, "path" | "body"> & {
   databaseId: RestReviewComment["id"];
   line: NonNullable<RestReviewComment["line"]>;
+  at: RestRepoReviewComment["created_at"];
 };
 
 /** A submitted review. */

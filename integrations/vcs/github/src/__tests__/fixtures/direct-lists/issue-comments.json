@@ -1,0 +1,22 @@
+[
+  {
+    "url": "https://api.github.com/repos/acme/app/issues/comments/4400000001",
+    "html_url": "https://github.com/acme/app/pull/8#issuecomment-4400000001",
+    "issue_url": "https://api.github.com/repos/acme/app/issues/8",
+    "id": 4400000001,
+    "user": { "login": "noor", "type": "User" },
+    "created_at": "2026-01-05T10:00:00Z",
+    "updated_at": "2026-01-05T10:00:00Z",
+    "body": "Can you rebase on main?"
+  },
+  {
+    "url": "https://api.github.com/repos/acme/app/issues/comments/4400000002",
+    "html_url": "https://github.com/acme/app/issues/9#issuecomment-4400000002",
+    "issue_url": "https://api.github.com/repos/acme/app/issues/9",
+    "id": 4400000002,
+    "user": { "login": "noor", "type": "User" },
+    "created_at": "2026-01-05T10:00:10Z",
+    "updated_at": "2026-01-05T10:00:10Z",
+    "body": "A comment on an issue, not a pull request."
+  }
+]
