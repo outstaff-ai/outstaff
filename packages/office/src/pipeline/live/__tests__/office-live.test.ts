@@ -310,4 +310,49 @@ describe("the office with the event pipeline live", () => {
       { type: "wake", person: "sam", policy: "assigned_to_assignee" },
     ]);
   });
+
+  it("bounds two agents that keep mentioning each other with the loop guard", async () => {
+    const { tracker, ada, sam, pia } = await start();
+    const issue = await tracker.as(ada).createIssue({
+      title: "Fold into the device work",
+      body: "",
+      status: "backlog",
+    });
+
+    await office!.parts.intake.pollOnce();
+    const scheduler = office!.parts.scheduler;
+    const turns: string[] = [];
+    for (let i = 0; i < 40; i++) {
+      const [from, to] = i % 2 === 0 ? [sam, "pia"] : [pia, "sam"];
+      await tracker.as(from).comment(issue.key, `@${to} over to you`);
+      await office!.parts.intake.pollOnce();
+      const queued = async () =>
+        (await store.listItems({ person: to })).find((w) => w.status === "queued");
+
+      await until(async () => (await queued()) !== undefined);
+      const item = await queued();
+      if (!item) {
+        turns.push(`${to}: not woken`);
+        break;
+      }
+
+      const started = await scheduler.markActive(item.id);
+      if (!started.started) {
+        turns.push(`${to}: ${started.reason}`);
+        break;
+      }
+
+      turns.push(`${to}: ran`);
+      await scheduler.finish(item.id, { outcome: "ok" });
+      clock.advance(60_000);
+    }
+
+    // Each agent ran its 12 agent-triggered rounds on the ticket in the hour (the team's default limit), across one
+    // work item per wake; the next wake is blocked until a human unblocks it.
+    expect(turns.filter((t) => t === "pia: ran")).toHaveLength(12);
+    expect(turns.filter((t) => t === "sam: ran")).toHaveLength(12);
+    expect(turns.at(-1)).toBe("pia: loop_guard");
+    const blocked = (await store.listItems({ person: "pia" })).find((w) => w.status === "blocked")!;
+    expect((await store.readJournal(blocked.id)).at(-1)?.text).toMatch(/Blocked: Loop guard/);
+  });
 });

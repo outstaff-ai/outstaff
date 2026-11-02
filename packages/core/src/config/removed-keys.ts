@@ -38,7 +38,7 @@ export const REMOVED_TEAM_KEYS: RemovedKeys = {
   ),
   "feedback.mentions": pipeline(
     "policies.feedback.mentions",
-    "A comment that mentions an agent wakes that agent (ticket_comment_to_agent, doc_comment_to_agent); the agent takes the ticket itself if the comment asks it to.",
+    "A comment that mentions an agent wakes that agent (ticket_comment_to_mentioned_agent, doc_comment_to_agent); the agent takes the ticket itself if the comment asks it to.",
   ),
   "hand_back.reassign": policy(
     "policies.hand_back.reassign",
@@ -49,6 +49,8 @@ export const REMOVED_TEAM_KEYS: RemovedKeys = {
     "policies.retry.on_signal",
     "A human's comment, review or assignment wakes the agent with a new round through the pipeline's policies; remove the key.",
   ),
+  "agent_loop_guard.max_runs_per_item_per_hour":
+    "policies.agent_loop_guard.max_runs_per_item_per_hour was renamed to max_runs_per_subject_per_hour: the loop guard counts a person's runs on one ticket, pull request or document across its work items.",
   "tickets.start_moves_active": pipeline(
     "policies.tickets.start_moves_active",
     "The agent moves its ticket to active when it starts the work; remove the key.",

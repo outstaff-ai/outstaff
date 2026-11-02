@@ -161,7 +161,7 @@ Wakes for the same person and subject that come close together become one run: a
 
 ### Loop guard
 
-A run of an agent- or automation-triggered item is counted when it starts. When an item already had `policies.agent_loop_guard.max_runs_per_item_per_hour` runs in the last hour, it is blocked instead of started, and the reason is returned to the caller (and written to the item's journal) so the caller can report it. `tick()` also blocks queued items that tripped the guard. Human-triggered and scheduled runs are never limited.
+A run of an agent- or automation-triggered item is counted when it starts. An item with a subject counts the runs of every item of the same person on that ticket, pull request, document or conversation, so a loop that ends one item and wakes the next (two agents mentioning each other on a ticket) is still counted. When an item already had `policies.agent_loop_guard.max_runs_per_subject_per_hour` runs in the last hour, it is blocked instead of started, and the reason is returned to the caller (and written to the item's journal) so the caller can report it. `tick()` also blocks queued items that tripped the guard. Human-triggered and scheduled runs are never limited. A trusted human's retry of the blocked item clears the count for the person and subject.
 
 ### Which runtime ran it
 

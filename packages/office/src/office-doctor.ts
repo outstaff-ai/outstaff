@@ -1,6 +1,7 @@
 import {
   mergeGateChecks,
   trackerRepoChecks,
+  trackerUsernameChecks,
   type Logger,
   type Tracker,
   type Vcs,
@@ -12,8 +13,8 @@ import type { CreateOfficeInput } from "./office.types.js";
 export const DEFAULT_SECRETS_DIR = "/run/secrets/outstaff";
 
 /**
- * The office's doctor, on the office's own team, secrets and store; it also reads the code host's merge rules and
- * which repositories the tracker can link pull requests of.
+ * The office's doctor, on the office's own team, secrets and store; it also reads the code host's merge rules, which
+ * repositories the tracker can link pull requests of, and the agents' tracker usernames.
  */
 export const doctorForOffice = (
   input: CreateOfficeInput,
@@ -31,6 +32,7 @@ export const doctorForOffice = (
     extraChecks: async () => [
       ...(await mergeGateChecks(input.team, ports.vcs)),
       ...(await trackerRepoChecks(input.team, ports.tracker)),
+      ...(await trackerUsernameChecks(input.team, ports.tracker)),
     ],
     ...(input.fetch ? { fetch: input.fetch } : {}),
   });

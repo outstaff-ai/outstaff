@@ -80,7 +80,7 @@ const valid = (): TeamConfigInput => ({
   office: { events: "webhook", poll_interval_seconds: 30 },
   workflow: { statuses: { review: "In Review" }, needs_human_label: "hold" },
   policies: {
-    agent_loop_guard: { max_runs_per_item_per_hour: 6 },
+    agent_loop_guard: { max_runs_per_subject_per_hour: 6 },
     usage: { defer_scheduled_at: 0.5, pause_automatic_at: 0.9 },
     messages: { max_lines: 5, always_link: false, omit: ["ci"] },
   },
@@ -125,7 +125,7 @@ describe("parseTeamConfig", () => {
     expect(r.config.office).toEqual({ events: "poll", poll_interval_seconds: 60 });
     expect(r.config.workflow).toEqual({});
     expect(r.config.policies).toEqual({
-      agent_loop_guard: { max_runs_per_item_per_hour: 12 },
+      agent_loop_guard: { max_runs_per_subject_per_hour: 12 },
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
       acknowledge: { chat: true, vcs: true },
       feedback: { follow_up_round: true },
@@ -232,6 +232,18 @@ describe("parseTeamConfig", () => {
       expect(message).toContain("decision 0018");
       expect(message).toContain(hint);
     }
+  });
+
+  it("says the loop guard's per-item limit was renamed to a per-subject one", () => {
+    const [issue] = bad(
+      (c) => (c.policies = { agent_loop_guard: { max_runs_per_item_per_hour: 6 } }),
+    );
+
+    expect(issue).toMatchObject({
+      path: ["policies", "agent_loop_guard", "max_runs_per_item_per_hour"],
+      code: "schema.removed_key",
+      message: expect.stringContaining("renamed to max_runs_per_subject_per_hour"),
+    });
   });
 
   it("accepts policies.merge and rejects a bad approver, method or repo", () => {
@@ -521,9 +533,9 @@ describe("parseTeamConfig", () => {
     });
 
     expect(
-      bad((c) => (c.policies.agent_loop_guard.max_runs_per_item_per_hour = 0))[0],
+      bad((c) => (c.policies.agent_loop_guard.max_runs_per_subject_per_hour = 0))[0],
     ).toMatchObject({
-      path: ["policies", "agent_loop_guard", "max_runs_per_item_per_hour"],
+      path: ["policies", "agent_loop_guard", "max_runs_per_subject_per_hour"],
       code: "schema.too_small",
     });
   });

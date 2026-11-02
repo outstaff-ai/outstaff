@@ -661,17 +661,21 @@ export async function* docFeedback(ctx: ItemContext): Script {
   return `Answered ${open.length} comment${open.length === 1 ? "" : "s"} on the document and updated it.`;
 }
 
-/** A trusted human commented on the ticket: answer on it. */
+/**
+ * A comment on the ticket: answer on it. One that says `ask <name>: <question>` is passed on with a mention of the
+ * name, as the tracker writes it, for example `ask Pia.Novak: ...`.
+ */
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const feedback = need(ctx.feedback[0], "the comment");
+  const ask = /^ask (\S+): (.+)$/m.exec(feedback.body);
   yield {
     type: "tool",
     tool: "ticket_comment",
-    input: { key, body: `Noted: ${feedback.body}` },
+    input: { key, body: ask ? `@${ask[1]} ${ask[2]}` : `Noted: ${feedback.body}` },
   };
 
-  return `Answered the comment on ${key}.`;
+  return ask ? `Asked ${ask[1]} on ${key}.` : `Answered the comment on ${key}.`;
 }
 
 /** The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own. */
@@ -1141,6 +1145,7 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   merge,
   doc_feedback: docFeedback,
   ticket_comment: ticketComment,
+  asked: ticketComment,
   rebase: conflict,
   ci_failed: ciFailed,
   merge_checks_failed: mergeChecksFailed,

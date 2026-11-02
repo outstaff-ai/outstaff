@@ -26,17 +26,42 @@ describe("mentions in a ticket comment", () => {
     expect(tracked(events)[0]?.data).not.toHaveProperty("mentions");
   });
 
-  it("are dropped from an agent's comment", async () => {
+  it("in an agent's comment name the other agents, never the agent itself", async () => {
     const { tracker, intake, events } = await setup({
       trackerActor: { id: "u-sam", name: "Sam", username: "u-sam", kind: "agent" },
     });
 
     const issue = await tracker.createIssue({ title: "Search", body: "" });
     await tracker.comment(issue.key, "@noor please review");
+    await tracker.comment(issue.key, "@sam: note to self");
+    await tracker.comment(issue.key, "@Sam and @noor");
     await intake.pollOnce();
 
     expect(tracked(events)[0]).toMatchObject({ actor: { kind: "agent", id: "sam" } });
+    expect(tracked(events).map((e) => e.data["mentions"])).toEqual([["noor"], undefined, ["noor"]]);
+  });
+
+  it("are dropped from a comment by an automation", async () => {
+    const { tracker, intake, events } = await setup({
+      trackerActor: { id: "u-bot", name: "Build Bot", kind: "agent" },
+    });
+
+    const issue = await tracker.createIssue({ title: "Search", body: "" });
+    await tracker.comment(issue.key, "@noor the build is green");
+    await intake.pollOnce();
+
+    expect(tracked(events)[0]).toMatchObject({ actor: { kind: "automation" } });
     expect(tracked(events)[0]?.data).not.toHaveProperty("mentions");
+  });
+
+  it("match what the tracker calls the member the team file names", async () => {
+    const { tracker, intake, events } = await setup({ trackerActor: human("u1", "dana") });
+    await tracker.seed.member({ name: "Sam Duarte", username: "u-sam", kind: "agent" });
+    const issue = await tracker.createIssue({ title: "Search", body: "" });
+    await tracker.comment(issue.key, "this is for @sam.duarte");
+    await intake.pollOnce();
+
+    expect(tracked(events)[0]?.data["mentions"]).toEqual(["sam"]);
   });
 });
 

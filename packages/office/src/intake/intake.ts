@@ -3,7 +3,7 @@ import type { RepoRef } from "@outstaff/core";
 import { DEFAULT_BACKOFF } from "./backoff.js";
 import { createDelivery } from "./delivery.js";
 import { createIngest } from "./ingest.js";
-import { agentMentionResolver } from "./normalize.js";
+import { createMentionResolver } from "./mentions.js";
 import { createPoller } from "./poller.js";
 import { pollSources, webhookParsers } from "./sources.js";
 import { createTrust } from "./trust.js";
@@ -51,8 +51,8 @@ export function createIntake(opts: IntakeOptions): Intake {
     ...defined({ ttlMs: opts.trustTtlMs, resolveAgent: opts.resolveAgent }),
   });
 
-  // A trusted person's @mention of an agent in a comment.
-  const mentions = agentMentionResolver(team);
+  // An @mention of an agent in a comment, by a person or another agent.
+  const mentions = createMentionResolver({ team, tracker: ports.tracker, clock, logger });
 
   let running = false;
   const isRunning = () => running;
@@ -113,6 +113,7 @@ export function createIntake(opts: IntakeOptions): Intake {
       }
 
       running = true;
+      await mentions.load();
       poller.reset(sources);
       await drain(true);
       if (mode === "webhook") {

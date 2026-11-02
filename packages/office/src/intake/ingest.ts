@@ -164,7 +164,7 @@ export function createIngest(opts: IngestOptions): Ingest {
         const actor = trust.trackerActor(event.actor);
         const mapped = normalizeTrackerEvent(event, actor);
         if (mapped) {
-          resolveMentions(mapped, mentions);
+          await resolveMentions(mapped, mentions);
           resolveStatuses(mapped, statuses);
         }
 
@@ -175,7 +175,7 @@ export function createIngest(opts: IngestOptions): Ingest {
       ingest("knowledge", event, event.doc, async () => {
         const actor = trust.trackerActor(event.actor);
         const mapped = normalizeDocEvent(event, actor, ticket);
-        resolveMentions(mapped, mentions);
+        await resolveMentions(mapped, mentions);
         return { event: mapped, trusted: actor.kind !== "human" || actor.trusted };
       }),
   };

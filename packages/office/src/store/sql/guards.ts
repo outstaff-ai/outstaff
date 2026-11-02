@@ -18,6 +18,29 @@ export function guardQueries({
 > {
   const stamp = () => iso(now());
 
+  /**
+   * The items whose runs count toward an item's loop guard: every item of the same person on the same subject, so a
+   * loop that ends one item and starts the next on the same ticket, pull request or document is still counted.
+   */
+  const guardedWith = async (workItemId: string) => {
+    const item = await db
+      .selectFrom("work_items")
+      .select(["person", "subject_type", "subject_ref"])
+      .where("id", "=", workItemId)
+      .executeTakeFirst();
+
+    if (!item?.subject_type || item.subject_ref === null) {
+      return [workItemId];
+    }
+
+    return db
+      .selectFrom("work_items")
+      .select("id")
+      .where("person", "=", item.person)
+      .where("subject_type", "=", item.subject_type)
+      .where("subject_ref", "=", item.subject_ref);
+  };
+
   return {
     async recordLoopGuard(workItemId) {
       await db.insertInto("loop_guard").values({ work_item_id: workItemId, at: stamp() }).execute();
@@ -28,7 +51,7 @@ export function guardQueries({
       const row = await db
         .selectFrom("loop_guard")
         .select((eb) => eb.fn.countAll().as("n"))
-        .where("work_item_id", "=", workItemId)
+        .where("work_item_id", "in", await guardedWith(workItemId))
         .where("at", ">=", since)
         .executeTakeFirstOrThrow();
 
@@ -54,7 +77,10 @@ export function guardQueries({
     },
 
     async clearLoopGuard(workItemId) {
-      await db.deleteFrom("loop_guard").where("work_item_id", "=", workItemId).execute();
+      await db
+        .deleteFrom("loop_guard")
+        .where("work_item_id", "in", await guardedWith(workItemId))
+        .execute();
     },
 
     async setPause(scope, reason) {

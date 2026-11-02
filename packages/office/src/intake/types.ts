@@ -180,12 +180,21 @@ export interface IngestOptions {
   logger: Logger;
   trust: Trust;
 
-  /** Resolves `@mentions` to agent handles; unset when the switch is off. */
-  mentions: ((names: unknown) => string[]) | undefined;
+  /** Resolves `@mentions` to agent handles. */
+  mentions: MentionResolver;
 
   /** The team's `workflow.statuses`, to turn the tracker's status names into canonical statuses. */
   statuses: WorkflowStatusMap;
   drain(): Promise<void>;
+}
+
+/** The agents the `@name`s of a comment mention. */
+export interface MentionResolver {
+  /** The handles of the agents the names are, first mention first; names that are nobody on the team are dropped. */
+  resolve(names: unknown): Promise<string[]>;
+
+  /** Reads the tracker's members again now. Never throws: on a failure the last ones read are kept. */
+  load(): Promise<void>;
 }
 
 export interface Ingest {

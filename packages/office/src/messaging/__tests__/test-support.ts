@@ -143,7 +143,7 @@ export async function harness(
   if (maxRuns) {
     team.policies = {
       ...team.policies!,
-      agent_loop_guard: { max_runs_per_item_per_hour: maxRuns },
+      agent_loop_guard: { max_runs_per_subject_per_hour: maxRuns },
     };
   }
 

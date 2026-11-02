@@ -62,7 +62,7 @@ How to read it:
 | # | Event | Decisions |
 | - | - | - |
 | 28 | `ticket.commented` ACME-150 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ |
-| 29 | `ticket.commented` ACME-150 by ada.admin | wake mira (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ |
+| 29 | `ticket.commented` ACME-150 by ada.admin | wake mira (asked): _ada.admin mentioned you in a comment on ACME-150. Read the comment and answer it, or do what it asks, on the ticket. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over._ |
 | 30 | `ticket.commented` ACME-154 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-154, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work._ |
 | 31 | `ticket.commented` ACME-150 by sam | (drop: no policy matched) |
 | 32 | `ticket.commented` ACME-123 by ada.admin | (drop: no policy matched) |

@@ -257,7 +257,7 @@ describe(
       ]);
     });
 
-    it("hands a ticket comment the open PR's CI state, mergeability, unresolved threads and stack", async () => {
+    it("hands a mention on a ticket the open PR's CI state, mergeability, unresolved threads and stack", async () => {
       const { issue, pr, key } = await chatToTicketToPr();
       await vcs.seed.thread(REPO, pr.number, {
         path: "src/cart.ts",
@@ -280,7 +280,7 @@ describe(
       await poll();
 
       const offer = await next();
-      expect(offer.workItem).toMatchObject({ kind: "ticket_comment" });
+      expect(offer.workItem).toMatchObject({ kind: "asked" });
       expect(offer.context.wake!.prs[0]).toMatchObject({
         ref: key,
         url: pr.url,
