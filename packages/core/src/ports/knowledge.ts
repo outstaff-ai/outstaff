@@ -50,6 +50,15 @@ export interface DocEvent {
   };
 }
 
+/** A document linked on a ticket, as the knowledge base lists the ticket's documents. */
+export interface IssueDoc {
+  id: string;
+  title: string;
+}
+
+/** What linking a document on a ticket did: linked it now, or found it linked already. */
+export type DocIssueLinkOutcome = "linked" | "already_linked";
+
 export interface Knowledge {
   links: Pick<Links, "doc" | "comment">;
   search(query: string, limit?: number): Promise<Doc[]>;
@@ -70,4 +79,13 @@ export interface Knowledge {
    * so a feed that is not per document is still bounded.
    */
   events(docs: string[], cursor?: string): Promise<EventPage<DocEvent>>;
+
+  /**
+   * Capability `knowledge.issueLinks`. Shows the document on the ticket (by its key), once: a document already linked
+   * is left as it is. An unknown document or ticket is `not_found`.
+   */
+  linkIssue?(docId: string, ticketKey: string): Promise<DocIssueLinkOutcome>;
+
+  /** Capability `knowledge.issueLinks`. The documents linked on the ticket. */
+  issueDocs?(ticketKey: string): Promise<IssueDoc[]>;
 }

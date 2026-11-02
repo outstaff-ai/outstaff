@@ -859,7 +859,7 @@ Sent by: agent. Answered by: `ack`, `error`.
 
 ### `act`
 
-Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments, parents and pull request links. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.
+Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments, parents, and pull request and document links. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.
 
 Sent by: office.
 
@@ -883,17 +883,18 @@ Sent by: agent. Answered by: `ack`, `error`.
 
 ### `doc_link`
 
-Tells the office that the caller wrote a document for the ticket of a work item, so comments people leave on the document reach the caller as work.
+Tells the office that the caller wrote a document for the ticket of a work item (or the ticket it names), so comments people leave on the document reach the caller as work, and the document is linked on the ticket in the tracker.
 
 Sent by: agent. Answered by: `ack`, `error`.
 
-| Field        | Type   | Required | Description                               |
-| ------------ | ------ | -------- | ----------------------------------------- |
-| `workItemId` | string | yes      | Id of the work item.                      |
-| `doc`        | object | yes      |                                           |
-| `doc.id`     | string | yes      | Id of the document in the knowledge base. |
-| `doc.title`  | string | yes      | Title of the document.                    |
-| `doc.url`    | string | yes      | Absolute URL of the document.             |
+| Field        | Type   | Required | Description                                                                     |
+| ------------ | ------ | -------- | ------------------------------------------------------------------------------- |
+| `workItemId` | string | yes      | Id of the work item.                                                            |
+| `doc`        | object | yes      |                                                                                 |
+| `doc.id`     | string | yes      | Id of the document in the knowledge base.                                       |
+| `doc.title`  | string | yes      | Title of the document.                                                          |
+| `doc.url`    | string | yes      | Absolute URL of the document.                                                   |
+| `ticket`     | string | no       | Key of the ticket the document is for; without it, the ticket of the work item. |
 
 ### `doctor_report`
 

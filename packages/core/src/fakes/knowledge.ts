@@ -82,10 +82,27 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     return structuredClone(doc);
   };
 
+  // The tickets documents can be linked on: the seed adds them, as the fake has no tracker of its own.
+  const issues = new Set<string>();
+  const issueLinks: FakeKnowledge["issueLinks"] = new Map();
+  const needIssue = (key: string) => {
+    if (!issues.has(key)) {
+      throw new PortError("not_found", `Ticket ${key} not found.`);
+    }
+
+    return issueLinks.get(key) ?? [];
+  };
+
   return {
     links,
+    issueLinks,
     seed: {
       doc: create,
+      async issue() {
+        const key = `ACME-${issues.size + 1}`;
+        issues.add(key);
+        return key;
+      },
       forbiddenCall: () => Promise.reject(new PortError("forbidden", "Forbidden.")),
     },
     async search(q, limit) {
@@ -134,6 +151,19 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     },
     async resolve(commentId) {
       needComment(commentId).resolved = true;
+    },
+    async linkIssue(docId, ticketKey) {
+      const doc = find(docId);
+      const list = needIssue(ticketKey);
+      if (list.some((l) => l.doc === doc.id)) {
+        return "already_linked";
+      }
+
+      issueLinks.set(ticketKey, [...list, { doc: doc.id, by: author }]);
+      return "linked";
+    },
+    async issueDocs(ticketKey) {
+      return needIssue(ticketKey).map((l) => ({ id: l.doc, title: docs.get(l.doc)!.title }));
     },
     async events(ids, cursor) {
       const after = cursor === undefined ? undefined : (JSON.parse(cursor) as { since: string });

@@ -35,6 +35,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`doc_comment_to_mentioned_agent`](#doc_comment_to_mentioned_agent) | `doc.commented` | wake `mentioned` (kind `doc_feedback`) |
+| [`link_doc_on_ticket`](#link_doc_on_ticket) | `doc.linked` | act for `doc_author`, else `actor`: link the document on the ticket, when the knowledge base can link documents on tickets (`knowledge.issueLinks`) |
 | [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
 | [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else |
 | [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else |
@@ -483,6 +484,16 @@ Instruction:
 {{actor.id}} mentioned you in a comment on the document {{doc.title}}. Answer in the document and change it if needed.
 ```
 
+### link_doc_on_ticket
+
+A document an agent wrote for a ticket, in a round on the ticket or attached to it later, is shown on the ticket in the tracker, by its author with its own account. Bookkeeping: it wakes no one.
+
+Listens to `doc.linked`. Decides: act for `doc_author`, else `actor`: link the document on the ticket, when the knowledge base can link documents on tickets (`knowledge.issueLinks`).
+
+When: always.
+
+Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.link_doc_on_ticket.instruction`.
+
 ### start_marks_active
 
 A round of work starting on a ticket assigns the ticket to the agent and moves it to active, for the agent.
@@ -598,6 +609,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `ticket.unblocked`
 - `ticket.closed`
 - `doc.commented`
+- `doc.linked`
 - `agent.started`
 - `agent.handed_back`
 - `agent.idle`

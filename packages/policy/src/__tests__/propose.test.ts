@@ -187,6 +187,24 @@ describe("ctx.act", () => {
     ]);
   });
 
+  it("links the event's document on its ticket, or says why not", () => {
+    const spec: ActSpec = { as: "actor", ops: [{ link_doc: true }] };
+    const linked = event("doc.linked", { subject: { doc: "42", ticket: "ACME-1" }, actor: sam });
+    expect(act(spec, linked, onTicket())).toEqual([
+      {
+        type: "act",
+        as: "sam",
+        ops: [{ op: "link_doc", ticket: "ACME-1", doc: "42" }],
+        reason: "it matched",
+      },
+    ]);
+
+    const onTicketOnly = event("ticket.moved", { subject: { ticket: "ACME-1" }, actor: sam });
+    expect(act(spec, onTicketOnly, onTicket())).toEqual([
+      { type: "drop", reason: "nothing to change: link_doc: the event has no document" },
+    ]);
+  });
+
   it("assigns the agent a person reference names, or says why nobody", () => {
     const spec: ActSpec = { as: "actor", ops: [{ assign: "role:pm" }] };
     const e = event("agent.handed_back", { subject: { ticket: "ACME-1" }, actor: sam });

@@ -15,7 +15,14 @@ export interface ChatDeskOptions {
   team: Pick<TeamConfig, "people" | "policies"> & Partial<Pick<TeamConfig, "integrations">>;
   workState: Pick<
     WorkState,
-    "currentWork" | "pullRequests" | "ticket" | "prSubject" | "lastWorker" | "catchUp"
+    | "currentWork"
+    | "pullRequests"
+    | "ticket"
+    | "prSubject"
+    | "lastWorker"
+    | "catchUp"
+    | "doc"
+    | "linkDoc"
   >;
   tracker?: Pick<Tracker, "links">;
 

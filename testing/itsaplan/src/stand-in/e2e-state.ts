@@ -24,6 +24,13 @@ function ticketState(s: ItsaplanStore, i: StoredIssue) {
         number: l.number,
         by: usernameOf(s, l.by),
       })),
+    documents: s.docIssues
+      .filter((l) => l.issueId === i.id)
+      .map((l) => ({
+        id: String(l.docId),
+        title: s.docs.find((d) => d.id === l.docId)?.title,
+        by: usernameOf(s, l.by),
+      })),
     attachments: s.attachments
       .filter((a) => a.issueId === i.id)
       .map((a) => ({

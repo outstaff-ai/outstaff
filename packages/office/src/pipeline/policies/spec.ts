@@ -24,6 +24,10 @@ function opText(op: OpSpec): string {
       : `assign it to ${code(op.assign)}`;
   }
 
+  if ("link_doc" in op) {
+    return "link the document on the ticket";
+  }
+
   return "link_pr" in op ? "link the pull request on the ticket" : "set its parent";
 }
 

@@ -59,6 +59,11 @@ export const actOpSchema = z.discriminatedUnion("op", [
       })
       .describe("The pull request to show in the ticket's development section."),
   }),
+  z.strictObject({
+    op: z.literal("link_doc"),
+    ticket,
+    doc: z.string().min(1).max(500).describe("Id of the document to show on the ticket."),
+  }),
 ]);
 
 /** Tracker or knowledge-base changes for the agent to make as itself, without a model run. */

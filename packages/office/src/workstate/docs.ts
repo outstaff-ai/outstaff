@@ -1,7 +1,21 @@
 import type { WorkflowEvent } from "@outstaff/core";
-import type { DocOps, WorkstateCore } from "./core.types.js";
+import type { DocOps, RefreshCtx, WorkstateCore } from "./core.types.js";
 import { docNode, personNode, ROOT } from "./links.js";
-import type { DocRecord } from "./types.js";
+import { recordSynthetic } from "./synthetic.js";
+import type { DocLink, DocRecord } from "./types.js";
+
+/** The record of a document an agent recorded: the first author and the latest ticket stay. */
+function recordOf(doc: DocLink, known: DocRecord | undefined, at: string): DocRecord {
+  const ticket = doc.ticket ?? known?.ticket;
+  return {
+    id: doc.id,
+    title: doc.title,
+    url: doc.url,
+    author: known?.author ?? doc.author,
+    ...(ticket ? { ticket } : {}),
+    touchedAt: at,
+  };
+}
 
 /** Knowledge documents agents wrote, kept so comments on them reach the agent. */
 export function createDocs(core: WorkstateCore): DocOps {
@@ -21,5 +35,30 @@ export function createDocs(core: WorkstateCore): DocOps {
     }
   };
 
-  return { saveDoc, touchDoc };
+  /** Raises `doc.linked` once per document and ticket, as the agent who recorded the document. */
+  const raiseLinked = async (ctx: RefreshCtx, doc: DocLink, ticket: string, at: string) => {
+    const event: WorkflowEvent = {
+      type: "doc.linked",
+      subject: { doc: doc.id, ticket },
+      actor: { kind: "agent", id: doc.author },
+      data: { ticket, title: doc.title, url: doc.url, at },
+    };
+
+    await recordSynthetic(store, ctx, event, `doc.linked:${doc.id}:${ticket}`);
+  };
+
+  /**
+   * The agent who recorded the document keeps it unless another wrote it first. A ticket it is for now, and was not
+   * before, raises `doc.linked`, so the document is linked on the ticket in the tracker.
+   */
+  const linkDoc: DocOps["linkDoc"] = async (ctx, doc) => {
+    const known = docs.get(doc.id);
+    const rec = recordOf(doc, known, clock.now().toISOString());
+    await saveDoc(rec);
+    if (rec.ticket && rec.ticket !== known?.ticket) {
+      await raiseLinked(ctx, doc, rec.ticket, rec.touchedAt);
+    }
+  };
+
+  return { saveDoc, touchDoc, linkDoc };
 }

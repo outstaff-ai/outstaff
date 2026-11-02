@@ -21,7 +21,10 @@ export interface WakeProposal {
 }
 
 /** The changes an act may make: bookkeeping only. Anything that needs judgement is a wake. */
-export type BookkeepingOp = Extract<ActOp, { op: "move" | "assign" | "set_parent" | "link_pr" }>;
+export type BookkeepingOp = Extract<
+  ActOp,
+  { op: "move" | "assign" | "set_parent" | "link_pr" | "link_doc" }
+>;
 
 /** Change the tracker for an agent, without a model run; `note` is posted with the changes, in the agent's voice. */
 export interface ActProposal {

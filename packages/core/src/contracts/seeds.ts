@@ -26,6 +26,9 @@ export interface TrackerSeed {
 
 export interface KnowledgeSeed {
   doc(d: { path: string; title: string; body: string }): Promise<Doc>;
+
+  /** Add a ticket documents can be linked on, and return its key. */
+  issue?(): Promise<string>;
   forbiddenCall?(): Promise<unknown>;
 }
 

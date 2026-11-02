@@ -1,6 +1,6 @@
 # @outstaff/integration.knowledge.itsaplan
 
-Its a Plan knowledge adapter (`knowledge/itsaplan`) for Outstaff: the project's document tree, markdown in and out of the editor's JSON, search, versions, inline comments, replies and resolve.
+Its a Plan knowledge adapter (`knowledge/itsaplan`) for Outstaff: the project's document tree, markdown in and out of the editor's JSON, search, versions, inline comments, replies and resolve, and documents linked on issues.
 
 It runs on the REST client, options, setup guide and doctor checks of [`@outstaff/integration.shared.itsaplan`](../../shared/itsaplan/README.md), which the tracker adapter uses too; identity, self-hosted instances and custom CAs, the rate limit and error mapping are described there. The two adapters of a process share one pacer per API key.
 
@@ -24,6 +24,7 @@ Setup (members for agents, emails, API keys) is in the [adapter guide](https://d
 - `create` makes missing parent pages (empty), and rejects an existing path with `conflict`.
 - `update` sends `content` and `contentJson` together so the page stays commentable. Without `baseVersion` it edits the current version; a stale one is `conflict` (HTTP 409).
 - Comment ids are `<documentId>:<commentId>`, because replying and resolving need the document. A top-level comment is anchored to `anchorText` (copied exactly from one paragraph); without it, the start of the first paragraph is used. A page written as markdown only is given its editor JSON on the first comment.
+- `linkIssue` (capability `knowledge.issueLinks`) links a document on an issue: it reads the issue by its key for its internal id, lists the issues the document is linked on (`GET /projects/{key}/documents/{id}/issues`) and `POST`s `{ issueId }` there only when the issue is not among them; a `409` from a link made meanwhile counts as linked already. `issueDocs` lists an issue's documents (`GET /projects/{key}/documents/for-issue/{issueId}`). Linking needs the member to edit both the document and the issue (`documents: edit`, `work items: edit`); the doctor, run with an agent's key, reads the links of the project's first document and warns when the key is refused.
 - Markdown support: headings, paragraphs, bullet, ordered and task lists (nested), blockquotes, fenced code, rules, tables, hard breaks, bold, italic, strike, inline code and links. Anything else degrades to plain text. `docToMd` writes the same subset back.
 
 ## Tests

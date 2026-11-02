@@ -4,20 +4,20 @@ import type { ErrorProposal, PipelineEvent, Proposal } from "@outstaff/policy";
 import type { ContextManifest, ManifestEntry, MergeManifest } from "./context/context.types.js";
 import type { Trace } from "./trace.types.js";
 
+/** Each kind of tracker change, in words. */
+const OP_TEXT: { [K in ActOp["op"]]: (op: Extract<ActOp, { op: K }>) => string } = {
+  move: (op) => `move ${op.ticket} to ${op.to}`,
+  assign: (op) =>
+    op.to ? `assign ${op.ticket} to ${op.to.kind} ${op.to.id}` : `unassign ${op.ticket}`,
+  comment: (op) => `comment on ${"ticket" in op.on ? op.on.ticket : `doc ${op.on.doc}`}`,
+  set_parent: (op) => `set the parent of ${op.ticket} to ${op.parent}`,
+  link_pr: (op) => `link ${op.pr.repo.owner}/${op.pr.repo.name}#${op.pr.number} on ${op.ticket}`,
+  link_doc: (op) => `link doc ${op.doc} on ${op.ticket}`,
+};
+
 /** One tracker change, in words. */
 export function describeOp(op: ActOp): string {
-  switch (op.op) {
-    case "move":
-      return `move ${op.ticket} to ${op.to}`;
-    case "assign":
-      return op.to ? `assign ${op.ticket} to ${op.to.kind} ${op.to.id}` : `unassign ${op.ticket}`;
-    case "comment":
-      return `comment on ${"ticket" in op.on ? op.on.ticket : `doc ${op.on.doc}`}`;
-    case "set_parent":
-      return `set the parent of ${op.ticket} to ${op.parent}`;
-    case "link_pr":
-      return `link ${op.pr.repo.owner}/${op.pr.repo.name}#${op.pr.number} on ${op.ticket}`;
-  }
+  return (OP_TEXT[op.op] as (o: ActOp) => string)(op);
 }
 
 /** What an event is about, in words: a pull request, ticket, document or chat channel. */

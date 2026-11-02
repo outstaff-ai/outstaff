@@ -7,11 +7,15 @@ import type { Slot } from "./aggregate.types.js";
 const FIELD: Record<string, string> = { move: "status", assign: "assignee", set_parent: "parent" };
 
 /**
- * Acts are bookkeeping only by now: the invariants rejected any other op. Linking a pull request adds to the ticket's
- * development section rather than setting a field, so each pull request is one of its own.
+ * Acts are bookkeeping only by now: the invariants rejected any other op. Linking a pull request or a document adds to
+ * the ticket's links rather than setting a field, so each pull request and each document is one of its own.
  */
 function fieldOf(op: ActOp): string {
   const o = op as BookkeepingOp;
+  if (o.op === "link_doc") {
+    return `${o.ticket} doc ${o.doc}`;
+  }
+
   return o.op === "link_pr"
     ? `${o.ticket} development ${o.pr.repo.owner}/${o.pr.repo.name}#${o.pr.number}`.toLowerCase()
     : `${o.ticket} ${FIELD[o.op]}`;

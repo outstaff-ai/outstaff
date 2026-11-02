@@ -19,24 +19,40 @@ const commentLine = (c: DocComment) =>
   `- ${c.id} ${c.resolved ? "[resolved] " : ""}${c.parentId ? `(reply to ${c.parentId}) ` : ""}${c.author}: ${c.body.trim()}`;
 
 /**
- * Tells the office the caller wrote the document for the work it is on, so that comments people leave on it come back
- * as work. The document is already written: a refusal or an office that does not know the message costs only that.
+ * Tells the office the caller wrote the document for the work it is on (or for the ticket it names), so that comments
+ * people leave on it come back as work and the document is linked on its ticket. The document is already written: a
+ * refusal or an office that does not know the message costs only that. Only a ticket the caller named is worth a line
+ * in the output when it could not be linked.
  */
-async function linkToWork(env: AgentEnv, ctx: VerbContext, doc: Doc, url: string) {
+async function linkToWork(
+  env: AgentEnv,
+  ctx: VerbContext,
+  doc: Doc,
+  url: string,
+  ticket?: string,
+): Promise<string[]> {
   if (!env.office || !ctx.workItemId) {
-    return;
+    return ticket ? [`Not linked to ${ticket}: there is no work item to link it from.`] : [];
   }
 
   try {
     await env.office.docLink({
       workItemId: ctx.workItemId,
       doc: { id: doc.id, title: doc.title, url },
+      ...(ticket ? { ticket } : {}),
     });
+
+    return [];
   } catch (error) {
-    env.log?.warn(`could not tell the office about document ${doc.id}`, {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    return refused(env, doc, error, ticket);
   }
+}
+
+/** A refused link: logged, and a line of the output when the caller named the ticket. */
+function refused(env: AgentEnv, doc: Doc, error: unknown, ticket?: string): string[] {
+  const message = error instanceof Error ? error.message : String(error);
+  env.log?.warn(`could not tell the office about document ${doc.id}`, { error: message });
+  return ticket ? [`Not linked to ${ticket}: ${message}`] : [];
 }
 
 export const docSearch = defineVerb({
@@ -95,20 +111,31 @@ export const docShow = defineVerb({
 export const docCreate = defineVerb({
   name: "doc.create",
   summary: "Create a document.",
-  description: "Creates a new document. It never overwrites: an existing path is a conflict.",
+  description:
+    "Creates a new document. It never overwrites: an existing path is a conflict. A document written for a ticket (the one you are working on, or --ticket) is linked on that ticket.",
   input: z.strictObject({
     path: docPath,
     title: z.string().min(1).max(200).describe("Document title."),
     body: z.string().max(200_000).describe("Document text, Markdown."),
+    ticket: z
+      .string()
+      .regex(/^[A-Za-z][A-Za-z0-9_]*-\d+$/, "Use a ticket key, for example ACME-12.")
+      .optional()
+      .describe(
+        "Key of the ticket the document is for, for example ACME-12; it is linked on the ticket. Default: the ticket of the work you are on.",
+      ),
   }),
   args: ["path"],
-  examples: ['ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"'],
-  async run(env, input, ctx) {
+  examples: [
+    'ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"',
+    'ost doc create specs/search.md --title "Search" --body "# Search" --ticket ACME-12',
+  ],
+  async run(env, { ticket, ...input }, ctx) {
     const kb = requireKnowledge(env);
     const doc = await kb.create(input);
     const url = kb.links.doc(doc.id);
-    await linkToWork(env, ctx, doc, url);
-    return result([`Created ${doc.title} (${doc.path}).`, url], { doc }, [url]);
+    const notes = await linkToWork(env, ctx, doc, url, ticket);
+    return result([`Created ${doc.title} (${doc.path}).`, url, ...notes], { doc }, [url]);
   },
 });
 

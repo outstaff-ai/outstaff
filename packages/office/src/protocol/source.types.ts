@@ -162,8 +162,16 @@ export interface CiLogs {
 
 /** Which documents agents wrote for which work. Optional: without it `doc_link` is unsupported. */
 export interface DocLinks {
-  /** Records that the person wrote the document for the ticket of the work item (if it has one). */
-  link(person: string, workItemId: string, doc: PayloadOf<"doc_link">["doc"]): Promise<void>;
+  /**
+   * Records that the person wrote the document for `ticket`, else the ticket of the work item (if it has one). Refuses
+   * (`invalid`) a ticket the office does not know.
+   */
+  link(
+    person: string,
+    workItemId: string,
+    doc: PayloadOf<"doc_link">["doc"],
+    ticket?: string,
+  ): Promise<void>;
 }
 
 /** Agent-to-agent questions. Optional until the messaging component exists; without it `ask` is unsupported. */

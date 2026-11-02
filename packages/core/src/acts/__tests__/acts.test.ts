@@ -146,6 +146,44 @@ describe("applyActOps: link_pr", () => {
   });
 });
 
+describe("applyActOps: link_doc", () => {
+  const member = async (t: { id: string }) => t.id;
+
+  it("links a document on a ticket once, and says when it was linked already", async () => {
+    const knowledge = createFakeKnowledge({ author: "u-sam" });
+    const ticket = await knowledge.seed.issue!();
+    const doc = await knowledge.create({ path: "design/cart", title: "Cart", body: "" });
+    const op = { op: "link_doc" as const, ticket, doc: doc.id };
+    expect(await applyActOps([op, op], { knowledge }, member)).toEqual({
+      ok: true,
+      results: [
+        `linked doc ${doc.id} on ${ticket}`,
+        `doc ${doc.id} was already linked on ${ticket}`,
+      ],
+    });
+
+    expect(knowledge.issueLinks.get(ticket)).toEqual([{ doc: doc.id, by: "u-sam" }]);
+  });
+
+  it("needs a knowledge base that links documents on tickets", async () => {
+    const { linkIssue: _link, ...plain } = createFakeKnowledge();
+    expect(
+      await applyActOps(
+        [{ op: "link_doc", ticket: "ACME-1", doc: "doc-1" }],
+        { knowledge: plain },
+        member,
+      ),
+    ).toMatchObject({
+      error:
+        "link_doc ACME-1: the knowledge base cannot link documents on tickets (knowledge.issueLinks)",
+    });
+
+    expect(
+      await applyActOps([{ op: "link_doc", ticket: "ACME-1", doc: "doc-1" }], {}, member),
+    ).toMatchObject({ error: "link_doc ACME-1: no knowledge base is configured" });
+  });
+});
+
 describe("trackerMemberOf", () => {
   const team = {
     people: [{ handle: "sam", identities: { tracker: "sam.duarte" } }, { handle: "noor" }],

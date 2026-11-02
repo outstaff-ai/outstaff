@@ -14,6 +14,7 @@ import type { KnowledgeOptions } from "./types.js";
 import { commentId, parseCommentId } from "./comment-ids.js";
 import { find, pathOf, segments } from "./doc-tree.js";
 import { readDocEvents } from "./events.js";
+import { issueLinkHelpers } from "./issue-links.js";
 import { mdToDoc } from "./markdown.js";
 import { findRange, plainText } from "./text-range.js";
 import type {
@@ -121,6 +122,7 @@ function buildKnowledge(api: Itsaplan, now: () => Date): Knowledge {
   };
 
   return {
+    ...issueLinkHelpers(api, idOf),
     links: {
       doc: (id) => api.docUrl(id),
       comment: (docId, id) => api.docCommentUrl(docId, id),
