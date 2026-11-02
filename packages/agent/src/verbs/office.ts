@@ -8,6 +8,8 @@ import type {
   ChatReportResult,
   TicketPrsRequest,
   TicketPrsResult,
+  PrListRequest,
+  PrListResult,
   DocLinkRequest,
   CiLogRequest,
   CiLogResult,
@@ -26,6 +28,9 @@ export function createFakeOffice(
 
     /** What the office answers about the pull requests of the ticket a draft links to; by default none. */
     ticketPrs?: (draft: TicketPrsRequest) => TicketPrsResult;
+
+    /** What the office answers for a pull request list; by default none. */
+    prList?: (filter: PrListRequest) => PrListResult;
 
     /** What the office answers for a check's log; by default a log with no failed step. */
     ciLog?: (request: CiLogRequest) => CiLogResult;
@@ -49,11 +54,13 @@ export function createFakeOffice(
   const chatReports: FakeOffice["chatReports"] = [];
   const reportsPosted: FakeOffice["reportsPosted"] = [];
   const ticketPrsAsked: TicketPrsRequest[] = [];
+  const prListsAsked: PrListRequest[] = [];
   const docsLinked: DocLinkRequest[] = [];
   const ciLogsAsked: CiLogRequest[] = [];
   const seen = new Set<string>();
   return {
     ticketPrsAsked,
+    prListsAsked,
     docsLinked,
     ciLogsAsked,
     async ciLog(request) {
@@ -66,6 +73,10 @@ export function createFakeOffice(
     async ticketPrs(draft) {
       ticketPrsAsked.push(draft);
       return opts.ticketPrs?.(draft) ?? { prs: [] };
+    },
+    async prList(filter) {
+      prListsAsked.push(filter);
+      return opts.prList?.(filter) ?? { prs: [], more: 0 };
     },
     asked,
     answered,

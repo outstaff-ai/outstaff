@@ -73,6 +73,7 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
     },
 
     ticketPrs: (draft) => call("ticket_prs", draft, "ticket_prs_result"),
+    prList: (filter) => call("pr_list", filter, "pr_list_result"),
     docLink: (request) => ack("doc_link", request),
     ciLog: (request) => call("ci_log", request, "ci_log_result"),
 

@@ -93,7 +93,8 @@ describe("ready tickets in the work state", () => {
     await ws.rescan();
     await ws.apply(event("ticket.created", theirs.key), meta);
 
-    expect(ws.readyTickets("sam")).toEqual([
+    // In no particular order.
+    expect(ws.readyTickets("sam").toSorted((a, b) => a.readyAt.localeCompare(b.readyAt))).toEqual([
       { key: first.key, title: "Ticket first", readyAt: "2030-01-01T08:00:00.000Z" },
       { key: second.key, title: "Ticket second", readyAt: "2030-01-01T08:01:00.000Z" },
     ]);

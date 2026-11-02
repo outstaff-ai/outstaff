@@ -40,6 +40,9 @@ export interface ChatRelayOptions {
 
   /** Messages of the conversation a new chat session starts with. Default 10. */
   historyLimit?: number;
+
+  /** The clock the context reads to say how long ago each message was. Default: the system clock. */
+  now?: () => Date;
 }
 
 export interface ChatRelay {
@@ -87,6 +90,7 @@ export interface ChatContextDeps {
   office: ChatOffice;
   log: Logger;
   historyLimit: number;
+  now: () => Date;
 
   /** The numbered list of the agent's work: one line per piece of work. */
   describe(work: WorkSummary[]): string[];

@@ -10,6 +10,7 @@ import { defineVerb, result } from "./define.js";
 import { key, memberFor, summary, who } from "./ticket-support.js";
 import { ticketCreate } from "./ticket-create.js";
 import { ticketEdit } from "./ticket-edit.js";
+import { ticketList } from "./ticket-list.js";
 
 export const ticketShow = defineVerb({
   name: "ticket.show",
@@ -189,6 +190,7 @@ export const ticketAttach = defineVerb({
 
 export const ticketVerbs = [
   ticketShow,
+  ticketList,
   ticketComment,
   ticketMove,
   ticketAssign,

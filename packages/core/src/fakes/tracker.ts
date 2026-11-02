@@ -2,6 +2,7 @@ import { PortError, type CanonicalStatus } from "#/ports/index.js";
 import type { Comment, Issue, LinkedIssue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
 import { fakeDevelopment } from "./tracker-development.js";
+import { listIssues } from "./tracker-listing.js";
 import type { FakeTracker, FakeTrackerOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
 
@@ -126,20 +127,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       return structuredClone(withLinks(need(key)));
     },
     async listIssues(f) {
-      let out = [...issues.values()];
-      if (f.assignee !== undefined) {
-        out = out.filter((i) => i.assignee?.id === f.assignee);
-      }
-
-      if (f.status) {
-        out = out.filter((i) => i.status.canonical === f.status);
-      }
-
-      if (f.updatedSince) {
-        out = out.filter((i) => i.updatedAt >= f.updatedSince!);
-      }
-
-      return structuredClone(out.slice(0, f.limit));
+      return structuredClone(listIssues([...issues.values()], parents, f));
     },
     async search(q, limit) {
       const needle = q.toLowerCase();

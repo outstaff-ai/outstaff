@@ -32,7 +32,7 @@ export interface ProtocolServerOptions {
   /** Takes the checks agents report at start (`doctor_report`). Without it a report is refused as unsupported. */
   doctor?: { report(person: string, checks: PayloadOf<"doctor_report">["checks"]): Promise<void> };
 
-  /** Answers `ticket_prs`. Without it the request is refused as unsupported. */
+  /** Answers `ticket_prs` and `pr_list`. Without it the requests are refused as unsupported. */
   tickets?: TicketPrs;
 
   /** Takes `doc_link`. Without it the request is refused as unsupported. */

@@ -1971,6 +1971,7 @@ describe("verb catalogue", () => {
   it("has the verbs of the issue and no destructive ones", () => {
     expect(VERBS.map((v) => v.name)).toEqual([
       "ticket.show",
+      "ticket.list",
       "ticket.comment",
       "ticket.move",
       "ticket.assign",
@@ -1984,6 +1985,7 @@ describe("verb catalogue", () => {
       "doc.update",
       "doc.reply",
       "doc.resolve",
+      "pr.list",
       "pr.status",
       "pr.checks",
       "pr.threads",

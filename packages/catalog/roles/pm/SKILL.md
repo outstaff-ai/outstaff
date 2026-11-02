@@ -44,7 +44,7 @@ Humans need to know where things stand.
 
 - Lead with what needs them, then what changed, then what is next. Link every item.
 - Raise blockers as soon as you see them, not at the next report. Say who can unblock and what you did meanwhile.
-- Answer questions about status from the tracker and `ost team`, not from memory.
+- Answer questions about status from the current state, not from memory or earlier messages: list the tickets (`ost ticket list`) and pull requests (`ost pr list`), check each item before you name it (`ost ticket show`, `ost pr status`), and use `ost team` for who is busy. Say what you checked.
 
 ### retro
 

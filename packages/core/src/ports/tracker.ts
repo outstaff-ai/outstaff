@@ -75,6 +75,33 @@ export interface IssueChanges {
   body?: string;
 }
 
+/** Which tickets `listIssues` returns. Every filter given must match; none given lists all. */
+export interface IssueFilter {
+  /** Id of the tracker member they are assigned to; `null` for tickets assigned to nobody. */
+  assignee?: string | null;
+
+  /** In any of these canonical statuses. */
+  status?: CanonicalStatus[];
+
+  /** Carrying this label, by name. A label the tracker does not have matches nothing. */
+  label?: string;
+
+  /** Subtasks of this ticket, by key. */
+  parent?: string;
+
+  /** Updated at or after this time (ISO-8601). */
+  updatedSince?: string;
+
+  /** At most this many. */
+  limit?: number;
+
+  /**
+   * Only what a listing shows: key, title, status, assignee, labels, URL and update time. The body is then empty, and
+   * blocks, blockedBy and parent are absent. A tracker whose listing carries more may return more.
+   */
+  brief?: boolean;
+}
+
 /** A file attached to a ticket, as the tracker lists it. */
 export interface TicketAttachment {
   id: string;
@@ -116,12 +143,9 @@ export interface Tracker {
    */
   mentionsUsers?: boolean;
   getIssue(key: string): Promise<Issue>;
-  listIssues(filter: {
-    assignee?: string;
-    status?: CanonicalStatus;
-    updatedSince?: string;
-    limit?: number;
-  }): Promise<Issue[]>;
+
+  /** The tickets every given filter matches, most recently updated first. */
+  listIssues(filter: IssueFilter): Promise<Issue[]>;
   search(query: string, limit?: number): Promise<Issue[]>;
   createIssue(issue: NewIssue): Promise<Issue>;
 

@@ -242,6 +242,17 @@ export const MESSAGE_META = {
       "The ticket the pull request would link to, its status, and the pull requests it already has.",
     replies: [],
   },
+  pr_list: {
+    from: "agent",
+    summary:
+      "Lists the pull requests of the team's repositories as the office's work state has them: open ones and recently merged or closed ones, with their CI and review state and linked ticket. For `ost pr list`, so agents answer status questions from the current state.",
+    replies: ["pr_list_result", "error"],
+  },
+  pr_list_result: {
+    from: "office",
+    summary: "The matching pull requests and how many more match beyond the limit.",
+    replies: [],
+  },
   ci_log: {
     from: "agent",
     summary:

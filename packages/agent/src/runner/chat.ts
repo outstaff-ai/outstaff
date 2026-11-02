@@ -20,6 +20,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
   const { chat, office, team } = opts;
   const log = opts.log ?? silentLogger;
   const historyLimit = opts.historyLimit ?? 10;
+  const now = opts.now ?? (() => new Date());
   const acknowledge = policyOn(team.policies, "acknowledge.chat");
 
   const linker = createTicketLinker(team, opts.tracker);
@@ -181,7 +182,7 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
       });
     },
 
-    context: (offer) => chatContext({ chat, office, log, historyLimit, describe }, offer),
+    context: (offer) => chatContext({ chat, office, log, historyLimit, now, describe }, offer),
 
     async acknowledge(offer, what, filed) {
       const origin = offer.workItem.origin;

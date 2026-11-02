@@ -11,6 +11,7 @@ function required<T>(service: T | undefined, refusal: string): T {
 }
 
 const NO_QUESTIONS = "This office does not route questions.";
+const NO_PRS = "This office does not track tickets and pull requests.";
 
 /** The optional services: usage and doctor reports, questions between people, documents, act results, and tickets with their pull requests. */
 export const serviceHandlers: RequestHandlers = {
@@ -49,12 +50,10 @@ export const serviceHandlers: RequestHandlers = {
     reply("ack", {});
   },
   async ticket_prs({ ctx, payload, reply }) {
-    const tickets = required(
-      ctx.opts.tickets,
-      "This office does not track tickets and pull requests.",
-    );
-
-    reply("ticket_prs_result", await tickets.forDraft(payload));
+    reply("ticket_prs_result", await required(ctx.opts.tickets, NO_PRS).forDraft(payload));
+  },
+  async pr_list({ ctx, person, payload, reply }) {
+    reply("pr_list_result", await required(ctx.opts.tickets, NO_PRS).list(person, payload));
   },
   async ci_log({ ctx, person, payload, reply }) {
     const logs = required(ctx.opts.ciLogs, "This office does not read check logs.");
