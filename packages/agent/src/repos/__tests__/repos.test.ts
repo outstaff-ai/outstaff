@@ -9,6 +9,8 @@ import type { Offer } from "#/office-client/index.js";
 import { acmeTeam } from "@outstaff/testing.agent";
 import { cappedAccess, fileOnlySecrets } from "#/repos/access.js";
 import { syncRepositories } from "#/repos/clone.js";
+import { runGit } from "#/repos/git.js";
+import type { RunGit } from "#/repos/types.js";
 import {
   createCredentialHelper,
   parseCredentialRequest,
@@ -44,6 +46,17 @@ function remotes(names: string[]) {
   }
 
   return { dir, bare, remoteUrl: (r: Required<RepoRef>) => bare(r.name) };
+}
+
+/** Pushes a new commit with one file to a remote's main, as if a pull request merged. */
+function pushSeed(r: { dir: string; bare: (name: string) => string }, name: string, file: string) {
+  const seed = join(r.dir, "seed", name);
+  writeFileSync(join(seed, file), `${file}\n`);
+  sh(seed, "add", ".");
+  sh(seed, "commit", "-q", "-m", file);
+  sh(seed, "push", "-q", r.bare(name), "main");
+
+  return sh(seed, "rev-parse", "HEAD").trim();
 }
 
 /** A fake VCS where sam may write shop and read design-system, and nothing else. */
@@ -282,6 +295,42 @@ describe("syncRepositories", () => {
     await s.run();
     const shop = join(s.reposDir, "shop");
     expect(sh(shop, "rev-parse", "origin/main")).toBe(sh(seed, "rev-parse", "HEAD"));
+    // The base clone itself moves too, so whatever reads it sees the new commit.
+    expect(sh(shop, "rev-parse", "HEAD")).toBe(sh(seed, "rev-parse", "HEAD"));
+    expect(existsSync(join(shop, "NEW.md"))).toBe(true);
+    expect(sh(shop, "config", "--local", "--get-all", "credential.helper")).toBe(
+      "\n!ost git-credential\n",
+    );
+
+    expect(statSync(join(shop, ".git/hooks/pre-push")).mode & 0o111).not.toBe(0);
+  });
+
+  it("leaves a base clone with local changes where it is and reports it", async () => {
+    const s = await setup();
+    await s.run();
+    const shop = join(s.reposDir, "shop");
+    const before = sh(shop, "rev-parse", "HEAD");
+    writeFileSync(join(shop, "README.md"), "# changed by hand\n");
+    pushSeed(s, "shop", "NEW.md");
+
+    const warn = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
+    const repos = await syncRepositories({
+      team: acmeTeam(),
+      person: "sam",
+      vcs: s.vcs,
+      profile: "code",
+      reposDir: s.reposDir,
+      remoteUrl: s.remoteUrl,
+      log: { ...silentLogger, warn },
+    });
+
+    expect(repos.map((r) => r.name)).toContain("shop");
+    expect(sh(shop, "rev-parse", "HEAD")).toBe(before);
+    expect(readFileSync(join(shop, "README.md"), "utf8")).toBe("# changed by hand\n");
+    expect(warn).toHaveBeenCalledWith(
+      "a base clone has local changes, so it was not moved to the default branch",
+      expect.objectContaining({ repo: "shop", changed: 1 }),
+    );
   });
 
   it("skips a repo it cannot reach and keeps the others", async () => {
@@ -335,6 +384,8 @@ describe("push safety", () => {
   it("refuses a push to the default branch but allows another branch", async () => {
     const s = await cloned();
     const shop = join(s.dir, "home/repos/shop");
+    // The base clone is detached at the default branch; a push comes from a branch.
+    sh(shop, "switch", "-q", "-c", "local/a");
     writeFileSync(join(shop, "a.txt"), "a\n");
     sh(shop, "add", ".");
     sh(shop, "commit", "-q", "-m", "a");
@@ -351,6 +402,7 @@ describe("push safety", () => {
   it("refuses every push from a repo with read access", async () => {
     const s = await cloned();
     const ds = join(s.dir, "home/repos/design-system");
+    sh(ds, "switch", "-q", "-c", "local/a");
     writeFileSync(join(ds, "a.txt"), "a\n");
     sh(ds, "add", ".");
     sh(ds, "-c", "user.name=x", "-c", "user.email=x@x", "commit", "-q", "-m", "a");
@@ -432,6 +484,145 @@ describe("workspaces", () => {
 
     const w = await s.workspaces.prepare(offer("w2"));
     expect(existsSync(join(w!.worktree, "LATER.md"))).toBe(true);
+  });
+
+  it("moves the base clone to the fetched default branch before a round", async () => {
+    const s = await setup();
+    const merged = pushSeed(s, "shop", "MERGED.md");
+
+    await s.workspaces.prepare(offer("w3"));
+    const shop = join(s.dir, "home/repos/shop");
+    expect(sh(shop, "rev-parse", "HEAD").trim()).toBe(merged);
+    expect(existsSync(join(shop, "MERGED.md"))).toBe(true);
+  });
+
+  it("refreshes every base clone for a chat session, fetching each at most once a minute", async () => {
+    const s = await setup();
+    let now = 1_000_000;
+    const workspaces = createWorkspaces({ layout: s.layout, repos: s.repos, now: () => now });
+    const shop = join(s.dir, "home/repos/shop");
+
+    const first = pushSeed(s, "shop", "ONE.md");
+    const heads = await workspaces.refresh();
+    expect(heads).toEqual([
+      { name: "shop", commit: first, atDefault: true },
+      {
+        name: "design-system",
+        commit: sh(join(s.dir, "seed/design-system"), "rev-parse", "HEAD").trim(),
+        atDefault: true,
+      },
+    ]);
+
+    expect(existsSync(join(shop, "ONE.md"))).toBe(true);
+
+    const second = pushSeed(s, "shop", "TWO.md");
+    now += 30_000;
+    expect((await workspaces.refresh())[0]!.commit).toBe(first.trim());
+
+    now += 30_000;
+    expect((await workspaces.refresh())[0]!.commit).toBe(second.trim());
+    expect(existsSync(join(shop, "TWO.md"))).toBe(true);
+  });
+
+  it("reports a clone it cannot fetch at the commit it is at", async () => {
+    const s = await setup();
+    const shop = join(s.dir, "home/repos/shop");
+    sh(shop, "remote", "set-url", "origin", join(s.dir, "missing.git"));
+    const warn = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
+    const workspaces = createWorkspaces({
+      layout: s.layout,
+      repos: s.repos,
+      log: { ...silentLogger, warn },
+    });
+
+    const [head] = await workspaces.refresh();
+    expect(head).toEqual({
+      name: "shop",
+      commit: sh(shop, "rev-parse", "HEAD").trim(),
+      atDefault: false,
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      "could not refresh a repository",
+      expect.objectContaining({ repo: "shop" }),
+    );
+  });
+
+  it("reports a clone with local changes and leaves it alone before a chat session", async () => {
+    const s = await setup();
+    const shop = join(s.dir, "home/repos/shop");
+    writeFileSync(join(shop, "README.md"), "# changed by hand\n");
+    const before = sh(shop, "rev-parse", "HEAD").trim();
+    pushSeed(s, "shop", "NEW.md");
+    const warn = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
+    const workspaces = createWorkspaces({
+      layout: s.layout,
+      repos: s.repos,
+      log: { ...silentLogger, warn },
+    });
+
+    const [head] = await workspaces.refresh();
+    expect(head).toEqual({ name: "shop", commit: before, atDefault: false });
+    expect(readFileSync(join(shop, "README.md"), "utf8")).toBe("# changed by hand\n");
+    expect(warn).toHaveBeenCalledWith(
+      "a base clone has local changes, so it was not moved to the default branch",
+      expect.objectContaining({ repo: "shop" }),
+    );
+  });
+
+  it("reports a clone it cannot move and keeps going", async () => {
+    const s = await setup();
+    const shop = join(s.dir, "home/repos/shop");
+    pushSeed(s, "shop", "CLASH.md");
+    // An untracked file the incoming commit would overwrite stops the checkout.
+    writeFileSync(join(shop, "CLASH.md"), "mine\n");
+    const warn = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
+    const workspaces = createWorkspaces({
+      layout: s.layout,
+      repos: s.repos,
+      log: { ...silentLogger, warn },
+    });
+
+    const [head] = await workspaces.refresh();
+    expect(head!.atDefault).toBe(false);
+    expect(readFileSync(join(shop, "CLASH.md"), "utf8")).toBe("mine\n");
+    expect(warn).toHaveBeenCalledWith(
+      "could not move a base clone to the default branch",
+      expect.objectContaining({ repo: "shop" }),
+    );
+  });
+
+  it("never runs git in one clone for a round and a chat session at once", async () => {
+    const s = await setup();
+    const shop = join(s.dir, "home/repos/shop");
+    let active = 0;
+    let most = 0;
+    const git: RunGit = async (args, o) => {
+      if (o?.cwd !== shop) {
+        return runGit(args, o);
+      }
+
+      active += 1;
+      most = Math.max(most, active);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        return await runGit(args, o);
+      } finally {
+        active -= 1;
+      }
+    };
+
+    const workspaces = createWorkspaces({ layout: s.layout, repos: s.repos, git });
+    pushSeed(s, "shop", "BUSY.md");
+    await Promise.all([
+      workspaces.prepare(offer("w5")),
+      workspaces.refresh(),
+      workspaces.prepare(offer("w6")),
+      workspaces.refresh(),
+    ]);
+
+    expect(most).toBe(1);
+    expect(existsSync(join(shop, "BUSY.md"))).toBe(true);
   });
 
   it("keeps the branch the agent created when the worktree is prepared again, and stays detached otherwise", async () => {

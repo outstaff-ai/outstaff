@@ -481,6 +481,8 @@ describe("buildWorkPrompt repositories", () => {
       kind,
       access,
       trackerLabels,
+      dir: `/home/sam/repos/${name}`,
+      defaultBranch: "main",
       ref: { host: "github.acme.example", owner: "acme", name },
     }) as never;
 
@@ -503,6 +505,40 @@ describe("buildWorkPrompt repositories", () => {
     expect(
       buildWorkPrompt(chat, { resumed: false, repos: [repo("app", "primary", "write")] }),
     ).not.toContain("Your repositories");
+  });
+
+  it("tells a chat session which commit each clone it reads is at", () => {
+    const chat = offer();
+    chat.workItem.kind = "chat";
+    const prompt = buildWorkPrompt(chat, {
+      resumed: false,
+      repos: [repo("app", "primary", "write"), repo("infra", "infra", "read")],
+      heads: [
+        { name: "app", commit: "0123456789abcdef0123", atDefault: true },
+        { name: "infra", commit: "fedcba9876543210", atDefault: false },
+      ],
+    });
+
+    expect(prompt).not.toContain("Your repositories");
+    expect(prompt).toContain(
+      "- app: /home/sam/repos/app, at commit 0123456789ab, the latest origin/main fetched",
+    );
+
+    expect(prompt).toContain(
+      "- infra: /home/sam/repos/infra, at commit fedcba987654, which may not be the latest origin/main",
+    );
+  });
+
+  it("says so when a clone's commit is unknown", () => {
+    const chat = offer();
+    chat.workItem.kind = "chat";
+    const prompt = buildWorkPrompt(chat, {
+      resumed: false,
+      repos: [repo("app", "primary", "write")],
+      heads: [],
+    });
+
+    expect(prompt).toContain("- app: /home/sam/repos/app, at an unknown commit, which may not be");
   });
 });
 

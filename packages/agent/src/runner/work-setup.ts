@@ -1,6 +1,6 @@
 import type { Policy, RunRequest } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
-import type { Workspace } from "#/repos/index.js";
+import type { RepoHead, Workspace } from "#/repos/index.js";
 import { VERBS, createRuntimeTools } from "#/verbs/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import { itemEnv, itemFiles } from "./item-env.js";
@@ -60,9 +60,16 @@ function buildRequest(
 interface PromptParts {
   storedSession: string | undefined;
   workspace: Workspace | undefined;
+  heads: RepoHead[] | undefined;
   attachments: Attachment[];
   ticketFiles: Record<string, Attachment[]>;
 }
+
+/** The repositories for the prompt, and for a chat session where each base clone is. */
+const repoParts = (opts: WorkLoopOptions, heads: RepoHead[] | undefined) => ({
+  ...(opts.repos?.length ? { repos: opts.repos } : {}),
+  ...(heads ? { heads } : {}),
+});
 
 function buildPrompt(
   opts: WorkLoopOptions,
@@ -79,7 +86,7 @@ function buildPrompt(
     ...(opts.env.layout ? { docsDir: opts.env.layout.workDir } : {}),
     ...(offer.interrupted ? { interrupted: true } : {}),
     ...(workspace ? { workspace } : {}),
-    ...(opts.repos?.length ? { repos: opts.repos } : {}),
+    ...repoParts(opts, parts.heads),
     ...(context ? { chatContext: context } : {}),
     attachments: parts.attachments,
     ticketFiles: parts.ticketFiles,
@@ -112,11 +119,13 @@ export async function setUpItem(
   const session = offer.workItem.kind === CHAT_KIND ? opts.chatSession : undefined;
   const policy = session?.policy ?? opts.policy;
   const workspace = session ? undefined : await opts.workspaces?.prepare(offer);
+  // A chat session reads the base clones, so they are brought up to date first.
+  const heads = session ? await opts.workspaces?.refresh() : undefined;
   const chatContext = await chatContextFor(opts, offer, storedSession);
   const files = await itemFiles(opts, offer, log);
   const item = itemEnv(opts, offer, files, log);
   const requestParts = { id, policy, session, workspace, env: item.env, abort };
-  const promptParts = { storedSession, workspace, ...files };
+  const promptParts = { storedSession, workspace, heads, ...files };
 
   return {
     offer,

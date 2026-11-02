@@ -2,7 +2,8 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { parseRepoUrl, silentLogger } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
-import type { ClonedRepo, Workspaces, WorkspacesOptions } from "./types.js";
+import { createCloneRefresher } from "./base-clone.js";
+import type { ClonedRepo, RepoHead, Workspaces, WorkspacesOptions } from "./types.js";
 import { runGit } from "./git.js";
 
 /** Where a repository states how work is done in it. */
@@ -101,6 +102,32 @@ const namesIn = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
 export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
   const git = opts.git ?? runGit;
   const log = opts.log ?? silentLogger;
+  const clones = createCloneRefresher({
+    git,
+    log,
+    ...(opts.minFetchGapMs === undefined ? {} : { minFetchGapMs: opts.minFetchGapMs }),
+    ...(opts.now ? { now: opts.now } : {}),
+  });
+
+  /** A read-only session's view of one clone: refreshed when it can be, else where it is. */
+  const readable = async (repo: ClonedRepo): Promise<RepoHead> => {
+    try {
+      return await clones.refresh(repo, { throttled: true });
+    } catch (e) {
+      log.warn("could not refresh a repository", {
+        repo: repo.name,
+        error: e instanceof Error ? e.message : String(e),
+      });
+
+      const commit = await git(["rev-parse", "HEAD"], { cwd: repo.dir }).then(
+        (out) => out.trim(),
+        () => undefined,
+      );
+
+      return { name: repo.name, commit, atDefault: false };
+    }
+  };
+
   const worktreeOf = (repo: string, id: string) => join(opts.layout.worktreesDir, repo, safeId(id));
   const scratchOf = (id: string) => join(opts.layout.scratchDir, safeId(id));
   const has = (cwd: string, ref: string) =>
@@ -127,68 +154,76 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
     conventionFiles: findConventionFiles(worktree, repo.instructions),
   });
 
+  /** Makes the item's worktree, or finds it; the caller holds the clone. */
+  async function prepareIn(repo: ClonedRepo, offer: Offer) {
+    const item = offer.workItem;
+    // Fetch first, so a branch someone else updated is built on and never overwritten. The base clone follows.
+    await clones.update(repo);
+
+    const worktree = worktreeOf(repo.name, item.id);
+    const scratch = scratchOf(item.id);
+    mkdirSync(scratch, { recursive: true });
+
+    if (existsSync(worktree)) {
+      const current = (await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })).trim();
+
+      return space(repo, worktree, current === "HEAD" ? undefined : current, scratch);
+    }
+
+    const head = headBranchOf(offer);
+    mkdirSync(join(opts.layout.worktreesDir, repo.name), { recursive: true });
+    await git(["worktree", "prune"], { cwd: repo.dir });
+
+    if (!head) {
+      // New work names no branch: the agent creates one, by the repository's conventions, once it has the work.
+      await git(["worktree", "add", "--detach", worktree, `origin/${repo.defaultBranch}`], {
+        cwd: repo.dir,
+      });
+
+      return space(repo, worktree, undefined, scratch);
+    }
+
+    // A branch can be checked out in one worktree only. When an earlier item that is still waiting holds the pull
+    // request's head, this round gets a local branch of its own on the same commit and pushes to the head by name.
+    let branch = head;
+    if (await checkedOut(repo.dir, head)) {
+      branch = `${head}-${safeId(item.id)}`;
+      await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${head}`], {
+        cwd: repo.dir,
+      });
+
+      return space(repo, worktree, branch, scratch);
+    }
+
+    if (await has(repo.dir, `refs/remotes/origin/${branch}`)) {
+      await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${branch}`], {
+        cwd: repo.dir,
+      });
+    } else if (await has(repo.dir, `refs/heads/${branch}`)) {
+      await git(["worktree", "add", worktree, branch], { cwd: repo.dir });
+    } else {
+      await git(
+        ["worktree", "add", "--no-track", "-b", branch, worktree, `origin/${repo.defaultBranch}`],
+        { cwd: repo.dir },
+      );
+    }
+
+    return space(repo, worktree, branch, scratch);
+  }
+
   return {
     async prepare(offer) {
-      const item = offer.workItem;
       const repo = repoForItem(offer, opts.repos);
       if (!repo) {
         return undefined;
       }
 
-      // Fetch first, so a branch someone else updated is built on and never overwritten.
-      await git(["fetch", "--prune", "origin"], { cwd: repo.dir });
+      // One task at a time per clone: a chat session may be refreshing it right now.
+      return clones.exclusive(repo.dir, () => prepareIn(repo, offer));
+    },
 
-      const worktree = worktreeOf(repo.name, item.id);
-      const scratch = scratchOf(item.id);
-      mkdirSync(scratch, { recursive: true });
-
-      if (existsSync(worktree)) {
-        const current = (
-          await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })
-        ).trim();
-
-        return space(repo, worktree, current === "HEAD" ? undefined : current, scratch);
-      }
-
-      const head = headBranchOf(offer);
-      mkdirSync(join(opts.layout.worktreesDir, repo.name), { recursive: true });
-      await git(["worktree", "prune"], { cwd: repo.dir });
-
-      if (!head) {
-        // New work names no branch: the agent creates one, by the repository's conventions, once it has the work.
-        await git(["worktree", "add", "--detach", worktree, `origin/${repo.defaultBranch}`], {
-          cwd: repo.dir,
-        });
-
-        return space(repo, worktree, undefined, scratch);
-      }
-
-      // A branch can be checked out in one worktree only. When an earlier item that is still waiting holds the pull
-      // request's head, this round gets a local branch of its own on the same commit and pushes to the head by name.
-      let branch = head;
-      if (await checkedOut(repo.dir, head)) {
-        branch = `${head}-${safeId(item.id)}`;
-        await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${head}`], {
-          cwd: repo.dir,
-        });
-
-        return space(repo, worktree, branch, scratch);
-      }
-
-      if (await has(repo.dir, `refs/remotes/origin/${branch}`)) {
-        await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${branch}`], {
-          cwd: repo.dir,
-        });
-      } else if (await has(repo.dir, `refs/heads/${branch}`)) {
-        await git(["worktree", "add", worktree, branch], { cwd: repo.dir });
-      } else {
-        await git(
-          ["worktree", "add", "--no-track", "-b", branch, worktree, `origin/${repo.defaultBranch}`],
-          { cwd: repo.dir },
-        );
-      }
-
-      return space(repo, worktree, branch, scratch);
+    refresh() {
+      return Promise.all(opts.repos.map(readable));
     },
 
     held() {
@@ -208,8 +243,10 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
         }
 
         try {
-          await git(["worktree", "remove", "--force", worktree], { cwd: repo.dir });
-          await git(["worktree", "prune"], { cwd: repo.dir });
+          await clones.exclusive(repo.dir, async () => {
+            await git(["worktree", "remove", "--force", worktree], { cwd: repo.dir });
+            await git(["worktree", "prune"], { cwd: repo.dir });
+          });
         } catch (e) {
           log.warn("could not remove a worktree", {
             workItemId,

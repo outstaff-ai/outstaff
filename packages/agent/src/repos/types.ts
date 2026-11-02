@@ -56,6 +56,45 @@ export interface SyncRepositoriesOptions {
   helper?: string;
 }
 
+/** Where a base clone is checked out. */
+export interface RepoHead {
+  /** The repo's short name in team.yaml. */
+  name: string;
+
+  /** The commit the clone's working tree is at; undefined when it could not be read. */
+  commit: string | undefined;
+
+  /** Whether the clone is at the fetched `origin/<default branch>`. False when it has local changes or could not move. */
+  atDefault: boolean;
+}
+
+/** What a refresh needs of a clone. */
+export type BaseClone = Pick<ClonedRepo, "name" | "dir" | "defaultBranch">;
+
+export interface CloneRefresherOptions {
+  git: RunGit;
+  log: Logger;
+
+  /** Least time between two throttled fetches of one clone. Default 60000. */
+  minFetchGapMs?: number;
+  now?: () => number;
+}
+
+export interface CloneRefresher {
+  /** Runs `fn` once every earlier task on the same clone has ended, so two of them never share a clone. */
+  exclusive<T>(dir: string, fn: () => Promise<T>): Promise<T>;
+
+  /**
+   * Fetches the clone and moves it to the fetched default branch, without taking the clone: call it inside
+   * {@link exclusive}. A throttled update skips the fetch when the clone was fetched less than `minFetchGapMs` ago.
+   * Rejects when the fetch fails.
+   */
+  update(repo: BaseClone, opts?: { throttled?: boolean }): Promise<RepoHead>;
+
+  /** {@link update} inside {@link exclusive}. */
+  refresh(repo: BaseClone, opts?: { throttled?: boolean }): Promise<RepoHead>;
+}
+
 /** The places one work item works in. */
 export interface Workspace {
   repo: string;
@@ -73,6 +112,12 @@ export interface Workspaces {
   /** Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when no repo fits. */
   prepare(offer: Offer): Promise<Workspace | undefined>;
 
+  /**
+   * Fetches every base clone, at most once a minute each, and moves it to the fetched default branch, for a session
+   * that reads the clones. A clone that cannot be fetched is logged and reported where it is.
+   */
+  refresh(): Promise<RepoHead[]>;
+
   /** Removes the item's worktree and scratch directory. The branch stays, so unmerged commits are not lost. */
   release(workItemId: string): Promise<void>;
 
@@ -85,4 +130,8 @@ export interface WorkspacesOptions {
   repos: ClonedRepo[];
   git?: RunGit;
   log?: Logger;
+
+  /** Least time between two fetches of one clone for a session that only reads it. Default 60000. */
+  minFetchGapMs?: number;
+  now?: () => number;
 }

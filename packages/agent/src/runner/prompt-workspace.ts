@@ -1,5 +1,5 @@
 import type { Offer } from "#/office-client/index.js";
-import { headBranchOf, type ClonedRepo, type Workspace } from "#/repos/index.js";
+import { headBranchOf, type ClonedRepo, type RepoHead, type Workspace } from "#/repos/index.js";
 import type { DocPath, WorkPromptOptions } from "./prompt.types.js";
 
 function repoLine(r: ClonedRepo): string {
@@ -10,13 +10,42 @@ function repoLine(r: ClonedRepo): string {
   return `- ${r.name} (${r.kind}, ${r.access}): ${r.ref.host}/${r.ref.owner}/${r.ref.name}${labels}`;
 }
 
-/** The repositories the person can work in, for every item but a chat session. */
+function headText(r: ClonedRepo, head: RepoHead | undefined): string {
+  const commit = head?.commit ? `commit ${head.commit.slice(0, 12)}` : "an unknown commit";
+  if (head?.atDefault) {
+    return `${commit}, the latest origin/${r.defaultBranch} fetched`;
+  }
+
+  return `${commit}, which may not be the latest origin/${r.defaultBranch}: the clone has local changes or could not be fetched`;
+}
+
+/** The base clones a chat session reads, with the commit each is at. */
+function readableLines(repos: ClonedRepo[], heads: RepoHead[]): string[] {
+  const line = (r: ClonedRepo) =>
+    `- ${r.name}: ${r.dir}, at ${headText(
+      r,
+      heads.find((h) => h.name === r.name),
+    )}`;
+
+  return [
+    "",
+    "The repositories you can read, refreshed when this session started and each at the commit shown (a change merged since is not in them yet):",
+    ...repos.map(line),
+  ];
+}
+
+/** The repositories the person can work in, or for a chat session the clones it reads. */
 export function repoLines(
   kind: Offer["workItem"]["kind"],
   repos: ClonedRepo[] | undefined,
+  heads?: RepoHead[],
 ): string[] {
-  if (!repos?.length || kind === "chat") {
+  if (!repos?.length) {
     return [];
+  }
+
+  if (kind === "chat") {
+    return heads ? readableLines(repos, heads) : [];
   }
 
   return [

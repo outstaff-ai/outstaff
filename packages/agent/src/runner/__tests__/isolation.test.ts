@@ -137,6 +137,7 @@ describe("isolation between work items", () => {
         return { repo: "shop", worktree, branch: `ticket/${id}`, scratch, conventionFiles: [] };
       },
       held: () => [],
+      refresh: async () => [],
       async release(id) {
         rmSync(join(layout.worktreesDir, "shop", id), { recursive: true, force: true });
         rmSync(join(layout.scratchDir, id), { recursive: true, force: true });
