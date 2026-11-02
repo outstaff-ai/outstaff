@@ -1,7 +1,8 @@
-import { PortError, type UnmappedEvent, type Vcs } from "@outstaff/core";
+import { PortError, type RepoRef, type UnmappedEvent, type Vcs } from "@outstaff/core";
 import type { Cursor } from "#/api.types.js";
+import { directPosition, pollDirect } from "./direct-lists.js";
 import { feedPosition, pollRepo } from "./event-feed.js";
-import type { FoundEvent, GithubContext } from "./types.js";
+import type { FeedPosition, FoundEvent, GithubContext, PollGet } from "./types.js";
 
 function parseCursor(cursor: string | undefined): Cursor {
   if (!cursor) {
@@ -29,7 +30,45 @@ function byTimeThenId(a: FoundEvent, b: FoundEvent): number {
   return a.id < b.id ? -1 : Number(a.id > b.id);
 }
 
-/** The repository event feeds, polled by time with an etag per repository. */
+/** The first of each external id: a comment or review read from both the feed and a direct list is one event. */
+function once(found: FoundEvent[]): FoundEvent[] {
+  const seen = new Set<string>();
+  return found.filter((f) => !seen.has(f.event.externalId) && seen.add(f.event.externalId));
+}
+
+/** Where the direct lists start without a stored entry: at the feed's time, or now when the feed has none yet. */
+function directStart(c: GithubContext, feed: FeedPosition): number {
+  return feed.unknown ? c.now().getTime() : feed.since;
+}
+
+/** One repository: its feed, and the direct lists beside it, which a baseline does not read (they hold history). */
+async function pollOne(
+  c: GithubContext,
+  get: PollGet,
+  repo: RepoRef,
+  state: Cursor,
+  hasCursor: boolean,
+) {
+  const entry = state[`${repo.owner}/${repo.name}`];
+  const feed = feedPosition(entry, hasCursor);
+  const direct = directPosition(entry?.direct, directStart(c, feed));
+  const poll = await pollRepo(c, get, repo, feed);
+  const start = new Date(direct.since).toISOString();
+  const lists = feed.unknown
+    ? { cursor: { since: start, after: start }, found: [] }
+    : await pollDirect(get, await c.apiToken(repo), repo, direct);
+
+  return {
+    entry: { ...(poll ? poll.entry : entry), direct: lists.cursor },
+    found: [...(poll?.found ?? []), ...lists.found],
+    unmapped: poll?.unmapped ?? [],
+  };
+}
+
+/**
+ * The repository event feeds, polled by time with an etag per repository, and the direct comment and review lists
+ * beside them, which do not lag.
+ */
 export function eventOperations(c: GithubContext): Pick<Vcs, "events"> {
   return {
     async events(repos, cursor) {
@@ -37,18 +76,26 @@ export function eventOperations(c: GithubContext): Pick<Vcs, "events"> {
       const next: Cursor = { ...state };
       const found: FoundEvent[] = [];
       const unmapped: UnmappedEvent[] = [];
+      let requests = 0;
+      const get: PollGet = (path, opts) => {
+        requests++;
+        return c.http.request("GET", path, opts);
+      };
+
       for (const repo of repos) {
-        const key = `${repo.owner}/${repo.name}`;
-        const poll = await pollRepo(c, repo, feedPosition(state[key], cursor !== undefined));
-        if (poll) {
-          next[key] = poll.entry;
-          found.push(...poll.found);
-          unmapped.push(...poll.unmapped);
-        }
+        const one = await pollOne(c, get, repo, state, cursor !== undefined);
+        next[`${repo.owner}/${repo.name}`] = one.entry;
+        found.push(...one.found);
+        unmapped.push(...one.unmapped);
       }
 
+      c.log.debug(`vcs: GitHub poll of ${repos.length} repositories made ${requests} requests`, {
+        repos: repos.length,
+        requests,
+      });
+
       found.sort(byTimeThenId);
-      return { events: found.map((f) => f.event), cursor: JSON.stringify(next), unmapped };
+      return { events: once(found).map((f) => f.event), cursor: JSON.stringify(next), unmapped };
     },
   };
 }

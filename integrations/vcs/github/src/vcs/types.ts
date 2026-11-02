@@ -1,4 +1,5 @@
 import type {
+  Logger,
   RepoRef,
   SecretSource,
   UnmappedEvent,
@@ -9,6 +10,7 @@ import type {
 import type { Cursor } from "#/api.types.js";
 import type { AppAuth } from "#/auth.js";
 import type { GithubHttp } from "#/http.js";
+import type { HttpResult, RequestOptions } from "#/types.js";
 
 /** The secret prefix of a GitHub App: this container's own, or the read-only office App. */
 export type AppPrefix = "GH_APP_" | "GH_OFFICE_APP_";
@@ -16,6 +18,7 @@ export type AppPrefix = "GH_APP_" | "GH_OFFICE_APP_";
 /** What `createGithubContext` builds once per adapter and every group of operations shares. */
 export interface GithubContext {
   http: GithubHttp;
+  log: Logger;
 
   /** REST API root without a trailing slash. */
   apiUrl: string;
@@ -57,6 +60,12 @@ export interface FeedPosition {
 
   /** A cursor that lacks this repository: this poll only baselines it (#229). */
   baseline: boolean;
+
+  /**
+   * An entry from before the direct lists, whose comments and reviews were recorded under feed event ids: this
+   * poll reads the whole feed and reports only what is newer than `since`.
+   */
+  upgrade: boolean;
   etag: string | undefined;
 
   /** Ids already read at baseline time, which the overlap would otherwise hand back as news. */
@@ -75,4 +84,21 @@ export interface RepoPoll {
   entry: Cursor[string];
   found: FoundEvent[];
   unmapped: UnmappedEvent[];
+}
+
+/** A GET made by one poll, counted towards the requests the poll logs. */
+export type PollGet = <T>(path: string, opts: RequestOptions) => Promise<HttpResult<T>>;
+
+/** Where one repository's direct comment and review lists start reading this poll. */
+export interface DirectPosition {
+  /** The newest time read from them before. */
+  since: number;
+
+  /** What is at or before it is not news; NaN once the overlap has moved past it. */
+  after: number;
+
+  /** The oldest time that is still news: `since` less the overlap, but never at or before `after`. */
+  floor: number;
+  etags: Record<string, string>;
+  reviewed: Record<string, string>;
 }

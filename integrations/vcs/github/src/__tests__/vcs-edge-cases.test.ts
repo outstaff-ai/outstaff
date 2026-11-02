@@ -15,6 +15,7 @@ import {
   team,
 } from "@outstaff/testing.github";
 import { testKey } from "@outstaff/testing.core";
+import { listRoutes } from "./lists.js";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -621,32 +622,58 @@ describe("events edge cases", () => {
     handler: () => ({ headers, body: events }),
   });
 
-  const SINCE = JSON.stringify({ "acme/app": { since: "2026-01-01T00:00:00Z" } });
+  const SINCE = JSON.stringify({
+    "acme/app": { since: "2026-01-01T00:00:00Z", direct: { since: "2026-01-01T00:00:00Z" } },
+  });
 
-  it("breaks ties between events of the same second by event id", async () => {
+  it("breaks ties between events of the same second by event id, and reports each comment once", async () => {
     const at = "2026-01-01T00:01:00Z";
     const { vcs } = build([
       ...appRoutes(),
+      ...listRoutes(),
       feed([ev("30", at), ev("10", at), ev("20", at), ev("20", at)]),
     ]);
 
     const page = await vcs.events([REPO], SINCE);
-    expect(page.events.map((e) => e.externalId)).toEqual(["10", "20", "20", "30"]);
+    expect(page.events.map((e) => e.externalId)).toEqual([
+      "comment:10",
+      "comment:20",
+      "comment:30",
+    ]);
   });
 
   it("baselines an empty first feed at the injected clock's time, without an etag", async () => {
-    const { vcs } = build([...appRoutes(), feed([])], undefined, {}, clock("2026-02-03T04:05:06Z"));
+    const { vcs } = build(
+      [...appRoutes(), ...listRoutes(), feed([])],
+      undefined,
+      {},
+      clock("2026-02-03T04:05:06Z"),
+    );
+
     const page = await vcs.events([REPO], "{}");
-    expect(JSON.parse(page.cursor)).toEqual({ "acme/app": { since: "2026-02-03T04:05:06.000Z" } });
+    const now = "2026-02-03T04:05:06.000Z";
+    expect(JSON.parse(page.cursor)).toEqual({
+      "acme/app": { since: now, direct: { since: now, after: now } },
+    });
+
     expect(page.events).toEqual([]);
   });
 
   it("keeps the stored etag when the feed sends none", async () => {
     const cursor = JSON.stringify({
-      "acme/app": { since: "2026-01-01T00:00:00Z", etag: 'W/"old"' },
+      "acme/app": {
+        since: "2026-01-01T00:00:00Z",
+        etag: 'W/"old"',
+        direct: { since: "2026-01-01T00:00:00Z" },
+      },
     });
 
-    const { vcs } = build([...appRoutes(), feed([ev("1", "2026-01-01T00:00:05Z")])]);
+    const { vcs } = build([
+      ...appRoutes(),
+      ...listRoutes(),
+      feed([ev("1", "2026-01-01T00:00:05Z")]),
+    ]);
+
     const page = await vcs.events([REPO], cursor);
     expect(JSON.parse(page.cursor)["acme/app"].etag).toBe('W/"old"');
   });

@@ -219,6 +219,7 @@ export function createGithubContext(
 
   return {
     http,
+    log: ctx.log,
     apiUrl,
     secrets,
     self,

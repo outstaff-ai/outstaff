@@ -4,30 +4,47 @@ import type { HttpResult } from "#/types.js";
 import { toVcsEvent } from "#/event-mapping.js";
 import type { Cursor, RestEvent } from "#/api.types.js";
 import { repoPath } from "./context.js";
-import type { FeedPosition, FoundEvent, GithubContext, RepoPoll } from "./types.js";
+import type { FeedPosition, FoundEvent, GithubContext, PollGet, RepoPoll } from "./types.js";
 
 const EVENT_PAGES = 3;
 // Re-read this much before the newest time seen; intake de-duplicates by external id.
-const OVERLAP_MS = 5 * 60_000;
+export const OVERLAP_MS = 5 * 60_000;
 
 /** Where the stored cursor entry of a repository says its feed was left off. */
 export function feedPosition(entry: Cursor[string] | undefined, hasCursor: boolean): FeedPosition {
   // An entry without a valid `since` (new repo, or a cursor from before times were tracked) is no entry.
   const since = typeof entry?.since === "string" ? Date.parse(entry.since) : Number.NaN;
-  const unknown = Number.isNaN(since);
-  return {
-    since,
-    unknown,
+  if (!entry || Number.isNaN(since)) {
     // No cursor at all is the first poll: intake decides whether that history is a baseline.
     // A cursor that lacks this repository only baselines this repository (#229).
-    baseline: unknown && hasCursor,
-    etag: unknown ? undefined : entry?.etag,
-    skip: new Set(unknown ? [] : entry?.seen),
+    return {
+      since,
+      unknown: true,
+      baseline: hasCursor,
+      upgrade: false,
+      etag: undefined,
+      skip: new Set(),
+    };
+  }
+
+  const upgrade = entry.direct === undefined;
+  return {
+    since,
+    unknown: false,
+    baseline: false,
+    upgrade,
+    // The upgrade reads the feed whatever its etag, to remember what it already reported.
+    etag: upgrade ? undefined : entry.etag,
+    skip: new Set(entry.seen),
   };
 }
 
 /** The time below which an event is old news. */
 function feedFloor(position: FeedPosition, firstPage: RestEvent[]): number {
+  if (position.upgrade) {
+    return position.since + 1;
+  }
+
   const top = position.unknown
     ? Math.max(...firstPage.map((e) => Date.parse(e.created_at)))
     : position.since;
@@ -49,6 +66,7 @@ function olderPageLink(
 /** Follows the feed back from its first page; GitHub event ids are not one sequence, so this pages by time. */
 async function readOlderPages(
   c: GithubContext,
+  get: PollGet,
   token: string,
   first: HttpResult<RestEvent[]>,
   floor: number,
@@ -61,7 +79,7 @@ async function readOlderPages(
       break;
     }
 
-    res = await c.http.request<RestEvent[]>("GET", link, { token });
+    res = await get<RestEvent[]>(link, { token });
     raw.push(...res.data);
   }
 
@@ -117,7 +135,8 @@ function nextEntry(
   now: () => Date,
 ): Cursor[string] {
   const stamp = newestAt(raw, position, now);
-  const keep = position.unknown ? undefined : position.skip;
+  // A baseline or an upgrade remembers everything in the overlap; later polls keep what is still in it.
+  const keep = position.unknown || position.upgrade ? undefined : position.skip;
   const seen = raw
     .filter((e) => (keep ? keep.has(e.id) : true) && Date.parse(e.created_at) >= stamp - OVERLAP_MS)
     .map((e) => e.id);
@@ -132,12 +151,13 @@ function nextEntry(
 /** Polls one repository's event feed; undefined when it has not changed since the stored etag. */
 export async function pollRepo(
   c: GithubContext,
+  get: PollGet,
   repo: RepoRef,
   position: FeedPosition,
 ): Promise<RepoPoll | undefined> {
   const token = await c.apiToken(repo);
   // A 304 answers without touching the rate limit.
-  const first = await c.http.request<RestEvent[]>("GET", `${repoPath(repo)}/events`, {
+  const first = await get<RestEvent[]>(`${repoPath(repo)}/events`, {
     token,
     query: { per_page: 100 },
     ...(position.etag ? { headers: { "if-none-match": position.etag } } : {}),
@@ -149,6 +169,6 @@ export async function pollRepo(
 
   const etag = first.headers.get("etag") ?? position.etag;
   const floor = feedFloor(position, first.data);
-  const raw = await readOlderPages(c, token, first, floor);
+  const raw = await readOlderPages(c, get, token, first, floor);
   return { entry: nextEntry(raw, position, etag, c.now), ...collect(repo, raw, position, floor) };
 }

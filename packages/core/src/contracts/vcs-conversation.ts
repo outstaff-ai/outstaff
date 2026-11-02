@@ -102,4 +102,22 @@ export function vcsConversationCases({ get, repoOf }: VcsCases): void {
 
     expect(all.events.every((e) => e.number === pr.number && e.actor)).toBe(true);
   });
+
+  it("reports a comment and a review under one id each, however often they are read", async (t) => {
+    const s = get();
+    requireCapability(t, s, "vcs.pullRequests");
+    const repo = repoOf(t, s);
+    const pr = await requireSeed(t, s.seed, "pullRequest")(repo, { title: "Discussed" });
+    await requireSeed(t, s.seed, "comment")(repo, pr.number, "dana", "Looks close.");
+    await requireSeed(t, s.seed, "review")(repo, pr.number, "dana", "commented", "One thought");
+    const ids = async () =>
+      (await s.subject.events([repo])).events
+        .filter((e) => e.number === pr.number && e.type !== "pr.opened")
+        .map((e) => [e.type, e.externalId]);
+
+    const first = await ids();
+    expect(first.map(([type]) => type)).toEqual(["pr.comment", "pr.review_submitted"]);
+    expect(new Set(first.map(([, id]) => id)).size).toBe(2);
+    expect(await ids()).toEqual(first);
+  });
 }

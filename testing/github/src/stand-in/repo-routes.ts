@@ -1,6 +1,7 @@
 import type { RestCheckRun } from "@outstaff/integration.vcs.github";
 import type { Route } from "@outstaff/testing.http";
 import { branchRoutes } from "./branch-routes.js";
+import { emptyListRoutes } from "./list-routes.js";
 import { NOT_FOUND, WEB, etag } from "./model.js";
 import type { GithubStore, StandInRepo, StoredCheckRun } from "./types.js";
 
@@ -74,6 +75,7 @@ export function moreRoutes(s: GithubStore, api: string, more: StandInRepo[]): Ro
       { method: "GET", path: base, handler: () => ({ default_branch: "main" }) },
       ...branchRoutes({ rules: [] }, base),
       { method: "GET", path: `${base}/pulls`, handler: () => [] },
+      ...emptyListRoutes(base),
       {
         method: "GET",
         path: `${base}/events`,

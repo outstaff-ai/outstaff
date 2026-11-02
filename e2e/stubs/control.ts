@@ -51,7 +51,14 @@ function githubControls({ github }: World): Route[] {
       method: "POST",
       path: "/_test/pulls/:n/comment",
       handler: async (r) => {
-        await github.comment(pull(r), r.json.actor ?? "grace-lead", r.json.body ?? "");
+        // `feed: false` holds the comment out of the events feed, as a lagging feed would.
+        await github.comment(
+          pull(r),
+          r.json.actor ?? "grace-lead",
+          r.json.body ?? "",
+          r.json.feed !== false,
+        );
+
         return ok();
       },
     },

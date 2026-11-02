@@ -145,6 +145,7 @@ export interface Review {
 export type VcsPermission = "admin" | "write" | "read" | "none";
 
 export interface VcsEvent {
+  /** What intake de-duplicates on: a comment or a review has one id, however and however often it is read. */
   externalId: string;
   type:
     | "pr.opened"

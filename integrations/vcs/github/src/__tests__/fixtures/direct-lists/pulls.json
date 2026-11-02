@@ -1,0 +1,22 @@
+[
+  {
+    "number": 8,
+    "title": "Add login",
+    "body": null,
+    "user": { "login": "marcus" },
+    "head": { "ref": "feat/login", "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    "base": { "ref": "main" },
+    "state": "open",
+    "updated_at": "2026-01-05T10:00:00Z"
+  },
+  {
+    "number": 3,
+    "title": "Old work",
+    "body": null,
+    "user": { "login": "marcus" },
+    "head": { "ref": "feat/old", "sha": "cccccccccccccccccccccccccccccccccccccccc" },
+    "base": { "ref": "main" },
+    "state": "closed",
+    "updated_at": "2025-12-01T10:00:00Z"
+  }
+]

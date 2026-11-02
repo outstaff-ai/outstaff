@@ -63,6 +63,9 @@ export interface FakeVcsState {
     number: number,
     actor: string,
     data?: Record<string, unknown>,
+
+    /** The object's key, for a comment or a review: the same however often the object is reported. */
+    externalId?: string,
   ) => void;
   need: (repo: RepoRef, number: number) => StoredPr;
   read: (s: StoredPr) => PullRequest;

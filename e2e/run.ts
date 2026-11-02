@@ -1062,9 +1062,10 @@ async function main() {
     `conflict: #${pr2.pr.number} conflicted with main -> follow-up item, rebased, force-pushed with a lease, merges cleanly`,
   );
 
-  // ---- 5. a comment on the merged pull request: the agent replies and opens a follow-up from the default branch
+  // ---- 5. a comment on the merged pull request: the agent replies and opens a follow-up from the default branch.
+  // The events feed never shows the comment, as when it lags: the office reads it from the direct comment list.
   const note = "The greeting should also say goodbye.";
-  await stub("POST", `/_test/pulls/${pr1.pr.number}/comment`, { body: note });
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/comment`, { body: note, feed: false });
   const followed = await until(
     `#${pr1.pr.number} answered and a follow-up pull request opened`,
     (s) => {
@@ -1103,7 +1104,7 @@ async function main() {
   );
 
   step(
-    `merged feedback: a comment on merged #${pr1.pr.number} -> answered, follow-up #${followed.follow.number} opened, ${first} still done`,
+    `merged feedback: a comment on merged #${pr1.pr.number}, missing from the events feed -> answered, follow-up #${followed.follow.number} opened, ${first} still done`,
   );
 
   // ---- 6. a ticket created already assigned to the agent: one `created` item, no assignment item, and it still starts
