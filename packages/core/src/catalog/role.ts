@@ -18,8 +18,9 @@ export const roleSchema = z
     name: slug.meta(d("Role id; must equal the directory name.")),
     title: z.string().min(1).meta(d('Display title, for example "Developer".')),
     summary: z.string().min(1).meta(d("One line on what the role does.")),
-    toolset: z.enum(["base", "code", "infra"]).meta(d("Which tool bundle the agent gets.")),
-    permissions: z.enum(["readonly", "docs", "code", "infra"]).meta(d("Permission profile.")),
+    permissions: z
+      .enum(["readonly", "docs", "code", "infra"])
+      .meta(d("Permission profile. The agent gets every toolset whose profiles include it.")),
     needs: z
       .array(z.enum(CAPABILITIES))
       .default([])

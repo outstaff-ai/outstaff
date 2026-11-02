@@ -1,7 +1,6 @@
 name: developer
 title: Developer
 summary: Implements tickets, fixes review feedback, keeps stacks rebased and tests the work.
-toolset: code
 permissions: code
 needs:
   - vcs.pullRequests

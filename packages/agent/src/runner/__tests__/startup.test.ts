@@ -447,7 +447,7 @@ people:`,
     mkdirSync(role, { recursive: true });
     writeFileSync(
       join(role, "role.yaml"),
-      "name: auditor\ntitle: Auditor\nsummary: Checks the books.\ntoolset: base\npermissions: readonly\n",
+      "name: auditor\ntitle: Auditor\nsummary: Checks the books.\npermissions: readonly\n",
     );
 
     writeFileSync(join(role, "SKILL.md"), "# Auditor of {{ team.name }}\n");

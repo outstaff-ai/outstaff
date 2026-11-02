@@ -5,7 +5,7 @@ The catalog of agent roles and skills that ship with Outstaff, as plain content 
 ## Format
 
 ```
-roles/<role>/role.yaml   name, title, summary, toolset (base|code|infra),
+roles/<role>/role.yaml   name, title, summary,
                          permissions (readonly|docs|code|infra), needs,
                          optional_needs, modes[{name, when}],
                          extends[], files {skill: SKILL.md}
@@ -35,7 +35,7 @@ Rendering is strict: an unknown path (also in `#if`), a bad tag or an unbalanced
 
 ## Toolsets
 
-`toolsets/<name>.yaml` declares a family of tools to install at agent start. A role names its toolset in `role.yaml` (`base`, `code` or `infra`). Agents run any program inside the sandbox, so a toolset is mostly about what gets installed. A toolset has two optional parts, and needs at least one:
+`toolsets/<name>.yaml` declares a family of tools to install at agent start. A role does not name its toolsets: an agent gets every toolset whose `profiles` include its role's `permissions` (all roles when `profiles` is omitted), so `base` goes to `readonly` and `docs` roles, `code` to `code` and `infra` roles, and `infra` to `infra` roles. The `profiles` also limit the toolset's rules to those profiles. Agents run any program inside the sandbox, so a toolset is mostly about what gets installed. A toolset has two optional parts, and needs at least one:
 
 - `tools:` installs tools at agent start with mise. Each entry is `name: { version, source?, allow? }`: an exact `version`, an optional mise `source` such as `ubi:vendor/their-cli`, and an optional `allow` that narrows the tool to a list of first subcommands or structured command rules (default `all`). The stock `base` toolset (python, for designers and the other roles that do not build software) and `code` toolset (pnpm, yarn, python, go) install their tools with no narrowing; the stock `infra` toolset (terraform, kubectl, helm) narrows them to read-only verbs.
 - `rules:` holds command rules for programs that come with the image or that Outstaff does not install: `deny` rules, or `allow` rules that narrow a program to what they match.

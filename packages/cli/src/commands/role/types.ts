@@ -2,7 +2,6 @@ export type RoleOptions = {
   from?: string;
   title?: string;
   profile?: string;
-  toolset?: string;
   force?: boolean;
 };
 

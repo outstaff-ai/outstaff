@@ -32,8 +32,7 @@ function stock(version: string, files: Record<string, string | null> = {}) {
   const dir = join(root, `stock${n++}`);
   const base: Record<string, string> = { "package.json": JSON.stringify({ version }) };
   for (const r of ROLES) {
-    base[`roles/${r}/role.yaml`] =
-      `name: ${r}\ntitle: ${r}\nsummary: s\ntoolset: base\npermissions: docs\n`;
+    base[`roles/${r}/role.yaml`] = `name: ${r}\ntitle: ${r}\nsummary: s\npermissions: docs\n`;
 
     base[`roles/${r}/SKILL.md`] = skill(r);
   }

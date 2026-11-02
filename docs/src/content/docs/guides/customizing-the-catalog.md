@@ -77,14 +77,14 @@ You can add roles the stock catalog does not have. A custom role lives next to y
 ```
 ost role new auditor
 ost role new qa --from reviewer --title "QA Engineer"
-ost role new data-engineer --profile code --toolset code
+ost role new data-engineer --profile code
 ```
 
 This writes `roles/<name>/role.yaml` and `roles/<name>/SKILL.md`.
 
 - Without `--from`, both files come from a minimal template with `TODO` placeholders for the summary, the modes and the instructions.
 - With `--from <stock-role>`, both files are copies of that stock role with the name and title replaced. The copy stops following stock; if you want future catalog changes merged into it, `ost eject` the role and edit it instead.
-- `--title` sets the display title (the name in title case by default). `--profile` (`readonly`, `docs`, `code` or `infra`) and `--toolset` (`base`, `code` or `infra`) set the permission profile and tool bundle; they default to `docs` and `base`, or to the `--from` role's values.
+- `--title` sets the display title (the name in title case by default). `--profile` (`readonly`, `docs`, `code` or `infra`) sets the permission profile, which also picks the toolsets the agent installs ([stock toolsets](/guides/tools/#the-stock-toolsets)); it defaults to `docs`, or to the `--from` role's value.
 
 The name must be a DNS-safe label: lowercase letters, digits and dashes, starting with a letter, at most 63 characters. A name that belongs to a stock role is refused, and the error points to `ost eject`. An existing custom role is only replaced when you pass `--force`.
 

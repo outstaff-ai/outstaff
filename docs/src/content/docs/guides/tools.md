@@ -29,7 +29,7 @@ people:
       terraform: { version: 1.9.8, allow: [init, validate, plan] }
 ```
 
-The key is the program name the agent runs. The stock catalog toolsets declare tools the same way: the `infra` toolset installs terraform, kubectl and helm with read-only verbs. A role's toolset is the base, `tools:` in `team.yaml` replaces a tool of the same name from it, and a person's `tools:` replaces the team's. The winning declaration replaces the others completely, `allow` included, so overriding a version also decides the narrowing.
+The key is the program name the agent runs. The stock catalog toolsets declare tools the same way: the `infra` toolset installs terraform, kubectl and helm with read-only verbs. A role's toolsets are the base, `tools:` in `team.yaml` replaces a tool of the same name from them, and a person's `tools:` replaces the team's. The winning declaration replaces the others completely, `allow` included, so overriding a version also decides the narrowing.
 
 ## Versions
 
@@ -84,7 +84,17 @@ The other options (`bin_path`, `strip_components`, `format` and the rest) are mi
 
 ## The stock toolsets
 
-The agent image carries only Node, git and mise. The `base` toolset, which the designer, PM, product and reviewer roles use, installs python. The `code` toolset installs pnpm, yarn, python and go at pinned versions, with no narrowing. The `infra` toolset installs terraform, kubectl and helm narrowed to read-only verbs (for kubectl: `get`, `describe`, `logs`, `diff`, `version`, `api-resources`, `api-versions`, `explain` and `auth can-i`). Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; anything on the `PATH` runs.
+The agent image carries only Node, git, curl and mise. A role does not name its toolsets: the agent installs every toolset whose `profiles` include the role's permission profile (`permissions` in `role.yaml`), and a toolset without `profiles` goes to every role.
+
+| Toolset | Profiles           | Installs                                                 | Stock roles                     |
+| ------- | ------------------ | -------------------------------------------------------- | ------------------------------- |
+| `base`  | `readonly`, `docs` | python                                                   | designer, PM, product, reviewer |
+| `code`  | `code`, `infra`    | pnpm, yarn, python and go, with no narrowing             | developer, architect, devops    |
+| `infra` | `infra`            | terraform, kubectl and helm, narrowed to read-only verbs | devops                          |
+
+kubectl is narrowed to `get`, `describe`, `logs`, `diff`, `version`, `api-resources`, `api-versions`, `explain` and `auth can-i`.
+
+So a devops agent has the code toolchains as well as the infrastructure CLIs, and runs a repository's own tests, typecheck and lint before it opens a pull request. The `profiles` of a toolset also limit its rules to those profiles. An ejected `toolsets/<name>.yaml` replaces the stock file of that name, and a new file in the ejected `toolsets/` adds a toolset; its `name` must equal the file name. Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; anything on the `PATH` runs.
 
 ## Narrowing a tool
 
@@ -192,7 +202,7 @@ A repository can ask for its own pnpm: `packageManager` in `package.json`, or `d
 
 ## Egress
 
-Installing needs outbound HTTPS to the tool sources: mise's registry and release hosts, `github.com` and `api.github.com` for `github:` (and the older `ubi:`), the download host of each `http:` source, and the package registries of the backends you use. Only the first start and a version change need them, so you can leave them blocked afterwards. See [egress](/reference/container-contract/#egress).
+Installing needs outbound HTTPS to the tool sources: mise's registry and release hosts, `github.com` and `api.github.com` for `github:` (and the older `ubi:`), the download host of each `http:` source, and the package registries of the backends you use. Only the first start and a version change need them. Package installs in the agent's work are different: `pnpm install`, `yarn install`, `pip install` and `go mod download` reach the package registries (`registry.npmjs.org`, `pypi.org` and `files.pythonhosted.org`, `proxy.golang.org`, or your own mirror) every time a lockfile changes, so keep those open for roles that build or test code. The [example network policy](/guides/kubernetes/#network-policy) allows HTTPS to any public address, which covers them. See [egress](/reference/container-contract/#egress).
 
 ## Prebuilt images instead
 

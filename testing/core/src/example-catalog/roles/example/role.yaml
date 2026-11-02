@@ -2,7 +2,6 @@
 name: example
 title: Example Role
 summary: Shows the catalog format; not a real role.
-toolset: base
 permissions: readonly
 needs:
   - tracker.issues

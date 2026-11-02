@@ -1,5 +1,5 @@
 name: code
-description: Language toolchains for build, test and lint, installed at agent start. Node and git come with the agent image.
+description: Language toolchains for build, test and lint, installed at agent start. Node, git and curl come with the agent image.
 profiles: [code, infra]
 tools:
   pnpm:

@@ -30,7 +30,7 @@ function project(name = `p${n++}`, team?: string) {
 }
 
 const roleFiles = (name: string) => ({
-  [`roles/${name}/role.yaml`]: `name: ${name}\ntitle: ${name}\nsummary: s\ntoolset: base\npermissions: docs\n`,
+  [`roles/${name}/role.yaml`]: `name: ${name}\ntitle: ${name}\nsummary: s\npermissions: docs\n`,
   [`roles/${name}/SKILL.md`]: `Skill of ${name} at {{team.name}}.\n`,
 });
 

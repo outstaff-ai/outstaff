@@ -51,7 +51,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   const rendered = renderWorkdir(team, person, layout.workDir, catalogs, log);
   const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
   const role = roles[me.role];
-  const toolsets = loadToolsets(opts.stockCatalogDir, roles, me.role, rendered.extends);
+  const toolsets = loadToolsets([opts.stockCatalogDir, catalogs.ejected?.dir], rendered.profile);
 
   // Person beats team beats toolset. Installing a tool allows nothing; its `allow` becomes policy rules below.
   const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });

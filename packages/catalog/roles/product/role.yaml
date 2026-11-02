@@ -1,7 +1,6 @@
 name: product
 title: Product
 summary: Writes requirements and acceptance criteria, and reviews solutions against them.
-toolset: base
 permissions: docs
 needs:
   - knowledge.docs

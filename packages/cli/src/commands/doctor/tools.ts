@@ -1,6 +1,12 @@
 import { homedir } from "node:os";
 import { loadToolsets, runMise, verifyTools } from "@outstaff/agent";
-import { effectiveTools, renderPerson, type DoctorCheck, type TeamConfig } from "@outstaff/core";
+import {
+  effectiveTools,
+  renderPerson,
+  type DoctorCheck,
+  type Profile,
+  type TeamConfig,
+} from "@outstaff/core";
 import { stockCatalogDir } from "#/catalogs.js";
 import type { Context, TeamCatalogs } from "#/types.js";
 import { plural } from "./check.js";
@@ -9,19 +15,15 @@ import type { Status } from "./types.js";
 type Person = TeamConfig["people"][number];
 type Tool = ReturnType<typeof effectiveTools>[number];
 
-/** The roles the person's role extends, or undefined when the person does not render. */
-function extendedRoles(
-  team: TeamConfig,
-  person: Person,
-  catalogs: TeamCatalogs,
-): string[] | undefined {
+/** The person's permission profile, or undefined when the person does not render. */
+function profileOf(team: TeamConfig, person: Person, catalogs: TeamCatalogs): Profile | undefined {
   try {
     return renderPerson({
       team,
       handle: person.handle,
       catalog: catalogs.stock,
       ...(catalogs.ejected ? { ejected: catalogs.ejected } : {}),
-    }).extends;
+    }).profile;
   } catch {
     return undefined;
   }
@@ -34,17 +36,12 @@ function declaredTools(
   person: Person,
   catalogs: TeamCatalogs | undefined,
 ): Tool[] {
-  if (!catalogs) {
+  const profile = catalogs && profileOf(team, person, catalogs);
+  if (!profile) {
     return [];
   }
 
-  const extended = extendedRoles(team, person, catalogs);
-  if (!extended) {
-    return [];
-  }
-
-  const roles = { ...catalogs.stock.roles, ...catalogs.ejected?.roles };
-  const toolsets = loadToolsets(stockCatalogDir(ctx), roles, person.role, extended);
+  const toolsets = loadToolsets([stockCatalogDir(ctx), catalogs.ejected?.dir], profile);
   return effectiveTools({ toolsets, team: team.tools, person: person.tools });
 }
 

@@ -3,16 +3,17 @@ import type { PreparedAgent } from "#/runner/startup.types.js";
 import { actsCheck } from "./acts.js";
 import { diskCheck } from "./disk.js";
 import { networkChecks } from "./network.js";
-import { toolStatusChecks } from "./tools.js";
+import { toolPathChecks, toolStatusChecks } from "./tools.js";
 import type { DoctorReporter, StartupChecksInput } from "./types.js";
 
 /**
- * What only the agent's own container can tell: its tools installed, its tracker port ready for acts, its services
+ * What only the agent's own container can tell: its tools installed and on its PATH, its tracker port ready for acts, its services
  * and devices answer, its disk.
  */
 export async function startupChecks(input: StartupChecksInput): Promise<DoctorCheck[]> {
   return [
     ...toolStatusChecks(input.tools),
+    ...toolPathChecks(input.tools, input.env, input.executable),
     ...(input.ports ? actsCheck(input.team, input.ports) : []),
     ...(await networkChecks(input, input.team, input.person, true)),
     await diskCheck(input.home, input.volume),

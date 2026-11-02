@@ -21,8 +21,7 @@ const infos = (c: { roles: Record<string, { name: string; title: string; summary
   Object.values(c.roles).map((r) => ({ name: r.name, title: r.title, summary: r.summary }));
 
 let n = 0;
-const GOOD_ROLE =
-  "name: dev\ntitle: Dev\nsummary: Writes code.\ntoolset: code\npermissions: code\n";
+const GOOD_ROLE = "name: dev\ntitle: Dev\nsummary: Writes code.\npermissions: code\n";
 
 /** Writes a catalog from {relative path: text}; adds a version unless given. */
 const make = (files: Record<string, string>): string => {
@@ -61,7 +60,6 @@ describe("loadCatalog on the example role", () => {
     const r = catalog.roles.example;
     expect(r).toMatchObject({
       title: "Example Role",
-      toolset: "base",
       permissions: "readonly",
       needs: ["tracker.issues"],
       optional_needs: ["knowledge.docs"],
@@ -242,14 +240,17 @@ describe("loadCatalog errors", () => {
       ),
     );
 
-    expect(issues[0]).toMatchObject({ code: "catalog.unknown_key", line: 6 });
-    const bad = issuesOf(make(role("dev", GOOD_ROLE.replace("toolset: code", "toolset: laser"))));
+    expect(issues[0]).toMatchObject({ code: "catalog.unknown_key", line: 5 });
+    const bad = issuesOf(
+      make(role("dev", GOOD_ROLE.replace("permissions: code", "permissions: laser"))),
+    );
+
     expect(bad[0]).toMatchObject({ code: "catalog.invalid_value", line: 4 });
     const cap = issuesOf(
       make(role("dev", GOOD_ROLE + "needs:\n  - tracker.issues\n  - nope.thing\n")),
     );
 
-    expect(cap[0]).toMatchObject({ code: "catalog.invalid_value", line: 8 });
+    expect(cap[0]).toMatchObject({ code: "catalog.invalid_value", line: 7 });
   });
 
   it("reports a role's default_model as removed: every person names their model", () => {
@@ -257,9 +258,22 @@ describe("loadCatalog errors", () => {
     expect(issues).toEqual([
       expect.objectContaining({
         code: "catalog.removed_key",
-        line: 6,
+        line: 5,
         message: expect.stringMatching(
           /^default_model: default_model was removed.*people\[\]\.model/,
+        ),
+      }),
+    ]);
+  });
+
+  it("reports a role's toolset as removed: the permission profile picks the toolsets", () => {
+    const issues = issuesOf(make(role("dev", GOOD_ROLE + "toolset: infra\n")));
+    expect(issues).toEqual([
+      expect.objectContaining({
+        code: "catalog.removed_key",
+        line: 5,
+        message: expect.stringMatching(
+          /^toolset: toolset was removed: the role's permission profile/,
         ),
       }),
     ]);
@@ -280,7 +294,7 @@ describe("loadCatalog errors", () => {
 
   it("checks extends for unknown roles and cycles", () => {
     const unknown = issuesOf(make({ ...role("dev", GOOD_ROLE + "extends: [ghost]\n") }));
-    expect(unknown[0]).toMatchObject({ code: "catalog.unknown_extends", line: 6 });
+    expect(unknown[0]).toMatchObject({ code: "catalog.unknown_extends", line: 5 });
     const cycle = issuesOf(
       make({
         ...role("a", GOOD_ROLE.replace("name: dev", "name: a") + "extends: [b]\n"),
