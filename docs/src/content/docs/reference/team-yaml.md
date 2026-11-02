@@ -635,7 +635,7 @@ Options of the tool that take their value as the next word, such as -c or --cont
 
 #### people[].tools.<key>.allow
 
-Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. Deny rules and the built-in denies still win.
+Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of subcommands, or structured rules. With a list or rules, only the commands they match run. When an option before the subcommand is not in valued_options and might take the next word as its value, every way of reading the command must be allowed. Deny rules and the built-in denies still win.
 
 - Type: `string or list of string or list of object`
 - Optional
@@ -648,7 +648,7 @@ Narrows what the agent may run of the tool: "all" (the default: any arguments), 
 
 #### people[].tools.<key>.deny
 
-Commands of the tool the agent may never run: a list of first subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.
+Commands of the tool the agent may never run: a list of subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.
 
 - Type: `list of string or list of object`
 - Optional
@@ -972,7 +972,7 @@ Options of the tool that take their value as the next word, such as -c or --cont
 
 #### tools.<key>.allow
 
-Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. Deny rules and the built-in denies still win.
+Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of subcommands, or structured rules. With a list or rules, only the commands they match run. When an option before the subcommand is not in valued_options and might take the next word as its value, every way of reading the command must be allowed. Deny rules and the built-in denies still win.
 
 - Type: `string or list of string or list of object`
 - Optional
@@ -985,7 +985,7 @@ Narrows what the agent may run of the tool: "all" (the default: any arguments), 
 
 #### tools.<key>.deny
 
-Commands of the tool the agent may never run: a list of first subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.
+Commands of the tool the agent may never run: a list of subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.
 
 - Type: `list of string or list of object`
 - Optional

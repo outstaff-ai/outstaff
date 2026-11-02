@@ -84,20 +84,23 @@ The other options (`bin_path`, `strip_components`, `format` and the rest) are mi
 
 ## The stock toolsets
 
-The agent image carries only Node, git and mise. The `base` toolset, which the designer, PM, product and reviewer roles use, installs python. The `code` toolset installs pnpm, yarn, python and go at pinned versions, with no narrowing. The `infra` toolset installs terraform, kubectl and helm narrowed to read-only verbs. Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; anything on the `PATH` runs.
+The agent image carries only Node, git and mise. The `base` toolset, which the designer, PM, product and reviewer roles use, installs python. The `code` toolset installs pnpm, yarn, python and go at pinned versions, with no narrowing. The `infra` toolset installs terraform, kubectl and helm narrowed to read-only verbs (for kubectl: `get`, `describe`, `logs`, `diff`, `version`, `api-resources`, `api-versions`, `explain` and `auth can-i`). Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; anything on the `PATH` runs.
 
 ## Narrowing a tool
 
 Without `allow`, or with `allow: all`, the tool runs with any arguments. `allow` narrows it:
 
-- A list of words, such as `[get, describe, logs]`, allows those first subcommands only: `kubectl get pods` runs, `kubectl delete pod x` is denied.
+- A list of words, such as `[get, describe, logs]`, allows those first subcommands only: `kubectl get pods` runs, `kubectl delete pod x` is denied. An entry of several words names a nested subcommand: `auth can-i` allows `kubectl auth can-i list pods`, not `kubectl auth reconcile`.
+
+A command outside the list is refused with what the tool allows, for example `kubectl delete is refused: kubectl here allows get, describe, logs.`, so the agent can take a command that runs instead.
+
 - Structured rules take the same fields as `policies.commands` (`subcommand`, `args`, `reason`, `requires_repo`). `program` may be left out; when given it must be the tool's own name. Only the commands they match run.
 
 Declaring a tool also lifts the built-in default denies for infrastructure writes (`kubectl apply`, `terraform apply`, `helm upgrade` and the like): they run when the declaration allows them, with `all` or a list that names them.
 
 ## Denying commands
 
-`deny` refuses commands of a tool, in the same forms as `allow`: a list of first subcommands, or structured rules with a `reason`. Deny always wins, over `allow` and over `all`, so a tool can run whole except for a few commands:
+`deny` refuses commands of a tool, in the same forms as `allow`: a list of subcommands, or structured rules with a `reason`. Deny always wins, over `allow` and over `all`, so a tool can run whole except for a few commands:
 
 ```yaml
 tools:
@@ -112,7 +115,8 @@ Many tools take options before the subcommand: `acmectl -c prod delete`, `adb -s
 
 - `--option=value` is one word, so it never hides the subcommand.
 - `valued_options` lists the options of the tool that take the next word as their value. With it, `allow` and `deny` find the subcommand exactly.
-- Without it, a deny rule also tries each leading word that follows an option as that option's value, so `-c prod delete` cannot slip past a deny of `delete`. An allow list does not guess: `acmectl -c prod status` is outside `allow: [status]` until `-c` is in `valued_options`.
+- Outstaff knows the global options of `kubectl` and `helm`, so `kubectl -n ops get pods` is a `get` without a declaration.
+- Otherwise a leading word that follows an option may be that option's value, so a rule reads the command each way. A deny rule refuses it if any reading is denied, so `-c prod delete` cannot slip past a deny of `delete`. An allow list runs it only if every reading is allowed, so `-c get delete` cannot pass as a `get`: `acmectl -c prod status` is outside `allow: [status]` until `-c` is in `valued_options`, and the refusal says so.
 
 ```yaml
 tools:
@@ -123,7 +127,7 @@ tools:
     deny: [delete]
 ```
 
-Guessing can refuse a command whose leading option took no value: without `valued_options`, `acmectl --verbose status delete` is refused as if it were a `delete`. Listing the tool's valued options makes deny rules exact too.
+Guessing can refuse a command whose leading option took no value: without `valued_options`, `acmectl --verbose status delete` is refused as if it were a `delete`, and `acmectl --verbose status x` is outside `allow: [status]` as if it were an `x`. Listing the tool's valued options makes the rules exact; so does writing the option as `--option=value` or after the subcommand.
 
 ### Example: guarding a device
 

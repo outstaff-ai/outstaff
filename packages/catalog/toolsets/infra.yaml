@@ -7,7 +7,7 @@ tools:
     allow: [init, validate, fmt, plan, show]
   kubectl:
     version: 1.31.3
-    allow: [get, describe, logs, diff]
+    allow: [get, describe, logs, diff, version, api-resources, api-versions, explain, auth can-i]
   helm:
     version: 3.16.3
     allow: [template, lint]
