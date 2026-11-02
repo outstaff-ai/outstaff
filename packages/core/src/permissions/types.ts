@@ -56,8 +56,10 @@ export interface CommandRule {
   requiresRepo?: GitMode;
 
   /**
-   * Options of the program that take their value as the next word (`-c`, `--context`). Their values are not operands.
-   * Without it, a deny rule also tries the words after the leading options as the subcommand, in case one is a value.
+   * Options of the program that take their value as the next word (`-c`, `--context`). Their values are not operands,
+   * and a program whose rules declare them is read exactly. Without them, a leading option not known to take a value
+   * (kubectl's and helm's global options are known) may still take the next word, so the command is read each way: a
+   * deny rule refuses it on any reading, and allow rules must allow every reading.
    */
   valuedOptions?: string[];
 

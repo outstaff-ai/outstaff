@@ -60,7 +60,7 @@ const allRule = (name: string): CommandRule => ({
   reason: `${name} is declared in tools.`,
 });
 
-/** The rule of one `allow` or `deny` entry: a first subcommand, or a structured rule. */
+/** The rule of one `allow` or `deny` entry: a subcommand (one or more words), or a structured rule. */
 function entryRule(
   name: string,
   effect: CommandRule["effect"],
@@ -69,10 +69,12 @@ function entryRule(
 ): CommandRule {
   const prefix = effect === "allow" ? `tools.${name}` : `tools.${name}.deny`;
   if (typeof entry === "string") {
+    // A multi-word entry such as `auth can-i` names a nested subcommand.
+    const words = entry.trim().split(/\s+/);
     return {
-      id: `${prefix}.${entry}`,
+      id: `${prefix}.${words.join(".")}`,
       program: name,
-      subcommand: [entry],
+      subcommand: words,
       effect,
       reason: `${name} ${entry} is ${effect === "allow" ? "allowed" : "denied"} by the ${name} tools declaration.`,
     };

@@ -23,14 +23,25 @@ export function operands(args: readonly string[], valued: readonly string[] = []
   return out;
 }
 
+/** Whether an option not known to take a value may still take the next word as one. */
+const mayTakeValue = (option: string, next: string, flags: readonly string[]): boolean =>
+  !flags.includes(option) && !option.includes("=") && !next.startsWith("-");
+
 /**
- * How many leading operands may be the value of the option before them, when nothing says which options take one:
- * `-c prod -v x delete` gives 2 (`prod` and `x`), so `delete` may be the subcommand. `--name=value` is one word.
+ * How many leading operands may be the value of an option before them that is neither in `valued` nor in `flags`:
+ * `-c prod -v x delete` gives 2 (`prod` and `x`), so `delete` may be the subcommand. `--name=value` is one word, a
+ * `valued` option's value is never an operand and a flag never takes one.
  */
-export function leadingValues(args: readonly string[]): number {
+export function leadingValues(
+  args: readonly string[],
+  valued: readonly string[] = [],
+  flags: readonly string[] = [],
+): number {
   let n = 0;
   for (let i = 0; i < args.length - 1 && isOption(args[i]!); i++) {
-    if (!args[i + 1]!.startsWith("-") && !args[i]!.includes("=")) {
+    if (valued.includes(args[i]!)) {
+      i++;
+    } else if (mayTakeValue(args[i]!, args[i + 1]!, flags)) {
       n++;
       i++;
     }

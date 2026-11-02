@@ -2,6 +2,8 @@ import { checkPath } from "./check-path.js";
 import { allow, deny } from "./decision.js";
 import { repoFor } from "./git.js";
 import { leadingValues, operands } from "./operands.js";
+import { narrowedDenial } from "./narrowed-denial.js";
+import { knownOptions } from "./program-options.js";
 import type { ArgPredicate, CommandRule, Decision, Policy } from "./types.js";
 
 function flagValues(args: string[], names: string[]): string[] | null {
@@ -48,31 +50,21 @@ function predicateHolds(p: ArgPredicate, args: string[], positionals: string[]):
 }
 
 /**
- * Whether the rule applies to the command, and the positionals after its subcommand when it does. A deny rule of a
- * program whose valued options are not declared also tries each leading word that may be an option's value as not
- * being the subcommand, so `-c prod delete` cannot hide a denied `delete`.
+ * The words a command may hold after its leading options, one list per reading: the first takes every leading option
+ * that is not known to take a value as a flag, each next one takes one more of them as taking the following word. A
+ * program whose rules declare `valuedOptions` is read exactly, as is one whose leading options are all known.
  */
-function matchRule(
-  r: CommandRule,
-  program: string,
-  args: string[],
-): { positionals: string[] } | null {
-  if (r.program !== program) {
-    return null;
-  }
+function readings(rules: CommandRule[], program: string, args: string[]): string[][] {
+  const known = knownOptions(program);
+  const declared = rules.flatMap((r) => r.valuedOptions ?? []);
+  const valued = [...known.valued, ...declared];
+  const all = operands(args, valued);
+  const guesses = declared.length > 0 ? 0 : leadingValues(args, valued, known.flags);
 
-  const all = operands(args, r.valuedOptions);
-  const skips = r.effect === "deny" && !r.valuedOptions ? leadingValues(args) : 0;
-  for (let skip = 0; skip <= skips; skip++) {
-    const m = matchAt(r, args, all.slice(skip));
-    if (m) {
-      return m;
-    }
-  }
-
-  return null;
+  return Array.from({ length: guesses + 1 }, (_, skip) => all.slice(skip));
 }
 
+/** Whether the rule applies to one reading of the command, and the positionals after its subcommand when it does. */
 function matchAt(
   r: CommandRule,
   args: string[],
@@ -91,9 +83,22 @@ function matchAt(
   return { positionals };
 }
 
+type Hit = { r: CommandRule; positionals: string[] };
+
+/** The first of the rules that matches the reading. */
+function hitAt(rules: CommandRule[], args: string[], words: string[]): Hit | undefined {
+  for (const r of rules) {
+    const m = matchAt(r, args, words);
+    if (m) {
+      return { r, ...m };
+    }
+  }
+}
+
 /**
- * Deny rules win. A program no allow rule names runs (built-in fallback denies still apply to it); a program that allow
- * rules name runs only what one of them allows.
+ * Deny rules win, on any reading of the command, so `-c prod delete` cannot hide a denied `delete`. A program no allow
+ * rule names runs (built-in fallback denies still apply to it); a program that allow rules name runs only what they
+ * allow, on every reading that has a subcommand, so `-n get delete` cannot pass as a `get`.
  */
 export function evaluateCommandRules(
   policy: Policy,
@@ -102,36 +107,59 @@ export function evaluateCommandRules(
   cwd: string,
 ): Decision {
   const named = policy.commands.filter((r) => r.program === program);
-  const matches = named.map((r) => ({ r, m: matchRule(r, program, args) })).filter((x) => x.m);
+  const views = readings(named, program, args);
+  const denyRules = named.filter((r) => r.effect === "deny");
+  const denied = views.flatMap((w) => hitAt(denyRules, args, w) ?? []);
 
-  const denied = matches.find((x) => x.r.effect === "deny" && !x.r.fallback);
-  if (denied) {
-    return deny(denied.r.reason, denied.r.id);
+  const hard = denied.find((x) => !x.r.fallback);
+  if (hard) {
+    return deny(hard.r.reason, hard.r.id);
   }
 
-  const narrowed = named.some((r) => r.effect === "allow");
-  if (!narrowed) {
-    const fallback = matches.find((x) => x.r.effect === "deny");
-    return fallback
-      ? deny(fallback.r.reason, fallback.r.id)
-      : allow(`${program} runs inside the sandbox.`, "commands.default");
+  const allowRules = named.filter((r) => r.effect === "allow");
+  if (allowRules.length > 0) {
+    return evaluateNarrowed(policy, { program, args, cwd }, allowRules, views);
   }
 
-  const hit = matches.find((x) => x.r.effect === "allow");
-  if (!hit) {
-    return deny(
-      `${program} is limited to the commands its tools declaration or team rules allow, and this is not one of them.`,
-      "commands.narrowed",
-    );
+  const fallback = denied[0];
+
+  return fallback
+    ? deny(fallback.r.reason, fallback.r.id)
+    : allow(`${program} runs inside the sandbox.`, "commands.default");
+}
+
+type Command = { program: string; args: string[]; cwd: string };
+
+/** A program that allow rules name: every reading must hit one, and each hit's repository and path checks must pass. */
+function evaluateNarrowed(
+  policy: Policy,
+  { program, args, cwd }: Command,
+  allowRules: CommandRule[],
+  views: string[][],
+): Decision {
+  // A reading in which an option took the last word runs no subcommand; the others decide.
+  const decisive = views.filter((words, k) => k === 0 || words.length > 0);
+  const hits: Hit[] = [];
+  for (const words of decisive) {
+    const hit = hitAt(allowRules, args, words);
+    if (!hit) {
+      return narrowedDenial(program, allowRules, words, views.length > 1);
+    }
+
+    hits.push(hit);
   }
 
-  const { r, m } = hit;
+  for (const { r, positionals } of hits) {
+    const refused =
+      unmetRepoRequirement(policy, r, program, args, cwd) ??
+      deniedPathArgument(policy, r, positionals, cwd);
 
-  return (
-    unmetRepoRequirement(policy, r, program, args, cwd) ??
-    deniedPathArgument(policy, r, m!.positionals, cwd) ??
-    allow(r.reason, r.id)
-  );
+    if (refused) {
+      return refused;
+    }
+  }
+
+  return allow(hits[0]!.r.reason, hits[0]!.r.id);
 }
 
 /** Why the repository the command runs in does not meet the rule's `requiresRepo`, if it does not. */

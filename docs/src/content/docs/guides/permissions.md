@@ -55,7 +55,7 @@ policies:
       - { program: acme-cli, subcommand: [prod], reason: Never touch prod. }
 ```
 
-`kubectl delete pod x`, `make deploy` and `acmectl -c prod delete x` are then denied, `acmectl -c prod status` runs, and `acme-cli prod` is denied whatever else allows it. A refusal names the rule that decided it, such as `tools.acmectl.deny.delete`. Rules find the subcommand after the program's leading global options; see [tools](/guides/tools/#denying-commands) for the forms `allow` and `deny` take and for `valued_options`.
+`kubectl delete pod x`, `make deploy` and `acmectl -c prod delete x` are then denied, `acmectl -c prod status` runs, and `acme-cli prod` is denied whatever else allows it. A refusal names the rule that decided it, such as `tools.acmectl.deny.delete`; a command outside an allow list is refused with the command and what the program allows (`kubectl delete is refused: kubectl here allows get, describe, logs.`). Rules find the subcommand after the program's leading global options; see [tools](/guides/tools/#denying-commands) for the forms `allow` and `deny` take and for `valued_options`.
 
 ## Profiles
 

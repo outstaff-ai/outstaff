@@ -155,18 +155,25 @@ export const toolDeclarationSchema = z
         ),
       ),
     allow: z
-      .union([z.literal("all"), commandList("Subcommand verbs the agent may run.")])
+      .union([
+        z.literal("all"),
+        commandList(
+          'Subcommands the agent may run: one word each, or several for a nested one such as "auth can-i".',
+        ),
+      ])
       .optional()
       .meta(
         d(
-          'Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of first subcommands, or structured rules. With a list or rules, only the commands they match run. Deny rules and the built-in denies still win.',
+          'Narrows what the agent may run of the tool: "all" (the default: any arguments), a list of subcommands, or structured rules. With a list or rules, only the commands they match run. When an option before the subcommand is not in valued_options and might take the next word as its value, every way of reading the command must be allowed. Deny rules and the built-in denies still win.',
         ),
       ),
-    deny: commandList("Subcommand verbs the agent may never run.")
+    deny: commandList(
+      'Subcommands the agent may never run: one word each, or several for a nested one such as "rollout restart".',
+    )
       .optional()
       .meta(
         d(
-          'Commands of the tool the agent may never run: a list of first subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.',
+          'Commands of the tool the agent may never run: a list of subcommands, or structured rules. Deny always wins over allow, including "all". A deny rule also looks past the value of a leading option that is not in valued_options, so `-x value delete` cannot hide a denied `delete`.',
         ),
       ),
   })
