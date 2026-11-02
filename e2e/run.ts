@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2143,6 +2143,7 @@ async function main() {
   );
 
   await unblockDependents();
+  await canceledWhileQueued();
   await mergeChecks();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
@@ -2254,6 +2255,84 @@ async function unblockDependents() {
 
   step(
     `unblock dependents: ${blocker13c} blocks ${waiting13c.join(" and ")} -> the human closed it -> both moved to ready as sam, and sam was woken on each`,
+  );
+}
+
+/**
+ * 13e. a ticket canceled while its round is queued: sam is busy with a round held at a gate when a second ticket is
+ * assigned to him, so its round waits in his queue, and the human cancels that ticket. The queued round is canceled,
+ * naming who canceled the ticket, and never runs: sam neither starts nor comments on it.
+ */
+async function canceledWhileQueued() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  await stub("POST", "/_test/gates/closed/close");
+  const { key: busy } = await stub("POST", "/_test/tickets", {
+    title: "Check the staging font",
+    description: "which repo: unclear\nhold: closed",
+  });
+
+  await stub("POST", `/_test/tickets/${busy}/assign`, { to: "sam" });
+  await until(`sam's round on ${busy} held at the gate`, (s) => s.chat.gates.closed?.arrived);
+
+  const { key: dup } = await stub("POST", "/_test/tickets", {
+    title: "Check the staging font again",
+    description: "which repo: unclear",
+  });
+
+  // The assignment queues one round; a second wake for the same ticket folds into it.
+  const queued = () =>
+    logs("office").match(/queued work item \S+ for sam \(assigned\)/g)?.length ?? 0;
+
+  const queuedBefore = queued();
+  await stub("POST", `/_test/tickets/${dup}/assign`, { to: "sam" });
+  await until(`a round on ${dup} queued for sam`, () =>
+    queued() > queuedBefore ? true : undefined,
+  );
+
+  await stub("POST", `/_test/tickets/${dup}/move`, { to: "Canceled" });
+  const canceled = new RegExp(
+    `canceled work item \\S+ for sam: Canceled: ${dup} was canceled by \\S+ at`,
+  );
+
+  await until(`the queued round on ${dup} canceled`, () =>
+    canceled.test(logs("office")) ? true : undefined,
+  );
+
+  const wakesAtCancel = wakesOf("sam").length;
+
+  await stub("POST", "/_test/gates/closed/open");
+  await until(`sam's round on ${busy} done`, (s) =>
+    s.tickets
+      .find((x: Json) => x.key === busy)
+      .comments.some((c: Json) => c.body.includes("Which repository is")) && idle(s)
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${busy} handed back`);
+  const after = (await state()).tickets.find((x: Json) => x.key === dup);
+  assertEq(after.status, "Canceled", `${dup} stayed canceled`);
+  assertEq(
+    JSON.stringify(after.comments.filter((c: Json) => c.author === "sam")),
+    "[]",
+    `sam never worked on ${dup}`,
+  );
+
+  assertEq(
+    after.moves.some((m: Json) => m.by === "sam"),
+    false,
+    `sam never moved ${dup}: its round never started`,
+  );
+
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(wakesAtCancel)),
+    "[]",
+    "the cancel woke no one: sam's running round was on another ticket",
+  );
+
+  step(
+    `canceled while queued: ${dup} assigned to sam while he worked on ${busy} -> the human canceled it -> its queued round was canceled and never ran`,
   );
 }
 

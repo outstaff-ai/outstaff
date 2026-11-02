@@ -195,7 +195,8 @@ export interface WorkState extends WorkflowState {
 
   /**
    * Receives the synthetic events the work state derives: `pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`,
-   * `pr.base_merged`, `pr.linked`, `pr.merge_checks_passed`, `pr.merge_checks_failed` and `ticket.unblocked`.
+   * `pr.base_merged`, `pr.linked`, `pr.merge_checks_passed`, `pr.merge_checks_failed`, `ticket.closed` and
+   * `ticket.unblocked`.
    */
   onEvent(handler: WorkstateHandler): void;
 

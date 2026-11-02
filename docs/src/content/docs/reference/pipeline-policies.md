@@ -30,6 +30,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
+| [`closed_stops_work`](#closed_stops_work) | `ticket.closed` | stop the work on the ticket of every agent but the one who closed it; a ticket closed as done by an unknown closer or an automation stops nothing |
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
@@ -395,6 +396,22 @@ Instruction:
 
 Note posted with the change: none; the instruction is the wake's.
 
+### closed_stops_work
+
+A ticket canceled, or closed as done by someone other than the agent working on it, stops the work on it: every agent's queued work on it and its pull requests is canceled, and an agent running such work is told to stop when its round ends. The agent who closed the ticket is left alone.
+
+Listens to `ticket.closed`. Decides: stop the work on the ticket of every agent but the one who closed it; a ticket closed as done by an unknown closer or an automation stops nothing.
+
+When:
+
+- `ticket_status: done, canceled`
+
+Note posted with the change:
+
+```text
+{{ticket}} was {{closed}} by {{closer}} at {{closed.at}}. Stop, and don't open a pull request for it. If the work belongs to another ticket, say which and hand back.
+```
+
 ### unblocked_to_blocked_agent
 
 A blocked ticket whose last open blocker was closed wakes the agent blocked on it, to check whether it can go on; the ticket stays where it is, since it may be blocked for other reasons too.
@@ -579,6 +596,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `ticket.moved`
 - `ticket.created`
 - `ticket.unblocked`
+- `ticket.closed`
 - `doc.commented`
 - `agent.started`
 - `agent.handed_back`
@@ -614,3 +632,6 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `requester`
 - `blocker`
 - `checks`
+- `closer`
+- `closed`
+- `closed.at`

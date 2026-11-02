@@ -73,5 +73,18 @@ describe("describeProposal", () => {
 
     expect(describeProposal({ type: "drop", reason: "no" })).toBe("drop: no");
     expect(describeProposal({ type: "error", reason: "threw: boom" })).toBe("error: threw: boom");
+    expect(describeProposal({ type: "stop", ticket: "ACME-1", notice: "Stop.", reason: "r" })).toBe(
+      "stop the work on ACME-1: Stop.",
+    );
+
+    expect(
+      describeProposal({
+        type: "stop",
+        ticket: "ACME-1",
+        notice: "Stop.",
+        except: ["sam"],
+        reason: "r",
+      }),
+    ).toBe("stop the work on ACME-1 except sam's: Stop.");
   });
 });

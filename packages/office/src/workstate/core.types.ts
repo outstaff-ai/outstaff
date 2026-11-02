@@ -106,8 +106,8 @@ export interface Closing {
 
 export interface UnblockOps {
   /**
-   * Reads the ticket again, like `refreshTicket`. When that finds it just closed, raises `ticket.unblocked` on each
-   * ticket it blocks that is blocked and has no open blocker left.
+   * Reads the ticket again, like `refreshTicket`. When that finds it just closed, raises `ticket.closed` on it and
+   * `ticket.unblocked` on each ticket it blocks that is blocked and has no open blocker left.
    */
   refreshAndUnblock(ctx: RefreshCtx, key: string, closing?: Closing): Promise<void>;
 }

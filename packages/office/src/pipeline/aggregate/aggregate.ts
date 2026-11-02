@@ -1,4 +1,4 @@
-import type { Policy, PolicyRun } from "@outstaff/policy";
+import type { ActProposal, Policy, PolicyRun, StopProposal } from "@outstaff/policy";
 import type { Decision } from "#/pipeline/decisions.types.js";
 import type { AggregationEntry } from "#/pipeline/trace.types.js";
 import type { AggregateInput, Slot } from "./aggregate.types.js";
@@ -20,7 +20,14 @@ function slotsOf(runs: readonly PolicyRun[], priorities: ReadonlyMap<string, num
   );
 }
 
-/** What each proposal is before the cross-policy rules: an error, a drop, a wake, an act, or a suppression (later). */
+/** The decision an act or a stop becomes as it is. */
+function keptAs(p: ActProposal | StopProposal, policy: string): Decision {
+  return p.type === "act"
+    ? { type: "act", policy, as: p.as, ops: [...p.ops], ...(p.note ? { note: p.note } : {}) }
+    : { type: "stop", policy, ticket: p.ticket, notice: p.notice, except: [...(p.except ?? [])] };
+}
+
+/** What each proposal is before the cross-policy rules: an error, a drop, a wake, an act, a stop, or a suppression (later). */
 function initial(slot: Slot, input: AggregateInput): void {
   const p = slot.proposal;
   if (slot.outcome) {
@@ -40,14 +47,9 @@ function initial(slot: Slot, input: AggregateInput): void {
       wakeOf(slot, p, input);
       return;
     case "act":
+    case "stop":
       slot.outcome = "kept";
-      slot.decision = {
-        type: "act",
-        policy: slot.policy,
-        as: p.as,
-        ops: [...p.ops],
-        ...(p.note ? { note: p.note } : {}),
-      };
+      slot.decision = keptAs(p, slot.policy);
   }
 }
 

@@ -12,6 +12,9 @@ export interface ChecksOptions {
   usage: UsageSource | undefined;
   maxRuns: number;
   chatSessions: number;
+
+  /** The start-time check (`SchedulerOptions.stopped`). */
+  stopped?: ((item: WorkItem) => Promise<string | undefined>) | undefined;
 }
 
 /** The scheduler's reads of the store and its policy checks, shared by its operations. */
@@ -37,6 +40,9 @@ export interface Checks {
   blockItem(item: WorkItem, reason: string, code: BlockNotice["code"]): Promise<BlockNotice>;
   queuedOf(person: string): Promise<WorkItem[]>;
   applyMove(itemId: string, target: MoveTarget): Promise<void>;
+
+  /** Cancels a queued item the start-time check stops, with the reason in its journal; the reason, when it did. */
+  stop(item: WorkItem): Promise<string | undefined>;
 }
 
 /** What the scheduler's operations outside `scheduler.ts` work with. */

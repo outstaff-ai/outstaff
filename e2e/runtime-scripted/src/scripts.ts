@@ -410,6 +410,14 @@ async function* followUpOnTicket(
   return `Opened ${url}`;
 }
 
+/** A ticket that says `hold: <gate>` keeps its round running until the driver opens that gate. */
+async function* holdIfAsked(shown: string): AsyncGenerator<Action, void, string> {
+  const hold = /^hold: (\S+)$/m.exec(shown)?.[1];
+  if (hold) {
+    yield { type: "gate", name: hold };
+  }
+}
+
 /**
  * A ticket is assigned: read it, change the file, push, open the pull request, and ask when the ticket says so. A
  * ticket that says `split: <title>` needs two pull requests, so it is split first: a sub-ticket with that title, the
@@ -420,6 +428,7 @@ export async function* assigned(ctx: ItemContext): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+  yield* holdIfAsked(shown);
   const stopped = yield* blockIfStuck(key, shown, ctx.unblocked);
   if (stopped !== undefined) {
     return stopped;

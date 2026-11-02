@@ -6,6 +6,7 @@ import {
   formatTrace,
   subjectOf,
 } from "#/pipeline/describe.js";
+import { decisionLines } from "#/pipeline/replay/decision-lines.js";
 import type { Trace } from "#/pipeline/trace.types.js";
 import { event, prRef } from "./support.js";
 
@@ -394,5 +395,49 @@ describe("formatTrace", () => {
     } as unknown as Trace;
 
     expect(formatTrace(old)).toContain("  matched  p: no condition\n\nDecisions:");
+  });
+});
+
+describe("a stop in words", () => {
+  const stop = {
+    type: "stop" as const,
+    policy: "closed_stops_work",
+    ticket: "ACME-144",
+    notice: "ACME-144 was canceled. Stop.",
+    except: [] as string[],
+  };
+
+  it("names the ticket, the agents it spares, and what it canceled and queued", () => {
+    expect(describeDecision(stop)).toBe("stop the work on ACME-144");
+    expect(describeDecision({ ...stop, except: ["sam"] })).toBe(
+      "stop the work on ACME-144, except sam's",
+    );
+
+    expect(describeProposal({ ...stop, reason: "r" })).toBe("stop the work on ACME-144");
+    expect(describeProposal({ ...stop, except: ["sam"], reason: "r" })).toBe(
+      "stop the work on ACME-144, except sam's",
+    );
+
+    const trace: Trace = {
+      event: event("ticket.closed", { id: "workstate:c-1", subject: { ticket: "ACME-144" } }),
+      policies: [],
+      aggregation: [],
+      decisions: [stop, { ...stop, canceled: ["w-1"], noticed: ["w-2"] }],
+    };
+
+    expect(formatTrace(trace).split("\n").slice(-7)).toEqual([
+      "Decisions:",
+      "  stop the work on ACME-144",
+      "    notice: ACME-144 was canceled. Stop.",
+      "  stop the work on ACME-144",
+      "    notice: ACME-144 was canceled. Stop.",
+      "    canceled work items w-1",
+      "    queued notice rounds w-2",
+    ]);
+
+    expect(decisionLines(trace)).toEqual([
+      "stop the work on ACME-144: _ACME-144 was canceled. Stop._",
+      "stop the work on ACME-144: _ACME-144 was canceled. Stop._",
+    ]);
   });
 });

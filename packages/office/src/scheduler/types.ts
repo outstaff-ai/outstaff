@@ -23,6 +23,12 @@ export interface SchedulerOptions {
 
   /** A queued item held for coalescing can be offered now; the person is told there is work. */
   onReleased?: (person: string) => void;
+
+  /**
+   * The start-time check: why a queued item must not start any more (its ticket was closed after it was queued), or
+   * undefined. Such an item is canceled when it would start, with the reason in its journal, instead of being offered.
+   */
+  stopped?: (item: WorkItem) => Promise<string | undefined>;
 }
 
 export type Placement = "next" | "last" | { before: string } | { after: string };
@@ -66,7 +72,7 @@ export type StartResult =
   | { started: true; item: WorkItem; run: Run }
   | {
       started: false;
-      reason: "not_queued" | "busy" | "backoff" | RunBlock["code"] | "loop_guard";
+      reason: "not_queued" | "busy" | "backoff" | RunBlock["code"] | "loop_guard" | "stopped";
       detail: string;
 
       /** Set when the attempt blocked the item (loop guard). */
@@ -128,7 +134,8 @@ export interface Scheduler {
   /**
    * The item the person should run next, or null: while paused, and when every queued item is held back by a
    * policy, a failure backoff, or a lane that is full (one work item at a time; chat sessions up to
-   * `policies.chat.parallel_sessions`, beside it). Does not change state.
+   * `policies.chat.parallel_sessions`, beside it). Changes nothing, except that an item the start-time check stops
+   * (`stopped`) is canceled on the way.
    */
   next(person: string): Promise<WorkItem | null>;
 

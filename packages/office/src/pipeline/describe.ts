@@ -30,6 +30,10 @@ export function subjectOf(event: PipelineEvent): string {
   return subjectLabel(event.subject);
 }
 
+/** A stop in words: the ticket, and the agents whose work it leaves alone. */
+const stopText = (ticket: string, except: readonly string[] = []) =>
+  `stop the work on ${ticket}${except.length > 0 ? `, except ${except.join(", ")}'s` : ""}`;
+
 /** One line per decision, for `ost explain` and the replay report. */
 export function describeDecision(d: Decision): string {
   switch (d.type) {
@@ -39,6 +43,8 @@ export function describeDecision(d: Decision): string {
       return `act for ${d.as}: ${d.ops.map(describeOp).join(", ")}`;
     case "drop":
       return `drop: ${d.reason}`;
+    case "stop":
+      return stopText(d.ticket, d.except);
   }
 }
 
@@ -51,6 +57,8 @@ export function describeProposal(p: Proposal | ErrorProposal): string {
       return `act for ${p.as}: ${p.ops.map(describeOp).join(", ")}`;
     case "suppress":
       return `suppress waking ${p.person}${p.kind ? ` (${p.kind})` : ""}: ${p.reason}`;
+    case "stop":
+      return stopText(p.ticket, p.except);
     default:
       return `${p.type}: ${p.reason}`;
   }
@@ -101,11 +109,20 @@ function wakeLines(d: Extract<Decision, { type: "wake" }>): string[] {
   return [`    instruction: ${d.instruction}`, ...item];
 }
 
+/** A stop's notice, and the items it canceled and the notice rounds it queued. */
+function stopLines(d: Extract<Decision, { type: "stop" }>): string[] {
+  return [
+    `    notice: ${d.notice}`,
+    ...(d.canceled?.length ? [`    canceled work items ${d.canceled.join(", ")}`] : []),
+    ...(d.noticed?.length ? [`    queued notice rounds ${d.noticed.join(", ")}`] : []),
+  ];
+}
+
+const extraLines = (d: Decision): string[] =>
+  d.type === "wake" ? wakeLines(d) : d.type === "stop" ? stopLines(d) : [];
+
 const decisionLines = (decisions: Trace["decisions"]): string[] =>
-  decisions.flatMap((d) => [
-    `  ${describeDecision(d)}`,
-    ...(d.type === "wake" ? wakeLines(d) : []),
-  ]);
+  decisions.flatMap((d) => [`  ${describeDecision(d)}`, ...extraLines(d)]);
 
 function entryLine(e: ManifestEntry): string {
   const counted =

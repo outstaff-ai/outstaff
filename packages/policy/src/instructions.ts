@@ -30,6 +30,9 @@ export const INSTRUCTION_VARIABLES = [
   "requester",
   "blocker",
   "checks",
+  "closer",
+  "closed",
+  "closed.at",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -62,6 +65,25 @@ function causeVariables(data: Record<string, unknown>): Record<string, string> {
   };
 }
 
+/** Who closed the ticket a `ticket.closed` or `ticket.unblocked` names, from its `closedBy`; `someone` when unknown. */
+function closerOf(by: unknown): string {
+  const id = (by as { id?: unknown } | undefined)?.id;
+  return typeof id === "string" && id !== "" ? id : "someone";
+}
+
+/** How a `ticket.closed` closed its ticket, and when, as `HH:MM UTC`; empty for any other event. */
+function closedVariables(type: string, data: Record<string, unknown>): Record<string, string> {
+  if (type !== "ticket.closed") {
+    return { closed: "", "closed.at": "" };
+  }
+
+  const time = /T(\d\d:\d\d)/.exec(stringOf(data["at"]))?.[1];
+  return {
+    closed: data["status"] === "canceled" ? "canceled" : "closed as done",
+    "closed.at": time ? `${time} UTC` : "an unknown time",
+  };
+}
+
 /** The human who asked for the ticket's work, else the team's first human, as a hand-back assigns it. */
 const requesterOf = ({ ticket, state, opts }: EvaluationContext): string =>
   (ticket ? state.requester(ticket) : undefined) ?? opts.fallbackRequester ?? "";
@@ -83,6 +105,8 @@ export function instructionVariables(
     requester: requesterOf(ctx),
     blocker: stringOf(event.data["blocker"]),
     checks: checksOf(event.data["failing"]),
+    closer: closerOf(event.data["closedBy"]),
+    ...closedVariables(event.type, event.data),
   };
 }
 

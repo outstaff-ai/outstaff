@@ -19,7 +19,7 @@ export const TEAM_SCOPE = "team";
 export const personScope = (person: string) => `person:${person}`;
 
 export function createChecks(opts: ChecksOptions): Checks {
-  const { store, team, clock, log, usage, maxRuns, chatSessions } = opts;
+  const { store, team, clock, log, usage, maxRuns, chatSessions, stopped } = opts;
 
   /** The active merge of another item in the item's repository, if there is one. */
   const mergeRunning = async (item: Pick<WorkItem, "id" | "kind" | "subject">) => {
@@ -139,6 +139,17 @@ export function createChecks(opts: ChecksOptions): Checks {
     await store.reorderQueue(planMove(queue, itemId, target));
   };
 
+  const stop = async (item: WorkItem): Promise<string | undefined> => {
+    const why = await stopped?.(item);
+    if (why) {
+      await store.updateItem(item.id, { status: "canceled" });
+      await store.appendJournal(item.id, "scheduler", why);
+      log.info("work item canceled at its start", { item: item.id, person: item.person, why });
+    }
+
+    return why;
+  };
+
   return {
     hasRoom,
     mergeRunning,
@@ -151,5 +162,6 @@ export function createChecks(opts: ChecksOptions): Checks {
     blockItem,
     queuedOf,
     applyMove,
+    stop,
   };
 }

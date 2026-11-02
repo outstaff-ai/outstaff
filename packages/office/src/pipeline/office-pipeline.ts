@@ -4,6 +4,8 @@ import { createLivePipeline } from "./live/live.js";
 import type { OfficePipeline, OfficePipelineOptions } from "./office-pipeline.types.js";
 import { createStoreTraceStore } from "./store-traces.js";
 
+export { stoppedWork } from "./live/stop.js";
+
 /**
  * The event pipeline as the office runs it (decision 0018): it decides on every event, and its acts go to the agents
  * that make them.
