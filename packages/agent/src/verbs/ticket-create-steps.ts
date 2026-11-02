@@ -177,14 +177,14 @@ export async function noteFailedUploads(
 }
 
 /**
- * Tells the office about a chat ticket: the caller's own is filed as its work; one for someone else is only recorded
- * against the request. Returns the line that says which, and the filing for the verb's data.
+ * Tells the office about a chat ticket: the caller's own is filed as its work, with the agent's line for the reply;
+ * one for someone else is only recorded against the request. Returns the line that says which, and the filing for
+ * the verb's data.
  */
 export async function fileInOffice(
   env: AgentEnv,
   chat: OfficeWorkItem | undefined,
-  key: string,
-  request: string,
+  { key, request, say }: { key: string; request: string; say?: string | undefined },
   to: Assignee,
 ): Promise<{ line?: string; data: { filed?: Filed; filedFor?: string } }> {
   if (!chat) {
@@ -193,7 +193,7 @@ export async function fileInOffice(
 
   const office = requireOffice(env);
   if (!to.forOther || !to.member) {
-    const filed = await office.linkTicket(chat.id, key, request);
+    const filed = await office.linkTicket(chat.id, key, request, say);
     return { line: filedLine(filed), data: { filed } };
   }
 

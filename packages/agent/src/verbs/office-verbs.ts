@@ -4,6 +4,7 @@ import { z } from "zod";
 import { uploadAttachments, uploadedLines } from "./attachments.js";
 import type { AgentEnv, Uploaded } from "./types.js";
 import { filedLine, requireOffice } from "./support.js";
+import { chatLine, sayInput } from "./chat-line.js";
 import { defineVerb, result } from "./define.js";
 
 export const ask = defineVerb({
@@ -165,6 +166,25 @@ async function uploadToTicket(env: AgentEnv, ticket: string | undefined): Promis
   return uploadAttachments(env, ticket, env.attachments ?? []);
 }
 
+/** What `ost work attach` asks of the office, with the agent's line for the reply checked first. */
+function attachRequest(
+  env: AgentEnv,
+  input: {
+    target: string;
+    confirmed: boolean;
+    request?: string | undefined;
+    say?: string | undefined;
+  },
+) {
+  const say = chatLine(env, input.say);
+  return {
+    target: input.target,
+    confirmed: input.confirmed,
+    ...(input.request ? { request: input.request } : {}),
+    ...(say ? { say } : {}),
+  };
+}
+
 export const workAttach = defineVerb({
   name: "work.attach",
   summary: "Add a chat request to work you already have.",
@@ -191,9 +211,14 @@ export const workAttach = defineVerb({
       .describe(
         'What to add, when the message of this session is only the human\'s answer (for example "this PR"): restate the request they made earlier in the thread.',
       ),
+    say: sayInput,
   }),
   args: ["target"],
-  examples: ["ost work attach ACME-11", "ost work attach 11 --confirmed"],
+  examples: [
+    "ost work attach ACME-11",
+    "ost work attach 11 --confirmed",
+    'ost work attach 11 --confirmed --say "Reworking it from your new comment."',
+  ],
   async run(env, input, ctx) {
     if (!ctx.workItemId) {
       throw new PortError(
@@ -202,11 +227,7 @@ export const workAttach = defineVerb({
       );
     }
 
-    const done = await requireOffice(env).attachWork(ctx.workItemId, {
-      target: input.target,
-      confirmed: input.confirmed,
-      ...(input.request ? { request: input.request } : {}),
-    });
+    const done = await requireOffice(env).attachWork(ctx.workItemId, attachRequest(env, input));
 
     const { pr, ticket } = done.attached;
     // The files of the message join the ticket the request was added to.

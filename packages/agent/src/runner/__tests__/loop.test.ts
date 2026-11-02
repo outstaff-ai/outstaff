@@ -65,6 +65,10 @@ const officeReplies: Partial<{
   work_list: (m) => ["work_list_result", { items: chatItems(m.payload.workItemId) }],
   work_link: () => ["work_link_result", filedReply],
   work_queue: () => ["work_queue_result", filedReply],
+  work_attach: () => [
+    "work_attach_result",
+    { ...filedReply, attached: { ticket: { type: "ticket", ref: "SHOP-1" } } },
+  ],
 };
 
 const chatOrigin = (files: Record<string, unknown>[] | undefined) => ({
@@ -876,7 +880,7 @@ describe("work loop", () => {
 
   const relay = () => {
     const reports: { kind: string; text: string; links: unknown; item: string }[] = [];
-    const acks: { item: string; key: string }[] = [];
+    const acks: { item: string; key: string; say?: string }[] = [];
     const chat: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments"> = {
       async attachments() {
         return [];
@@ -885,7 +889,11 @@ describe("work loop", () => {
         return "Recent messages:\n- Dana: add search\n\nYour current work:\nTicket ACME-9";
       },
       async acknowledge(offer, what) {
-        acks.push({ item: offer.workItem.id, key: what.key ?? what.title });
+        acks.push({
+          item: offer.workItem.id,
+          key: what.key ?? what.title,
+          ...(what.say ? { say: what.say } : {}),
+        });
       },
       async report(offer, kind, text, links) {
         reports.push({ kind, text, links, item: offer.workItem.id });
@@ -1141,6 +1149,37 @@ describe("work loop", () => {
       expect(sentOf("work_link")[0]?.payload).toMatchObject({ workItemId: "c1" });
       expect(acks).toEqual([{ item: "c1", key: expect.stringMatching(/^SHOP-/) as string }]);
       expect(reports).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("posts the agent's own line when a chat session attaches its request, and never sends it to the office", async () => {
+      await connect();
+      const { chat, acks } = relay();
+      const runtime: Runtime = {
+        async *run(req) {
+          yield { type: "started", sessionId: "s" };
+          await req.tools
+            .find((t) => t.name === "work_attach")!
+            .handler(
+              { target: "SHOP-1", say: "Reworking it now." },
+              { workItemId: req.workItemId! },
+            );
+
+          yield { type: "finished", ok: true, text: "Done." };
+        },
+      };
+
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("work_attach")[0]?.payload).toEqual({
+        workItemId: "c1",
+        target: "SHOP-1",
+        confirmed: false,
+      });
+
+      expect(acks).toEqual([{ item: "c1", key: "Filed", say: "Reworking it now." }]);
       await loop.stop();
       await conn.stop();
     });

@@ -63,7 +63,8 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
       call("work_link", { workItemId, ticket, request }, "work_link_result"),
     fileFor: (workItemId, filing) => ack("work_file_for", { workItemId, ...filing }),
     checkFiling: (workItemId, request) => ack("work_check", { workItemId, request }),
-    attachWork: (workItemId, request) =>
+    // The agent's line for the chat reply stays with the agent.
+    attachWork: (workItemId, { say: _say, ...request }) =>
       call("work_attach", { workItemId, ...request }, "work_attach_result"),
     queueWork: (workItemId, request) =>
       call("work_queue", { workItemId, ...request }, "work_queue_result"),
