@@ -116,9 +116,14 @@ function identityCheck(ctx: DeriveContext, member: KeyOwner): DoctorCheck | unde
   return compareIdentity(ctx.person.handle, ctx.person.identities?.tracker, member);
 }
 
+/**
+ * The checks both adapters share: the key works, links can be built, the member is the one the team file names. An
+ * adapter adds its own with `extra`, on the same connection.
+ */
 export async function doctorItsaplan(
   secrets: SecretSource,
   ctx: DeriveContext,
+  extra?: (api: Itsaplan, ctx: DeriveContext) => Promise<DoctorCheck[]>,
 ): Promise<DoctorCheck[]> {
   const apiKey = secrets.get("ITSAPLAN_API_KEY");
   if (!apiKey) {
@@ -138,6 +143,7 @@ export async function doctorItsaplan(
     await linkCheck(session.api),
     memberIdCheck(secrets.get("ITSAPLAN_MEMBER_ID"), member.id),
     identityCheck(ctx, member),
+    ...(extra ? await extra(session.api, ctx) : []),
   ];
 
   return checks.filter((c) => c !== undefined);

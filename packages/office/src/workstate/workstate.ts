@@ -87,7 +87,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const unblockOps = createUnblock(core, ticketOps);
   const prOps = createPrs(core, ticketOps);
   const requesters = createRequesters(core, ticketOps);
-  const { saveDoc, touchDoc } = createDocs(core);
+  const { saveDoc, touchDoc, linkDoc } = createDocs(core);
   const { followMerges } = createMergeChecks(core);
   const { refreshPr, ticketOfDraft } = prOps;
   const { deliver, handle } = createEvents(core, {
@@ -97,6 +97,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     ...requesters,
     saveDoc,
     touchDoc,
+    linkDoc,
     followMerges,
   });
 
@@ -239,18 +240,14 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     doc: (id) => docs.get(id),
     docAuthor: (id) => docs.get(id)?.author,
 
-    linkDoc: (doc) =>
-      locked(async () => {
-        const known = docs.get(doc.id);
-        await saveDoc({
-          id: doc.id,
-          title: doc.title,
-          url: doc.url,
-          author: known?.author ?? doc.author,
-          ...((doc.ticket ?? known?.ticket) ? { ticket: (doc.ticket ?? known?.ticket)! } : {}),
-          touchedAt: clock.now().toISOString(),
-        });
-      }),
+    async linkDoc(doc) {
+      const ctx: RefreshCtx = { fresh: [] };
+      try {
+        await locked(() => linkDoc(ctx, doc));
+      } finally {
+        await deliver(ctx.fresh);
+      }
+    },
 
     openDocs: (limit) =>
       [...docs.values()]

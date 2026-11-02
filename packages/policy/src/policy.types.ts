@@ -93,13 +93,15 @@ export interface PolicyOptions extends WorkflowOptions {
  * One bookkeeping change of an act. `assign: requester` is the human who asked for the work (else the team's first
  * human), `assign: self` the agent acted for, and any other person reference (`role:pm`, for example) the agent it
  * names; `set_parent` sets the parent ticket the event names in `data.parent`; `link_pr` shows the event's pull
- * request on the ticket (the tracker's `tracker.development`).
+ * request on the ticket (the tracker's `tracker.development`); `link_doc` shows the event's document on the ticket
+ * (the knowledge base's `knowledge.issueLinks`).
  */
 export type OpSpec =
   | { move: CanonicalStatus }
   | { assign: "requester" | "self" | PersonRef }
   | { set_parent: true }
-  | { link_pr: true };
+  | { link_pr: true }
+  | { link_doc: true };
 
 /** What `ctx.wake` wakes: a person, the kind of run, and its subject (the event's, or the agent's next ready ticket). */
 export interface WakeSpec {

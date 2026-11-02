@@ -4,6 +4,7 @@ export { ticketCandidates } from "./infer.js";
 export type {
   CiState,
   CurrentWork,
+  DocLink,
   DocRecord,
   MergeCheck,
   MergeChecks,

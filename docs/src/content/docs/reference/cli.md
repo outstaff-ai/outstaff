@@ -695,7 +695,7 @@ ost doc show specs/checkout.md --json
 
 Create a document.
 
-Creates a new document. It never overwrites: an existing path is a conflict.
+Creates a new document. It never overwrites: an existing path is a conflict. A document written for a ticket (the one you are working on, or --ticket) is linked on that ticket.
 
 ```
 ost doc create <path> [options]
@@ -705,6 +705,7 @@ ost doc create <path> [options]
 | --- | --- |
 | `--title <title>` | Document title. |
 | `--body <body>` | Document text, Markdown. |
+| `--ticket <ticket>` | Key of the ticket the document is for, for example ACME-12; it is linked on the ticket. Default: the ticket of the work you are on. |
 
 Exit codes:
 
@@ -715,6 +716,7 @@ Examples:
 
 ```sh
 ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"
+ost doc create specs/search.md --title "Search" --body "# Search" --ticket ACME-12
 ost doc create specs/checkout.md --title "Checkout" --body "# Checkout" --json
 ```
 

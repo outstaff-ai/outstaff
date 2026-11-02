@@ -2,6 +2,7 @@ import type { Doc, Member } from "@outstaff/core";
 import type { KnowledgeSeed, TrackerSeed } from "@outstaff/core/contracts";
 import { createStubFetch } from "./http-stub.js";
 import { createItsaplanStandIn, err } from "./stand-in/index.js";
+import { createIssue } from "./stand-in/model.js";
 import type { ItsaplanStore, StoredDoc } from "./stand-in/index.js";
 import type { FakeOptions, Markdown, Route } from "./types.js";
 
@@ -52,6 +53,10 @@ const trackerSeed = (s: ItsaplanStore): TrackerSeed => ({
 });
 
 const knowledgeSeed = (s: ItsaplanStore, markdown: Markdown | undefined): KnowledgeSeed => ({
+  async issue() {
+    return createIssue(s, s.members[0]!.userId, { title: "Linked", columnId: s.columns[0]!.id })
+      .identifier;
+  },
   async doc(d) {
     const row: StoredDoc = {
       id: ++s.counters.doc,
@@ -86,7 +91,7 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
 
   const stub = createStubFetch([...forbidden, ...routes]);
   const { issues, activity, columns, labels, members, attachments, docs, docComments } = store;
-  const { repositories, pullRequests, development } = store;
+  const { repositories, pullRequests, development, docIssues } = store;
   return {
     fetch: stub.fetch,
     calls: stub.calls,
@@ -103,6 +108,7 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
       repositories,
       pullRequests,
       development,
+      docIssues,
     },
     trackerSeed: trackerSeed(store),
     knowledgeSeed: knowledgeSeed(store, markdown),

@@ -31,7 +31,7 @@ trackerContract("fake", async () => {
 
 knowledgeContract("fake", async () => {
   const subject = createFakeKnowledge();
-  return { subject, seed: subject.seed, capabilities: ["knowledge.docs"] };
+  return { subject, seed: subject.seed, capabilities: ["knowledge.docs", "knowledge.issueLinks"] };
 });
 
 vcsContract("fake", async () => {

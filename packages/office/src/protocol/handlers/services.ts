@@ -41,7 +41,7 @@ export const serviceHandlers: RequestHandlers = {
   },
   async doc_link({ ctx, person, payload, reply }) {
     const docs = required(ctx.opts.docs, "This office does not track documents.");
-    await docs.link(person, payload.workItemId, payload.doc);
+    await docs.link(person, payload.workItemId, payload.doc, payload.ticket);
     reply("ack", {});
   },
   async act_result({ ctx, person, payload, reply }) {

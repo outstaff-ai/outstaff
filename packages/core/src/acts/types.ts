@@ -11,7 +11,8 @@ export type ActOp =
   | { op: "assign"; ticket: string; to: ActTarget | null }
   | { op: "comment"; on: { ticket: string } | { doc: string }; body: string }
   | { op: "set_parent"; ticket: string; parent: string }
-  | { op: "link_pr"; ticket: string; pr: PullRequestToLink };
+  | { op: "link_pr"; ticket: string; pr: PullRequestToLink }
+  | { op: "link_doc"; ticket: string; doc: string };
 
 /** What applying an act did: one line per change made, and the error that stopped it, if any. */
 export interface ActOutcome {

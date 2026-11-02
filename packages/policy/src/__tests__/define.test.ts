@@ -55,6 +55,7 @@ describe("checkProposals", () => {
             ticket: "ACME-1",
             pr: { repo: { owner: "acme", name: "shop" }, number: 7, url: "https://x.example/7" },
           },
+          { op: "link_doc", ticket: "ACME-1", doc: "42" },
           { op: "comment", on: { ticket: "ACME-1" }, body: "x" },
         ],
         note: "n",

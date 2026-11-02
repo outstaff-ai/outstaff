@@ -4,6 +4,7 @@ import { ProtocolError } from "#/protocol/errors.js";
 import { CHAT_KIND } from "#/scheduler/policy.js";
 import type { WorkItem } from "#/store/types.js";
 import { addFeedback } from "#/work-feedback.js";
+import { attachSessionDocs } from "./desk-attach-docs.js";
 import type { ChatDeskOptions, ChatRequests, DeskFiling } from "./desk.types.js";
 import { resolveOwnWork } from "./desk-resolve.js";
 import {
@@ -193,6 +194,7 @@ export function createAttach(
         : []),
     ]);
 
+    await attachSessionDocs(opts, person, { sessionId: session.id, itemId: item.id, ticket: key });
     await store.upsertSubject(CHAT_THREAD_SUBJECT, threadKey(origin.channel, origin.thread), {
       itemId: item.id,
     });

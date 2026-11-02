@@ -10,7 +10,7 @@ import { createChatDesk } from "#/chat/desk.js";
 import type { ChatRequests } from "#/chat/desk.types.js";
 import { openChatSession } from "#/chat/session.js";
 import { readOrigin, threadsOf, withThread } from "#/chat/origin.js";
-import type { PrRecord, TicketRecord } from "#/workstate/index.js";
+import type { DocLink, DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
 import { addFeedback, readFeedback } from "#/work-feedback.js";
 
 function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConfig {
@@ -60,6 +60,7 @@ describe("chat requests", () => {
   let tickets: TicketRecord[];
   let pulls: PrRecord[];
   let workers: Record<string, string>;
+  let docs: DocLink[];
 
   // The office's picture of the work, as the work state keeps it.
   const knownWork = () => ({
@@ -85,6 +86,8 @@ describe("chat requests", () => {
     lastWorker: (key: string) => workers[key],
     catchUp: async () => {},
     prSubject: (ref: { number: number }) => `acme/app#${ref.number}`,
+    doc: (id: string) => docs.findLast((d) => d.id === id) as DocRecord | undefined,
+    linkDoc: async (d: DocLink) => void docs.push(d),
   });
 
   /** A message the pipeline woke sam for: a chat session for it, as `chat_to_addressed` queues one. */
@@ -148,6 +151,7 @@ describe("chat requests", () => {
     tickets = [];
     pulls = [];
     workers = {};
+    docs = [];
     n = 0;
     notified = [];
     clock = manualClock();
@@ -647,6 +651,44 @@ describe("chat requests", () => {
         id: running!.id,
         state: "running",
       });
+    });
+
+    it("makes the documents the session wrote the ticket's, on the item that does the work", async () => {
+      ticket("ACME-11");
+      const s = await session();
+      const url = "https://docs.acme.example/42";
+      await store.addItemRefs(s.id, [
+        { type: "doc", ref: "42", url, role: "created", source: "doc_link" },
+        { type: "doc", ref: "43", role: "created", source: "doc_link" },
+      ]);
+
+      docs.push({ id: "42", title: "Search design", url, author: "sam" });
+      const done = await desk.attachWork("sam", s.id, { target: "ACME-11", confirmed: false });
+      expect(docs.slice(1)).toEqual([
+        { id: "42", title: "Search design", url, author: "sam", ticket: "ACME-11" },
+        { id: "43", title: "43", url: "", author: "sam", ticket: "ACME-11" },
+      ]);
+
+      expect(await store.listItemRefs(done.item.id)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ type: "doc", ref: "42", url, role: "attached" }),
+          expect.objectContaining({ type: "doc", ref: "43", role: "attached" }),
+        ]),
+      );
+    });
+
+    it("attaches no document to a pull request without a ticket, and none of a session that wrote none", async () => {
+      const { ticket: _ticket, ...untracked } = pull(11);
+      pulls.splice(0, pulls.length, untracked);
+      const s = await session();
+      await store.addItemRefs(s.id, [
+        { type: "doc", ref: "42", role: "created", source: "doc_link" },
+      ]);
+
+      await desk.attachWork("sam", s.id, { target: "#11", confirmed: false });
+      ticket("ACME-12");
+      await attach("ACME-12");
+      expect(docs).toEqual([]);
     });
 
     it("keeps the item's own thread, adds the attached thread once, and has the result go to each", async () => {

@@ -1,4 +1,4 @@
-import { PortError, type Issue, type LinkedIssue, type Member } from "@outstaff/core";
+import type { Issue, LinkedIssue, Member } from "@outstaff/core";
 import type {
   ApiFeedItem,
   ApiIssue,
@@ -9,7 +9,6 @@ import type {
 } from "@outstaff/integration.shared.itsaplan";
 import type { Statuses } from "./types.js";
 
-const KEY = /^(?:([A-Za-z0-9_]+)-)?(\d+)$/;
 const HYDRATE_CONCURRENCY = 5;
 export const FEED_PAGE = 100;
 
@@ -52,19 +51,7 @@ export function issueHelpers(api: Itsaplan, statuses: Statuses) {
     };
   };
 
-  const fetchIssue = async (key: string): Promise<ApiIssue> => {
-    const m = KEY.exec(key.trim());
-    if (!m) {
-      throw new PortError("invalid", `"${key}" is not an issue key (expected KEY-12).`);
-    }
-
-    const setup = await api.project();
-    if (m[1] && m[1].toLowerCase() !== setup.project.key.toLowerCase()) {
-      throw new PortError("not_found", `Issue ${key} is not in project ${setup.project.key}.`);
-    }
-
-    return api.http.request<ApiIssue>("GET", `${api.projectPath}/issues/${m[2]}`);
-  };
+  const fetchIssue = (key: string): Promise<ApiIssue> => api.issue(key);
 
   const labelIds = async (names: string[], create: boolean): Promise<number[]> => {
     let setup = await api.project();

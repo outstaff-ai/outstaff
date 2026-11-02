@@ -182,6 +182,57 @@ describe("doc verbs", () => {
     );
   });
 
+  it("links a new document to the ticket it names, and says when it could not", async () => {
+    const { env, office } = fakeEnv();
+    const made = await run(
+      "doc.create",
+      env,
+      { path: "specs/search.md", title: "Search", body: "x", ticket: "ACME-12" },
+      { workItemId: "w1" },
+    );
+
+    expect(office.docsLinked).toEqual([
+      expect.objectContaining({ workItemId: "w1", ticket: "ACME-12" }),
+    ]);
+
+    expect(made.text).not.toContain("Not linked");
+    const loose = await run("doc.create", env, {
+      path: "specs/loose.md",
+      title: "Loose",
+      body: "x",
+      ticket: "ACME-12",
+    });
+
+    expect(loose.text).toContain("Not linked to ACME-12: there is no work item to link it from.");
+    env.office!.docLink = () =>
+      Promise.reject(new Error("No ticket ACME-404 is known to the office."));
+
+    const refused = await run(
+      "doc.create",
+      env,
+      { path: "specs/gone.md", title: "Gone", body: "x", ticket: "ACME-404" },
+      { workItemId: "w1" },
+    );
+
+    expect(refused.text).toContain(
+      "Not linked to ACME-404: No ticket ACME-404 is known to the office.",
+    );
+
+    env.office!.docLink = () => Promise.reject("down");
+    const down = await run(
+      "doc.create",
+      env,
+      { path: "specs/down.md", title: "Down", body: "x", ticket: "ACME-1" },
+      { workItemId: "w1" },
+    );
+
+    expect(down.text).toContain("Not linked to ACME-1: down");
+    await rejects(
+      run("doc.create", env, { path: "x.md", title: "X", body: "", ticket: "nope" }),
+      "invalid",
+    );
+  });
+
   it("updates the text and title, refuses a stale version and an empty change, and links the document", async () => {
     const { env, knowledge, office } = fakeEnv();
     const doc = await knowledge.seed.doc({ path: "specs/u.md", title: "U", body: "one" });

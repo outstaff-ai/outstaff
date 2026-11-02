@@ -57,6 +57,9 @@ export interface FakeKnowledgeOptions {
 
 export interface FakeKnowledge extends Knowledge {
   seed: KnowledgeSeed;
+
+  /** The documents linked on each ticket with `linkIssue`, by ticket key, with who linked each. */
+  issueLinks: Map<string, { doc: string; by: string }[]>;
 }
 
 export type FakeRunStep =

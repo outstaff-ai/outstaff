@@ -18,6 +18,7 @@ export const WORKFLOW_EVENT_TYPES = [
   "ticket.unblocked",
   "ticket.closed",
   "doc.commented",
+  "doc.linked",
   "agent.started",
   "agent.handed_back",
   "agent.asked",

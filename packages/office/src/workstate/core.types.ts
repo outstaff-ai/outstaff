@@ -11,7 +11,7 @@ import type {
 } from "@outstaff/core";
 import type { Store, WorkItem } from "#/store/index.js";
 import type { Clock } from "#/types.js";
-import type { DocRecord, PrRecord, TicketRecord, WorkstateHandler } from "./types.js";
+import type { DocLink, DocRecord, PrRecord, TicketRecord, WorkstateHandler } from "./types.js";
 
 /** A person's work items on one ticket: whether one is still open, and when the latest was created. */
 export interface Pickup {
@@ -171,5 +171,8 @@ export interface RequesterOps {
 
 export interface DocOps {
   saveDoc(rec: DocRecord): Promise<void>;
+
+  /** Records the document an agent wrote, and raises `doc.linked` the first time it is for a ticket. */
+  linkDoc(ctx: RefreshCtx, doc: DocLink): Promise<void>;
   touchDoc(id: string, event: WorkflowEvent): Promise<void>;
 }

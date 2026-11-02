@@ -3,7 +3,7 @@ title: Its a Plan
 description: Set up the Its a Plan tracker and knowledge adapters, with one member account per agent.
 ---
 
-The `itsaplan` adapters implement two ports: the **tracker** (issues, columns, comments, labels, links, members and an event feed) in `@outstaff/integration.tracker.itsaplan`, and **knowledge** (the project's documents, with comments) in `@outstaff/integration.knowledge.itsaplan`. Both run on `@outstaff/integration.shared.itsaplan`, which holds the client, its rate-limit pacer, the options, setup and doctor checks; neither adapter depends on the other.
+The `itsaplan` adapters implement two ports: the **tracker** (issues, columns, comments, labels, links, members and an event feed) in `@outstaff/integration.tracker.itsaplan`, and **knowledge** (the project's documents, with comments and their links on issues) in `@outstaff/integration.knowledge.itsaplan`. Both run on `@outstaff/integration.shared.itsaplan`, which holds the client, its rate-limit pacer, the options, setup and doctor checks; neither adapter depends on the other.
 
 ## Agents are members
 
@@ -19,7 +19,7 @@ For each person in `team.people`:
 4. **Create the agent's API key** while signed in as that member: Account settings > API keys. The key is shown once.
 5. **Give the key to the agent's container** as the secret `ITSAPLAN_API_KEY` (a file under the secrets directory is preferred over an environment variable). The office needs a member of its own with the same kind of key. The office only reads with it: every change in Its a Plan is made by an agent, as itself.
 
-The key has the permissions of its member, so give the member only the projects it works in. The member must be able to read the project's activity feed (the dashboards permission), which the office uses to see events.
+The key has the permissions of its member, so give the member only the projects it works in. The member must be able to read the project's activity feed (the dashboards permission), which the office uses to see events. An agent's member also needs to edit the project's documents and work items, so it can link the documents it writes on their tickets.
 
 ## Configure
 
@@ -74,6 +74,7 @@ Its a Plan answers HTTP 500 (not 429) once a key has made about 100 requests in 
 - **Tracker:** read, list, search and create issues; edit their title and description (`ost ticket edit`); move them between columns by canonical status; assign; comment; set labels (missing labels are created); link issues (`blocks`, `relates`, `duplicates`); list members; poll the project activity feed with an opaque cursor.
 - **Attachments** (capability `tracker.attachments`): upload a file to an issue (`ost ticket attach`, and the files of a chat message when a chat session files a ticket), and list and download the files attached to an issue. The agent downloads the images and small text files (up to 10 MB) attached to the tickets of its work item into the item's scratch directory and lists them in its prompt as data from whoever attached them; `ost ticket show` lists them too.
 - **Pull request links** (capability `tracker.development`): an agent's pull request is linked on its ticket's Development section, by the agent with its own API key, when it is opened for the ticket or linked to it later (the `link_pr_on_ticket` policy). Its a Plan links only pull requests of repositories connected to the team (the team's GitHub or GitLab integration in Its a Plan); the office's doctor (`ost doctor --via-office`) warns about each repository in `repos:` that someone can write to and that is not connected. It lists the connected repositories per issue, so the check is made once the project has an issue. A pull request already linked is left as it is.
+- **Document links** (capability `knowledge.issueLinks`): a document an agent writes for a ticket (`ost doc create` in a round on the ticket, or with `--ticket <key>`, or written in a chat session that `ost work attach` then attaches to the ticket) is linked on the ticket, by the agent with its own API key (the `link_doc_on_ticket` policy). A document already linked is left as it is. Linking needs the member to edit both the document and the work item (the `documents: edit` and `work items: edit` permissions); each agent's doctor (`ost doctor`) reads the links of a document with the agent's key, and warns when the key is refused, naming those permissions.
 - **Sub-tickets:** `ost ticket create --parent <key>` (the default parent of a follow-up) is created as a real subtask (`parentId`); `ost ticket parent <key> <parent>` does the same for an existing ticket. Either way its description starts with a `Part of <key>: <link>` line.
 - **Knowledge:** a document tree addressed by path or id; search; create (missing parent pages are made); update with a version check (a stale `baseVersion` is a `conflict`); inline comments anchored to a quoted passage, replies and resolve. Markdown is converted to and from the editor's JSON.
 - **Errors** map to the port error codes: 401 and 403 `forbidden`, 404 `not_found`, 409 `conflict`, 429 `rate_limited`, 400 and 422 `invalid`, 5xx and network failures `unavailable`.

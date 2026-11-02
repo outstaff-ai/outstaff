@@ -199,7 +199,7 @@ export const MESSAGE_META = {
   act: {
     from: "office",
     summary:
-      "Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments, parents and pull request links. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.",
+      "Tracker or knowledge-base changes the event pipeline decided for the agent (an `act` decision): moves, assignments, comments, parents, and pull request and document links. The agent makes them with its own tracker and knowledge credentials, in order, without a model run, and answers with `act_result`. Sent while the agent is connected; the `welcome` carries the ones it has not answered.",
     replies: [],
   },
   act_result: {
@@ -211,7 +211,7 @@ export const MESSAGE_META = {
   doc_link: {
     from: "agent",
     summary:
-      "Tells the office that the caller wrote a document for the ticket of a work item, so comments people leave on the document reach the caller as work.",
+      "Tells the office that the caller wrote a document for the ticket of a work item (or the ticket it names), so comments people leave on the document reach the caller as work, and the document is linked on the ticket in the tracker.",
     replies: ["ack", "error"],
   },
   doctor_report: {

@@ -6,6 +6,7 @@ import {
   itsaplanSetupGuide,
   optionalConnectionOptions,
 } from "@outstaff/integration.shared.itsaplan";
+import { docLinkCheck } from "./doctor.js";
 import { createItsaplanKnowledge } from "./knowledge.js";
 
 export { createItsaplanKnowledge } from "./knowledge.js";
@@ -20,11 +21,11 @@ export const knowledgeOptions = optionalConnectionOptions;
 export const itsaplanKnowledge = defineAdapter({
   port: "knowledge",
   name: "itsaplan",
-  capabilities: ["knowledge.docs"],
+  capabilities: ["knowledge.docs", "knowledge.issueLinks"],
   options: knowledgeOptions,
   secrets: itsaplanSecrets,
   create: (ctx) => createItsaplanKnowledge(ctx),
   setupGuide: itsaplanSetupGuide,
   derive: deriveItsaplan,
-  doctor: doctorItsaplan,
+  doctor: (secrets, ctx) => doctorItsaplan(secrets, ctx, docLinkCheck),
 });

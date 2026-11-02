@@ -4,7 +4,10 @@ import { itemTicket } from "./item-ticket.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { WorkState } from "./workstate/index.js";
 
-/** Records which documents agents wrote for which ticket, for the protocol's `doc_link`. */
+/**
+ * Records which documents agents wrote for which ticket, for the protocol's `doc_link`. A document for a ticket is then
+ * linked on it in the tracker (`doc.linked`).
+ */
 export function officeDocLinks(deps: {
   store: Store;
   workState: WorkState;
@@ -17,14 +20,27 @@ export function officeDocLinks(deps: {
       ? workState.doc(item.subject.ref)?.ticket
       : await itemTicket(store, item);
 
+  /** A ticket the agent named: one the office knows, read from the tracker if it is new. */
+  const named = async (key: string) => {
+    if (!workState.ticket(key)) {
+      await workState.refreshTicket(key);
+    }
+
+    if (!workState.ticket(key)) {
+      throw new ProtocolError("invalid", `No ticket ${key} is known to the office.`);
+    }
+
+    return key;
+  };
+
   return {
-    async link(person, workItemId, doc) {
+    async link(person, workItemId, doc, explicit) {
       const item = await store.getItem(workItemId);
       if (!item || item.person !== person) {
         throw new ProtocolError("unknown_item", `No work item ${workItemId} for ${person}.`);
       }
 
-      const ticket = await ticketOf(item);
+      const ticket = explicit ? await named(explicit) : await ticketOf(item);
 
       await workState.linkDoc({ ...doc, author: person, ...(ticket ? { ticket } : {}) });
       await store.addItemRefs(item.id, [

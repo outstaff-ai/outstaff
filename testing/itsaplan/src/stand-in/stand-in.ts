@@ -2,6 +2,7 @@ import { createRouter, type Route } from "@outstaff/testing.http";
 import { attachmentRoutes } from "./attachment-routes.js";
 import { developmentRoutes } from "./development-routes.js";
 import { docCommentRoutes } from "./doc-comment-routes.js";
+import { docIssueRoutes } from "./doc-issue-routes.js";
 import { documentRoutes } from "./document-routes.js";
 import { issueRoutes } from "./issue-routes.js";
 import { projectRoutes } from "./project-routes.js";
@@ -22,12 +23,14 @@ function guarded(s: ItsaplanStore, basePath: string, route: ActorRoute): Route {
 
 /**
  * The parts of the Its a Plan REST API the tracker and knowledge adapters use: the project, issues, comments,
- * attachments, the activity feed, links, the development section, documents and their comment threads. One implementation, served in
- * process to the adapter tests and over HTTP to the end-to-end run; what differs between them is in `opts`.
+ * attachments, the activity feed, links, the development section, documents, their comment threads and their links
+ * on issues. One implementation, served in process to the adapter tests and over HTTP to the end-to-end run; what
+ * differs between them is in `opts`.
  */
 export function createItsaplanStandIn(opts: StandInOptions = {}) {
   const store = createStore(opts);
   const routes = [
+    ...docIssueRoutes(store),
     ...documentRoutes(store),
     ...docCommentRoutes(store),
     ...projectRoutes(store),

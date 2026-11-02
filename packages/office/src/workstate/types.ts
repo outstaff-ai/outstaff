@@ -60,6 +60,15 @@ export interface ReadyTicket {
 }
 
 /** A knowledge document an agent wrote for a ticket (or in a chat request), kept so comments on it reach the agent. */
+/** A document an agent recorded: `author` is that agent, `ticket` the ticket it is for, when any. */
+export interface DocLink {
+  id: string;
+  title: string;
+  url: string;
+  author: string;
+  ticket?: string | undefined;
+}
+
 export interface DocRecord {
   id: string;
   title: string;
@@ -259,14 +268,11 @@ export interface WorkState extends WorkflowState {
   }): Promise<string | undefined>;
   ticket(key: string): TicketRecord | undefined;
 
-  /** Records that an agent wrote a document, for a ticket or not. Idempotent; the first author stays. */
-  linkDoc(doc: {
-    id: string;
-    title: string;
-    url: string;
-    author: string;
-    ticket?: string;
-  }): Promise<void>;
+  /**
+   * Records that an agent wrote a document, for a ticket or not. Idempotent; the first author stays. A ticket the
+   * document is for now, and was not before, raises `doc.linked`.
+   */
+  linkDoc(doc: DocLink): Promise<void>;
   doc(id: string): DocRecord | undefined;
 
   /** The documents whose comments are worth reading: those of tickets not finished, and recent ones without. Most recently active first. */

@@ -599,12 +599,12 @@ describe("protocol server with a document desk", () => {
       source: createFakeSource(),
       team: fakeTeam(),
       docs: {
-        async link(person, workItemId, doc) {
+        async link(person, workItemId, doc, ticket) {
           if (workItemId === "other") {
             throw new ProtocolError("unknown_item", "No work item other for ada.");
           }
 
-          linked.push({ person, workItemId, doc });
+          linked.push({ person, workItemId, doc, ticket });
         },
       },
       auth: createAgentAuth(tokens),
@@ -620,7 +620,12 @@ describe("protocol server with a document desk", () => {
     const doc = { id: "d1", title: "Cart design", url: "https://docs.acme.example/d1" };
     a.send("doc_link", { workItemId: "w1", doc });
     expect(await a.next("ack")).toBeDefined();
-    expect(linked).toEqual([{ person: "ada", workItemId: "w1", doc }]);
+    a.send("doc_link", { workItemId: "w1", doc, ticket: "ACME-7" });
+    expect(await a.next("ack")).toBeDefined();
+    expect(linked).toEqual([
+      { person: "ada", workItemId: "w1", doc, ticket: undefined },
+      { person: "ada", workItemId: "w1", doc, ticket: "ACME-7" },
+    ]);
 
     a.send("doc_link", { workItemId: "other", doc });
     expect((await a.next("error")).payload).toMatchObject({ code: "unknown_item" });

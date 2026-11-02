@@ -45,7 +45,15 @@ export type {
   TrackerEvent,
 } from "./tracker.js";
 
-export type { Doc, DocComment, DocEvent, Knowledge } from "./knowledge.js";
+export type {
+  Doc,
+  DocComment,
+  DocEvent,
+  DocIssueLinkOutcome,
+  IssueDoc,
+  Knowledge,
+} from "./knowledge.js";
+
 export type { Check, CheckLog, CheckLogStep } from "./vcs-checks.js";
 export type {
   ConversationEntry,

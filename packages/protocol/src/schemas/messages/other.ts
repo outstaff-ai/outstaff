@@ -13,6 +13,14 @@ export const otherMessages = [
         title: z.string().max(500).describe("Title of the document."),
         url: z.string().min(1).describe("Absolute URL of the document."),
       }),
+      ticket: z
+        .string()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          "Key of the ticket the document is for; without it, the ticket of the work item.",
+        ),
     }),
   ),
   message(

@@ -258,10 +258,10 @@ ost doc show specs/checkout.md
 
 Create a document.
 
-Creates a new document. It never overwrites: an existing path is a conflict.
+Creates a new document. It never overwrites: an existing path is a conflict. A document written for a ticket (the one you are working on, or --ticket) is linked on that ticket.
 
 ```
-ost doc create <path> --title <title> --body <body>
+ost doc create <path> --title <title> --body <body> [--ticket <ticket>]
 ```
 
 Runtime tool: `doc_create`
@@ -271,11 +271,13 @@ Runtime tool: `doc_create`
 | `path` | string | yes | Path of the document in the knowledge base, for example specs/checkout.md. |
 | `title` | string | yes | Document title. |
 | `body` | string | yes | Document text, Markdown. |
+| `ticket` | string | no | Key of the ticket the document is for, for example ACME-12; it is linked on the ticket. Default: the ticket of the work you are on. |
 
 Examples:
 
 ```sh
 ost doc create specs/checkout.md --title "Checkout" --body "# Checkout"
+ost doc create specs/search.md --title "Search" --body "# Search" --ticket ACME-12
 ```
 
 ## doc.update

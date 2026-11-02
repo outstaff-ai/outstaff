@@ -1,5 +1,5 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
-import { createFakeTracker } from "@outstaff/core/fakes";
+import { createFakeKnowledge, createFakeTracker } from "@outstaff/core/fakes";
 import type { PayloadOf } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
 import { createActMaker } from "#/runner/acts.js";
@@ -93,6 +93,25 @@ describe("the act maker", () => {
     ]);
 
     expect(tracker.development.get(issue.key)).toEqual([{ repo, number: 7, by: sam.id }]);
+  });
+
+  it("links a document on its ticket with the agent's own knowledge account", async () => {
+    const knowledge = createFakeKnowledge({ author: "u-sam" });
+    const ticket = await knowledge.seed.issue!();
+    const doc = await knowledge.create({ path: "design/cart", title: "Cart", body: "" });
+    const h = harness();
+    const maker = createActMaker({
+      env: { team: teamOf("u-sam"), knowledge },
+      office: h.office,
+      log: h.log,
+    });
+
+    await maker.make([{ id: "e:doc", ops: [{ op: "link_doc", ticket, doc: doc.id }] }]);
+    expect(h.answers).toEqual([
+      { id: "e:doc", ok: true, results: [`linked doc ${doc.id} on ${ticket}`] },
+    ]);
+
+    expect(knowledge.issueLinks.get(ticket)).toEqual([{ doc: doc.id, by: "u-sam" }]);
   });
 
   it("answers a change that failed, and keeps the answer for the next delivery when sending it fails", async () => {

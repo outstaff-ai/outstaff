@@ -83,6 +83,18 @@ export function knowledgeContract(
       await expectPortError(s.subject.resolve("missing-comment"), "not_found");
     });
 
+    it("links a document on a ticket once, and lists the ticket's documents", async (t) => {
+      const s = get();
+      requireCapability(t, s, "knowledge.docs", "knowledge.issueLinks");
+      const ticket = await requireSeed(t, s.seed, "issue")();
+      const doc = await s.subject.create({ path: "n/linked", title: "Linked", body: "" });
+      expect(await s.subject.issueDocs!(ticket)).toEqual([]);
+      expect(await s.subject.linkIssue!(doc.id, ticket)).toBe("linked");
+      expect(await s.subject.linkIssue!(doc.id, ticket)).toBe("already_linked");
+      expect(await s.subject.issueDocs!(ticket)).toEqual([{ id: doc.id, title: "Linked" }]);
+      await expectPortError(s.subject.linkIssue!("999999", ticket), "not_found");
+    });
+
     it("reports the comments and replies of the named documents after a cursor, oldest first", async (t) => {
       const s = get();
       requireCapability(t, s, "knowledge.docs");

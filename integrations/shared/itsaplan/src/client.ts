@@ -2,6 +2,7 @@ import { PortError, type AdapterContext, type Logger, type Member } from "@outst
 import { buildFetch } from "./fetch.js";
 import { ItsaplanHttp } from "./http.js";
 import { resolveConnection } from "./options.js";
+import type { ApiIssue } from "./api.types.js";
 import type {
   ApiAssignee,
   ApiProject,
@@ -12,6 +13,9 @@ import type {
 } from "./types.js";
 
 const SETUP_TTL_MS = 30_000;
+
+/** An issue key (`SHOP-12`), or its number alone. */
+const ISSUE_KEY = /^(?:([A-Za-z0-9_]+)-)?(\d+)$/;
 
 /** First wait before asking for the workspace again after a failure; doubles up to the maximum. */
 const WORKSPACE_RETRY_MS = 5_000;
@@ -103,6 +107,21 @@ export class Itsaplan {
     }
 
     return hit.userId;
+  }
+
+  /** One issue of the project by its key; a key of another project is `not_found`. */
+  async issue(key: string): Promise<ApiIssue> {
+    const m = ISSUE_KEY.exec(key.trim());
+    if (!m) {
+      throw new PortError("invalid", `"${key}" is not an issue key (expected KEY-12).`);
+    }
+
+    const setup = await this.project();
+    if (m[1] && m[1].toLowerCase() !== setup.project.key.toLowerCase()) {
+      throw new PortError("not_found", `Issue ${key} is not in project ${setup.project.key}.`);
+    }
+
+    return this.http.request<ApiIssue>("GET", `${this.projectPath}/issues/${m[2]}`);
   }
 
   /** Reads the workspace slug from the project setup; fails when the API is unreachable or names none. Used by `ost doctor`. */

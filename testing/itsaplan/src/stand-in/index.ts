@@ -20,6 +20,7 @@ export type {
   StoredDoc,
   StoredDevelopmentLink,
   StoredDocComment,
+  StoredDocIssue,
   StoredIssue,
   StoredLabel,
   StoredLink,

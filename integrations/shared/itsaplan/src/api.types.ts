@@ -187,3 +187,25 @@ export interface ApiDevLink {
   title: string;
   url: string | null;
 }
+
+// Documents linked on issues.
+
+/** An issue a document is linked on, as `GET` and `POST /projects/{key}/documents/{id}/issues` answer. */
+export interface ApiDocIssue {
+  issueId: number;
+  sequenceNumber: number;
+  identifier: string;
+  title: string;
+  archived: boolean;
+  createdAt: string;
+}
+
+/** A document linked on an issue, as `GET /projects/{key}/documents/for-issue/{issueId}` answers. */
+export interface ApiIssueDoc {
+  documentId: number;
+  title: string;
+  icon: string | null;
+  isPrivate: boolean;
+  archived: boolean;
+  createdAt: string;
+}

@@ -66,6 +66,13 @@ export interface StoredLink {
   kind: ApiIssueLink["kind"];
 }
 
+/** A document linked on an issue (`POST /projects/:p/documents/:id/issues`), and the member who linked it. */
+export interface StoredDocIssue {
+  docId: number;
+  issueId: number;
+  by: string;
+}
+
 /** A code repository connected to the team. */
 export type StoredRepository = ApiDevRepository;
 
@@ -166,6 +173,7 @@ export interface ItsaplanStore {
   pullRequests: Map<number, StoredPullRequest[]>;
   pullRequestsOf: PullRequestSource;
   development: StoredDevelopmentLink[];
+  docIssues: StoredDocIssue[];
   counters: { activity: number; label: number; doc: number; comment: number; link: number };
 }
 

@@ -71,6 +71,17 @@ const linkPr: Make<"link_pr"> = async (op, ports) => {
   }
 };
 
+const linkDoc: Make<"link_doc"> = async (op, ports) => {
+  const knowledge = need(ports.knowledge, "knowledge base");
+  if (!knowledge.linkIssue) {
+    throw new Error("the knowledge base cannot link documents on tickets (knowledge.issueLinks)");
+  }
+
+  return (await knowledge.linkIssue(op.doc, op.ticket)) === "linked"
+    ? `linked doc ${op.doc} on ${op.ticket}`
+    : `doc ${op.doc} was already linked on ${op.ticket}`;
+};
+
 function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
   switch (op.op) {
     case "move":
@@ -83,6 +94,8 @@ function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
       return setParent(op, ports, member);
     case "link_pr":
       return linkPr(op, ports, member);
+    case "link_doc":
+      return linkDoc(op, ports, member);
   }
 }
 

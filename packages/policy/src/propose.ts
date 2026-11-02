@@ -143,6 +143,14 @@ function linkOp(ticket: string, ctx: Ctx): Resolved<BookkeepingOp> {
   };
 }
 
+/** The event's document, to show on its ticket. */
+function linkDocOp(ticket: string, ctx: Ctx): Resolved<BookkeepingOp> {
+  const doc = ctx.event.subject.doc;
+  return doc
+    ? { value: { op: "link_doc", ticket, doc } }
+    : { skip: "link_doc: the event has no document" };
+}
+
 function op(spec: OpSpec, as: string, ctx: Ctx): OpResult {
   const ticket = ctx.ticket;
   if (!ticket) {
@@ -155,6 +163,10 @@ function op(spec: OpSpec, as: string, ctx: Ctx): OpResult {
 
   if ("link_pr" in spec) {
     return linkOp(ticket, ctx);
+  }
+
+  if ("link_doc" in spec) {
+    return linkDocOp(ticket, ctx);
   }
 
   return "assign" in spec ? assignOp(spec, as, ticket, ctx) : parentOp(ticket, ctx);
