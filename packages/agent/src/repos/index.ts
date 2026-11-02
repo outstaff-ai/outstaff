@@ -14,6 +14,7 @@ export type {
   CredentialHelper,
   CredentialHelperOptions,
   CredentialOperation,
+  RepoHead,
   RunGit,
   SyncRepositoriesOptions,
   Workspace,

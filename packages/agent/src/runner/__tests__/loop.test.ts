@@ -27,7 +27,7 @@ import {
 import { FakeSocket, createManualClock } from "#/office-client/__tests__/testing.js";
 import type { ManualClientClock } from "#/office-client/types.js";
 import { fakeEnv } from "@outstaff/testing.agent";
-import type { Workspaces } from "#/repos/index.js";
+import type { ClonedRepo, Workspaces } from "#/repos/index.js";
 import { JOURNAL_PROMPT } from "#/runner/journal.js";
 import type { ChatRelay } from "#/runner/chat.types.js";
 import { createWorkLoop } from "#/runner/loop.js";
@@ -222,6 +222,7 @@ describe("work loop", () => {
       policies?: TeamConfig["policies"];
       layout?: Layout;
       tracker?: Tracker;
+      repos?: ClonedRepo[];
     } = {},
   ) {
     fake = fakeEnv();
@@ -509,6 +510,7 @@ describe("work loop", () => {
         };
       },
       held: () => [],
+      refresh: async () => [],
       async release(id) {
         released.push(id);
       },
@@ -1075,16 +1077,34 @@ describe("work loop", () => {
       };
 
       const prepared: string[] = [];
+      let refreshed = 0;
       const workspaces = {
         async prepare(offer: Offer) {
           prepared.push(offer.workItem.id);
           return undefined;
         },
+        async refresh() {
+          refreshed += 1;
+          return [{ name: "shop", commit: "0123456789abcdef", atDefault: true }];
+        },
         async release() {},
       } as unknown as Workspaces;
 
+      const repos: ClonedRepo[] = [
+        {
+          name: "shop",
+          dir: "/home/sam/repos/shop",
+          ref: { host: "github.com", owner: "acme-example", name: "shop" },
+          defaultBranch: "main",
+          access: "write",
+          kind: "primary",
+          instructions: [],
+          trackerLabels: [],
+        },
+      ];
+
       const { chat, reports } = relay();
-      start(runtime, { chat, workspaces, chatSession: sessionFor() });
+      start(runtime, { chat, workspaces, repos, chatSession: sessionFor() });
       socket.offerWith("w1");
       await until(() => requests.some((r) => r.workItemId === "w1"));
 
@@ -1101,6 +1121,13 @@ describe("work loop", () => {
       expect(chatRun.policy.profile).toBe("chat");
       expect(workRun.policy.profile).toBe("readonly");
       expect(prepared).toEqual(["w1"]);
+      // The chat session reads the base clones: they are refreshed first, and it is told where each one is.
+      expect(refreshed).toBe(1);
+      expect(chatRun.prompt).toContain(
+        "- shop: /home/sam/repos/shop, at commit 0123456789ab, the latest origin/main fetched",
+      );
+
+      expect(workRun.prompt).not.toContain("0123456789ab");
       expect(chatRun.tools.map((t) => t.name)).toContain("ticket_create");
       expect(chatRun.tools.map((t) => t.name)).toContain("work_queue");
       expect(chatRun.tools.map((t) => t.name)).not.toContain("pr_open");

@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseRepoUrl, repoGrant, silentLogger, type GitMode, type RepoRef } from "@outstaff/core";
 import { cappedAccess } from "./access.js";
+import { moveToDefault } from "./base-clone.js";
 import { runGit } from "./git.js";
 import type { ClonedRepo, RunGit, SyncRepositoriesOptions } from "./types.js";
 
@@ -104,6 +105,11 @@ async function prepareRepository(
   await fetchOrClone(git, helper, dir, remote(ref));
   await configureClone(git, dir, helper, issued.author);
   writePrePushHook(dir, access, repo.default_branch);
+  await moveToDefault(git, opts.log ?? silentLogger, {
+    name: repo.name,
+    dir,
+    defaultBranch: repo.default_branch,
+  });
 
   return {
     name: repo.name,
@@ -118,7 +124,8 @@ async function prepareRepository(
 }
 
 /**
- * Clones every team repo the person has a grant on into `<reposDir>/<name>`, or fetches it when it is there.
+ * Clones every team repo the person has a grant on into `<reposDir>/<name>`, or fetches it when it is there, and
+ * leaves each clone detached at the fetched default branch.
  * Repos without a grant are never touched. The credentials asked for here only validate the grant and give the
  * commit author: git itself gets its token from the credential helper, at each request.
  */

@@ -102,7 +102,7 @@ export function buildWorkPrompt(offer: Offer, opts: WorkPromptOptions): string {
     ...wakeLines(context.wake),
     ...journalLines(context.journal),
     ...originLines(item, opts, doc),
-    ...repoLines(item.kind, opts.repos),
+    ...repoLines(item.kind, opts.repos, opts.heads),
     ...workspaceLines(offer, opts, doc),
     "",
     sessionLine(opts),

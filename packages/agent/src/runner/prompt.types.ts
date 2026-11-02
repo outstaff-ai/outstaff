@@ -1,4 +1,4 @@
-import type { ClonedRepo, Workspace } from "#/repos/index.js";
+import type { ClonedRepo, RepoHead, Workspace } from "#/repos/index.js";
 import type { Attachment } from "./types.js";
 
 /** What the runner knows of a run besides the offer, for its user prompt. */
@@ -10,6 +10,9 @@ export interface WorkPromptOptions {
 
   /** The repositories the person has a grant on, with their access. */
   repos?: ClonedRepo[];
+
+  /** Where each base clone is checked out, refreshed for a chat session that reads them. */
+  heads?: RepoHead[];
   chatContext?: string;
 
   /** The directory the catalog documents (`process/`, `references/`) are written to; their paths are absolute below it. */
