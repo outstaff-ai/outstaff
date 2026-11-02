@@ -36,6 +36,36 @@ Examples:
 ost ticket show ACME-12
 ```
 
+## ticket.list
+
+List tickets by status, assignee, label, parent or last update.
+
+Lists tickets as the tracker has them now, most recently updated first: key, title, canonical status, assignee, when it was last updated, and the URL. Default: open tickets (every status but done and canceled). Use it to answer what is open, blocked or done from the current state rather than from earlier messages.
+
+```
+ost ticket list [--status <status>] [--assignee <assignee>] [--label <label>] [--parent <parent>] [--since <since>] [--limit <limit>]
+```
+
+Runtime tool: `ticket_list`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `status` | string | no | open (every status but done and canceled), all, or canonical statuses separated by commas, for example review,blocked. Default: "open". |
+| `assignee` | string | no | "me", "unassigned", or a tracker member's username, name or id. |
+| `label` | string | no | Only tickets with this label. |
+| `parent` | string | no | Only the subtasks of this ticket. |
+| `since` | string | no | Only tickets updated at or after this time (ISO-8601). |
+| `limit` | integer | no | How many tickets to show. Default: 25. |
+
+Examples:
+
+```sh
+ost ticket list
+ost ticket list --status blocked --assignee me
+ost ticket list --status done --since 2026-01-31T00:00:00Z
+ost ticket list --parent ACME-10 --status all
+```
+
 ## ticket.comment
 
 Add a comment to a ticket.
@@ -348,6 +378,35 @@ Examples:
 
 ```sh
 ost doc resolve specs/checkout.md c-3
+```
+
+## pr.list
+
+List the team's pull requests: open ones and recently merged or closed ones.
+
+Lists the pull requests of the team's repositories as the office tracks them now: number, title, state, CI state, review state, linked ticket, author and URL. Open ones first, then the recently merged or closed ones the office still keeps. Use it to answer what is open, waiting or merged from the current state rather than from earlier messages.
+
+```
+ost pr list [--state <state>] [--author <author>] [--ticket <ticket>] [--repo <repo>] [--limit <limit>]
+```
+
+Runtime tool: `pr_list`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `state` | open \| merged \| closed \| all | no | open, merged, closed, or all (open and recently finished). Default: "all". |
+| `author` | string | no | "me", a teammate's handle, or a code host login. |
+| `ticket` | string | no | Only pull requests linked to this ticket. |
+| `repo` | string | no | Only this repository: its name in team.yaml or owner/name. |
+| `limit` | integer | no | How many to show. Default: 25. |
+
+Examples:
+
+```sh
+ost pr list
+ost pr list --state open --author me
+ost pr list --ticket ACME-12
+ost pr list --state merged --repo shop
 ```
 
 ## pr.status

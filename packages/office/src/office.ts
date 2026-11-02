@@ -245,7 +245,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     usage,
     chat: { ...chatDesk, message: chatEntry.message },
     docs: officeDocLinks({ store, workState, log }),
-    tickets: officeTicketPrs({ workState, log }),
+    tickets: officeTicketPrs({ workState, team, log }),
     ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
     acts,
     onConnected: (person) => void track(idle.check(person)),

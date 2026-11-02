@@ -6,6 +6,7 @@ import { defineVerb, result } from "./define.js";
 import type { AgentEnv } from "./types.js";
 import { repoOrWorktree } from "./worktree.js";
 import { prChecks } from "./pr-checks.js";
+import { prList } from "./pr-list.js";
 import { number, repo } from "./pr-inputs.js";
 
 export const prStatus = defineVerb({
@@ -231,4 +232,12 @@ export const prResolve = defineVerb({
   },
 });
 
-export const prVerbs = [prStatus, prChecks, prThreads, prConversation, prResolve, ...prWriteVerbs];
+export const prVerbs = [
+  prList,
+  prStatus,
+  prChecks,
+  prThreads,
+  prConversation,
+  prResolve,
+  ...prWriteVerbs,
+];

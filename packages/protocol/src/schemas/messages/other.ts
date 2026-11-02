@@ -64,6 +64,67 @@ export const otherMessages = [
     }),
   ),
   message(
+    "pr_list",
+    z.strictObject({
+      state: z
+        .enum(["open", "merged", "closed", "all"])
+        .describe(
+          "Which pull requests: open, merged, closed, or all. Merged and closed ones are those finished recently enough for the office to keep.",
+        ),
+      author: z
+        .string()
+        .min(1)
+        .max(200)
+        .optional()
+        .describe("Only those by this author: a person's handle or a code host login."),
+      ticket: z.string().min(1).max(64).optional().describe("Only those linked to this ticket."),
+      repo: z
+        .string()
+        .min(1)
+        .max(300)
+        .optional()
+        .describe("Only those of this repository, `owner/name`."),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(200)
+        .describe(
+          "At most this many: open ones first, newest first, then the most recently finished.",
+        ),
+    }),
+  ),
+  message(
+    "pr_list_result",
+    z.strictObject({
+      prs: z
+        .array(
+          z.strictObject({
+            ref: z.string().describe("Pull request, for example `acme/shop#12`."),
+            number: z.number().int(),
+            title: z.string(),
+            url: z.string().optional(),
+            state: z.enum(["open", "closed", "merged"]),
+            draft: z.boolean(),
+            author: z.string().describe("The person's handle, else the code host login."),
+            ci: z.enum(["none", "pending", "success", "failure"]),
+            mergeable: z.enum(["clean", "conflicting", "unknown"]),
+            review: z
+              .string()
+              .optional()
+              .describe("State of the latest submitted review, for example `approved`."),
+            unresolvedThreads: z.number().int(),
+            ticket: z.string().optional().describe("The ticket it is linked to."),
+            updatedAt: z.string().describe("When the office last read it."),
+          }),
+        )
+        .describe(
+          "The matching pull requests: open ones first, newest first, then the most recently finished.",
+        ),
+      more: z.number().int().describe("How many more match beyond the limit."),
+    }),
+  ),
+  message(
     "ci_log",
     z.strictObject({
       url: z

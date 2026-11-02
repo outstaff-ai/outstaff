@@ -42,6 +42,7 @@ export async function createAgentEnv(opts: CreateAgentEnvOptions): Promise<Agent
     ...(Object.keys(unavailable).length ? { unavailable } : {}),
     ...(opts.office ? { office: opts.office } : {}),
     ...(network ? { network } : {}),
+    ...(opts.now ? { now: opts.now } : {}),
   };
 }
 

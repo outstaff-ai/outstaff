@@ -20,6 +20,7 @@ import {
 import { developmentHelpers } from "./development.js";
 import { readEvents } from "./events.js";
 import { issueHelpers } from "./issues.js";
+import { issueListing } from "./listing.js";
 import { teamStatuses } from "./statuses.js";
 import type { Statuses, TrackerOptions } from "./types.js";
 
@@ -82,19 +83,7 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
       return { ...toIssue(raw, await api.project()), ...(parent ? { parent } : {}) };
     },
 
-    async listIssues(filter) {
-      const setup = await api.project();
-      const items = await api.http.request<ApiIssue[]>("GET", `${api.projectPath}/issues`, {
-        query: {
-          columnId: filter.status ? statuses.column(setup, filter.status).id : undefined,
-          assigneeUserId: filter.assignee ? api.resolveMemberId(setup, filter.assignee) : undefined,
-          updatedFrom: filter.updatedSince,
-          limit: filter.limit,
-        },
-      });
-
-      return hydrate(items, setup);
-    },
+    listIssues: issueListing(api, statuses, { toIssue, fetchIssue, labelIds, hydrate }),
 
     async search(query, limit) {
       const items = await api.http.request<ApiIssue[]>("GET", `${api.projectPath}/issues/search`, {

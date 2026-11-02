@@ -9,10 +9,12 @@ import {
   requireCapability,
   requireSeed,
 } from "./harness.js";
+import { trackerListingCases } from "./tracker-listing.js";
 import type { ContractSetupFn } from "./types.js";
 
 export function trackerContract(name: string, setup: ContractSetupFn<Tracker, TrackerSeed>): void {
   contractSuite(`tracker contract: ${name}`, setup, (get) => {
+    trackerListingCases(get);
     it("creates an issue that can be read back with an absolute url", async (t) => {
       const s = get();
       requireCapability(t, s, "tracker.issues");
@@ -124,9 +126,9 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       const issue = await s.subject.createIssue({ title: "Move me", body: "" });
       const moved = await s.subject.transition(issue.key, "review");
       expect(moved.status.canonical).toBe("review");
-      const listed = await s.subject.listIssues({ status: "review" });
+      const listed = await s.subject.listIssues({ status: ["review"] });
       expect(listed.map((i) => i.key)).toContain(issue.key);
-      const other = await s.subject.listIssues({ status: "canceled" });
+      const other = await s.subject.listIssues({ status: ["canceled"] });
       expect(other.map((i) => i.key)).not.toContain(issue.key);
     });
 
@@ -212,6 +214,13 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       );
 
       expect((await s.subject.assign(issue.key, null)).assignee).toBeUndefined();
+      expect((await s.subject.listIssues({ assignee: member.id })).map((i) => i.key)).not.toContain(
+        issue.key,
+      );
+
+      expect((await s.subject.listIssues({ assignee: null })).map((i) => i.key)).toContain(
+        issue.key,
+      );
     });
 
     it("creates an issue already assigned to a member", async (t) => {

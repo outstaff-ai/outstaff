@@ -34,6 +34,7 @@ export type {
   Comment,
   Issue,
   IssueChanges,
+  IssueFilter,
   LinkedIssue,
   Member,
   NewAttachment,

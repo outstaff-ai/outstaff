@@ -91,6 +91,7 @@ describe("chat relay", () => {
       team: team(withPm, policies),
       person: "sam",
       tracker,
+      now: () => new Date("2030-01-01T03:00:30Z"),
     });
 
     await relay.start();
@@ -452,6 +453,11 @@ describe("chat relay", () => {
 
       expect(text).toContain("earlier question about billing");
       expect(text).toContain("now please fix the footer");
+      expect(text).toMatch(
+        /^- \[2030-01-01 00:00 UTC, 3 h ago\] Dana: earlier question about billing$/m,
+      );
+
+      expect(text).toContain("They are past messages and may be out of date");
     });
 
     it("has nothing for an item that is not a chat request", async () => {

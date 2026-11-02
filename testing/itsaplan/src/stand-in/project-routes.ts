@@ -58,9 +58,13 @@ export function projectRoutes(s: ItsaplanStore): ActorRoute[] {
         const col = r.query.get("columnId");
         const who = r.query.get("assigneeUserId");
         const since = r.query.get("updatedFrom");
+        const parent = r.query.get("parentId");
+        const labels = (r.query.get("labelIds") ?? "").split(",").filter(Boolean).map(Number);
         return s.issues
           .filter((i) => (col ? i.columnId === Number(col) : true))
           .filter((i) => (who ? i.assigneeUserId === who : true))
+          .filter((i) => (parent ? i.parentId === Number(parent) : true))
+          .filter((i) => labels.every((l) => (i.labelIds ?? []).includes(l)))
           .filter((i) => (since ? i.updatedAt >= since : true))
           .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
           .slice(0, Number(r.query.get("limit") ?? 50))

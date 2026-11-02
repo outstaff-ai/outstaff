@@ -42,6 +42,10 @@ export type TicketPrsRequest = PayloadOf<"ticket_prs">;
 
 export type TicketPrsResult = PayloadOf<"ticket_prs_result">;
 
+export type PrListRequest = PayloadOf<"pr_list">;
+
+export type PrListResult = PayloadOf<"pr_list_result">;
+
 export type DocLinkRequest = PayloadOf<"doc_link">;
 
 export type CiLogRequest = PayloadOf<"ci_log">;
@@ -78,6 +82,9 @@ export interface OfficeClient {
 
   /** The ticket a pull request about to be opened would link to, and the pull requests that ticket already has. */
   ticketPrs(draft: TicketPrsRequest): Promise<TicketPrsResult>;
+
+  /** The team's pull requests as the office's work state has them: open ones and recently finished ones. */
+  prList(filter: PrListRequest): Promise<PrListResult>;
 
   /**
    * Tells the office the caller wrote a document for the work item's ticket, so that comments people leave on it
@@ -135,6 +142,7 @@ export interface FakeOffice extends OfficeClient {
   chatReports: { workItemId: string; kind: ChatReportKind }[];
   reportsPosted: { workItemId: string; id: string }[];
   ticketPrsAsked: TicketPrsRequest[];
+  prListsAsked: PrListRequest[];
   docsLinked: DocLinkRequest[];
   ciLogsAsked: CiLogRequest[];
 }

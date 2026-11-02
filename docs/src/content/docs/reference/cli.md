@@ -468,6 +468,40 @@ ost ticket show ACME-12
 ost ticket show ACME-12 --json
 ```
 
+## ost ticket list
+
+List tickets by status, assignee, label, parent or last update.
+
+Lists tickets as the tracker has them now, most recently updated first: key, title, canonical status, assignee, when it was last updated, and the URL. Default: open tickets (every status but done and canceled). Use it to answer what is open, blocked or done from the current state rather than from earlier messages.
+
+```
+ost ticket list [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--status <status>` | open (every status but done and canceled), all, or canonical statuses separated by commas, for example review,blocked. |
+| `--assignee <assignee>` | "me", "unassigned", or a tracker member's username, name or id. |
+| `--label <label>` | Only tickets with this label. |
+| `--parent <parent>` | Only the subtasks of this ticket. |
+| `--since <since>` | Only tickets updated at or after this time (ISO-8601). |
+| `--limit <limit>` | How many tickets to show. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket list
+ost ticket list --status blocked --assignee me
+ost ticket list --status done --since 2026-01-31T00:00:00Z
+ost ticket list --parent ACME-10 --status all
+ost ticket list --json
+```
+
 ## ost ticket comment
 
 Add a comment to a ticket.
@@ -788,6 +822,39 @@ Examples:
 ```sh
 ost doc resolve specs/checkout.md c-3
 ost doc resolve specs/checkout.md c-3 --json
+```
+
+## ost pr list
+
+List the team's pull requests: open ones and recently merged or closed ones.
+
+Lists the pull requests of the team's repositories as the office tracks them now: number, title, state, CI state, review state, linked ticket, author and URL. Open ones first, then the recently merged or closed ones the office still keeps. Use it to answer what is open, waiting or merged from the current state rather than from earlier messages.
+
+```
+ost pr list [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--state <state>` | open, merged, closed, or all (open and recently finished). |
+| `--author <author>` | "me", a teammate's handle, or a code host login. |
+| `--ticket <ticket>` | Only pull requests linked to this ticket. |
+| `--repo <repo>` | Only this repository: its name in team.yaml or owner/name. |
+| `--limit <limit>` | How many to show. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr list
+ost pr list --state open --author me
+ost pr list --ticket ACME-12
+ost pr list --state merged --repo shop
+ost pr list --json
 ```
 
 ## ost pr status

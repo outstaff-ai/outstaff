@@ -143,9 +143,15 @@ export interface ChatDesk {
   ): Promise<Filed>;
 }
 
-/** Which ticket a pull request about to be opened would link to, and what that ticket already has. Optional: without it `ticket_prs` is unsupported. */
+/**
+ * Which ticket a pull request about to be opened would link to, and what that ticket already has; and the team's pull
+ * requests as the work state has them. Optional: without it `ticket_prs` and `pr_list` are unsupported.
+ */
 export interface TicketPrs {
   forDraft(draft: PayloadOf<"ticket_prs">): Promise<PayloadOf<"ticket_prs_result">>;
+
+  /** The pull requests that match, for the caller (`person`); `author: "me"` is the caller. */
+  list(person: string, filter: PayloadOf<"pr_list">): Promise<PayloadOf<"pr_list_result">>;
 }
 
 /** The logs of checks on the team's repositories, read with the office's credentials. Optional: without it `ci_log` is unsupported. */

@@ -342,6 +342,15 @@ describe("office connection", () => {
 
       current().reply(current().last(), "ticket_prs_result", found);
       expect(await prs).toEqual(found);
+
+      const listing = conn.prList({ state: "open", limit: 5 });
+      expect(current().last()).toMatchObject({
+        type: "pr_list",
+        payload: { state: "open", limit: 5 },
+      });
+
+      current().reply(current().last(), "pr_list_result", { prs: [], more: 0 });
+      expect(await listing).toEqual({ prs: [], more: 0 });
     });
 
     it("maps ask, work and team onto the protocol", async () => {

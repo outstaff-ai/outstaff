@@ -578,6 +578,12 @@ describe("protocol server", () => {
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
 
+    it("says pr_list is unsupported without a ticket desk", async () => {
+      const a = await login("ada", tokens.ada);
+      a.send("pr_list", { state: "all", limit: 5 });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+
     it("says doctor_report is unsupported without a doctor", async () => {
       const a = await login("ada", tokens.ada);
       a.send("doctor_report", { checks: [] });
@@ -684,6 +690,10 @@ describe("protocol server with a ticket desk", () => {
             ],
           };
         },
+        async list(person, filter) {
+          asked.push({ person, filter });
+          return { prs: [], more: 2 };
+        },
       },
       auth: createAgentAuth(tokens),
       clock: manualClock(),
@@ -702,6 +712,13 @@ describe("protocol server with a ticket desk", () => {
     });
 
     expect(asked).toEqual([{ headRef: "feat/x", title: "x", body: "Closes ACME-1" }]);
+    a.send("pr_list", { state: "open", author: "me", limit: 5 });
+    expect((await a.next("pr_list_result")).payload).toEqual({ prs: [], more: 2 });
+    expect(asked[1]).toEqual({
+      person: "ada",
+      filter: { state: "open", author: "me", limit: 5 },
+    });
+
     a.ws.terminate();
     await server.stop();
   });

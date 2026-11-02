@@ -73,6 +73,9 @@ export interface AgentEnv {
 
   /** The files attached to tickets of this run, by ticket key, downloaded to the scratch directory. Data from whoever attached them. */
   ticketFiles?: Record<string, Attachment[]>;
+
+  /** The clock verbs read to say how long ago something was. Default: the system clock. */
+  now?: () => Date;
 }
 
 export interface VerbContext {

@@ -959,6 +959,44 @@ Sent by: office.
 | `prs[].state`      | `open` or `closed` or `merged`                                                    | yes      |                                                                                                                                                                                                            |
 | `prs[].authorKind` | `human` or `agent` or `bot`                                                       | yes      |                                                                                                                                                                                                            |
 
+### `pr_list`
+
+Lists the pull requests of the team's repositories as the office's work state has them: open ones and recently merged or closed ones, with their CI and review state and linked ticket. For `ost pr list`, so agents answer status questions from the current state.
+
+Sent by: agent. Answered by: `pr_list_result`, `error`.
+
+| Field    | Type                                    | Required | Description                                                                                                                          |
+| -------- | --------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `state`  | `open` or `merged` or `closed` or `all` | yes      | Which pull requests: open, merged, closed, or all. Merged and closed ones are those finished recently enough for the office to keep. |
+| `author` | string                                  | no       | Only those by this author: a person's handle or a code host login.                                                                   |
+| `ticket` | string                                  | no       | Only those linked to this ticket.                                                                                                    |
+| `repo`   | string                                  | no       | Only those of this repository, `owner/name`.                                                                                         |
+| `limit`  | integer                                 | yes      | At most this many: open ones first, newest first, then the most recently finished.                                                   |
+
+### `pr_list_result`
+
+The matching pull requests and how many more match beyond the limit.
+
+Sent by: office.
+
+| Field                     | Type                                          | Required | Description                                                                                 |
+| ------------------------- | --------------------------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `prs`                     | list of objects                               | yes      | The matching pull requests: open ones first, newest first, then the most recently finished. |
+| `prs[].ref`               | string                                        | yes      | Pull request, for example `acme/shop#12`.                                                   |
+| `prs[].number`            | integer                                       | yes      |                                                                                             |
+| `prs[].title`             | string                                        | yes      |                                                                                             |
+| `prs[].url`               | string                                        | no       |                                                                                             |
+| `prs[].state`             | `open` or `closed` or `merged`                | yes      |                                                                                             |
+| `prs[].draft`             | boolean                                       | yes      |                                                                                             |
+| `prs[].author`            | string                                        | yes      | The person's handle, else the code host login.                                              |
+| `prs[].ci`                | `none` or `pending` or `success` or `failure` | yes      |                                                                                             |
+| `prs[].mergeable`         | `clean` or `conflicting` or `unknown`         | yes      |                                                                                             |
+| `prs[].review`            | string                                        | no       | State of the latest submitted review, for example `approved`.                               |
+| `prs[].unresolvedThreads` | integer                                       | yes      |                                                                                             |
+| `prs[].ticket`            | string                                        | no       | The ticket it is linked to.                                                                 |
+| `prs[].updatedAt`         | string                                        | yes      | When the office last read it.                                                               |
+| `more`                    | integer                                       | yes      | How many more match beyond the limit.                                                       |
+
 ### `ci_log`
 
 Asks for the log of a check on one of the team's repositories, by its link: the office reads it with its own code host credentials, so agents need no CI access of their own.
