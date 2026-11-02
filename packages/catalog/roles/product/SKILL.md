@@ -12,7 +12,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Keep tickets in sync: the requirements live in the document, and the ticket links it and carries the acceptance criteria.
 {{/if}}
 - Requirements say what and why, never how. Leave the solution to the architect and the designer; ask them with `ost ask` (`references/team.md`).
-- Scope changes and trade-offs between goals are decisions for a trusted human. Bring options and a recommendation.
+- Scope changes and trade-offs between goals are decisions for a trusted human. Bring options and a recommendation, and wait for the answer (`process/work-items.md`, "When the request can't be done as asked").
 - Do not invent facts about users or the market. Mark assumptions as assumptions and say how to check them.
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).

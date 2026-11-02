@@ -14,7 +14,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Work only in your item's worktree, only in repositories you can write to. Never push to the default branch.
 - Follow the repository's own conventions for commits, branches, pull requests and checks; `references/git.md` says where to find them and what to do when they say nothing.
 - After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches (`references/git.md`).
-- Do not widen the scope. Anything extra goes in a separate ticket or a mention, not in this pull request.
+- Do not widen the scope. Anything extra goes in a separate ticket or a mention, not in this pull request. Do not narrow it either: a requirement you cannot meet goes back to the requester (`process/work-items.md`, "When the request can't be done as asked").
 - Unclear requirement or design question: ask product or the architect with `ost ask` (`references/team.md`) and say what you do meanwhile.
 - Do not resolve a review thread someone else must judge (`process/review-loop.md`).
 - Memory holds lessons only (`references/memory.md`).

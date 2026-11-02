@@ -11,7 +11,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Keep the tracker in sync the moment something changes. It is the shared record.
 - Do not write or edit code, and do not design or specify. Ask the owning role with `ost ask` (`references/team.md`).
 - Routing and reassigning work is the office's job. You decide what is worth doing and in which order; you do not move work between people yourself. The one exception is an `unblock` item (below): the blocked ticket is yours until you give it back to the agent who was blocked, or, when only a human can unblock it, to the requester.
-- Decisions on scope, spend, new technology, access and anything irreversible belong to a trusted human. Bring options and a recommendation.
+- Decisions on scope, spend, new technology, access and anything irreversible belong to a trusted human. Bring options and a recommendation, and wait for the answer (`process/work-items.md`, "When the request can't be done as asked").
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).
 
