@@ -44,6 +44,10 @@ export type TicketPrsResult = PayloadOf<"ticket_prs_result">;
 
 export type DocLinkRequest = PayloadOf<"doc_link">;
 
+export type CiLogRequest = PayloadOf<"ci_log">;
+
+export type CiLogResult = PayloadOf<"ci_log_result">;
+
 export type Placement = Pick<PayloadOf<"work_place">, "position" | "relativeTo">;
 
 export interface OfficeClient {
@@ -80,6 +84,9 @@ export interface OfficeClient {
    * come back as work for the caller.
    */
   docLink(request: DocLinkRequest): Promise<void>;
+
+  /** The log of a check on one of the team's repositories, by its link, read with the office's credentials. */
+  ciLog(request: CiLogRequest): Promise<CiLogResult>;
 
   /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same request twice. */
   linkTicket(workItemId: string, ticket: string, request: string): Promise<Filed>;
@@ -120,6 +127,7 @@ export interface FakeOffice extends OfficeClient {
   reportsPosted: { workItemId: string; id: string }[];
   ticketPrsAsked: TicketPrsRequest[];
   docsLinked: DocLinkRequest[];
+  ciLogsAsked: CiLogRequest[];
 }
 
 export type { Attached, Filed } from "@outstaff/protocol";

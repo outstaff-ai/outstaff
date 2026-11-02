@@ -9,6 +9,7 @@ export type {
   Messaging,
   Offer,
   TicketPrs,
+  CiLogs,
   WorkSource,
 } from "./source.types.js";
 

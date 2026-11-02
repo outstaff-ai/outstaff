@@ -2,6 +2,7 @@ import type { EventPage } from "./events.js";
 import type { Links } from "./links.js";
 import type { MergeMethod, MergeOptions, MergeRequirements, MergeResult } from "./vcs-merge.js";
 import type { RepoRef } from "./types.js";
+import type { Check, CheckLog } from "./vcs-checks.js";
 
 export interface PullRequest {
   repo: RepoRef;
@@ -18,35 +19,10 @@ export interface PullRequest {
 
   /** The host merges it on its own once the repository's rules are met (auto-merge or a merge queue entry). */
   autoMerge?: boolean;
+
+  /** For a merged one: the commit the merge made on the base branch, whose checks run after the merge. */
+  mergeCommitSha?: string;
   updatedAt: string;
-}
-
-export interface Check {
-  name: string;
-  status: "pending" | "success" | "failure" | "neutral";
-  url: string;
-
-  /** What the check reports about itself (a check run's output summary), when it has one. */
-  summary?: string;
-
-  /** Set when the host can show this check's log through `Vcs.checkLog`; pass it back as is. */
-  logId?: string;
-}
-
-/** The log of one failed step of a check. */
-export interface CheckLogStep {
-  name: string;
-
-  /** The last lines of the step's log, oldest first, timestamps removed. */
-  lines: string[];
-
-  /** Lines of the step's log before `lines`. */
-  omitted: number;
-}
-
-export interface CheckLog {
-  /** Steps that failed; empty when the check did not fail or the host reports no failed step. */
-  failedSteps: CheckLogStep[];
 }
 
 export interface ReviewThread {
@@ -198,6 +174,13 @@ export interface Vcs {
    * Adapters whose host has no step logs leave it out.
    */
   checkLog?(repo: RepoRef, logId: string, opts?: { tail?: number }): Promise<CheckLog>;
+
+  /**
+   * The repository and `logId` a check's link points at (a `Check.url`, or for GitHub the link of an Actions job), so
+   * `checkLog` can read it; undefined for a link that is not one of this host's checks with a log. Reads nothing.
+   * Adapters with `checkLog` have it.
+   */
+  checkLink?(url: string): { repo: RepoRef; logId: string } | undefined;
   reviewThreads(repo: RepoRef, number: number): Promise<ReviewThread[]>;
 
   /**

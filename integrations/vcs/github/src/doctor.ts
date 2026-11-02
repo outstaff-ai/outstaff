@@ -23,6 +23,7 @@ function personApps(
       extraCanWrite: true,
       readOnly: false,
       wantWrite: writable.length > 0,
+      wantActions: writable.length > 0,
       wantWorkflows: writable.length > 0 && needsWorkflows(ctx),
       ...(person.identities?.vcs ? { login: person.identities.vcs } : {}),
     },
@@ -34,6 +35,7 @@ function personApps(
       exact: false,
       readOnly: true,
       wantWrite: false,
+      wantActions: true,
     },
   ];
 }
@@ -83,6 +85,7 @@ export async function doctorGithub(
         exact: true,
         readOnly: true,
         wantWrite: false,
+        wantActions: true,
       },
     ]);
   }

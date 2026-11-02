@@ -6,6 +6,7 @@ import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
 import { blockedAgent, inRound } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
+import { createMergeChecks } from "./merge-checks.js";
 import { visible } from "./open.js";
 import { createPrs } from "./prs.js";
 import { readyTickets } from "./ready.js";
@@ -17,6 +18,10 @@ import type { WorkState, WorkstateOptions } from "./types.js";
 
 const DEFAULT_REFRESH_MS = 60_000;
 const DEFAULT_RETENTION_MS = 14 * 24 * 3_600_000;
+
+/** Merges are followed as often as events are polled, so a ticket closes soon after its merge's checks pass. */
+const followInterval = (opts: WorkstateOptions) =>
+  opts.followIntervalMs ?? (opts.team.office?.poll_interval_seconds ?? 60) * 1000;
 
 /** Opens the work state and loads what the store already knows. */
 export async function createWorkState(opts: WorkstateOptions): Promise<WorkState> {
@@ -83,6 +88,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const prOps = createPrs(core, ticketOps);
   const requesters = createRequesters(core, ticketOps);
   const { saveDoc, touchDoc } = createDocs(core);
+  const { followMerges } = createMergeChecks(core);
   const { refreshPr, ticketOfDraft } = prOps;
   const { deliver, handle } = createEvents(core, {
     ...ticketOps,
@@ -91,6 +97,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     ...requesters,
     saveDoc,
     touchDoc,
+    followMerges,
   });
 
   const { refreshWorkers, doRescan, load } = createRescan(core, {
@@ -103,7 +110,22 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const seen = () => [...prs.values()].filter(visible);
 
   let timer: Cancel | undefined;
+  let followTimer: Cancel | undefined;
   let running = false;
+
+  const scheduleFollow = () => {
+    followTimer = clock.setTimeout(() => {
+      void state.followMerges().then(
+        () => running && scheduleFollow(),
+        (error: unknown) => {
+          logger.warn("following merges failed", { error: String(error) });
+          if (running) {
+            scheduleFollow();
+          }
+        },
+      );
+    }, followInterval(opts));
+  };
 
   const schedule = () => {
     timer = clock.setTimeout(() => {
@@ -143,6 +165,15 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       }
     },
 
+    async followMerges() {
+      const ctx: RefreshCtx = { fresh: [] };
+      try {
+        await locked(() => followMerges(ctx));
+      } finally {
+        await deliver(ctx.fresh);
+      }
+    },
+
     refreshWorkers: () => locked(refreshWorkers),
     async refreshTicket(key, by) {
       const ctx: RefreshCtx = { fresh: [] };
@@ -176,12 +207,15 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
       running = true;
       schedule();
+      scheduleFollow();
     },
 
     async stop() {
       running = false;
       timer?.();
+      followTimer?.();
       timer = undefined;
+      followTimer = undefined;
       await chain;
     },
 

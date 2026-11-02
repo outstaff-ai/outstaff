@@ -54,7 +54,14 @@ describe("start_marks_active", () => {
     for (const kind of ["chat", "doc_feedback", "asked", "unblock", "merge"]) {
       expect(judge("start_marks_active", started(kind), world("review", "ada.admin"))).toEqual({
         failed: {
-          work_kind: ["assigned", "review_feedback", "ticket_comment", "rebase", "ci_failed"],
+          work_kind: [
+            "assigned",
+            "review_feedback",
+            "ticket_comment",
+            "rebase",
+            "ci_failed",
+            "merge_checks_failed",
+          ],
         },
       });
     }

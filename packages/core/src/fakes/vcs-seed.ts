@@ -74,6 +74,7 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
     async merge(repo, number, actor) {
       const s = need(repo, number);
       s.pr.state = "merged";
+      s.pr.mergeCommitSha = newSha();
       touch(s);
       emit("pr.merged", repo, number, actor);
       return structuredClone(s.pr);

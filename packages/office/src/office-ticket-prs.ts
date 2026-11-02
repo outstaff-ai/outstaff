@@ -18,8 +18,10 @@ export function officeTicketPrs(deps: { workState: WorkState; log: Logger }): Ti
         body: draft.body,
       });
 
+      const status = ticket ? workState.ticket(ticket)?.status : undefined;
       return {
         ...(ticket ? { ticket } : {}),
+        ...(status ? { status } : {}),
         prs: ticket
           ? workState
               .prsOfTicket(ticket)

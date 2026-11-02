@@ -5,6 +5,8 @@ export type {
   CiState,
   CurrentWork,
   DocRecord,
+  MergeCheck,
+  MergeChecks,
   PrRecord,
   ReadyTicket,
   TicketRecord,

@@ -14,6 +14,8 @@ export const PIPELINE_EVENT_TYPES = [
   "pr.behind_base",
   "pr.base_merged",
   "pr.linked",
+  "pr.merge_checks_passed",
+  "pr.merge_checks_failed",
   "ticket.commented",
   "ticket.assigned",
   "ticket.moved",

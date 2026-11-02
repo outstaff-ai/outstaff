@@ -56,4 +56,8 @@ export const serviceHandlers: RequestHandlers = {
 
     reply("ticket_prs_result", await tickets.forDraft(payload));
   },
+  async ci_log({ ctx, person, payload, reply }) {
+    const logs = required(ctx.opts.ciLogs, "This office does not read check logs.");
+    reply("ci_log_result", await logs.read(person, payload));
+  },
 };

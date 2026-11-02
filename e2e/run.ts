@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -325,6 +325,9 @@ policies:
   # Only this approver's approval wakes an author to merge: the other steps approve nothing, and a human here changes
   # none of them. The stub's ruleset needs one approval and its merge queue merges what joins it.
   merge: { on_approval: true, approvers: [human:merge-approver] }
+  # A merge with no checks on its merge commit closes its ticket after 3 seconds instead of 5 minutes, finished checks
+  # pass after 3 seconds with no new one instead of 2 minutes, and a check still running after a minute fails it.
+  merge_checks: { wait_for_start_minutes: 0.05, timeout_minutes: 1, settle_minutes: 0.05 }
 `;
 
 /**
@@ -1050,7 +1053,9 @@ async function main() {
     (s) => s.tickets.find((x: Json) => x.key === first).status === "Done",
   );
 
-  step(`merge: #${pr1.pr.number} merged -> ${first} is done`);
+  step(
+    `merge: #${pr1.pr.number} merged, no checks start on the merge commit -> ${first} is done after the short wait`,
+  );
 
   const rebased = await until(`#${pr2.pr.number} rebased on main and pushed with a lease`, (s) => {
     const pr = s.github.pulls.find((p: Json) => p.number === pr2.pr.number);
@@ -2043,6 +2048,7 @@ async function main() {
   );
 
   await unblockDependents();
+  await mergeChecks();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2154,6 +2160,91 @@ async function unblockDependents() {
   step(
     `unblock dependents: ${blocker13c} blocks ${waiting13c.join(" and ")} -> the human closed it -> both moved to ready as sam, and sam was woken on each`,
   );
+}
+
+/**
+ * 13d. the checks on a merge commit: a deploy that fails after the merge wakes the author with the end of its log, and
+ * the ticket stays open. The author reads more of the log through the office (`ost ci log`) and opens a fix on the
+ * same ticket, which its merged pull request no longer blocks; once the fix merges with the deploy green, the ticket
+ * is done.
+ */
+async function mergeChecks() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const samBefore = wakesOf("sam").length;
+  const { key } = await stub("POST", "/_test/tickets", { title: "Deploy the greeting" });
+  await stub("POST", `/_test/tickets/${key}/assign`, { to: "sam" });
+  const ticketOf = (s: Json) => s.tickets.find((x: Json) => x.key === key);
+  const first = await until(`a pull request for ${key}, the ticket in review`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${key}`));
+    const t = ticketOf(s);
+    return pr && t.status === "In Review" && t.assignee !== "sam" ? pr : undefined;
+  });
+
+  await stub("POST", `/_test/pulls/${first.number}/merge`, {
+    checks: [
+      {
+        name: "deploy",
+        conclusion: "failure",
+        step: "Apply the configuration",
+        log: ["Loading the configuration", "error: region is not set"],
+      },
+    ],
+  });
+
+  const fix = await until(
+    `${key}: sam woken on the failed deploy, and a fix opened on the same ticket`,
+    (s) => {
+      const t = ticketOf(s);
+      const pr = s.github.pulls.find(
+        (p: Json) => p.number !== first.number && p.body.includes(`Closes ${key}`),
+      );
+
+      const note = t.comments.find(
+        (c: Json) =>
+          c.author === "sam" && c.body.startsWith(`deploy failed after #${first.number}`),
+      );
+
+      return pr && note && t.status === "In Review" ? { pr, note, t } : undefined;
+    },
+  );
+
+  assertIncludes(
+    wakesOf("sam")
+      .slice(samBefore)
+      .map((k) => k ?? ""),
+    "merge_checks_failed",
+    "the failed deploy on the merge commit woke sam",
+  );
+
+  assertEq(
+    fix.note.body.includes("error: region is not set (from the wake)"),
+    true,
+    "the wake carried the end of the failed step's log",
+  );
+
+  assertEq(
+    fix.note.body.includes("ost ci log: error: region is not set"),
+    true,
+    "ost ci log read the log through the office",
+  );
+
+  assertEq(
+    fix.t.moves.some((m: Json) => m.to === "Done"),
+    false,
+    `${key} stayed open after its merge's deploy failed`,
+  );
+
+  step(
+    `merge checks: #${first.number} merged, its deploy failed -> sam woken with the log, ${key} open, fix #${fix.pr.number} opened on the same ticket`,
+  );
+
+  await stub("POST", `/_test/pulls/${fix.pr.number}/merge`, {
+    checks: [{ name: "deploy", conclusion: "success" }],
+  });
+
+  await until(`${key} done`, (s) => ticketOf(s).status === "Done");
+  step(`merge checks: fix #${fix.pr.number} merged with the deploy green -> ${key} is done`);
 }
 
 /** The merge approver approves the pull request's current head. */

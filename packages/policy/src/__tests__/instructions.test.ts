@@ -48,6 +48,21 @@ describe("instruction variables", () => {
     });
   });
 
+  it("names the checks that failed on a merge commit, with their links", () => {
+    const e = event("pr.merge_checks_failed", {
+      subject: { pr: prRef(51) },
+      data: {
+        failing: [{ name: "deploy", url: "https://ci.acme.example/7" }, { name: "smoke" }, {}],
+      },
+    });
+
+    expect(instructionVariables(ctxOf(e, { prs: [pr(51)] }), {}).checks).toBe(
+      "deploy (https://ci.acme.example/7), smoke",
+    );
+
+    expect(instructionVariables(ctxOf(event("pr.merged")), {}).checks).toBe("");
+  });
+
   it("names the requester of the ticket, else the team's first human", () => {
     const e = event("agent.handed_back", { subject: { ticket: "ACME-9" } });
     const asked = { tickets: { "ACME-9": { status: "blocked" as const, requester: "grace" } } };

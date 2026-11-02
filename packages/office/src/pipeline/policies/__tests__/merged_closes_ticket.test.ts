@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { judge, onPr, prWorld, HUMAN_AUTHOR, pr, t, type World } from "./support.js";
+import { OFFICE, judge, onPr, prWorld, HUMAN_AUTHOR, pr, t, type World } from "./support.js";
 
-const merged = onPr("pr.merged");
+const merged = onPr("pr.merge_checks_passed", {}, OFFICE);
 
 /** A human's merged pull request #9 on ACME-9, with the ticket as given. */
 const humans = (ticket: ReturnType<typeof t>, more: Partial<World> = {}): World => ({

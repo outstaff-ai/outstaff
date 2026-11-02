@@ -8,6 +8,7 @@ import {
 } from "#/pipeline/context/index.js";
 import { MERGE_KIND } from "#/scheduler/index.js";
 import type { Store, WorkItem } from "#/store/types.js";
+import { failedChecksOf } from "./failed-checks.js";
 import { gatherGraph } from "./gather.js";
 import { mergeContextOf } from "./merge.js";
 import type { ContextReaders, WakeContextOptions } from "./types.js";
@@ -22,7 +23,9 @@ async function eventsOf(store: Store, itemId: string): Promise<string[]> {
 }
 
 const isEmpty = (c: WakeContext) =>
-  c.tickets.length + c.prs.length + c.docs.length + c.chats.length === 0 && !c.merge;
+  c.tickets.length + c.prs.length + c.docs.length + c.chats.length === 0 &&
+  !c.merge &&
+  !c.failedChecks?.length;
 
 /** A merge item's context of the merge, when the office knows its pull request. */
 async function mergeOf(readers: ContextReaders, item: WorkItem, limit: number) {
@@ -63,11 +66,13 @@ export function wakeContextOf(readers: ContextReaders, opts: WakeContextOptions)
     try {
       const graph = await gatherGraph(readers, item.id, limits.items * 2);
       const merge = await mergeOf(readers, item, limits.items);
-      const { context, manifest } = withMerge(buildWakeContext(graph, limits), merge);
+      const { context: built, manifest } = withMerge(buildWakeContext(graph, limits), merge);
       if (fresh && traces) {
         await recordContext(traces, await eventsOf(readers.store, item.id), manifest);
       }
 
+      const failedChecks = await failedChecksOf(readers, item);
+      const context = failedChecks?.length ? { ...built, failedChecks } : built;
       return isEmpty(context) ? undefined : context;
     } catch (error) {
       opts.logger?.warn("could not build the context of a wake", {

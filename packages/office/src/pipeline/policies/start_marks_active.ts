@@ -3,7 +3,14 @@ import { NOT_CLOSED } from "./conditions.js";
 import { acts } from "./spec.js";
 
 /** The rounds that work on a ticket. A chat session works on none: work a chat attaches runs as a round of these. */
-const ROUNDS = ["assigned", "review_feedback", "ticket_comment", "rebase", "ci_failed"];
+const ROUNDS = [
+  "assigned",
+  "review_feedback",
+  "ticket_comment",
+  "rebase",
+  "ci_failed",
+  "merge_checks_failed",
+];
 
 export const policy = definePolicy({
   id: "start_marks_active",

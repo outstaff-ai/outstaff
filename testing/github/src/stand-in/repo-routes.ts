@@ -7,19 +7,30 @@ import type { GithubStore, StandInRepo, StoredCheckRun } from "./types.js";
 /** Where Actions job logs are downloaded from, after a redirect. */
 export const LOG_ORIGIN = "https://logs.github.test";
 
+/** The link of an Actions job, as GitHub gives it to the job's check run. */
+export const jobUrl = (s: GithubStore, id: number) =>
+  `${WEB}/${s.repo.owner}/${s.repo.name}/actions/runs/9/job/${id}`;
+
 const checkRun = (s: GithubStore, c: StoredCheckRun): RestCheckRun => ({
   id: c.id,
   name: c.name,
   status: c.status,
   conclusion: c.conclusion,
-  html_url: c.html_url ?? `${WEB}/runs/${c.name}`,
-  details_url: c.job ? `${WEB}/${s.repo.owner}/${s.repo.name}/actions/runs/9/job/${c.id}` : null,
+  html_url: c.html_url ?? (c.job ? jobUrl(s, c.id) : `${WEB}/runs/${c.name}`),
+  details_url: c.job ? jobUrl(s, c.id) : null,
   app: { slug: c.job ? "github-actions" : "other-ci" },
   ...(c.output ? { output: c.output } : {}),
 });
 
+/** Where a log redirect points, and the route that serves it: on its own origin, or under a path of this server. */
+function logPlace(s: GithubStore) {
+  const base = s.logUrl ?? `${LOG_ORIGIN}/logs`;
+  return { base, route: s.logUrl ? `${new URL(s.logUrl).pathname}/:id` : `${base}/:id` };
+}
+
 /** Checks, Actions jobs and their logs, commit statuses, permissions and the event feed. */
 export function repoRoutes(s: GithubStore, repo: string): Route[] {
+  const logs = logPlace(s);
   return [
     {
       method: "GET",
@@ -41,12 +52,12 @@ export function repoRoutes(s: GithubStore, repo: string): Route[] {
       path: `${repo}/actions/jobs/:id/logs`,
       handler: (r) =>
         s.jobs.has(Number(r.params["id"]))
-          ? { status: 302, headers: { location: `${LOG_ORIGIN}/logs/${r.params["id"]}?sig=abc` } }
+          ? { status: 302, headers: { location: `${logs.base}/${r.params["id"]}?sig=abc` } }
           : NOT_FOUND,
     },
     {
       method: "GET",
-      path: `${LOG_ORIGIN}/logs/:id`,
+      path: logs.route,
       handler: (r) => ({ text: s.jobs.get(Number(r.params["id"]))?.log ?? "" }),
     },
     { method: "GET", path: `${repo}/commits/:sha/status`, handler: () => ({ statuses: [] }) },

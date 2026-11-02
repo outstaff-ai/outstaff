@@ -149,8 +149,8 @@ export const otherPrEvents: ReplayScenario = {
     {
       event: ev(
         "s11-human-merge",
-        "pr.merged",
-        "grace-lead",
+        "pr.merge_checks_passed",
+        "office",
         { pr: 55, ticket: "ACME-135" },
         at(183),
       ),
@@ -163,8 +163,8 @@ export const otherPrEvents: ReplayScenario = {
     {
       event: ev(
         "s11-merge-one-of-two",
-        "pr.merged",
-        "ada-admin",
+        "pr.merge_checks_passed",
+        "office",
         { pr: 56, ticket: "ACME-136" },
         at(184),
       ),

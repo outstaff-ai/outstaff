@@ -67,7 +67,7 @@ function githubControls({ github }: World): Route[] {
       method: "POST",
       path: "/_test/pulls/:n/merge",
       handler: async (r) => {
-        await github.merge(pull(r), "grace-lead");
+        await github.merge(pull(r), "grace-lead", r.json?.checks ?? []);
         return ok();
       },
     },

@@ -70,7 +70,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     off: "many",
     kind: "agent",
     behaviour:
-      "One pull request per ticket: `ost pr open` refuses a second pull request for a ticket (open or merged) and points to `ost ticket create --parent`. With many, several pull requests are allowed. Either way the ticket moves to done when its last open pull request merges into the default branch (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is).",
+      "One open pull request per ticket: `ost pr open` refuses a pull request for a ticket that has an open one, and points to `ost ticket create --parent`, or that is done or canceled; a merged one does not count while the ticket is open. With many, several pull requests are allowed. Either way the ticket moves to done when its last open pull request merges into the default branch and the checks on the merge commit pass (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is).",
   },
   {
     path: "pull_ready",

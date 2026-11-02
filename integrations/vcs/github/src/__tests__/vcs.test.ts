@@ -1429,6 +1429,37 @@ describe("check logs", () => {
     expect(e.message).toContain("ost doctor");
   });
 
+  it("reads the logs with the office App in the office, and names it when GitHub refuses", async () => {
+    const { vcs, stub } = build(routes({ actions: "read" }), officeSecrets);
+    const out = await vcs.checkLog!(REPO, "42", { tail: 1 });
+    expect(out.failedSteps[0]!.lines).toEqual(["##[error]Process completed with exit code 1."]);
+    expect(stub.calls.some((c) => c.path === "/repos/acme/app/actions/jobs/42/logs")).toBe(true);
+
+    const refused = build(
+      routes({}, () => ({ status: 403, body: { message: "Resource not accessible" } })),
+      officeSecrets,
+    );
+
+    const e = await expectPortError(refused.vcs.checkLog!(REPO, "42"), "forbidden");
+    expect(e.message).toContain("the office GitHub App needs the Actions: read permission");
+  });
+
+  it("finds the job an Actions link of this GitHub points at, and nothing else", () => {
+    const { vcs } = build([]);
+    expect(vcs.checkLink!("https://github.com/acme/app/actions/runs/7/job/42")).toEqual({
+      repo: { host: "github.com", owner: "acme", name: "app" },
+      logId: "42",
+    });
+
+    expect(vcs.checkLink!("https://github.com/acme/app/actions/runs/7/job/42/")).toMatchObject({
+      logId: "42",
+    });
+
+    expect(vcs.checkLink!("https://other.example/acme/app/actions/runs/7/job/42")).toBeUndefined();
+    expect(vcs.checkLink!("https://github.com/acme/app/actions/runs/7")).toBeUndefined();
+    expect(vcs.checkLink!("acme/app#42")).toBeUndefined();
+  });
+
   it("refuses a person without a grant and an id that is not a job", async () => {
     expect.hasAssertions();
     const { vcs } = build(routes({ actions: "read" }), { ...agent, OUTSTAFF_PERSON: "lee" });

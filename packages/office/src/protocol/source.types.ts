@@ -148,6 +148,12 @@ export interface TicketPrs {
   forDraft(draft: PayloadOf<"ticket_prs">): Promise<PayloadOf<"ticket_prs_result">>;
 }
 
+/** The logs of checks on the team's repositories, read with the office's credentials. Optional: without it `ci_log` is unsupported. */
+export interface CiLogs {
+  /** Refuses (`invalid`) a link that is not a check with a log on one of the team's repositories. */
+  read(person: string, request: PayloadOf<"ci_log">): Promise<PayloadOf<"ci_log_result">>;
+}
+
 /** Which documents agents wrote for which work. Optional: without it `doc_link` is unsupported. */
 export interface DocLinks {
   /** Records that the person wrote the document for the ticket of the work item (if it has one). */

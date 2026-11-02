@@ -132,6 +132,45 @@ export const policiesSchema = z
           "Agents merging their own approved pull requests, each merge their decision, woken when a pull request may be ready (opt-in).",
         ),
       ),
+    merge_checks: z
+      .strictObject({
+        wait_for_start_minutes: z
+          .number()
+          .positive()
+          .max(1440)
+          .default(5)
+          .meta(
+            d(
+              "Minutes the office waits for a check to appear on a merge commit. With none by then, the merge counts as passed and its ticket can close. Fractions are allowed. Default 5.",
+            ),
+          ),
+        timeout_minutes: z
+          .number()
+          .positive()
+          .max(10_080)
+          .default(120)
+          .meta(
+            d(
+              "Minutes after the merge after which a check still running on the merge commit counts as failed, naming that check. Fractions are allowed. Default 120.",
+            ),
+          ),
+        settle_minutes: z
+          .number()
+          .min(0)
+          .max(1440)
+          .default(2)
+          .meta(
+            d(
+              "Minutes the checks on a merge commit must stay finished, with none failed and no new one appearing, before the merge counts as passed, so a workflow that starts after the first ones finish is still waited for. Fractions are allowed. Default 2.",
+            ),
+          ),
+      })
+      .default({ wait_for_start_minutes: 5, timeout_minutes: 120, settle_minutes: 2 })
+      .meta(
+        d(
+          "The checks that run on a pull request's merge commit in the default branch, such as a deploy. A ticket closes only once they pass; when one fails, the author is woken with its log.",
+        ),
+      ),
     messages: z
       .strictObject({
         max_lines: z

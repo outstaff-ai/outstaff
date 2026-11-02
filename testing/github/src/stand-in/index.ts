@@ -7,6 +7,7 @@ export { fakeAuth, OFFICE_APP, OWN_APP } from "./fake-auth.js";
 export type {
   AppAuth,
   AppAuthOptions,
+  DriverCheck,
   DriverComment,
   GithubE2eOptions,
   GitHttpRequest,

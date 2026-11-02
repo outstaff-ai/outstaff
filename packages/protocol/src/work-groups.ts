@@ -10,6 +10,7 @@ const WHAT: Record<string, string> = {
   merge: "merging",
   conflict: "resolving conflicts",
   ci_failed: "CI failed",
+  merge_checks_failed: "fixing checks that failed after merge",
 };
 
 const keyOf = (i: WorkSummary) =>

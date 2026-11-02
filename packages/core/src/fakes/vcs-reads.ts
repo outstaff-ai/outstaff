@@ -1,4 +1,4 @@
-import { PortError } from "#/ports/index.js";
+import { PortError, parseRepoUrl } from "#/ports/index.js";
 import type { CheckLog, ReviewThread } from "#/ports/index.js";
 import type { FakeVcsState, VcsReads } from "./vcs.types.js";
 
@@ -59,6 +59,16 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
             omitted: Math.max(0, s.lines.length - tail),
           })),
       };
+    },
+    checkLink(url) {
+      for (const [at, list] of checks) {
+        const found = list.find((c) => c.url === url && c.logId);
+        if (found) {
+          return { repo: parseRepoUrl(at.slice(0, at.lastIndexOf("@"))), logId: found.logId! };
+        }
+      }
+
+      return undefined;
     },
     async reviewThreads(repo, number) {
       return structuredClone(need(repo, number).threads);

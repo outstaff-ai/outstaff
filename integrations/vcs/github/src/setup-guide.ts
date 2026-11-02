@@ -13,6 +13,9 @@ const READ = {
   statuses: "read",
 } as const;
 
+/** Actions: read lets the office read the log of a check that failed after a merge, for the agent it wakes. */
+const OFFICE = { ...READ, actions: "read" } as const;
+
 /** Actions: read lets a person who can write read the logs of a failed CI job (`ost pr checks`). */
 const WRITE = {
   ...READ,
@@ -65,8 +68,8 @@ function officeGuide(team: Team): SetupStep[] {
     createStep(
       "Create the office GitHub App",
       slugOf(team, "office"),
-      READ,
-      "metadata, contents, pull requests, issues, checks and commit statuses, all read-only.",
+      OFFICE,
+      "metadata, contents, pull requests, issues, checks, commit statuses and Actions (to read the log of a check that fails after a merge, for the agent it wakes), all read-only.",
     ),
     {
       title: "Install it on exactly the team repositories",

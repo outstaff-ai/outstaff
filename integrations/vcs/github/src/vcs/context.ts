@@ -220,6 +220,7 @@ export function createGithubContext(
   return {
     http,
     apiUrl,
+    web,
     secrets,
     self,
     sleep,

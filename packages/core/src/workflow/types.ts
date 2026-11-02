@@ -33,6 +33,8 @@ export interface WorkflowEvent {
    * carries `docId`, `title`, `commentId`, `anchorText` and `url` of a comment or reply on a knowledge document;
    * its subject is the document and, when the work state knows it, the ticket the document was written for.
    * `ticket.unblocked` carries `blocker`, the ticket whose close left none open, and `closedBy`, who closed it, when known.
+   * `pr.merge_checks_passed` and `pr.merge_checks_failed` carry `sha`, the merge commit, and `base`; the failure also
+   * carries `failing` (each check's `name` and `url`) and `timedOut` when a check was still running at the timeout.
    */
   data: Record<string, unknown>;
 }

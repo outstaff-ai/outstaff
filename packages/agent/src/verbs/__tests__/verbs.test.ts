@@ -599,31 +599,46 @@ describe("pr write verbs", () => {
     const open = (f: Awaited<ReturnType<typeof setup>>) =>
       run("pr.open", f.env, { title: "feat(cart): more coupons", body: "Closes SHOP-1" }, f.ctx);
 
-    it.each(["open", "merged"] as const)(
-      "refuses a second pull request for a ticket that has one %s, naming it and the split",
+    it("refuses a second pull request for a ticket that has an open one, naming it and the split", async () => {
+      const f = await setup();
+      office(f, () => linked("open"));
+      await rejects(
+        open(f),
+        "conflict",
+        /SHOP-1 already has an open pull request: acme\/shop#4 https:\/\/git\.acme\.example\/acme\/shop\/pull\/4.*ost ticket create --parent SHOP-1/s,
+      );
+
+      expect(f.office.ticketPrsAsked).toEqual([
+        { headRef: "feat/coupons", title: "feat(cart): more coupons", body: "Closes SHOP-1" },
+      ]);
+
+      expect((await f.vcs.events([f.repo])).events).toEqual([]);
+    });
+
+    it.each(["closed", "merged"] as const)(
+      "allows a follow-up when the earlier pull request is %s and the ticket still open",
       async (state) => {
         const f = await setup();
-        office(f, () => linked(state));
+        office(f, () => ({ ...linked(state), status: "review" as const }));
+        await open(f);
+        expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
+      },
+    );
+
+    it.each(["done", "canceled"] as const)(
+      "refuses a pull request for a ticket that is %s, pointing at a follow-up ticket",
+      async (status) => {
+        const f = await setup();
+        office(f, () => ({ ...linked("merged"), status }));
         await rejects(
           open(f),
           "conflict",
-          /SHOP-1 already has a pull request: acme\/shop#4 \(.+\) https:\/\/git\.acme\.example\/acme\/shop\/pull\/4.*ost ticket create --parent SHOP-1/s,
+          new RegExp(`SHOP-1 is ${status}.*ost ticket create --related SHOP-1`, "s"),
         );
-
-        expect(f.office.ticketPrsAsked).toEqual([
-          { headRef: "feat/coupons", title: "feat(cart): more coupons", body: "Closes SHOP-1" },
-        ]);
 
         expect((await f.vcs.events([f.repo])).events).toEqual([]);
       },
     );
-
-    it("allows it when the earlier pull request was closed without merging", async () => {
-      const f = await setup();
-      office(f, () => linked("closed"));
-      await open(f);
-      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
-    });
 
     it("allows the pull request of a sub-ticket, which has none yet", async () => {
       const f = await setup();
@@ -1980,6 +1995,7 @@ describe("verb catalogue", () => {
       "pr.comment",
       "pr.diff",
       "pr.merge",
+      "ci.log",
       "me",
       "ask",
       "question.answer",

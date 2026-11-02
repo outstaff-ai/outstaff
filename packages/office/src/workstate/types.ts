@@ -75,6 +75,37 @@ export interface DocRecord {
   touchedAt: string;
 }
 
+/** A check on a merge commit that did not pass, as a `pr.merge_checks_failed` names it. */
+export interface MergeCheck {
+  name: string;
+  url?: string;
+
+  /** Set when the code host can show the check's log (`Vcs.checkLog`). */
+  logId?: string;
+}
+
+/** The checks on the commit a merge made on the default branch, followed from the merge until they are decided. */
+export interface MergeChecks {
+  /** The merge commit; absent when the code host does not say, which counts as passed. */
+  sha?: string;
+
+  /** When the office saw the merge (ISO-8601); the waits count from here. */
+  since: string;
+  state: "pending" | "passed" | "failed";
+
+  /** For a failed merge: the checks that failed, or the ones still running at the timeout. */
+  failing?: MergeCheck[];
+
+  /** The merge failed because a check was still running after `policies.merge_checks.timeout_minutes`. */
+  timedOut?: boolean;
+
+  /**
+   * Since when every check seen has finished without failing, and which they were. The merge passes once no new check
+   * appears for `policies.merge_checks.settle_minutes`; a check that starts ends the quiet.
+   */
+  quiet?: { since: string; checks: string[] };
+}
+
 export interface PrRecord {
   ref: PrRef;
   title: string;
@@ -100,6 +131,9 @@ export interface PrRecord {
   /** Subject ref of the open pull request this one is stacked on. */
   stackedOn?: string;
 
+  /** For a pull request merged into the default branch: the checks on its merge commit. */
+  mergeChecks?: MergeChecks;
+
   /**
    * When the code host answered that the pull request is not there or not ours to read (not found or forbidden). It is
    * not refreshed again until an event names it or the host lists it again.
@@ -123,6 +157,9 @@ export interface WorkstateOptions {
 
   /** How often `start()` rescans open pull requests for CI and mergeability changes. Default 60 seconds. */
   refreshIntervalMs?: number;
+
+  /** How often `start()` reads the checks of merges not decided yet. Default `office.poll_interval_seconds`. */
+  followIntervalMs?: number;
 
   /** How long finished tickets and closed pull requests stay in the state. Default 14 days. */
   retentionMs?: number;
@@ -158,7 +195,7 @@ export interface WorkState extends WorkflowState {
 
   /**
    * Receives the synthetic events the work state derives: `pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`,
-   * `pr.base_merged`, `pr.linked` and `ticket.unblocked`.
+   * `pr.base_merged`, `pr.linked`, `pr.merge_checks_passed`, `pr.merge_checks_failed` and `ticket.unblocked`.
    */
   onEvent(handler: WorkstateHandler): void;
 
@@ -188,7 +225,16 @@ export interface WorkState extends WorkflowState {
    */
   readyTickets(person: string): ReadyTicket[];
 
-  /** Rescans on the clock every `refreshIntervalMs`, because CI results arrive without an event. */
+  /**
+   * Reads the checks on the merge commit of each merge not decided yet, and raises `pr.merge_checks_passed` or
+   * `pr.merge_checks_failed` once for each merge they decide.
+   */
+  followMerges(): Promise<void>;
+
+  /**
+   * Rescans on the clock every `refreshIntervalMs`, because CI results arrive without an event, and follows merges
+   * every `followIntervalMs`.
+   */
   start(): Promise<void>;
   stop(): Promise<void>;
 

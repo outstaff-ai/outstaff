@@ -32,7 +32,7 @@ export interface PipelineSubject {
  * fills them for the conditions, `addressed` (an agent's handle) for `chat.message`, `cause` (a `MergeCause`) on
  * the merge-derived types, `kind` and `workItem` on `agent.started`, `status`, `kind` and `summary` (what the agent
  * handed back) on `agent.handed_back`, `blocker` (the ticket that closed) and `closedBy` (who closed it, when known) on
- * `ticket.unblocked`, and `echo` (the act's id) on a tracker event that is the echo of an office act.
+ * `ticket.unblocked`, `sha`, `base`, `failing` and `timedOut` on `pr.merge_checks_passed` and `pr.merge_checks_failed`, and `echo` (the act's id) on a tracker event that is the echo of an office act.
  */
 export interface PipelineEvent {
   /** Unique per event: the office's `<source>:<externalId>`. */

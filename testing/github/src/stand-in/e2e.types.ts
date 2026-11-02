@@ -51,6 +51,19 @@ export interface GithubE2eOptions extends AppAuthOptions {
 
   /** Login to permission level, for `collaborators/:login/permission`. */
   permissions: Record<string, string>;
+
+  /** Where the stubs serve Actions logs: a URL of their own server that the office can reach. */
+  logUrl?: string;
+}
+
+/** A check the CI reports on a merge commit, as an Actions job: its conclusion, and the log of the step that ran. */
+export interface DriverCheck {
+  name: string;
+  conclusion: string;
+
+  /** The step the job ran; its output is `log`. */
+  step?: string;
+  log?: string[];
 }
 
 /** An inline comment of a review the test driver submits as a person. */

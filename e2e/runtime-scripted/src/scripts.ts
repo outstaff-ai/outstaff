@@ -1041,6 +1041,60 @@ export async function* ciFailed(ctx: ItemContext): Script {
 }
 
 /**
+ * A check failed on the merge commit of the agent's pull request: read more of its log through the office, say on the
+ * ticket what failed, and open a fix on the same ticket from the default branch.
+ */
+export async function* mergeChecksFailed(ctx: ItemContext): Script {
+  const key = need(ctx.ticket, "the ticket");
+  const number = need(ctx.pr, "the pull request");
+  const cwd = need(ctx.worktree, "the worktree");
+  const repo = need(ctx.repo, "the repository");
+  const check = need(ctx.failedChecks?.[0], "the failed check");
+  const url = need(check.url, "the failed check's link");
+  const more = yield { type: "tool", tool: "ci_log", input: { url, lines: 50 } };
+  const cause = /^ {2}(error: .*)$/m.exec(more)?.[1] ?? "see the log";
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}`,
+    },
+  };
+
+  yield { type: "shell", command: "git fetch --prune origin", cwd };
+  const branch = branchFor(yield* conventions(ctx, cwd), key, `fix ${check.name} after ${number}`);
+  yield { type: "shell", command: `git switch -c ${q(branch)} origin/main`, cwd };
+  const current = yield { type: "read", path: `${cwd}/${FILE}` };
+  yield {
+    type: "write",
+    path: `${cwd}/${FILE}`,
+    text: `${current.replace(/\n$/, "")}\nregion: eu\n`,
+  };
+
+  yield { type: "shell", command: "git add -A", cwd };
+  yield {
+    type: "shell",
+    command: `git commit -m ${q(`fix: set the region for ${check.name}`)}`,
+    cwd,
+  };
+
+  yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
+
+  const opened = yield {
+    type: "tool",
+    tool: "pr_open",
+    input: {
+      repo,
+      title: `${key}: fix ${check.name} after #${number}`,
+      body: `Closes ${key}\n\nFixes the ${check.name} check that failed on the merge commit of #${number}.\n`,
+    },
+  };
+
+  return `${check.name} failed after #${number}; opened the fix ${firstUrl(opened)}`;
+}
+
+/**
  * The PM unblocks a ticket an agent handed back as blocked. A ticket that says `pm knows: <answer>` is answered on the
  * ticket and given back to the blocked agent; any other needs a human, so it goes to the requester the office named,
  * with what is needed.
@@ -1089,6 +1143,7 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   ticket_comment: ticketComment,
   rebase: conflict,
   ci_failed: ciFailed,
+  merge_checks_failed: mergeChecksFailed,
   unblock,
   chat,
 };

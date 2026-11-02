@@ -9,6 +9,8 @@ import type {
   TicketPrsRequest,
   TicketPrsResult,
   DocLinkRequest,
+  CiLogRequest,
+  CiLogResult,
   FakeOffice,
 } from "./office.types.js";
 
@@ -24,6 +26,9 @@ export function createFakeOffice(
 
     /** What the office answers about the pull requests of the ticket a draft links to; by default none. */
     ticketPrs?: (draft: TicketPrsRequest) => TicketPrsResult;
+
+    /** What the office answers for a check's log; by default a log with no failed step. */
+    ciLog?: (request: CiLogRequest) => CiLogResult;
 
     /** What the office answers when a chat session files work; by default the person is idle. */
     filed?: Partial<Filed>;
@@ -45,10 +50,16 @@ export function createFakeOffice(
   const reportsPosted: FakeOffice["reportsPosted"] = [];
   const ticketPrsAsked: TicketPrsRequest[] = [];
   const docsLinked: DocLinkRequest[] = [];
+  const ciLogsAsked: CiLogRequest[] = [];
   const seen = new Set<string>();
   return {
     ticketPrsAsked,
     docsLinked,
+    ciLogsAsked,
+    async ciLog(request) {
+      ciLogsAsked.push(request);
+      return opts.ciLog?.(request) ?? { repo: "acme/shop", steps: [] };
+    },
     async docLink(request) {
       docsLinked.push(request);
     },

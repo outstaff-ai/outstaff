@@ -16,7 +16,8 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`chat_to_addressed`](#chat_to_addressed) | `chat.message` | wake `addressed` (kind `chat`) |
 | [`review_to_author`](#review_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `review_feedback`) |
 | [`merged_feedback_to_author`](#merged_feedback_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `merged_feedback`) |
-| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merged` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done` |
+| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merge_checks_passed` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done` |
+| [`merge_checks_failed_to_agent`](#merge_checks_failed_to_agent) | `pr.merge_checks_failed` | wake `author`, else `assignee`, else `last_worker` (kind `merge_checks_failed`) |
 | [`rebase_to_author`](#rebase_to_author) | `pr.conflicted`, `pr.behind_base`, `pr.base_merged` | wake `author` (kind `rebase`) |
 | [`ci_failed_to_author`](#ci_failed_to_author) | `pr.ci_failed` | wake `author` (kind `ci_failed`) |
 | [`merge_ready`](#merge_ready) | `pr.review_submitted`, `pr.ci_passed`, `pr.base_merged` | wake `author` (kind `merge`) with the merge context, when its checks are green and the repository is in `policies.merge.repos` |
@@ -103,9 +104,9 @@ Instruction:
 
 ### merged_closes_ticket
 
-A merge into the default branch closes the ticket, unless another of its pull requests is open: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
+A merge into the default branch closes the ticket once the checks on its merge commit pass (or none start), unless another of its pull requests is open: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
 
-Listens to `pr.merged`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`.
+Listens to `pr.merge_checks_passed`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`.
 
 When:
 
@@ -118,7 +119,26 @@ When:
 Note posted with the change:
 
 ```text
-Moved to done: pull request #{{pr.number}} by {{pr.author}} merged.
+Moved to done: pull request #{{pr.number}} by {{pr.author}} merged and the checks on its merge commit passed.
+```
+
+### merge_checks_failed_to_agent
+
+A check that fails on the merge commit of a pull request in the default branch, such as a deploy, wakes the ticket's agent with the failed step's log: the pull request's author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it. The ticket stays open.
+
+Listens to `pr.merge_checks_failed`. Decides: wake `author`, else `assignee`, else `last_worker` (kind `merge_checks_failed`).
+
+When:
+
+- all of:
+  - `pr_merged: true`
+  - not:
+    - `ticket_status: canceled`
+
+Instruction:
+
+```text
+Pull request #{{pr.number}} ({{pr.title}}) by {{pr.author}} merged, but checks on its merge commit failed: {{checks}}. The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks.
 ```
 
 ### rebase_to_author
@@ -416,7 +436,7 @@ Listens to `agent.started`. Decides: act for `actor`: assign it to the agent act
 When:
 
 - all of:
-  - `work_kind: assigned, review_feedback, ticket_comment, rebase, ci_failed`
+  - `work_kind: assigned, review_feedback, ticket_comment, rebase, ci_failed, merge_checks_failed`
   - not:
     - `ticket_status: done, canceled`
 
@@ -513,6 +533,8 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `pr.behind_base`
 - `pr.base_merged`
 - `pr.linked`
+- `pr.merge_checks_passed`
+- `pr.merge_checks_failed`
 - `ticket.commented`
 - `ticket.assigned`
 - `ticket.moved`
@@ -552,3 +574,4 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `next.ticket`
 - `requester`
 - `blocker`
+- `checks`

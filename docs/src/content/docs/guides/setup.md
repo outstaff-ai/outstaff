@@ -66,7 +66,7 @@ ost setup office
 ost setup office --derive
 ```
 
-The office has its own template at `.outstaff/office/.env.example`: the read-only GitHub App that covers every team repository, the tracker member the office acts as, and one `OUTSTAFF_AGENT_TOKEN_<HANDLE>` per person. Generate each token yourself (`openssl rand -hex 32`) and give the same value to that agent as `OUTSTAFF_AGENT_TOKEN`. Slack and the model credentials belong to agents and are not listed.
+The office has its own template at `.outstaff/office/.env.example`: the read-only GitHub App that covers every team repository (its printed permissions include **Actions: read**, so the office can hand an agent the log of a check that failed after a merge), the tracker member the office acts as, and one `OUTSTAFF_AGENT_TOKEN_<HANDLE>` per person. Generate each token yourself (`openssl rand -hex 32`) and give the same value to that agent as `OUTSTAFF_AGENT_TOKEN`. Slack and the model credentials belong to agents and are not listed.
 
 ## Then
 

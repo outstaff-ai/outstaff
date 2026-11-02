@@ -35,6 +35,7 @@ function createStore(opts: StandInOptions): GithubStore {
     branch: { rules: opts.rules ?? [] },
     events: [],
     queueDelayMs: opts.queueDelayMs,
+    logUrl: opts.logUrl,
   };
 }
 

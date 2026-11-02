@@ -53,6 +53,22 @@ export const stackedMerge: ReplayScenario = {
       },
       merge: {},
     },
+    {
+      // The deploy on the merge commit fails: the author is woken with its log, and the ticket stays open.
+      event: ev(
+        "s1-checks-41",
+        "pr.merge_checks_failed",
+        "office",
+        { pr: 41, ticket: "ACME-123" },
+        at(45),
+        { sha: "4141414", failing: [{ name: "deploy", url: "https://github.com/run/41" }] },
+      ),
+      world: {
+        tickets: { "ACME-123": ticket("review", "sam"), "ACME-124": ticket("review", "sam") },
+        prs: [{ ...searchApi, state: "merged" }, searchPage],
+        links: stackLinks,
+      },
+    },
   ],
 };
 
@@ -86,6 +102,21 @@ export const unrelatedConflict: ReplayScenario = {
           requiredApprovals: 1,
           upToDate: true,
         },
+      },
+    },
+    {
+      event: ev(
+        "s2-checks-50",
+        "pr.merge_checks_passed",
+        "office",
+        { pr: 50, ticket: "ACME-130" },
+        at(65),
+        { sha: "5050505" },
+      ),
+      world: {
+        tickets: { "ACME-130": ticket("review", "ada.admin") },
+        prs: [{ ...cart, state: "merged" }],
+        links: { 50: "ACME-130" },
       },
     },
   ],

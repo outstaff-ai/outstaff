@@ -19,6 +19,9 @@ export interface RestPull {
   state: "open" | "closed";
   merged?: boolean;
   merged_at?: string | null;
+
+  /** For a merged pull request, the commit the merge made; GitHub also fills it with a test merge while it is open. */
+  merge_commit_sha?: string | null;
   draft?: boolean;
   requested_reviewers?: { login: string }[] | null;
   mergeable?: boolean | null;
