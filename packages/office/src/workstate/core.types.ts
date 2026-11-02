@@ -141,6 +141,9 @@ export interface RefreshPrOptions {
 
   review?: string;
   verdict?: PrVerdict;
+
+  /** A `pr.merged` asked for the read: the merge is news even when the pull request is first seen merged. */
+  merged?: boolean;
 }
 
 export interface PrOps {
@@ -154,6 +157,11 @@ export interface PrOps {
 
   /** Raises `pr.base_merged` for an open pull request that was stacked on the branch of the merged one. */
   raiseBaseMerged(ctx: RefreshCtx, rec: PrRecord, merged: PrRecord): Promise<void>;
+}
+
+export interface MergeCheckOps {
+  /** Reads the checks of each merge not decided yet, and raises the event of each one they decide. */
+  followMerges(ctx: RefreshCtx): Promise<void>;
 }
 
 export interface RequesterOps {

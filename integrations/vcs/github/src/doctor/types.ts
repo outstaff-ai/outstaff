@@ -21,6 +21,12 @@ export interface AppExpectation {
   readOnly: boolean;
   wantWrite: boolean;
 
+  /**
+   * The App reads the logs of Actions jobs, so it needs Actions: read: a writer's own App for `ost pr checks`, the
+   * office App for the log of a check that failed after a merge (the wake and `ost ci log`).
+   */
+  wantActions?: boolean;
+
   /** The person's role changes CI workflow files, so the App needs the Workflows permission. */
   wantWorkflows?: boolean;
 

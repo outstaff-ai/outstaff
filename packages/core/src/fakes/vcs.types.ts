@@ -82,6 +82,7 @@ export type VcsReads = Pick<
   | "getPullRequest"
   | "checks"
   | "checkLog"
+  | "checkLink"
   | "reviewThreads"
   | "conversation"
   | "reviewComments"

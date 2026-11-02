@@ -64,6 +64,18 @@ describe("toPullRequest", () => {
 
     expect(toPullRequest(REPO, pull({ state: "closed" }), "u", () => false).state).toBe("closed");
   });
+
+  it("carries the merge commit of a merged pull request only", () => {
+    const sha = "abc123";
+    expect(
+      toPullRequest(REPO, pull({ merged: true, merge_commit_sha: sha }), "u", () => false)
+        .mergeCommitSha,
+    ).toBe(sha);
+
+    expect(
+      toPullRequest(REPO, pull({ merge_commit_sha: sha }), "u", () => false).mergeCommitSha,
+    ).toBeUndefined();
+  });
 });
 
 describe("authorKind and stripBot", () => {

@@ -32,6 +32,10 @@ export function mergeability(
   return "unknown";
 }
 
+/** The merge commit of a merged pull request; GitHub also names a test merge of an open one, which is left out. */
+const mergeCommit = (pr: RestPull, merged: boolean) =>
+  merged && pr.merge_commit_sha ? { mergeCommitSha: pr.merge_commit_sha } : {};
+
 export function toPullRequest(
   repo: RepoRef,
   pr: RestPull,
@@ -53,6 +57,7 @@ export function toPullRequest(
     draft: pr.draft === true,
     mergeable: mergeability(pr),
     ...(pr.auto_merge ? { autoMerge: true } : {}),
+    ...mergeCommit(pr, merged),
     updatedAt: pr.updated_at,
   };
 }

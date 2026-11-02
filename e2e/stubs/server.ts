@@ -67,6 +67,8 @@ const github = createGithubE2e({
   apps: pairs(env("STUB_APPS")),
   publicKey: readFileSync(env("STUB_APP_PUBLIC_KEY"), "utf8"),
   permissions: { "ada-admin": "write", "grace-lead": "write" },
+  // Actions logs come from this server too, at an address the office can reach.
+  logUrl: "http://github.acme.example:8081/_logs",
 });
 
 /** acme/shop's pull requests as the tracker reads them from the code host; acme/ops is not connected. */

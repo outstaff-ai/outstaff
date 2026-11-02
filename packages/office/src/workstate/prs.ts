@@ -11,6 +11,7 @@ import { openPrs, prGone, teamRepo } from "./derive.js";
 import { ticketCandidates } from "./infer.js";
 import { inferStackRefs, inferTicketRefs } from "./item-refs.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
+import { startMergeChecks } from "./merge-checks.js";
 import { ciFailure, keptLive, readLive, toPrRecord } from "./pr-record.js";
 import { recordSynthetic, WORKSTATE_ACTOR } from "./synthetic.js";
 import type { PrRecord } from "./types.js";
@@ -225,11 +226,13 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     const live = open ? await readLive(vcs, pr) : keptLive(prev);
     const person = vcsPeople.get(pr.author.login.toLowerCase());
     const ticket = await inferTicket(pr, prev);
-    const rec = toPrRecord(
-      pr,
+    const now = clock.now().toISOString();
+    const rec = startMergeChecks(
+      core,
+      toPrRecord(pr, prev, { ...live, person, ticket, review: o.review, verdict: o.verdict }, now),
       prev,
-      { ...live, person, ticket, review: o.review, verdict: o.verdict },
-      clock.now().toISOString(),
+      pr,
+      { now, merged: o.merged },
     );
 
     // A pull request seen for the first time during a rescan sets the baseline instead of raising events.

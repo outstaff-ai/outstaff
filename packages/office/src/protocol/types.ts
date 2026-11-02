@@ -5,6 +5,7 @@ import type { Clock } from "#/types.js";
 import type {
   AgentActs,
   ChatDesk,
+  CiLogs,
   DocLinks,
   Messaging,
   TicketPrs,
@@ -36,6 +37,9 @@ export interface ProtocolServerOptions {
 
   /** Takes `doc_link`. Without it the request is refused as unsupported. */
   docs?: DocLinks;
+
+  /** Answers `ci_log`. Without it the request is refused as unsupported. */
+  ciLogs?: CiLogs;
 
   /** Hands agents their acts and takes `act_result`. Without it a result is refused as unsupported. */
   acts?: AgentActs;

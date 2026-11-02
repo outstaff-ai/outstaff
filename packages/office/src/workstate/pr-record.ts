@@ -46,6 +46,12 @@ function reviews(prev: PrRecord | undefined, facts: PrFacts) {
   };
 }
 
+/** What a record keeps from the previous one: the pull request it is stacked on, and the checks of its merge. */
+const carried = (prev: PrRecord | undefined) => ({
+  ...(prev?.stackedOn ? { stackedOn: prev.stackedOn } : {}),
+  ...(prev?.mergeChecks ? { mergeChecks: prev.mergeChecks } : {}),
+});
+
 export function toPrRecord(
   pr: PullRequest,
   prev: PrRecord | undefined,
@@ -73,7 +79,7 @@ export function toPrRecord(
     unresolvedThreads: facts.unresolved,
     ...reviews(prev, facts),
     ...(facts.ticket ? { ticket: facts.ticket } : {}),
-    ...(prev?.stackedOn ? { stackedOn: prev.stackedOn } : {}),
+    ...carried(prev),
     updatedAt: now,
   };
 }

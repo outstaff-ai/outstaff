@@ -8,7 +8,7 @@ import type { PrRecord } from "#/workstate/index.js";
 export interface ContextReaders {
   store: Store;
   tracker?: Pick<Tracker, "getIssue" | "listComments"> | undefined;
-  vcs?: Pick<Vcs, "reviewThreads" | "links" | "checks" | "changedFiles"> | undefined;
+  vcs?: Pick<Vcs, "reviewThreads" | "links" | "checks" | "changedFiles" | "checkLog"> | undefined;
 
   /** The pull requests of a repository the work state keeps, for a merge's context. */
   prs?: ((repo: RepoRef) => PrRecord[]) | undefined;

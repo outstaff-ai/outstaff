@@ -2,7 +2,8 @@ import type { MemoryRepo, Mergeability } from "./types.js";
 
 /**
  * A repository without git: every branch exists and gets a made-up commit on first sight, a push gives it a new
- * one, and mergeability follows a script per branch (the last answer sticks). Merging changes nothing.
+ * one, and mergeability follows a script per branch (the last answer sticks). Merging changes no branch; it only
+ * makes up the merge commit.
  */
 export function createMemoryRepo(): MemoryRepo {
   const heads = new Map<string, string>();
@@ -25,7 +26,7 @@ export function createMemoryRepo(): MemoryRepo {
       return (script.length > 1 ? script.shift() : script[0]) ?? "unknown";
     },
     conflicts: async (_base, head) => scripts.get(head)?.[0] === "conflicting",
-    merge: async () => undefined,
+    merge: async () => mint(),
     diff: async (_base, head) =>
       `diff --git a/${head}.txt b/${head}.txt\n--- a/${head}.txt\n+++ b/${head}.txt\n@@ -1 +1 @@\n-old\n+new\n`,
     isAncestor: async () => true,

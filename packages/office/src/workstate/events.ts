@@ -3,6 +3,7 @@ import { awaitsReview } from "#/work-feedback.js";
 import type {
   DocOps,
   Fresh,
+  MergeCheckOps,
   PrOps,
   RefreshCtx,
   RequesterOps,
@@ -39,7 +40,7 @@ function verdictOf(event: WorkflowEvent, review: string | undefined): PrVerdict 
 /** Applies events to the records, and delivers the synthetic events that raises. */
 export function createEvents(
   core: WorkstateCore,
-  ops: TicketOps & UnblockOps & PrOps & RequesterOps & DocOps,
+  ops: TicketOps & UnblockOps & PrOps & RequesterOps & DocOps & MergeCheckOps,
 ) {
   const { store, logger, handlers, prSubject } = core;
   const {
@@ -49,6 +50,7 @@ export function createEvents(
     recordFeedbackRequester,
     recordCommentRequester,
     touchDoc,
+    followMerges,
   } = ops;
 
   const deliver = async (list: Fresh[]) => {
@@ -97,13 +99,19 @@ export function createEvents(
 
     const review = reviewOf(event);
     const verdict = verdictOf(event, review);
-    await refreshPr(ctx, pr, { ...(review ? { review } : {}), ...(verdict ? { verdict } : {}) });
+    await refreshPr(ctx, pr, {
+      ...(review ? { review } : {}),
+      ...(verdict ? { verdict } : {}),
+      ...(event.type === "pr.merged" ? { merged: true } : {}),
+    });
+
     if (event.type === "pr.review_submitted" || event.type === "pr.comment") {
       await recordFeedbackRequester(event, pr);
     }
 
     if (event.type === "pr.merged") {
       await refreshSiblings(ctx, pr);
+      await followMerges(ctx);
     }
   };
 

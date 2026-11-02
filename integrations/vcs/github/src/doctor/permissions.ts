@@ -17,14 +17,14 @@ interface Missing {
   read: string[];
   write: string[];
 
-  /** Writers read the logs of their failed CI jobs, which needs Actions: read (write also covers it). */
+  /** The App reads the logs of failed CI jobs, which needs Actions: read (write also covers it). */
   actions: boolean;
   workflows: boolean;
 }
 
 function missingPermissions(want: AppExpectation, granted: Record<string, string>): Missing {
   const level = (p: string) => granted[p] ?? "none";
-  const actions = want.wantWrite && level("actions") === "none";
+  const actions = want.wantActions === true && level("actions") === "none";
   const workflows = want.wantWorkflows === true && level("workflows") !== "write";
   const write = want.wantWrite ? WRITE_PERMISSIONS.filter((p) => level(p) !== "write") : [];
   return {
@@ -35,6 +35,11 @@ function missingPermissions(want: AppExpectation, granted: Record<string, string
   };
 }
 
+const actionsNote = (want: AppExpectation) =>
+  want.readOnly
+    ? ". Without Actions: read, the office cannot hand agents the log of a check that failed after a merge, in the wake or through `ost ci log`"
+    : ". Without Actions: read, `ost pr checks` cannot show why a CI job failed";
+
 function lacksDetail(want: AppExpectation, missing: Missing): string {
   const lacks = [
     ...missing.read.map((p) => `${p}:read`),
@@ -43,7 +48,7 @@ function lacksDetail(want: AppExpectation, missing: Missing): string {
 
   const notes: [boolean, string][] = [
     [want.wantWrite, " (this person has a write grant)"],
-    [missing.actions, ". Without Actions: read, `ost pr checks` cannot show why a CI job failed"],
+    [missing.actions, actionsNote(want)],
     [
       missing.workflows,
       ". Without Workflows, GitHub refuses to push a change under .github/workflows/ (this person's role changes CI)",
@@ -71,7 +76,7 @@ function grantCheck(want: AppExpectation, granted: Record<string, string>): Doct
 function surplusCheck(want: AppExpectation, granted: Record<string, string>): DoctorCheck[] {
   const needed = new Set<string>([
     ...READ_PERMISSIONS,
-    ...(want.wantWrite ? ["actions"] : []),
+    ...(want.wantActions ? ["actions"] : []),
     ...(want.wantWorkflows ? ["workflows"] : []),
   ]);
 

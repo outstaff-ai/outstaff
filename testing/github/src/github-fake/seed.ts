@@ -28,6 +28,7 @@ const domain = async (s: GithubStore, pr: StoredPull): Promise<PullRequest> => (
   state: pr.merged ? "merged" : pr.state,
   draft: pr.draft,
   mergeable: "unknown",
+  ...(pr.mergeCommitSha ? { mergeCommitSha: pr.mergeCommitSha } : {}),
   updatedAt: pr.updatedAt,
 });
 

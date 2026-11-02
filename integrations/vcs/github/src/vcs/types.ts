@@ -19,6 +19,9 @@ export interface GithubContext {
 
   /** REST API root without a trailing slash. */
   apiUrl: string;
+
+  /** Web root, where links point, without a trailing slash. */
+  web: string;
   secrets: SecretSource;
 
   /** The person this container runs as. */

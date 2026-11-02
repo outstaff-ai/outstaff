@@ -30,7 +30,9 @@ export interface RepoBackend {
 
   /** Whether merging would fail now; unlike `mergeable`, never counts as a read. */
   conflicts(base: string, head: string): Promise<boolean>;
-  merge(base: string, head: string, message: string): Promise<unknown>;
+
+  /** Resolves to the merge commit. */
+  merge(base: string, head: string, message: string): Promise<string>;
   diff(base: string, head: string): Promise<string>;
   isAncestor(ancestor: string, descendant: string): Promise<boolean>;
 
@@ -77,6 +79,9 @@ export type StoredPull = Pick<
 
     /** Pushes that did not build on the previous head. */
     forcePushes: number;
+
+    /** The commit the merge made, once merged. */
+    mergeCommitSha?: NonNullable<RestPull["merge_commit_sha"]>;
 
     /** Taken into the merge queue, by `merge-async` or by an approval while auto-merge is on. */
     queued?: boolean;
@@ -193,6 +198,7 @@ export interface GithubStore {
 
   /** How long the merge queue takes to merge an enqueued pull request; never, when unset. */
   queueDelayMs: number | undefined;
+  logUrl: string | undefined;
 }
 
 export interface StandInOptions {
@@ -225,4 +231,10 @@ export interface StandInOptions {
 
   /** The rules of the default branch's rulesets; none by default. */
   rules?: RestRule[];
+
+  /**
+   * Where an Actions log redirect points, like GitHub's blob storage: a separate origin by default. The end-to-end
+   * stubs pass a URL of their own server, which then serves the logs under its path.
+   */
+  logUrl?: string;
 }

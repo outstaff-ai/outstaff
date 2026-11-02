@@ -89,6 +89,8 @@ export function vcsPullRequestCases({ get, repoOf }: VcsCases): void {
     const pr = await requireSeed(t, s.seed, "pullRequest")(repo, { title: "Done soon" });
     await requireSeed(t, s.seed, "merge")(repo, pr.number, "noor");
     expect((await s.subject.listPullRequests(repo)).map((p) => p.number)).not.toContain(pr.number);
+    expect((await s.subject.getPullRequest(repo, pr.number)).mergeCommitSha).toMatch(/\S/);
+    expect(pr.mergeCommitSha).toBeUndefined();
 
     expect(
       (await s.subject.listPullRequests(repo, { state: "all" })).find((p) => p.number === pr.number)
@@ -135,6 +137,29 @@ export function vcsPullRequestCases({ get, repoOf }: VcsCases): void {
     expect(log.failedSteps[0]!.lines).toHaveLength(2);
     expect(log.failedSteps[0]!.omitted).toBeGreaterThanOrEqual(2);
     await expectPortError(s.subject.checkLog!(repo, "no-such-log"), "not_found");
+  });
+
+  it("finds the log a check's link points at", async (t) => {
+    const s = get();
+    requireCapability(t, s, "vcs.pullRequests");
+    if (!s.subject.checkLog || !s.subject.checkLink) {
+      t.skip("checkLink not implemented");
+    }
+
+    const repo = repoOf(t, s);
+    const pr = await requireSeed(t, s.seed, "pullRequest")(repo, { title: "Linked log" });
+    await requireSeed(t, s.seed, "check")(repo, pr.head.sha, {
+      name: "deploy",
+      status: "failure",
+      log: { steps: [{ name: "Deploy", failed: true, lines: ["bad config"] }] },
+    });
+
+    const check = (await s.subject.checks(repo, pr.head.sha)).find((c) => c.name === "deploy")!;
+    const found = s.subject.checkLink!(check.url);
+    expect(found?.logId).toBe(check.logId);
+    expect(found?.repo).toMatchObject({ owner: repo.owner, name: repo.name });
+    expect(s.subject.checkLink!("https://elsewhere.acme.example/nothing")).toBeUndefined();
+    expect(s.subject.checkLink!("not a link")).toBeUndefined();
   });
 
   it("resolves a review thread only when the last comment is the caller's", async (t) => {

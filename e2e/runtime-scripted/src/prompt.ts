@@ -40,6 +40,9 @@ export interface ItemContext {
 
   /** For a merge: what the office handed over to decide with. */
   merge?: MergeView;
+
+  /** For checks that failed after a merge: each check's link and the end of its failed step's log. */
+  failedChecks?: { name: string; url?: string; lines: string[] }[];
 }
 
 /** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
@@ -246,6 +249,21 @@ function parseMerge(prompt: string): Pick<ItemContext, "merge"> {
   return { merge: { mergeable: /Mergeable: (\w+)\./.exec(block)?.[1] ?? "unknown", others } };
 }
 
+// "Check <name> on the merge commit <sha> of <pr> failed <url>", then the step's log lines as "    | <line>".
+function parseFailedChecks(prompt: string): Pick<ItemContext, "failedChecks"> {
+  const checks = [
+    ...prompt.matchAll(
+      /^Check (\S+) on the merge commit[^\n]*?(?: (https?:\/\/\S+))?\n((?: {2}[^\n]*(?:\n|$))*)/gm,
+    ),
+  ].map((m) => ({
+    name: m[1]!,
+    ...(m[2] ? { url: m[2] } : {}),
+    lines: [...m[3]!.matchAll(/^ {4}\| (.*)$/gm)].map((l) => l[1]!),
+  }));
+
+  return checks.length ? { failedChecks: checks } : {};
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {
@@ -274,5 +292,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseAbout(prompt),
     ...parseUnblocked(prompt),
     ...parseMerge(prompt),
+    ...parseFailedChecks(prompt),
   };
 }

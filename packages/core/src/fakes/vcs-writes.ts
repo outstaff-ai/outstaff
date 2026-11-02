@@ -154,6 +154,7 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
       }
 
       s.pr.state = "merged";
+      s.pr.mergeCommitSha = newSha();
       touch(s);
       emit("pr.merged", repo, number, self);
       return { outcome: "merged" };

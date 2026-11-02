@@ -16,6 +16,7 @@ export function settleAutoMerge(st: FakeVcsState, repo: RepoRef, s: StoredPr): v
   }
 
   s.pr.state = "merged";
+  s.pr.mergeCommitSha = st.newSha();
   st.touch(s);
   st.emit("pr.merged", repo, s.pr.number, st.self);
 }

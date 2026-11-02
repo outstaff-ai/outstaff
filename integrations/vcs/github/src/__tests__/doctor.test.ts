@@ -32,6 +32,9 @@ const WRITE = {
 const { actions: _actions, ...READ_BASE } = WRITE;
 const READ = { ...READ_BASE, contents: "read", pull_requests: "read", issues: "read" };
 
+/** The office App also reads the logs of checks that fail after a merge. */
+const OFFICE = { ...READ, actions: "read" };
+
 interface Fake {
   app?: { status?: number; slug?: string };
   installation?: { status?: number; account?: string; selection?: string; permissions?: object };
@@ -60,7 +63,7 @@ function installationReply(a: Fake): Response {
     : json(200, {
         account: { login: i.account ?? "acme-example" },
         repository_selection: i.selection ?? "selected",
-        permissions: i.permissions ?? READ,
+        permissions: i.permissions ?? OFFICE,
       });
 }
 
@@ -445,7 +448,23 @@ describe("doctorGithub", () => {
     const [permissions] = failing(await doctorGithub(secrets(), ctx(f, "office")), "permissions");
     expect(permissions!.detail).toContain("metadata:read");
     expect(permissions!.detail).not.toContain("write grant");
-    expect(permissions!.detail).not.toContain("Actions");
+    expect(permissions!.detail).toContain("actions:read");
+    expect(permissions!.detail).toContain("failed after a merge");
+  });
+
+  it("fails when the office App cannot read Actions logs", async () => {
+    const { impl } = fake({
+      ...good,
+      "22": { ...good["22"]!, installation: { permissions: READ } },
+    });
+
+    const [permissions] = failing(
+      await doctorGithub(secrets(), ctx(impl, "office")),
+      "permissions",
+    );
+
+    expect(permissions!.detail).toContain("actions:read");
+    expect(permissions!.detail).toContain("ost ci log");
   });
 
   it("gives the office App its own advice when it is installed on all repositories", async () => {

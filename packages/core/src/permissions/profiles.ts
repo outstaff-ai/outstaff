@@ -19,6 +19,7 @@ export const CHAT_VERBS = [
   "ticket.attach",
   "pr.status",
   "pr.checks",
+  "ci.log",
   "pr.threads",
   "pr.conversation",
   "pr.diff",

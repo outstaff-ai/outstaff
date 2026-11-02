@@ -14,6 +14,7 @@ import { createOfficeRounds } from "./office-rounds.js";
 import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
 import { officeTicketPrs } from "./office-ticket-prs.js";
+import { officeCiLogs } from "./office-ci-log.js";
 import type { CreateOfficeInput, Office, OfficeOptions } from "./office.types.js";
 import { createOfficePorts } from "./ports.js";
 import { createOfficePipeline } from "./pipeline/office-pipeline.js";
@@ -66,6 +67,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     clock,
     logger: log,
     ...defined({ refreshIntervalMs: o.refreshIntervalMs }),
+    ...defined({ followIntervalMs: o.pollIntervalMs }),
   });
 
   const webhook = team.office?.events === "webhook";
@@ -243,6 +245,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     chat: { ...chatDesk, message: chatEntry.message },
     docs: officeDocLinks({ store, workState, log }),
     tickets: officeTicketPrs({ workState, log }),
+    ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
     acts,
     onConnected: (person) => void track(idle.check(person)),
     auth: agentAuthFromSecrets(

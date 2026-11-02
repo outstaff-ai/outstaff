@@ -69,6 +69,14 @@ export function checkOperations(
     return pr.commits.nodes[0]?.commit.statusCheckRollup?.contexts;
   }
 
+  const appLabel = self ? `${self}'s GitHub App` : "the office GitHub App";
+
+  /** An agent reads logs with its own App; the office, which has none, with the office App. */
+  const logToken = async (repo: RepoRef) =>
+    self
+      ? (await actingToken(repo, "read", LOG_PERMISSIONS, OPTIONAL_LOGS)).token
+      : await apiToken(repo);
+
   return {
     async checks(repo, sha) {
       const token = await apiToken(repo);
@@ -107,7 +115,7 @@ export function checkOperations(
         throw new PortError("not_found", `"${logId}" is not a GitHub Actions job id.`);
       }
 
-      const { token } = await actingToken(repo, "read", LOG_PERMISSIONS, OPTIONAL_LOGS);
+      const token = await logToken(repo);
       const jobPath = `${repoPath(repo)}/actions/jobs/${logId}`;
       let text: string;
       let steps: { name: string; conclusion: string | null }[];
@@ -126,7 +134,7 @@ export function checkOperations(
         if (e instanceof PortError && e.code === "forbidden") {
           throw new PortError(
             "forbidden",
-            `GitHub refused the logs of job ${logId}: ${self}'s GitHub App needs the Actions: read permission on the installation (run \`ost doctor\`). ${e.message}`,
+            `GitHub refused the logs of job ${logId}: ${appLabel} needs the Actions: read permission on the installation (run \`ost doctor\`). ${e.message}`,
             { cause: e },
           );
         }

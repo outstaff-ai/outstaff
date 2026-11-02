@@ -1639,6 +1639,42 @@ Names of the repos (from repos) whose pull requests agents may merge, and are wo
 - Optional
 - Minimum length 1
 
+### policies.merge_checks
+
+The checks that run on a pull request's merge commit in the default branch, such as a deploy. A ticket closes only once they pass; when one fails, the author is woken with its log.
+
+- Type: `object`
+- Optional
+- Default: `{"wait_for_start_minutes":5,"timeout_minutes":120,"settle_minutes":2}`
+
+#### policies.merge_checks.wait_for_start_minutes
+
+Minutes the office waits for a check to appear on a merge commit. With none by then, the merge counts as passed and its ticket can close. Fractions are allowed. Default 5.
+
+- Type: `number`
+- Optional
+- Default: `5`
+- Maximum 1440
+
+#### policies.merge_checks.timeout_minutes
+
+Minutes after the merge after which a check still running on the merge commit counts as failed, naming that check. Fractions are allowed. Default 120.
+
+- Type: `number`
+- Optional
+- Default: `120`
+- Maximum 10080
+
+#### policies.merge_checks.settle_minutes
+
+Minutes the checks on a merge commit must stay finished, with none failed and no new one appearing, before the merge counts as passed, so a workflow that starts after the first ones finish is still waited for. Fractions are allowed. Default 2.
+
+- Type: `number`
+- Optional
+- Default: `2`
+- Minimum 0
+- Maximum 1440
+
 ### policies.messages
 
 How agents write chat messages.

@@ -29,6 +29,7 @@ export const INSTRUCTION_VARIABLES = [
   "next.ticket",
   "requester",
   "blocker",
+  "checks",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -37,6 +38,15 @@ const isCause = (v: unknown): v is MergeCause =>
 const number = (pr: PrRef) => String(pr.number);
 
 const stringOf = (v: unknown): string => (typeof v === "string" ? v : "");
+
+/** The checks a `pr.merge_checks_failed` names, by name, with their links. */
+function checksOf(failing: unknown): string {
+  const list = Array.isArray(failing) ? (failing as { name?: unknown; url?: unknown }[]) : [];
+  return list
+    .filter((c) => typeof c?.name === "string")
+    .map((c) => (typeof c.url === "string" ? `${String(c.name)} (${c.url})` : String(c.name)))
+    .join(", ");
+}
 
 /** The variables that name the merge behind a derived event; empty for any other event. */
 function causeVariables(data: Record<string, unknown>): Record<string, string> {
@@ -72,6 +82,7 @@ export function instructionVariables(
     "next.ticket": extra.next ?? "",
     requester: requesterOf(ctx),
     blocker: stringOf(event.data["blocker"]),
+    checks: checksOf(event.data["failing"]),
   };
 }
 

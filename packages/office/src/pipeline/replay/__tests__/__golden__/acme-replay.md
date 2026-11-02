@@ -8,7 +8,7 @@ How to read it:
 - A merge re-checks the repository's other open pull requests and raises `pr.conflicted`, `pr.behind_base` or `pr.base_merged` for every pull request the merge changed something under; those rows say derived.
 - A change to the policies that changes a decision changes this file: review the difference like any other.
 
-**49 events** (5 derived from merges).
+**51 events** (5 derived from merges).
 
 ## A stacked pull request series merges
 
@@ -18,104 +18,106 @@ How to read it:
 | 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (for sam)<br>link acme-example/shop#42 on ACME-124 (for sam) |
 | 3 | `pr.merged` acme-example/shop#43 by ada-admin | (drop: no policy matched) |
 | 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merge): _#41 (Search API) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
-| 5 | `pr.merged` acme-example/shop#41 by sam | move ACME-123 to done (for sam) |
+| 5 | `pr.merged` acme-example/shop#41 by sam | (drop: no policy matched) |
 | 6 | derived `pr.base_merged` acme-example/shop#42 after #41 | wake sam (rebase): _Your pull request #42 (Search page) is stacked on a branch that was just merged after #41 (Search API) merged. Bring it up to date with `sam/acme-123` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
+| 7 | `pr.merge_checks_failed` acme-example/shop#41 | wake sam (merge_checks_failed): _Pull request #41 (Search API) by sam merged, but checks on its merge commit failed: deploy (https://github.com/run/41). The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks._ |
 
 ## Another agent's merge changes the base under unrelated pull requests
 
 | # | Event | Decisions |
 | - | - | - |
-| 7 | `pr.merged` acme-example/shop#50 by ada-admin | move ACME-130 to done (for noor) |
-| 8 | derived `pr.conflicted` acme-example/shop#51 after #50 | wake sam (rebase): _Your pull request #51 (Checkout form) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
-| 9 | derived `pr.conflicted` acme-example/shop#52 after #50 | wake kofi (rebase): _Your pull request #52 (CI cache) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
-| 10 | derived `pr.behind_base` acme-example/shop#53 after #50 | wake mira (rebase): _Your pull request #53 (Order events) is behind its base branch, and the repository requires it to be up to date after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
-| 11 | derived `pr.conflicted` acme-example/shop#54 after #50 | (drop: no policy matched) |
+| 8 | `pr.merged` acme-example/shop#50 by ada-admin | (drop: no policy matched) |
+| 9 | derived `pr.conflicted` acme-example/shop#51 after #50 | wake sam (rebase): _Your pull request #51 (Checkout form) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
+| 10 | derived `pr.conflicted` acme-example/shop#52 after #50 | wake kofi (rebase): _Your pull request #52 (CI cache) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
+| 11 | derived `pr.behind_base` acme-example/shop#53 after #50 | wake mira (rebase): _Your pull request #53 (Order events) is behind its base branch, and the repository requires it to be up to date after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
+| 12 | derived `pr.conflicted` acme-example/shop#54 after #50 | (drop: no policy matched) |
+| 13 | `pr.merge_checks_passed` acme-example/shop#50 | move ACME-130 to done (for noor) |
 
 ## A review round: pending comments, a batch of feedback, approval and merge
 
 | # | Event | Decisions |
 | - | - | - |
-| 12 | `pr.comment` acme-example/shop#60 by ada-admin | (drop: an inline comment of a review still pending: the submitted review brings it) |
-| 13 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
-| 14 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
-| 15 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
-| 16 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._<br>wake sam (merge): _#60 (Wishlist) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
-| 17 | `pr.review_submitted` acme-example/shop#60 by outside-contributor | (drop: the event comes from someone who is not trusted: recorded, never acted on) |
-| 18 | `agent.handed_back` acme-example/shop#60 by sam | move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam) |
+| 14 | `pr.comment` acme-example/shop#60 by ada-admin | (drop: an inline comment of a review still pending: the submitted review brings it) |
+| 15 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
+| 16 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
+| 17 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
+| 18 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._<br>wake sam (merge): _#60 (Wishlist) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
+| 19 | `pr.review_submitted` acme-example/shop#60 by outside-contributor | (drop: the event comes from someone who is not trusted: recorded, never acted on) |
+| 20 | `agent.handed_back` acme-example/shop#60 by sam | move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam) |
 
 ## Tickets assigned and moved, by a human and by the agent itself
 
 | # | Event | Decisions |
 | - | - | - |
-| 19 | `ticket.assigned` ACME-150 by ada.admin | wake sam (assigned): _ACME-150 is assigned to you. Work on it the way the repository asks._ |
-| 20 | `ticket.assigned` ACME-151 by sam | (drop: no policy matched) |
-| 21 | `ticket.created` ACME-152 by ada.admin | wake noor (assigned): _ACME-152 is assigned to you. Work on it the way the repository asks._ |
-| 22 | `ticket.assigned` ACME-153 by ada.admin | (drop: no policy matched) |
-| 23 | `ticket.moved` ACME-150 by ada.admin | wake sam (assigned): _ada.admin moved ACME-150 to active. Pick the work up._ |
-| 24 | `ticket.moved` ACME-154 by ada.admin | assign ACME-154 to agent sam (for sam)<br>wake sam (assigned): _ada.admin moved ACME-154 to active and it is assigned to you again. Pick the work up._ |
-| 25 | `ticket.moved` ACME-150 by ada.admin | (drop: no policy matched) |
+| 21 | `ticket.assigned` ACME-150 by ada.admin | wake sam (assigned): _ACME-150 is assigned to you. Work on it the way the repository asks._ |
+| 22 | `ticket.assigned` ACME-151 by sam | (drop: no policy matched) |
+| 23 | `ticket.created` ACME-152 by ada.admin | wake noor (assigned): _ACME-152 is assigned to you. Work on it the way the repository asks._ |
+| 24 | `ticket.assigned` ACME-153 by ada.admin | (drop: no policy matched) |
+| 25 | `ticket.moved` ACME-150 by ada.admin | wake sam (assigned): _ada.admin moved ACME-150 to active. Pick the work up._ |
+| 26 | `ticket.moved` ACME-154 by ada.admin | assign ACME-154 to agent sam (for sam)<br>wake sam (assigned): _ada.admin moved ACME-154 to active and it is assigned to you again. Pick the work up._ |
+| 27 | `ticket.moved` ACME-150 by ada.admin | (drop: no policy matched) |
 
 ## Comments on tickets
 
 | # | Event | Decisions |
 | - | - | - |
-| 26 | `ticket.commented` ACME-150 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ |
-| 27 | `ticket.commented` ACME-150 by ada.admin | wake mira (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ |
-| 28 | `ticket.commented` ACME-154 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-154, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work._ |
-| 29 | `ticket.commented` ACME-150 by sam | (drop: no policy matched) |
-| 30 | `ticket.commented` ACME-123 by ada.admin | (drop: no policy matched) |
+| 28 | `ticket.commented` ACME-150 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ |
+| 29 | `ticket.commented` ACME-150 by ada.admin | wake mira (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it._ |
+| 30 | `ticket.commented` ACME-154 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-154, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work._ |
+| 31 | `ticket.commented` ACME-150 by sam | (drop: no policy matched) |
+| 32 | `ticket.commented` ACME-123 by ada.admin | (drop: no policy matched) |
 
 ## An agent runs out of work
 
 | # | Event | Decisions |
 | - | - | - |
-| 31 | `agent.idle` no subject by sam | wake sam (assigned): _You have nothing queued. Start ACME-161, the next ready ticket assigned to you. Work on it the way the repository asks._ |
-| 32 | `agent.idle` no subject by noor | (drop: no ready ticket is assigned to noor) |
+| 33 | `agent.idle` no subject by sam | wake sam (assigned): _You have nothing queued. Start ACME-161, the next ready ticket assigned to you. Work on it the way the repository asks._ |
+| 34 | `agent.idle` no subject by noor | (drop: no ready ticket is assigned to noor) |
 
 ## Hand-backs: blocked, done and waiting
 
 | # | Event | Decisions |
 | - | - | - |
-| 33 | `agent.handed_back` ACME-170 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-170 to blocked (for noor)<br>assign ACME-170 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-170 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
-| 34 | `agent.handed_back` ACME-171 by noor | move ACME-171 to review (for noor)<br>assign ACME-171 to human ada.admin (for noor) |
-| 35 | `agent.handed_back` ACME-172 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>assign ACME-172 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-172 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
-| 36 | `agent.handed_back` ACME-173 by noor | (drop: no policy matched) |
+| 35 | `agent.handed_back` ACME-170 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-170 to blocked (for noor)<br>assign ACME-170 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-170 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
+| 36 | `agent.handed_back` ACME-171 by noor | move ACME-171 to review (for noor)<br>assign ACME-171 to human ada.admin (for noor) |
+| 37 | `agent.handed_back` ACME-172 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>assign ACME-172 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-172 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
+| 38 | `agent.handed_back` ACME-173 by noor | (drop: no policy matched) |
 
 ## Chat messages
 
 | # | Event | Decisions |
 | - | - | - |
-| 37 | `chat.message` chat D0SAM by U0ADA0001 | wake sam (chat): _U0ADA0001 wrote to you in chat. Answer in the thread. If they ask for work, decide how it fits your queue._ |
-| 38 | `chat.message` chat D0SAM by kofi | (drop: no policy matched) |
+| 39 | `chat.message` chat D0SAM by U0ADA0001 | wake sam (chat): _U0ADA0001 wrote to you in chat. Answer in the thread. If they ask for work, decide how it fits your queue._ |
+| 40 | `chat.message` chat D0SAM by kofi | (drop: no policy matched) |
 
 ## Comments on a design document
 
 | # | Event | Decisions |
 | - | - | - |
-| 39 | `doc.commented` ACME-180 by grace-lead | wake mira (doc_feedback): _grace-lead commented on the document Order events design. Answer in the document and change it if needed._ |
-| 40 | `doc.commented` ACME-180 by ada.admin | wake leo (doc_feedback): _ada.admin commented on the document Order events design. Answer in the document and change it if needed._ |
+| 41 | `doc.commented` ACME-180 by grace-lead | wake mira (doc_feedback): _grace-lead commented on the document Order events design. Answer in the document and change it if needed._ |
+| 42 | `doc.commented` ACME-180 by ada.admin | wake leo (doc_feedback): _ada.admin commented on the document Order events design. Answer in the document and change it if needed._ |
 
 ## Checks fail
 
 | # | Event | Decisions |
 | - | - | - |
-| 41 | `pr.ci_failed` acme-example/shop#61 | wake sam (ci_failed): _Your pull request #61 (Saved searches) has failing checks. The failing checks are in the feedback. Fix them and push._ |
-| 42 | `pr.ci_failed` acme-example/shop#54 | (drop: no policy matched) |
+| 43 | `pr.ci_failed` acme-example/shop#61 | wake sam (ci_failed): _Your pull request #61 (Saved searches) has failing checks. The failing checks are in the feedback. Fix them and push._ |
+| 44 | `pr.ci_failed` acme-example/shop#54 | (drop: no policy matched) |
 
 ## Other pull request events
 
 | # | Event | Decisions |
 | - | - | - |
-| 43 | `pr.opened` acme-example/shop#62 by sam | link acme-example/shop#62 on ACME-162 (for sam) |
-| 44 | `pr.opened` acme-example/shop#63 by grace-lead | move ACME-131 to review (for sam)<br>(drop: no agent to act for: pull request has no agent author) |
-| 45 | `pr.closed` acme-example/shop#62 by ada-admin | (drop: no policy matched) |
-| 46 | `pr.merged` acme-example/shop#55 by grace-lead | (drop: no agent to act for: pull request has no agent author; ticket is not assigned to an agent; no agent has worked on the ticket yet) |
-| 47 | `pr.merged` acme-example/shop#56 by ada-admin | (drop: no policy matched) |
-| 48 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merged_feedback): _ada-admin commented on your merged pull request #41 (Search API). Answer there. If they ask for a change, open a follow-up pull request._ |
-| 49 | `pr.comment` acme-example/shop#60 by ines | (drop: no policy matched) |
+| 45 | `pr.opened` acme-example/shop#62 by sam | link acme-example/shop#62 on ACME-162 (for sam) |
+| 46 | `pr.opened` acme-example/shop#63 by grace-lead | move ACME-131 to review (for sam)<br>(drop: no agent to act for: pull request has no agent author) |
+| 47 | `pr.closed` acme-example/shop#62 by ada-admin | (drop: no policy matched) |
+| 48 | `pr.merge_checks_passed` acme-example/shop#55 | (drop: no agent to act for: pull request has no agent author; ticket is not assigned to an agent; no agent has worked on the ticket yet) |
+| 49 | `pr.merge_checks_passed` acme-example/shop#56 | (drop: no policy matched) |
+| 50 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merged_feedback): _ada-admin commented on your merged pull request #41 (Search API). Answer there. If they ask for a change, open a follow-up pull request._ |
+| 51 | `pr.comment` acme-example/shop#60 by ines | (drop: no policy matched) |
 
 ## Coalescing
 
-The pipeline's 25 wakes become 23 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 26 wakes become 24 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

@@ -31,7 +31,7 @@ export function findConventionFiles(worktree: string, instructions: readonly str
 export const safeId = (id: string) => id.replaceAll(/[^\w.-]/g, "-").replace(/^\.+/, "_");
 
 /** Item kinds that always start from the default branch. */
-const STARTS_AFRESH = new Set<string>(["merged_feedback", "doc_feedback"]);
+const STARTS_AFRESH = new Set<string>(["merged_feedback", "merge_checks_failed", "doc_feedback"]);
 
 type Subject = Offer["context"]["subjects"][number];
 

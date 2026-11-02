@@ -21,4 +21,6 @@ How to decide:
 
 One merge runs per repository at a time: while another agent decides on a merge in the same repository, yours waits, and it starts with fresh facts.
 
+After the merge, the office follows the checks on the merge commit (a deploy, for example). The ticket moves to `done` only once they pass. If one fails, you are woken with the end of the failed step's log, and the ticket stays open: fix it as the repository asks, usually with a follow-up pull request on the same ticket. Do not watch the checks yourself after merging.
+
 Never merge another way: not with `gh` or `git`, not in the host's web page, not by turning on the host's auto-merge, not by editing the pull request, its checks or the repository's settings. Do not rewrite the pull request's history or messages to get the merge through. How a repository wants commits and history handled is in its own files (`references/git.md`), and the host decides what it accepts.

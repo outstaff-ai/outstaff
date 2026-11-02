@@ -65,6 +65,7 @@ export async function rest(s: GithubStore, pr: StoredPull): Promise<RestPull> {
     state: pr.state,
     merged: pr.merged,
     merged_at: pr.merged ? pr.updatedAt : null,
+    merge_commit_sha: pr.mergeCommitSha ?? null,
     draft: pr.draft,
     requested_reviewers: [...(pr.requested ?? [])].map((login) => ({ login })),
     updated_at: pr.updatedAt,
@@ -88,17 +89,27 @@ export async function prPayload(s: GithubStore, pr: StoredPull, action: string) 
   };
 }
 
-/** Closes a pull request, merged or not, and announces it. */
-export async function closePull(s: GithubStore, pr: StoredPull, actor: string, merged: boolean) {
+/** Closes a pull request, merged or not, and announces it. A merge without a commit of its own gets a made-up one. */
+export async function closePull(
+  s: GithubStore,
+  pr: StoredPull,
+  actor: string,
+  merged: boolean,
+  mergeCommit?: string,
+) {
   Object.assign(pr, { state: "closed", merged: merged || pr.merged });
+  if (merged && !pr.mergeCommitSha) {
+    pr.mergeCommitSha = mergeCommit ?? nextSeq(s).toString(16).padStart(40, "c");
+  }
+
   touch(s, pr);
   emit(s, "PullRequestEvent", actor, await prPayload(s, pr, "closed"));
 }
 
 /** Merges the head into the base in the repository, then closes the pull request as merged. */
 export async function mergePull(s: GithubStore, pr: StoredPull, actor: string, message: string) {
-  await s.backend.merge(pr.base.ref, pr.head.ref, message);
-  await closePull(s, pr, actor, true);
+  const commit = await s.backend.merge(pr.base.ref, pr.head.ref, message);
+  await closePull(s, pr, actor, true, commit);
 }
 
 /** Takes a pull request into the merge queue, which merges it `s.queueDelayMs` later; never, without a delay. */
