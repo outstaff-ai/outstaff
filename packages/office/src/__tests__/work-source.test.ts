@@ -186,3 +186,33 @@ describe("work source: a run cut short by a shutdown", () => {
     expect(handedBack).toEqual(["interrupted"]);
   });
 });
+
+describe("work source: an item stopped as it would start", () => {
+  it("cancels it and offers the next item instead", async () => {
+    const clock = manualClock();
+    const store = await openStore("sqlite://:memory:", { now: () => clock.now() });
+    // The ticket closes between picking the first item and starting it: the second check stops it.
+    let checks = 0;
+    const scheduler = createScheduler({
+      store,
+      team,
+      clock,
+      stopped: async (item) =>
+        item.title === "a" && ++checks === 2 ? "Canceled: its ticket was closed." : undefined,
+    });
+
+    const source = schedulerWorkSource({ scheduler, store, team });
+    const a = await scheduler.enqueue({
+      person: "ann",
+      kind: "task",
+      title: "a",
+      trigger: "human",
+    });
+
+    await scheduler.enqueue({ person: "ann", kind: "task", title: "b", trigger: "human" });
+
+    expect((await source.next("ann"))?.workItem.title).toBe("b");
+    expect((await store.getItem(a.id))?.status).toBe("canceled");
+    await store.close();
+  });
+});

@@ -13,6 +13,23 @@ export interface WakeReason {
   policy: string;
 }
 
+/** The latest stop of a closed ticket's work, kept by ticket key so a later start can be checked against it. */
+export interface StopRecord {
+  /** The event whose stop it was; that event delivered again stops nothing more. */
+  event: string;
+
+  /** When the office stopped the work (ISO-8601): items queued before it are skipped when they would start. */
+  at: string;
+
+  /** The agents whose work it left alone. */
+  except: string[];
+
+  /** The journal line of each item it canceled, or skipped at its start. */
+  line: string;
+  canceled: string[];
+  noticed: string[];
+}
+
 export interface LiveOptions {
   team: TeamConfig;
   store: Pick<

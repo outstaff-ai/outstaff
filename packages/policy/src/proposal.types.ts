@@ -52,7 +52,22 @@ export interface SuppressProposal {
   reason: string;
 }
 
-export type Proposal = WakeProposal | ActProposal | DropProposal | SuppressProposal;
+/**
+ * Stops the work on a ticket nobody wants any more: every agent's queued work on it, and on its pull requests, is
+ * canceled, and an agent running such work is sent `notice` as a round of its own, which starts when the running one
+ * ends. The agents in `except` are left alone, for example the agent who closed its own ticket.
+ */
+export interface StopProposal {
+  type: "stop";
+  ticket: string;
+
+  /** What the agent running work on the ticket is told, and the line the canceled items' journals get. */
+  notice: string;
+  except?: string[] | undefined;
+  reason: string;
+}
+
+export type Proposal = WakeProposal | ActProposal | DropProposal | SuppressProposal | StopProposal;
 
 /** In a trace only: the policy threw or returned something that is not a proposal. */
 export interface ErrorProposal {

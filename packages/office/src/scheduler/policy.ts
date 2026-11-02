@@ -22,6 +22,9 @@ export const PRIORITY = {
 
 export const CHAT_KIND = "chat";
 
+/** The round that tells an agent a ticket it was working on was closed; it is queued when a stop finds the work running. */
+export const TICKET_CLOSED_KIND = "ticket_closed";
+
 /** A merge is decided on its own: one runs per repository at a time, and only merge wakes fold into it. */
 export const MERGE_KIND = "merge";
 

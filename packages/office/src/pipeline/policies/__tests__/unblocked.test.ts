@@ -25,7 +25,7 @@ const decisions = (e: PipelineEvent, w: World) =>
   traceOf(e, w).decisions.map((d) =>
     d.type === "drop"
       ? `drop: ${d.reason}`
-      : `${d.policy}: ${d.type} ${"as" in d ? d.as : d.person}`,
+      : `${d.policy}: ${d.type} ${"as" in d ? d.as : "person" in d ? d.person : d.ticket}`,
   );
 
 describe("unblocked_to_ready", () => {
@@ -76,12 +76,12 @@ describe("unblocked_to_ready", () => {
 
     const [byHuman] = traceOf(unblocked(ADA), world("blocked")).decisions;
     expect(byHuman?.type === "drop" && byHuman.reason).toContain(
-      "the blocker was closed by a human, not an agent",
+      "the ticket was closed by a human, not an agent",
     );
 
     const [byNobody] = traceOf(unblocked(), world("blocked")).decisions;
     expect(byNobody?.type === "drop" && byNobody.reason).toContain(
-      "the event names no one who closed the blocker",
+      "the event names no one who closed the ticket",
     );
   });
 

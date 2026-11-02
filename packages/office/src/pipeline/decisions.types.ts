@@ -60,4 +60,22 @@ export interface Drop {
   reason: string;
 }
 
-export type Decision = Wake | Act | Drop;
+/**
+ * Stop the work on a closed ticket: the queued work of every agent but those in `except` on it, and on its pull
+ * requests, is canceled; an agent running such work gets the notice as a round of its own, after the running one.
+ */
+export interface Stop {
+  type: "stop";
+  policy: string;
+  ticket: string;
+  notice: string;
+  except: string[];
+
+  /** The queued items it canceled; set once the live pipeline has stopped the work. */
+  canceled?: string[] | undefined;
+
+  /** The notice rounds it queued for running items; set once the live pipeline has stopped the work. */
+  noticed?: string[] | undefined;
+}
+
+export type Decision = Wake | Act | Drop | Stop;

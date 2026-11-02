@@ -1,5 +1,5 @@
 export { createWorkState } from "./workstate.js";
-export { formatCurrentWork } from "./derive.js";
+export { formatCurrentWork, isTerminal } from "./derive.js";
 export { ticketCandidates } from "./infer.js";
 export type {
   CiState,

@@ -79,4 +79,11 @@ export const proposalSchema = z.discriminatedUnion("type", [
     kind: text.optional(),
     reason: text,
   }),
+  z.strictObject({
+    type: z.literal("stop"),
+    ticket: text,
+    notice: text,
+    except: z.array(text).optional(),
+    reason: text,
+  }),
 ]);

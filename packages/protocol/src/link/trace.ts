@@ -51,6 +51,25 @@ const decisionSchema = z.discriminatedUnion("type", [
       .describe("A comment the agent posts on the ticket after the changes."),
   }),
   z.strictObject({ type: z.literal("drop"), policy: z.string().optional(), reason: z.string() }),
+  z.strictObject({
+    type: z.literal("stop"),
+    policy: z.string(),
+    ticket: z.string().describe("The closed ticket whose work is stopped."),
+    notice: z
+      .string()
+      .describe(
+        "What an agent running work on the ticket is told; the canceled items' journals get it too.",
+      ),
+    except: z.array(z.string()).describe("The agents whose work is left alone."),
+    canceled: z
+      .array(z.string())
+      .optional()
+      .describe("The queued work items it canceled, once the pipeline is live."),
+    noticed: z
+      .array(z.string())
+      .optional()
+      .describe("The notice rounds it queued for running work items, once the pipeline is live."),
+  }),
 ]);
 
 const reason = z.string().describe("Why, in words.");
@@ -80,6 +99,13 @@ const proposalSchema = z.discriminatedUnion("type", [
     person: z.string(),
     subject: wakeSubject.optional(),
     kind: z.string().optional(),
+    reason,
+  }),
+  z.strictObject({
+    type: z.literal("stop"),
+    ticket: z.string(),
+    notice: z.string(),
+    except: z.array(z.string()).optional(),
     reason,
   }),
   z.strictObject({ type: z.literal("error"), reason }).describe("The policy threw."),

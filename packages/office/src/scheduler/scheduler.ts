@@ -6,6 +6,7 @@ import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
 import { enqueueItem, releaseHold } from "./enqueue.js";
 import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";
 import { CHAT_KIND, DEFAULT_RETRY, isLoopGuarded, orderQueue } from "./policy.js";
+import type { UsageWindow } from "./policy.types.js";
 import { runTick } from "./tick.js";
 import type { PauseState, Scheduler, SchedulerOptions, StartResult } from "./types.js";
 
@@ -55,6 +56,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     usage: opts.usage,
     maxRuns,
     chatSessions,
+    stopped: opts.stopped,
   });
 
   const {
@@ -68,6 +70,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     blockItem,
     queuedOf,
     applyMove,
+    stop,
   } = checks;
 
   const deps: SchedulerDeps = { store, clock, log, checks, retry, staleMs };
@@ -116,6 +119,12 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
       : undefined;
   };
 
+  /** Whether a queued item waits for now: a failure backoff, too little usage left, or the loop guard. */
+  const waits = async (item: WorkItem, windows: UsageWindow[]) =>
+    backingOff(item) ||
+    (await usageBlock(item.person, item, windows)) !== null ||
+    (await guardTripped(item)) !== null;
+
   /** Why the item is held back: a pause, too little usage left, or the loop guard, which blocks it. */
   const heldBack = async (item: WorkItem): Promise<StartResult | undefined> => {
     const held = (await pauseBlock(item.person)) ?? (await usageBlock(item.person, item));
@@ -149,23 +158,13 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
       const windows = await getWindows(person);
       for (const item of queue) {
-        if (!(await hasRoom(item))) {
+        if (!(await hasRoom(item)) || (await exclusive(() => stop(item)))) {
           continue;
         }
 
-        if (backingOff(item)) {
-          continue;
+        if (!(await waits(item, windows))) {
+          return item;
         }
-
-        if (await usageBlock(person, item, windows)) {
-          continue;
-        }
-
-        if (await guardTripped(item)) {
-          continue;
-        }
-
-        return item;
       }
 
       return null;
@@ -181,6 +180,11 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
         const refused = (await notReady(item)) ?? (await heldBack(item));
         if (refused) {
           return refused;
+        }
+
+        const stopped = await stop(item);
+        if (stopped) {
+          return { started: false, reason: "stopped", detail: stopped };
         }
 
         const active = await store.activateItem(itemId);

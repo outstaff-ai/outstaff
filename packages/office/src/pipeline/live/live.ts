@@ -3,12 +3,13 @@ import { evaluatePipeline } from "#/pipeline/evaluate.js";
 import { toPipelineEvent } from "#/pipeline/from-workflow.js";
 import type { PipelineRunner } from "#/pipeline/runner.types.js";
 import type { LiveOptions } from "./live.types.js";
+import { stopWork } from "./stop.js";
 import { enqueueWake } from "./wake.js";
 
 /**
- * The pipeline deciding on every event: each event is judged and traced, its wakes are queued and its acts carried
- * out. Errors propagate, so intake delivers the event again; the trace, the queue and the acts are all idempotent per
- * event.
+ * The pipeline deciding on every event: each event is judged and traced, its wakes are queued, its acts carried out
+ * and its stops made. Errors propagate, so intake delivers the event again; the trace, the queue, the acts and the
+ * stops are all idempotent per event.
  */
 export function createLivePipeline(opts: LiveOptions): PipelineRunner {
   const { traces, clock, logger, executor, workState: state } = opts;
@@ -39,6 +40,13 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
       await traces.record(trace);
       let queued = false;
       for (const d of trace.decisions) {
+        if (d.type === "stop") {
+          const { canceled, noticed } = await stopWork(d, event, opts);
+          Object.assign(d, { canceled, noticed });
+          queued = true;
+          continue;
+        }
+
         if (d.type === "act") {
           // The agent makes the act; the office reads its tickets again when the agent answers (see the act desk).
           await executor.execute(d, event.id);
@@ -59,7 +67,7 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
         }
       }
 
-      // The trace says which item each wake queued.
+      // The trace says which item each wake queued, and what each stop canceled.
       if (queued) {
         await traces.record(trace);
       }

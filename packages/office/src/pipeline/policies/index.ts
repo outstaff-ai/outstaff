@@ -2,6 +2,7 @@ import type { Policy } from "@outstaff/policy";
 import { policy as assignedToAssignee } from "./assigned_to_assignee.js";
 import { policy as chatToAddressed } from "./chat_to_addressed.js";
 import { policy as ciFailedToAuthor } from "./ci_failed_to_author.js";
+import { policy as closedStopsWork } from "./closed_stops_work.js";
 import { policy as docCommentToAgent } from "./doc_comment_to_agent.js";
 import { policy as docCommentToMentionedAgent } from "./doc_comment_to_mentioned_agent.js";
 import { policy as handBackBlocked } from "./hand_back_blocked.js";
@@ -46,6 +47,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   ticketCommentToLastWorker,
   movedActiveToAssignee,
   movedActiveToLastWorker,
+  closedStopsWork,
   unblockedToBlockedAgent,
   unblockedToReady,
   docCommentToAgent,

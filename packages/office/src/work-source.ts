@@ -84,22 +84,27 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
     },
 
     async next(person) {
-      const item = await scheduler.next(person);
-      if (!item) {
-        return undefined;
-      }
-
-      const started = await scheduler.markActive(item.id);
-      if (!started.started) {
-        if (started.blocked) {
-          await opts.onBlocked?.(started.blocked);
+      // An item the start-time check stopped is canceled, and the one after it is tried.
+      for (;;) {
+        const item = await scheduler.next(person);
+        if (!item) {
+          return undefined;
         }
 
-        return undefined;
-      }
+        const started = await scheduler.markActive(item.id);
+        if (started.started) {
+          await store.upsertSubject(OFFER_SUBJECT, item.id, { accepted: false });
+          return offerOf(started.item);
+        }
 
-      await store.upsertSubject(OFFER_SUBJECT, item.id, { accepted: false });
-      return offerOf(started.item);
+        if (started.reason !== "stopped") {
+          if (started.blocked) {
+            await opts.onBlocked?.(started.blocked);
+          }
+
+          return undefined;
+        }
+      }
     },
 
     async accept(person, id, on) {

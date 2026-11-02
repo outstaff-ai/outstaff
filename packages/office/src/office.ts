@@ -17,7 +17,7 @@ import { officeTicketPrs } from "./office-ticket-prs.js";
 import { officeCiLogs } from "./office-ci-log.js";
 import type { CreateOfficeInput, Office, OfficeOptions } from "./office.types.js";
 import { createOfficePorts } from "./ports.js";
-import { createOfficePipeline } from "./pipeline/office-pipeline.js";
+import { createOfficePipeline, stoppedWork } from "./pipeline/office-pipeline.js";
 import { createLinkForOffice } from "./office-link.js";
 import {
   agentAuthFromSecrets,
@@ -107,6 +107,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     logger: log,
     usage,
     onReleased: notify,
+    stopped: stoppedWork({ store, workState }),
     ...defined({ staleAfterMinutes: o.staleAfterMinutes }),
   });
 

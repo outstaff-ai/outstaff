@@ -117,6 +117,22 @@ describe("assigned, on a ticket that says it is blocked", () => {
   });
 });
 
+describe("assigned, on a ticket that says to hold", () => {
+  it("waits at the gate the ticket names before it works", async () => {
+    const { seen } = await play(assigned(ctx), (a) =>
+      isTool(a, "ticket_show")
+        ? "SHOP-1 Stage\nStatus: In Progress (active)\nhold: closed\nblocked: nothing to do"
+        : "",
+    );
+
+    expect(seen.slice(0, 3)).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      { type: "gate", name: "closed" },
+      { type: "tool", tool: "ticket_move", input: { key: "SHOP-1", to: "blocked" } },
+    ]);
+  });
+});
+
 describe("unblock", () => {
   const pm = {
     ...ctx,

@@ -29,6 +29,35 @@ describe("instruction variables", () => {
     expect(Object.keys(vars).toSorted()).toEqual([...INSTRUCTION_VARIABLES].toSorted());
   });
 
+  it("says how a ticket.closed closed its ticket, by whom and when", () => {
+    const closed = (data: Record<string, unknown>) =>
+      instructionVariables(
+        ctxOf(event("ticket.closed", { subject: { ticket: "ACME-144" }, data })),
+        {},
+      );
+
+    expect(
+      closed({
+        status: "canceled",
+        closedBy: { kind: "human", id: "ada" },
+        at: "2026-11-02T18:22:16Z",
+      }),
+    ).toMatchObject({ closed: "canceled", closer: "ada", "closed.at": "18:22 UTC" });
+
+    expect(closed({ status: "done" })).toMatchObject({
+      closed: "closed as done",
+      closer: "someone",
+      "closed.at": "an unknown time",
+    });
+
+    expect(
+      instructionVariables(
+        ctxOf(event("ticket.unblocked", { data: { closedBy: { id: "sam" } } })),
+        {},
+      ),
+    ).toMatchObject({ closer: "sam", closed: "", "closed.at": "" });
+  });
+
   it("leaves what the event does not carry empty", () => {
     const vars = instructionVariables(
       ctxOf(event("agent.idle", { data: { cause: "not a cause" } })),
