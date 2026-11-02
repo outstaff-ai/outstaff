@@ -138,8 +138,7 @@ ost role new <name> [options]
 | --- | --- |
 | `--from <stock-role>` | Start from the text of this stock role. |
 | `--title <title>` | Display title; defaults to the name in title case. |
-| `--profile <profile>` | Permission profile: readonly, docs, code, infra. Defaults to docs, or the --from role's. |
-| `--toolset <toolset>` | Tool bundle: base, code, infra. Defaults to base, or the --from role's. |
+| `--profile <profile>` | Permission profile: readonly, docs, code, infra. It also picks the toolsets the agent installs. Defaults to docs, or the --from role's. |
 | `--force` | Replace a custom role that already exists. |
 
 Exit codes:
@@ -152,7 +151,7 @@ Examples:
 ```sh
 ost role new auditor
 ost role new qa --from reviewer --title "QA Engineer"
-ost role new data-engineer --profile code --toolset code
+ost role new data-engineer --profile code
 ```
 
 ## ost diff

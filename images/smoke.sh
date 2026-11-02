@@ -53,6 +53,7 @@ smoke_agent() {
   expect "$image" '^[1-9][0-9]*$' id -u
   expect "$image" 'git version' git --version
   expect "$image" '^20[0-9]{2}\.' mise --version
+  expect "$image" '^curl [0-9]' curl --version
   # The pinned Claude Code binary the SDK launches.
   expect "$image" 'Claude Code' sh -c 'exec /opt/outstaff/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-*/node_modules/@anthropic-ai/claude-agent-sdk-linux-*/claude --version'
   # Claude Code's sandbox for the agent's commands: bubblewrap (never setuid) and socat.

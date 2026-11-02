@@ -222,13 +222,17 @@ export const toolsetSchema = z
     name: z
       .string()
       .regex(/^[a-z][a-z0-9-]*$/, "Use lowercase letters, digits and dashes.")
-      .meta(d("Toolset name, matching the image variant.")),
+      .meta(d("Toolset name; must equal the file name.")),
     description: z.string().optional().meta(d("What the toolset covers.")),
     profiles: z
       .array(z.enum(PROFILES))
       .min(1)
       .optional()
-      .meta(d("Profiles the rules apply to; all profiles when omitted.")),
+      .meta(
+        d(
+          "Permission profiles whose roles get the toolset and that its rules apply to; all profiles when omitted.",
+        ),
+      ),
     rules: z.array(toolsetRuleSchema).optional().meta(d("Command rules.")),
     tools: toolsSchema.optional(),
   })

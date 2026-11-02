@@ -26,6 +26,9 @@ export interface StartupChecksInput extends NetworkProbes {
   /** The ports the agent started with; the acts the office sends are made with its tracker port. */
   ports?: Pick<AgentEnv, "tracker" | "unavailable"> | undefined;
 
+  /** Whether an executable file is at a path. Defaults to the file system. */
+  executable?: ((file: string) => boolean) | undefined;
+
   /** Reads the usage of the volume a path is on. Defaults to statfs. */
   volume?: ((path: string) => Promise<VolumeUsage>) | undefined;
 }

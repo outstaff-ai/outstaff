@@ -8,11 +8,10 @@ export const titleOf = (name: string): string =>
     .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join(" ");
 
-const roleYaml = (name: string, title: string, toolset: string, profile: string): string =>
+const roleYaml = (name: string, title: string, profile: string): string =>
   `name: ${name}
 title: ${title}
 summary: TODO describe in one line what this role does.
-toolset: ${toolset}
 permissions: ${profile}
 # needs:
 #   - vcs.pullRequests
@@ -53,15 +52,13 @@ const ROLE_DIR = /^[a-z][a-z0-9-]*$/;
 
 /** A new role from the minimal template, with TODO placeholders. */
 export const templateRole = (name: string, title: string, o: RoleOptions): RoleFiles => ({
-  yaml: roleYaml(name, title, o.toolset ?? "base", o.profile ?? "docs"),
+  yaml: roleYaml(name, title, o.profile ?? "docs"),
   skill: skillMd(title),
 });
 
-/** Sets --toolset and --profile on a copied role.yaml, when given. */
-function withOverrides(yaml: string, o: RoleOptions): string {
-  const toolset = o.toolset === undefined ? yaml : setKey(yaml, "toolset", o.toolset);
-  return o.profile === undefined ? toolset : setKey(toolset, "permissions", o.profile);
-}
+/** Sets --profile on a copied role.yaml, when given. */
+const withOverrides = (yaml: string, o: RoleOptions): string =>
+  o.profile === undefined ? yaml : setKey(yaml, "permissions", o.profile);
 
 /** Replaces the SKILL.md heading when it is the stock role's title. */
 function retitle(skill: string, fromTitle: string, title: string): string {

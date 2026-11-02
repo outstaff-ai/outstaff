@@ -27,7 +27,7 @@ function stock(version = "1.0.0", files: Record<string, string> = {}) {
   const base: Record<string, string> = { "package.json": JSON.stringify({ version }) };
   for (const r of ROLES) {
     base[`roles/${r}/role.yaml`] =
-      `name: ${r}\ntitle: ${r === "reviewer" ? "Code Reviewer" : r}\nsummary: s\ntoolset: ${r === "reviewer" ? "code" : "base"}\npermissions: ${r === "reviewer" ? "readonly" : "docs"}\n`;
+      `name: ${r}\ntitle: ${r === "reviewer" ? "Code Reviewer" : r}\nsummary: s\npermissions: ${r === "reviewer" ? "readonly" : "docs"}\n`;
 
     base[`roles/${r}/SKILL.md`] = skill(r === "reviewer" ? "Code Reviewer" : r);
   }
@@ -75,14 +75,14 @@ describe("ost role new", () => {
     const r = await ost(cwd, s, ["role", "new", "qa-lead"]);
     expect(r.code).toBe(0);
     expect(read(cwd, "roles/qa-lead/role.yaml")).toContain("name: qa-lead\ntitle: Qa Lead\n");
-    expect(read(cwd, "roles/qa-lead/role.yaml")).toContain("toolset: base\npermissions: docs\n");
+    expect(read(cwd, "roles/qa-lead/role.yaml")).toContain("permissions: docs\n");
     expect(read(cwd, "roles/qa-lead/SKILL.md")).toMatch(/^# Qa Lead\n/);
     expect(existsSync(cat(cwd, ".ejected.json"))).toBe(false);
     expect((await ost(cwd, s, ["validate"])).code).toBe(0);
     expect((await ost(cwd, s, ["build"])).code).toBe(0);
   });
 
-  it("applies --title, --profile and --toolset", async () => {
+  it("applies --title and --profile", async () => {
     const cwd = project();
     const r = await ost(cwd, stock(), [
       "role",
@@ -92,14 +92,12 @@ describe("ost role new", () => {
       "Data Engineer",
       "--profile",
       "code",
-      "--toolset",
-      "code",
     ]);
 
     expect(r.code).toBe(0);
     const yaml = read(cwd, "roles/data/role.yaml");
     expect(yaml).toContain("title: Data Engineer\n");
-    expect(yaml).toContain("toolset: code\npermissions: code\n");
+    expect(yaml).toContain("permissions: code\n");
   });
 
   it("copies a stock role with --from and replaces name and title", async () => {
@@ -108,7 +106,7 @@ describe("ost role new", () => {
     const r = await ost(cwd, s, ["role", "new", "qa", "--from", "reviewer", "--title", "QA"]);
     expect(r.code).toBe(0);
     expect(read(cwd, "roles/qa/role.yaml")).toBe(
-      "name: qa\ntitle: QA\nsummary: s\ntoolset: code\npermissions: readonly\n",
+      "name: qa\ntitle: QA\nsummary: s\npermissions: readonly\n",
     );
 
     expect(read(cwd, "roles/qa/SKILL.md")).toBe(
@@ -120,21 +118,13 @@ describe("ost role new", () => {
     expect((await ost(cwd, s, ["validate"])).code).toBe(0);
   });
 
-  it("lets --profile and --toolset override a --from role", async () => {
+  it("lets --profile override a --from role", async () => {
     const cwd = project();
-    await ost(cwd, stock(), [
-      "role",
-      "new",
-      "qa",
-      "--from",
-      "reviewer",
-      "--profile",
-      "docs",
-      "--toolset",
-      "base",
-    ]);
+    await ost(cwd, stock(), ["role", "new", "qa", "--from", "reviewer", "--profile", "docs"]);
 
-    expect(read(cwd, "roles/qa/role.yaml")).toContain("toolset: base\npermissions: docs\n");
+    expect(read(cwd, "roles/qa/role.yaml")).toBe(
+      "name: qa\ntitle: Qa\nsummary: s\npermissions: docs\n",
+    );
   });
 
   it("refuses a stock role name and points to eject", async () => {
@@ -170,7 +160,7 @@ describe("ost role new", () => {
     },
   );
 
-  it("rejects an unknown --from, --profile and --toolset", async () => {
+  it("rejects an unknown --from, --profile and the removed --toolset", async () => {
     const cwd = project();
     const s = stock();
     expect((await ost(cwd, s, ["role", "new", "qa", "--from", "nobody"])).code).toBe(1);

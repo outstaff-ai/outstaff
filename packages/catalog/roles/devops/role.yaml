@@ -1,7 +1,6 @@
 name: devops
 title: DevOps
 summary: Changes infrastructure through pull requests, runs deploys and keeps runbooks.
-toolset: infra
 permissions: infra
 needs:
   - vcs.pullRequests

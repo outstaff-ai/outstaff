@@ -8,7 +8,6 @@ import { onlyArg } from "./args.js";
 import { fromStockRole, templateRole, titleOf } from "./role/files.js";
 import type { RoleFiles, RoleOptions } from "./role/types.js";
 
-const TOOLSETS = ["base", "code", "infra"] as const;
 const PROFILES = ["readonly", "docs", "code", "infra"] as const;
 
 /** A DNS label: it ends up in file names, branch names and hostnames. */
@@ -27,10 +26,6 @@ function invalidInput(name: string, o: RoleOptions): string | undefined {
 
   if (!isOneOf(PROFILES, o.profile)) {
     return `--profile must be one of ${PROFILES.join(", ")}.`;
-  }
-
-  if (!isOneOf(TOOLSETS, o.toolset)) {
-    return `--toolset must be one of ${TOOLSETS.join(", ")}.`;
   }
 
   if (o.title !== undefined && !isSingleLine(o.title)) {
@@ -112,18 +107,14 @@ export const roleNew = defineCommand({
     { flags: "--title <title>", description: "Display title; defaults to the name in title case." },
     {
       flags: "--profile <profile>",
-      description: `Permission profile: ${PROFILES.join(", ")}. Defaults to docs, or the --from role's.`,
-    },
-    {
-      flags: "--toolset <toolset>",
-      description: `Tool bundle: ${TOOLSETS.join(", ")}. Defaults to base, or the --from role's.`,
+      description: `Permission profile: ${PROFILES.join(", ")}. It also picks the toolsets the agent installs. Defaults to docs, or the --from role's.`,
     },
     { flags: "--force", description: "Replace a custom role that already exists." },
   ],
   examples: [
     "ost role new auditor",
     'ost role new qa --from reviewer --title "QA Engineer"',
-    "ost role new data-engineer --profile code --toolset code",
+    "ost role new data-engineer --profile code",
   ],
   exitCodes: [
     "0: the role was created",

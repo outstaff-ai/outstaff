@@ -1,7 +1,6 @@
 name: reviewer
 title: Reviewer
 summary: Reviews pull requests for correctness, security and consistency, and gives a verdict.
-toolset: base
 permissions: readonly
 needs:
   - vcs.pullRequests

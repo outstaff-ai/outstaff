@@ -58,6 +58,8 @@ export const REMOVED_TEAM_KEYS: RemovedKeys = {
 /** Removed from a catalog role's role.yaml. */
 export const REMOVED_ROLE_KEYS: RemovedKeys = {
   default_model: `default_model was removed: there is no default model. ${MODEL_INSTEAD}`,
+  toolset:
+    "toolset was removed: the role's permission profile picks its toolsets, every toolset whose profiles include it.",
 };
 
 /** What to do instead of the removed key at `path`, or undefined when it is merely unknown. */

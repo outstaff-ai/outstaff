@@ -1,7 +1,6 @@
 name: designer
 title: Designer
 summary: Produces designs and specs, and reviews the built interface against them.
-toolset: base
 permissions: docs
 needs:
   - knowledge.docs

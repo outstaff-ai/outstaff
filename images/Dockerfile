@@ -67,11 +67,14 @@ ARG BUBBLEWRAP_VERSION=0.8.0-2+deb12u1
 # integrations.runtime) must be one of them. `ost-agent --runtimes` prints the same list, and the smoke test compares them.
 LABEL work.outstaff.runtimes="claude-agent-sdk"
 ARG SOCAT_VERSION=1.7.4.4-2
+ARG CURL_VERSION=7.88.1-10+deb12u15
 # Claude Code runs each of the agent's commands in a bubblewrap sandbox (user and PID namespaces, a fresh /proc) so
 # they cannot read its credential; it needs socat for that sandbox too. bwrap must not be setuid: it works through an
 # unprivileged user namespace, which the container's seccomp and AppArmor profiles allow (examples/k8s).
+# curl is for the agent's own commands (runbooks, health checks, APIs); what it reaches is the network policy's call.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends "bubblewrap=${BUBBLEWRAP_VERSION}" "socat=${SOCAT_VERSION}" \
+      "curl=${CURL_VERSION}" \
  && rm -rf /var/lib/apt/lists/* \
  && test ! -u /usr/bin/bwrap
 # mise installs the tools a team's toolsets ask for at agent start; keep its data on the home volume.

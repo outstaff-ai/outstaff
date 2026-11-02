@@ -54,7 +54,7 @@ const make = (files: Record<string, string>): string => {
 };
 
 const role = (name: string, extra = "") =>
-  `name: ${name}\ntitle: ${name}\nsummary: s\ntoolset: base\npermissions: docs\n${extra}`;
+  `name: ${name}\ntitle: ${name}\nsummary: s\npermissions: docs\n${extra}`;
 
 const roleFiles = (name: string, extra = "", skill = `skill ${name}`) => ({
   [`roles/${name}/role.yaml`]: role(name, extra),

@@ -16,7 +16,7 @@ A team runs one **office** container and one **agent** container per person.
 
 These are the planned names; the images are tracked in [#45](https://github.com/outstaff-ai/outstaff/issues/45) and are not published yet. The catalog is baked into them. A client image extends one with `FROM` and `ost build`.
 
-There is one agent image for every role. The tools a person needs are not in the image: at start the agent installs the toolsets of its role and the tools declared in `team.yaml` into `$HOME` with mise (see [Tools](/guides/tools/)). A team that wants no install at start, or no egress for it, can prebuild its own image with the tools instead.
+There is one agent image for every role. The tools a person needs are not in the image: at start the agent installs the toolsets of its role's permission profile and the tools declared in `team.yaml` into `$HOME` with mise (see [Tools](/guides/tools/)). A team that wants no install at start, or no egress for it, can prebuild its own image with the tools instead.
 
 Images never contain secrets. A client image that needs one at build time takes it with BuildKit `--secret`, never `ARG` or `ENV`, because both end up in the image history.
 
@@ -180,4 +180,6 @@ Allow what a container needs and block the rest. An agent can run shell commands
 
 Agents also need the **tool sources**: the registries and release hosts of the tools the team declares. They are only needed on the first start and when a declared version changes, because later starts reuse the installed tools on the home volume. A team that prebuilds its image with the tools can leave them blocked.
 
-Everything else stays blocked, including package registries unless the agent's work needs them; if it does, allow the registry hosts you name and nothing broader.
+Agents that build or test code (the `code` and `infra` profiles) also need the **package registries** their repositories install from, every time a lockfile changes: `registry.npmjs.org` for pnpm, yarn and npm, `pypi.org` and `files.pythonhosted.org` for pip, `proxy.golang.org` and `sum.golang.org` for Go, or your own mirror. Without them `pnpm install` fails, and so do the repository's tests.
+
+Everything else stays blocked: allow the registry hosts you name and nothing broader.

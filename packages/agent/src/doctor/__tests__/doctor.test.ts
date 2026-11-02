@@ -1,10 +1,12 @@
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { delimiter, join } from "node:path";
 import { silentLogger, type Logger, type TeamConfig } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { actsCheck } from "#/doctor/acts.js";
 import { diskCheck, volumeUsage } from "#/doctor/disk.js";
 import { reportAgentChecks, reportStartupChecks, startupChecks } from "#/doctor/startup.js";
-import { toolStatusChecks } from "#/doctor/tools.js";
+import { toolPathChecks, toolStatusChecks } from "#/doctor/tools.js";
 
 const GIB = 1024 ** 3;
 const volume = (used: number) => async () => ({ used: used * GIB, total: 100 * GIB });
@@ -45,6 +47,47 @@ describe("the agent's startup checks", () => {
         detail: "yq@4 did not install.",
       }),
     ]);
+  });
+
+  it("reports each declared tool that is not on the PATH, or that all are", () => {
+    const pnpm = { name: "pnpm", version: "12.9.1", state: "installed" as const };
+    const kubectl = { name: "kubectl", version: "1.31.3", state: "cached" as const };
+    const broken = { name: "helm", version: "3", state: "unavailable" as const };
+    const onPath = (file: string) => file === "/shims/pnpm" || file === "/usr/bin/kubectl";
+    const env = { PATH: ["/shims", "/usr/bin"].join(delimiter) };
+
+    expect(toolPathChecks([], env, onPath)).toEqual([]);
+    expect(toolPathChecks([broken], env, onPath)).toEqual([]);
+    expect(toolPathChecks([pnpm, kubectl, broken], env, onPath)).toEqual([
+      { name: "Tools on PATH", status: "ok", detail: "pnpm, kubectl found on the PATH." },
+    ]);
+
+    expect(toolPathChecks([pnpm, kubectl], { PATH: "/usr/bin" }, onPath)).toEqual([
+      expect.objectContaining({
+        name: "Tool pnpm on PATH",
+        status: "fail",
+        detail: expect.stringContaining("pnpm is declared for this agent but is not on its PATH"),
+      }),
+    ]);
+
+    expect(toolPathChecks([pnpm], {}, onPath)[0]?.detail).toContain("(empty)");
+  });
+
+  it("finds a tool on the real PATH only as an executable file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "ost-path-"));
+    writeFileSync(join(dir, "acme-cli"), "#!/bin/sh\n");
+    chmodSync(join(dir, "acme-cli"), 0o755);
+    writeFileSync(join(dir, "acme-doc"), "text\n");
+    mkdirSync(join(dir, "acme-dir"));
+    const tool = (name: string) => ({ name, version: "1", state: "installed" as const });
+    const env = { PATH: dir };
+
+    expect(toolPathChecks([tool("acme-cli")], env)).toMatchObject([{ status: "ok" }]);
+    expect(
+      toolPathChecks([tool("acme-doc"), tool("acme-dir"), tool("acme-none")], env).map(
+        (c) => c.name,
+      ),
+    ).toEqual(["Tool acme-doc on PATH", "Tool acme-dir on PATH", "Tool acme-none on PATH"]);
   });
 
   it("warns from 80% of the home volume used and fails from 90%", async () => {
@@ -148,7 +191,10 @@ describe("the agent's startup checks", () => {
     );
 
     expect(sent).toEqual([
-      expect.arrayContaining([expect.objectContaining({ name: "Tools install", status: "ok" })]),
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Tools install", status: "ok" }),
+        expect.objectContaining({ name: "Tool jq on PATH", status: "fail" }),
+      ]),
     ]);
   });
 });
