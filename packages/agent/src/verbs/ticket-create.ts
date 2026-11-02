@@ -2,6 +2,7 @@ import { z } from "zod";
 import { uploadAttachments, uploadedLines } from "./attachments.js";
 import { requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./define.js";
+import { chatLine, sayInput } from "./chat-line.js";
 import { key, summary } from "./ticket-support.js";
 import {
   assigneeFor,
@@ -48,12 +49,14 @@ export const ticketCreate = defineVerb({
       .describe(
         'Member username, name or id; "me" for yourself. Unassigned when omitted, except in a chat session, where it is yours unless you name someone else.',
       ),
+    say: sayInput,
   }),
   args: [],
   examples: [
     'ost ticket create --title "Add a search index" --body "Part of ACME-48."',
     'ost ticket create --related ACME-48 --title "Rate-limit the search endpoint" --body "Found while reviewing ACME-48."',
     'ost ticket create --parent ACME-12 --title "Add the search index" --assignee me --status active --body "The index half of ACME-12."',
+    'ost ticket create --title "Export orders as CSV" --body "Asked in chat." --say "Will do, starting on the export next."',
   ],
   async run(env, input, ctx) {
     const tracker = requireTracker(env);
@@ -63,6 +66,7 @@ export const ticketCreate = defineVerb({
     const chat = current?.kind === "chat" ? current : undefined;
 
     // Every refusal comes before the first write: a ticket the office would then refuse must not exist.
+    const say = chat ? chatLine(env, input.say) : undefined;
     if (chat) {
       await requireOffice(env).checkFiling(chat.id, input.title);
     }
@@ -79,7 +83,7 @@ export const ticketCreate = defineVerb({
     const uploaded = await uploadAttachments(env, issue.key, files);
     await noteFailedUploads(tracker, issue.key, uploaded);
     const url = tracker.links.issue(issue.key);
-    const office = await fileInOffice(env, chat, issue.key, input.title, to);
+    const office = await fileInOffice(env, chat, { key: issue.key, request: input.title, say }, to);
 
     return result(
       [

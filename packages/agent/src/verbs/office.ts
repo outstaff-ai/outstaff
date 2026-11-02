@@ -100,8 +100,8 @@ export function createFakeOffice(
     async checkFiling(workItemId, request) {
       checked.push({ workItemId, request });
     },
-    async linkTicket(workItemId, ticket, request) {
-      linked.push({ workItemId, ticket, request });
+    async linkTicket(workItemId, ticket, request, say) {
+      linked.push({ workItemId, ticket, request, ...(say ? { say } : {}) });
       return {
         url: `https://tracker.acme.example/issue/${ticket}`,
         item: { id: `work-${ticket}`, title: ticket, status: "queued" },

@@ -88,8 +88,11 @@ export interface OfficeClient {
   /** The log of a check on one of the team's repositories, by its link, read with the office's credentials. */
   ciLog(request: CiLogRequest): Promise<CiLogResult>;
 
-  /** Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same request twice. */
-  linkTicket(workItemId: string, ticket: string, request: string): Promise<Filed>;
+  /**
+   * Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same
+   * request twice. `say` is the agent's line for the reply in the thread: the agent posts it, the office never sees it.
+   */
+  linkTicket(workItemId: string, ticket: string, request: string, say?: string): Promise<Filed>;
 
   /**
    * Records a ticket a chat session created for someone else against the session: no work item for the caller, and
@@ -103,10 +106,10 @@ export interface OfficeClient {
   /** Asks whether a chat session may file this request, before anything is created. Refused when it may not. */
   checkFiling(workItemId: string, request: string): Promise<void>;
 
-  /** Makes a chat session's request part of the caller's existing ticket or pull request. */
+  /** Makes a chat session's request part of the caller's existing ticket or pull request. `say` as for `linkTicket`. */
   attachWork(
     workItemId: string,
-    request: { target: string; confirmed: boolean; request?: string },
+    request: { target: string; confirmed: boolean; request?: string; say?: string },
   ): Promise<Attached>;
 
   /** Files work from a chat session when there is no tracker. Like `linkTicket`. */
@@ -117,11 +120,17 @@ export interface FakeOffice extends OfficeClient {
   asked: { to: string; question: string; workItemId?: string }[];
   answered: { questionId: string; answer: string }[];
   placed: { workItemId: string; placement: Placement }[];
-  linked: { workItemId: string; ticket: string; request: string }[];
+  linked: { workItemId: string; ticket: string; request: string; say?: string }[];
   filedFor: { workItemId: string; ticket: string; request: string; assignee: string }[];
   checked: { workItemId: string; request: string }[];
   queued: { workItemId: string; title: string; body: string }[];
-  attached: { workItemId: string; target: string; confirmed: boolean; request?: string }[];
+  attached: {
+    workItemId: string;
+    target: string;
+    confirmed: boolean;
+    request?: string;
+    say?: string;
+  }[];
   chatMessages: ChatMessageRequest[];
   chatReports: { workItemId: string; kind: ChatReportKind }[];
   reportsPosted: { workItemId: string; id: string }[];

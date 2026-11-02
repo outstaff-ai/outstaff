@@ -45,6 +45,46 @@ describe("acknowledgement", () => {
       "Adding this to [PR app#3](https://g.example/pull/3) for [ACME-2](https://t.acme.example/ACME-2). I'll pick it up when the current round ends.",
     );
   });
+
+  describe("with the agent's own line", () => {
+    const links = "[PR #88](https://g.example/pull/88) · [ACME-54](https://t.acme.example/ACME-54)";
+    const attached = (say: string) =>
+      ({
+        title: "x",
+        say,
+        attached: {
+          pr: { ref: "#88", url: "https://g.example/pull/88" },
+          ticket: { ref: "ACME-54" },
+        },
+      }) as Parameters<typeof acknowledgement>[0];
+
+    const active = filed({
+      item: { id: "w9", title: "Filed", status: "active" },
+    } as Partial<Filed>);
+
+    it("leads with the line, then the links of the work it joined", () => {
+      expect(acknowledgement(attached("Reworking it on the operator."), filed(), issueUrl)).toBe(
+        `Reworking it on the operator. ${links}`,
+      );
+    });
+
+    it("adds when running work picks it up, unless the line says when", () => {
+      expect(acknowledgement(attached("Got it, the review fixes."), active, issueUrl)).toBe(
+        `Got it, the review fixes. ${links} I'll pick it up when the current round ends.`,
+      );
+
+      expect(
+        acknowledgement(attached("Reworking it once this round ends."), active, issueUrl),
+      ).toBe(`Reworking it once this round ends. ${links}`);
+    });
+
+    it("leads with the line, then the ticket it was filed as", () => {
+      const what = { key: "ACME-1", title: "x", say: "Will do, the CSV export." };
+      expect(acknowledgement(what, filed(), issueUrl)).toBe(
+        "Will do, the CSV export. [ACME-1](https://t.acme.example/ACME-1)",
+      );
+    });
+  });
 });
 
 describe("reports", () => {

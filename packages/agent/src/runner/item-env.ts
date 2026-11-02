@@ -129,14 +129,20 @@ export function itemEnv(
             asked ||= r.status === "pending";
             return r;
           },
-          async linkTicket(workItemId, ticket, request) {
+          async linkTicket(workItemId, ticket, request, say) {
             const r = await base.linkTicket(workItemId, ticket, request);
-            await filed(workItemId, { key: ticket, title: ticket }, r);
+            await filed(workItemId, { key: ticket, title: ticket, ...(say ? { say } : {}) }, r);
             return r;
           },
           async attachWork(workItemId, request) {
             const r = await base.attachWork(workItemId, request);
-            await filed(workItemId, { attached: r.attached, title: r.item.title }, r);
+            const { say } = request;
+            await filed(
+              workItemId,
+              { attached: r.attached, title: r.item.title, ...(say ? { say } : {}) },
+              r,
+            );
+
             return r;
           },
           async queueWork(workItemId, request) {

@@ -553,6 +553,7 @@ ost ticket create [options]
 | `--parent <parent>` | Key of the ticket this one is part of. Defaults to the ticket of the work item you are in. |
 | `--related <related>` | Key of a ticket this one only relates to: an independent follow-up. It is then not a subtask of the current ticket. |
 | `--assignee <assignee>` | Member username, name or id; "me" for yourself. Unassigned when omitted, except in a chat session, where it is yours unless you name someone else. |
+| `--say <say>` | In a chat session, one short line your agent posts in the thread, followed by the links: answer what the human actually said, in their terms (for example "Reworking it from your new comment."). No links, no greeting. Without it a fixed line is posted. |
 
 Exit codes:
 
@@ -565,6 +566,7 @@ Examples:
 ost ticket create --title "Add a search index" --body "Part of ACME-48."
 ost ticket create --related ACME-48 --title "Rate-limit the search endpoint" --body "Found while reviewing ACME-48."
 ost ticket create --parent ACME-12 --title "Add the search index" --assignee me --status active --body "The index half of ACME-12."
+ost ticket create --title "Export orders as CSV" --body "Asked in chat." --say "Will do, starting on the export next."
 ost ticket create --title "Add a search index" --body "Part of ACME-48." --json
 ```
 
@@ -1277,6 +1279,7 @@ ost work attach <target> [options]
 | --- | --- |
 | `--confirmed` | The requester said in the thread that the request belongs to this pull request, which is in review. |
 | `--request <request>` | What to add, when the message of this session is only the human's answer (for example "this PR"): restate the request they made earlier in the thread. |
+| `--say <say>` | In a chat session, one short line your agent posts in the thread, followed by the links: answer what the human actually said, in their terms (for example "Reworking it from your new comment."). No links, no greeting. Without it a fixed line is posted. |
 
 Exit codes:
 
@@ -1288,6 +1291,7 @@ Examples:
 ```sh
 ost work attach ACME-11
 ost work attach 11 --confirmed
+ost work attach 11 --confirmed --say "Reworking it from your new comment."
 ost work attach ACME-11 --json
 ```
 

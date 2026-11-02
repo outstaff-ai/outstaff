@@ -22,6 +22,9 @@ export interface FiledWhat {
   key?: string;
   title: string;
   attached?: Attached["attached"];
+
+  /** The agent's own line for the reply (`--say`), checked by the verb; the template is used without one. */
+  say?: string;
 }
 
 export interface ChatRelayOptions {
