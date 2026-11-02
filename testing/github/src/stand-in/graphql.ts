@@ -14,7 +14,10 @@ interface Operation {
 const page = { hasNextPage: false, endCursor: null };
 
 function threadsOf(s: GithubStore, vars: Vars) {
-  const nodes = [...s.threads.values()].filter((t) => t.prNumber === vars["number"]).map(toNode);
+  const nodes = [...s.threads.values()]
+    .filter((t) => t.prNumber === vars["number"])
+    .map((t) => toNode(s, t));
+
   const data: ThreadsData = {
     repository: { pullRequest: { reviewThreads: { pageInfo: page, nodes } } },
   };
@@ -34,6 +37,7 @@ function reply(s: GithubStore, vars: Vars, _query: string, actor: string) {
     seq: nextSeq(s),
     author: actor,
     body: vars["body"],
+    at: s.now(),
   });
 
   return { data: { addPullRequestReviewThreadReply: { comment: { id: t.id } } } };
@@ -99,7 +103,7 @@ function resolve(s: GithubStore, vars: Vars) {
 /** A thread with only its last comment: who spoke last. */
 function lastWord(s: GithubStore, vars: Vars) {
   const t = s.threads.get(vars["id"]);
-  const node = t ? toNode(t) : undefined;
+  const node = t ? toNode(s, t) : undefined;
   return {
     data: { node: node ? { ...node, comments: { nodes: node.comments.nodes.slice(-1) } } : null },
   };

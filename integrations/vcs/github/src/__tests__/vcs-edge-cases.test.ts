@@ -306,7 +306,18 @@ describe("conversation and review mapping of missing fields", () => {
                   path: "a.ts",
                   line: null,
                   originalLine: 4,
-                  comments: { nodes: [{ id: "C1", databaseId: 1, body: "hi", author: null }] },
+                  comments: {
+                    nodes: [
+                      {
+                        id: "C1",
+                        databaseId: 1,
+                        body: "hi",
+                        createdAt: "2026-01-01T00:00:00Z",
+                        url: "https://github.com/acme/app/pull/1#discussion_r1",
+                        author: null,
+                      },
+                    ],
+                  },
                 },
               ],
             },
@@ -321,7 +332,16 @@ describe("conversation and review mapping of missing fields", () => {
         resolved: false,
         path: "a.ts",
         line: 4,
-        comments: [{ id: "C1", author: "ghost", body: "hi" }],
+        comments: [
+          {
+            id: "C1",
+            author: "ghost",
+            kind: "human",
+            body: "hi",
+            at: "2026-01-01T00:00:00Z",
+            url: "https://github.com/acme/app/pull/1#discussion_r1",
+          },
+        ],
       },
     ]);
   });

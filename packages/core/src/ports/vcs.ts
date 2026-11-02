@@ -3,6 +3,7 @@ import type { Links } from "./links.js";
 import type { MergeMethod, MergeOptions, MergeRequirements, MergeResult } from "./vcs-merge.js";
 import type { RepoRef } from "./types.js";
 import type { Check, CheckLog } from "./vcs-checks.js";
+import type { ReviewThread } from "./vcs-threads.js";
 
 export interface PullRequest {
   repo: RepoRef;
@@ -23,14 +24,6 @@ export interface PullRequest {
   /** For a merged one: the commit the merge made on the base branch, whose checks run after the merge. */
   mergeCommitSha?: string;
   updatedAt: string;
-}
-
-export interface ReviewThread {
-  id: string;
-  resolved: boolean;
-  path?: string;
-  line?: number;
-  comments: { id: string; author: string; body: string }[];
 }
 
 /** One inline comment of a submitted review. */

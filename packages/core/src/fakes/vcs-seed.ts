@@ -1,8 +1,24 @@
 import type { NewSeedPullRequest, VcsSeed } from "#/contracts/seeds.js";
 import { PortError } from "#/ports/index.js";
-import type { PullRequest, ReviewInlineComment, ReviewThread } from "#/ports/index.js";
+import type {
+  PullRequest,
+  ReviewInlineComment,
+  ReviewThread,
+  ReviewThreadComment,
+} from "#/ports/index.js";
 import { settleAutoMerge } from "./vcs-auto-merge.js";
 import type { FakeVcsState, StoredPr } from "./vcs.types.js";
+
+/** Who wrote a seeded comment: the fake's own login is the agent, a `[bot]` login a bot, anyone else a human. */
+const kindOfIn =
+  (self: string) =>
+  (login: string): ReviewThreadComment["kind"] => {
+    if (login === self) {
+      return "agent";
+    }
+
+    return login.endsWith("[bot]") ? "bot" : "human";
+  };
 
 /** The seed of a fake vcs: puts pull requests, reviews, checks and grants in place as a test needs them. */
 export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
@@ -31,6 +47,8 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
     settingsOf,
     record,
   } = st;
+
+  const kindOf = kindOfIn(self);
 
   return {
     repo: defaultRepo,
@@ -96,7 +114,15 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
           resolved: false,
           path: c.path,
           line: c.line,
-          comments: [{ id: `rc${++counters.comment}`, author: actor, body: c.body }],
+          comments: [
+            {
+              id: `rc${++counters.comment}`,
+              author: actor,
+              kind: kindOf(actor),
+              body: c.body,
+              at: now().toISOString(),
+            },
+          ],
         };
 
         s.threads.push(thread);
@@ -187,7 +213,12 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
       const thread: ReviewThread = {
         id: `t${++counters.thread}`,
         resolved: false,
-        comments: t.comments.map((c) => ({ id: `rc${++counters.comment}`, ...c })),
+        comments: t.comments.map((c) => ({
+          id: `rc${++counters.comment}`,
+          kind: kindOf(c.author),
+          at: now().toISOString(),
+          ...c,
+        })),
       };
 
       if (t.path !== undefined) {

@@ -149,6 +149,7 @@ export function createSeed(s: GithubStore, git: MemoryRepo, vcsRef: FakeVcsRef):
           id: `${id}_c${i}`,
           databaseId: ++s.counters.comment,
           seq: nextSeq(s),
+          at: s.now(),
           ...c,
         })),
       });

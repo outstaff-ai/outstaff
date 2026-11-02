@@ -58,12 +58,13 @@ export type {
   ReactionTarget,
   Reaction,
   ReviewInlineComment,
-  ReviewThread,
   ReviewVerdict,
   Vcs,
   VcsEvent,
   VcsPermission,
 } from "./vcs.js";
+
+export type { ReviewThread, ReviewThreadComment } from "./vcs-threads.js";
 
 export type {
   BranchRule,

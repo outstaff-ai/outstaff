@@ -1507,6 +1507,12 @@
               "minimum": 0,
               "maximum": 50
             },
+            "reviews": {
+              "description": "The latest review comments on the pull requests of the ticket being worked on and of its parent, resolved and merged ones included. Default 10.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 50
+            },
             "items": {
               "description": "How many tickets, pull requests, documents and chat threads one wake carries at most, the closest to what woke the agent first. Default 8.",
               "type": "integer",

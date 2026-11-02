@@ -7,6 +7,7 @@ export interface ContextLimits {
   comments: number;
   messages: number;
   threads: number;
+  reviews: number;
   items: number;
   bodyChars: number;
 }
@@ -28,6 +29,25 @@ export interface GraphTicket {
 
   /** Oldest first. */
   comments: GraphNote[];
+
+  /** The key of the ticket it is a subtask of, when the tracker says. */
+  parent?: string | undefined;
+
+  /** For the ticket being worked on: review comments on its and its parent's pull requests, in no order. */
+  reviews?: GraphReview[] | undefined;
+}
+
+/** A review comment on a pull request of the ticket being worked on, or of its parent. */
+export interface GraphReview {
+  pr: string;
+  ticket?: string | undefined;
+  resolved: boolean;
+  path?: string | undefined;
+  line?: number | undefined;
+  url?: string | undefined;
+  author: string;
+  at: string;
+  body: string;
 }
 
 export interface GraphThread {
@@ -107,6 +127,9 @@ export interface ManifestEntry {
   /** Comments, review threads or messages that went in, and how many were left out. */
   shown?: number | undefined;
   left?: number | undefined;
+
+  /** For the ticket being worked on: review comments that went in, and how many were left out. */
+  reviews?: { shown: number; left: number } | undefined;
 }
 
 /** A linked item of the bundle, before it is filled in. */

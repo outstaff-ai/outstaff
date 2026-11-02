@@ -111,7 +111,11 @@ function entryLine(e: ManifestEntry): string {
   const counted =
     e.shown === undefined ? "" : `, ${e.shown} shown${e.left ? `, ${e.left} left out` : ""}`;
 
-  return `    ${e.type} ${e.ref} (${e.why.role}: ${e.why.source}${counted})${e.url ? ` ${e.url}` : ""}`;
+  const reviews = e.reviews
+    ? `, ${e.reviews.shown} review comment${e.reviews.shown === 1 ? "" : "s"}${e.reviews.left ? `, ${e.reviews.left} left out` : ""}`
+    : "";
+
+  return `    ${e.type} ${e.ref} (${e.why.role}: ${e.why.source}${counted}${reviews})${e.url ? ` ${e.url}` : ""}`;
 }
 
 /** What a merge's context named. */

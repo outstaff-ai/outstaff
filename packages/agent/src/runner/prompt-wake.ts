@@ -5,6 +5,7 @@ import type {
   ContextMerge,
   ContextMergeOther,
   ContextPr,
+  ContextReview,
   ContextTicket,
   ContextWhy,
   WakeContext,
@@ -24,6 +25,24 @@ const WHY: Record<ContextWhy["role"], string> = {
 const why = (w: ContextWhy) => `  Why: ${WHY[w.role]} (${w.source}).`;
 const link = (url: string | undefined) => (url ? ` ${url}` : "");
 const spaced = (s: string) => s.replaceAll("_", " ");
+
+function reviewLine(r: ContextReview): string {
+  const where = r.path ? ` ${r.path}${r.line === undefined ? "" : `:${r.line}`}` : "";
+  const ticket = r.ticket ? ` (${r.ticket})` : "";
+  return `  - ${r.at} ${r.author} on ${r.pr}${ticket}${where}, ${r.resolved ? "resolved" : "unresolved"}${link(r.url)}`;
+}
+
+/** What reviews decided, kept after their threads are resolved or the pull requests merge. */
+function reviewLines(t: ContextTicket): string[] {
+  if (!t.reviews?.length) {
+    return [];
+  }
+
+  return [
+    `  Review comments on the pull requests of this ticket and its parent, newest first${t.moreReviews ? ` (${t.moreReviews} older left out)` : ""}:`,
+    ...t.reviews.flatMap((r) => [reviewLine(r), ...quoteBody(r.body, "    > ")]),
+  ];
+}
 
 function ticketLines(t: ContextTicket): string[] {
   const state = [
@@ -46,6 +65,7 @@ function ticketLines(t: ContextTicket): string[] {
           ]),
         ]
       : []),
+    ...reviewLines(t),
   ];
 }
 

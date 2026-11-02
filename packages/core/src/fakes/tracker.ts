@@ -58,13 +58,15 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
   const linked = (key: string): LinkedIssue => ({ key, status: { ...need(key).status } });
 
-  /** The issue with its `blocks` links both ways, as the relations have them now. */
+  /** The issue with its `blocks` links both ways and its parent, as the relations have them now. */
   const withLinks = (issue: Issue): Issue => {
     const blocking = relations.filter((r) => r.relation === "blocks");
+    const parent = parents.get(issue.key);
     return {
       ...issue,
       blocks: blocking.filter((r) => r.key === issue.key).map((r) => linked(r.otherKey)),
       blockedBy: blocking.filter((r) => r.otherKey === issue.key).map((r) => linked(r.key)),
+      ...(parent ? { parent } : {}),
     };
   };
 

@@ -9,7 +9,7 @@ import type {
 import { readChatLog } from "#/chat/log.js";
 import { isOpen } from "#/workstate/open.js";
 import type { DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
-import type { ContextReaders } from "./types.js";
+import type { ContextReaders, ThreadsRead } from "./types.js";
 
 const record = async <T>(r: ContextReaders, type: string, ref: string) =>
   (await r.store.getSubject(type, ref))?.data as T | undefined;
@@ -33,6 +33,7 @@ function ticketFields(key: string, rec: TicketRecord | undefined, issue: Issue |
       status: issue.status.canonical,
       assignee: issue.assignee?.name,
       description: issue.body,
+      parent: issue.parent,
     };
   }
 
@@ -63,6 +64,8 @@ export async function readTicket(r: ContextReaders, key: string): Promise<GraphT
  */
 async function threadsOf(
   r: ContextReaders,
+  read: ThreadsRead,
+  key: string,
   rec: PrRecord,
 ): Promise<GraphPr["threads"] | undefined> {
   const vcs = r.vcs;
@@ -70,7 +73,7 @@ async function threadsOf(
     return undefined;
   }
 
-  const threads = await attempt(() => vcs.reviewThreads(rec.ref.repo, rec.ref.number));
+  const threads = await read(key, rec);
   return threads
     ?.filter((t) => !t.resolved && t.comments.length > 0)
     .map((t) => ({
@@ -83,13 +86,17 @@ async function threadsOf(
 }
 
 /** A pull request as the work state knows it, with its unresolved review threads when the code host can be read. */
-export async function readPr(r: ContextReaders, key: string): Promise<GraphPr | undefined> {
+export async function readPr(
+  r: ContextReaders,
+  key: string,
+  read: ThreadsRead,
+): Promise<GraphPr | undefined> {
   const rec = await record<PrRecord>(r, "pr", key);
   if (!rec) {
     return undefined;
   }
 
-  const threads = await threadsOf(r, rec);
+  const threads = await threadsOf(r, read, key, rec);
   return {
     ref: key,
     number: rec.ref.number,
