@@ -61,7 +61,7 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .strictObject({ agent_mentioned: z.boolean() })
       .meta(
         d(
-          "The comment in the event mentions (or, with false, does not mention) a team agent: event.data.mentions, which the office fills with the handles of the agents a trusted person's comment names.",
+          "The comment in the event mentions (or, with false, does not mention) a team agent: event.data.mentions, which the office fills with the handles of the agents a person's or another agent's comment names, by tracker username, handle or name. An agent's mention of itself does not count.",
         ),
       ),
     z

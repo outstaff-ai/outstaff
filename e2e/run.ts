@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human makes the ticket the agent's, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, a comment on an agent's design document and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -1830,6 +1830,50 @@ async function main() {
     `ticket comment: a comment on the handed-back ${design} sent it back to its agent (active), who answered and handed it back`,
   );
 
+  // ---- 11a. an agent mentions the PM on a ticket, by her name written as a tracker username (`@Pia.Novak`): the PM
+  // is woken with the comment and answers; her answer mentions only herself, so it wakes no one.
+  const piaBeforeMention = piaWakes().length;
+  const movesBeforePm = (await state()).tickets.find((x: Json) => x.key === design).moves.length;
+  const pmQuestion = "does the mobile layout ship first?";
+  await stub("POST", `/_test/tickets/${design}/comment`, { body: `ask Pia.Novak: ${pmQuestion}` });
+  const askedPm = await until(`${design}: sam asked the PM, and the PM answered`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === design);
+    const bySam = t.comments.find(
+      (c: Json) => c.author === "sam" && c.body === `@Pia.Novak ${pmQuestion}`,
+    );
+
+    const byPia = t.comments.find(
+      (c: Json) => c.author === "pia" && c.body === `Noted: @Pia.Novak ${pmQuestion}`,
+    );
+
+    return bySam && byPia && t.status === "In Review" && t.assignee === "ada.admin" ? t : undefined;
+  });
+
+  await officePolledTwice(`pia's answer on ${design}`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforeMention)),
+    JSON.stringify(["asked"]),
+    "pia was woken once, by sam's mention, and not by her own answer",
+  );
+
+  assertEq(
+    (await state()).tickets
+      .find((x: Json) => x.key === design)
+      .comments.filter((c: Json) => c.author === "pia").length,
+    askedPm.comments.filter((c: Json) => c.author === "pia").length,
+    "the PM's answer started nothing more",
+  );
+
+  assertEq(
+    askedPm.moves.slice(movesBeforePm).some((m: Json) => m.by === "pia"),
+    false,
+    "the mention did not hand the ticket to the PM",
+  );
+
+  step(
+    `agent mention: sam's @Pia.Novak on ${design} woke the PM, who answered; her answer woke no one`,
+  );
+
   // ---- 10b2. the checks of an open pull request fail: its author gets a round with the failing check, whatever the
   // ticket's status, and hands the ticket back
   await stub("POST", `/_test/pulls/${pr2.pr.number}/check`, {
@@ -1889,32 +1933,37 @@ async function main() {
     `blocked retry: ${stuck} assigned to sam again, still blocked -> active when the work started, blocked again by sam, the PM gave it back to the requester`,
   );
 
-  // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the ticket is the agent's again
+  // ---- 11b. a human mentions the agent on the ticket it left blocked with the human: the agent answers on it, and
+  // the ticket stays blocked with the human (a mention does not hand the ticket over)
   const mentionText = "@sam the staging key is rotated, please carry on.";
   const movesBeforeMention = retried.moves.length;
+  const samBeforeMention = wakesOf("sam").length;
   await stub("POST", `/_test/tickets/${stuck}/comment`, { body: mentionText });
-  const mentioned = await until(
-    `${stuck}: the mention answered and the ticket handed back again`,
-    (s) => {
-      const t = s.tickets.find((x: Json) => x.key === stuck);
-      const answer = t.comments.find(
-        (c: Json) => c.author === "sam" && c.body === `Noted: ${mentionText}`,
-      );
+  await until(`${stuck}: the mention answered`, (s) =>
+    s.tickets
+      .find((x: Json) => x.key === stuck)
+      .comments.some((c: Json) => c.author === "sam" && c.body === `Noted: ${mentionText}`)
+      ? true
+      : undefined,
+  );
 
-      return answer && t.status === "In Review" && t.assignee === "ada.admin" ? t : undefined;
-    },
+  await until("sam idle after answering the mention", (s) => idle(s) || undefined);
+  await officePolledTwice(`sam's answer on ${stuck}`);
+  const mentioned = (await state()).tickets.find((x: Json) => x.key === stuck);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBeforeMention)),
+    JSON.stringify(["asked"]),
+    "the mention woke sam once, to answer it",
   );
 
   assertEq(
-    mentioned.moves
-      .slice(movesBeforeMention)
-      .filter((m: Json) => m.from === "Blocked" && m.to === "In Progress").length,
-    1,
-    "the mention moved the blocked ticket to active once",
+    JSON.stringify([mentioned.status, mentioned.assignee, mentioned.moves.length]),
+    JSON.stringify(["Blocked", "ada.admin", movesBeforeMention]),
+    "the mention left the ticket blocked with the human",
   );
 
   step(
-    `mention: @sam on the blocked ${stuck} (held by the human) assigned it to sam and made it active; sam answered and handed it back`,
+    `mention: @sam on the blocked ${stuck} (held by the human) woke sam, who answered; the ticket stayed blocked with the human`,
   );
 
   // Before the last step: merging another pull request makes the second one conflict with main again.

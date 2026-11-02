@@ -57,12 +57,25 @@ describe("ticket_comment_to_blocked_agent", () => {
     ]);
   });
 
-  it("a human's mention wakes the agent mentioned, through ticket_comment_to_agent alone", () => {
+  it("a human's mention wakes the agent mentioned, through ticket_comment_to_mentioned_agent alone", () => {
     for (const mentioned of ["sam", "mira"]) {
       expect(decisions(comment(ADA, { mentions: [mentioned] }), blocked())).toEqual([
-        `ticket_comment_to_agent: wake ${mentioned}`,
+        `ticket_comment_to_mentioned_agent: wake ${mentioned}`,
       ]);
     }
+  });
+
+  it("an agent's mention wakes the agent mentioned, through ticket_comment_to_mentioned_agent alone", () => {
+    for (const mentioned of ["sam", "leo"]) {
+      expect(decisions(comment(MIRA, { mentions: [mentioned] }), blocked())).toEqual([
+        `ticket_comment_to_mentioned_agent: wake ${mentioned}`,
+      ]);
+    }
+
+    // The blocked agent's own mention of the PM wakes the PM.
+    expect(decisions(comment(SAM, { mentions: ["mira"] }), blocked())).toEqual([
+      "ticket_comment_to_mentioned_agent: wake mira",
+    ]);
   });
 
   it("a comment on a ticket with an agent wakes that agent if a human made it, else no one", () => {

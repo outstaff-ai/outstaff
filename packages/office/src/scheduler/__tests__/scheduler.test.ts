@@ -14,7 +14,7 @@ import type { Scheduler, UsageSource } from "#/scheduler/types.js";
 
 const team = {
   policies: {
-    agent_loop_guard: { max_runs_per_item_per_hour: 3 },
+    agent_loop_guard: { max_runs_per_subject_per_hour: 3 },
     usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
     retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
   },
@@ -441,6 +441,39 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
 
       clock.advance(61 * 60_000);
       expect((await cycle(auto.id)).started).toBe(true);
+    });
+
+    it("counts the person's runs on one subject across items, and a retry clears them all", async () => {
+      const on = (title: string, ref: string, person = "ann") =>
+        sched.enqueue({
+          person,
+          kind: "task",
+          title,
+          trigger: "agent",
+          subject: { type: "ticket", ref },
+        });
+
+      // One round per item, which ends done: the next wake on the ticket is a new item.
+      const round = async (title: string, ref: string, person?: string) => {
+        const item = await on(title, ref, person);
+        const res = await sched.markActive(item.id);
+        await sched.finish(item.id, { outcome: "ok" });
+        return res.started;
+      };
+
+      for (let i = 0; i < 3; i++) {
+        expect(await round(`a${i}`, "ACME-1")).toBe(true);
+      }
+
+      // Another subject, and another person on the same one, count apart.
+      expect(await round("other", "ACME-2")).toBe(true);
+      expect(await round("bob", "ACME-1", "bob")).toBe(true);
+
+      const tripped = await on("a3", "ACME-1");
+      expect(await sched.markActive(tripped.id)).toMatchObject({ reason: "loop_guard" });
+      expect(await sched.retry(tripped.id, { by: "dana", signal: "ticket moved" })).not.toBeNull();
+      expect(await store.countLoopGuard(tripped.id, 60 * 60_000)).toBe(0);
+      expect((await sched.markActive(tripped.id)).started).toBe(true);
     });
 
     it("keeps tripped items out of next() and blocks them on tick", async () => {

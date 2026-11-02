@@ -108,6 +108,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
         const created: Member = {
           id: `u-${members.size + 1}`,
           name: m.name,
+          ...(m.username ? { username: m.username } : {}),
           kind: m.kind ?? "human",
         };
 

@@ -1547,14 +1547,14 @@
       "properties": {
         "agent_loop_guard": {
           "default": {
-            "max_runs_per_item_per_hour": 12
+            "max_runs_per_subject_per_hour": 12
           },
           "description": "Stops agents from triggering each other in endless loops. Limits only runs triggered by agents or automation; humans are never limited.",
           "type": "object",
           "properties": {
-            "max_runs_per_item_per_hour": {
+            "max_runs_per_subject_per_hour": {
               "default": 12,
-              "description": "Maximum runs per work item per hour triggered by agents or automation; humans are never limited.",
+              "description": "Maximum runs per hour, triggered by agents or automation, of one person on one ticket, pull request or document, counted across the person's work items on it (an item without one counts alone). Humans are never limited.",
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
@@ -2514,7 +2514,7 @@
             "agent_mentioned"
           ],
           "additionalProperties": false,
-          "description": "The comment in the event mentions (or, with false, does not mention) a team agent: event.data.mentions, which the office fills with the handles of the agents a trusted person's comment names."
+          "description": "The comment in the event mentions (or, with false, does not mention) a team agent: event.data.mentions, which the office fills with the handles of the agents a person's or another agent's comment names, by tracker username, handle or name. An agent's mention of itself does not count."
         },
         {
           "type": "object",

@@ -1,5 +1,4 @@
 import type {
-  TeamConfig,
   DocEvent,
   TrackerEvent,
   VcsEvent,
@@ -7,7 +6,7 @@ import type {
   WorkflowEventType,
   WorkflowStatusMap,
 } from "@outstaff/core";
-import type { Actor } from "./types.js";
+import type { Actor, MentionResolver } from "./types.js";
 
 const VCS_TYPES: Partial<Record<VcsEvent["type"], WorkflowEventType>> = {
   "pr.opened": "pr.opened",
@@ -89,34 +88,21 @@ export function normalizeDocEvent(
 }
 
 /**
- * Maps the `@name`s an adapter parsed out of a comment to the handles of the team's agents, by their tracker username,
- * handle or display name, in the order they were written. Names that are nobody on the team are dropped.
+ * Replaces the names in `data.mentions` with the handles of the agents they mention, or removes them when the comment
+ * mentions no agent. An agent's mention of itself does not count, and an automation's comment mentions no one.
  */
-export function agentMentionResolver(team: TeamConfig): (names: unknown) => string[] {
-  const byName = new Map<string, string>();
-  for (const p of team.people) {
-    for (const name of [p.identities?.tracker, p.handle, p.name]) {
-      if (name) {
-        byName.set(name.toLowerCase(), p.handle);
-      }
-    }
-  }
-
-  return (names) => {
-    const handles = Array.isArray(names)
-      ? names.flatMap((n) => (typeof n === "string" ? [byName.get(n.toLowerCase())] : []))
-      : [];
-
-    return [...new Set(handles.filter((h): h is string => h !== undefined))];
-  };
-}
-
-/** Replaces the names in `data.mentions` with agent handles, or removes them when nobody on the team is named. */
-export function resolveMentions(
+export async function resolveMentions(
   event: WorkflowEvent,
-  resolve: ((names: unknown) => string[]) | undefined,
-): void {
-  const handles = resolve && event.actor.kind === "human" ? resolve(event.data["mentions"]) : [];
+  mentions: MentionResolver,
+): Promise<void> {
+  const { actor } = event;
+  const handles =
+    actor.kind === "automation"
+      ? []
+      : (await mentions.resolve(event.data["mentions"])).filter(
+          (h) => actor.kind !== "agent" || h !== actor.id,
+        );
+
   if (handles.length > 0) {
     event.data["mentions"] = handles;
   } else {

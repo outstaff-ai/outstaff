@@ -19,7 +19,7 @@ const DEFAULT_MAX_RUNS_PER_HOUR = 12;
 function limitsOf(team: SchedulerOptions["team"]) {
   return {
     maxRuns:
-      team.policies?.agent_loop_guard.max_runs_per_item_per_hour ?? DEFAULT_MAX_RUNS_PER_HOUR,
+      team.policies?.agent_loop_guard.max_runs_per_subject_per_hour ?? DEFAULT_MAX_RUNS_PER_HOUR,
     chatSessions: team.policies?.chat?.parallel_sessions ?? DEFAULT_CHAT_SESSIONS,
     retry: { ...DEFAULT_RETRY, ...team.policies?.retry },
   };

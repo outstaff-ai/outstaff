@@ -5,17 +5,17 @@ import { d } from "./schema-meta.js";
 
 export const agentLoopGuardSchema = z
   .strictObject({
-    max_runs_per_item_per_hour: z
+    max_runs_per_subject_per_hour: z
       .int()
       .min(1)
       .default(12)
       .meta(
         d(
-          "Maximum runs per work item per hour triggered by agents or automation; humans are never limited.",
+          "Maximum runs per hour, triggered by agents or automation, of one person on one ticket, pull request or document, counted across the person's work items on it (an item without one counts alone). Humans are never limited.",
         ),
       ),
   })
-  .default({ max_runs_per_item_per_hour: 12 })
+  .default({ max_runs_per_subject_per_hour: 12 })
   .meta(
     d(
       "Stops agents from triggering each other in endless loops. Limits only runs triggered by agents or automation; humans are never limited.",

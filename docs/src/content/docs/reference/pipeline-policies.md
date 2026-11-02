@@ -24,7 +24,8 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`opened_to_review`](#opened_to_review) | `pr.opened` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `review` |
 | [`link_pr_on_ticket`](#link_pr_on_ticket) | `pr.opened`, `pr.linked` | act for `author`: link the pull request on the ticket, when the tracker can link pull requests (`tracker.development`) |
 | [`assigned_to_assignee`](#assigned_to_assignee) | `ticket.assigned`, `ticket.created` | wake `assignee` (kind `assigned`) |
-| [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `mentioned`, else `assignee` (kind `ticket_comment`) |
+| [`ticket_comment_to_agent`](#ticket_comment_to_agent) | `ticket.commented` | wake `assignee` (kind `ticket_comment`) |
+| [`ticket_comment_to_mentioned_agent`](#ticket_comment_to_mentioned_agent) | `ticket.commented` | wake `mentioned` (kind `asked`) |
 | [`ticket_comment_to_blocked_agent`](#ticket_comment_to_blocked_agent) | `ticket.commented` | wake `blocked_agent` (kind `ticket_comment`) |
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
@@ -32,6 +33,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
+| [`doc_comment_to_mentioned_agent`](#doc_comment_to_mentioned_agent) | `doc.commented` | wake `mentioned` (kind `doc_feedback`) |
 | [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
 | [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else |
 | [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else |
@@ -260,9 +262,9 @@ Instruction:
 
 ### ticket_comment_to_agent
 
-A human's comment on a ticket wakes the agent it mentions, else the agent assigned.
+A human's comment, mentioning no agent, on a ticket assigned to an agent wakes that agent.
 
-Listens to `ticket.commented`. Decides: wake `mentioned`, else `assignee` (kind `ticket_comment`).
+Listens to `ticket.commented`. Decides: wake `assignee` (kind `ticket_comment`).
 
 When:
 
@@ -270,9 +272,9 @@ When:
   - `actor_kind: human`
   - not:
     - `ticket_status: done, canceled`
-  - any of:
+  - not:
     - `agent_mentioned: true`
-    - `assignee_kind: agent`
+  - `assignee_kind: agent`
 
 Instruction:
 
@@ -280,9 +282,30 @@ Instruction:
 {{actor.id}} commented on {{ticket}}. Read the comment and act on it.
 ```
 
+### ticket_comment_to_mentioned_agent
+
+A comment on a ticket, by a human or another agent, wakes the agent it mentions first, to answer or act on it; the ticket stays with its assignee. An agent's comment that mentions no other agent wakes no one.
+
+Listens to `ticket.commented`. Decides: wake `mentioned` (kind `asked`).
+
+When:
+
+- all of:
+  - not:
+    - `actor_kind: automation`
+  - not:
+    - `ticket_status: done, canceled`
+  - `agent_mentioned: true`
+
+Instruction:
+
+```text
+{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and answer it, or do what it asks, on the ticket. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
+```
+
 ### ticket_comment_to_blocked_agent
 
-A comment on a blocked ticket, by a human or an agent other than the agent blocked on it, wakes the agent blocked on it; unless the ticket is with an agent (who is unblocking it), a human mentions an agent (that agent is woken), or an agent comments during its own round on the ticket.
+A comment on a blocked ticket, by a human or an agent other than the agent blocked on it, wakes the agent blocked on it; unless the ticket is with an agent (who is unblocking it), the comment mentions an agent (that agent is woken), or an agent comments during its own round on the ticket.
 
 Listens to `ticket.commented`. Decides: wake `blocked_agent` (kind `ticket_comment`).
 
@@ -297,9 +320,7 @@ When:
   - not:
     - `assignee_kind: agent`
   - not:
-    - all of:
-      - `actor_kind: human`
-      - `agent_mentioned: true`
+    - `agent_mentioned: true`
   - not:
     - `actor_in_round: true`
 
@@ -425,6 +446,24 @@ Instruction:
 
 ```text
 {{actor.id}} commented on the document {{doc.title}}. Answer in the document and change it if needed.
+```
+
+### doc_comment_to_mentioned_agent
+
+An agent's comment on a document wakes the other agent it mentions. An agent's comment that mentions no other agent wakes no one.
+
+Listens to `doc.commented`. Decides: wake `mentioned` (kind `doc_feedback`).
+
+When:
+
+- all of:
+  - `actor_kind: agent`
+  - `agent_mentioned: true`
+
+Instruction:
+
+```text
+{{actor.id}} mentioned you in a comment on the document {{doc.title}}. Answer in the document and change it if needed.
 ```
 
 ### start_marks_active

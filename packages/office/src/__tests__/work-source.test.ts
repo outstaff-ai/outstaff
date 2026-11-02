@@ -11,7 +11,7 @@ import { schedulerWorkSource } from "#/work-source.js";
 const team = {
   people: [],
   policies: {
-    agent_loop_guard: { max_runs_per_item_per_hour: 12 },
+    agent_loop_guard: { max_runs_per_subject_per_hour: 12 },
     usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
     retry: { base_minutes: 1, cap_minutes: 30, max_failures: 2 },
   },

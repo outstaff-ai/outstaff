@@ -1402,11 +1402,11 @@ Stops agents from triggering each other in endless loops. Limits only runs trigg
 
 - Type: `object`
 - Optional
-- Default: `{"max_runs_per_item_per_hour":12}`
+- Default: `{"max_runs_per_subject_per_hour":12}`
 
-#### policies.agent_loop_guard.max_runs_per_item_per_hour
+#### policies.agent_loop_guard.max_runs_per_subject_per_hour
 
-Maximum runs per work item per hour triggered by agents or automation; humans are never limited.
+Maximum runs per hour, triggered by agents or automation, of one person on one ticket, pull request or document, counted across the person's work items on it (an item without one counts alone). Humans are never limited.
 
 - Type: `integer`
 - Optional

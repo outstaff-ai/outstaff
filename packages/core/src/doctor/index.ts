@@ -3,5 +3,6 @@ export { mergeGateCheck, mergeGateChecks, mergeRepos, writableRepos } from "./me
 export { scopeChecks } from "./scope.js";
 export { secretChecks } from "./secrets.js";
 export { trackerRepoChecks } from "./tracker-repos.js";
+export { trackerUsernameChecks } from "./tracker-usernames.js";
 export { coreSpecs, secretSections, tokenKey } from "./specs.js";
 export type * from "./types.js";

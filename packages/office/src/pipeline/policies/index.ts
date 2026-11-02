@@ -3,6 +3,7 @@ import { policy as assignedToAssignee } from "./assigned_to_assignee.js";
 import { policy as chatToAddressed } from "./chat_to_addressed.js";
 import { policy as ciFailedToAuthor } from "./ci_failed_to_author.js";
 import { policy as docCommentToAgent } from "./doc_comment_to_agent.js";
+import { policy as docCommentToMentionedAgent } from "./doc_comment_to_mentioned_agent.js";
 import { policy as handBackBlocked } from "./hand_back_blocked.js";
 import { policy as handBackBlockedToPm } from "./hand_back_blocked_to_pm.js";
 import { policy as handBackDone } from "./hand_back_done.js";
@@ -21,6 +22,7 @@ import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
 import { policy as ticketCommentToBlockedAgent } from "./ticket_comment_to_blocked_agent.js";
 import { policy as ticketCommentToLastWorker } from "./ticket_comment_to_last_worker.js";
+import { policy as ticketCommentToMentionedAgent } from "./ticket_comment_to_mentioned_agent.js";
 import { policy as unblockedToBlockedAgent } from "./unblocked_to_blocked_agent.js";
 import { policy as unblockedToReady } from "./unblocked_to_ready.js";
 
@@ -39,6 +41,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   linkPrOnTicket,
   assignedToAssignee,
   ticketCommentToAgent,
+  ticketCommentToMentionedAgent,
   ticketCommentToBlockedAgent,
   ticketCommentToLastWorker,
   movedActiveToAssignee,
@@ -46,6 +49,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   unblockedToBlockedAgent,
   unblockedToReady,
   docCommentToAgent,
+  docCommentToMentionedAgent,
   startMarksActive,
   handBackDone,
   handBackBlocked,
