@@ -33,6 +33,25 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       });
     });
 
+    it("edits the title and description of an issue, one field at a time", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues");
+      const issue = await s.subject.createIssue({
+        title: "Use approach A",
+        body: "Either A or B.",
+      });
+
+      const titled = await s.subject.updateIssue(issue.key, { title: "Use approach B" });
+      expect(titled).toMatchObject({ title: "Use approach B", body: "Either A or B." });
+      await s.subject.updateIssue(issue.key, { body: "Decision: B." });
+      expect(await s.subject.getIssue(issue.key)).toMatchObject({
+        title: "Use approach B",
+        body: "Decision: B.",
+      });
+
+      await expectPortError(s.subject.updateIssue("NOPE-99999", { title: "x" }), "not_found");
+    });
+
     it("attaches a file to an issue and rejects an unknown key", async (t) => {
       const s = get();
       requireCapability(t, s, "tracker.issues", "tracker.attachments");

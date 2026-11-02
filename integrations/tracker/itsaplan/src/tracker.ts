@@ -131,6 +131,13 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
       return toIssue(created, await api.project());
     },
 
+    async updateIssue(key, changes) {
+      return patch(key, {
+        ...(changes.title === undefined ? {} : { title: changes.title }),
+        ...(changes.body === undefined ? {} : { description: changes.body }),
+      });
+    },
+
     async transition(key, to: CanonicalStatus) {
       const setup = await api.project();
       return patch(key, { columnId: statuses.column(setup, to).id });

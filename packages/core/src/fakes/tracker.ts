@@ -185,6 +185,19 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
       return structuredClone(issue);
     },
+    async updateIssue(key, changes) {
+      const issue = need(key);
+      if (changes.title !== undefined && !changes.title.trim()) {
+        throw new PortError("invalid", "Title is required.");
+      }
+
+      Object.assign(issue, {
+        ...(changes.title === undefined ? {} : { title: changes.title }),
+        ...(changes.body === undefined ? {} : { body: changes.body }),
+      });
+
+      return touch(issue);
+    },
     async transition(key, to) {
       const issue = need(key);
       const from = issue.status.name;

@@ -2,7 +2,8 @@ import type { Profile, ProfileSpec, ToolKind } from "./types.js";
 
 /**
  * The verbs a chat session may call: look at the team, the work, tickets, documents and pull requests, comment, file
- * work, and place queued work where the requester says. Nothing that changes a ticket, a pull request or a document.
+ * work, place queued work where the requester says, and change a ticket (assign, move, re-parent, edit) on a trusted
+ * human's request. Nothing that changes a pull request, a document or code.
  */
 export const CHAT_VERBS = [
   "me",
@@ -17,6 +18,10 @@ export const CHAT_VERBS = [
   "ticket.comment",
   "ticket.create",
   "ticket.attach",
+  "ticket.assign",
+  "ticket.move",
+  "ticket.parent",
+  "ticket.edit",
   "pr.status",
   "pr.checks",
   "ci.log",

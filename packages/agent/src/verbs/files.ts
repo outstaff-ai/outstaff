@@ -19,10 +19,17 @@ const inside = (root: string, path: string) => path === root || path.startsWith(
 /**
  * Text of a file the caller names (`--body-file`, `--comment-file`), which a verb then publishes. A file is
  * read only when it is under the item's worktree or scratch directory AND the person's Policy lets the Read
- * tool read it, both as named and after symlinks. Refusals never include file content.
+ * tool read it, both as named and after symlinks. Refusals never include file content. `needCwd: false` lets a
+ * call without a worktree (a chat session) read its scratch directory.
  */
-export function readInputFile(env: AgentEnv, ctx: VerbContext, path: string, what: string): string {
-  const target = checkedPath(env, ctx, path, what, true);
+export function readInputFile(
+  env: AgentEnv,
+  ctx: VerbContext,
+  path: string,
+  what: string,
+  needCwd = true,
+): string {
+  const target = checkedPath(env, ctx, path, what, needCwd);
   try {
     const text = readFileSync(target, "utf8");
     if (text.length > MAX_FILE) {

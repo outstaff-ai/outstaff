@@ -3,7 +3,7 @@ import { assignIssue, commentIssue, issueById, moveIssue, page, touch } from "./
 import { err } from "./store.js";
 import type { ActorRoute, ItsaplanStore, StoredIssue } from "./types.js";
 
-/** Applies a `PATCH /issues/:id` body; moves and assignments land in the feed. */
+/** Applies a `PATCH /issues/:id` body; moves and assignments land in the feed, title and description edits do not. */
 function patchIssue(s: ItsaplanStore, issue: StoredIssue, actor: string, b: Partial<StoredIssue>) {
   if (b.columnId !== undefined) {
     moveIssue(s, issue, actor, b.columnId);
@@ -15,6 +15,14 @@ function patchIssue(s: ItsaplanStore, issue: StoredIssue, actor: string, b: Part
 
   if (b.parentId !== undefined) {
     issue.parentId = b.parentId;
+  }
+
+  if (b.title !== undefined) {
+    issue.title = b.title;
+  }
+
+  if (b.description !== undefined) {
+    issue.description = b.description;
   }
 
   if (b.labelIds) {

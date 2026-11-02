@@ -68,7 +68,7 @@ A role's `permissions` names its profile. Profiles no longer differ in what may 
 | `code`     | Commits and pushes in write repositories. | Any file.                                                         |
 | `infra`    | Commits and pushes in write repositories. | Any file.                                                         |
 
-A chat session, which runs beside a work item, has the same tools as a work session and the rule packs of the role's profile. It has read-only git, edits no repository file, and calls only the `ost` verbs that look at the work, comment and file new work.
+A chat session, which runs beside a work item, has the same tools as a work session and the rule packs of the role's profile. It has read-only git, edits no repository file, and calls only the `ost` verbs that look at the work, comment, file new work, and change a ticket on the requester's word (assign, move, re-parent, edit its title or description). It changes no pull request or document.
 
 ## Where the boundary sits
 

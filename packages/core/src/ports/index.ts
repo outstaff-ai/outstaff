@@ -33,6 +33,7 @@ export type {
 export type {
   Comment,
   Issue,
+  IssueChanges,
   LinkedIssue,
   Member,
   NewAttachment,

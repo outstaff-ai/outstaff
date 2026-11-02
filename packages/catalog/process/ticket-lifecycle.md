@@ -32,6 +32,8 @@ Do not make these moves or assignments yourself, not even when your round starts
 
 - File what you find yourself with `ost ticket create`; do not ask someone else to. Work that is part of an existing ticket's scope is a subtask of it (`--parent <ticket>`, the default inside that ticket's work item, or `ost ticket parent <ticket> <parent>` for one that exists). A follow-up that stands on its own is a separate ticket with a relates link: `ost ticket create --related <ticket>`. It lands in the backlog, unassigned, unless you pass `--assignee` or `--status`. Name every ticket you filed in your hand-back.
 - If the tracker and a work item disagree, trust the tracker, fix the work item, and mention it in the journal.
+- When a decision changes what a ticket will do, edit its title and description (`ost ticket edit`) so they say what will be done; a comment alone leaves the ticket saying the old thing.
+- One ticket per piece of work. Never file a ticket for work an existing ticket covers, not to get around something you cannot change, nor because the existing one waits on something unrelated: change that ticket (`ost ticket assign`, `move`, `edit`), or ask a human to. `ost ticket create` warns when an open ticket has a similar title; if it is the same work, cancel the new ticket with a comment that links the existing one, and if it is not, say on the new ticket why it is separate.
 
 ## One pull request per ticket
 

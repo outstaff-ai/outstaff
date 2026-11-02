@@ -20,6 +20,6 @@ Use this each time a pull request you own gets review feedback. It comes in thre
 
 ## Decisions
 
-- When a review comment, or your answer to one, changes what the ticket includes (drops, adds or changes something), record the decision on the ticket in the same round. Update its description or acceptance criteria where you can; otherwise add a ticket comment (`ost ticket comment`) that starts with `Decision:`, says what changed, and links the review comment.
+- When a review comment, or your answer to one, changes what the ticket includes (drops, adds or changes something), record the decision on the ticket in the same round. Update its title and description with `ost ticket edit`, and add a ticket comment (`ost ticket comment`) that starts with `Decision:`, says what changed, and links the review comment.
 - The wake lists the review comments on the pull requests of your ticket and its parent, resolved threads and merged pull requests included. A decision there replaces any earlier plan in the ticket's description or comments, including your own.
 - When you hand back, do not repeat a plan that a later decision replaced.

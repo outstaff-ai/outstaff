@@ -69,6 +69,12 @@ export interface NewIssue {
   parent?: string;
 }
 
+/** What `updateIssue` changes; a field left out stays as it is. */
+export interface IssueChanges {
+  title?: string;
+  body?: string;
+}
+
 /** A file attached to a ticket, as the tracker lists it. */
 export interface TicketAttachment {
   id: string;
@@ -118,6 +124,9 @@ export interface Tracker {
   }): Promise<Issue[]>;
   search(query: string, limit?: number): Promise<Issue[]>;
   createIssue(issue: NewIssue): Promise<Issue>;
+
+  /** Changes the title or description of an issue; a field left out stays as it is. */
+  updateIssue(key: string, changes: IssueChanges): Promise<Issue>;
 
   /** Status names come from `team.workflow.statuses` via a `StatusMap` the adapter builds at create. */
   transition(key: string, to: CanonicalStatus): Promise<Issue>;

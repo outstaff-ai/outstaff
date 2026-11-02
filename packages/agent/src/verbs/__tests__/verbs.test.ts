@@ -1975,6 +1975,7 @@ describe("verb catalogue", () => {
       "ticket.move",
       "ticket.assign",
       "ticket.create",
+      "ticket.edit",
       "ticket.parent",
       "ticket.attach",
       "doc.search",

@@ -2097,6 +2097,51 @@ async function main() {
     `file for a teammate: pia filed ${filed13b.key} for sam from chat -> sam was woken and opened #${pr13b.pr.number}; pia never worked on it`,
   );
 
+  // ---- 13b2. a human tells the PM in chat to assign a ticket that exists to sam, with the title of the approach they
+  // picked: the PM's chat session changes that ticket, sam is woken on it, and no new ticket is filed
+  const piaBefore13c = piaWakes().length;
+  const { key: picked } = await stub("POST", "/_test/tickets", {
+    title: "Status badge: approach A or B?",
+    description: "Pick an approach for the status badge.",
+  });
+
+  const ticketsBefore13c = (await state()).tickets.length;
+  const asked13c = await stub("POST", "/_test/chat/say", {
+    to: "pia",
+    text: `Assign ${picked} to sam, retitled "Status badge with approach B".`,
+  });
+
+  // The relay links ticket keys in a posted reply: "Assigned [SHOP-21](<link>) to sam; ...".
+  const reply13c = await until("pia's reply in her thread, saying she assigned it", (s) =>
+    s.chat.posts.find(
+      (p: Json) =>
+        p.agent === "pia" &&
+        p.thread === asked13c.id &&
+        p.text.startsWith(`Assigned [${picked}](`) &&
+        p.text.includes(") to sam;"),
+    ),
+  );
+
+  assertEq(reply13c.text.includes(picked), true, "pia's reply names the ticket");
+  const pr13c = await until(`sam's pull request for ${picked}, handed back`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${picked}`));
+    const t = s.tickets.find((x: Json) => x.key === picked);
+    return pr && t.status === "In Review" ? { pr, t } : undefined;
+  });
+
+  assertEq(pr13c.t.title, "Status badge with approach B", "the ticket's title names the approach");
+  assertEq(pr13c.pr.author, "acme-sam[bot]", "sam opened the pull request");
+  assertEq((await state()).tickets.length, ticketsBefore13c, "no new ticket was filed");
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore13c)),
+    JSON.stringify(["chat"]),
+    "pia ran only the chat session",
+  );
+
+  step(
+    `change a ticket from chat: pia retitled ${picked} and assigned it to sam -> sam was woken and opened #${pr13c.pr.number}; no new ticket`,
+  );
+
   await unblockDependents();
   await mergeChecks();
 
