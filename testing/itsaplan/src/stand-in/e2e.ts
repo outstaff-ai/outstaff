@@ -8,8 +8,10 @@ import {
   docById,
   issueByKey,
   memberNamed,
+  moveIssue,
   touch,
 } from "./model.js";
+import { addLink } from "./links.js";
 import { createItsaplanStandIn } from "./stand-in.js";
 import type { ItsaplanStore } from "./types.js";
 
@@ -28,6 +30,15 @@ function realClock(): () => string {
 
 const columnNamed = (s: ItsaplanStore, name: string) =>
   s.columns.find((c) => c.name.toLowerCase() === name.toLowerCase());
+
+const issueNamed = (s: ItsaplanStore, keyName: string) => {
+  const issue = issueByKey(s, keyName);
+  if (!issue) {
+    throw new Error(`No ticket ${keyName}.`);
+  }
+
+  return issue;
+};
 
 const member = (s: ItsaplanStore, username: string) => {
   const m = memberNamed(s, username);
@@ -75,6 +86,25 @@ function controls(s: ItsaplanStore, human: string) {
       }
 
       assignIssue(s, issue, human, who.userId);
+      touch(s, issue);
+    },
+
+    /** The human links two tickets, `kind` read from `from`'s side: `blocks` means `from` blocks `to`. */
+    linkTickets(from: string, to: string, kind: string) {
+      if (!addLink(s, issueNamed(s, from), issueNamed(s, to), kind)) {
+        throw new Error(`No link kind ${kind}.`);
+      }
+    },
+
+    /** A person moves a ticket to a column (by status name): the human, or `actor` (a username). */
+    moveTicket(keyName: string, status: string, actor?: string) {
+      const issue = issueNamed(s, keyName);
+      const col = columnNamed(s, status);
+      if (!col) {
+        throw new Error(`No column ${status}.`);
+      }
+
+      moveIssue(s, issue, actor === undefined ? human : member(s, actor).userId, col.id);
       touch(s, issue);
     },
 

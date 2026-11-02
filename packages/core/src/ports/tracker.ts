@@ -9,6 +9,12 @@ export interface Member {
   kind: "human" | "agent";
 }
 
+/** Another ticket a ticket is linked to as blocking or blocked, with that ticket's current status. */
+export interface LinkedIssue {
+  key: string;
+  status: { name: string; canonical?: CanonicalStatus };
+}
+
 export interface Issue {
   key: string;
   id: string;
@@ -22,6 +28,12 @@ export interface Issue {
 
   /** The tracker's priority, when it has one: 1 is the most urgent, and a larger number is less urgent. */
   priority?: number;
+
+  /** The tickets this one blocks (its `blocks` links). Absent when the tracker did not say, as in a listing. */
+  blocks?: LinkedIssue[];
+
+  /** The tickets that block this one. Absent when the tracker did not say, as in a listing. */
+  blockedBy?: LinkedIssue[];
 }
 
 export interface Comment {

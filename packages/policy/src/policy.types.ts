@@ -14,7 +14,8 @@ import type { ErrorProposal, Proposal } from "./proposal.types.js";
  * A person a policy names. `author` (of the pull request), `assignee` (of the ticket), `mentioned` (the first agent
  * the comment names), `doc_author`, `last_worker` (the agent who last worked on the ticket), `blocked_agent` (the agent
  * blocked on the ticket), `role:<role>`, as the conditions' evaluator resolves them; plus `actor` (the agent who caused
- * the event) and `addressed` (the agent a chat message was written to).
+ * the event), `addressed` (the agent a chat message was written to) and `closer` (the agent who closed the blocker a
+ * `ticket.unblocked` names).
  */
 export type PersonRef =
   | "author"
@@ -25,6 +26,7 @@ export type PersonRef =
   | "blocked_agent"
   | "actor"
   | "addressed"
+  | "closer"
   | `role:${string}`;
 
 /** One person, or a list tried in order: the first that resolves to a team agent. */

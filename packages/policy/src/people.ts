@@ -1,6 +1,18 @@
 import { resolvePerson, type EvaluationContext, type Resolved } from "@outstaff/core";
 import type { PersonRef, PersonSpec, PolicyOptions } from "./policy.types.js";
 
+/** The agent who closed the blocker of a `ticket.unblocked`, from its `closedBy`. */
+function closer(by: unknown): Resolved<string> {
+  const { kind, id } = (by ?? {}) as { kind?: unknown; id?: unknown };
+  if (typeof id !== "string" || id === "") {
+    return { skip: "the event names no one who closed the blocker" };
+  }
+
+  return kind === "agent"
+    ? { value: id }
+    : { skip: `the blocker was closed by a ${String(kind)}, not an agent` };
+}
+
 function one(ref: PersonRef, ctx: EvaluationContext): Resolved<string> {
   if (ref === "actor") {
     const { actor } = ctx.event;
@@ -14,6 +26,10 @@ function one(ref: PersonRef, ctx: EvaluationContext): Resolved<string> {
     return typeof to === "string" && to !== ""
       ? { value: to }
       : { skip: "the message is addressed to no agent" };
+  }
+
+  if (ref === "closer") {
+    return closer(ctx.event.data["closedBy"]);
   }
 
   return resolvePerson(ref, ctx);

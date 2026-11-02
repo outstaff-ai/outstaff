@@ -1,6 +1,7 @@
 import type {
   CanonicalStatus,
   Issue,
+  LinkedIssue,
   Member,
   TeamConfig,
   Tracker,
@@ -40,6 +41,18 @@ function pendingOn(item: WorkItem, key: string, prKeys: Set<string>): boolean {
   }
 
   return on.type === "ticket" ? on.ref === key : on.type === "pr" && prKeys.has(on.ref);
+}
+
+const blocker = (l: LinkedIssue) => ({
+  key: l.key,
+  ...(l.status.canonical ? { status: l.status.canonical } : {}),
+});
+
+/** The ticket's blocking links as the tracker says them, else as the previous record had them. */
+function linksOf(issue: Issue, prev?: TicketRecord): Pick<TicketRecord, "blocks" | "blockedBy"> {
+  const blocks = issue.blocks ? issue.blocks.map((l) => l.key) : prev?.blocks;
+  const blockedBy = issue.blockedBy ? issue.blockedBy.map(blocker) : prev?.blockedBy;
+  return { ...(blocks && { blocks }), ...(blockedBy && { blockedBy }) };
 }
 
 /** When the tracker says the event happened, if it says. */
@@ -109,6 +122,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
       ...priorityOf(issue),
       ...(assignee ? { assignee } : {}),
       labels: [...issue.labels],
+      ...linksOf(issue, prev),
       ...keptRequester(prev),
       updatedAt: clock.now().toISOString(),
     };

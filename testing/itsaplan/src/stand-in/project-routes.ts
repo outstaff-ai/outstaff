@@ -1,4 +1,5 @@
 import type { ApiProject } from "@outstaff/integration.shared.itsaplan";
+import { issueView } from "./links.js";
 import { columnOf, createIssue } from "./model.js";
 import { err } from "./store.js";
 import type { ActorRoute, ItsaplanStore, StoredIssue } from "./types.js";
@@ -45,9 +46,10 @@ export function projectRoutes(s: ItsaplanStore): ActorRoute[] {
     {
       method: "GET",
       path: "/projects/:p/issues/:seq",
-      handler: (r) =>
-        s.issues.find((i) => i.sequenceNumber === Number(r.params["seq"])) ??
-        err(404, "issue not found"),
+      handler: (r) => {
+        const issue = s.issues.find((i) => i.sequenceNumber === Number(r.params["seq"]));
+        return issue ? issueView(s, issue) : err(404, "issue not found");
+      },
     },
     {
       method: "GET",

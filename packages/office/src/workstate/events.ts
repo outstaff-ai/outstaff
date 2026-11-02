@@ -7,6 +7,7 @@ import type {
   RefreshCtx,
   RequesterOps,
   TicketOps,
+  UnblockOps,
   WorkstateCore,
 } from "./core.types.js";
 import { openPrs } from "./derive.js";
@@ -36,12 +37,15 @@ function verdictOf(event: WorkflowEvent, review: string | undefined): PrVerdict 
 }
 
 /** Applies events to the records, and delivers the synthetic events that raises. */
-export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & RequesterOps & DocOps) {
+export function createEvents(
+  core: WorkstateCore,
+  ops: TicketOps & UnblockOps & PrOps & RequesterOps & DocOps,
+) {
   const { store, logger, handlers, prSubject } = core;
   const {
     refreshPr,
     raiseBaseMerged,
-    refreshTicket,
+    refreshAndUnblock,
     recordFeedbackRequester,
     recordCommentRequester,
     touchDoc,
@@ -103,13 +107,13 @@ export function createEvents(core: WorkstateCore, ops: TicketOps & PrOps & Reque
     }
   };
 
-  const onTicket = async (_ctx: RefreshCtx, event: WorkflowEvent) => {
+  const onTicket = async (ctx: RefreshCtx, event: WorkflowEvent) => {
     const ticket = event.subject.ticket;
     if (!ticket) {
       return;
     }
 
-    await refreshTicket(ticket, event);
+    await refreshAndUnblock(ctx, ticket, { event });
     if (event.type === "ticket.commented") {
       await recordCommentRequester(ticket, event);
     }

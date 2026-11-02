@@ -36,6 +36,12 @@ export interface TicketRecord {
   /** When the requester was recorded; a later human assignment or send-back replaces it. */
   requesterAt?: string;
 
+  /** The tickets this one blocks, as the tracker last said. */
+  blocks?: string[];
+
+  /** The tickets that block this one, with their status as the tracker last said. */
+  blockedBy?: { key: string; status?: CanonicalStatus }[];
+
   /** When the tracker answered that the ticket does not exist. It is not refreshed again unless an event names it. */
   goneAt?: string;
   updatedAt: string;
@@ -150,7 +156,10 @@ export interface WorkState extends WorkflowState {
   /** Idempotent; register as an intake handler. */
   apply(event: WorkflowEvent, meta: IntakeMeta | WorkstateMeta): Promise<void>;
 
-  /** Receives the synthetic events (`pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`, `pr.base_merged`, `pr.linked`) the work state derives. */
+  /**
+   * Receives the synthetic events the work state derives: `pr.conflicted`, `pr.ci_failed`, `pr.ci_passed`,
+   * `pr.base_merged`, `pr.linked` and `ticket.unblocked`.
+   */
   onEvent(handler: WorkstateHandler): void;
 
   /** Re-reads every open pull request and live ticket through the ports; losing the store only costs this. */
@@ -165,8 +174,11 @@ export interface WorkState extends WorkflowState {
   /** Re-reads who last worked on each ticket from the work item history. */
   refreshWorkers(): Promise<void>;
 
-  /** Re-reads one ticket from the tracker, for a ticket an agent may have changed since the last poll. */
-  refreshTicket(key: string): Promise<void>;
+  /**
+   * Re-reads one ticket from the tracker, for a ticket an agent may have changed since the last poll. `by` is who
+   * changed it, when known: if the ticket turns out closed now, the tickets it unblocked name them.
+   */
+  refreshTicket(key: string, by?: WorkflowEvent["actor"]): Promise<void>;
   currentWork(person: string): CurrentWork;
 
   /**

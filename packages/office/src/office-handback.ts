@@ -47,7 +47,9 @@ export function createHandedBack(deps: {
     // assigned the ticket during the round, after the tracker was last polled, so both are re-read first.
     await Promise.all([
       workState.refreshWorkers(),
-      ...(subject.ticket ? [workState.refreshTicket(subject.ticket)] : []),
+      ...(subject.ticket
+        ? [workState.refreshTicket(subject.ticket, { kind: "agent", id: item.person })]
+        : []),
     ]).catch((error: unknown) => {
       log.warn("refreshing the state before a hand-back failed", { error: String(error) });
     });

@@ -5,6 +5,7 @@ import type {
   ApiDevPullRequest,
   ApiDevRepository,
   ApiIssue,
+  ApiIssueLink,
   ApiLabel,
   ApiDoc,
   ApiDocComment,
@@ -59,9 +60,10 @@ export interface StoredAttachment {
 
 /** A relation made between two issues (`POST /issues/:id/links`), by identifier. */
 export interface StoredLink {
+  id: number;
   from: string;
   to: string;
-  kind: string;
+  kind: ApiIssueLink["kind"];
 }
 
 /** A code repository connected to the team. */

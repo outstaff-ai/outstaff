@@ -48,6 +48,20 @@ export interface ApiIssue {
   parentId?: number | null;
   createdAt?: string;
   updatedAt: string;
+
+  /** The issue's relations to other issues; only reading one issue carries them. */
+  links?: ApiIssueLink[];
+}
+
+/**
+ * A relation of an issue to another, as read from the issue: `outward` is the relation as stated (this issue blocks
+ * the other), `inward` the other way round (this issue is blocked by the other).
+ */
+export interface ApiIssueLink {
+  id: number;
+  kind: "blocks" | "relates" | "duplicates";
+  direction: "outward" | "inward";
+  issue: Pick<ApiIssue, "id" | "sequenceNumber" | "identifier" | "title" | "columnId">;
 }
 
 /** The API names these fields in more than one way across versions; the first present one wins. */

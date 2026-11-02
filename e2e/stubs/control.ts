@@ -74,7 +74,7 @@ function githubControls({ github }: World): Route[] {
   ];
 }
 
-/** The driver's tracker controls: it creates, assigns and comments on tickets and comments on documents. */
+/** The driver's tracker controls: it creates, assigns, links, moves and comments on tickets and comments on documents. */
 function trackerControls({ tracker }: World): Route[] {
   return [
     {
@@ -95,6 +95,24 @@ function trackerControls({ tracker }: World): Route[] {
       path: "/_test/tickets/:key/assign",
       handler: (r) => {
         tracker.assignTicket(r.params["key"]!, r.json.to);
+        return ok();
+      },
+    },
+    {
+      // The human links two tickets: `kind` (default `blocks`) is read from this ticket's side.
+      method: "POST",
+      path: "/_test/tickets/:key/link",
+      handler: (r) => {
+        tracker.linkTickets(r.params["key"]!, r.json.to, r.json.kind ?? "blocks");
+        return ok();
+      },
+    },
+    {
+      // A person moves a ticket to a status (by name): the human, or `as`.
+      method: "POST",
+      path: "/_test/tickets/:key/move",
+      handler: (r) => {
+        tracker.moveTicket(r.params["key"]!, r.json.to, r.json.as);
         return ok();
       },
     },

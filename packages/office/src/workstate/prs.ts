@@ -12,9 +12,8 @@ import { ticketCandidates } from "./infer.js";
 import { inferStackRefs, inferTicketRefs } from "./item-refs.js";
 import { personNode, prNode, relink, ROOT, ticketNode } from "./links.js";
 import { ciFailure, keptLive, readLive, toPrRecord } from "./pr-record.js";
+import { recordSynthetic, WORKSTATE_ACTOR } from "./synthetic.js";
 import type { PrRecord } from "./types.js";
-
-const ACTOR = { kind: "automation", id: "workstate" } as const;
 
 /** Whether a field of the record took the value just now: it has it, and the previous record did not. */
 const turned = <K extends "mergeable" | "ci">(
@@ -35,25 +34,14 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     data: Record<string, unknown>,
     once = rec.headSha,
   ) => {
-    const externalId = `${type}:${prSubject(rec.ref)}:${once}`;
     const event: WorkflowEvent = {
       type,
       subject: { pr: rec.ref, ...(rec.ticket ? { ticket: rec.ticket } : {}) },
-      actor: { ...ACTOR },
+      actor: { ...WORKSTATE_ACTOR },
       data: { ...data, sha: rec.headSha, at: clock.now().toISOString() },
     };
 
-    // The stored shape is the one intake delivers, so a crash before delivery is repaired by intake.
-    const fresh = await store.recordEvent({
-      source: "workstate",
-      externalId,
-      type,
-      payload: { raw: { externalId, type }, event, trusted: true },
-    });
-
-    if (fresh) {
-      ctx.fresh.push({ event, externalId });
-    }
+    await recordSynthetic(store, ctx, event, `${type}:${prSubject(rec.ref)}:${once}`);
   };
 
   /** The ticket a pull request links to: the first candidate by `ticketCandidates` (branch, title, closing keyword) that the tracker knows. */

@@ -28,6 +28,8 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
+| [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
+| [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
 | [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else |
@@ -352,6 +354,43 @@ Instruction:
 
 Note posted with the change: none; the instruction is the wake's.
 
+### unblocked_to_blocked_agent
+
+A blocked ticket whose last open blocker was closed wakes the agent blocked on it, to check whether it can go on; the ticket stays where it is, since it may be blocked for other reasons too.
+
+Listens to `ticket.unblocked`. Decides: wake `blocked_agent` (kind `unblocked`).
+
+When:
+
+- `blocked_agent: true`
+
+Instruction:
+
+```text
+{{blocker}}, which blocked {{ticket}}, is closed, and no other ticket blocks it. You handed {{ticket}} back as blocked: check whether you can continue now. If so, assign it to yourself, move it to active and continue. Otherwise answer on the ticket what is still missing.
+```
+
+### unblocked_to_ready
+
+A blocked ticket whose last open blocker was closed, with no agent blocked on it, was only waiting on its blockers: it moves to ready, for the agent it is assigned to, who is then woken; else for the agent who closed the blocker.
+
+Listens to `ticket.unblocked`. Decides: act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready`.
+
+When:
+
+- all of:
+  - `ticket_status: blocked`
+  - not:
+    - `blocked_agent: true`
+
+Instruction:
+
+```text
+{{blocker}}, which blocked {{ticket}}, is closed, and no other ticket blocks it: {{ticket}} is ready again. Work on it the way the repository asks.
+```
+
+Note posted with the change: none; the instruction is the wake's.
+
 ### doc_comment_to_agent
 
 A human's comment on a document wakes the agent it mentions, else the agent who wrote it.
@@ -478,6 +517,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `ticket.assigned`
 - `ticket.moved`
 - `ticket.created`
+- `ticket.unblocked`
 - `doc.commented`
 - `agent.started`
 - `agent.handed_back`
@@ -511,3 +551,4 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `cause.title`
 - `next.ticket`
 - `requester`
+- `blocker`

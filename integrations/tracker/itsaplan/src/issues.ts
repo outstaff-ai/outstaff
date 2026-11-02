@@ -1,7 +1,8 @@
-import { PortError, type Issue, type Member } from "@outstaff/core";
+import { PortError, type Issue, type LinkedIssue, type Member } from "@outstaff/core";
 import type {
   ApiFeedItem,
   ApiIssue,
+  ApiIssueLink,
   ApiProject,
   Itsaplan,
   Page,
@@ -14,6 +15,25 @@ export const FEED_PAGE = 100;
 
 /** Reading and writing issues through the client: the shapes the tracker methods share. */
 export function issueHelpers(api: Itsaplan, statuses: Statuses) {
+  /** The other ends of the issue's `blocks` links in one direction: outward it blocks them, inward they block it. */
+  const blockLinks = (
+    links: ApiIssueLink[],
+    direction: ApiIssueLink["direction"],
+    setup: ApiProject,
+  ): LinkedIssue[] =>
+    links
+      .filter((l) => l.kind === "blocks" && l.direction === direction)
+      .map((l) => ({ key: l.issue.identifier, status: statuses.status(setup, l.issue.columnId) }));
+
+  /** The tickets the issue blocks and is blocked by; none said when the answer carries no links. */
+  const blocking = (raw: ApiIssue, setup: ApiProject): Pick<Issue, "blocks" | "blockedBy"> =>
+    raw.links
+      ? {
+          blocks: blockLinks(raw.links, "outward", setup),
+          blockedBy: blockLinks(raw.links, "inward", setup),
+        }
+      : {};
+
   const toIssue = (raw: ApiIssue, setup: ApiProject): Issue => {
     const assignee = raw.assigneeUserId ? api.member(setup, raw.assigneeUserId) : undefined;
     return {
@@ -28,6 +48,7 @@ export function issueHelpers(api: Itsaplan, statuses: Statuses) {
         .filter((n): n is string => n !== undefined),
       url: api.issueUrl(raw.identifier),
       updatedAt: raw.updatedAt,
+      ...blocking(raw, setup),
     };
   };
 

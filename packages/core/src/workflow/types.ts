@@ -32,6 +32,7 @@ export interface WorkflowEvent {
    * `pr.review_submitted` carries `state` (for example "approved" or "changes_requested"). `doc.commented`
    * carries `docId`, `title`, `commentId`, `anchorText` and `url` of a comment or reply on a knowledge document;
    * its subject is the document and, when the work state knows it, the ticket the document was written for.
+   * `ticket.unblocked` carries `blocker`, the ticket whose close left none open, and `closedBy`, who closed it, when known.
    */
   data: Record<string, unknown>;
 }
