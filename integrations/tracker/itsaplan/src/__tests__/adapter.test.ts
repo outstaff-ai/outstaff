@@ -430,6 +430,32 @@ describe("tracker", () => {
   });
 });
 
+describe("edit", () => {
+  it("sends only the fields it changes, the description as description", async () => {
+    const fake = createItsaplanFake();
+    const sent: unknown[] = [];
+    const tracker = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      fetch: (async (input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+        if (init?.method === "PATCH" && typeof init.body === "string") {
+          sent.push(JSON.parse(init.body));
+        }
+
+        return fake.fetch(input, init);
+      }) as typeof fetch,
+    });
+
+    const issue = await tracker.createIssue({ title: "Use approach A", body: "A or B?" });
+    expect(await tracker.updateIssue(issue.key, { title: "Use approach B" })).toMatchObject({
+      title: "Use approach B",
+      body: "A or B?",
+    });
+
+    await tracker.updateIssue(issue.key, { body: "Decision: B." });
+    expect(sent).toEqual([{ title: "Use approach B" }, { description: "Decision: B." }]);
+  });
+});
+
 describe("parent", () => {
   it("sets the real parent field and refuses an API that ignores it", async () => {
     const fake = createItsaplanFake();

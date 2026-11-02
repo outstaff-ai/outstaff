@@ -539,7 +539,7 @@ ost ticket assign ACME-12 me --json
 
 Create a ticket; a follow-up goes to the backlog, unassigned.
 
-Creates a ticket. Inside a work item that has a ticket, it is a follow-up: it lands in the backlog, unassigned, as a sub-ticket of the ticket you are working (pass parent for another one). File what you find while working instead of asking someone else to; name each follow-up in your hand-back. A follow-up that stands on its own, not part of the ticket's scope, passes related (the ticket it came from) instead: it is then a separate ticket with a relates link. Pass assignee to give it to someone ("me" for yourself) and status to start it elsewhere; use that for a part of the current ticket you will do yourself. The parent is set in the tracker's own parent field where it has one and is otherwise a "relates" link; the description starts with a Part of line with the parent's link either way. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). The ticket files the request as work for you: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. When the requester asks for it to go to someone else, pass assignee: the ticket is then theirs, the assignment wakes them, and nothing is filed as your work; tell the requester who has it. A chat session may file several requests of one message, one ticket each; filing the same request twice is refused before anything is created. Create a ticket only for a request that is work; answer a question directly.
+Creates a ticket. Inside a work item that has a ticket, it is a follow-up: it lands in the backlog, unassigned, as a sub-ticket of the ticket you are working (pass parent for another one). File what you find while working instead of asking someone else to; name each follow-up in your hand-back. A follow-up that stands on its own, not part of the ticket's scope, passes related (the ticket it came from) instead: it is then a separate ticket with a relates link. Pass assignee to give it to someone ("me" for yourself) and status to start it elsewhere; use that for a part of the current ticket you will do yourself. The parent is set in the tracker's own parent field where it has one and is otherwise a "relates" link; the description starts with a Part of line with the parent's link either way. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). The ticket files the request as work for you: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. When the requester asks for it to go to someone else, pass assignee: the ticket is then theirs, the assignment wakes them, and nothing is filed as your work; tell the requester who has it. A chat session may file several requests of one message, one ticket each; filing the same request twice is refused before anything is created. When an open ticket has a similar title, the ticket is still created and the result warns, listing it: never file a ticket for work an existing ticket already covers; change that ticket instead (ost ticket assign, move or edit). Create a ticket only for a request that is work; answer a question directly.
 
 ```
 ost ticket create [options]
@@ -568,6 +568,35 @@ ost ticket create --related ACME-48 --title "Rate-limit the search endpoint" --b
 ost ticket create --parent ACME-12 --title "Add the search index" --assignee me --status active --body "The index half of ACME-12."
 ost ticket create --title "Export orders as CSV" --body "Asked in chat." --say "Will do, starting on the export next."
 ost ticket create --title "Add a search index" --body "Part of ACME-48." --json
+```
+
+## ost ticket edit
+
+Change a ticket's title or description.
+
+Changes the title, the description, or both, of an existing ticket; what you leave out stays as it is. The description is replaced as a whole: read it first with ost ticket show and pass the full new text. When a decision changes a ticket's scope or approach, edit the title and description so they say what will be done, and comment the decision too: a reader trusts the description, not the comments. Change the ticket that exists; never file a new one for the same work.
+
+```
+ost ticket edit <key> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--title <title>` | New title. |
+| `--description <description>` | New description, Markdown. Replaces the old one. Or pass description-file. |
+| `--description-file <descriptionFile>` | File with the new description (in the worktree or your scratch directory; the read policy applies). Use it for long text. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost ticket edit ACME-41 --title "Cache the search results in Redis"
+ost ticket edit ACME-41 --description-file .scratch/acme-41.md
+ost ticket edit ACME-41 --title "Cache the search results in Redis" --json
 ```
 
 ## ost ticket parent

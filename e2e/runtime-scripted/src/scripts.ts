@@ -883,6 +883,30 @@ async function* fileFor(assignee: string, title: string): AsyncGenerator<Action,
   return `Filed ${/Created (\S+)\./.exec(created)?.[1] ?? "it"} for ${assignee}; it is theirs.`;
 }
 
+/** A change to a ticket that exists is made on that ticket: retitled when asked, then assigned. Nothing is filed. */
+async function* changeTicket(latest: string): AsyncGenerator<Action, string | undefined, string> {
+  const asked = /^assign (\S+) to (\w+)(?:, retitled "(.+)")?\.?$/i.exec(latest);
+  if (!asked) {
+    return undefined;
+  }
+
+  const [, key, to, title] = asked;
+  if (title) {
+    yield { type: "tool", tool: "ticket_edit", input: { key, title } };
+  }
+
+  yield { type: "tool", tool: "ticket_assign", input: { key, to } };
+  return `Assigned ${key} to ${to}; it is theirs now.`;
+}
+
+/** A change to a ticket that exists, or new work to file; undefined when the message asks for neither. */
+async function* changeOrFile(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  return (yield* changeTicket(latest)) ?? (yield* fileRequest(ctx, latest));
+}
+
 /**
  * New work is filed as a ticket, which the office turns into the work; a message with pictures is a request to file,
  * and the ticket gets the files, which the agent attaches itself. Returns undefined when the message asks for neither.
@@ -972,8 +996,8 @@ async function* attachToPr(
 
 /**
  * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
- * view of it; a request about an open pull request is attached to it, after asking when the pull request is in
- * review. Nothing is ever filed as a new ticket.
+ * view of it; a request to change a ticket is made on that ticket; a request about an open pull request is attached
+ * to it, after asking when the pull request is in review. Nothing is ever filed as a new ticket.
  */
 export async function* chat(ctx: ItemContext): Script {
   const talk = ctx.conversation ?? [];
@@ -987,8 +1011,8 @@ export async function* chat(ctx: ItemContext): Script {
     return yield* replyAboutWork(ctx, talk, latest);
   }
 
-  const filed = yield* fileRequest(ctx, latest);
-  return filed ?? (yield* attachToPr(talk, latest));
+  const done = yield* changeOrFile(ctx, latest);
+  return done ?? (yield* attachToPr(talk, latest));
 }
 
 /**

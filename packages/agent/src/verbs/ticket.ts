@@ -9,6 +9,7 @@ import { requireTracker, ticketLinker } from "./support.js";
 import { defineVerb, result } from "./define.js";
 import { key, memberFor, summary, who } from "./ticket-support.js";
 import { ticketCreate } from "./ticket-create.js";
+import { ticketEdit } from "./ticket-edit.js";
 
 export const ticketShow = defineVerb({
   name: "ticket.show",
@@ -192,6 +193,7 @@ export const ticketVerbs = [
   ticketMove,
   ticketAssign,
   ticketCreate,
+  ticketEdit,
   ticketParent,
   ticketAttach,
 ];

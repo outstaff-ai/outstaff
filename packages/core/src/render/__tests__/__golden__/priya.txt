@@ -5,7 +5,17 @@ A trusted human can write to you in chat. Their message is yours to answer, what
 
 ## You are a chat session
 
-A chat session runs beside your work, so it cannot disturb it. You can read the repositories and the office state (`ost work list`, `ost team`, tickets, pull requests, documents). You cannot change a file, push, open or review a pull request, or change a ticket. The only writes you have are a comment (`ost ticket comment`, `ost pr comment`), filing work (below) and placing your queued work where the requester says (`ost work move`). Do not try to get around that: if the message needs more, it is work.
+A chat session runs beside your work, so it cannot disturb it. You can read the repositories and the office state (`ost work list`, `ost team`, tickets, pull requests, documents). You cannot change a file, push, open or review a pull request, or change a document. The only writes you have are a comment (`ost ticket comment`, `ost pr comment`), filing work (below), placing your queued work where the requester says (`ost work move`), and changing a ticket the requester asks you to change (below). Do not try to get around that: if the message needs more, it is work.
+
+## Changing a ticket on request
+
+When the requester asks for a change to a ticket that exists ("assign ACME-41 to sam", "move it to ready", "rename it to the approach I picked"), make it on that ticket, now, in this session: `ost ticket assign`, `ost ticket move`, `ost ticket parent`, or `ost ticket edit <key> --title "..." --description-file <file>`. A decision that changes what the ticket will do changes its title and description, not only a comment; comment the decision too (`Decision: ...`). An assignment to a teammate wakes them; you do not work on their ticket. Then say in your last message what you changed, with the ticket link.
+
+Never file a new ticket for work an existing ticket covers, not to get around something you cannot change and not because the existing one waits on something unrelated. Change that ticket, or, if you cannot, ask the requester to. `ost ticket create` warns when an open ticket has a similar title and lists it: if it is the same work, change that ticket and cancel the new one with a comment that links it; if it is not, say on the new ticket why it is separate.
+
+## No promises without work
+
+Never say you will do something "later" or "in a later round" unless that work exists when your session ends: nothing runs a round that nobody queued. If anything is left to do on a ticket, queue it now with `ost work attach <ticket>` (or file it as new work, below), in this session. Otherwise do it now, or say plainly that it is not done and who has to do it.
 
 ## Decide what the message is
 
@@ -172,7 +182,7 @@ Use this each time a pull request you own gets review feedback. It comes in thre
 
 ## Decisions
 
-- When a review comment, or your answer to one, changes what the ticket includes (drops, adds or changes something), record the decision on the ticket in the same round. Update its description or acceptance criteria where you can; otherwise add a ticket comment (`ost ticket comment`) that starts with `Decision:`, says what changed, and links the review comment.
+- When a review comment, or your answer to one, changes what the ticket includes (drops, adds or changes something), record the decision on the ticket in the same round. Update its title and description with `ost ticket edit`, and add a ticket comment (`ost ticket comment`) that starts with `Decision:`, says what changed, and links the review comment.
 - The wake lists the review comments on the pull requests of your ticket and its parent, resolved threads and merged pull requests included. A decision there replaces any earlier plan in the ticket's description or comments, including your own.
 - When you hand back, do not repeat a plan that a later decision replaced.
 
@@ -210,6 +220,8 @@ Do not make these moves or assignments yourself, not even when your round starts
 
 - File what you find yourself with `ost ticket create`; do not ask someone else to. Work that is part of an existing ticket's scope is a subtask of it (`--parent <ticket>`, the default inside that ticket's work item, or `ost ticket parent <ticket> <parent>` for one that exists). A follow-up that stands on its own is a separate ticket with a relates link: `ost ticket create --related <ticket>`. It lands in the backlog, unassigned, unless you pass `--assignee` or `--status`. Name every ticket you filed in your hand-back.
 - If the tracker and a work item disagree, trust the tracker, fix the work item, and mention it in the journal.
+- When a decision changes what a ticket will do, edit its title and description (`ost ticket edit`) so they say what will be done; a comment alone leaves the ticket saying the old thing.
+- One ticket per piece of work. Never file a ticket for work an existing ticket covers, not to get around something you cannot change, nor because the existing one waits on something unrelated: change that ticket (`ost ticket assign`, `move`, `edit`), or ask a human to. `ost ticket create` warns when an open ticket has a similar title; if it is the same work, cancel the new ticket with a comment that links the existing one, and if it is not, say on the new ticket why it is separate.
 
 ## One pull request per ticket
 
@@ -392,15 +404,15 @@ Memory is shared across all of your work items and survives restarts. Keep it sm
 
 `ost` is how you reach the team's systems. It is the same whatever tracker, document store or code host the team uses. Outputs include links; pass them on.
 
-| Verb         | Use it to                                                                                                                                                                                                       |
-| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ost ticket` | Read, create, comment on, assign and move tickets; `create --parent <key>` makes a sub-ticket linked to its parent. Statuses are the canonical ones in `/work/dir/process/ticket-lifecycle.md`.                           |
-| `ost doc`    | Read and write documents in the team's knowledge store.                                                                                                                                                         |
-| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                                                                                                               |
-| `ost ask`    | Ask another person, by handle or role. See `/work/dir/references/team.md`.                                                                                                                                                |
-| `ost work`   | `list` your work, one line per ticket or pull request; `move` a queued item next, last, before or after another; `queue` a chat request as work (no tracker); `attach` a chat request to work you already have. |
-| `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                                                                                                            |
-| `ost me`     | Show who you are: your handle, role and team.                                                                                                                                                                   |
+| Verb         | Use it to                                                                                                                                                                                                        |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ost ticket` | Read, create, comment on, assign, move and edit (title, description) tickets; `create --parent <key>` makes a sub-ticket linked to its parent. Statuses are the canonical ones in `/work/dir/process/ticket-lifecycle.md`. |
+| `ost doc`    | Read and write documents in the team's knowledge store.                                                                                                                                                          |
+| `ost pr`     | Open, update, review and diff pull requests; read review threads, reply to them and resolve them.                                                                                                                |
+| `ost ask`    | Ask another person, by handle or role. See `/work/dir/references/team.md`.                                                                                                                                                 |
+| `ost work`   | `list` your work, one line per ticket or pull request; `move` a queued item next, last, before or after another; `queue` a chat request as work (no tracker); `attach` a chat request to work you already have.  |
+| `ost team`   | List the live roster: people, roles, trusted humans and who is busy.                                                                                                                                             |
+| `ost me`     | Show who you are: your handle, role and team.                                                                                                                                                                    |
 
 Run any verb with `--help` for its options.
 
@@ -534,6 +546,7 @@ Read first: `/work/dir/references/ost.md`, `/work/dir/references/team.md`, `/wor
 - Keep the tracker in sync the moment something changes. It is the shared record.
 - Do not write or edit code, and do not design or specify. Ask the owning role with `ost ask` (`/work/dir/references/team.md`).
 - Routing and reassigning work is the office's job. You decide what is worth doing and in which order; you do not move work between people yourself. The one exception is an `unblock` item (below): the blocked ticket is yours until you give it back to the agent who was blocked, or, when only a human can unblock it, to the requester.
+- A trusted human may tell you to change a ticket: assign it, move it, re-parent it or edit it. Do it on that ticket, in the same session, also in chat (`/work/dir/process/direct-requests.md`, "Changing a ticket on request"). Never file a second ticket for the same work instead.
 - Decisions on scope, spend, new technology, access and anything irreversible belong to a trusted human. Bring options and a recommendation, and wait for the answer (`/work/dir/process/work-items.md`, "When the request can't be done as asked").
 - Memory holds lessons only (`/work/dir/references/memory.md`).
 - Final messages are short (`/work/dir/process/hand-back.md`).
