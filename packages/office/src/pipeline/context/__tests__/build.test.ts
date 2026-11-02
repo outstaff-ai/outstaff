@@ -269,6 +269,105 @@ describe("the wake context builder", () => {
     expect(manifest.entries).toEqual([]);
   });
 
+  it("keeps a review's decision on the ticket after its thread is resolved and its PR merged, the parent's too", () => {
+    const { context, manifest } = buildWakeContext(
+      graph({
+        refs: [ref({ type: "ticket", ref: "ACME-141", role: "subject", source: "office" })],
+        tickets: [
+          {
+            ...ticket41({ key: "ACME-141", parent: "ACME-53", comments: [] }),
+            reviews: [
+              {
+                pr: "acme/app#84",
+                ticket: "ACME-53",
+                resolved: true,
+                path: "test/isolation.test.ts",
+                line: 1,
+                url: "https://git.acme.example/acme/app/pull/84#discussion_r1",
+                author: "dana",
+                at: "2026-10-01T09:00:00.000Z",
+                body: "Let's remove the isolation test.",
+              },
+              {
+                pr: "acme/app#84",
+                ticket: "ACME-53",
+                resolved: true,
+                path: "test/isolation.test.ts",
+                line: 1,
+                author: "sam",
+                at: "2026-10-01T09:30:00.000Z",
+                body: "Removed.",
+              },
+              {
+                pr: "acme/app#87",
+                resolved: false,
+                author: "dana",
+                at: "2026-10-02T09:00:00.000Z",
+                body: "x".repeat(300),
+              },
+            ],
+          },
+        ],
+      }),
+      { ...limits, reviews: 2, bodyChars: 100 },
+    );
+
+    expect(context.tickets[0]).toMatchObject({
+      key: "ACME-141",
+      moreReviews: 1,
+      reviews: [
+        {
+          pr: "acme/app#87",
+          resolved: false,
+          author: "dana",
+          body: `${"x".repeat(100)} ... (cut; the link has the rest)`,
+        },
+        {
+          pr: "acme/app#84",
+          ticket: "ACME-53",
+          resolved: true,
+          path: "test/isolation.test.ts",
+          line: 1,
+          author: "sam",
+          body: "Removed.",
+        },
+      ],
+    });
+
+    expect(Object.keys(context.tickets[0]!.reviews![0]!)).toEqual([
+      "pr",
+      "resolved",
+      "author",
+      "at",
+      "body",
+    ]);
+
+    expect(manifest.entries[0]).toMatchObject({ reviews: { shown: 2, left: 1 } });
+  });
+
+  it("hands no review list for a ticket the work is not on, nor an empty one", () => {
+    const { context, manifest } = buildWakeContext(
+      graph({
+        refs: [
+          ref({ type: "ticket", ref: "ACME-41", role: "subject", source: "office" }),
+          ref({ type: "ticket", ref: "ACME-9", role: "mentioned", source: "chat:1" }),
+        ],
+        tickets: [
+          { ...ticket41(), reviews: [] },
+          { key: "ACME-9", title: "Old", comments: [] },
+        ],
+      }),
+      limits,
+    );
+
+    expect(context.tickets.map((t) => [t.key, t.reviews, t.moreReviews])).toEqual([
+      ["ACME-41", undefined, undefined],
+      ["ACME-9", undefined, undefined],
+    ]);
+
+    expect(manifest.entries.map((e) => e.reviews)).toEqual([{ shown: 0, left: 0 }, undefined]);
+  });
+
   it("cuts text only past the limit", () => {
     expect(cut("  short  ", 10)).toBe("short");
     expect(cut("abcdef", 3)).toBe("abc ... (cut; the link has the rest)");
@@ -278,8 +377,10 @@ describe("the wake context builder", () => {
     expect(contextLimits({})).toEqual(DEFAULT_CONTEXT_LIMITS);
     expect(
       contextLimits({
-        pipeline: { context: { comments: 1, messages: 2, threads: 3, items: 4, body_chars: 500 } },
+        pipeline: {
+          context: { comments: 1, messages: 2, threads: 3, reviews: 6, items: 4, body_chars: 500 },
+        },
       }),
-    ).toEqual({ comments: 1, messages: 2, threads: 3, items: 4, bodyChars: 500 });
+    ).toEqual({ comments: 1, messages: 2, threads: 3, reviews: 6, items: 4, bodyChars: 500 });
   });
 });

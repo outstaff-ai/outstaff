@@ -48,6 +48,16 @@ export const pipelineContextSchema = z
       .max(50)
       .optional()
       .meta(d("The unresolved review threads of each pull request handed over. Default 5.")),
+    reviews: z
+      .int()
+      .min(0)
+      .max(50)
+      .optional()
+      .meta(
+        d(
+          "The latest review comments on the pull requests of the ticket being worked on and of its parent, resolved and merged ones included. Default 10.",
+        ),
+      ),
     items: z
       .int()
       .min(1)

@@ -180,7 +180,15 @@ describe("formatTrace", () => {
   });
 
   it("says what each wake's bundle carried, item by item", () => {
-    const limits = { comments: 5, messages: 10, threads: 5, items: 2, bodyChars: 1500 };
+    const limits = {
+      comments: 5,
+      messages: 10,
+      threads: 5,
+      reviews: 10,
+      items: 2,
+      bodyChars: 1500,
+    };
+
     const trace: Trace = {
       event: event("pr.comment", { id: "vcs:1", subject: { ticket: "ACME-1" } }),
       policies: [],
@@ -213,26 +221,54 @@ describe("formatTrace", () => {
           itemId: "item-2",
           omitted: 0,
           limits,
-          entries: [{ type: "doc", ref: "doc-1", why: { role: "created", source: "doc_link" } }],
+          entries: [
+            { type: "doc", ref: "doc-1", why: { role: "created", source: "doc_link" } },
+            {
+              type: "ticket",
+              ref: "ACME-1",
+              why: { role: "subject", source: "office" },
+              shown: 0,
+              left: 0,
+              reviews: { shown: 10, left: 2 },
+            },
+            {
+              type: "ticket",
+              ref: "ACME-2",
+              why: { role: "subject", source: "office" },
+              shown: 0,
+              left: 0,
+              reviews: { shown: 1, left: 0 },
+            },
+          ],
         },
       },
     };
 
-    expect(formatTrace(trace).split("\n").slice(-7)).toEqual([
+    expect(formatTrace(trace).split("\n").slice(-9)).toEqual([
       "",
       "Context handed over:",
       "  work item item-1: 2 linked, 1 left out by pipeline.context.items",
       "    pr acme/app#12 (subject: vcs:1, 1 shown, 2 left out) https://git.acme.example/acme/app/pull/12",
       "    chat_thread D1:1 (linked: chat thread of work item item-0, 3 shown)",
-      "  work item item-2: 1 linked",
+      "  work item item-2: 3 linked",
       "    doc doc-1 (created: doc_link)",
+      "    ticket ACME-1 (subject: office, 0 shown, 10 review comments, 2 left out)",
+      "    ticket ACME-2 (subject: office, 0 shown, 1 review comment)",
     ]);
 
     expect(formatTrace({ ...trace, context: {} })).not.toContain("Context handed over");
   });
 
   it("says what a merge's context named", () => {
-    const limits = { comments: 5, messages: 10, threads: 5, items: 2, bodyChars: 1500 };
+    const limits = {
+      comments: 5,
+      messages: 10,
+      threads: 5,
+      reviews: 10,
+      items: 2,
+      bodyChars: 1500,
+    };
+
     const merge = {
       pr: "acme/app#12",
       base: { ref: "main", ci: "success" },

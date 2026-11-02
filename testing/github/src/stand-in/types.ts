@@ -99,6 +99,7 @@ export interface StoredThreadComment {
   seq: number;
   author: NonNullable<ThreadComment["author"]>["login"];
   body: ThreadComment["body"];
+  at: ThreadComment["createdAt"];
 }
 
 /** A review thread on a pull request. */

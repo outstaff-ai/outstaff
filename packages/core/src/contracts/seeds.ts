@@ -94,7 +94,11 @@ export interface VcsSeed {
   thread(
     repo: RepoRef,
     number: number,
-    t: { path?: string; line?: number; comments: { author: string; body: string }[] },
+    t: {
+      path?: string;
+      line?: number;
+      comments: { author: string; body: string; kind?: "human" | "agent" | "bot"; at?: string }[];
+    },
   ): Promise<string>;
   check(
     repo: RepoRef,

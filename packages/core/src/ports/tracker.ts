@@ -34,6 +34,9 @@ export interface Issue {
 
   /** The tickets that block this one. Absent when the tracker did not say, as in a listing. */
   blockedBy?: LinkedIssue[];
+
+  /** Key of the ticket this one is a subtask of. Absent when it has none or the tracker did not say, as in a listing. */
+  parent?: string;
 }
 
 export interface Comment {

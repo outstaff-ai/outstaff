@@ -119,7 +119,11 @@ export type ThreadNode = {
       id: string;
       databaseId: number | null;
       body: string;
-      author: { login: string } | null;
+      createdAt: string;
+      url: string;
+
+      /** `Bot` for an App, which GraphQL names without the `[bot]` suffix REST adds. */
+      author: { login: string; __typename: string } | null;
     }[];
   };
 };

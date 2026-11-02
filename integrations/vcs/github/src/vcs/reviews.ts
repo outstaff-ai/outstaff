@@ -3,16 +3,17 @@ import {
   type RepoRef,
   type ReviewInlineComment,
   type ReviewThread,
+  type ReviewThreadComment,
   type Vcs,
 } from "@outstaff/core";
 import type { AppAuth } from "#/auth.js";
-import { stripBot } from "#/mapping.js";
+import { authorKind, stripBot } from "#/mapping.js";
 import type { RestPull, RestReviewComment, ThreadNode, ThreadsData } from "#/api.types.js";
 import { PERMISSIONS, repoPath } from "./context.js";
 import type { GithubContext } from "./types.js";
 
 const REPLY_MUTATION = `mutation($id:ID!,$body:String!){addPullRequestReviewThreadReply(input:{pullRequestReviewThreadId:$id,body:$body}){comment{id}}}`;
-const THREADS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{id isResolved path line originalLine comments(first:100){nodes{id databaseId body author{login}}}}}}}}`;
+const THREADS_QUERY = `query($owner:String!,$name:String!,$number:Int!,$after:String){repository(owner:$owner,name:$name){pullRequest(number:$number){reviewThreads(first:100,after:$after){pageInfo{hasNextPage endCursor}nodes{id isResolved path line originalLine comments(first:100){nodes{id databaseId body createdAt url author{login __typename}}}}}}}}`;
 const LAST_COMMENT_QUERY = `query($id:ID!){node(id:$id){... on PullRequestReviewThread{id isResolved comments(last:1){nodes{author{login}}}}}}`;
 const RESOLVE_MUTATION = `mutation($id:ID!){resolveReviewThread(input:{threadId:$id}){thread{id isResolved}}}`;
 
@@ -66,7 +67,11 @@ type ReviewOperations =
 
 /** Review threads and inline comments: reading, replying, resolving, and submitting reviews. */
 export function reviewOperations(c: GithubContext): Pick<Vcs, ReviewOperations> {
-  const { http, self, apiToken, own, actingToken } = c;
+  const { http, self, apiToken, own, actingToken, isAgentLogin } = c;
+
+  /** GraphQL names an App without the `[bot]` suffix that the people's identities have. */
+  const kindOf = (login: string, typename: string | undefined): ReviewThreadComment["kind"] =>
+    authorKind(typename === "Bot" ? `${login}[bot]` : login, isAgentLogin);
 
   async function threadNodes(repo: RepoRef, number: number, token: string): Promise<ThreadNode[]> {
     const nodes: ThreadNode[] = [];
@@ -128,7 +133,10 @@ export function reviewOperations(c: GithubContext): Pick<Vcs, ReviewOperations> 
           comments: n.comments.nodes.map((c) => ({
             id: c.id,
             author: c.author?.login ?? "ghost",
+            kind: kindOf(c.author?.login ?? "ghost", c.author?.__typename),
             body: c.body,
+            at: c.createdAt,
+            url: c.url,
           })),
         };
       });

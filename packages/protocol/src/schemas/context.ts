@@ -24,6 +24,18 @@ export const contextNoteSchema = z.strictObject({
   body: data("What they wrote, cut to `pipeline.context.body_chars`."),
 });
 
+export const contextReviewSchema = z.strictObject({
+  pr: z.string().min(1).describe("The pull request it is on, the office's key."),
+  ticket: z.string().optional().describe("The ticket that pull request implements."),
+  resolved: z.boolean().describe("Whether its review thread is resolved."),
+  path: z.string().optional().describe("File the thread is on."),
+  line: z.number().int().optional(),
+  url: z.string().optional().describe("Link to the comment."),
+  author: z.string().describe("Who wrote it."),
+  at: z.string().describe("When (ISO-8601)."),
+  body: data("What they wrote, cut to `pipeline.context.body_chars`."),
+});
+
 export const contextTicketSchema = z.strictObject({
   key: z.string().min(1),
   title: z.string(),
@@ -35,6 +47,13 @@ export const contextTicketSchema = z.strictObject({
     .array(contextNoteSchema)
     .describe("The latest comments, oldest first, at most `pipeline.context.comments`."),
   moreComments: z.number().int().optional().describe("Earlier comments left out."),
+  reviews: z
+    .array(contextReviewSchema)
+    .optional()
+    .describe(
+      "For the ticket being worked on: the review comments on its pull requests and its parent's, open and merged, resolved threads included, newest first, at most `pipeline.context.reviews`. Comments in a thread a human opened, and human comments in any other.",
+    ),
+  moreReviews: z.number().int().optional().describe("Older review comments left out."),
   why: contextWhySchema,
 });
 

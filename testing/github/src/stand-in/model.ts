@@ -124,7 +124,7 @@ export function enqueue(s: GithubStore, pr: StoredPull, actor: string) {
 }
 
 /** A thread as GraphQL serves it. GraphQL names an App without the `[bot]` suffix REST adds. */
-export const toNode = (t: StoredThread): ThreadNode => ({
+export const toNode = (s: GithubStore, t: StoredThread): ThreadNode => ({
   id: t.id,
   isResolved: t.resolved,
   path: t.path ?? null,
@@ -135,7 +135,12 @@ export const toNode = (t: StoredThread): ThreadNode => ({
       id: c.id,
       databaseId: c.databaseId,
       body: c.body,
-      author: { login: c.author.replace(/\[bot\]$/, "") },
+      createdAt: c.at,
+      url: `${pullUrl(s, t.prNumber)}#discussion_r${c.databaseId}`,
+      author: {
+        login: c.author.replace(/\[bot\]$/, ""),
+        __typename: c.author.endsWith("[bot]") ? "Bot" : "User",
+      },
     })),
   },
 });

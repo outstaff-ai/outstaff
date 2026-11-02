@@ -50,6 +50,19 @@ function listedAttachment(a: ApiAttachment): TicketAttachment[] {
   ];
 }
 
+/** The key of an issue's parent, one more read; none when it has none or the parent cannot be read. */
+async function parentKey(api: Itsaplan, raw: ApiIssue): Promise<string | undefined> {
+  if (!raw.parentId) {
+    return undefined;
+  }
+
+  try {
+    return (await api.http.request<ApiIssue>("GET", `/issues/${raw.parentId}`)).identifier;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
   const { toIssue, fetchIssue, labelIds, hydrate, patch, commentFeed, actor } = issueHelpers(
     api,
@@ -64,7 +77,9 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
     },
 
     async getIssue(key) {
-      return toIssue(await fetchIssue(key), await api.project());
+      const raw = await fetchIssue(key);
+      const parent = await parentKey(api, raw);
+      return { ...toIssue(raw, await api.project()), ...(parent ? { parent } : {}) };
     },
 
     async listIssues(filter) {

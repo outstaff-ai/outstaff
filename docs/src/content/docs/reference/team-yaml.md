@@ -1356,6 +1356,15 @@ The unresolved review threads of each pull request handed over. Default 5.
 - Minimum 0
 - Maximum 50
 
+#### pipeline.context.reviews
+
+The latest review comments on the pull requests of the ticket being worked on and of its parent, resolved and merged ones included. Default 10.
+
+- Type: `integer`
+- Optional
+- Minimum 0
+- Maximum 50
+
 #### pipeline.context.items
 
 How many tickets, pull requests, documents and chat threads one wake carries at most, the closest to what woke the agent first. Default 8.

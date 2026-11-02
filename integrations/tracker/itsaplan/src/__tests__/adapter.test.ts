@@ -471,6 +471,27 @@ describe("parent", () => {
   });
 });
 
+describe("parent key", () => {
+  it("reads an issue's parent key, and none when it has none or the parent cannot be read", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const parent = await tracker.createIssue({ title: "Parent", body: "" });
+    const child = await tracker.createIssue({ title: "Child", body: "", parent: parent.key });
+    expect((await tracker.getIssue(child.key)).parent).toBe(parent.key);
+    expect((await tracker.getIssue(parent.key)).parent).toBeUndefined();
+
+    const blind = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      fetch: (async (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+        String(input).endsWith(`/issues/${parent.id}`)
+          ? new Response("{}", { status: 404 })
+          : fake.fetch(input, init)) as typeof fetch,
+    });
+
+    expect((await blind.getIssue(child.key)).parent).toBeUndefined();
+  });
+});
+
 describe("errors", () => {
   it("maps HTTP statuses to port error codes", () => {
     expect(

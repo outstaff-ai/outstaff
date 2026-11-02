@@ -48,7 +48,7 @@ describe("present", () => {
         itemId: "item-1",
         entries: [{ type: "ticket", ref: "ACME-1", why: { role: "trigger", source: "event" } }],
         omitted: 0,
-        limits: { comments: 10, messages: 20, threads: 10, items: 8, bodyChars: 4000 },
+        limits: { comments: 10, messages: 20, threads: 10, reviews: 10, items: 8, bodyChars: 4000 },
       },
     };
 

@@ -2,6 +2,7 @@ import type {
   ContextChat,
   ContextDoc,
   ContextPr,
+  ContextReview,
   ContextTicket,
   WakeContext,
 } from "@outstaff/protocol";
@@ -10,6 +11,7 @@ import type {
   ContextLimits,
   ContextManifest,
   ContextNode,
+  GraphReview,
   GraphTicket,
   ManifestEntry,
 } from "./context.types.js";
@@ -50,8 +52,38 @@ const entryOf = (
   ...counts,
 });
 
+const reviewOf = (r: GraphReview, limits: ContextLimits): ContextReview => ({
+  pr: r.pr,
+  ...(r.ticket ? { ticket: r.ticket } : {}),
+  resolved: r.resolved,
+  ...(r.path ? { path: r.path } : {}),
+  ...(r.line === undefined ? {} : { line: r.line }),
+  ...(r.url ? { url: r.url } : {}),
+  author: r.author,
+  at: r.at,
+  body: cut(r.body, limits.bodyChars),
+});
+
+/** The newest review comments first, at most the limit, each cut; none for a ticket the work is not on. */
+function reviewsOf(t: GraphTicket, limits: ContextLimits) {
+  if (!t.reviews) {
+    return { fields: {} };
+  }
+
+  const newest = t.reviews.toSorted((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  const shown = newest.slice(0, limits.reviews);
+  const left = newest.length - shown.length;
+  const fields: Pick<ContextTicket, "reviews" | "moreReviews"> = {
+    ...(shown.length ? { reviews: shown.map((r) => reviewOf(r, limits)) } : {}),
+    ...(more(left) ? { moreReviews: left } : {}),
+  };
+
+  return { fields, counts: { shown: shown.length, left } };
+}
+
 function ticketValue(t: GraphTicket, node: ContextNode, limits: ContextLimits) {
   const { shown, left } = latest(t.comments, limits.comments);
+  const reviews = reviewsOf(t, limits);
   const url = t.url ?? node.url;
   const value: ContextTicket = {
     key: t.key,
@@ -62,10 +94,11 @@ function ticketValue(t: GraphTicket, node: ContextNode, limits: ContextLimits) {
     ...(t.description?.trim() ? { description: cut(t.description, limits.bodyChars) } : {}),
     comments: shown.map((c) => ({ ...c, body: cut(c.body, limits.bodyChars) })),
     ...(more(left) ? { moreComments: left } : {}),
+    ...reviews.fields,
     why: node.why,
   };
 
-  return { value, url, shown: shown.length, left };
+  return { value, url, shown: shown.length, left, reviews: reviews.counts };
 }
 
 const ticket: Filler = (graph, node, limits) => {
@@ -74,8 +107,9 @@ const ticket: Filler = (graph, node, limits) => {
     return undefined;
   }
 
-  const { value, url, shown, left } = ticketValue(t, node, limits);
-  return { kind: "tickets", value, entry: entryOf(node, url, { shown, left }) };
+  const { value, url, shown, left, reviews } = ticketValue(t, node, limits);
+  const entry = entryOf(node, url, { shown, left });
+  return { kind: "tickets", value, entry: reviews ? { ...entry, reviews } : entry };
 };
 
 const pr: Filler = (graph, node, limits) => {

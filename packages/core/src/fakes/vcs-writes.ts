@@ -113,7 +113,15 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
           resolved: false,
           path: c.path,
           line: c.line,
-          comments: [{ id: `rc${++counters.comment}`, author: self, body: c.body }],
+          comments: [
+            {
+              id: `rc${++counters.comment}`,
+              author: self,
+              kind: "agent",
+              body: c.body,
+              at: now().toISOString(),
+            },
+          ],
         });
       }
 
@@ -175,7 +183,14 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
       }
 
       const commentId = `rc${++counters.comment}`;
-      thread.comments.push({ id: commentId, author: self, body });
+      thread.comments.push({
+        id: commentId,
+        author: self,
+        kind: "agent",
+        body,
+        at: now().toISOString(),
+      });
+
       emit(
         "pr.comment",
         repo,

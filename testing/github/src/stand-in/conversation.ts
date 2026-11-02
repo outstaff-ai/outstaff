@@ -21,7 +21,9 @@ function addInline(s: GithubStore, pr: StoredPull, review: number, actor: string
     resolved: false,
     path: c.path,
     line: c.line,
-    comments: [{ id: `${thread}_c0`, databaseId, seq: nextSeq(s), author: actor, body: c.body }],
+    comments: [
+      { id: `${thread}_c0`, databaseId, seq: nextSeq(s), author: actor, body: c.body, at: s.now() },
+    ],
   });
 
   touch(s, pr);
