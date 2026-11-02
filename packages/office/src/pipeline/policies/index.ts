@@ -20,6 +20,8 @@ import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
 import { policy as ticketCommentToBlockedAgent } from "./ticket_comment_to_blocked_agent.js";
 import { policy as ticketCommentToLastWorker } from "./ticket_comment_to_last_worker.js";
+import { policy as unblockedToBlockedAgent } from "./unblocked_to_blocked_agent.js";
+import { policy as unblockedToReady } from "./unblocked_to_ready.js";
 
 /** The built-in policies, one module each, in the order the trace lists them. */
 export const BUILT_IN_POLICIES: readonly Policy[] = [
@@ -39,6 +41,8 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   ticketCommentToLastWorker,
   movedActiveToAssignee,
   movedActiveToLastWorker,
+  unblockedToBlockedAgent,
+  unblockedToReady,
   docCommentToAgent,
   startMarksActive,
   handBackDone,

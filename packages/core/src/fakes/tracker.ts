@@ -1,5 +1,5 @@
 import { PortError, type CanonicalStatus } from "#/ports/index.js";
-import type { Comment, Issue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
+import type { Comment, Issue, LinkedIssue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
 import { fakeDevelopment } from "./tracker-development.js";
 import type { FakeTracker, FakeTrackerOptions } from "./types.js";
@@ -56,6 +56,18 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
     return m;
   };
 
+  const linked = (key: string): LinkedIssue => ({ key, status: { ...need(key).status } });
+
+  /** The issue with its `blocks` links both ways, as the relations have them now. */
+  const withLinks = (issue: Issue): Issue => {
+    const blocking = relations.filter((r) => r.relation === "blocks");
+    return {
+      ...issue,
+      blocks: blocking.filter((r) => r.key === issue.key).map((r) => linked(r.otherKey)),
+      blockedBy: blocking.filter((r) => r.otherKey === issue.key).map((r) => linked(r.key)),
+    };
+  };
+
   const links = {
     issue: (key: string) => `${base}/issue/${encodeURIComponent(key)}`,
     comment: (key: string, id: string) =>
@@ -108,7 +120,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       forbiddenCall: () => Promise.reject(new PortError("forbidden", "Forbidden.")),
     },
     async getIssue(key) {
-      return structuredClone(need(key));
+      return structuredClone(withLinks(need(key)));
     },
     async listIssues(f) {
       let out = [...issues.values()];

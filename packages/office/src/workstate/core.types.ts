@@ -98,6 +98,20 @@ export interface TicketOps {
   withRequester(rec: TicketRecord, requester: string, event: WorkflowEvent): TicketRecord;
 }
 
+/** What closed a ticket, as far as the work state knows: the event that moved it, or who changed it. */
+export interface Closing {
+  event?: WorkflowEvent | undefined;
+  by?: WorkflowEvent["actor"] | undefined;
+}
+
+export interface UnblockOps {
+  /**
+   * Reads the ticket again, like `refreshTicket`. When that finds it just closed, raises `ticket.unblocked` on each
+   * ticket it blocks that is blocked and has no open blocker left.
+   */
+  refreshAndUnblock(ctx: RefreshCtx, key: string, closing?: Closing): Promise<void>;
+}
+
 /** What is read from the code host about an open pull request beside the pull request itself. */
 export interface PrLive {
   checks: PrRecord["checks"];

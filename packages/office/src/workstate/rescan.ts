@@ -1,7 +1,7 @@
 import type { TeamConfig } from "@outstaff/core";
 import type { Ref, WorkItem } from "#/store/index.js";
 import type { PrRecord, TicketRecord } from "./types.js";
-import type { PrOps, RefreshCtx, TicketOps, WorkstateCore } from "./core.types.js";
+import type { PrOps, RefreshCtx, TicketOps, UnblockOps, WorkstateCore } from "./core.types.js";
 import { docOpen, isTerminal, openPrs, teamRepo } from "./derive.js";
 import { docNode, prNode, ROOT, ticketNode, unlinkAll } from "./links.js";
 import { isOpen } from "./open.js";
@@ -44,10 +44,10 @@ const trackerIds = (team: TeamConfig) =>
   team.people.flatMap((p) => (p.identities?.tracker ? [p.identities.tracker] : []));
 
 /** Rebuilds the records: from the store on open, and from the ports on a rescan. */
-export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
+export function createRescan(core: WorkstateCore, ops: TicketOps & UnblockOps & PrOps) {
   const { store, vcs, tracker, team, clock, logger, retentionMs, repos, prs, tickets, docs } = core;
   const { workers, handedBack, pickups, work, prSubject } = core;
-  const { refreshPr, refreshTicket, saveTicket, toTicket } = ops;
+  const { refreshPr, refreshAndUnblock, saveTicket, toTicket } = ops;
   const refreshPickups = (items: WorkItem[]) => {
     pickups.clear();
     work.clear();
@@ -121,14 +121,14 @@ export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
     }
   };
 
-  const rescanTickets = async () => {
+  const rescanTickets = async (ctx: RefreshCtx) => {
     if (!tracker) {
       return;
     }
 
     for (const rec of tickets.values()) {
       if (live(rec)) {
-        await refreshTicket(rec.key);
+        await refreshAndUnblock(ctx, rec.key);
       }
     }
 
@@ -142,7 +142,7 @@ export function createRescan(core: WorkstateCore, ops: TicketOps & PrOps) {
 
   const doRescan = async (ctx: RefreshCtx) => {
     await rescanPrs(ctx);
-    await rescanTickets();
+    await rescanTickets(ctx);
     await prune();
     await refreshWorkers();
   };

@@ -1,3 +1,4 @@
+import { addLink, issueView, linkOf } from "./links.js";
 import { assignIssue, commentIssue, issueById, moveIssue, page, touch } from "./model.js";
 import { err } from "./store.js";
 import type { ActorRoute, ItsaplanStore, StoredIssue } from "./types.js";
@@ -31,7 +32,10 @@ export function issueRoutes(s: ItsaplanStore): ActorRoute[] {
     {
       method: "GET",
       path: "/issues/:id",
-      handler: (r) => issueById(s, r.params["id"]!) ?? missing,
+      handler: (r) => {
+        const issue = issueById(s, r.params["id"]!);
+        return issue ? issueView(s, issue) : missing;
+      },
     },
     {
       method: "PATCH",
@@ -78,8 +82,8 @@ export function issueRoutes(s: ItsaplanStore): ActorRoute[] {
           return missing;
         }
 
-        s.links.push({ from: from.identifier, to: to.identifier, kind: String(r.json.kind) });
-        return { status: 201, body: { id: 1, kind: r.json.kind, direction: "outward", issue: to } };
+        const link = addLink(s, from, to, String(r.json.kind));
+        return link ? { status: 201, body: linkOf(s, from, link) } : err(400, "unknown link kind");
       },
     },
     {

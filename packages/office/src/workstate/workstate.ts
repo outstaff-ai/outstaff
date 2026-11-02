@@ -12,6 +12,7 @@ import { readyTickets } from "./ready.js";
 import { createRequesters } from "./requesters.js";
 import { createRescan } from "./rescan.js";
 import { createTickets } from "./tickets.js";
+import { createUnblock } from "./unblock.js";
 import type { WorkState, WorkstateOptions } from "./types.js";
 
 const DEFAULT_REFRESH_MS = 60_000;
@@ -78,19 +79,25 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   };
 
   const ticketOps = createTickets(core);
+  const unblockOps = createUnblock(core, ticketOps);
   const prOps = createPrs(core, ticketOps);
   const requesters = createRequesters(core, ticketOps);
   const { saveDoc, touchDoc } = createDocs(core);
   const { refreshPr, ticketOfDraft } = prOps;
   const { deliver, handle } = createEvents(core, {
     ...ticketOps,
+    ...unblockOps,
     ...prOps,
     ...requesters,
     saveDoc,
     touchDoc,
   });
 
-  const { refreshWorkers, doRescan, load } = createRescan(core, { ...ticketOps, ...prOps });
+  const { refreshWorkers, doRescan, load } = createRescan(core, {
+    ...ticketOps,
+    ...unblockOps,
+    ...prOps,
+  });
 
   /** The pull requests the office can still read: a gone one is left out of every answer. */
   const seen = () => [...prs.values()].filter(visible);
@@ -137,7 +144,14 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     },
 
     refreshWorkers: () => locked(refreshWorkers),
-    refreshTicket: (key) => locked(() => ticketOps.refreshTicket(key)),
+    async refreshTicket(key, by) {
+      const ctx: RefreshCtx = { fresh: [] };
+      try {
+        await locked(() => unblockOps.refreshAndUnblock(ctx, key, { by }));
+      } finally {
+        await deliver(ctx.fresh);
+      }
+    },
 
     async catchUp() {
       const ctx: RefreshCtx = { fresh: [] };

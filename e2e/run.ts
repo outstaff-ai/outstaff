@@ -2042,6 +2042,8 @@ async function main() {
     `file for a teammate: pia filed ${filed13b.key} for sam from chat -> sam was woken and opened #${pr13b.pr.number}; pia never worked on it`,
   );
 
+  await unblockDependents();
+
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
   const authors = await state();
@@ -2067,6 +2069,91 @@ async function main() {
   );
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
+
+/**
+ * 13c. a ticket that blocks two others: when the human closes it, both move to ready, as sam, the agent they are
+ * assigned to, and sam is woken on each. Sam filed both himself, already blocked, so filing them woke no one; neither
+ * names a repository, so each round only asks, as in 10b.
+ */
+async function unblockDependents() {
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice("the last round handed back");
+  const samBefore13c = wakesOf("sam").length;
+  const { key: blocker13c } = await stub("POST", "/_test/tickets", {
+    title: "Choose the release font",
+    description: "Both font pages wait for this.",
+  });
+
+  const waiting13c: string[] = [];
+  for (const title of ["Set the font on the home page", "Set the font on the help page"]) {
+    const { key } = await stub("POST", "/_test/tickets", {
+      title,
+      description: "which repo: unclear",
+      status: "Blocked",
+      assignee: "sam",
+      as: "sam",
+    });
+
+    await stub("POST", `/_test/tickets/${blocker13c}/link`, { to: key });
+    waiting13c.push(key);
+  }
+
+  // The office has to have read the blocker open: a ticket it first sees closed unblocks nothing.
+  await officePolledTwice(`${blocker13c} and the tickets it blocks were filed`);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore13c)),
+    "[]",
+    "filing the blocked tickets, and the ticket blocking them, woke no one",
+  );
+
+  await stub("POST", `/_test/tickets/${blocker13c}/move`, { to: "Done" });
+  const unblocked13c = await until(
+    `${waiting13c.join(" and ")} moved to ready by sam and worked on`,
+    (s) => {
+      const ts = waiting13c.map((k) => s.tickets.find((x: Json) => x.key === k));
+      return ts.every((t: Json) =>
+        t.comments.some((c: Json) => c.body.includes("Which repository is")),
+      )
+        ? ts
+        : undefined;
+    },
+  );
+
+  for (const t of unblocked13c) {
+    const moves = t.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`);
+    assertEq(
+      moves.filter((m: string) => m === "sam:Blocked>Ready").length,
+      1,
+      `${t.key} moved from blocked to ready once, as sam`,
+    );
+
+    assertIncludes(moves, "sam:Ready>In Progress", `${t.key} made active when sam's round started`);
+  }
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${waiting13c.join(" and ")} worked on`);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore13c)),
+    JSON.stringify(["assigned", "assigned"]),
+    "closing the blocker woke sam once on each ticket it unblocked",
+  );
+
+  step(
+    `unblock dependents: ${blocker13c} blocks ${waiting13c.join(" and ")} -> the human closed it -> both moved to ready as sam, and sam was woken on each`,
+  );
 }
 
 /** The merge approver approves the pull request's current head. */

@@ -28,12 +28,15 @@ export const INSTRUCTION_VARIABLES = [
   "cause.title",
   "next.ticket",
   "requester",
+  "blocker",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
   typeof v === "object" && v !== null && "pr" in v && "title" in v;
 
 const number = (pr: PrRef) => String(pr.number);
+
+const stringOf = (v: unknown): string => (typeof v === "string" ? v : "");
 
 /** The variables that name the merge behind a derived event; empty for any other event. */
 function causeVariables(data: Record<string, unknown>): Record<string, string> {
@@ -68,6 +71,7 @@ export function instructionVariables(
     ...causeVariables(event.data),
     "next.ticket": extra.next ?? "",
     requester: requesterOf(ctx),
+    blocker: stringOf(event.data["blocker"]),
   };
 }
 

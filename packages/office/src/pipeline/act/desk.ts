@@ -67,9 +67,11 @@ export function createActDesk(opts: ActDeskOptions): ActDesk {
 
       // The office's state follows the change at once, so the next decisions see it.
       for (const key of changedTickets(act.ops)) {
-        await opts.workState.refreshTicket(key).catch((err: unknown) => {
-          log.warn("could not read a ticket an act changed", { ticket: key, error: String(err) });
-        });
+        await opts.workState
+          .refreshTicket(key, { kind: "agent", id: person })
+          .catch((err: unknown) => {
+            log.warn("could not read a ticket an act changed", { ticket: key, error: String(err) });
+          });
       }
 
       if (act.event) {
