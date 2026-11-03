@@ -2,7 +2,7 @@
 
 Hand back each time you stop, whether the work is finished or not.
 
-1. Comment on the ticket or pull request with what you did. Link every pull request, ticket and document you mention. Report the pull request, not a branch name. If you split the ticket, link the sub-tickets and their pull requests too.
+1. Comment on the ticket or pull request with what you did. Link every pull request, ticket and document you mention. Report the pull request, not a branch name. If you split the ticket, link the sub-tickets and their pull requests too. A round woken by a comment that had nothing for you skips this step and step 4, and hands back `silent` (`process/work-items.md`, "Comments on documents and tickets").
 2. Hand back with the status that says where the work is, with `ost handback <status>` before you end the round:
    - `done`: only when there is a result to review or the work is finished: a pull request open for review, a document linked to the ticket, the ticket closed, or the ticket moved to review by you with your answer in a comment (see "Questions and investigations" below). A round that leaves none of these is not `done`, whatever the work: you are told so once, and then it is handed back as `blocked`.
    - `blocked`: you wait on a decision or an answer from a human, or on anything outside your control. Say in the comment what you need and from whom. A push rejected for a missing permission (for example "refusing to allow a GitHub App to create or update workflow ... without `workflows` permission") is `blocked`, never `done`: name the missing permission, and keep the commit on its branch so nothing is lost.

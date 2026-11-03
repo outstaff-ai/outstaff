@@ -8,6 +8,7 @@ import {
   keepBoth,
   merge,
   mergedFeedback,
+  mentioned,
   nothingToReview,
   reviewFeedback,
   ticketComment,
@@ -1046,6 +1047,39 @@ describe("ticket comment", () => {
     ]);
 
     expect(text).toBe("Asked: Formal or casual?");
+  });
+
+  it("passes a question on to a human, naming another only for information", async () => {
+    const { seen } = await comment("ticket_comment", "ask ada.admin, cc Pia.Novak: Launch date?");
+    expect(seen[0]).toEqual({
+      type: "tool",
+      tool: "ticket_comment",
+      input: { key: "SHOP-1", body: "@ada.admin Launch date? FYI @Pia.Novak" },
+    });
+  });
+});
+
+describe("mentioned", () => {
+  const mention = (body: string) =>
+    play(
+      mentioned({
+        ...ctx,
+        kind: "asked",
+        feedback: [{ kind: "ticket_comment", body, threads: [] }],
+      }),
+      () => "",
+    );
+
+  it("posts nothing for a mention only for information and finishes silently", async () => {
+    const { seen, text } = await mention("@ada.admin Launch date? FYI @Pia.Novak");
+    expect(seen).toEqual([{ type: "tool", tool: "handback", input: { status: "silent" } }]);
+    expect(text).toContain("nothing for me");
+  });
+
+  it("answers any other mention once, and finishes silently", async () => {
+    const { seen } = await mention("@Pia.Novak Mobile first?");
+    expect(seen.filter((a) => (a as { tool?: string }).tool === "ticket_comment")).toHaveLength(1);
+    expect(seen.at(-1)).toEqual({ type: "tool", tool: "handback", input: { status: "silent" } });
   });
 });
 

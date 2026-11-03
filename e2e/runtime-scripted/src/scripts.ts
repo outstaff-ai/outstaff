@@ -820,9 +820,14 @@ export async function* docFeedback(ctx: ItemContext): Script {
   return `Answered ${open.length} comment${open.length === 1 ? "" : "s"} on the document and updated it.`;
 }
 
+/** `ask <name>, cc <other>: <question>` passed on: the question to the name, and the other named only for information. */
+const passedOn = ([, to, cc, question]: RegExpExecArray) =>
+  `@${to} ${question}${cc ? ` FYI @${cc}` : ""}`;
+
 /**
  * A comment on the ticket: answer on it. One that says `ask <name>: <question>` is passed on with a mention of the
- * name, as the tracker writes it, for example `ask Pia.Novak: ...`.
+ * name, as the tracker writes it, for example `ask Pia.Novak: ...`; `ask <name>, cc <other>: <question>` also names
+ * the other, for information only.
  */
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
@@ -838,11 +843,11 @@ export async function* ticketComment(ctx: ItemContext): Script {
     return `Nothing for me in the comment on ${key}.`;
   }
 
-  const ask = /^ask (\S+): (.+)$/m.exec(feedback.body);
+  const ask = /^ask ([^\s,]+)(?:, cc (\S+))?: (.+)$/m.exec(feedback.body);
   yield {
     type: "tool",
     tool: "ticket_comment",
-    input: { key, body: ask ? `@${ask[1]} ${ask[2]}` : `Noted: ${feedback.body}` },
+    input: { key, body: ask ? passedOn(ask) : `Noted: ${feedback.body}` },
   };
 
   // A mention on someone else's ticket needs nothing handed on: the round finishes silently. On its own ticket the
@@ -865,6 +870,21 @@ async function* askForDecision(
   yield { type: "tool", tool: "ticket_comment", input: { key, body: `Question: ${question}` } };
   yield { type: "tool", tool: "handback", input: { status: "done" } };
   return `Asked: ${question}`;
+}
+
+/**
+ * A mention on someone else's ticket. One that names the agent only so it knows (`FYI @<name>` at the end of a comment
+ * to someone else) asks nothing of it: the round posts nothing and finishes silently. Any other is answered once, on
+ * the ticket.
+ */
+export async function* mentioned(ctx: ItemContext): Script {
+  const feedback = need(ctx.feedback[0], "the comment");
+  if (/\bFYI @\S+\s*$/.test(feedback.body)) {
+    yield { type: "tool", tool: "handback", input: { status: "silent" } };
+    return "Mentioned for information only; nothing for me.";
+  }
+
+  return yield* ticketComment(ctx);
 }
 
 /** The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own. */
@@ -1392,7 +1412,7 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   merge,
   doc_feedback: docFeedback,
   ticket_comment: ticketComment,
-  asked: ticketComment,
+  asked: mentioned,
   rebase: conflict,
   ci_failed: ciFailed,
   merge_checks_failed: mergeChecksFailed,
