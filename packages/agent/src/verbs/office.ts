@@ -14,6 +14,8 @@ import type {
   NotesReport,
   CiLogRequest,
   CiLogResult,
+  RecallRequest,
+  RecallResult,
   FakeOffice,
 } from "./office.types.js";
 
@@ -35,6 +37,9 @@ export function createFakeOffice(
 
     /** What the office answers for a check's log; by default a log with no failed step. */
     ciLog?: (request: CiLogRequest) => CiLogResult;
+
+    /** What the office answers for a recall; by default nothing matches. */
+    recall?: (request: RecallRequest) => RecallResult;
 
     /** What the office answers when a chat session files work; by default the person is idle. */
     filed?: Partial<Filed>;
@@ -59,6 +64,7 @@ export function createFakeOffice(
   const docsLinked: DocLinkRequest[] = [];
   const notesReported: NotesReport[] = [];
   const ciLogsAsked: CiLogRequest[] = [];
+  const recalled: RecallRequest[] = [];
   const seen = new Set<string>();
   return {
     ticketPrsAsked,
@@ -66,6 +72,11 @@ export function createFakeOffice(
     docsLinked,
     notesReported,
     ciLogsAsked,
+    recalled,
+    async recall(request) {
+      recalled.push(request);
+      return opts.recall?.(request) ?? { moments: [], more: false };
+    },
     async ciLog(request) {
       ciLogsAsked.push(request);
       return opts.ciLog?.(request) ?? { repo: "acme/shop", steps: [] };

@@ -40,9 +40,12 @@ export function officeLifecycle(deps: {
 
   /** After each tick of the scheduler's housekeeping; never throws. */
   onTick?: () => Promise<unknown>;
+
+  /** Once the office runs; never throws, and stopping waits for what it tracks. */
+  onStarted?: () => void;
 }): Pick<Office, "start" | "stop" | "health"> {
   const { team, link, doctor, store, log, intake, workState, scheduler, protocol } = deps;
-  const { inFlight, notify, onBlocked, onTick } = deps;
+  const { inFlight, notify, onBlocked, onTick, onStarted } = deps;
 
   let state: State = "created";
   let stopping: Promise<void> | undefined;
@@ -117,6 +120,7 @@ export function officeLifecycle(deps: {
         log.info("office started", { team: team.team.name, agentPort: protocol.port() });
         // After the office is running, so slow providers do not hold up readiness; stopping waits for it.
         doctor.start();
+        onStarted?.();
       } catch (error) {
         await stop();
         throw error;

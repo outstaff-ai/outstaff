@@ -9,6 +9,7 @@ import type {
   CiLogs,
   DocLinks,
   Messaging,
+  Recall,
   TicketPrs,
   WorkSource,
 } from "./source.types.js";
@@ -44,6 +45,9 @@ export interface ProtocolServerOptions {
 
   /** Answers `ci_log`. Without it the request is refused as unsupported. */
   ciLogs?: CiLogs;
+
+  /** Answers `recall`. Without it the request is refused as unsupported. */
+  recall?: Recall;
 
   /** Hands agents their acts and takes `act_result`. Without it a result is refused as unsupported. */
   acts?: AgentActs;

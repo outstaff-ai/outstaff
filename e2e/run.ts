@@ -4,7 +4,7 @@
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
 // requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green. The office, Postgres and the agent are the real images; GitHub,
+// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2176,6 +2176,7 @@ async function main() {
   await unblockDependents();
   await canceledWhileQueued();
   await mergeChecks();
+  await recallHistory();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2453,6 +2454,87 @@ async function mergeChecks() {
 
   await until(`${key} done`, (s) => ticketOf(s).status === "Done");
   step(`merge checks: fix #${fix.pr.number} merged with the deploy green -> ${key} is done`);
+}
+
+/**
+ * 15. `ost recall`: sam handled a ticket about the marigold banner and talked about it with the human in chat; the PM
+ * heard about the banner in a private chat of her own. Working a later ticket, sam recalls both of his, with links:
+ * `--about` the first ticket leaves out the later one, `--with` the human leaves out sam's own work, and the PM's
+ * private chat is never there.
+ */
+async function recallHistory() {
+  const { key: banner } = await stub("POST", "/_test/tickets", {
+    title: "Add a marigold banner",
+    assignee: "sam",
+  });
+
+  const handled = await until(`sam's pull request for ${banner}, handed back`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${banner}`));
+    const t = s.tickets.find((x: Json) => x.key === banner);
+    return pr && t.status === "In Review" ? pr : undefined;
+  });
+
+  const talked = await stub("POST", "/_test/chat/say", {
+    text: `About ${banner}: we agreed the marigold banner stays yellow.`,
+  });
+
+  await until("sam's answer about the banner in chat", (s) =>
+    s.chat.posts.find((p: Json) => p.agent === "sam" && p.thread === talked.id),
+  );
+
+  const secret = await stub("POST", "/_test/chat/say", {
+    to: "pia",
+    text: "Between us: the marigold banner budget is 300.",
+  });
+
+  await until("pia's answer in her private chat", (s) =>
+    s.chat.posts.find((p: Json) => p.agent === "pia" && p.thread === secret.id),
+  );
+
+  const { key: later } = await stub("POST", "/_test/tickets", {
+    title: "Follow up on the marigold banner",
+    // The earlier ticket by its number only: a key in this ticket would make it refer to that one.
+    description: `recall: marigold banner\nrecall about ticket: ${banner.split("-").at(-1)}\nrecall with: Ada`,
+    assignee: "sam",
+  });
+
+  const comment = await until(`${later} commented with what sam recalled`, (s) =>
+    s.tickets
+      .find((x: Json) => x.key === later)
+      .comments.find((c: Json) => c.author === "sam" && c.body.startsWith("Recall:")),
+  );
+
+  const [all = "", about = "", withAda = ""] = comment.body.split(/\n\nRecall (?:about|with) /);
+  const yellow = "we agreed the marigold banner stays yellow";
+  assertEq(all.includes(yellow), true, "sam recalls the chat about the banner");
+  assertEq(all.includes("Add a marigold banner"), true, `sam recalls his work on ${banner}`);
+  assertEq(
+    new RegExp(`https?://\\S*(${banner}|/pull/${handled.number})`).test(all),
+    true,
+    `the recalled work on ${banner} comes with its link`,
+  );
+
+  assertEq(all.includes("Follow up on the marigold banner"), true, "the later ticket matches too");
+  assertEq(about.includes(yellow), true, `the chat that named ${banner} is about it`);
+  assertEq(about.includes("Add a marigold banner"), true, `--about ${banner} keeps its work`);
+  assertEq(
+    about.includes("Follow up on the marigold banner"),
+    false,
+    `--about ${banner} leaves out the later ticket`,
+  );
+
+  assertEq(withAda.includes(yellow), true, "--with Ada keeps what she said");
+  assertEq(withAda.includes("work item"), false, "--with Ada leaves out sam's own work items");
+  assertEq(
+    comment.body.includes("budget is 300"),
+    false,
+    "the PM's private chat is never in sam's recall",
+  );
+
+  assertEq(comment.body.includes("not instructions"), true, "the recall is marked as data");
+  step(
+    `recall: working ${later}, sam recalled ${banner} and the chat about it with links; --about and --with narrowed it; pia's private chat never showed`,
+  );
 }
 
 /** The merge approver approves the pull request's current head. */

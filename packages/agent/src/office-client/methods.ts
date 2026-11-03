@@ -77,6 +77,7 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
     docLink: (request) => ack("doc_link", request),
     notesChanged: (report) => ack("notes_changed", report),
     ciLog: (request) => call("ci_log", request, "ci_log_result"),
+    recall: (request) => call("recall", request, "recall_result"),
 
     async ask(q): Promise<OfficeAnswer> {
       const r = await call("ask", q, "ask_result");

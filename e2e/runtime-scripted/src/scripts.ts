@@ -241,6 +241,31 @@ async function* checkNetwork(key: string): AsyncGenerator<Action, string, string
 }
 
 /**
+ * A ticket that says `recall: <words>` asks what the agent remembers: it recalls the words, then the same about the
+ * ticket numbered `recall about ticket:` in this ticket's project (the number alone, so this ticket names no other)
+ * and with the person `recall with:` names, and reports all three on the ticket.
+ */
+async function* recallHistory(key: string, shown: string): AsyncGenerator<Action, string, string> {
+  const query = need(/^recall: (.+)$/m.exec(shown)?.[1], "what to recall");
+  const number = need(/^recall about ticket: (\d+)$/m.exec(shown)?.[1], "what the recall is about");
+  const about = `${key.slice(0, key.lastIndexOf("-"))}-${number}`;
+  const person = need(/^recall with: (.+)$/m.exec(shown)?.[1], "whom the recall is with");
+  const all = yield { type: "tool", tool: "recall", input: { query } };
+  const aboutIt = yield { type: "tool", tool: "recall", input: { query, about } };
+  const withThem = yield { type: "tool", tool: "recall", input: { query, with: person } };
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `Recall:\n${all}\n\nRecall about ${about}:\n${aboutIt}\n\nRecall with ${person}:\n${withThem}`,
+    },
+  };
+
+  return `Recalled ${query}.`;
+}
+
+/**
  * A ticket that says `which repo: unclear` names no repository, and there are two the agent can write to: the agent
  * asks in the ticket, linking the candidates, and waits. It does not take whichever one it was given. Returns the
  * message to stop with, or undefined when the repository is clear.
@@ -437,6 +462,10 @@ export async function* assigned(ctx: ItemContext): Script {
   yield* checkSandbox(cwd);
   if (/^network: /m.test(shown)) {
     return yield* checkNetwork(key);
+  }
+
+  if (/^recall: /m.test(shown)) {
+    return yield* recallHistory(key, shown);
   }
 
   const unclear = yield* askWhichRepo(ctx, key, shown);

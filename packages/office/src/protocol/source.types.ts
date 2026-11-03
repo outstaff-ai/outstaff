@@ -160,6 +160,12 @@ export interface CiLogs {
   read(person: string, request: PayloadOf<"ci_log">): Promise<PayloadOf<"ci_log_result">>;
 }
 
+/** An agent's own history in what the office stores, searched. Optional: without it `recall` is unsupported. */
+export interface Recall {
+  /** The person's moments that match, newest first; refuses (`invalid`) a `since` that is not a date. */
+  search(person: string, request: PayloadOf<"recall">): Promise<PayloadOf<"recall_result">>;
+}
+
 /** Which documents agents wrote for which work. Optional: without it `doc_link` is unsupported. */
 export interface DocLinks {
   /**

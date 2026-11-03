@@ -1,5 +1,6 @@
 import type { Store, JournalEntry } from "#/store/types.js";
 import { iso, newId } from "./ids.js";
+import { insertJournalMoment, insertOutcomeMoment } from "./moments.js";
 import { toRun } from "./rows.js";
 import type { StoreInternals } from "./types.js";
 
@@ -50,6 +51,8 @@ export function runQueries({
       if (Number(res.numUpdatedRows) === 0) {
         throw new Error(`unknown run: ${id}`);
       }
+
+      await insertOutcomeMoment(db, id);
     },
 
     async listRuns(workItemId) {
@@ -91,6 +94,7 @@ export function runQueries({
         .returningAll()
         .executeTakeFirstOrThrow();
 
+      await insertJournalMoment(db, row.id);
       return {
         id: row.id,
         workItemId: row.work_item_id,
