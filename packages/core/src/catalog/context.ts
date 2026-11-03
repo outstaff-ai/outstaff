@@ -112,5 +112,6 @@ function policiesOf(team: TeamConfig): CatalogContext["policies"] {
     },
     tickets: ticketsOf(team),
     design: { canvas: policyOn(team.policies, "design.canvas") },
+    notify_handoff: policyOn(team.policies, "notify_handoff"),
   };
 }

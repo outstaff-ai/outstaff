@@ -61,6 +61,10 @@ function violation(slot: Slot, input: AggregateInput, acted: Set<string>): strin
       return wakeViolation(p, input);
     case "act":
       return actViolation(p, input, acted, slot.policy);
+    case "notify":
+      return input.options.people.includes(p.as)
+        ? undefined
+        : `never message as the office: ${p.as} is not an agent on the team`;
     case "suppress":
       return input.options.people.includes(p.person)
         ? undefined

@@ -1,5 +1,5 @@
 import type { Logger, TeamConfig } from "@outstaff/core";
-import { createFakeKnowledge, createFakeTracker } from "@outstaff/core/fakes";
+import { createFakeChat, createFakeKnowledge, createFakeTracker } from "@outstaff/core/fakes";
 import type { PayloadOf } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
 import { createActMaker } from "#/runner/acts.js";
@@ -112,6 +112,25 @@ describe("the act maker", () => {
     ]);
 
     expect(knowledge.issueLinks.get(ticket)).toEqual([{ doc: doc.id, by: "u-sam" }]);
+  });
+
+  it("sends a direct message in chat with the agent's own chat account", async () => {
+    const chat = createFakeChat();
+    const h = harness();
+    const maker = createActMaker({
+      env: { team: teamOf("u-sam"), chat },
+      office: h.office,
+      log: h.log,
+    });
+
+    await maker.make([{ id: "e:dm", ops: [{ op: "chat_dm", to: "U-ada", body: "Ready." }] }]);
+    expect(h.answers).toEqual([
+      { id: "e:dm", ok: true, results: ["sent a direct message to U-ada"] },
+    ]);
+
+    expect(chat.posts.map((p) => ({ channel: p.channel, text: p.text }))).toEqual([
+      { channel: await chat.openDirect("U-ada"), text: "Ready." },
+    ]);
   });
 
   it("answers a change that failed, and keeps the answer for the next delivery when sending it fails", async () => {

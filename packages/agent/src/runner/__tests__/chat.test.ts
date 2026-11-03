@@ -430,7 +430,7 @@ describe("chat relay", () => {
       });
 
       const root = await dana("add a search page");
-      await chat.post("D-U0DANA0001", "On it.", { thread: root.id });
+      await chat.post("D-U0DANA0001", "On it.\nFilters next.", { thread: root.id });
       await dana("with filters", root.id);
 
       const text = await relay.context({
@@ -449,8 +449,8 @@ describe("chat relay", () => {
 
       expect(text).toContain("add a search page");
       expect(text).toContain("with filters");
-      expect(text).toContain("On it.");
-      expect(text).toContain("(agent)");
+      // A message of several lines stays one item of the list: its later lines are indented under it.
+      expect(text).toMatch(/\(agent\): On it\.\n {2}Filters next\./);
       expect(text).toContain(
         `Your current work, one line per ticket or pull request:\n1. [ACME-9 Old work](${tracker.links.issue("ACME-9")}) (running)`,
       );

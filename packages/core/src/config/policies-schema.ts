@@ -50,6 +50,14 @@ export const policiesSchema = z
     feedback: feedbackSchema,
     hand_back: handBackSchema,
     tickets: ticketsSchema,
+    notify_handoff: z
+      .boolean()
+      .default(true)
+      .meta(
+        d(
+          "Have an agent tell a human in a direct message in chat when work lands on them: a ticket it hands back to them for review, a blocked ticket given to them (a PM that cannot unblock it, for example), or a pull request it opens for their review. The message links the ticket and the pull requests and says, in a line or two from the hand-back, what is needed. One agent's messages to one human are batched (pipeline.notify.debounce_seconds). A human with no identities.chat is sent nothing, and the office logs it. Default on.",
+        ),
+      ),
     pull_ready: z
       .boolean()
       .default(true)

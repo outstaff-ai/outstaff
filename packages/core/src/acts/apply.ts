@@ -92,23 +92,35 @@ const setField: Make<"set_field"> = async (op, ports) => {
   return `set ${op.field} of ${op.ticket} to ${op.value ?? "nothing"}`;
 };
 
-function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
-  switch (op.op) {
-    case "move":
-      return move(op, ports, member);
-    case "assign":
-      return assign(op, ports, member);
-    case "comment":
-      return comment(op, ports, member);
-    case "set_parent":
-      return setParent(op, ports, member);
-    case "link_pr":
-      return linkPr(op, ports, member);
-    case "link_doc":
-      return linkDoc(op, ports, member);
-    case "set_field":
-      return setField(op, ports, member);
+const chatDm: Make<"chat_dm"> = async (op, ports) => {
+  const chat = need(ports.chat, "chat");
+  await chat.post(await chat.openDirect(op.to), op.body);
+  return `sent a direct message to ${op.to}`;
+};
+
+/** What a failed change was, for the error. */
+function what(op: ActOp): string {
+  if (op.op === "comment") {
+    return "comment";
   }
+
+  return op.op === "chat_dm" ? `chat_dm ${op.to}` : `${op.op} ${op.ticket}`;
+}
+
+/** How each kind of change is made. */
+const MAKERS: { [K in ActOp["op"]]: Make<K> } = {
+  move,
+  assign,
+  comment,
+  set_parent: setParent,
+  link_pr: linkPr,
+  link_doc: linkDoc,
+  set_field: setField,
+  chat_dm: chatDm,
+};
+
+function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
+  return (MAKERS[op.op] as Make<ActOp["op"]>)(op as never, ports, member);
 }
 
 /**
@@ -125,8 +137,7 @@ export async function applyActOps(
     try {
       results.push(await one(op, ports, member));
     } catch (error) {
-      const what = op.op === "comment" ? "comment" : `${op.op} ${op.ticket}`;
-      return { ok: false, results, error: `${what}: ${(error as Error).message}` };
+      return { ok: false, results, error: `${what(op)}: ${(error as Error).message}` };
     }
   }
 

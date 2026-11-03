@@ -5,7 +5,7 @@ import type { AgentEnv } from "#/verbs/types.js";
 
 export interface ActMakerOptions {
   /** The agent's own ports: its changes are made with its credentials. */
-  env: Pick<AgentEnv, "team" | "tracker" | "knowledge">;
+  env: Pick<AgentEnv, "team" | "tracker" | "knowledge" | "chat">;
   office: Pick<OfficeConnection, "actResult">;
   log: Logger;
 }

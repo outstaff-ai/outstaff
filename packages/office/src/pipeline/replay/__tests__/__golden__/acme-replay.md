@@ -14,8 +14,8 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 1 | `pr.opened` acme-example/shop#41 by sam | move ACME-123 to review (for sam)<br>link acme-example/shop#41 on ACME-123 (for sam) |
-| 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (for sam)<br>link acme-example/shop#42 on ACME-124 (for sam) |
+| 1 | `pr.opened` acme-example/shop#41 by sam | move ACME-123 to review (for sam)<br>link acme-example/shop#41 on ACME-123 (for sam)<br>notify ada.admin in chat, as sam (review) of ACME-123 with acme-example/shop#41 |
+| 2 | `pr.opened` acme-example/shop#42 by sam | move ACME-124 to review (for sam)<br>link acme-example/shop#42 on ACME-124 (for sam)<br>notify ada.admin in chat, as sam (review) of ACME-124 with acme-example/shop#42 |
 | 3 | `pr.merged` acme-example/shop#43 by ada-admin | (drop: no policy matched) |
 | 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merge): _#41 (Search API) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
 | 5 | `pr.merged` acme-example/shop#41 by sam | (drop: no policy matched) |
@@ -43,7 +43,7 @@ How to read it:
 | 17 | `pr.comment` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
 | 18 | `pr.review_submitted` acme-example/shop#60 by ada-admin | wake sam (review_feedback): _ada-admin left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._<br>wake sam (merge): _#60 (Wishlist) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
 | 19 | `pr.review_submitted` acme-example/shop#60 by outside-contributor | (drop: the event comes from someone who is not trusted: recorded, never acted on) |
-| 20 | `agent.handed_back` acme-example/shop#60 by sam | move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam) |
+| 20 | `agent.handed_back` acme-example/shop#60 by sam | move ACME-140 to review (for sam)<br>assign ACME-140 to human ada.admin (for sam)<br>notify ada.admin in chat, as sam (review) of ACME-140 with acme-example/shop#60 |
 
 ## Tickets assigned and moved, by a human and by the agent itself
 
@@ -79,7 +79,7 @@ How to read it:
 | # | Event | Decisions |
 | - | - | - |
 | 35 | `agent.handed_back` ACME-170 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-170 to blocked (for noor)<br>assign ACME-170 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-170 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
-| 36 | `agent.handed_back` ACME-171 by noor | move ACME-171 to review (for noor)<br>assign ACME-171 to human ada.admin (for noor) |
+| 36 | `agent.handed_back` ACME-171 by noor | move ACME-171 to review (for noor)<br>assign ACME-171 to human ada.admin (for noor)<br>notify ada.admin in chat, as noor (review) of ACME-171 |
 | 37 | `agent.handed_back` ACME-172 by noor | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>assign ACME-172 to agent priya (for noor)<br>wake priya (unblock): _noor handed ACME-172 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to noor. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed._ |
 | 38 | `agent.handed_back` ACME-173 by noor | (drop: no policy matched) |
 

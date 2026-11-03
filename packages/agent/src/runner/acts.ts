@@ -3,8 +3,8 @@ import type { QueuedAct } from "@outstaff/protocol";
 import type { ActMaker, ActMakerOptions } from "./acts.types.js";
 
 /**
- * Makes the acts the office sends with the agent's own tracker and knowledge ports, so the changes are the agent's,
- * and answers each with what it did. No model runs. Acts are made one at a time, in the order they came; an act sent
+ * Makes the acts the office sends with the agent's own tracker, knowledge and chat ports, so the changes and the
+ * direct messages are the agent's, and answers each with what it did. No model runs. Acts are made one at a time, in the order they came; an act sent
  * again (the answer was lost) is answered again without being made twice.
  */
 export function createActMaker(opts: ActMakerOptions): ActMaker {
@@ -15,8 +15,8 @@ export function createActMaker(opts: ActMakerOptions): ActMaker {
   async function make(act: QueuedAct) {
     let outcome = made.get(act.id);
     if (!outcome) {
-      const { tracker, knowledge, team } = env;
-      outcome = await applyActOps(act.ops, { tracker, knowledge }, (target) =>
+      const { tracker, knowledge, chat, team } = env;
+      outcome = await applyActOps(act.ops, { tracker, knowledge, chat }, (target) =>
         trackerMemberOf(target, team, tracker!),
       );
 

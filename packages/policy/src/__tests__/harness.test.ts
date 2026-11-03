@@ -86,5 +86,17 @@ describe("describeProposal", () => {
         reason: "r",
       }),
     ).toBe("stop the work on ACME-1 except sam's: Stop.");
+
+    const notice = { type: "notify", as: "sam", human: "ada.admin", need: "review" } as const;
+    expect(describeProposal({ ...notice, reason: "r" })).toBe("notify ada.admin as sam (review)");
+    expect(
+      describeProposal({
+        ...notice,
+        ticket: "ACME-1",
+        prs: [{ ref: "acme/shop#7" }],
+        told: true,
+        reason: "r",
+      }),
+    ).toBe("notify ada.admin as sam (review) of ACME-1 with acme/shop#7, told in the chat thread");
   });
 });

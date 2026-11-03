@@ -333,6 +333,7 @@ policies.hand_back.blocked_notify  pm           default
 policies.hand_back.fallback        first_human  team.yaml
 policies.tickets.prs_per_ticket    one          team.yaml
 policies.pull_ready                true         default
+policies.notify_handoff            true         default
 policies.merge.on_approval         false        default
 `);
   });

@@ -109,6 +109,23 @@ export const pipelineSchema = z
       })
       .optional()
       .meta(d("How wakes are batched.")),
+    notify: z
+      .strictObject({
+        debounce_seconds: z
+          .int()
+          .min(0)
+          .max(3600)
+          .optional()
+          .meta(
+            d(
+              "How long a direct message to a human about work that landed on them (the notify_human_on_handoff policy) waits for more to join it: an agent's messages to one human within this many seconds of the latest go as one. A message also waits while the agent's round on its ticket runs, so a pull request opened in a round goes with the round's hand-back. Default 60, or office.poll_interval_seconds plus 15 when that is longer, so a pull request the office reads after the hand-back still joins its message.",
+            ),
+          ),
+      })
+      .optional()
+      .meta(
+        d("How the direct messages that tell a human about work that landed on them are batched."),
+      ),
     context: pipelineContextSchema.optional(),
   })
   .meta(

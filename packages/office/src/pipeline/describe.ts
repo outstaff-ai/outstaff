@@ -1,5 +1,5 @@
 import { subjectLabel } from "#/log.js";
-import type { ActOp, Decision } from "./decisions.types.js";
+import type { ActOp, Decision, Notify } from "./decisions.types.js";
 import type { ErrorProposal, PipelineEvent, Proposal } from "@outstaff/policy";
 import type { ContextManifest, ManifestEntry, MergeManifest } from "./context/context.types.js";
 import type { Trace } from "./trace.types.js";
@@ -14,6 +14,7 @@ const OP_TEXT: { [K in ActOp["op"]]: (op: Extract<ActOp, { op: K }>) => string }
   link_pr: (op) => `link ${op.pr.repo.owner}/${op.pr.repo.name}#${op.pr.number} on ${op.ticket}`,
   link_doc: (op) => `link doc ${op.doc} on ${op.ticket}`,
   set_field: (op) => `set ${op.field} of ${op.ticket} to ${op.value ?? "nothing"}`,
+  chat_dm: (op) => `send a direct message to ${op.to}`,
 };
 
 /** One tracker change, in words. */
@@ -31,6 +32,15 @@ export function subjectOf(event: PipelineEvent): string {
   return subjectLabel(event.subject);
 }
 
+/** A notice in words: who tells whom, about what. */
+export function notifyText(n: Pick<Notify, "as" | "human" | "need" | "ticket" | "prs" | "told">) {
+  const of = n.ticket ? ` of ${n.ticket}` : "";
+  const prs = n.prs?.length ? ` with ${n.prs.map((p) => p.ref).join(", ")}` : "";
+  return n.told
+    ? `notify ${n.human} of nothing more${of}: told in the chat thread the work came from`
+    : `notify ${n.human} in chat, as ${n.as} (${n.need})${of}${prs}`;
+}
+
 /** A stop in words: the ticket, and the agents whose work it leaves alone. */
 const stopText = (ticket: string, except: readonly string[] = []) =>
   `stop the work on ${ticket}${except.length > 0 ? `, except ${except.join(", ")}'s` : ""}`;
@@ -46,6 +56,8 @@ export function describeDecision(d: Decision): string {
       return `drop: ${d.reason}`;
     case "stop":
       return stopText(d.ticket, d.except);
+    case "notify":
+      return notifyText(d);
   }
 }
 
@@ -60,6 +72,8 @@ export function describeProposal(p: Proposal | ErrorProposal): string {
       return `suppress waking ${p.person}${p.kind ? ` (${p.kind})` : ""}: ${p.reason}`;
     case "stop":
       return stopText(p.ticket, p.except);
+    case "notify":
+      return notifyText(p);
     default:
       return `${p.type}: ${p.reason}`;
   }

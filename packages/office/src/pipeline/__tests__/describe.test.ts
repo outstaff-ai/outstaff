@@ -449,3 +449,40 @@ describe("a stop in words", () => {
     ]);
   });
 });
+
+describe("a notice in words", () => {
+  it("says whom the agent tells about what, or that the chat thread told them", () => {
+    const notice = {
+      type: "notify" as const,
+      policy: "notify_human_on_handoff",
+      as: "sam",
+      human: "ada.admin",
+      need: "review" as const,
+      ticket: "ACME-1",
+      prs: [{ ref: "acme/shop#9" }],
+    };
+
+    expect(describeDecision(notice)).toBe(
+      "notify ada.admin in chat, as sam (review) of ACME-1 with acme/shop#9",
+    );
+
+    expect(describeProposal({ ...notice, told: true, reason: "r" })).toBe(
+      "notify ada.admin of nothing more of ACME-1: told in the chat thread the work came from",
+    );
+
+    expect(describeOp({ op: "chat_dm", to: "U0ADA", body: "x" })).toBe(
+      "send a direct message to U0ADA",
+    );
+
+    const trace: Trace = {
+      event: event("agent.handed_back"),
+      policies: [],
+      aggregation: [],
+      decisions: [notice],
+    };
+
+    expect(decisionLines(trace)).toEqual([
+      "notify ada.admin in chat, as sam (review) of ACME-1 with acme/shop#9",
+    ]);
+  });
+});

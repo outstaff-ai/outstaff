@@ -5,12 +5,14 @@ import type { WorkState } from "./workstate/index.js";
 
 type Team = Pick<TeamConfig, "humans" | "policies">;
 
+/** The human of the team file one of their identities names: tracker, vcs, or their name. */
+export const humanOf = (team: Pick<TeamConfig, "humans">, id: string) =>
+  team.humans?.find((h) => h.identities.tracker === id || h.identities.vcs === id || h.name === id);
+
 /** The human who asked for the ticket, by any of their names; without one, the first human if the policy says so. */
 function requesterHuman(team: Team, asked: string | undefined) {
   if (asked) {
-    return team.humans?.find(
-      (h) => h.identities.tracker === asked || h.identities.vcs === asked || h.name === asked,
-    );
+    return humanOf(team, asked);
   }
 
   return policyOn(team.policies, "hand_back.fallback") ? team.humans?.[0] : undefined;

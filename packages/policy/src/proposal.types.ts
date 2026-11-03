@@ -70,7 +70,51 @@ export interface StopProposal {
   reason: string;
 }
 
-export type Proposal = WakeProposal | ActProposal | DropProposal | SuppressProposal | StopProposal;
+/** A pull request a notice points the human to. */
+export interface NoticePr {
+  /** `owner/name#n`. */
+  ref: string;
+  url?: string | undefined;
+  title?: string | undefined;
+}
+
+/**
+ * Tell a human in chat that work landed on them: a direct message from the agent's own chat account. The office
+ * holds a human's notices from one agent for a short while, and while that agent's round on the ticket still runs,
+ * then sends them as one message.
+ */
+export interface NotifyProposal {
+  type: "notify";
+
+  /** The agent who sends the message. */
+  as: string;
+
+  /** The human, by an identity the team file gives them: tracker, vcs, or their name. */
+  human: string;
+
+  /** What is needed from them: a review, or what blocks the work. */
+  need: "review" | "blocked";
+  ticket?: string | undefined;
+  prs?: NoticePr[] | undefined;
+
+  /** What is needed, in the agent's words (the hand-back summary); the message keeps its first lines. */
+  text?: string | undefined;
+
+  /**
+   * The human was told already, in the chat thread the work came from: nothing is sent, and the notices held for the
+   * ticket are dropped.
+   */
+  told?: boolean | undefined;
+  reason: string;
+}
+
+export type Proposal =
+  | WakeProposal
+  | ActProposal
+  | DropProposal
+  | SuppressProposal
+  | StopProposal
+  | NotifyProposal;
 
 /** In a trace only: the policy threw or returned something that is not a proposal. */
 export interface ErrorProposal {

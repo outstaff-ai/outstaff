@@ -1,4 +1,4 @@
-import type { Capability, Logger, TeamConfig } from "@outstaff/core";
+import type { Capability, Logger, TeamConfig, Tracker } from "@outstaff/core";
 import type { ConfiguredPolicy } from "@outstaff/policy";
 import type { QueuedAct } from "@outstaff/protocol";
 import type { Clock } from "#/types.js";
@@ -6,6 +6,7 @@ import type { Scheduler } from "#/scheduler/index.js";
 import type { Store } from "#/store/types.js";
 import type { WorkState } from "#/workstate/index.js";
 import type { ActDesk } from "./act/act.types.js";
+import type { NoticeDesk } from "./notify/notify.types.js";
 import type { PipelineRunner } from "./runner.types.js";
 import type { TraceStore } from "./trace.types.js";
 
@@ -19,6 +20,9 @@ export interface OfficePipelineOptions {
   push(person: string, act: QueuedAct): boolean;
   clock: Clock;
   logger: Logger;
+
+  /** The office's own tracker, read only: the links and comments the notices to humans carry. */
+  tracker?: Tracker | undefined;
 
   /** The team's custom policies, loaded; they run after the built-in ones. */
   policies?: readonly ConfiguredPolicy[] | undefined;
@@ -35,4 +39,5 @@ export interface OfficePipeline {
   runner: PipelineRunner;
   traces: TraceStore;
   acts: ActDesk;
+  notices: NoticeDesk;
 }

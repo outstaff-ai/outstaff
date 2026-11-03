@@ -2,7 +2,13 @@ import { createStaticWorkflowState } from "@outstaff/core";
 import type { PipelineEvent, PipelineEventType } from "./events.types.js";
 import type { HarnessResult, HarnessStep, HarnessWorld } from "./harness.types.js";
 import type { ConfiguredPolicy, PolicyOptions, PolicyState } from "./policy.types.js";
-import type { ErrorProposal, Proposal, StopProposal, WakeProposal } from "./proposal.types.js";
+import type {
+  ErrorProposal,
+  NotifyProposal,
+  Proposal,
+  StopProposal,
+  WakeProposal,
+} from "./proposal.types.js";
 import { runPolicy } from "./run.js";
 
 /** The state a step's world describes: the office's static work state plus the agents' ready tickets. */
@@ -54,6 +60,9 @@ const wakeWords = (p: WakeProposal) =>
 const stopWords = (p: StopProposal) =>
   `stop the work on ${p.ticket}${p.except?.length ? ` except ${p.except.join(", ")}'s` : ""}: ${p.notice}`;
 
+const notifyWords = (p: NotifyProposal) =>
+  `notify ${p.human} as ${p.as} (${p.need})${p.ticket ? ` of ${p.ticket}` : ""}${p.prs?.length ? ` with ${p.prs.map((x) => x.ref).join(", ")}` : ""}${p.told ? ", told in the chat thread" : ""}`;
+
 /** One proposal in words. */
 export function describeProposal(p: Proposal | ErrorProposal): string {
   switch (p.type) {
@@ -68,6 +77,8 @@ export function describeProposal(p: Proposal | ErrorProposal): string {
       return `suppress waking ${p.person}${p.kind ? ` (${p.kind})` : ""}: ${p.reason}`;
     case "stop":
       return stopWords(p);
+    case "notify":
+      return notifyWords(p);
     default:
       return `${p.type}: ${p.reason}`;
   }

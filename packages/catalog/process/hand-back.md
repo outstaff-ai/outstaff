@@ -12,7 +12,7 @@ Hand back each time you stop, whether the work is finished or not.
    The office moves the ticket from that status for you, and gives it on: `done` to review and to the person who asked; `blocked` to blocked and to the team's PM, who tries to unblock it before a human is asked (to the person who asked when the team has no PM, or you are the PM); `waiting` changes nothing; `silent` leaves the ticket as it was before the round. A ticket you gave to someone else during the work stays with them: the hand-back does not move or reassign it. Do not make that move or assignment yourself. A `done` hand-back on a ticket that is blocked is treated as blocked, so never hand back as `done` while the ticket is blocked.
 
 3. Append the journal entry (see `process/work-items.md`).
-4. Send one final message to the person who asked, using `templates/hand-back.md`.
+4. Write your hand-back summary as one final message to the person who asked, using `templates/hand-back.md`. Do not post it in chat yourself: in a chat thread your agent posts it there{{#if policies.notify_handoff}}, and when the hand-back gives the work to a human, your agent sends them its first lines in a direct message with the ticket and pull request links{{/if}}.
 
 ## Questions and investigations
 

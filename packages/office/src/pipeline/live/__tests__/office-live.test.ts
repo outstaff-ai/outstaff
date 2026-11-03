@@ -29,7 +29,9 @@ function team(): TeamConfig {
     version: 1,
     team: { name: "acme" },
     catalog: { version: "1.0.0" },
-    humans: [{ name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "u-ada" } }],
+    humans: [
+      { name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "u-ada", chat: "U-ada" } },
+    ],
     repos: [{ name: "shop", url: "git.acme.example/acme-example/shop", kind: "primary" }],
     people: [
       {
@@ -54,7 +56,7 @@ function team(): TeamConfig {
       tracker: { adapter: "fake" },
     },
     // These scenarios are about what a wake carries; coalescing has its own.
-    pipeline: { wake: { coalesce_seconds: 0 } },
+    pipeline: { wake: { coalesce_seconds: 0 }, notify: { debounce_seconds: 1 } },
   });
 
   if (!result.ok) {
@@ -117,7 +119,12 @@ describe("the office with the event pipeline live", () => {
   }
 
   /** Sam's agent process: its connection to the office, which makes sam's acts with sam's own tracker account. */
-  function agent(tracker: FakeTracker, config: TeamConfig, sam: Member) {
+  function agent(
+    tracker: FakeTracker,
+    config: TeamConfig,
+    sam: Member,
+    chat = createFakeChat({ now: clock.now }),
+  ) {
     const c = createOfficeConnection({
       url: `ws://127.0.0.1:${office!.agentPort()}/agent`,
       person: "sam",
@@ -127,7 +134,7 @@ describe("the office with the event pipeline live", () => {
     });
 
     const acts = createActMaker({
-      env: { team: config, tracker: tracker.as(sam) },
+      env: { team: config, tracker: tracker.as(sam), chat },
       office: c,
       log: silentLogger,
     });
@@ -292,6 +299,43 @@ describe("the office with the event pipeline live", () => {
     }
 
     expect((await tracker.getIssue(later)).status.canonical).toBe("backlog");
+  });
+
+  it("has sam tell the requester in a direct message, once no other notice came for a while", async () => {
+    const { tracker, config, ada, sam } = await start();
+    const chat = createFakeChat({ now: clock.now });
+    conn = agent(tracker, config, sam, chat);
+    await conn.whenConnected();
+    const issue = await tracker.as(ada).createIssue({
+      title: "Greeting",
+      body: "",
+      status: "backlog",
+      assignee: sam.id,
+    });
+
+    await tracker.as(ada).assign(issue.key, sam.id);
+    await office!.parts.intake.pollOnce();
+    const offer = await conn.offers()[Symbol.asyncIterator]().next();
+    const item = offer.value!.workItem;
+    await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
+    await until(async () => office!.parts.workState.ticketStatus(issue.key) === "active");
+    await conn.handBack(item.id, {
+      summary: "Added the greeting.",
+      status: "done",
+      toReview: ["opened pull request acme/app#1"],
+    });
+
+    await until(async () => (await traces()).some((t) => t.event.type === "agent.handed_back"));
+    expect(chat.posts).toEqual([]);
+
+    clock.advance(1_100);
+    await until(async () => chat.posts.length > 0);
+    expect(chat.posts.map((p) => [p.channel, p.text])).toEqual([
+      [
+        await chat.openDirect("U-ada"),
+        `Ready for your review: [${issue.key}](${tracker.links.issue(issue.key)}) Greeting\nAdded the greeting.`,
+      ],
+    ]);
   });
 
   it("queues the act of an offline agent and has it made once the agent connects", async () => {

@@ -6,10 +6,12 @@ describe("the built-in policies", () => {
   it("are listed once each, every one with what it decides and every wake with an instruction", () => {
     const ids = BUILT_IN_POLICIES.map((p) => p.id);
     expect(new Set(ids).size).toBe(ids.length);
-    // An act may post no note: the ticket's history shows its changes.
+    // An act may post no note: the ticket's history shows its changes. A notice is its own message.
     expect(
       BUILT_IN_POLICIES.filter(
-        (p) => !p.decides || (!p.instruction && !p.decides.startsWith("act for")),
+        (p) =>
+          !p.decides ||
+          (!p.instruction && !p.decides.startsWith("act for") && !p.decides.startsWith("notify")),
       ),
     ).toEqual([]);
 

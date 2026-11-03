@@ -99,6 +99,8 @@ const tracker = createItsaplanE2e({
   ],
   members: [
     { userId: "u-ada", name: "Ada Admin", username: "ada.admin", kind: "member" },
+    // A trusted human with no chat identity: work handed back to her is not told in chat.
+    { userId: "u-ivy", name: "Ivy Ops", username: "ivy.ops", kind: "member" },
     { userId: "u-office", name: "Acme Office", username: "acme-office", kind: "agent" },
     { userId: "u-sam", name: "Sam Duarte", username: "sam", kind: "agent" },
     { userId: "u-mira", name: "Mira Okafor", username: "mira", kind: "agent" },

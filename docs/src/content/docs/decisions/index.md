@@ -33,3 +33,4 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0022](/decisions/0022-act-echoes-wake-no-one/)           | The tracker's echo of an act wakes no one                                      |
 | [0023](/decisions/0023-ticket-closes-after-merge-checks/) | A ticket closes once the checks on its merge commit pass                       |
 | [0024](/decisions/0024-agent-memory-behind-ost-note/)     | Agent memory is kept behind `ost note`, on the volume or in the knowledge base |
+| [0025](/decisions/0025-agents-tell-humans-work-landed/)   | Agents tell a human in chat when work lands on them                            |

@@ -95,6 +95,7 @@ A policy proposes; it never decides alone. Each proposal has a `reason`:
 
 - `wake`: wake an agent with an instruction. Its subject is the event's unless it names one; its feedback is the event's.
 - `act`: change the tracker for an agent, without a model run: move a ticket, assign it, set its parent, link a pull request or a document on it. Nothing else: anything that needs judgement is a wake.
+- `notify`: tell a `human` (by an identity the team file gives them) in a direct message from the agent `as`, that work landed on them: `need` (`review` or `blocked`), the `ticket`, the pull requests (`prs`, each `{ ref, url, title }`) and `text`, what is needed in the agent's words. The office holds a human's notices from one agent for `pipeline.notify.debounce_seconds` and while the agent's round on the ticket runs, then the agent sends them as one message. `told: true` says the human was told already (in the chat thread the work came from): nothing is sent, and what was held for the ticket is dropped. The built-in `notify_human_on_handoff` proposes it.
 - `drop`: nothing to do, recorded so it can be explained.
 - `suppress`: keep another policy's wake of an agent from happening, narrowed by `subject` and `kind` when given.
 - `stop`: stop the work on a closed `ticket`. Every agent's queued work on it and on its pull requests is canceled, and an agent running such work gets `notice` as a round of its own (kind `ticket_closed`), which starts when the running one ends. The agents in `except` are left alone. The built-in `closed_stops_work` proposes it on `ticket.closed`.
@@ -104,7 +105,7 @@ A policy proposes; it never decides alone. Each proposal has a `reason`:
 The aggregation layer makes the decisions from the proposals of every policy, in this order:
 
 1. **Invariants**, the same for every policy. A proposal that breaks one is rejected, and dropped with the reason:
-   - an act for, or a wake or suppression of, anyone who is not an agent on the team: the office never acts as itself;
+   - an act for, a notice from, or a wake or suppression of, anyone who is not an agent on the team: the office never acts as itself;
    - a wake of the agent who caused the event: an agent is never woken for its own action (the office's idle pull for an agent is the exception);
    - an act's echo: the tracker's report of a change an act made (marked `echo` in the event's data) wakes no one, since the event that caused the act already decided whom to wake;
    - the loop guard: an event a bot caused wakes no one, except the office's own merge, conflict and CI checks;

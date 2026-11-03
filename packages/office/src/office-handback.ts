@@ -1,4 +1,5 @@
 import type { Logger, WorkflowEvent } from "@outstaff/core";
+import { readOrigin } from "./chat/origin.js";
 import { itemEventSubject } from "./office-item-subject.js";
 import { PR_OPEN_SOURCE } from "./office-work-made.js";
 import { ROUND_START } from "./round-start.js";
@@ -91,6 +92,12 @@ const refresh = (workState: WorkState, person: string, tickets: string[]) =>
     ...tickets.map((key) => workState.refreshTicket(key, { kind: "agent", id: person })),
   ]);
 
+/** Work from a chat thread gets its result there (the chat desk's report): `chat` says so. */
+async function fromChat(store: Store, item: WorkItem): Promise<{ chat?: true }> {
+  const origin = await readOrigin(store, item.id);
+  return origin && !origin.filed ? { chat: true } : {};
+}
+
 /**
  * What follows an agent's hand-back of an item: an `agent.handed_back` event for its ticket or pull request, with the
  * summary the agent handed back.
@@ -123,7 +130,11 @@ export function createHandedBack(deps: {
       type: "agent.handed_back",
       subject,
       actor: { kind: "agent", id: item.person },
-      data: { ...(await dataOf(store, item, result, subject.ticket)), ...made },
+      data: {
+        ...(await dataOf(store, item, result, subject.ticket)),
+        ...(await fromChat(store, item)),
+        ...made,
+      },
     };
 
     // The policies read who last worked on the tickets, and the tickets themselves, from the state. The agent may have

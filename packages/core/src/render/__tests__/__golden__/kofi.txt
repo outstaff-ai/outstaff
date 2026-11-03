@@ -112,7 +112,7 @@ Hand back each time you stop, whether the work is finished or not.
    The office moves the ticket from that status for you, and gives it on: `done` to review and to the person who asked; `blocked` to blocked and to the team's PM, who tries to unblock it before a human is asked (to the person who asked when the team has no PM, or you are the PM); `waiting` changes nothing; `silent` leaves the ticket as it was before the round. A ticket you gave to someone else during the work stays with them: the hand-back does not move or reassign it. Do not make that move or assignment yourself. A `done` hand-back on a ticket that is blocked is treated as blocked, so never hand back as `done` while the ticket is blocked.
 
 3. Append the journal entry (see `/work/dir/process/work-items.md`).
-4. Send one final message to the person who asked, using `/work/dir/templates/hand-back.md`.
+4. Write your hand-back summary as one final message to the person who asked, using `/work/dir/templates/hand-back.md`. Do not post it in chat yourself: in a chat thread your agent posts it there, and when the hand-back gives the work to a human, your agent sends them its first lines in a direct message with the ticket and pull request links.
 
 ## Questions and investigations
 
@@ -281,7 +281,7 @@ Use this when a teammate handed a ticket back as blocked and the office gave you
    - Ask the teammate who can answer with `ost ask` (`/work/dir/references/team.md`). Ask once, with the question and the ticket link.
    - Re-plan when the plan is the problem: split the ticket, change its scope or order, or add the ticket that removes the dependency. Write the new plan on the ticket first, and file or change tickets for others as `/work/dir/process/ticket-lifecycle.md` says ("Planning work for others"). A new plan that needs a trusted human's confirmation is step 4.
 3. When it is unblocked, comment on the ticket with the answer or the new plan, then assign the ticket back to the agent who was blocked with `ost ticket assign <ticket> <agent>`. The assignment wakes the agent, and your comment reaches it with the ticket.
-4. Only when you cannot unblock it (it needs a decision, access, spend or anything irreversible from a human, or no teammate has the answer), comment on the ticket saying exactly what is needed from the human, what you tried and what waits meanwhile, then assign the ticket to the requester with `ost ticket assign <ticket> <requester>`. Their reply or comment on the ticket sends the work back to the agent.
+4. Only when you cannot unblock it (it needs a decision, access, spend or anything irreversible from a human, or no teammate has the answer), comment on the ticket saying exactly what is needed from the human, what you tried and what waits meanwhile, then assign the ticket to the requester with `ost ticket assign <ticket> <requester>`. Their reply or comment on the ticket sends the work back to the agent. Do not message them in chat: your agent sends them the ticket and your comment in a direct message.
 5. Hand back as in `/work/dir/process/hand-back.md`, as `done`: the ticket is with whoever acts next. Say in the journal what you tried and whom you gave the ticket to.
 
 === process/work-items.md ===

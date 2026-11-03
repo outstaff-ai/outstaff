@@ -557,6 +557,17 @@ describe("designer skill: Design canvas", () => {
     expect(text).toContain("Do not ask for the code.");
   });
 
+  it("says the agent's direct message on a hand-back only while the team has it on", () => {
+    const text = (team: typeof acme) =>
+      dump(renderPerson({ team, handle: "priya", catalog: real }).files);
+
+    expect(text(acme)).toContain("your agent sends them its first lines in a direct message");
+    expect(text(acme)).toContain("your agent sends them the ticket and your comment");
+    const off = { ...acme, policies: { ...acme.policies!, notify_handoff: false } };
+    expect(text(off)).not.toContain("in a direct message with the ticket and pull request links");
+    expect(text(off)).not.toContain("your agent sends them the ticket and your comment");
+  });
+
   it("drops the canvas guidance when the team switches the canvas off", () => {
     const off = { ...acme, policies: { ...acme.policies!, design: { canvas: false } } };
     expect(skill(off)).not.toContain("Design canvas");

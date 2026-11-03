@@ -1,5 +1,5 @@
 import type { Decision } from "#/pipeline/decisions.types.js";
-import { describeOp } from "#/pipeline/describe.js";
+import { describeOp, notifyText } from "#/pipeline/describe.js";
 import type { Trace } from "#/pipeline/trace.types.js";
 
 function linesOf(d: Decision): string[] {
@@ -12,6 +12,8 @@ function linesOf(d: Decision): string[] {
       return [`stop the work on ${d.ticket}: _${d.notice}_`];
     case "drop":
       return [`(drop: ${d.reason})`];
+    case "notify":
+      return [notifyText(d)];
   }
 }
 

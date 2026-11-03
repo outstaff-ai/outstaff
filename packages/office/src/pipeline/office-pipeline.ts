@@ -1,23 +1,26 @@
 import { createAgentActExecutor } from "./act/agent-executor.js";
 import { createActDesk } from "./act/desk.js";
 import { createLivePipeline } from "./live/live.js";
+import { createNoticeDesk } from "./notify/desk.js";
 import type { OfficePipeline, OfficePipelineOptions } from "./office-pipeline.types.js";
 import { createStoreTraceStore } from "./store-traces.js";
 
 export { stoppedWork } from "./live/stop.js";
 
 /**
- * The event pipeline as the office runs it (decision 0018): it decides on every event, and its acts go to the agents
- * that make them.
+ * The event pipeline as the office runs it (decision 0018): it decides on every event, and its acts and its notices to
+ * humans go to the agents that make and send them.
  */
 export function createOfficePipeline(opts: OfficePipelineOptions): OfficePipeline {
   const traces = createStoreTraceStore(opts.store);
   const acts = createActDesk({ ...opts, traces });
   const executor = createAgentActExecutor({ traces, acts });
+  const notices = createNoticeDesk({ ...opts, acts });
 
   return {
-    runner: createLivePipeline({ ...opts, executor, traces, echoOf: acts.echoOf }),
+    runner: createLivePipeline({ ...opts, executor, notices, traces, echoOf: acts.echoOf }),
     traces,
     acts,
+    notices,
   };
 }
