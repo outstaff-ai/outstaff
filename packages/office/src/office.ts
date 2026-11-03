@@ -13,7 +13,7 @@ import { createStarted } from "./office-started.js";
 import { createOfficeRounds } from "./office-rounds.js";
 import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
-import { officeTicketPrs } from "./office-ticket-prs.js";
+import { officeTicketDesks } from "./office-work-made.js";
 import { officeCiLogs } from "./office-ci-log.js";
 import { roleInfo, webhookOptions } from "./office-config.js";
 import type { CreateOfficeInput, Office } from "./office.types.js";
@@ -236,7 +236,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     usage,
     chat: { ...chatDesk, message: chatEntry.message },
     ...officeDocDesks({ store, workState, log }),
-    tickets: officeTicketPrs({ workState, team, log }),
+    ...officeTicketDesks({ store, workState, team, log }),
     ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
     recall,
     acts,

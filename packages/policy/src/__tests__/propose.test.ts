@@ -88,6 +88,73 @@ describe("ctx.wake", () => {
       { type: "drop", reason: "no ready ticket is assigned to sam" },
     ]);
   });
+
+  it("wakes an idle agent on the open parent of its next ready sub-ticket, naming the parent's ready ones", () => {
+    const next: WakeSpec = { person: "actor", kind: "assigned", subject: "next_ready_ticket" };
+    const idle = event("agent.idle", { actor: { kind: "agent", id: "sam" } });
+    const ready = {
+      sam: [
+        { key: "ACME-3", readyAt: "2026-10-05T07:00:00.000Z" },
+        { key: "ACME-4", readyAt: "2026-10-05T08:00:00.000Z" },
+        { key: "ACME-5", readyAt: "2026-10-05T09:00:00.000Z" },
+      ],
+    };
+
+    const of = (parent: "active" | "done") => ({
+      ready,
+      tickets: {
+        "ACME-2": { status: parent },
+        "ACME-3": { status: "ready" as const, parent: "ACME-2" },
+        "ACME-4": { status: "ready" as const, parent: "ACME-2" },
+        "ACME-5": { status: "ready" as const },
+      },
+    });
+
+    expect(wake(next, idle, of("active"), "Next: {{next.ticket}}.")).toMatchObject([
+      {
+        instruction:
+          "Next: ACME-2's ready sub-tickets ACME-3, ACME-4; take them in the order you planned.",
+        subject: { type: "ticket", ref: "ACME-2" },
+      },
+    ]);
+
+    const unread = { ...of("active"), tickets: { ...of("active").tickets } };
+    delete (unread.tickets as Record<string, unknown>)["ACME-2"];
+    expect(wake(next, idle, unread, "{{next.ticket}}")).toMatchObject([
+      { subject: { type: "ticket", ref: "ACME-2" } },
+    ]);
+
+    expect(wake(next, idle, of("done"), "Next: {{next.ticket}}.")).toMatchObject([
+      { instruction: "Next: ACME-3.", subject: { type: "ticket", ref: "ACME-3" } },
+    ]);
+  });
+
+  it("wakes on the parent of the event's ticket, with the parent's open sub-tickets", () => {
+    const up: WakeSpec = { person: "assignee", kind: "assigned", subject: "parent" };
+    const closed = event("ticket.closed", { subject: { ticket: "ACME-3" } });
+    const sam = { id: "sam", kind: "agent" as const };
+    const world = {
+      tickets: {
+        "ACME-2": { status: "active" as const, assignee: sam },
+        "ACME-3": { status: "done" as const, assignee: sam, parent: "ACME-2" },
+        "ACME-4": { status: "ready" as const, parent: "ACME-2" },
+      },
+    };
+
+    expect(wake(up, closed, world, "{{parent}}: {{parent.open}}")).toMatchObject([
+      { instruction: "ACME-2: ACME-4", subject: { type: "ticket", ref: "ACME-2" } },
+    ]);
+
+    const orphan = { tickets: { "ACME-3": { status: "done" as const, assignee: sam } } };
+    expect(wake(up, closed, orphan, "{{parent}}")).toEqual([
+      { type: "drop", reason: "ACME-3 has no parent ticket" },
+    ]);
+
+    const none = event("agent.idle", { actor: sam });
+    expect(wake({ ...up, person: "actor" }, none, {}, "x")).toEqual([
+      { type: "drop", reason: "the event's ticket has no parent ticket" },
+    ]);
+  });
 });
 
 describe("ctx.act", () => {

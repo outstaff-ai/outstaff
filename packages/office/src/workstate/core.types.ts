@@ -20,6 +20,9 @@ export interface Pickup {
 
   /** When the latest item was created (ISO-8601). */
   at: string;
+
+  /** When an item was last updated (ISO-8601): the work went on until then. */
+  until: string;
 }
 
 /** One agent's work item on a ticket, from when it was queued until it was last updated (ISO-8601). */

@@ -148,6 +148,43 @@ describe("ready tickets in the work state", () => {
     expect(ws.readyTickets("sam").map((r) => r.key)).toEqual([t.key]);
   });
 
+  it("leaves out a sub-ticket while the agent's work on its parent went on after it entered ready", async () => {
+    const parent = await tracker.createIssue({ title: "Parent", body: "", status: "active" });
+    const item = await store.enqueue({
+      person: "sam",
+      kind: "assigned",
+      title: "assigned: parent",
+      trigger: "automation",
+      subject: { type: "ticket", ref: parent.key },
+    });
+
+    clock.advance(MINUTE);
+    const sub = await tracker.createIssue({
+      title: "Part two",
+      body: "",
+      status: "ready",
+      assignee: "u-sam",
+      parent: parent.key,
+    });
+
+    await ws.apply(event("ticket.created", sub.key, { at: clock.now().toISOString() }), meta);
+    await ws.refreshWorkers();
+    expect(ws.readyTickets("sam")).toEqual([]);
+
+    // The round that split the parent ended after the sub-ticket was filed: the next one starts from the parent.
+    clock.advance(MINUTE);
+    await store.updateItem(item.id, { status: "done" });
+    await ws.refreshWorkers();
+    expect(ws.readyTickets("sam")).toEqual([]);
+
+    // Sent back to ready later, with no work on the parent since: it can be pulled.
+    await tracker.transition(sub.key, "backlog");
+    clock.advance(MINUTE);
+    await tracker.transition(sub.key, "ready");
+    await ws.apply(event("ticket.moved", sub.key, { at: clock.now().toISOString() }), meta);
+    expect(ws.readyTickets("sam").map((r) => r.key)).toEqual([sub.key]);
+  });
+
   it("carries the tracker's priority when the adapter has one", async () => {
     const t = await ready("one");
     await build({

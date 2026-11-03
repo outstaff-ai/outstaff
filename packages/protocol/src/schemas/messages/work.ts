@@ -23,6 +23,32 @@ export const workMessages = [
       humans: z.array(humanSchema).optional().describe("The trusted humans of the team."),
     }),
   ),
+  message(
+    "work_made",
+    z.strictObject({
+      workItemId: itemId,
+      ticket: z
+        .string()
+        .min(1)
+        .max(100)
+        .optional()
+        .describe(
+          "Without `pr`: the key of the ticket the caller created. With it: the ticket the pull request links to, when any.",
+        ),
+      pr: z
+        .strictObject({
+          repo: z.strictObject({
+            owner: z.string().min(1).max(200).describe("Owner of the repository."),
+            name: z.string().min(1).max(200).describe("Name of the repository."),
+            host: z.string().min(1).max(200).optional().describe("Host of the code host."),
+          }),
+          number: z.int().positive().describe("Number of the pull request."),
+          url: z.string().min(1).max(2000).optional().describe("Its page on the code host."),
+        })
+        .optional()
+        .describe("The pull request the caller opened."),
+    }),
+  ),
   message("work_list", z.strictObject({ workItemId: itemId.optional() })),
   message("work_list_result", z.strictObject({ items: z.array(workSummarySchema) })),
   message(

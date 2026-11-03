@@ -2356,6 +2356,32 @@
         {
           "type": "object",
           "properties": {
+            "parent_status": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "backlog",
+                  "ready",
+                  "active",
+                  "review",
+                  "blocked",
+                  "done",
+                  "canceled"
+                ]
+              }
+            }
+          },
+          "required": [
+            "parent_status"
+          ],
+          "additionalProperties": false,
+          "description": "The linked ticket is a sub-ticket whose parent is in one of these canonical statuses."
+        },
+        {
+          "type": "object",
+          "properties": {
             "moved_to": {
               "minItems": 1,
               "type": "array",
@@ -2647,6 +2673,19 @@
           ],
           "additionalProperties": false,
           "description": "The ticket has two or more pull requests that are open or merged (or, with false, fewer). Closed ones that were never merged do not count."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "open_subtickets": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "open_subtickets"
+          ],
+          "additionalProperties": false,
+          "description": "The ticket has open sub-tickets: ready, active, in review or blocked; one in the backlog waits for later and does not count (or, with false, it has none)."
         },
         {
           "type": "object",

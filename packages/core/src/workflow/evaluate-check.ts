@@ -21,6 +21,13 @@ const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? "" : "s"}`;
 const oneOf = (value: unknown, wanted: readonly string[]) =>
   typeof value === "string" && wanted.includes(value);
 
+/** Statuses of a sub-ticket whose work is under way: one in the backlog waits for later, and does not count. */
+const UNDER_WAY = new Set(["ready", "active", "review", "blocked"]);
+
+/** The ticket's open sub-tickets: ready, active, in review or blocked. */
+export const openSubTickets = (state: Ctx["state"], ticket: string): string[] =>
+  state.subTickets(ticket).filter((t) => UNDER_WAY.has(state.ticketStatus(t) ?? ""));
+
 const ticketPrs = (ctx: Ctx): WorkflowPr[] =>
   ctx.ticket ? ctx.state.pullRequestsOf(ctx.ticket) : [];
 
@@ -67,6 +74,15 @@ const CHECKS: ConditionChecks = {
     return {
       ok: s !== undefined && wanted.includes(s),
       detail: `ticket status ${shown} in ${list(wanted)}`,
+    };
+  },
+  parent_status: (wanted, ctx) => {
+    const parent = ctx.ticket ? ctx.state.parentOf(ctx.ticket) : undefined;
+    const s = parent ? ctx.state.ticketStatus(parent) : undefined;
+    const shown = parent ? `${parent} ${s ?? "unknown"}` : "none";
+    return {
+      ok: s !== undefined && wanted.includes(s),
+      detail: `parent ticket ${shown}, wanted in ${list(wanted)}`,
     };
   },
   moved_to: (wanted, ctx) => {
@@ -200,6 +216,13 @@ const CHECKS: ConditionChecks = {
     return {
       ok: live.length > 1 === wanted,
       detail: `ticket has ${plural(live.length, "open or merged pull request")}, wanted ${wanted ? "several" : "at most one"}`,
+    };
+  },
+  open_subtickets: (wanted, ctx) => {
+    const open = ctx.ticket ? openSubTickets(ctx.state, ctx.ticket) : [];
+    return {
+      ok: open.length > 0 === wanted,
+      detail: `ticket has ${plural(open.length, "open sub-ticket")}${open.length ? ` (${open.join(", ")})` : ""}, wanted ${wanted ? "some" : "none"}`,
     };
   },
   ticket_handed_back: (wanted, ctx) => {

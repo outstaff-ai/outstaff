@@ -48,6 +48,8 @@ export type PrListResult = PayloadOf<"pr_list_result">;
 
 export type DocLinkRequest = PayloadOf<"doc_link">;
 
+export type WorkMadeReport = PayloadOf<"work_made">;
+
 export type NotesReport = PayloadOf<"notes_changed">;
 
 export type CiLogRequest = PayloadOf<"ci_log">;
@@ -97,6 +99,12 @@ export interface OfficeClient {
    * come back as work for the caller.
    */
   docLink(request: DocLinkRequest): Promise<void>;
+
+  /**
+   * Tells the office the caller created a ticket, or opened a pull request (with the ticket it links to), in a work
+   * item, so the item's hand-back also gives that ticket to the requester once it is in review.
+   */
+  workMade(report: WorkMadeReport): Promise<void>;
 
   /** Tells the office the caller's notes changed, or have a version it does not use. */
   notesChanged(report: NotesReport): Promise<void>;
@@ -156,6 +164,7 @@ export interface FakeOffice extends OfficeClient {
   ticketPrsAsked: TicketPrsRequest[];
   prListsAsked: PrListRequest[];
   docsLinked: DocLinkRequest[];
+  made: WorkMadeReport[];
   notesReported: NotesReport[];
   ciLogsAsked: CiLogRequest[];
   recalled: RecallRequest[];

@@ -1,56 +1,18 @@
-import { PortError, policyValue } from "@outstaff/core";
+import { PortError } from "@outstaff/core";
 import { z } from "zod";
 import { repoLabel, requireVcs } from "./support.js";
 import { defineVerb, result } from "./define.js";
-import type { AgentEnv } from "./types.js";
 import { currentBranch, repoOrWorktree } from "./worktree.js";
 import { body, bodyFile, number, repo, textOf } from "./pr-write-support.js";
 import { prComment, prReply, prReview } from "./pr-review.js";
 import { prDiff, prMerge } from "./pr-merge.js";
-
-/**
- * With one pull request per ticket (the default), a pull request for a ticket that already has an open one, or that is
- * done or canceled, is refused. A merged one does not count while the ticket is open: a follow-up fix after a merge
- * (for example for a check that failed on the merge commit) goes on the same ticket. The office says which ticket the
- * new one would link to, by the rule it links existing ones with, its status and what pull requests it has.
- */
-async function oneForTicket(
-  env: AgentEnv,
-  draft: { headRef: string; title: string; body: string },
-): Promise<void> {
-  if (!env.office || policyValue(env.team.policies, "tickets.prs_per_ticket") !== "one") {
-    return;
-  }
-
-  const { ticket, status, prs } = await env.office.ticketPrs(draft);
-  if (!ticket) {
-    return;
-  }
-
-  if (status === "done" || status === "canceled") {
-    throw new PortError(
-      "conflict",
-      `${ticket} is ${status}, so it takes no new pull request. File a follow-up ticket with \`ost ticket create --related ${ticket} --assignee me --status active --title "..."\` and open the pull request for that one, with \`Closes <new ticket>\` in its body.`,
-    );
-  }
-
-  const open = prs.filter((p) => p.state === "open");
-  if (open.length === 0) {
-    return;
-  }
-
-  const named = open.map((p) => `${p.ref}${p.url ? ` ${p.url}` : ""}`).join(", ");
-  throw new PortError(
-    "conflict",
-    `${ticket} already has an open pull request: ${named}. A ticket takes one open pull request at a time, because outstaff moves the ticket to done when its last open pull request merges and the checks on the merge pass. To change that pull request, use \`ost pr update\` or push to its branch. If this is a separate part, split the work: create a ticket for it with \`ost ticket create --parent ${ticket} --assignee me --status active --title "..."\`, then open the pull request for that new ticket, with \`Closes <new ticket>\` in its body.`,
-  );
-}
+import { afterOpen, draftTicket, oneForTicket } from "./pr-open-ticket.js";
 
 export const prOpen = defineVerb({
   name: "pr.open",
   summary: "Open a pull request from a pushed branch.",
   description:
-    "Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. Opening it ready does not set it to merge: when the team lets agents merge, you are woken to decide once it is approved. A ticket takes one open pull request at a time: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has an open one, or is done or canceled. A merged one does not count while the ticket is open, so a follow-up fix after a merge (for example for a check that failed on the merge commit) goes on the same ticket. For a separate part, split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.",
+    "Opens a pull request as you. The head defaults to the branch checked out in your worktree, the base to the repository's default branch and the repository to the worktree's origin. Refuses to open from the default branch or a detached HEAD: create the branch first. Push the branch first. Pass draft to open it as a draft. Opening it ready does not set it to merge: when the team lets agents merge, you are woken to decide once it is approved. It is linked on the ticket it is for in the tracker right away, as you. A ticket takes one open pull request at a time: it is refused when the ticket the pull request would link to (a closing keyword in the body, the branch, the title) already has an open one, or is done or canceled. A merged one does not count while the ticket is open, so a follow-up fix after a merge (for example for a check that failed on the merge commit) goes on the same ticket. For a separate part, split the work into a sub-ticket with ticket create --parent and open the pull request for that ticket. A team can allow several with policies.tickets.prs_per_ticket: many.",
   input: z.strictObject({
     repo,
     head: z
@@ -80,7 +42,8 @@ export const prOpen = defineVerb({
     const ref = await repoOrWorktree(env, ctx, input.repo);
     const head = input.head ?? (await currentBranch(ctx));
     const text = textOf(env, ctx, input, true) ?? "";
-    await oneForTicket(env, { headRef: head, title: input.title, body: text });
+    const found = await draftTicket(env, { headRef: head, title: input.title, body: text });
+    oneForTicket(env, found);
     const pr = await vcs.openPullRequest(ref, {
       head,
       title: input.title,
@@ -90,11 +53,13 @@ export const prOpen = defineVerb({
     });
 
     const url = vcs.links.pr(ref, pr.number);
+    const linked = await afterOpen(env, ctx, { repo: ref, number: pr.number, url }, found?.ticket);
     return result(
       [
         `Opened ${repoLabel(ref)}#${pr.number}${pr.draft ? " (draft)" : ""}: ${pr.title}`,
         `${pr.head.ref} -> ${pr.base.ref}`,
         url,
+        ...linked,
       ],
       { pr },
       [url],

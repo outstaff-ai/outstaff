@@ -2,9 +2,10 @@
 // request, a human asks for changes while another asks a question in chat (answered by a chat session before the round ends), the agent fixes and resolves the thread, a review with only a summary gets a
 // pull request comment, a batch review with two inline comments gets a reply in each thread, a short "yes" to the agent's own earlier comment is answered from the conversation, the human merges, a
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
-// request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs two pull
-// requests is split into a sub-ticket first, so that each ticket has one (merging the first closes only its own
-// ticket), and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat. The office, Postgres and the agent are the real images; GitHub,
+// request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs several pull
+// requests is split into sub-tickets first, one pull request each: the one in review goes to the human with the
+// hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
+// for the next, until the last one closes the parent, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -1249,81 +1250,8 @@ async function main() {
     `restart: the agent restarted mid-round on #${pr4.pr.number} -> the round was interrupted, queued first, resumed and finished`,
   );
 
-  // ---- 8. a ticket that needs two pull requests: the agent splits it first, then opens one pull request per ticket
-  const pullsBeforeSplit = (await state()).github.pulls.length;
-  const { key: parent } = await stub("POST", "/_test/tickets", {
-    title: "Add a farewell page",
-    description: "It takes two pull requests.\n\nsplit: Add a farewell footer",
-    assignee: "sam",
-  });
-
-  const split = await until(
-    "a sub-ticket, one pull request per ticket, both tickets in review",
-    (s) => {
-      const child = s.tickets.find((t: Json) => t.description.includes(`Part of ${parent}:`));
-      const forParent = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${parent}`));
-      const forChild =
-        child && s.github.pulls.find((p: Json) => p.body.includes(`Closes ${child.key}`));
-
-      const t = s.tickets.find((x: Json) => x.key === parent);
-      return forParent &&
-        forChild &&
-        t.status === "In Review" &&
-        t.assignee !== "sam" &&
-        child.status === "In Review"
-        ? { child, forParent, forChild, t }
-        : undefined;
-    },
-  );
-
-  assertEq(split.child.assignee, "sam", "the sub-ticket is assigned to the agent who made it");
-  assertEq(split.child.parent, parent, "the sub-ticket has its parent as a real parent");
-  assertEq(JSON.stringify(split.child.links), "[]", "no relates link where the parent is real");
-
-  assertEq(
-    split.t.comments.some((c: Json) => c.body.includes(split.child.key)),
-    true,
-    "the parent says it was split, with the sub-ticket's key",
-  );
-
-  const afterSplit = await state();
-  assertEq(
-    afterSplit.github.pulls.length,
-    pullsBeforeSplit + 2,
-    "two pull requests, one per ticket: the second one for the parent was refused",
-  );
-
-  assertEq(
-    afterSplit.github.pulls.filter((p: Json) => p.body.includes(`Closes ${parent}`)).length,
-    1,
-    "the parent has one pull request",
-  );
-
-  step(
-    `split: ${parent} split into ${split.child.key} -> #${split.forParent.number} and #${split.forChild.number}, one pull request per ticket; a second for ${parent} refused`,
-  );
-
-  await stub("POST", `/_test/pulls/${split.forParent.number}/merge`);
-  await until(
-    `${parent} done`,
-    (s) => s.tickets.find((x: Json) => x.key === parent).status === "Done",
-  );
-
-  assertEq(
-    (await state()).tickets.find((x: Json) => x.key === split.child.key).status,
-    "In Review",
-    "merging the parent's pull request leaves the sub-ticket alone",
-  );
-
-  await stub("POST", `/_test/pulls/${split.forChild.number}/merge`);
-  await until(
-    `${split.child.key} done`,
-    (s) => s.tickets.find((x: Json) => x.key === split.child.key).status === "Done",
-  );
-
-  step(
-    `split merge: #${split.forParent.number} merged -> only ${parent} is done; #${split.forChild.number} merged -> ${split.child.key} is done`,
-  );
+  // ---- 8. a ticket that needs several pull requests (see splitWork)
+  await splitWork();
 
   // ---- 9. a direct message with a picture: it is answered (it used to be dropped), the ticket it becomes gets the
   // picture, and the agent that works the ticket downloads the picture from the tracker.
@@ -2206,6 +2134,159 @@ async function main() {
   await notesInTheKnowledgeBase();
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
+
+/**
+ * A ticket that needs several pull requests: the agent splits it into a sub-ticket it starts now, with its own pull
+ * request, and one for later, ready; the parent stays with the agent until its last sub-ticket closes.
+ */
+async function splitWork() {
+  const pullsBeforeSplit = (await state()).github.pulls.length;
+  const { key: parent } = await stub("POST", "/_test/tickets", {
+    title: "Add a farewell page",
+    description:
+      "It takes three pull requests.\n\nsplit: Add a farewell footer\nlater: Add a farewell banner",
+    assignee: "sam",
+  });
+
+  const partOf = (s: Json, title: string) =>
+    s.tickets.find((t: Json) => t.parent === parent && t.title === title);
+
+  const ticketOf = (s: Json, key: string) => s.tickets.find((t: Json) => t.key === key);
+  const subPr = await until("the sub-ticket's pull request", (s) => {
+    const child = partOf(s, "Add a farewell footer");
+    const pr = child && s.github.pulls.find((p: Json) => p.body.includes(`Closes ${child.key}`));
+    return pr ? { child, pr } : undefined;
+  });
+
+  // `ost pr open` linked it on its ticket at once, as the agent: before the office's next GitHub poll (one may have
+  // been under way when the pull request opened).
+  const vcsPolls = pollCounts(await officeHealth())["vcs"] ?? 0;
+  const early = await until("the sub-ticket's pull request linked on it", (s) => {
+    const dev = ticketOf(s, subPr.child.key).development;
+    return dev.length > 0 ? dev : undefined;
+  });
+
+  assertEq(
+    (pollCounts(await officeHealth())["vcs"] ?? 0) <= vcsPolls + 1,
+    true,
+    "the link came before the office's next GitHub poll",
+  );
+
+  assertEq(
+    JSON.stringify(early),
+    JSON.stringify([{ repository: "acme/shop", number: subPr.pr.number, by: "sam" }]),
+    "the agent linked its sub-ticket's pull request, with its own tracker account",
+  );
+
+  // The hand-back as done gives the sub-ticket in review to the human who asked; the parent, with open sub-tickets,
+  // stays active with the agent, and the part for later stays ready.
+  const split = await until(
+    "the sub-ticket in review with the human, the parent active with sam",
+    (s) => {
+      const child = ticketOf(s, subPr.child.key);
+      const later = partOf(s, "Add a farewell banner");
+      const t = ticketOf(s, parent);
+      const forParent = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${parent}`));
+      return forParent &&
+        later &&
+        child.status === "In Review" &&
+        child.assignee === "ada.admin" &&
+        t.status === "In Progress" &&
+        t.assignee === "sam"
+        ? { child, later, forParent, forChild: subPr.pr, t }
+        : undefined;
+    },
+  );
+
+  assertEq(split.child.parent, parent, "the sub-ticket has its parent as a real parent");
+  assertEq(JSON.stringify(split.child.links), "[]", "no relates link where the parent is real");
+  assertEq(split.later.status, "Ready", "the part for later is ready, not in the backlog");
+  assertEq(split.later.assignee, "sam", "the part for later is the agent's");
+  assertEq(
+    split.t.comments.some(
+      (c: Json) => c.body.includes(split.child.key) && c.body.includes(split.later.key),
+    ),
+    true,
+    "the parent says it was split, with the sub-tickets in their order",
+  );
+
+  // The office's own link, when its poll sees the pull request opened, finds it there: one link, not two. The idle
+  // agent is not pulled onto the later part either: the work that split the parent orders it.
+  await officePolledTwice("the split");
+  const afterSplit = await state();
+  assertEq(ticketOf(afterSplit, split.child.key).development.length, 1, "exactly one link");
+  assertEq(ticketOf(afterSplit, split.later.key).status, "Ready", "the later part waits");
+  assertEq(
+    afterSplit.github.pulls.length,
+    pullsBeforeSplit + 2,
+    "two pull requests, one per ticket: the second one for the parent was refused",
+  );
+
+  assertEq(
+    afterSplit.github.pulls.filter((p: Json) => p.body.includes(`Closes ${parent}`)).length,
+    1,
+    "the parent has one pull request",
+  );
+
+  assertEq(
+    ticketOf(afterSplit, parent).status,
+    "In Progress",
+    "the parent's own pull request leaves it active",
+  );
+
+  step(
+    `split: ${parent} split into ${split.child.key} (#${split.forChild.number}, in review with the human, linked once before the next poll) and ${split.later.key} (ready); ${parent} has #${split.forParent.number} and stays active with sam; a second for ${parent} refused`,
+  );
+
+  // Merging the parent's own pull request leaves it active: it still has open sub-tickets.
+  await stub("POST", `/_test/pulls/${split.forParent.number}/merge`);
+  await officePolledTwice(`#${split.forParent.number} merged`);
+  assertEq(
+    ticketOf(await state(), parent).status,
+    "In Progress",
+    "merging the parent's pull request leaves it active while its sub-tickets are open",
+  );
+
+  // Merging the sub-ticket's closes it, with the agent who did the work, and wakes the agent on the parent: it starts
+  // the later part on its own, with no human acting.
+  await stub("POST", `/_test/pulls/${split.forChild.number}/merge`);
+  const next = await until(`${split.child.key} done and the later part's pull request`, (s) => {
+    const child = ticketOf(s, split.child.key);
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${split.later.key}`));
+    return child.status === "Done" && pr ? { child, pr, t: ticketOf(s, parent) } : undefined;
+  });
+
+  assertEq(
+    next.child.assignee,
+    "sam",
+    "the merged sub-ticket ends with the agent who did the work",
+  );
+
+  assertEq(next.t.status, "In Progress", "the parent is still active");
+  assertEq(next.t.assignee, "sam", "the parent is still the agent's");
+  const nextLater = await until(`${split.later.key} in review with the human`, (s) => {
+    const later = ticketOf(s, split.later.key);
+    return later.status === "In Review" && later.assignee === "ada.admin" ? later : undefined;
+  });
+
+  assertEq(nextLater.development.length, 1, "the later part's pull request is linked on it once");
+  step(
+    `split next: #${split.forChild.number} merged -> ${split.child.key} done with sam; sam woken on ${parent} opened #${next.pr.number} for ${split.later.key}; ${parent} still active with sam`,
+  );
+
+  // The last sub-ticket closing moves the parent on: its own pull request merged, so it is done, with the agent.
+  await stub("POST", `/_test/pulls/${next.pr.number}/merge`);
+  const finished = await until(`${parent} done`, (s) => {
+    const t = ticketOf(s, parent);
+    return t.status === "Done" ? t : undefined;
+  });
+
+  assertEq(ticketOf(await state(), split.later.key).status, "Done", "the later part is done");
+  assertEq(finished.assignee, "sam", "the parent ends with the agent who did the work");
+  step(
+    `split end: #${next.pr.number} merged -> ${split.later.key} done, the last sub-ticket; ${parent} left active and is done`,
+  );
 }
 
 /**

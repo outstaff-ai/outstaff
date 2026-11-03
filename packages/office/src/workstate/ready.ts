@@ -34,10 +34,12 @@ export function statusSince(
 export const priorityOf = (issue: Issue): Pick<TicketRecord, "priority"> =>
   issue.priority === undefined ? {} : { priority: issue.priority };
 
+const later = (a: string | undefined, b: string) => (a && Date.parse(a) > Date.parse(b) ? a : b);
+
 /** Adds one work item to the person's work on its ticket. */
 export function addPickup(
   pickups: Map<string, Pickup>,
-  item: { person: string; kind: string; status: string; createdAt: string },
+  item: { person: string; kind: string; status: string; createdAt: string; updatedAt: string },
   ticket: string,
 ): void {
   if (NOT_WORK.has(item.kind) || item.status === "canceled") {
@@ -48,18 +50,24 @@ export function addPickup(
   const seen = pickups.get(key);
   pickups.set(key, {
     open: (seen?.open ?? false) || OPEN.has(item.status),
-    at: seen && Date.parse(seen.at) > Date.parse(item.createdAt) ? seen.at : item.createdAt,
+    at: later(seen?.at, item.createdAt),
+    until: later(seen?.until, item.updatedAt),
   });
 }
 
-/** The person worked on the ticket since it entered its status, or still has work open on it. */
+/**
+ * The person worked on the ticket since it entered its status, or still has work open on it. A sub-ticket also counts
+ * as picked up while the person's work on its parent went on after it entered its status: that work split the parent
+ * and orders its sub-tickets, and the next one starts from the parent when one closes.
+ */
 function pickedUp(core: WorkstateCore, person: string, t: TicketRecord): boolean {
+  const since = (at: string) => !t.statusSince || Date.parse(at) >= Date.parse(t.statusSince);
   const work = core.pickups.get(pickupKey(person, t.key));
-  if (!work) {
-    return false;
-  }
-
-  return work.open || !t.statusSince || Date.parse(work.at) >= Date.parse(t.statusSince);
+  const parent = t.parent ? core.pickups.get(pickupKey(person, t.parent)) : undefined;
+  return (
+    (work !== undefined && (work.open || since(work.at))) ||
+    (parent !== undefined && (parent.open || since(parent.until)))
+  );
 }
 
 const readyFor = (person: string, t: TicketRecord): boolean =>

@@ -112,6 +112,12 @@ export interface WorkflowState {
 
   /** Handle of the agent playing a catalog role, if exactly one is configured. */
   personForRole(role: string): string | undefined;
+
+  /** The ticket's parent ticket (it is a sub-ticket of), as the tracker last said. */
+  parentOf(ticket: string): string | undefined;
+
+  /** The ticket's sub-tickets the state knows, in any status. */
+  subTickets(ticket: string): string[];
 }
 
 /**
@@ -159,6 +165,7 @@ export type Condition =
   | { any: Condition[] }
   | { not: Condition }
   | { ticket_status: CanonicalStatus[] }
+  | { parent_status: CanonicalStatus[] }
   | { moved_to: CanonicalStatus[] }
   | { actor_kind: "human" | "agent" | "automation" }
   | { assignee_kind: "human" | "agent" | "none" }
@@ -179,6 +186,7 @@ export type Condition =
   | { ticket_prs_open: boolean }
   | { ticket_prs_several: boolean }
   | { ticket_handed_back: boolean }
+  | { open_subtickets: boolean }
   | { blocked_agent: boolean }
   | { actor_in_round: boolean };
 
@@ -199,6 +207,9 @@ export interface StaticTicket {
 
   /** The agents' rounds on the ticket. */
   rounds?: StaticRound[];
+
+  /** The ticket it is a sub-ticket of. */
+  parent?: string;
 }
 
 /** One agent's round on a ticket: from when it was queued until it ended (ISO-8601), still under way without `to`. */

@@ -36,6 +36,9 @@ export interface TicketRecord {
   /** When the requester was recorded; a later human assignment or send-back replaces it. */
   requesterAt?: string;
 
+  /** The ticket this one is a sub-ticket of, as the tracker last said. */
+  parent?: string;
+
   /** The tickets this one blocks, as the tracker last said. */
   blocks?: string[];
 

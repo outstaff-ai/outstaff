@@ -708,20 +708,68 @@ describe("pr write verbs", () => {
       expect((await f.vcs.getPullRequest(f.repo, 1)).title).toBe("feat(cart): more coupons");
     });
 
-    it("allows several with policies.tickets.prs_per_ticket: many, without asking", async () => {
-      const f = await setup();
+    const many = (f: Awaited<ReturnType<typeof setup>>) => {
       f.env.team = {
         ...f.env.team,
-        policies: {
-          ...f.env.team.policies!,
-          tickets: { prs_per_ticket: "many" },
-        },
+        policies: { ...f.env.team.policies!, tickets: { prs_per_ticket: "many" } },
       };
+    };
 
+    it("allows several with policies.tickets.prs_per_ticket: many, asking only for the ticket to link", async () => {
+      const f = await setup();
+      many(f);
       office(f, () => linked("open"));
       await open(f);
-      expect(f.office.ticketPrsAsked).toEqual([]);
+      expect(f.office.ticketPrsAsked).toHaveLength(1);
       expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
+    });
+
+    it("opens it with many even when the office cannot say which ticket it is for", async () => {
+      const f = await setup();
+      many(f);
+      f.office.ticketPrs = () => Promise.reject(new Error("unsupported"));
+      const r = await open(f);
+      expect(r.text).not.toContain("Linked on");
+      expect(f.office.made).toEqual([
+        { workItemId: "w1", pr: expect.objectContaining({ number: 1 }) },
+      ]);
+    });
+
+    it("links it on its ticket at once, as the agent, and tells the office the item opened it", async () => {
+      const f = await setup();
+      const issue = await f.tracker.createIssue({ title: "Coupons", body: "" });
+      await f.tracker.seed.repository!(f.repo, [1]);
+      office(f, () => ({ ticket: issue.key, prs: [] }));
+      const r = await open(f);
+      const pr = {
+        repo: f.repo,
+        number: 1,
+        url: f.vcs.links.pr(f.repo, 1),
+      };
+
+      expect(r.text).toContain(`Linked on ${issue.key}.`);
+      expect(f.tracker.development.get(issue.key)).toEqual([{ ...pr, by: expect.any(String) }]);
+
+      expect(f.office.made).toEqual([{ workItemId: "w1", pr, ticket: issue.key }]);
+    });
+
+    it("leaves the link to the office when the tracker refuses it", async () => {
+      const f = await setup();
+      const issue = await f.tracker.createIssue({ title: "Coupons", body: "" });
+      office(f, () => ({ ticket: issue.key, prs: [] }));
+      f.office.workMade = () => Promise.reject(new Error("unsupported"));
+      const r = await open(f);
+      expect(r.text).not.toContain("Linked on");
+      expect(f.tracker.development.get(issue.key)).toBeUndefined();
+      expect((await f.vcs.getPullRequest(f.repo, 1)).body).toBe("Closes SHOP-1");
+    });
+
+    it("links nothing on a tracker that cannot link pull requests", async () => {
+      const f = await setup();
+      office(f, () => ({ ticket: "SHOP-1", prs: [] }));
+      delete (f.tracker as { linkPullRequest?: unknown }).linkPullRequest;
+      const r = await open(f);
+      expect(r.text).not.toContain("Linked on");
     });
 
     it("asks nothing when the agent is not connected to an office", async () => {
@@ -1598,6 +1646,23 @@ describe("office verbs", () => {
     const mine = await f.tracker.getIssue("SHOP-3");
     expect(mine.status.canonical).toBe("active");
     expect(mine.assignee).toBeDefined();
+
+    // Both are the item's: its hand-back gives the ones in review to the requester.
+    expect(f.office.made).toEqual([
+      { workItemId: "w1", ticket: "SHOP-2" },
+      { workItemId: "w1", ticket: "SHOP-3" },
+    ]);
+  });
+
+  it("creates the ticket when the office cannot record it, and records none outside a work item", async () => {
+    const f = fakeEnv();
+    await f.tracker.createIssue({ title: "Fix checkout", body: "" });
+    await run("ticket.create", f.env, { title: "Outside" });
+    expect(f.office.made).toEqual([]);
+
+    f.office.workMade = () => Promise.reject(new Error("unsupported"));
+    const r = await run("ticket.create", f.env, { title: "Inside" }, { workItemId: "w1" });
+    expect(r.text).toContain("Created SHOP-3.");
   });
 
   it("writes nothing to the tracker when the office refuses the filing", async () => {

@@ -16,6 +16,7 @@ export {
   templateVariables,
 } from "./evaluate.js";
 
+export { openSubTickets } from "./evaluate-check.js";
 export type { Resolved } from "./evaluate.types.js";
 export { createStaticWorkflowState } from "./state.js";
 export type {

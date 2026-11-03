@@ -33,9 +33,16 @@ function opText(op: OpSpec): string {
 
 type Decides = Pick<PolicyDefinition, "decides" | "decide">;
 
+/** What a wake's subject adds to its words: nothing for the event's own. */
+const SUBJECT_TEXT: Record<NonNullable<WakeSpec["subject"]>, string> = {
+  event: "",
+  next_ready_ticket: ", with its next ready ticket (for a sub-ticket, on its parent)",
+  parent: ", on the ticket's parent",
+};
+
 /** A policy that wakes one person: its `decide`, and the same in words for the reference. */
 export function wakes(spec: WakeSpec): Decides {
-  const next = spec.subject === "next_ready_ticket" ? ", with its next ready ticket" : "";
+  const next = SUBJECT_TEXT[spec.subject ?? "event"];
   return {
     decides: `wake ${personText(spec.person)} (kind ${code(spec.kind)})${next}`,
     decide: (_event, ctx) => ctx.wake(spec),
