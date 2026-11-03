@@ -106,17 +106,22 @@ describe("agent runner", () => {
       return connection;
     };
 
+    // A sweep is over once it has scheduled the next one.
+    const swept = clock.scheduled(1000);
     const runner = createAgentRunner({ ...options, clock, sweepEveryMs: 1000 }, connect);
     const running = runner.run();
-    await until(() => asked.length === 1);
-    expect(asked[0]).toEqual(["ACME-12"]);
+    await swept;
+    expect(asked).toEqual([["ACME-12"]]);
 
     // A changed team: the old round's sweeper stops and the new round starts its own.
+    const sweptAgain = clock.scheduled(1000);
     office.setTeam(TEAM.replace("name: acme,", "name: acme-next,"));
     office.sockets[0]!.drop();
-    await until(() => asked.length === 2);
+    await sweptAgain;
+    expect(asked).toHaveLength(2);
+    const next = clock.scheduled(1000);
     clock.advance(1000);
-    await until(() => asked.length === 3);
+    await next;
     await tick();
     expect(asked).toHaveLength(3);
 
