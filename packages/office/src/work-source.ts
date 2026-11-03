@@ -104,6 +104,22 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
   const summaryOf = (item: WorkItem, current?: string) => summarizeItem(store, item, current);
 
+  /** A round's usage goes on its run while the run is open; a failure to record it does not stop the hand-back. */
+  const record = async (item: WorkItem, usage: HandBackResult["usage"]) => {
+    if (!usage?.length || !opts.recordUsage) {
+      return;
+    }
+
+    try {
+      await opts.recordUsage(item, usage);
+    } catch (err) {
+      opts.logger?.warn("could not record the usage of a round", {
+        item: item.id,
+        error: String(err),
+      });
+    }
+  };
+
   return {
     async outstanding(person) {
       const active = await store.listItems({ person, status: "active" });
@@ -201,6 +217,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
       // A retried hand-back finds the item already finished and only repeats the follow-up.
       if (item.status === "active") {
+        await record(item, result.usage);
         await store.appendJournal(id, person, handBackNote(result));
         await settle(scheduler, id, result);
       } else if (!retried(item, result)) {
@@ -210,12 +227,13 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       await opts.onHandedBack?.((await store.getItem(id)) ?? item, result);
     },
 
-    async fail(person, id, reason) {
+    async fail(person, id, reason, usage) {
       const item = await own(person, id);
       if (item.status !== "active") {
         return;
       }
 
+      await record(item, usage);
       await store.appendJournal(id, person, `The run failed: ${reason}`);
       const failed = await scheduler.fail(id, reason);
       if (failed.blocked) {

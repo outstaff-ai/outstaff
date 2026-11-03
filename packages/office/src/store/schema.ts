@@ -1,4 +1,4 @@
-import type { Generated, Kysely } from "kysely";
+import type { ColumnType, Generated, Kysely } from "kysely";
 
 // Timestamps are ISO-8601 UTC text with milliseconds; JSON columns are text.
 // Both sort correctly as plain strings on either database.
@@ -54,9 +54,29 @@ export interface RunsTable {
   finished_at: string | null;
   outcome: string | null;
   error: string | null;
-  usage: string | null;
   runtime: string | null;
   model: string | null;
+}
+
+/** Token counts come back as strings from Postgres' bigint; read them with `Number`. */
+type Count = ColumnType<number | string, number, number>;
+
+interface UsageCounters {
+  model: string;
+  input_tokens: Count;
+  output_tokens: Count;
+  cache_read_tokens: Count;
+  cache_creation_tokens: Count;
+  cost_usd: number | null;
+}
+
+export interface RunUsageTable extends UsageCounters {
+  run_id: string;
+}
+
+export interface SessionUsageTable extends UsageCounters {
+  session_id: string;
+  reported_at: string;
 }
 
 export interface JournalTable {
@@ -157,6 +177,8 @@ export interface Database {
   events: EventsTable;
   work_items: WorkItemsTable;
   runs: RunsTable;
+  run_usage: RunUsageTable;
+  session_usage: SessionUsageTable;
   journal: JournalTable;
   links: LinksTable;
   subjects: SubjectsTable;

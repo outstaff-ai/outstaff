@@ -137,6 +137,15 @@ export type PullRequestLinkOutcome = "linked" | "already_linked" | "not_connecte
 /** How one ticket relates to another, read from the first one's side. */
 export type LinkRelation = "blocks" | "relates" | "duplicates";
 
+/** A project-wide custom field of the tracker. Only numbers so far. */
+export interface TrackerField {
+  name: string;
+  type: "number";
+}
+
+/** What making sure a field exists did: created it now, or found it there already. */
+export type FieldEnsureOutcome = "created" | "exists";
+
 export interface Tracker {
   links: Pick<Links, "issue" | "comment">;
 
@@ -197,6 +206,21 @@ export interface Tracker {
 
   /** Capability `tracker.development`. The code repositories connected to the tracker, whose pull requests it can link. */
   connectedRepositories?(): Promise<RepoRef[]>;
+
+  /**
+   * Capability `tracker.fields`. Makes sure the project has a custom field of this name (exact, case-insensitive) and
+   * type, creating it when missing. A field of that name with another type is a `conflict`.
+   */
+  ensureField?(field: TrackerField): Promise<FieldEnsureOutcome>;
+
+  /** Capability `tracker.fields`. Whether the project has a custom field of this name and type. */
+  hasField?(field: TrackerField): Promise<boolean>;
+
+  /** Capability `tracker.fields`. Sets a number field of the ticket, by the field's name; `null` clears it. A missing field is `not_found`. */
+  setField?(key: string, field: string, value: number | null): Promise<void>;
+
+  /** Capability `tracker.fields`. The value of a number field of the ticket; null when it has none. */
+  fieldValue?(key: string, field: string): Promise<number | null>;
   events(cursor?: string): Promise<EventPage<TrackerEvent>>;
 
   /** Webhook mode; same contract as `Vcs.parseWebhook`. */

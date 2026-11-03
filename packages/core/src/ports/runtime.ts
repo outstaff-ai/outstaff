@@ -39,6 +39,23 @@ export type UsageEvent = {
   }[];
 };
 
+/** Tokens and cost of one model in a session. */
+export interface ModelUsage {
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+
+  /** What the tokens cost at API list prices, when the runtime knows: an estimate, not a bill. */
+  costUsd?: number | undefined;
+}
+
+/**
+ * A session's usage so far, per model id. A running total, as the Claude Agent SDK reports it: a resumed session's
+ * figures include its earlier runs, so a run's own usage is the difference to the session's previous report.
+ */
+export type SessionUsage = Record<string, ModelUsage>;
+
 export type RuntimeEvent =
   | {
       type: "started";
@@ -55,6 +72,9 @@ export type RuntimeEvent =
       ok: boolean;
       text: string;
       costUsd?: number;
+
+      /** The session's running usage per model, when the runtime reports it. */
+      usage?: SessionUsage;
       error?: string;
       interrupted?: boolean;
 

@@ -1,4 +1,6 @@
 import type {
+  ApiCustomField,
+  ApiFieldValue,
   ApiActivityItem,
   ApiAssignee,
   ApiColumn,
@@ -112,6 +114,12 @@ export interface StoredDevelopmentLink {
   by: string;
 }
 
+/** A project custom field; the stand-in keeps every field it answers with. */
+export type StoredCustomField = Required<ApiCustomField>;
+
+/** A custom field's value on an issue, with the userId who set it last. */
+export type StoredFieldValue = Required<ApiFieldValue> & { issueId: number; by: string };
+
 /** The pull requests of a connected repository: the store's own, or, end to end, the code host stand-in's. */
 export type PullRequestSource = (
   repo: StoredRepository,
@@ -199,6 +207,8 @@ export interface ItsaplanStore {
   pullRequestsOf: PullRequestSource;
   development: StoredDevelopmentLink[];
   docIssues: StoredDocIssue[];
+  customFields: StoredCustomField[];
+  fieldValues: StoredFieldValue[];
   counters: {
     activity: number;
     label: number;
@@ -206,6 +216,7 @@ export interface ItsaplanStore {
     comment: number;
     link: number;
     revision: number;
+    field: number;
   };
 }
 

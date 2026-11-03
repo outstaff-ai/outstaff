@@ -32,7 +32,6 @@ export const toRun = (r: Selectable<Database["runs"]>): Run => ({
   finishedAt: r.finished_at,
   outcome: r.outcome,
   error: r.error,
-  usage: r.usage === null ? null : (JSON.parse(r.usage) as unknown),
   runtime: r.runtime,
   model: r.model,
 });

@@ -26,7 +26,6 @@ export function runQueries({
           finished_at: null,
           outcome: null,
           error: null,
-          usage: null,
           runtime: null,
           model: null,
         })
@@ -43,7 +42,6 @@ export function runQueries({
           finished_at: stamp(),
           outcome: result.outcome,
           error: result.error ?? null,
-          usage: result.usage === undefined ? null : JSON.stringify(result.usage),
         })
         .where("id", "=", id)
         .executeTakeFirst();

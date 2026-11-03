@@ -145,5 +145,6 @@ export async function setUpItem(
     prompt: (restarted, context) => buildPrompt(opts, offer, promptParts, restarted, context),
     current: storedSession,
     lastText: "",
+    usage: new Map(),
   };
 }

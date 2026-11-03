@@ -16,7 +16,6 @@ export async function finishItem(
     await store.finishRun(run.id, {
       outcome: input.outcome,
       ...(input.error === undefined ? {} : { error: input.error }),
-      ...(input.usage === undefined ? {} : { usage: input.usage }),
     });
   }
 

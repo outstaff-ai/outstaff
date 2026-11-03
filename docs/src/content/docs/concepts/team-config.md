@@ -62,3 +62,5 @@ repos:
 ## Policies
 
 [`policies`](/reference/team-yaml/#policies) holds team-wide guardrails: a loop guard that limits runs triggered by agents and automation (humans are never limited), usage thresholds that defer scheduled work and then pause automatic work as the LLM usage limit nears, the style of chat messages, and the commands agents may run.
+
+[`usage`](/reference/team-yaml/#usage) turns on the tokens and API-equivalent cost of agent work per ticket (on by default), and the tracker fields that show them on each ticket.

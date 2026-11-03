@@ -27,12 +27,19 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
       ack("session", { workItemId, sessionId, ...(model ? { model } : {}) }),
     journal: (workItemId, text) => ack("journal", { workItemId, text }),
     async handBack(workItemId, result) {
-      await ack("handback", { workItemId, ...result, links: result.links ?? [] });
+      const { usage, ...rest } = result;
+      await ack("handback", {
+        workItemId,
+        ...rest,
+        links: result.links ?? [],
+        ...(usage?.length ? { usage } : {}),
+      });
+
       activeItems.delete(workItemId);
     },
 
-    async fail(workItemId, reason) {
-      await ack("fail", { workItemId, reason });
+    async fail(workItemId, reason, usage) {
+      await ack("fail", { workItemId, reason, ...(usage?.length ? { usage } : {}) });
       activeItems.delete(workItemId);
     },
 
@@ -79,6 +86,7 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
     notesChanged: (report) => ack("notes_changed", report),
     ciLog: (request) => call("ci_log", request, "ci_log_result"),
     recall: (request) => call("recall", request, "recall_result"),
+    ticketUsage: (ticket) => call("ticket_usage", { ticket }, "ticket_usage_result"),
 
     async ask(q): Promise<OfficeAnswer> {
       const r = await call("ask", q, "ask_result");

@@ -1,4 +1,4 @@
-import type { Attached, Filed, PayloadOf, WorkSummary } from "@outstaff/protocol";
+import type { Attached, Filed, PayloadOf, TicketUsage, WorkSummary } from "@outstaff/protocol";
 
 /** What the office tells an agent; the wire protocol is defined separately (the verbs only need this). */
 export type OfficeWorkItem = WorkSummary;
@@ -115,6 +115,9 @@ export interface OfficeClient {
   /** The caller's own history that matches, as the office stores it: newest first. */
   recall(request: RecallRequest): Promise<RecallResult>;
 
+  /** A ticket's tokens and API-equivalent cost, as the office totals them. */
+  ticketUsage(ticket: string): Promise<TicketUsage>;
+
   /**
    * Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same
    * request twice. `say` is the agent's line for the reply in the thread: the agent posts it, the office never sees it.
@@ -168,6 +171,7 @@ export interface FakeOffice extends OfficeClient {
   notesReported: NotesReport[];
   ciLogsAsked: CiLogRequest[];
   recalled: RecallRequest[];
+  usageAsked: string[];
 }
 
 export type { Attached, Filed } from "@outstaff/protocol";

@@ -8,6 +8,7 @@ import { recallCases } from "./contract/recall.js";
 import { recordCases } from "./contract/records.js";
 import { refCases } from "./contract/refs.js";
 import { traceCases } from "./contract/traces.js";
+import { usageCases } from "./contract/usage.js";
 import type { ContractContext, StoreHarness } from "./contract.types.js";
 import type { OpenStoreOptions, Store } from "#/store/types.js";
 
@@ -46,5 +47,6 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
     doctorCases(ctx);
     refCases(ctx);
     recallCases(ctx);
+    usageCases(ctx);
   });
 }

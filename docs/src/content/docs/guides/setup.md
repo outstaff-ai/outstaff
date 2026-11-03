@@ -59,6 +59,8 @@ Derived values are written only as files into the secrets directory (`.outstaff/
 
 GitHub offers the private key as a download. If you set `GH_APP_SLUG` (the name in the App's URL) first, `--derive` finds the newest `<slug>.*.pem` in `~/Downloads`, asks before moving it into the secrets directory as `GH_APP_PRIVATE_KEY`, and deletes the download. Pass `--yes` to skip the question in scripts.
 
+Then it has each adapter make what the team needs in its provider and is missing there, and prints a `made` line for each. The Its a Plan tracker creates the two number fields that show agent tokens and cost on tickets, "Agent tokens" and "Agent cost, USD (API-equivalent)" ([Tokens and cost per ticket](/architecture/office/#tokens-and-cost-per-ticket)), unless `usage.tracker_fields` is off. Creating them needs a key that may create custom fields; when the key may not, the warning says so, and a project admin adds them as number fields in the project's settings instead.
+
 ## The office
 
 ```sh

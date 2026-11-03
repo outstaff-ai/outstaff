@@ -1,6 +1,7 @@
 import type { RunRequest, RuntimeEvent } from "@outstaff/core";
 import type { WorkerContext } from "./loop.types.js";
 import { reason } from "./reason.js";
+import { keepUsage } from "./round-usage.js";
 import type { ItemRun, Outcome } from "./work.types.js";
 
 const PROGRESS_MAX = 300;
@@ -48,6 +49,7 @@ export function createRounds({ opts, log, sessions }: WorkerContext, run: ItemRu
         opts.usage?.observe(e);
         return undefined;
       case "finished":
+        keepUsage(run, run.current, e.usage);
         return e;
       default:
         return undefined;

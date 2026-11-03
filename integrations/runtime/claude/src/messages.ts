@@ -1,5 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { RuntimeEvent, UsageEvent } from "@outstaff/core";
+import { sessionUsage } from "./session-usage.js";
 import type { MapState } from "./types.js";
 
 type Rec = Record<string, unknown>;
@@ -126,12 +127,14 @@ function mapResult(msg: Rec, state: MapState, signal?: AbortSignal): RuntimeEven
   const ok = msg["subtype"] === "success" && msg["is_error"] !== true;
   const interrupted = isInterrupted(msg, signal);
   const text = typeof msg["result"] === "string" ? msg["result"] : state.lastText;
+  const usage = sessionUsage(msg);
   return [
     {
       type: "finished",
       ok: ok && !interrupted,
       text,
       ...(typeof msg["total_cost_usd"] === "number" ? { costUsd: msg["total_cost_usd"] } : {}),
+      ...(usage ? { usage } : {}),
       ...(ok ? {} : { error: resultError(msg) }),
       ...(interrupted ? { interrupted: true } : {}),
     },

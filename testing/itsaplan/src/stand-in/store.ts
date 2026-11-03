@@ -76,6 +76,8 @@ export function createStore(opts: StandInOptions): ItsaplanStore {
     docComments: [],
     ...development(opts),
     docIssues: [],
-    counters: { activity: 100, label: 500, doc: 0, comment: 0, link: 0, revision: 0 },
+    customFields: [],
+    fieldValues: [],
+    counters: { activity: 100, label: 500, doc: 0, comment: 0, link: 0, revision: 0, field: 0 },
   };
 }

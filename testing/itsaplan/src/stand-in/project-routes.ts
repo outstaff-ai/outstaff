@@ -1,6 +1,6 @@
 import type { ApiProject } from "@outstaff/integration.shared.itsaplan";
 import { issueView } from "./links.js";
-import { columnOf, createIssue } from "./model.js";
+import { columnOf, createIssue, memberOf } from "./model.js";
 import { err } from "./store.js";
 import type { ActorRoute, ItsaplanStore, StoredIssue } from "./types.js";
 
@@ -10,6 +10,12 @@ const summary = ({ description: _d, ...rest }: StoredIssue) => rest;
 export function projectRoutes(s: ItsaplanStore): ActorRoute[] {
   const isProject = (p: string) => p === s.key || p === s.ref;
   return [
+    {
+      // Who the API key belongs to.
+      method: "GET",
+      path: "/me",
+      handler: (_r, actor) => ({ id: actor, username: memberOf(s, actor).username }),
+    },
     {
       method: "GET",
       path: "/projects/:p",

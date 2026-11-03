@@ -18,7 +18,9 @@ import type {
   RepoRef,
   RunRequest,
   Runtime,
+  SessionUsage,
   StatusMap,
+  TrackerField,
   Tracker,
   UsageEvent,
   Vcs,
@@ -83,6 +85,9 @@ export type FakeRunStep =
       text?: string;
       error?: string;
       costUsd?: number;
+
+      /** The session's running usage per model, as the finished event carries it. */
+      usage?: SessionUsage;
       sessionLost?: boolean;
     };
 
@@ -117,6 +122,12 @@ export interface FakeTracker extends Tracker {
 
   /** Every file attached, by ticket key. */
   attached: Map<string, NewAttachment[]>;
+
+  /** The project's custom fields, by lower-case name; `ensureField` adds to them. */
+  fields: Map<string, TrackerField>;
+
+  /** The custom field values set on each ticket, by ticket key and then field name, with the member id who set each. */
+  fieldValues: Map<string, Map<string, { value: number | null; by: string }>>;
 
   /** The pull requests linked on each ticket with `linkPullRequest`, by ticket key, with the member id who linked each. */
   development: Map<string, (PullRequestToLink & { by: string })[]>;

@@ -33,6 +33,12 @@ export interface OfficeOptions {
 
   /** Minutes after which a usage report counts as unknown. Default 30. */
   usageStaleAfterMinutes?: number;
+
+  /**
+   * How long a ticket must be quiet before its usage fields are written. Default 30 seconds, or twice
+   * `pollIntervalMs` when that test knob is set.
+   */
+  usageFieldsDebounceMs?: number;
   officeVersion?: string;
 
   /** Where the office's secret files are, for the doctor's file mode checks. Default /run/secrets/outstaff. */

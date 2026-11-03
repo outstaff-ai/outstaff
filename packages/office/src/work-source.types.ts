@@ -1,5 +1,5 @@
 import type { Logger, Tracker, TeamConfig, Vcs } from "@outstaff/core";
-import type { Link } from "@outstaff/protocol";
+import type { Link, SessionUsageReport } from "@outstaff/protocol";
 import type { RosterOptions } from "./messaging/index.js";
 import type { BlockNotice, Scheduler } from "./scheduler/index.js";
 import type { Store, WorkItem } from "./store/types.js";
@@ -13,6 +13,9 @@ export interface HandBackResult {
 
   /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
   toReview?: string[] | undefined;
+
+  /** What the round used, per runtime session. */
+  usage?: SessionUsageReport[] | undefined;
 }
 
 export interface WorkSourceOptions {
@@ -42,6 +45,9 @@ export interface WorkSourceOptions {
 
   /** Called after the scheduler blocked an item on its own (repeated failures, loop guard), so the requester hears of it. */
   onBlocked?: (notice: BlockNotice) => void | Promise<void>;
+
+  /** Records what a round used on the item's open run, before the run ends. */
+  recordUsage?: (item: WorkItem, usage: SessionUsageReport[]) => Promise<void>;
 
   /** Called after an item went back to the queue because the agent asked for it. */
   notify?: (person: string) => void;

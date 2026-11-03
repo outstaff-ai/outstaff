@@ -2,12 +2,7 @@ import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
 import { Itsaplan } from "./client.js";
 import { ItsaplanHttp } from "./http.js";
 import { optionalConnectionOptions, resolveConnection } from "./options.js";
-
-interface Me {
-  id?: number | string;
-  username?: string;
-  user?: { id?: number | string; username?: string };
-}
+import type { ItsaplanMe } from "./types.js";
 
 /** The member an API key belongs to. */
 interface KeyOwner {
@@ -16,11 +11,15 @@ interface KeyOwner {
 }
 
 /** The member the API key belongs to, wherever this version of /me puts it. */
-function memberOf(me: Me): KeyOwner {
+function memberOf(me: ItsaplanMe): KeyOwner {
   return { id: me.id ?? me.user?.id, username: me.username ?? me.user?.username };
 }
 
-async function connect(apiKey: string, ctx: DeriveContext): Promise<{ api: Itsaplan; me: Me }> {
+/** A client on the key, for the checks and setup steps that call Its a Plan outside an adapter, and who the key is. */
+export async function connectItsaplan(
+  apiKey: string,
+  ctx: DeriveContext,
+): Promise<{ api: Itsaplan; me: ItsaplanMe }> {
   const conn = resolveConnection(ctx, optionalConnectionOptions.parse(ctx.options ?? {}));
   const http = new ItsaplanHttp({
     fetch: ctx.fetch,
@@ -30,7 +29,7 @@ async function connect(apiKey: string, ctx: DeriveContext): Promise<{ api: Itsap
   });
 
   const api = new Itsaplan(http, conn, ctx);
-  return { api, me: await http.request<Me>("GET", "/me") };
+  return { api, me: await http.request<ItsaplanMe>("GET", "/me") };
 }
 
 function keyFailure(e: unknown): DoctorCheck {
@@ -130,9 +129,9 @@ export async function doctorItsaplan(
     return [];
   }
 
-  let session: { api: Itsaplan; me: Me };
+  let session: { api: Itsaplan; me: ItsaplanMe };
   try {
-    session = await connect(apiKey, ctx);
+    session = await connectItsaplan(apiKey, ctx);
   } catch (e) {
     return [keyFailure(e)];
   }

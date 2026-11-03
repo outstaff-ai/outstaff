@@ -554,6 +554,23 @@ async function* askHuman(
 export const nothingToReview = (last: string) =>
   `Blocked: ${last || "nothing to review yet"} I need the answer from a human before I go on.`;
 
+/** A ticket that says `usage: <key>` asks for `ost usage <key>`, posted on the ticket so the driver can read it. */
+async function* postUsage(key: string, of: string): AsyncGenerator<Action, string, string> {
+  const usage = yield { type: "tool", tool: "usage", input: { ticket: of } };
+  yield { type: "tool", tool: "ticket_comment", input: { key, body: `ost usage:\n${usage}` } };
+  return `Posted the usage of ${of} on ${key}.`;
+}
+
+/** A blocked ticket, or one that only asks for usage: the message to stop with, else undefined. */
+async function* stopsEarly(
+  ctx: ItemContext,
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const usageOf = /^usage: (\S+)$/m.exec(shown)?.[1];
+  return usageOf ? yield* postUsage(key, usageOf) : yield* blockIfStuck(key, shown, ctx.unblocked);
+}
+
 /** A ticket that says `hold: <gate>` keeps its round running until the driver opens that gate. */
 async function* holdIfAsked(shown: string): AsyncGenerator<Action, void, string> {
   const hold = /^hold: (\S+)$/m.exec(shown)?.[1];
@@ -579,7 +596,7 @@ async function* workOnTicket(ctx: ItemContext, key: string): Script {
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   yield* holdIfAsked(shown);
-  const stopped = (yield* blockIfStuck(key, shown, ctx.unblocked)) ?? (yield* askHuman(key, shown));
+  const stopped = (yield* stopsEarly(ctx, key, shown)) ?? (yield* askHuman(key, shown));
   if (stopped !== undefined) {
     return stopped;
   }

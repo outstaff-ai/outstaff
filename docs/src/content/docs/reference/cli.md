@@ -257,7 +257,7 @@ ost init --force
 
 Prepare the credentials of one person or of the office.
 
-Without --derive, writes `.outstaff/people/<handle>/.env.example` (or `.outstaff/office/.env.example`), which lists every secret the configured adapters need for that scope with where to get it, and prints a step-by-step guide per adapter. It never writes a real value. With --derive, reads the secrets already provided (files in the secrets directory first, then the environment), looks up the values that can be computed, such as GitHub App slug and installation id, the chat bot's user id and the tracker member id, and writes them as files into the secrets directory without printing them. If a `<app slug>.*.pem` was just downloaded to ~/Downloads, offers to move it there as the App's private key. Refuses to run unless the `.env` file and the secrets directory are ignored by git.
+Without --derive, writes `.outstaff/people/<handle>/.env.example` (or `.outstaff/office/.env.example`), which lists every secret the configured adapters need for that scope with where to get it, and prints a step-by-step guide per adapter. It never writes a real value. With --derive, reads the secrets already provided (files in the secrets directory first, then the environment), looks up the values that can be computed, such as GitHub App slug and installation id, the chat bot's user id and the tracker member id, and writes them as files into the secrets directory without printing them. Then it has each adapter make what the team needs in its provider and is missing there, such as the tracker's custom fields that show agent tokens and cost on tickets (with `usage.tracker_fields`). If a `<app slug>.*.pem` was just downloaded to ~/Downloads, offers to move it there as the App's private key. Refuses to run unless the `.env` file and the secrets directory are ignored by git.
 
 ```
 ost setup <handle|office> [options]
@@ -1379,6 +1379,28 @@ ost recall "cart session"
 ost recall "deploy freeze" --with dana
 ost recall greeting --about ACME-1 --since 2026-10-01
 ost recall "cart session" --json
+```
+
+## ost usage
+
+Show the tokens and cost of a ticket's agent work, by person, model and kind of round.
+
+Prints what agents used on a ticket, as the office totals it: every run of every work item whose subject or references name the ticket (its rounds, review and merge rounds of its pull requests, comment rounds and chat sessions attached to it), broken down by person, model and kind of round, and the total with its sub-tickets rolled up. The cost is API-equivalent (API list prices), not what a subscription bills.
+
+```
+ost usage <ticket>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost usage ACME-123
+ost usage ACME-123 --json
 ```
 
 ## ost me

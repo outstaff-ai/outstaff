@@ -12,6 +12,7 @@ import type {
   Recall,
   TicketPrs,
   WorkMade,
+  TicketUsageDesk,
   WorkSource,
 } from "./source.types.js";
 
@@ -52,6 +53,9 @@ export interface ProtocolServerOptions {
 
   /** Answers `recall`. Without it the request is refused as unsupported. */
   recall?: Recall;
+
+  /** Answers `ticket_usage`. Without it the request is refused as unsupported. */
+  ticketUsage?: TicketUsageDesk;
 
   /** Hands agents their acts and takes `act_result`. Without it a result is refused as unsupported. */
   acts?: AgentActs;

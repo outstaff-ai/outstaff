@@ -1,6 +1,7 @@
 import { createRouter, type Route } from "@outstaff/testing.http";
 import { attachmentRoutes } from "./attachment-routes.js";
 import { developmentRoutes } from "./development-routes.js";
+import { fieldRoutes } from "./field-routes.js";
 import { docCommentRoutes } from "./doc-comment-routes.js";
 import { docIssueRoutes } from "./doc-issue-routes.js";
 import { documentRoutes } from "./document-routes.js";
@@ -37,6 +38,7 @@ export function createItsaplanStandIn(opts: StandInOptions = {}) {
     ...issueRoutes(store),
     ...attachmentRoutes(store),
     ...developmentRoutes(store),
+    ...fieldRoutes(store),
   ].map((r) => guarded(store, opts.basePath ?? "", r));
 
   return { store, routes, dispatch: createRouter(routes) };

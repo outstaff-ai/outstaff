@@ -5,7 +5,6 @@ export interface Run {
   finishedAt: string | null;
   outcome: string | null;
   error: string | null;
-  usage: unknown;
 
   /** The runtime adapter that ran it; null until the agent reports it. */
   runtime: string | null;

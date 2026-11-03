@@ -9,6 +9,7 @@ import { doctorChecks } from "./0008_doctor_checks.js";
 import { workItemRefs } from "./0009_work_item_refs.js";
 import { runRuntime } from "./0010_run_runtime.js";
 import { recallMoments } from "./0011_recall_moments.js";
+import { runUsage } from "./0012_run_usage.js";
 import { queueOrderAndPauses } from "./0003_queue_order_and_pauses.js";
 
 export const migrationProvider: MigrationProvider = {
@@ -25,6 +26,7 @@ export const migrationProvider: MigrationProvider = {
       "0009_work_item_refs": workItemRefs,
       "0010_run_runtime": runRuntime,
       "0011_recall_moments": recallMoments,
+      "0012_run_usage": runUsage,
     };
   },
 };

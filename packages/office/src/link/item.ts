@@ -1,6 +1,7 @@
 import type { LinkItem } from "@outstaff/protocol";
 import { ITEM_EVENTS_SUBJECT } from "#/pipeline/live/wake.js";
 import type { Trace } from "#/pipeline/trace.types.js";
+import { runUsageOf } from "#/usage/index.js";
 import { scheduledBy as reasonOf } from "./items.js";
 import type { LinkStore } from "./link.types.js";
 
@@ -23,6 +24,9 @@ export async function findItem(
     reasonOf(store, id),
     store.getSubject(ITEM_EVENTS_SUBJECT, id),
   ]);
+
+  const usage =
+    runs.length === 0 ? [] : await store.listRunUsage({ runIds: runs.map((r) => r.id) });
 
   const traces = await Promise.all(
     ((events?.data as string[] | undefined) ?? []).map((e) => store.getTrace(e)),
@@ -48,6 +52,7 @@ export async function findItem(
         error: r.error,
         runtime: r.runtime,
         model: r.model,
+        usage: runUsageOf(usage.filter((u) => u.runId === r.id)),
       })),
       journal: {
         entries: journal.length,

@@ -893,6 +893,28 @@ ost recall "deploy freeze" --with dana
 ost recall greeting --about ACME-1 --since 2026-10-01
 ```
 
+## usage
+
+Show the tokens and cost of a ticket's agent work, by person, model and kind of round.
+
+Prints what agents used on a ticket, as the office totals it: every run of every work item whose subject or references name the ticket (its rounds, review and merge rounds of its pull requests, comment rounds and chat sessions attached to it), broken down by person, model and kind of round, and the total with its sub-tickets rolled up. The cost is API-equivalent (API list prices), not what a subscription bills.
+
+```
+ost usage <ticket>
+```
+
+Runtime tool: `usage`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `ticket` | string | yes | Key of the ticket, for example ACME-123. |
+
+Examples:
+
+```sh
+ost usage ACME-123
+```
+
 ## me
 
 Show who you are on this team.

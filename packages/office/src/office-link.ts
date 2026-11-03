@@ -35,9 +35,10 @@ export function createLinkForOffice(deps: {
   ports: OfficePorts;
   protocol: ProtocolServer;
   doctor: OfficeLinkOptions["doctor"];
+  usage?: OfficeLinkOptions["usage"];
   log: Logger;
 }): OfficeLink | undefined {
-  const { input, ports, protocol, doctor, log } = deps;
+  const { input, ports, protocol, doctor, usage, log } = deps;
   const { team, store, clock } = input;
   const token = input.secrets.get(LINK_TOKEN);
   if (!team.link || !token) {
@@ -55,6 +56,7 @@ export function createLinkForOffice(deps: {
       version: input.options?.officeVersion ?? "unknown",
     },
     doctor,
+    usage,
     connected: () => protocol.connected(),
     clock,
     logger: log,

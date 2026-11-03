@@ -1,4 +1,4 @@
-import type { Attached, Filed } from "@outstaff/protocol";
+import type { Attached, Filed, TicketUsage } from "@outstaff/protocol";
 import type {
   OfficeWorkItem,
   OfficeTeamMember,
@@ -19,6 +19,27 @@ import type {
   RecallResult,
   FakeOffice,
 } from "./office.types.js";
+
+const NONE = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheCreationTokens: 0,
+  tokens: 0,
+  costUsd: 0,
+  runs: 0,
+};
+
+/** A ticket nothing was used on. */
+const emptyUsage = (ticket: string): TicketUsage => ({
+  ticket,
+  own: NONE,
+  total: NONE,
+  subTickets: [],
+  byPerson: [],
+  byModel: [],
+  byKind: [],
+});
 
 export function createFakeOffice(
   opts: {
@@ -41,6 +62,9 @@ export function createFakeOffice(
 
     /** What the office answers for a recall; by default nothing matches. */
     recall?: (request: RecallRequest) => RecallResult;
+
+    /** What the office answers for a ticket's usage; by default nothing was used. */
+    ticketUsage?: (ticket: string) => TicketUsage;
 
     /** What the office answers when a chat session files work; by default the person is idle. */
     filed?: Partial<Filed>;
@@ -67,6 +91,7 @@ export function createFakeOffice(
   const notesReported: NotesReport[] = [];
   const ciLogsAsked: CiLogRequest[] = [];
   const recalled: RecallRequest[] = [];
+  const usageAsked: string[] = [];
   const seen = new Set<string>();
   return {
     ticketPrsAsked,
@@ -79,6 +104,11 @@ export function createFakeOffice(
     async recall(request) {
       recalled.push(request);
       return opts.recall?.(request) ?? { moments: [], more: false };
+    },
+    usageAsked,
+    async ticketUsage(ticket) {
+      usageAsked.push(ticket);
+      return opts.ticketUsage?.(ticket) ?? emptyUsage(ticket);
     },
     async ciLog(request) {
       ciLogsAsked.push(request);

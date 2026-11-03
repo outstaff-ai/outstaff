@@ -20,6 +20,7 @@ import {
   type Itsaplan,
 } from "@outstaff/integration.shared.itsaplan";
 import { developmentHelpers } from "./development.js";
+import { fieldHelpers } from "./fields.js";
 import { readEvents } from "./events.js";
 import { issueHelpers } from "./issues.js";
 import { issueListing } from "./listing.js";
@@ -80,6 +81,7 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
 
   return {
     ...developmentHelpers(api, fetchIssue),
+    ...fieldHelpers(api, fetchIssue),
     links: {
       issue: (key) => api.issueUrl(key),
       comment: (key, id) => api.issueCommentUrl(key, id),

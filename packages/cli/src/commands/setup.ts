@@ -102,7 +102,7 @@ async function deriveSecrets(
   const report = await runDerive(ctx, config, found, scope, person, dir, options.yes === true);
   if (options.json) {
     ctx.out(
-      `${JSON.stringify({ secretsDir: dir, written: report.written, warnings: report.warnings }, null, 2)}\n`,
+      `${JSON.stringify({ secretsDir: dir, written: report.written, prepared: report.prepared, warnings: report.warnings }, null, 2)}\n`,
     );
 
     return 0;
@@ -113,6 +113,10 @@ async function deriveSecrets(
       ? `Wrote ${report.written.join(", ")} to ${dir}\n`
       : "Nothing new to derive.\n",
   );
+
+  for (const p of report.prepared) {
+    ctx.out(`made     ${p}\n`);
+  }
 
   for (const w of report.warnings) {
     ctx.out(`warning  ${w}\n`);
@@ -125,7 +129,7 @@ export const setup = defineCommand<SetupOptions>({
   name: "setup",
   summary: "Prepare the credentials of one person or of the office.",
   description:
-    "Without --derive, writes `.outstaff/people/<handle>/.env.example` (or `.outstaff/office/.env.example`), which lists every secret the configured adapters need for that scope with where to get it, and prints a step-by-step guide per adapter. It never writes a real value. With --derive, reads the secrets already provided (files in the secrets directory first, then the environment), looks up the values that can be computed, such as GitHub App slug and installation id, the chat bot's user id and the tracker member id, and writes them as files into the secrets directory without printing them. If a `<app slug>.*.pem` was just downloaded to ~/Downloads, offers to move it there as the App's private key. Refuses to run unless the `.env` file and the secrets directory are ignored by git.",
+    "Without --derive, writes `.outstaff/people/<handle>/.env.example` (or `.outstaff/office/.env.example`), which lists every secret the configured adapters need for that scope with where to get it, and prints a step-by-step guide per adapter. It never writes a real value. With --derive, reads the secrets already provided (files in the secrets directory first, then the environment), looks up the values that can be computed, such as GitHub App slug and installation id, the chat bot's user id and the tracker member id, and writes them as files into the secrets directory without printing them. Then it has each adapter make what the team needs in its provider and is missing there, such as the tracker's custom fields that show agent tokens and cost on tickets (with `usage.tracker_fields`). If a `<app slug>.*.pem` was just downloaded to ~/Downloads, offers to move it there as the App's private key. Refuses to run unless the `.env` file and the secrets directory are ignored by git.",
   args: "<handle|office>",
   options: [
     {

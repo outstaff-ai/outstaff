@@ -6,6 +6,9 @@ export type Configured = ConfiguredAdapter;
 
 export interface DeriveReport {
   written: string[];
+
+  /** What the adapters made in their providers for the team, for example the tracker's custom fields. */
+  prepared: string[];
   warnings: string[];
 }
 

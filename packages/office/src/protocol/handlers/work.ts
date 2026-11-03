@@ -39,7 +39,7 @@ export const workHandlers: RequestHandlers = {
     ctx.deliver(person);
   },
   async fail({ ctx, person, payload, reply }) {
-    await ctx.opts.source.fail(person, payload.workItemId, payload.reason);
+    await ctx.opts.source.fail(person, payload.workItemId, payload.reason, payload.usage);
     reply("ack", {});
     ctx.deliver(person);
   },

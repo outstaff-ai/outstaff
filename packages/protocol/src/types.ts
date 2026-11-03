@@ -38,6 +38,11 @@ import type {
   usageWindowSchema,
 } from "./schemas/team.js";
 import type {
+  sessionUsageReportSchema,
+  ticketUsageSchema,
+  usageTotalsSchema,
+} from "./schemas/usage.js";
+import type {
   filedSchema,
   queuedReportSchema,
   workStateSchema,
@@ -75,6 +80,9 @@ export type WorkState = z.infer<typeof workStateSchema>;
 export type Filed = z.infer<typeof filedSchema>;
 export type Attached = PayloadOf<"work_attach_result">;
 export type UsageWindowReport = z.infer<typeof usageWindowSchema>;
+export type SessionUsageReport = z.infer<typeof sessionUsageReportSchema>;
+export type UsageTotals = z.infer<typeof usageTotalsSchema>;
+export type TicketUsage = z.infer<typeof ticketUsageSchema>;
 export type MemberUsage = z.infer<typeof memberUsageSchema>;
 export type QueuedReport = z.infer<typeof queuedReportSchema>;
 export type ChatOrigin = z.infer<typeof chatOriginSchema>;

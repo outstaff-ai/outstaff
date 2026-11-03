@@ -1,5 +1,5 @@
 import type { Logger, PrRef, TeamConfig } from "@outstaff/core";
-import type { LinkPayloadOf } from "@outstaff/protocol";
+import type { LinkPayloadOf, TicketUsage } from "@outstaff/protocol";
 import type { OfficeDoctor } from "#/doctor/index.js";
 import type { Store, WorkItemStatus } from "#/store/types.js";
 import type { Clock } from "#/types.js";
@@ -15,6 +15,8 @@ export type LinkStore = Pick<
   | "listTraces"
   | "countTraces"
   | "listTracesRecorded"
+  | "listRunUsage"
+  | "itemsWithoutTicket"
 >;
 
 export interface OfficeLinkOptions {
@@ -31,6 +33,9 @@ export interface OfficeLinkOptions {
 
   /** Who this office is, for the `hello` after the service's welcome. */
   identity: LinkPayloadOf<"hello">["office"];
+
+  /** A ticket's usage, for `ticket_usage`; absent when the team does not track usage, which both usage methods refuse. */
+  usage?: { ticket(key: string): Promise<TicketUsage> } | undefined;
 
   /** The doctor checks, for the `health` method and notification. */
   doctor: Pick<OfficeDoctor, "run" | "health">;

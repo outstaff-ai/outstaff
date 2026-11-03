@@ -125,7 +125,7 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
 
   const stub = createStubFetch([...forbidden, ...routes]);
   const { issues, activity, columns, labels, members, attachments, docs, docComments } = store;
-  const { repositories, pullRequests, development, docIssues } = store;
+  const { repositories, pullRequests, development, docIssues, customFields, fieldValues } = store;
   return {
     fetch: stub.fetch,
     calls: stub.calls,
@@ -143,6 +143,8 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
       pullRequests,
       development,
       docIssues,
+      customFields,
+      fieldValues,
     },
     trackerSeed: trackerSeed(store),
     knowledgeSeed: knowledgeSeed(store, markdown),

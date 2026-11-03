@@ -19,6 +19,8 @@ export type {
   StoredColumn,
   StoredDoc,
   StoredDevelopmentLink,
+  StoredCustomField,
+  StoredFieldValue,
   StoredDocComment,
   StoredDocIssue,
   StoredIssue,

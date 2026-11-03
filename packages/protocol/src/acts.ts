@@ -64,6 +64,12 @@ export const actOpSchema = z.discriminatedUnion("op", [
     ticket,
     doc: z.string().min(1).max(500).describe("Id of the document to show on the ticket."),
   }),
+  z.strictObject({
+    op: z.literal("set_field"),
+    ticket,
+    field: z.string().min(1).max(200).describe("Name of the ticket's custom number field."),
+    value: z.number().nullable().describe("The value to set; null clears it."),
+  }),
 ]);
 
 /** Tracker or knowledge-base changes for the agent to make as itself, without a model run. */

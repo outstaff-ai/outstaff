@@ -14,6 +14,7 @@ import { workflowSchema } from "./workflow-schema.js";
 import { linkSchema } from "./link.js";
 import { pipelineSchema } from "./pipeline.js";
 import { memorySchema } from "./memory-schema.js";
+import { usageSettingsSchema } from "./usage-schema.js";
 import { checkWorkflowConfig } from "#/workflow/validate.js";
 import { usageSharedIssues } from "./usage-shared.js";
 
@@ -154,6 +155,7 @@ export const teamConfigSchema = z
     link: linkSchema.optional(),
     policies: policiesSchema.optional(),
     memory: memorySchema.optional(),
+    usage: usageSettingsSchema.optional(),
   })
   .superRefine((cfg, ctx) => {
     const seenRepos = new Map<string, number>();

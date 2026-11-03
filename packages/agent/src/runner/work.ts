@@ -5,6 +5,7 @@ import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { WorkerContext } from "./loop.types.js";
 import { linksIn } from "./links.js";
 import { reason } from "./reason.js";
+import { keepUsage, usageReport } from "./round-usage.js";
 import { createRounds } from "./work-round.js";
 import { setUpItem } from "./work-setup.js";
 import { guardedHandBack } from "./work-done-guard.js";
@@ -70,8 +71,9 @@ export function createWorker(ctx: WorkerContext) {
     try {
       const request = { ...run.request(JOURNAL_PROMPT, session), tools: [], builtinTools: [] };
       for await (const e of opts.runtime.run({ ...request, maxTurns: 1 })) {
-        if (e.type === "finished" && e.ok) {
-          answer = e.text;
+        if (e.type === "finished") {
+          keepUsage(run, session, e.usage);
+          answer = e.ok ? e.text : answer;
         }
       }
     } catch (e) {
@@ -126,11 +128,13 @@ export function createWorker(ctx: WorkerContext) {
       summary: `Stopped before finishing because the agent shut down. ${text ? `Last message: ${text}` : "Nothing to report yet."}`,
       links: linksIn(text),
       status: "interrupted",
+      usage: usageReport(run),
     });
   }
 
-  async function failed(offer: Offer, why: string) {
-    await opts.office.fail(offer.workItem.id, why);
+  async function failed(run: ItemRun, why: string) {
+    const { offer } = run;
+    await opts.office.fail(offer.workItem.id, why, usageReport(run));
     await report(offer, "failed", why);
   }
 
@@ -143,6 +147,7 @@ export function createWorker(ctx: WorkerContext) {
       links: linksIn(summary),
       status,
       ...(status === "done" ? { toReview } : {}),
+      usage: usageReport(run),
     });
 
     const tell = REPORTS[status];
@@ -167,7 +172,7 @@ export function createWorker(ctx: WorkerContext) {
     }
 
     if (!outcome?.ok) {
-      await failed(offer, failureReason(outcome));
+      await failed(run, failureReason(outcome));
       return;
     }
 

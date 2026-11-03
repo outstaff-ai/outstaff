@@ -461,6 +461,79 @@ describe("work loop", () => {
     await running;
   });
 
+  it("hands back the round's usage per session, the journal question's included", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    const used = (n: number, costUsd?: number) => ({
+      "claude-opus-5-5": {
+        inputTokens: n,
+        outputTokens: n,
+        cacheReadTokens: n,
+        cacheCreationTokens: n,
+        ...(costUsd === undefined ? {} : { costUsd }),
+      },
+    });
+
+    runtime.enqueue([{ type: "finish", text: "Done.", usage: used(10, 0.1) }]);
+    runtime.enqueue([{ type: "finish", text: "Journal.", usage: used(12) }]);
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+    const handedBack = sentOf("handback")[0]!.payload as { usage: unknown };
+    expect(handedBack.usage).toEqual([{ session: "fake-session-1", models: used(12) }]);
+
+    await loop.stop();
+    await conn.stop();
+    await running;
+  });
+
+  it("reports the usage of a round that failed", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    runtime.enqueue([
+      {
+        type: "finish",
+        ok: false,
+        error: "boom",
+        usage: {
+          m: {
+            inputTokens: 1,
+            outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheCreationTokens: 0,
+            costUsd: 0.5,
+          },
+        },
+      },
+    ]);
+
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("fail").length === 1);
+    expect(sentOf("fail")[0]?.payload).toEqual({
+      workItemId: "w1",
+      reason: "boom",
+      usage: [
+        {
+          session: "fake-session-1",
+          models: {
+            m: {
+              inputTokens: 1,
+              outputTokens: 0,
+              cacheReadTokens: 0,
+              cacheCreationTokens: 0,
+              costUsd: 0.5,
+            },
+          },
+        },
+      ],
+    });
+
+    await loop.stop();
+    await conn.stop();
+    await running;
+  });
+
   it("tells the chat profile when an item is offered, accepted and handed back", async () => {
     await connect();
     const runtime = createFakeRuntime();

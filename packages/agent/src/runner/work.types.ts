@@ -1,4 +1,4 @@
-import type { RunRequest } from "@outstaff/core";
+import type { RunRequest, SessionUsage } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
 import type { ItemEnv } from "./loop.types.js";
 
@@ -47,4 +47,7 @@ export interface ItemRun {
 
   /** The runtime's latest message. */
   lastText: string;
+
+  /** The latest running usage of each session the round used, by session id. */
+  usage: Map<string, SessionUsage>;
 }

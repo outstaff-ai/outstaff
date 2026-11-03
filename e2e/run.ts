@@ -5,7 +5,7 @@
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs several pull
 // requests is split into sub-tickets first, one pull request each: the one in review goes to the human with the
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
-// for the next, until the last one closes the parent, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat. The office, Postgres and the agent are the real images; GitHub,
+// for the next, until the last one closes the parent, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -551,6 +551,7 @@ async function main() {
 
   await buildImages();
   await startStack();
+  await usageFields(keys.office);
 
   // ---- 1. a human assigns a ticket; the office schedules it; the agent clones, commits, pushes, opens a pull request
   const { key: first } = await stub("POST", "/_test/tickets", { title: "Add a greeting" });
@@ -2267,6 +2268,7 @@ async function main() {
   await canceledWhileQueued();
   await mergeChecks();
   await recallHistory();
+  await usagePerTicket();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2821,6 +2823,149 @@ async function recallHistory() {
   );
 }
 
+/** The tracker's usage fields, as `ost setup office --derive` makes them: the same calls, with the office's key. */
+const USAGE_FIELDS = ["Agent tokens", "Agent cost, USD (API-equivalent)"];
+
+async function usageFields(officeKey: string) {
+  for (const name of USAGE_FIELDS) {
+    const res = await fetch(`http://127.0.0.1:${port}/tracker/projects/SHOP/custom-fields`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-api-key": officeKey },
+      body: JSON.stringify({ name, fieldType: "number" }),
+    });
+
+    if (res.status !== 201) {
+      throw new Error(`Creating the field ${name} -> ${res.status}: ${await res.text()}`);
+    }
+  }
+
+  step(`setup: the tracker has the usage fields ${USAGE_FIELDS.join(" and ")}`);
+}
+
+/** Each scripted runtime run spends 10,000 tokens and two cents; a round has at least two (its run and the journal question). */
+const RUN = { tokens: 10_000, costUsd: 0.02 };
+
+/** The totals line of `ost usage`: `<key>: <tokens> tokens (...), $<cost>, <runs> runs`. The posted comment links the key. */
+function usageLine(text: string, key: string) {
+  const plain = text.replaceAll(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+  const m = new RegExp(
+    `^ *${key}: ([\\d,]+) tokens \\(.*\\), \\$([\\d.]+), (\\d+) runs?$`,
+    "m",
+  ).exec(plain);
+
+  if (!m) {
+    throw new Error(`ost usage printed no line for ${key}:\n${text}`);
+  }
+
+  return { tokens: Number(m[1]!.replaceAll(",", "")), costUsd: Number(m[2]), runs: Number(m[3]) };
+}
+
+const ticketOf = (s: Json, key: string) => s.tickets.find((x: Json) => x.key === key);
+
+/** The usage fields of a ticket with these totals, both written by sam. */
+const want = (t: { tokens: number; costUsd: number }) => ({
+  "Agent tokens": { value: t.tokens, by: "sam" },
+  "Agent cost, USD (API-equivalent)": { value: t.costUsd, by: "sam" },
+});
+
+/** A ticket's usage fields in the stub, with who set them. */
+const fieldsOf = (t: Json) =>
+  Object.fromEntries((t.fields ?? []).map((f: Json) => [f.name, { value: f.value, by: f.by }]));
+
+/**
+ * 13f. tokens and cost per ticket: sam works a sub-ticket and its parent, the office totals their runs, and sam
+ * writes each ticket's totals into its usage fields, the parent's with the sub-ticket rolled up. `ost usage` prints
+ * the parent's breakdown. Each scripted run reports the same usage as a running total of its session, so the totals
+ * are the rounds counted, whatever else the office did.
+ */
+async function usagePerTicket() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const ask = "which repo: unclear";
+  const { key: parent } = await stub("POST", "/_test/tickets", {
+    title: "Tidy the help pages",
+    description: ask,
+  });
+
+  const { key: child } = await stub("POST", "/_test/tickets", {
+    title: "Tidy the help page footer",
+    description: ask,
+  });
+
+  await stub("POST", `/_test/tickets/${child}/parent`, { parent });
+  const asked = (s: Json, key: string) =>
+    ticketOf(s, key).comments.some((c: Json) => c.body.includes(`Which repository is ${key}`));
+
+  for (const key of [child, parent]) {
+    await stub("POST", `/_test/tickets/${key}/assign`, { to: "sam" });
+    await until(`sam's round on ${key}`, (s) => (asked(s, key) && idle(s) ? true : undefined));
+    await officePolledTwice(`${key} handed back`);
+  }
+
+  // `ost usage` from a round of its own, on a ticket that is neither of them.
+  const { key: report } = await stub("POST", "/_test/tickets", {
+    title: "Report the cost of the help pages",
+    description: `usage: ${parent}`,
+  });
+
+  await stub("POST", `/_test/tickets/${report}/assign`, { to: "sam" });
+  const printed = await until(
+    `ost usage of ${parent} posted on ${report}`,
+    (s) =>
+      ticketOf(s, report).comments.find(
+        (c: Json) => c.author === "sam" && c.body.startsWith("ost usage:"),
+      )?.body as string | undefined,
+  );
+
+  const total = usageLine(printed, parent);
+  const own = usageLine(printed, "Own runs");
+  const sub = usageLine(printed, child);
+  for (const [what, t] of [
+    [parent, total],
+    [`${parent}'s own runs`, own],
+    [child, sub],
+  ] as const) {
+    const runtimeRuns = t.tokens / RUN.tokens;
+    assertSame(
+      [Number.isInteger(runtimeRuns) && runtimeRuns >= 2 * t.runs, t.costUsd.toFixed(2)],
+      [true, (runtimeRuns * RUN.costUsd).toFixed(2)],
+      `${what}: the office's total is the sum of the runtime's runs in its ${t.runs} rounds`,
+    );
+  }
+
+  assertSame(
+    [total.runs, total.tokens, total.costUsd.toFixed(2)],
+    [own.runs + sub.runs, own.tokens + sub.tokens, (own.costUsd + sub.costUsd).toFixed(2)],
+    `${parent}'s total rolls ${child} up`,
+  );
+
+  assertEq(sub.runs >= 1 && own.runs >= 1, true, "both tickets were worked on");
+  assertSame(
+    [/^By person:$/m.test(printed), /^ {2}sam: /m.test(printed)],
+    [true, true],
+    "ost usage breaks the runs down by person",
+  );
+
+  assertSame(
+    [/^By kind of round:$/m.test(printed), /^ {2}assigned: /m.test(printed)],
+    [true, true],
+    "and by kind of round",
+  );
+
+  assertSays(printed, "API-equivalent", "and says the cost is API-equivalent");
+
+  await until(`the usage fields of ${child} and ${parent}, written by sam`, (s) =>
+    JSON.stringify(fieldsOf(ticketOf(s, child))) === JSON.stringify(want(sub)) &&
+    JSON.stringify(fieldsOf(ticketOf(s, parent))) === JSON.stringify(want(total))
+      ? true
+      : undefined,
+  );
+
+  step(
+    `usage: ${child} (${sub.runs} runs) under ${parent} (${own.runs} of its own) -> the office's totals are the sum of the runs, sam wrote ${child}'s own and ${parent}'s rolled up into their fields, ost usage printed the breakdown`,
+  );
+}
+
 /** The merge approver approves the pull request's current head. */
 async function approve(number: number) {
   await stub("POST", `/_test/pulls/${number}/review`, {
@@ -3028,6 +3173,11 @@ function assertEq(actual: unknown, expected: unknown, what: string) {
   if (actual !== expected) {
     throw new Error(`${what}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
   }
+}
+
+/** Like assertEq, for values compared by their JSON (arrays and records). */
+function assertSame(actual: unknown, expected: unknown, what: string) {
+  assertEq(JSON.stringify(actual), JSON.stringify(expected), what);
 }
 
 function assertIncludes(list: string[], item: string, what: string) {

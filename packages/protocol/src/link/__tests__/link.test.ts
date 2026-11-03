@@ -94,6 +94,16 @@ const TRACE = {
   },
 };
 
+const TOTALS = {
+  inputTokens: 10,
+  outputTokens: 20,
+  cacheReadTokens: 300,
+  cacheCreationTokens: 40,
+  tokens: 370,
+  costUsd: 0.12,
+  runs: 1,
+};
+
 const ITEM = {
   id: "item-1",
   kind: "merge",
@@ -117,6 +127,16 @@ const ITEM = {
       error: null,
       runtime: "claude",
       model: null,
+      usage: null,
+    },
+    {
+      startedAt: "2026-10-05T08:00:30.000Z",
+      finishedAt: "2026-10-05T08:10:00.000Z",
+      outcome: "done",
+      error: null,
+      runtime: "claude",
+      model: "claude-opus-5-5",
+      usage: { totals: TOTALS, models: [{ model: "claude-opus-5-5", totals: TOTALS }] },
     },
   ],
   journal: {
@@ -209,6 +229,38 @@ describe("the office link messages", () => {
         },
       },
       { type: "response", payload: { id: "r4", result: { item: ITEM, traces: [TRACE] } } },
+      { type: "request", payload: { id: "r5", method: "usage", params: { since: "2026-10-01" } } },
+      {
+        type: "request",
+        payload: { id: "r6", method: "ticket_usage", params: { ticket: "ACME-1" } },
+      },
+      {
+        type: "response",
+        payload: {
+          id: "r5",
+          result: {
+            since: "2026-10-01",
+            until: "2026-10-05T10:00:00.000Z",
+            byPerson: [{ person: "sam", totals: TOTALS, unattributed: TOTALS }],
+            byDay: [{ day: "2026-10-05", totals: TOTALS }],
+          },
+        },
+      },
+      {
+        type: "response",
+        payload: {
+          id: "r6",
+          result: {
+            ticket: "ACME-1",
+            own: TOTALS,
+            total: TOTALS,
+            subTickets: [{ ticket: "ACME-2", total: TOTALS }],
+            byPerson: [{ key: "sam", totals: TOTALS }],
+            byModel: [{ key: "claude-opus-5-5", totals: TOTALS }],
+            byKind: [{ key: "assigned", totals: TOTALS }],
+          },
+        },
+      },
       {
         type: "response",
         payload: { id: "r9", error: { code: "unknown_method", message: "No method nope." } },

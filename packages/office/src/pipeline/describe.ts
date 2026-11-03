@@ -13,6 +13,7 @@ const OP_TEXT: { [K in ActOp["op"]]: (op: Extract<ActOp, { op: K }>) => string }
   set_parent: (op) => `set the parent of ${op.ticket} to ${op.parent}`,
   link_pr: (op) => `link ${op.pr.repo.owner}/${op.pr.repo.name}#${op.pr.number} on ${op.ticket}`,
   link_doc: (op) => `link doc ${op.doc} on ${op.ticket}`,
+  set_field: (op) => `set ${op.field} of ${op.ticket} to ${op.value ?? "nothing"}`,
 };
 
 /** One tracker change, in words. */
