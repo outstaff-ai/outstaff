@@ -251,9 +251,14 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       relations.splice(0, relations.length, ...relations.filter((r) => !same(r)));
     },
     async setParent(key, parentKey) {
-      need(parentKey);
       const issue = need(key);
-      parents.set(key, parentKey);
+      if (parentKey === null) {
+        parents.delete(key);
+      } else {
+        need(parentKey);
+        parents.set(key, parentKey);
+      }
+
       return touch(issue);
     },
     async members() {

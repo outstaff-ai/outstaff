@@ -197,25 +197,26 @@ ost ticket edit ACME-41 --description-file .scratch/acme-41.md
 
 ## ticket.parent
 
-Make a ticket a subtask of another ticket.
+Make a ticket a subtask of another ticket, or clear the parent of tickets.
 
-Sets the parent of an existing ticket in the tracker's own parent field, so it shows as a subtask of the parent. Use it for work that is part of another ticket's scope. Refused when the tracker has no parent field; link independent follow-ups with a relates link instead.
+Sets the parent of an existing ticket in the tracker's own parent field, so it shows as a subtask of the parent: pass the ticket, then its parent. Use it for work that is part of another ticket's scope. With clear, each ticket given loses its parent instead, and each is reported: a ticket without a parent is left as it is, and one that fails does not stop the others (the verb fails only when every one failed). Refused when the tracker has no parent field; link independent follow-ups with a relates link instead.
 
 ```
-ost ticket parent <key> <parent>
+ost ticket parent <tickets...> [--clear]
 ```
 
 Runtime tool: `ticket_parent`
 
 | Input | Type | Required | Description |
 | --- | --- | --- | --- |
-| `key` | string | yes | Ticket key, for example ACME-12. |
-| `parent` | string | yes | Key of the parent ticket. |
+| `tickets` | array | yes | The ticket, then its parent; with clear, the tickets whose parent to clear. |
+| `clear` | boolean | no | Clear the parent of each ticket given. Default: false. |
 
 Examples:
 
 ```sh
 ost ticket parent ACME-120 ACME-118
+ost ticket parent ACME-120 ACME-121 --clear
 ```
 
 ## ticket.link
