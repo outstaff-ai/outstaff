@@ -1,18 +1,14 @@
 name: End-to-end
 
 # The acme loop on Docker Compose with the real office and agent images and stand-ins for GitHub, the tracker and
-# the model (e2e/). It takes a few minutes and needs no secrets, so it runs every night, by hand, as a gate of the
-# Release workflow, and on pull requests that touch the code, the images or the test.
+# the model (e2e/). It takes 10 to 12 minutes in CI and needs no secrets. It runs every night, by hand, and as a gate of
+# the Release workflow, not on pull requests: a failure is fixed as a follow-up before the release.
 # How it works: CONTRIBUTING.md, "End-to-end test".
 
 on:
-  # Every pull request, so the check can be required; the nightly run covers the full matrix.
-  pull_request:
-    types: [opened, synchronize, reopened]
-  # the merge queue tests each PR combined with everything ahead of it (a required check)
-  merge_group:
   schedule:
     - cron: "23 3 * * *"
+  # on a branch: gh workflow run e2e.yml --ref <branch>
   workflow_dispatch:
   workflow_call:
 
@@ -21,7 +17,7 @@ permissions:
 
 concurrency:
   group: e2e-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: false
 
 jobs:
   e2e:
