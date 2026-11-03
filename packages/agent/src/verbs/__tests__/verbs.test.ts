@@ -2130,6 +2130,7 @@ describe("verb catalogue", () => {
       "work.attach",
       "team",
       "handback",
+      "worktree.add",
       "http",
     ]);
 

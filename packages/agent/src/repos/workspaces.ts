@@ -1,10 +1,18 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { parseRepoUrl, silentLogger } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
 import { createCloneRefresher } from "./base-clone.js";
 import type { ClonedRepo, RepoHead, Workspaces, WorkspacesOptions } from "./types.js";
 import { runGit } from "./git.js";
+import {
+  addWorktree,
+  ensureParent,
+  holderOf,
+  otherWorktrees,
+  worktreeDirs,
+  writableRepo,
+} from "./worktree-add.js";
 
 /** Where a repository states how work is done in it. */
 export const CONVENTION_FILES = [
@@ -130,17 +138,6 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
   const worktreeOf = (repo: string, id: string) => join(opts.layout.worktreesDir, repo, safeId(id));
   const scratchOf = (id: string) => join(opts.layout.scratchDir, safeId(id));
-  const has = (cwd: string, ref: string) =>
-    git(["show-ref", "--verify", "--quiet", ref], { cwd }).then(
-      () => true,
-      () => false,
-    );
-
-  const checkedOut = async (cwd: string, branch: string) =>
-    (await git(["worktree", "list", "--porcelain"], { cwd }))
-      .split("\n")
-      .includes(`branch refs/heads/${branch}`);
-
   const space = (
     repo: ClonedRepo,
     worktree: string,
@@ -152,6 +149,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
     branch,
     scratch,
     conventionFiles: findConventionFiles(worktree, repo.instructions),
+    others: otherWorktrees(opts.layout.worktreesDir, opts.repos, basename(scratch), repo.name),
   });
 
   /** Makes the item's worktree, or finds it; the caller holds the clone. */
@@ -176,17 +174,14 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
     if (!head) {
       // New work names no branch: the agent creates one, by the repository's conventions, once it has the work.
-      await git(["worktree", "add", "--detach", worktree, `origin/${repo.defaultBranch}`], {
-        cwd: repo.dir,
-      });
-
+      await addWorktree(git, repo, worktree, undefined);
       return space(repo, worktree, undefined, scratch);
     }
 
     // A branch can be checked out in one worktree only. When an earlier item that is still waiting holds the pull
     // request's head, this round gets a local branch of its own on the same commit and pushes to the head by name.
     let branch = head;
-    if (await checkedOut(repo.dir, head)) {
+    if (await holderOf(git, repo.dir, head)) {
       branch = `${head}-${safeId(item.id)}`;
       await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${head}`], {
         cwd: repo.dir,
@@ -195,20 +190,33 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       return space(repo, worktree, branch, scratch);
     }
 
-    if (await has(repo.dir, `refs/remotes/origin/${branch}`)) {
-      await git(["worktree", "add", "--no-track", "-B", branch, worktree, `origin/${branch}`], {
-        cwd: repo.dir,
-      });
-    } else if (await has(repo.dir, `refs/heads/${branch}`)) {
-      await git(["worktree", "add", worktree, branch], { cwd: repo.dir });
-    } else {
-      await git(
-        ["worktree", "add", "--no-track", "-b", branch, worktree, `origin/${repo.defaultBranch}`],
-        { cwd: repo.dir },
-      );
+    await addWorktree(git, repo, worktree, branch);
+    return space(repo, worktree, branch, scratch);
+  }
+
+  /** Adds a worktree of `repo` to the item; the caller holds the clone. */
+  async function addIn(repo: ClonedRepo, workItemId: string, branch: string | undefined) {
+    const worktree = worktreeOf(repo.name, workItemId);
+    if (existsSync(worktree)) {
+      const current = (await git(["rev-parse", "--abbrev-ref", "HEAD"], { cwd: worktree })).trim();
+      return {
+        repo: repo.name,
+        worktree,
+        branch: current === "HEAD" ? undefined : current,
+        existed: true,
+      };
     }
 
-    return space(repo, worktree, branch, scratch);
+    await clones.update(repo);
+    const heldBy = branch ? await holderOf(git, repo.dir, branch) : undefined;
+    if (heldBy) {
+      return { repo: repo.name, heldBy };
+    }
+
+    ensureParent(worktree);
+    await git(["worktree", "prune"], { cwd: repo.dir });
+    await addWorktree(git, repo, worktree, branch);
+    return { repo: repo.name, worktree, branch, existed: false };
   }
 
   return {
@@ -225,6 +233,13 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
     refresh() {
       return Promise.all(opts.repos.map(readable));
     },
+
+    async add(workItemId, name, branch) {
+      const repo = writableRepo(opts.repos, name);
+      return clones.exclusive(repo.dir, () => addIn(repo, workItemId, branch));
+    },
+
+    worktrees: () => worktreeDirs(opts.layout.worktreesDir, opts.repos),
 
     held() {
       const dirs = [

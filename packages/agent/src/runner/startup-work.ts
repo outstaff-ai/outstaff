@@ -186,7 +186,7 @@ export function workLoop({ team, log }: StartupContext, parts: LoopParts): WorkL
     usage: parts.usage,
     runtime: parts.runtime,
     runtimeName: team.integrations.runtime.adapter,
-    env: { ...parts.env, policy, layout },
+    env: { ...parts.env, policy, layout, workspaces: parts.workspaces },
     systemPrompt: parts.systemPrompt,
     policy,
     builtinTools: [...policy.tools.allow],

@@ -97,7 +97,20 @@ export function workspaceLines(offer: Offer, opts: WorkPromptOptions, doc: DocPa
   return [
     "",
     worktreeLine(w, targetUnsettled, doc),
+    ...othersLine(w),
     pushLine(head, w.branch),
     conventionLine(w.conventionFiles, doc),
+  ];
+}
+
+/** The worktrees an earlier round added in other repositories with `ost worktree add`. */
+function othersLine(w: Workspace): string[] {
+  if (!w.others?.length) {
+    return [];
+  }
+
+  const list = w.others.map((o) => `${o.worktree} (repository ${o.repo})`).join(", ");
+  return [
+    `This item also has worktrees in other repositories, added in an earlier round: ${list}. Work there as in the first one, by that repository's convention files.`,
   ];
 }

@@ -60,6 +60,12 @@ The worktree you are given is only a default, and write access is not a reason t
 If nothing settles it, or the repository it most likely means is one you can only read, do not use another repository instead. Ask in the ticket with `ost ask`, naming the candidates, and hand back as `waiting`, or as `blocked` when the likely repository is read-only for you. Make no change meanwhile.
 
 When you choose a repository the ticket did not name, say which and why in your first ticket comment or in the pull request description.
+
+## Work that spans repositories
+
+Your worktree is in one repository. When the work also needs a change in another, first check whether that change belongs to existing work: `ost work list` and `ost pr list --repo <repo>`. If another item of yours already has a pull request or a worktree there, the change is part of that work, not of this item: do not make it here. Comment the request on that work's {{#if integrations.has.tracker}}ticket or {{/if}}pull request, and say in your hand-back what that work still needs, linking it. Otherwise add a worktree for this item: `ost worktree add <repo>` (detached at the default branch; create the branch there as in your first worktree), or `--branch <name>` to work on an existing branch. You can add one only in a repository you have a write grant on; the worktree stays this item's for its later rounds, and each repository's own conventions apply to the work in it. A write refused because the path is in another item's worktree names that item and says the same: leave the change to it.
+
+Never tell anyone you can't change something before you have checked both.
 {{/if}}
 
 ## Journal

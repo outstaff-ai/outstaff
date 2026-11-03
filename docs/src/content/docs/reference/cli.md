@@ -1612,6 +1612,33 @@ ost handback silent
 ost handback blocked --json
 ```
 
+## ost worktree add
+
+Add a worktree of another repository to this work item.
+
+For work that spans repositories: adds a worktree of another repository you have a write grant on to the current work item, at <worktrees>/<repo>/<item>. It is this item's from now on: edit, commit, push and open the pull request there like in the item's first worktree, in this round and later ones, and it is removed with the item. Without --branch it starts detached at the fetched default branch: create the branch with git switch -c before your first commit. With --branch it checks out that branch, from the remote when it exists, else a new one from the default branch. Refused for a repository you can only read or have no grant on, and for a branch another work item's worktree has checked out: that change belongs to that work, and the refusal names it.
+
+```
+ost worktree add <repo> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--branch <branch>` | The branch to check out: an existing one (for example the head of a pull request), or a new one from the default branch. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost worktree add shop-kit
+ost worktree add shop-kit --branch feat/ACME-153-rule
+ost worktree add shop-kit --json
+```
+
 ## ost http
 
 Call a service your team granted you, over HTTP.

@@ -106,7 +106,18 @@ export interface Workspace {
 
   /** Convention files found in the worktree, relative to it, plus the `instructions` files team.yaml lists that exist. */
   conventionFiles: string[];
+
+  /** The item's worktrees in other repositories, added with `ost worktree add` in an earlier round. */
+  others?: { repo: string; worktree: string }[];
 }
+
+/**
+ * What adding a worktree to an item did: added it, found it already there, or found the branch checked out in another
+ * worktree (`heldBy`, its path), where git refuses a second checkout.
+ */
+export type AddedWorktree =
+  | { repo: string; worktree: string; branch: string | undefined; existed: boolean }
+  | { repo: string; heldBy: string };
 
 export interface Workspaces {
   /** Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when no repo fits. */
@@ -117,6 +128,15 @@ export interface Workspaces {
    * that reads the clones. A clone that cannot be fetched is logged and reported where it is.
    */
   refresh(): Promise<RepoHead[]>;
+
+  /**
+   * Adds a worktree of another repository to the item, at `<worktreesDir>/<repo>/<item>`, so later rounds find it as
+   * one of {@link Workspace.others}. Refuses a repository the person cannot write (`forbidden`).
+   */
+  add(workItemId: string, repo: string, branch?: string): Promise<AddedWorktree>;
+
+  /** The item directories under each repository's worktree folder, with their root. */
+  worktrees(): { repo: string; dir: string; root: string }[];
 
   /** Removes the item's worktree and scratch directory. The branch stays, so unmerged commits are not lost. */
   release(workItemId: string): Promise<void>;

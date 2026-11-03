@@ -70,6 +70,8 @@ A role's `permissions` names its profile. Profiles no longer differ in what may 
 
 A chat session, which runs beside a work item, has the same tools as a work session and the rule packs of the role's profile. It has read-only git, edits no repository file, and calls only the `ost` verbs that look at the work, comment, file new work, and change a ticket on the requester's word (assign, move, re-parent, edit its title or description). It changes no pull request or document.
 
+An edit refused in the worktree of another of the person's work items says whose it is and how to reach that work, for example: `... is outside the paths this person may write with the edit tools. This is the worktree of ACME-150 (shop-kit#1). To change it, attach the request to that work: ost work attach github.com/acme/shop-kit#1 --confirmed.` That is the form in a chat session, where the human directs the work. In a work round, which cannot attach, it names the work the same way and says to leave the change to it: comment the request on its ticket or pull request, and say so in the hand-back. The agent reads the work it names from the office at the start of each round.
+
 ## Where the boundary sits
 
 The policy reads command lines. It stops an agent from reading a secret or pushing to `main` by mistake, or because a ticket, comment or web page told it to. It does not stop a program written to get around it: a script the agent writes can do what its process can. What limits an agent is outside it, and the operator provides it:
