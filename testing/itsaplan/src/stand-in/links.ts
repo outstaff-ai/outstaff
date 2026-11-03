@@ -33,6 +33,12 @@ export function addLink(
   return link;
 }
 
+/** Where a link of the issue, from either end, is in the store; -1 when the issue has no such link. */
+export const linkIndex = (s: ItsaplanStore, issue: StoredIssue, id: number): number =>
+  s.links.findIndex(
+    (l) => l.id === id && (l.from === issue.identifier || l.to === issue.identifier),
+  );
+
 const linkedIssue = (s: ItsaplanStore, key: string): ApiIssueLink["issue"] => {
   const i = s.issues.find((x) => x.identifier === key)!;
   return {

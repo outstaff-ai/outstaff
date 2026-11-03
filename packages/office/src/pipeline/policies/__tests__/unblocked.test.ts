@@ -57,6 +57,27 @@ describe("unblocked_to_ready", () => {
     ]);
   });
 
+  it("only moves a sub-ticket whose sibling blocked it while the parent is with the same agent: the parent wake wins", () => {
+    const sibling = (parentAgent?: string) =>
+      unblocked(SAM, { parent: "ACME-1", ...(parentAgent ? { parentAgent } : {}) });
+
+    expect(decisions(sibling("sam"), world("blocked", "sam"))).toEqual([
+      "unblocked_to_ready: act sam",
+    ]);
+
+    expect(traceOf(sibling("sam"), world("blocked", "sam")).decisions[0]).not.toHaveProperty(
+      "note",
+    );
+
+    // The parent is with a human, or with another agent: no parent wake for this agent, so this one wakes it.
+    for (const w of [sibling(), sibling("mira")]) {
+      expect(decisions(w, world("blocked", "sam"))).toEqual([
+        "unblocked_to_ready: act sam",
+        "unblocked_to_ready: wake sam",
+      ]);
+    }
+  });
+
   it("acts as the agent who closed the blocker when no agent holds the ticket, and wakes no one", () => {
     for (const w of [world("blocked", "ada.admin"), world("blocked")]) {
       expect(judge("unblocked_to_ready", unblocked(MIRA), w)).toEqual([

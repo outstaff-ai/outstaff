@@ -385,7 +385,7 @@ describe("assigned, for a ticket that needs two pull requests", () => {
       [(a) => isTool(a, "pr_open"), "Opened https://git.example/acme/shop/pull/1"],
       [
         (a) => isTool(a, "ticket_create"),
-        "Created SHOP-2.\nSHOP-2: Add a farewell\nhttps://tracker.example/issue/SHOP-2\nPart of SHOP-1: https://tracker.example/issue/SHOP-1",
+        "Created SHOP-2.\nSHOP-2: Add a farewell\nhttps://tracker.example/issue/SHOP-2\nParent: SHOP-1.",
       ],
       [(a) => isTool(a, "ticket_show"), "SHOP-1 Add a greeting\n\nsplit: Add a farewell"],
       [(a) => isShell(a, "CI=1 pnpm --version"), "12.9.1\n"],
@@ -438,7 +438,7 @@ describe("assigned, for a ticket that needs two pull requests", () => {
 });
 
 describe("assigned, for a ticket split into a part now and a part later", () => {
-  it("files the later part as ready, assigned to itself, and says the order on the parent", async () => {
+  it("files the later part ready and blocked by the first, assigned to itself, and says the order on the parent", async () => {
     let created = 1;
     let opens = 0;
     const fixed = answerBy(
@@ -475,8 +475,17 @@ describe("assigned, for a ticket split into a part now and a part later", () => 
     const creates = seen.filter((a) => isTool(a, "ticket_create"));
     expect(creates.map((a) => (a.type === "tool" ? a.input : {}))).toMatchObject([
       { title: "Add a farewell", status: "active", assignee: "me", parent: "SHOP-1" },
-      { title: "Add a banner", status: "ready", assignee: "me", parent: "SHOP-1" },
+      {
+        title: "Add a banner",
+        status: "ready",
+        assignee: "me",
+        parent: "SHOP-1",
+        blockedBy: ["SHOP-2"],
+      },
     ]);
+
+    const bodies = creates.map((a) => (a.type === "tool" ? String(a.input["body"]) : ""));
+    expect(bodies.join("\n")).not.toMatch(/Part of|Depends on/);
 
     const comment = seen.find((a) => isTool(a, "ticket_comment"));
     expect(comment).toMatchObject({

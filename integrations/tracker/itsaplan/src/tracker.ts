@@ -4,6 +4,7 @@ import {
   type CanonicalStatus,
   type Comment,
   type EventPage,
+  type LinkRelation,
   type NewIssue,
   type TicketAttachment,
   type Tracker,
@@ -14,6 +15,7 @@ import {
   type ApiAttachment,
   type ApiFeedItem,
   type ApiIssue,
+  type ApiIssueLink,
   type ClientDeps,
   type Itsaplan,
 } from "@outstaff/integration.shared.itsaplan";
@@ -63,6 +65,12 @@ async function parentKey(api: Itsaplan, raw: ApiIssue): Promise<string | undefin
     return undefined;
   }
 }
+
+/** A link of an issue that `link(issue, other, relation)` makes: stated from the issue, or either way for "relates". */
+const sameLink = (l: ApiIssueLink, other: string, relation: LinkRelation) =>
+  l.kind === relation &&
+  l.issue.identifier === other &&
+  (relation === "relates" || l.direction === "outward");
 
 function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
   const { toIssue, fetchIssue, labelIds, hydrate, patch, commentFeed, actor } = issueHelpers(
@@ -185,6 +193,14 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
       await api.http.request("POST", `/issues/${from.id}/links`, {
         body: { targetIssueId: to.id, kind: relation },
       });
+    },
+
+    async unlink(key, otherKey, relation) {
+      const [from, to] = [await fetchIssue(key), await fetchIssue(otherKey)];
+      const links = (from.links ?? []).filter((l) => sameLink(l, to.identifier, relation));
+      for (const l of links) {
+        await api.http.request("DELETE", `/issues/${from.id}/links/${l.id}`);
+      }
     },
 
     async setParent(key, parentKey) {

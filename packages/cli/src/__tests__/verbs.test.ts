@@ -74,6 +74,34 @@ describe("ost verbs", () => {
     expect(parsed.data.issue.key).toBe(issue.key);
   });
 
+  it("ticket create takes --blocked-by repeated, and ticket link links and unlinks", async () => {
+    const f = fakeEnv();
+    for (const title of ["A", "B", "C"]) {
+      await f.tracker.createIssue({ title, body: "" });
+    }
+
+    const created = await ost(
+      ["ticket", "create", "--title", "D", "--blocked-by", "SHOP-1", "--blocked-by", "SHOP-2"],
+      f,
+    );
+
+    expect(created.code).toBe(0);
+    expect((await f.tracker.getIssue("SHOP-4")).blockedBy?.map((l) => l.key)).toEqual([
+      "SHOP-1",
+      "SHOP-2",
+    ]);
+
+    expect((await ost(["ticket", "link", "SHOP-3", "--blocked-by", "SHOP-4"], f)).code).toBe(0);
+    expect((await f.tracker.getIssue("SHOP-3")).blockedBy?.map((l) => l.key)).toEqual(["SHOP-4"]);
+    const removed = await ost(
+      ["ticket", "link", "SHOP-3", "--blocked-by", "SHOP-4", "--remove"],
+      f,
+    );
+
+    expect(removed.out).toContain("Removed the link: SHOP-4 blocks SHOP-3.");
+    expect((await f.tracker.getIssue("SHOP-3")).blockedBy).toEqual([]);
+  });
+
   it("ticket comment, move and assign", async () => {
     const f = fakeEnv();
     const issue = await f.tracker.createIssue({ title: "T", body: "" });

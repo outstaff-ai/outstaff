@@ -134,6 +134,9 @@ export interface PullRequestToLink {
  */
 export type PullRequestLinkOutcome = "linked" | "already_linked" | "not_connected";
 
+/** How one ticket relates to another, read from the first one's side. */
+export type LinkRelation = "blocks" | "relates" | "duplicates";
+
 export interface Tracker {
   links: Pick<Links, "issue" | "comment">;
 
@@ -158,7 +161,15 @@ export interface Tracker {
   comment(key: string, body: string): Promise<{ id: string; url: string }>;
   listComments(key: string): Promise<Comment[]>;
   setLabels(key: string, add: string[], remove: string[]): Promise<Issue>;
-  link(key: string, otherKey: string, relation: "blocks" | "relates" | "duplicates"): Promise<void>;
+
+  /** Links two tickets, the relation read from `key`'s side: `key` blocks, relates to or duplicates `otherKey`. */
+  link(key: string, otherKey: string, relation: LinkRelation): Promise<void>;
+
+  /**
+   * Removes the link `link` makes with the same arguments; a "relates" link either way round. Unlinking tickets that
+   * are not linked so changes nothing. An unknown key is `not_found`.
+   */
+  unlink(key: string, otherKey: string, relation: LinkRelation): Promise<void>;
   members(): Promise<Member[]>;
 
   /**

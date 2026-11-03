@@ -16,6 +16,7 @@ interface TicketCreateInput {
   parent?: string | undefined;
   related?: string | undefined;
   assignee?: string | undefined;
+  blockedBy?: string[] | undefined;
 }
 
 /** The work item this call runs in, if any. */
@@ -95,7 +96,14 @@ async function selfOnTracker(env: AgentEnv, tracker: Tracker): Promise<Member | 
 export const chatFiles = (env: AgentEnv, chat: boolean): Attachments =>
   chat ? (env.attachments ?? []) : [];
 
-/** What to create: the body opens with the parent's link and ends with where the attached files are. */
+/** A ticket to be worked (ready or active) that something still blocks starts blocked. */
+const startStatus = (status: NonNullable<TicketCreateInput["status"]>, blocked: boolean) =>
+  blocked && status !== "backlog" ? "blocked" : status;
+
+/**
+ * What to create: the body as written, ending with where the attached files are. The parent goes in the tracker's
+ * parent field, never in the body. A ticket to be worked (ready or active) with an open blocker starts blocked.
+ */
 export function newIssue(
   tracker: Tracker,
   input: TicketCreateInput,
@@ -104,15 +112,15 @@ export function newIssue(
     assignee: Member | undefined;
     files: Attachments;
     chat: boolean;
+    blocked: boolean;
   },
 ): Parameters<Tracker["createIssue"]>[0] {
   const { parent, assignee, files } = to;
-  const partOf = parent ? `Part of ${parent.key}: ${tracker.links.issue(parent.key)}` : undefined;
   const described = files.length ? attachmentsSection(files, canAttach(tracker)) : "";
   return {
     title: input.title,
-    body: [partOf, input.body, described].filter(Boolean).join("\n\n").trimEnd(),
-    status: input.status ?? (to.chat ? "ready" : "backlog"),
+    body: [input.body, described].filter(Boolean).join("\n\n").trimEnd(),
+    status: startStatus(input.status ?? (to.chat ? "ready" : "backlog"), to.blocked),
     ...(assignee ? { assignee: assignee.id } : {}),
     ...(parent && tracker.setParent ? { parent: parent.key } : {}),
   };

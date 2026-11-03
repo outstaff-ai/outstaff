@@ -308,16 +308,24 @@ interface SubTicket {
   title: string;
 }
 
-/** Files a sub-ticket of the parent, assigned to the caller, in the given status. */
+/** Files a sub-ticket of the parent, assigned to the caller, in the given status, blocked by the tickets named. */
 async function* subTicket(
   key: string,
   title: string,
   status: "active" | "ready",
+  blockedBy: string[] = [],
 ): AsyncGenerator<Action, SubTicket, string> {
   const created = yield {
     type: "tool",
     tool: "ticket_create",
-    input: { title, body: `A part of ${key}.`, parent: key, assignee: "me", status },
+    input: {
+      title,
+      body: `A part of ${key}.`,
+      parent: key,
+      assignee: "me",
+      status,
+      ...(blockedBy.length ? { blockedBy } : {}),
+    },
   };
 
   const subKey = /^Created (\S+?)\./m.exec(created)?.[1];
@@ -330,7 +338,7 @@ async function* subTicket(
 
 /**
  * Splits the ticket: a sub-ticket with the given title, started now; one for the part a `later: <title>` line names,
- * ready for after it; and the parent told about both, in their order.
+ * blocked by the first (a tracker link, no line in its description); and the parent told about both, in their order.
  */
 async function* splitTicket(
   key: string,
@@ -338,7 +346,7 @@ async function* splitTicket(
   laterTitle: string | undefined,
 ): AsyncGenerator<Action, SubTicket, string> {
   const sub = yield* subTicket(key, title, "active");
-  const later = laterTitle ? yield* subTicket(key, laterTitle, "ready") : undefined;
+  const later = laterTitle ? yield* subTicket(key, laterTitle, "ready", [sub.key]) : undefined;
   const order = later
     ? ` Then ${later.title} is ${later.key}, ${later.url}, once ${sub.key} merged.`
     : "";

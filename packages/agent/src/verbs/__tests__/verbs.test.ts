@@ -1567,10 +1567,10 @@ describe("office verbs", () => {
       { workItemId: "w1" },
     );
 
-    const url = f.tracker.links.issue(parent.key);
     const issue = await f.tracker.getIssue("SHOP-2");
 
-    expect(issue.body).toBe(`Part of ${parent.key}: ${url}\n\nOnly the cart.`);
+    // The parent is the parent field, never a line in the description.
+    expect(issue.body).toBe("Only the cart.");
     expect(issue.status.canonical).toBe("backlog");
     expect(issue.assignee).toBeUndefined();
     expect(f.tracker.parents.get("SHOP-2")).toBe(parent.key);
@@ -1590,6 +1590,7 @@ describe("office verbs", () => {
     ]);
 
     expect(r.text).toContain("Related to SHOP-1");
+    expect((await f.tracker.getIssue("SHOP-2")).body).toBe("");
   });
 
   it("sets a parent on an existing ticket, and refuses a tracker without parents", async () => {
@@ -1685,13 +1686,11 @@ describe("office verbs", () => {
     expect(f.office.linked).toEqual([]);
   });
 
-  it("creates a sub-ticket with an empty body as just the Part of line, and refuses an unknown parent", async () => {
+  it("creates a sub-ticket with an empty body as an empty description, and refuses an unknown parent", async () => {
     const f = fakeEnv();
     const parent = await f.tracker.createIssue({ title: "Fix checkout", body: "" });
     await run("ticket.create", f.env, { title: "Half", parent: parent.key });
-    expect((await f.tracker.getIssue("SHOP-2")).body).toBe(
-      `Part of ${parent.key}: ${f.tracker.links.issue(parent.key)}`,
-    );
+    expect((await f.tracker.getIssue("SHOP-2")).body).toBe("");
 
     await rejects(run("ticket.create", f.env, { title: "Orphan", parent: "SHOP-99" }), "not_found");
     expect(await f.tracker.listIssues({})).toHaveLength(2);
@@ -2094,6 +2093,7 @@ describe("verb catalogue", () => {
       "ticket.create",
       "ticket.edit",
       "ticket.parent",
+      "ticket.link",
       "ticket.attach",
       "doc.search",
       "doc.show",

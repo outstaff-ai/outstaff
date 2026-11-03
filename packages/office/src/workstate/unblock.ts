@@ -40,8 +40,25 @@ const closedAt = (rec: TicketRecord) => rec.statusSince ?? rec.updatedAt;
  * `ticket.unblocked`, naming the ticket that closed. Each is raised once per closing.
  */
 export function createUnblock(core: WorkstateCore, ticketOps: TicketOps): UnblockOps {
-  const { store, clock, tickets } = core;
+  const { store, clock, tickets, logger } = core;
   const { refreshTicket } = ticketOps;
+
+  /**
+   * The parent the ticket shares with its blocker, and that parent's agent, read again: a sibling's close also wakes
+   * the agent on the parent (`unblocked_to_ready` leaves the wake to that).
+   */
+  const sharedParent = async (rec: TicketRecord, blocker: TicketRecord) => {
+    if (!rec.parent || rec.parent !== blocker.parent) {
+      return {};
+    }
+
+    await refreshTicket(rec.parent);
+    const assignee = tickets.get(rec.parent)?.assignee;
+    return {
+      parent: rec.parent,
+      ...(assignee?.kind === "agent" ? { parentAgent: assignee.id } : {}),
+    };
+  };
 
   const raise = async (ctx: RefreshCtx, rec: TicketRecord, blocker: TicketRecord, c: Closing) => {
     const event: WorkflowEvent = {
@@ -51,6 +68,7 @@ export function createUnblock(core: WorkstateCore, ticketOps: TicketOps): Unbloc
       data: {
         blocker: blocker.key,
         blockerTitle: blocker.title,
+        ...(await sharedParent(rec, blocker)),
         ...closedBy(c),
         ...untrusted(c),
         at: clock.now().toISOString(),
@@ -62,6 +80,10 @@ export function createUnblock(core: WorkstateCore, ticketOps: TicketOps): Unbloc
       ctx,
       event,
       `ticket.unblocked:${rec.key}:${blocker.key}:${closedAt(blocker)}`,
+    );
+
+    logger.info(
+      `workstate: ticket.unblocked on ${rec.key}, its last blocker ${blocker.key} closed`,
     );
   };
 
