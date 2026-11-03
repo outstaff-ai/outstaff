@@ -24,6 +24,7 @@ import { policy as rebaseToAuthor } from "./rebase_to_author.js";
 import { policy as reviewToAuthor } from "./review_to_author.js";
 import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as subticketClosedToAgent } from "./subticket_closed_to_agent.js";
+import { policy as subticketsClosedCloseParent } from "./subtickets_closed_close_parent.js";
 import { policy as subticketsClosedMoveParent } from "./subtickets_closed_move_parent.js";
 import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
 import { policy as ticketCommentToBlockedAgent } from "./ticket_comment_to_blocked_agent.js";
@@ -55,6 +56,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   closedStopsWork,
   subticketClosedToAgent,
   subticketsClosedMoveParent,
+  subticketsClosedCloseParent,
   unblockedToBlockedAgent,
   unblockedToReady,
   docCommentToAgent,

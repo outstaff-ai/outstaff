@@ -145,6 +145,12 @@ describe("ctx.wake", () => {
       { instruction: "ACME-2: ACME-4", subject: { type: "ticket", ref: "ACME-2" } },
     ]);
 
+    // A sub-ticket whose status is not known counts as neither open nor closed.
+    const more = { ...world.tickets, "ACME-5": { parent: "ACME-2" } as never };
+    expect(wake(up, closed, { tickets: more }, "closed: {{parent.closed}}")).toMatchObject([
+      { instruction: "closed: ACME-3" },
+    ]);
+
     const orphan = { tickets: { "ACME-3": { status: "done" as const, assignee: sam } } };
     expect(wake(up, closed, orphan, "{{parent}}")).toEqual([
       { type: "drop", reason: "ACME-3 has no parent ticket" },
