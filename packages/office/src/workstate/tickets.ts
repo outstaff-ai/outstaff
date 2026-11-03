@@ -55,6 +55,12 @@ function linksOf(issue: Issue, prev?: TicketRecord): Pick<TicketRecord, "blocks"
   return { ...(blocks && { blocks }), ...(blockedBy && { blockedBy }) };
 }
 
+/** The parent the tracker gives; a read that carries none (a listing) keeps the one known. */
+function parentOf(issue: Issue, prev?: TicketRecord): Pick<TicketRecord, "parent"> {
+  const parent = issue.parent ?? prev?.parent;
+  return parent ? { parent } : {};
+}
+
 /** When the tracker says the event happened, if it says. */
 const eventAt = (event?: WorkflowEvent): string | undefined => {
   const at = event?.data["at"];
@@ -123,6 +129,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
       ...(assignee ? { assignee } : {}),
       labels: [...issue.labels],
       ...linksOf(issue, prev),
+      ...parentOf(issue, prev),
       ...keptRequester(prev),
       updatedAt: clock.now().toISOString(),
     };

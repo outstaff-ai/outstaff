@@ -7,20 +7,50 @@ type Ctx = Omit<PolicyContext, "wake" | "act">;
 
 const drop = (reason: string): Proposal => ({ type: "drop", reason });
 
-/** The subject of a wake: the event's (left for the office to fill in), or for an idle pull the agent's next ready ticket. */
+const onTicket = (ref: string): WakeSubject => ({ type: "ticket", ref });
+
+/**
+ * An idle agent's next ready ticket. A sub-ticket of an open parent wakes the agent on the parent instead, naming its
+ * ready sub-tickets: the agent planned their order when it split the parent, and keeps to it.
+ */
+function nextReady(person: string, ctx: Ctx): Resolved<{ subject?: WakeSubject; next?: string }> {
+  const ready = ctx.state.readyTickets(person);
+  const next = nextReadyTicket(ready)?.key;
+  if (!next) {
+    return { skip: `no ready ticket is assigned to ${person}` };
+  }
+
+  const parent = ctx.state.parentOf(next);
+  if (!parent || ["done", "canceled"].includes(ctx.state.ticketStatus(parent) ?? "")) {
+    return { value: { subject: onTicket(next), next } };
+  }
+
+  const parts = ready.filter((t) => ctx.state.parentOf(t.key) === parent).map((t) => t.key);
+  const named = `${parent}'s ready sub-tickets ${parts.join(", ")}; take them in the order you planned`;
+  return { value: { subject: onTicket(parent), next: named } };
+}
+
+/**
+ * The subject of a wake: the event's (left for the office to fill in), for an idle pull the agent's next ready ticket,
+ * or the parent of the event's ticket.
+ */
 function wakeTarget(
   spec: Omit<WakeSpec, "person">,
   person: string,
   ctx: Ctx,
 ): Resolved<{ subject?: WakeSubject; next?: string }> {
-  if (spec.subject !== "next_ready_ticket") {
+  if (spec.subject === "next_ready_ticket") {
+    return nextReady(person, ctx);
+  }
+
+  if (spec.subject !== "parent") {
     return { value: {} };
   }
 
-  const next = nextReadyTicket(ctx.state.readyTickets(person))?.key;
-  return next
-    ? { value: { subject: { type: "ticket", ref: next }, next } }
-    : { skip: `no ready ticket is assigned to ${person}` };
+  const parent = ctx.ticket ? ctx.state.parentOf(ctx.ticket) : undefined;
+  return parent
+    ? { value: { subject: onTicket(parent) } }
+    : { skip: `${ctx.ticket ?? "the event's ticket"} has no parent ticket` };
 }
 
 /** A wake of an agent already resolved, with the policy's instruction. */

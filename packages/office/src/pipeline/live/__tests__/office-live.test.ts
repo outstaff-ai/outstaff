@@ -113,7 +113,7 @@ describe("the office with the event pipeline live", () => {
 
     await office.start();
     await office.parts.intake.pollOnce();
-    return { tracker, config, ada, sam, pia, registry };
+    return { tracker, vcs, config, ada, sam, pia, registry };
   }
 
   /** Sam's agent process: its connection to the office, which makes sam's acts with sam's own tracker account. */
@@ -215,6 +215,78 @@ describe("the office with the event pipeline live", () => {
       status: "done",
       results: [`moved ${issue.key} to active`],
     });
+  });
+
+  it("hands in the tickets the item made with its own: in review, or with the pull request it opened", async () => {
+    const { tracker, vcs, config, ada, sam } = await start();
+    conn = agent(tracker, config, sam);
+    await conn.whenConnected();
+    const issue = await tracker.as(ada).createIssue({
+      title: "Checkout",
+      body: "",
+      status: "backlog",
+      assignee: sam.id,
+    });
+
+    await tracker.as(ada).assign(issue.key, sam.id);
+    await office!.parts.intake.pollOnce();
+    const item = (await conn.offers()[Symbol.asyncIterator]().next()).value!.workItem;
+    await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
+    await until(async () => office!.parts.workState.ticketStatus(issue.key) === "active");
+
+    // Sam splits the work: a part already in review, a part whose pull request it just opened, and one for later.
+    const made = async (title: string, status: "review" | "active" | "backlog") => {
+      const t = await tracker.as(sam).createIssue({ title, body: "", status, assignee: sam.id });
+      await conn!.workMade({ workItemId: item.id, ticket: t.key });
+      return t.key;
+    };
+
+    const review = await made("Cart half", "review");
+    const opened = await made("Index half", "active");
+    const later = await made("Later", "backlog");
+    const repo = { host: "git.acme.example", owner: "acme-example", name: "shop" };
+    const { number } = await vcs.seed.pullRequest(repo, {
+      title: "Index half",
+      body: `Closes ${opened}`,
+      author: { login: "sam", kind: "agent" },
+    });
+
+    await conn.workMade({ workItemId: item.id, pr: { repo, number }, ticket: opened });
+    expect(await store.listItemRefs(item.id)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "ticket", ref: review, role: "created" }),
+        expect.objectContaining({
+          type: "pr",
+          ref: `git.acme.example/acme-example/shop#${number}`,
+        }),
+      ]),
+    );
+
+    await conn.handBack(item.id, { summary: "Split in three.", status: "done" });
+    const resultOf = async () => {
+      const back = (await traces()).find((t) => t.event.type === "agent.handed_back");
+      return back?.results?.[`${back.event.id}:hand_back_done`];
+    };
+
+    await until(async () => (await resultOf())?.status === "done");
+    expect(await resultOf()).toMatchObject({
+      results: [
+        `moved ${issue.key} to review`,
+        `assigned ${issue.key} to ${ada.id}`,
+        `assigned ${review} to ${ada.id}`,
+        `moved ${opened} to review`,
+        `assigned ${opened} to ${ada.id}`,
+      ],
+    });
+
+    for (const key of [issue.key, review, opened]) {
+      expect(await tracker.getIssue(key)).toMatchObject({
+        status: { canonical: "review" },
+        assignee: { id: ada.id },
+      });
+    }
+
+    expect((await tracker.getIssue(later)).status.canonical).toBe("backlog");
   });
 
   it("queues the act of an offline agent and has it made once the agent connects", async () => {

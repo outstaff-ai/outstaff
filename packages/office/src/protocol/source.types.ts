@@ -166,6 +166,12 @@ export interface Recall {
   search(person: string, request: PayloadOf<"recall">): Promise<PayloadOf<"recall_result">>;
 }
 
+/** What agents made in their work items: tickets they created, pull requests they opened. Optional: without it `work_made` is unsupported. */
+export interface WorkMade {
+  /** Records it on the person's work item. Refuses (`unknown_item`) an item that is not theirs. */
+  made(person: string, made: PayloadOf<"work_made">): Promise<void>;
+}
+
 /** Which documents agents wrote for which work. Optional: without it `doc_link` is unsupported. */
 export interface DocLinks {
   /**

@@ -75,6 +75,16 @@ describe("work state: a ticket it had read open closing raises ticket.closed", (
     expect(closed()).toHaveLength(1);
   });
 
+  it("knows a sub-ticket's parent and a parent's sub-tickets", async () => {
+    const parent = await ticket("active");
+    const { key } = await tracker.createIssue({ title: "Part", body: "", parent, status: "ready" });
+    await moved(key);
+    expect(ws.parentOf(key)).toBe(parent);
+    expect(ws.subTickets(parent)).toEqual([key]);
+    expect(ws.subTickets(key)).toEqual([]);
+    expect(ws.parentOf("ACME-404")).toBeUndefined();
+  });
+
   it("names the agent whose act or hand-back the ticket was read for", async () => {
     const key = await ticket("review");
     await tracker.transition(key, "done");

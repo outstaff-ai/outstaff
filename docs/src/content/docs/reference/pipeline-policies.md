@@ -16,7 +16,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`chat_to_addressed`](#chat_to_addressed) | `chat.message` | wake `addressed` (kind `chat`) |
 | [`review_to_author`](#review_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `review_feedback`) |
 | [`merged_feedback_to_author`](#merged_feedback_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `merged_feedback`) |
-| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merge_checks_passed` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done` |
+| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merge_checks_passed` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`, assign it to the agent acted for |
 | [`merge_checks_failed_to_agent`](#merge_checks_failed_to_agent) | `pr.merge_checks_failed` | wake `author`, else `assignee`, else `last_worker` (kind `merge_checks_failed`) |
 | [`rebase_to_author`](#rebase_to_author) | `pr.conflicted`, `pr.behind_base`, `pr.base_merged` | wake `author` (kind `rebase`) |
 | [`ci_failed_to_author`](#ci_failed_to_author) | `pr.ci_failed` | wake `author` (kind `ci_failed`) |
@@ -31,16 +31,18 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
 | [`closed_stops_work`](#closed_stops_work) | `ticket.closed` | stop the work on the ticket of every agent but the one who closed it; a ticket closed as done by an unknown closer or an automation stops nothing |
+| [`subticket_closed_to_agent`](#subticket_closed_to_agent) | `ticket.closed` | wake `assignee`, else `last_worker`, else the parent's agent (kind `assigned`) on the ticket's parent, the first of them with more unfinished sub-tickets of the parent |
+| [`subtickets_closed_move_parent`](#subtickets_closed_move_parent) | `ticket.closed` | act for the parent's agent: move the parent to `done` and assign it to the agent, when its own pull requests merged, else to `review` and assign it to the requester; when the closed ticket was its last open sub-ticket |
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`doc_comment_to_mentioned_agent`](#doc_comment_to_mentioned_agent) | `doc.commented` | wake `mentioned` (kind `doc_feedback`) |
 | [`link_doc_on_ticket`](#link_doc_on_ticket) | `doc.linked` | act for `doc_author`, else `actor`: link the document on the ticket, when the knowledge base can link documents on tickets (`knowledge.issueLinks`) |
 | [`start_marks_active`](#start_marks_active) | `agent.started` | act for `actor`: assign it to the agent acted for, move the ticket to `active` |
-| [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else |
-| [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else |
-| [`hand_back_blocked_to_pm`](#hand_back_blocked_to_pm) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else |
-| [`idle_pulls_next`](#idle_pulls_next) | `agent.idle` | wake `actor` (kind `assigned`), with its next ready ticket |
+| [`hand_back_done`](#hand_back_done) | `agent.handed_back` | act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else; a ticket with open sub-tickets stays `active` with the agent instead; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester |
+| [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester |
+| [`hand_back_blocked_to_pm`](#hand_back_blocked_to_pm) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester |
+| [`idle_pulls_next`](#idle_pulls_next) | `agent.idle` | wake `actor` (kind `assigned`), with its next ready ticket (for a sub-ticket, on its parent) |
 
 ## Policies
 
@@ -108,9 +110,9 @@ Instruction:
 
 ### merged_closes_ticket
 
-A merge into the default branch closes the ticket once the checks on its merge commit pass (or none start), unless another of its pull requests is open: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
+A merge into the default branch closes the ticket once the checks on its merge commit pass (or none start), unless another of its pull requests or one of its sub-tickets is open; the ticket ends with the agent who did the work: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
 
-Listens to `pr.merge_checks_passed`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`.
+Listens to `pr.merge_checks_passed`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`, assign it to the agent acted for.
 
 When:
 
@@ -119,6 +121,8 @@ When:
   - `pr_base_default: true`
   - not:
     - `ticket_prs_open: true`
+  - not:
+    - `open_subtickets: true`
 
 Note posted with the change:
 
@@ -212,7 +216,7 @@ Instruction:
 
 ### opened_to_review
 
-A pull request opened for review moves its ticket to review: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
+A pull request opened for review moves its ticket to review: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it. A ticket with open sub-tickets stays active until the last one closes.
 
 Listens to `pr.opened`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `review`.
 
@@ -222,6 +226,8 @@ When:
   - not:
     - `pr_draft: true`
   - `ticket_status: backlog, ready, active`
+  - not:
+    - `open_subtickets: true`
 
 Note posted with the change:
 
@@ -413,6 +419,38 @@ Note posted with the change:
 {{ticket}} was {{closed}} by {{closer}} at {{closed.at}}. Stop, and don't open a pull request for it. If the work belongs to another ticket, say which and hand back.
 ```
 
+### subticket_closed_to_agent
+
+A sub-ticket closing wakes an agent on the parent ticket when the parent is open and that agent has more unfinished sub-tickets of it: the closed sub-ticket's agent, else the parent's. The agent planned their order when it split the parent, and picks the next one.
+
+Listens to `ticket.closed`. Decides: wake `assignee`, else `last_worker`, else the parent's agent (kind `assigned`) on the ticket's parent, the first of them with more unfinished sub-tickets of the parent.
+
+When:
+
+- all of:
+  - `ticket_status: done, canceled`
+  - `parent_status: backlog, ready, active, review, blocked`
+
+Instruction:
+
+```text
+{{ticket}} was {{closed}}. The open sub-tickets of {{parent}}: {{parent.open}}. Continue with the next one in the order you planned, the way the repository asks.
+```
+
+### subtickets_closed_move_parent
+
+The last open sub-ticket of an active parent closing moves the parent on, for its agent: to done, with the agent, when the parent's own pull requests merged; otherwise to review, with the requester.
+
+Listens to `ticket.closed`. Decides: act for the parent's agent: move the parent to `done` and assign it to the agent, when its own pull requests merged, else to `review` and assign it to the requester; when the closed ticket was its last open sub-ticket.
+
+When:
+
+- all of:
+  - `ticket_status: done, canceled`
+  - `parent_status: active`
+
+Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.subtickets_closed_move_parent.instruction`.
+
 ### unblocked_to_blocked_agent
 
 A blocked ticket whose last open blocker was closed wakes the agent blocked on it, to check whether it can go on; the ticket stays where it is, since it may be blocked for other reasons too.
@@ -511,14 +549,16 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### hand_back_done
 
-A hand-back as done moves the ticket to review and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work.
+A hand-back as done moves the ticket to review and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work; a ticket with open sub-tickets stays active with the agent instead. The work item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) go to review and to the requester too. A merge round's hand-back leaves the ticket as it is: nothing in it is left for the human.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `review`, assign it to the requester, unless the agent handed the ticket over to someone else; a ticket with open sub-tickets stays `active` with the agent instead; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester.
 
 When:
 
 - all of:
   - `hand_back_status: done`
+  - not:
+    - `work_kind: merge`
   - not:
     - `ticket_status: blocked, done, canceled`
 
@@ -526,9 +566,9 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### hand_back_blocked
 
-A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with no PM to unblock it (none, or the PM is the blocked agent), moves the ticket to blocked and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work.
+A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with no PM to unblock it (none, or the PM is the blocked agent), moves the ticket to blocked and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work. The work item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) go to review and to the requester.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester.
 
 When:
 
@@ -545,9 +585,9 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### hand_back_blocked_to_pm
 
-A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with a PM other than the blocked agent, moves the ticket to blocked and gives it to the PM, for the agent, then wakes the PM to unblock it; unless the agent handed the ticket over to someone other than the PM during the work.
+A hand-back as blocked, or as done on a ticket the agent moved to blocked, on a team with a PM other than the blocked agent, moves the ticket to blocked and gives it to the PM, for the agent, then wakes the PM to unblock it; unless the agent handed the ticket over to someone other than the PM during the work. The work item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) go to review and to the requester, not the PM.
 
-Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else.
+Listens to `agent.handed_back`. Decides: act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester.
 
 When:
 
@@ -570,9 +610,9 @@ Note posted with the change: none; the instruction is the wake's.
 
 ### idle_pulls_next
 
-An agent with nothing queued or running is woken with its next ready ticket: the highest tracker priority, then the one ready the longest (policies.pull_ready).
+An agent with nothing queued or running is woken with its next ready ticket: the highest tracker priority, then the one ready the longest (policies.pull_ready). For a sub-ticket of an open parent the agent is woken on the parent, so it takes the sub-tickets in the order it planned.
 
-Listens to `agent.idle`. Decides: wake `actor` (kind `assigned`), with its next ready ticket.
+Listens to `agent.idle`. Decides: wake `actor` (kind `assigned`), with its next ready ticket (for a sub-ticket, on its parent).
 
 On only while `policies.pull_ready` is on.
 
@@ -581,7 +621,7 @@ When: always.
 Instruction:
 
 ```text
-You have nothing queued. Start {{next.ticket}}, the next ready ticket assigned to you. Work on it the way the repository asks.
+You have nothing queued. Your next ready work is {{next.ticket}}. Work on it the way the repository asks.
 ```
 
 ## Events
@@ -647,3 +687,5 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `closer`
 - `closed`
 - `closed.at`
+- `parent`
+- `parent.open`

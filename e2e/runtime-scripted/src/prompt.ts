@@ -46,6 +46,9 @@ export interface ItemContext {
 
   /** The agent's notes the round started with, and the line about a version of them that is not used. */
   notes?: { list: string[]; ignored?: string };
+
+  /** For a wake on a parent after one of its sub-tickets closed: the parent's open sub-tickets, as the wake lists them. */
+  openSubtickets?: string[];
 }
 
 /** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
@@ -280,6 +283,12 @@ function parseNotes(prompt: string): Pick<ItemContext, "notes"> {
   return { notes: { list, ...(ignored ? { ignored } : {}) } };
 }
 
+// The wake after a sub-ticket closed: "<key> was closed as done. The open sub-tickets of <parent>: <a>, <b>. Continue ...".
+function parseOpenSubtickets(prompt: string): Pick<ItemContext, "openSubtickets"> {
+  const open = /The open sub-tickets of \S+: ([^\n]+?)\. Continue/.exec(prompt)?.[1];
+  return open ? { openSubtickets: open.split(", ") } : {};
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {
@@ -310,5 +319,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseMerge(prompt),
     ...parseFailedChecks(prompt),
     ...parseNotes(prompt),
+    ...parseOpenSubtickets(prompt),
   };
 }

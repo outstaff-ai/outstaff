@@ -121,7 +121,7 @@ describe("the idle pull", () => {
     ]);
 
     expect((await store.readJournal(item!.id)).map((j) => j.text)).toContain(
-      `You have nothing queued. Start ${first.key}, the next ready ticket assigned to you. Work on it the way the repository asks.`,
+      `You have nothing queued. Your next ready work is ${first.key}. Work on it the way the repository asks.`,
     );
 
     // Busy: nothing more is pulled, and nothing is raised.

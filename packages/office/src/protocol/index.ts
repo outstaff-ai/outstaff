@@ -12,6 +12,7 @@ export type {
   TicketPrs,
   CiLogs,
   Recall,
+  WorkMade,
   WorkSource,
 } from "./source.types.js";
 

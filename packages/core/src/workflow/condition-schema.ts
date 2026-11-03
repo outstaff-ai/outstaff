@@ -19,6 +19,11 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .strictObject({ ticket_status: z.array(status).min(1) })
       .meta(d("The linked ticket is in one of these canonical statuses.")),
     z
+      .strictObject({ parent_status: z.array(status).min(1) })
+      .meta(
+        d("The linked ticket is a sub-ticket whose parent is in one of these canonical statuses."),
+      ),
+    z
       .strictObject({ moved_to: z.array(status).min(1) })
       .meta(d("A ticket.moved event moved the ticket into one of these statuses.")),
     z
@@ -105,6 +110,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
       .meta(
         d(
           "The ticket has two or more pull requests that are open or merged (or, with false, fewer). Closed ones that were never merged do not count.",
+        ),
+      ),
+    z
+      .strictObject({ open_subtickets: z.boolean() })
+      .meta(
+        d(
+          "The ticket has open sub-tickets: ready, active, in review or blocked; one in the backlog waits for later and does not count (or, with false, it has none).",
         ),
       ),
     z

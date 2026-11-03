@@ -1168,6 +1168,19 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 - Optional
 - Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
 
+#### pipeline.policies.<key>.when.parent_status
+
+- Type: `list of string`
+- Required
+- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
+- Minimum items 1
+
+#### pipeline.policies.<key>.when.parent_status[]
+
+- Type: `string`
+- Optional
+- Allowed values: `backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`
+
 #### pipeline.policies.<key>.when.moved_to
 
 - Type: `list of string`
@@ -1293,6 +1306,11 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 - Required
 
 #### pipeline.policies.<key>.when.ticket_prs_several
+
+- Type: `boolean`
+- Required
+
+#### pipeline.policies.<key>.when.open_subtickets
 
 - Type: `boolean`
 - Required

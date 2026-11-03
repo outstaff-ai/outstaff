@@ -42,17 +42,30 @@ describe("merged_closes_ticket", () => {
   it("a human's pull request, as the agent who last worked on the ticket, when no agent holds it", () => {
     const lastSam = { lastWorker: "sam" };
     expect(judge("merged_closes_ticket", merged, humans(t("review", undefined, lastSam)))).toEqual([
-      "act for sam: move ACME-9 to done",
+      "act for sam: move ACME-9 to done, assign ACME-9 to agent sam",
     ]);
 
     expect(
       judge("merged_closes_ticket", merged, humans(t("review", "ada-admin", lastSam))),
-    ).toEqual(["act for sam: move ACME-9 to done"]);
+    ).toEqual(["act for sam: move ACME-9 to done, assign ACME-9 to agent sam"]);
   });
 
   it("drops a human's pull request on a ticket no agent holds or has worked on", () => {
     expect(judge("merged_closes_ticket", merged, humans(t("review", "ada-admin")))).toEqual([
       "drop: no agent to act for: pull request has no agent author; ticket is not assigned to an agent; no agent has worked on the ticket yet",
+    ]);
+  });
+
+  it("leaves a parent open while one of its sub-tickets is", () => {
+    const world = { ...prWorld({ state: "merged" }) };
+    world.tickets = { ...world.tickets, "ACME-10": t("ready", "sam", { parent: "ACME-9" }) };
+    expect(judge("merged_closes_ticket", merged, world)).toEqual({
+      failed: { not: { open_subtickets: true } },
+    });
+
+    world.tickets["ACME-10"] = t("done", "sam", { parent: "ACME-9" });
+    expect(judge("merged_closes_ticket", merged, world)).toEqual([
+      "act for sam: move ACME-9 to done",
     ]);
   });
 

@@ -31,7 +31,7 @@ How to read it:
 | 10 | derived `pr.conflicted` acme-example/shop#52 after #50 | wake kofi (rebase): _Your pull request #52 (CI cache) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
 | 11 | derived `pr.behind_base` acme-example/shop#53 after #50 | wake mira (rebase): _Your pull request #53 (Order events) is behind its base branch, and the repository requires it to be up to date after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
 | 12 | derived `pr.conflicted` acme-example/shop#54 after #50 | (drop: no policy matched) |
-| 13 | `pr.merge_checks_passed` acme-example/shop#50 | move ACME-130 to done (for noor) |
+| 13 | `pr.merge_checks_passed` acme-example/shop#50 | move ACME-130 to done (for noor)<br>assign ACME-130 to agent noor (for noor) |
 
 ## A review round: pending comments, a batch of feedback, approval and merge
 
@@ -71,7 +71,7 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 33 | `agent.idle` no subject by sam | wake sam (assigned): _You have nothing queued. Start ACME-161, the next ready ticket assigned to you. Work on it the way the repository asks._ |
+| 33 | `agent.idle` no subject by sam | wake sam (assigned): _You have nothing queued. Your next ready work is ACME-161. Work on it the way the repository asks._ |
 | 34 | `agent.idle` no subject by noor | (drop: no ready ticket is assigned to noor) |
 
 ## Hand-backs: blocked, done and waiting

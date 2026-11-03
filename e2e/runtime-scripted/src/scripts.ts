@@ -23,6 +23,9 @@ export const FILE = "greeting.txt";
 export const PART_ONE = "farewell.txt";
 export const PART_TWO = "footer.txt";
 
+/** The file the later sub-ticket of a split ticket adds, when its agent is woken for it on the parent. */
+export const PART_THREE = "banner.txt";
+
 const lines = (text: string) => text.replace(/\n$/, "").split("\n");
 
 /** Line one of the file becomes `hello from <key>`; the rest stays. Two tickets that do this to one file conflict. */
@@ -305,18 +308,16 @@ interface SubTicket {
   title: string;
 }
 
-/** Splits the ticket: a sub-ticket with the given title, and the parent told about it. */
-async function* splitTicket(key: string, title: string): AsyncGenerator<Action, SubTicket, string> {
+/** Files a sub-ticket of the parent, assigned to the caller, in the given status. */
+async function* subTicket(
+  key: string,
+  title: string,
+  status: "active" | "ready",
+): AsyncGenerator<Action, SubTicket, string> {
   const created = yield {
     type: "tool",
     tool: "ticket_create",
-    input: {
-      title,
-      body: `The second pull request of ${key}.`,
-      parent: key,
-      assignee: "me",
-      status: "active",
-    },
+    input: { title, body: `A part of ${key}.`, parent: key, assignee: "me", status },
   };
 
   const subKey = /^Created (\S+?)\./m.exec(created)?.[1];
@@ -324,14 +325,73 @@ async function* splitTicket(key: string, title: string): AsyncGenerator<Action, 
     throw new Error(`ticket_create did not say which ticket it created: ${created}`);
   }
 
-  const sub = { key: subKey, url: firstUrl(created), title };
+  return { key: subKey, url: firstUrl(created), title };
+}
+
+/**
+ * Splits the ticket: a sub-ticket with the given title, started now; one for the part a `later: <title>` line names,
+ * ready for after it; and the parent told about both, in their order.
+ */
+async function* splitTicket(
+  key: string,
+  title: string,
+  laterTitle: string | undefined,
+): AsyncGenerator<Action, SubTicket, string> {
+  const sub = yield* subTicket(key, title, "active");
+  const later = laterTitle ? yield* subTicket(key, laterTitle, "ready") : undefined;
+  const order = later
+    ? ` Then ${later.title} is ${later.key}, ${later.url}, once ${sub.key} merged.`
+    : "";
+
   yield {
     type: "tool",
     tool: "ticket_comment",
-    input: { key, body: `Split: ${title} is ${sub.key}, ${sub.url}. One pull request each.` },
+    input: {
+      key,
+      body: `Split: ${title} is ${sub.key}, ${sub.url}, now.${order} One pull request each.`,
+    },
   };
 
   return sub;
+}
+
+/** A ticket that says `split: <title>` (and maybe `later: <title>`) is split first; the sub-ticket started now. */
+async function* splitIfAsked(
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, SubTicket | undefined, string> {
+  const part = /^split: (.+)$/m.exec(shown)?.[1];
+  const later = /^later: (.+)$/m.exec(shown)?.[1];
+  return part ? yield* splitTicket(key, part, later) : undefined;
+}
+
+/**
+ * Woken on the parent after one of its sub-tickets closed: the next open sub-ticket in the order planned gets its pull
+ * request, on a branch of its own from the default branch.
+ */
+async function* nextSubTicket(
+  ctx: ItemContext,
+  parent: string,
+  sub: string,
+): AsyncGenerator<Action, string, string> {
+  const cwd = need(ctx.worktree, "the worktree");
+  const repo = need(ctx.repo, "the repository");
+  yield { type: "tool", tool: "ticket_show", input: { key: sub } };
+  const rules = yield* conventions(ctx, cwd);
+  const branch = branchFor(rules, sub, "the next part");
+  yield { type: "shell", command: "git fetch --prune origin", cwd };
+  yield { type: "shell", command: `git switch -c ${q(branch)} origin/main`, cwd };
+  yield { type: "write", path: `${cwd}/${PART_THREE}`, text: `goodbye from ${sub}\n` };
+  yield { type: "shell", command: "git add -A", cwd };
+  yield { type: "shell", command: `git commit -m ${q(`${sub}: the next part of ${parent}`)}`, cwd };
+  yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
+  const opened = yield {
+    type: "tool",
+    tool: "pr_open",
+    input: { repo, title: `${sub}: the next part of ${parent}`, body: `Closes ${sub}\n` },
+  };
+
+  return `Opened ${firstUrl(opened)} for ${sub}, the next part of ${parent}.`;
 }
 
 /** Makes the ticket's change on the new branch, commits and pushes it. */
@@ -450,6 +510,12 @@ async function* holdIfAsked(shown: string): AsyncGenerator<Action, void, string>
  */
 export async function* assigned(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
+  const next = ctx.openSubtickets?.[0];
+  return next ? yield* nextSubTicket(ctx, key, next) : yield* workOnTicket(ctx, key);
+}
+
+/** The ticket's own work, as `assigned` describes it. */
+async function* workOnTicket(ctx: ItemContext, key: string): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
@@ -473,8 +539,7 @@ export async function* assigned(ctx: ItemContext): Script {
     return unclear;
   }
 
-  const part = /^split: (.+)$/m.exec(shown)?.[1];
-  const sub = part ? yield* splitTicket(key, part) : undefined;
+  const sub = yield* splitIfAsked(key, shown);
   // The worktree is detached at the default branch: now that the work is known, name the branch by the repo's rules.
   const rules = yield* conventions(ctx, cwd);
   const branch = branchFor(rules, key, subject(ctx.title));

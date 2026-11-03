@@ -32,5 +32,10 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
       ),
     docAuthor: (doc) => data.docs?.[doc],
     personForRole: (role) => data.roles?.[role],
+    parentOf: (t) => data.tickets?.[t]?.parent,
+    subTickets: (t) =>
+      Object.entries(data.tickets ?? {})
+        .filter(([, ticket]) => ticket.parent === t)
+        .map(([key]) => key),
   };
 }

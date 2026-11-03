@@ -469,6 +469,24 @@ Sent by: office.
 | `humans`                      | list of objects                              | no       | The trusted humans of the team.                                       |
 | `humans[].name`               | string                                       | yes      |                                                                       |
 
+### `work_made`
+
+Tells the office what the caller made in a work item: a ticket it created, or a pull request it opened and the ticket that pull request links to. The office records them on the item, so the item's hand-back also gives those tickets, once in review, to the person who asked.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field           | Type    | Required | Description                                                                                                      |
+| --------------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `workItemId`    | string  | yes      | Id of the work item.                                                                                             |
+| `ticket`        | string  | no       | Without `pr`: the key of the ticket the caller created. With it: the ticket the pull request links to, when any. |
+| `pr`            | object  | no       | The pull request the caller opened.                                                                              |
+| `pr.repo`       | object  | yes      |                                                                                                                  |
+| `pr.repo.owner` | string  | yes      | Owner of the repository.                                                                                         |
+| `pr.repo.name`  | string  | yes      | Name of the repository.                                                                                          |
+| `pr.repo.host`  | string  | no       | Host of the code host.                                                                                           |
+| `pr.number`     | integer | yes      | Number of the pull request.                                                                                      |
+| `pr.url`        | string  | no       | Its page on the code host.                                                                                       |
+
 ### `work_list`
 
 Asks for the caller's work items.

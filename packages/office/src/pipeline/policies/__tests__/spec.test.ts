@@ -7,7 +7,7 @@ describe("the policy specs", () => {
   it("say in words whom a policy wakes, or what it changes for whom", () => {
     expect(personText(["mentioned", "assignee"])).toBe("`mentioned`, else `assignee`");
     expect(wakes({ person: "actor", kind: "assigned", subject: "next_ready_ticket" }).decides).toBe(
-      "wake `actor` (kind `assigned`), with its next ready ticket",
+      "wake `actor` (kind `assigned`), with its next ready ticket (for a sub-ticket, on its parent)",
     );
 
     expect(

@@ -437,6 +437,71 @@ describe("assigned, for a ticket that needs two pull requests", () => {
   });
 });
 
+describe("assigned, for a ticket split into a part now and a part later", () => {
+  it("files the later part as ready, assigned to itself, and says the order on the parent", async () => {
+    let created = 1;
+    let opens = 0;
+    const fixed = answerBy(
+      [
+        [(a) => a.type === "read", "hello\nworld\n"],
+        [(a) => isTool(a, "pr_open"), "Opened https://git.example/acme/shop/pull/1"],
+        [
+          (a) => isTool(a, "ticket_show"),
+          "SHOP-1 Add a greeting\n\nsplit: Add a farewell\nlater: Add a banner",
+        ],
+        [(a) => isShell(a, "CI=1 pnpm --version"), "12.9.1\n"],
+      ],
+      "",
+    );
+
+    const { seen } = await play(
+      assigned(ctx),
+      (a) =>
+        isTool(a, "ticket_create")
+          ? `Created SHOP-${++created}.\nhttps://tracker.example/issue/SHOP-${created}`
+          : fixed(a),
+      (a) => {
+        if (a.type === "tool" && a.tool === "pr_open") {
+          opens += 1;
+          return (
+            opens === 3 && "SHOP-1 already has a pull request: https://git.example/acme/shop/pull/1"
+          );
+        }
+
+        return false;
+      },
+    );
+
+    const creates = seen.filter((a) => isTool(a, "ticket_create"));
+    expect(creates.map((a) => (a.type === "tool" ? a.input : {}))).toMatchObject([
+      { title: "Add a farewell", status: "active", assignee: "me", parent: "SHOP-1" },
+      { title: "Add a banner", status: "ready", assignee: "me", parent: "SHOP-1" },
+    ]);
+
+    const comment = seen.find((a) => isTool(a, "ticket_comment"));
+    expect(comment).toMatchObject({
+      input: { body: expect.stringContaining("Then Add a banner is SHOP-3") },
+    });
+  });
+
+  it("woken on the parent with its open sub-tickets, opens the pull request of the next one", async () => {
+    const woken = { ...ctx, openSubtickets: ["SHOP-3"] };
+    const { seen, text } = await play(
+      assigned(woken),
+      answerBy([[(a) => isTool(a, "pr_open"), "Opened https://git.example/acme/shop/pull/4"]], ""),
+    );
+
+    expect(seen.filter((a) => isTool(a, "pr_open"))).toMatchObject([
+      { input: { body: "Closes SHOP-3\n" } },
+    ]);
+
+    expect(seen.some((a) => isTool(a, "ticket_create"))).toBe(false);
+    expect(text).toBe(
+      "Opened https://git.example/acme/shop/pull/4 for SHOP-3, the next part of SHOP-1.",
+    );
+  });
+});
+
 describe("branchFor", () => {
   it("defaults to <type>/<key>-<slug>, and drops the key without a ticket", () => {
     expect(branchFor("", "SHOP-1", "Add a greeting!")).toBe("feat/SHOP-1-add-a-greeting");

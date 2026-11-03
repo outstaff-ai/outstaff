@@ -17,6 +17,23 @@ const offer = (kind: string): Offer =>
 
 // The scripts read the prompt the agent builds. This keeps them in step with its template.
 describe("parsePrompt", () => {
+  it("reads the open sub-tickets a wake on the parent lists", () => {
+    const woken = offer("assigned");
+    woken.context.journal = [
+      {
+        at: "2026-01-01T00:00:00Z",
+        author: "office",
+        text: "SHOP-2 was closed as done. The open sub-tickets of SHOP-1: SHOP-3, SHOP-4. Continue with the next one in the order you planned, the way the repository asks.",
+      },
+    ];
+
+    const prompt = buildWorkPrompt(woken, { resumed: false });
+    expect(parsePrompt(prompt)?.openSubtickets).toEqual(["SHOP-3", "SHOP-4"]);
+    expect(
+      parsePrompt(buildWorkPrompt(offer("assigned"), { resumed: false }))?.openSubtickets,
+    ).toBeUndefined();
+  });
+
   it("reads the notes the round started with, and a version of them that is not used", () => {
     const prompt = buildWorkPrompt(offer("chat"), {
       resumed: false,

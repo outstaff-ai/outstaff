@@ -11,6 +11,7 @@ import type {
   PrListRequest,
   PrListResult,
   DocLinkRequest,
+  WorkMadeReport,
   NotesReport,
   CiLogRequest,
   CiLogResult,
@@ -62,6 +63,7 @@ export function createFakeOffice(
   const ticketPrsAsked: TicketPrsRequest[] = [];
   const prListsAsked: PrListRequest[] = [];
   const docsLinked: DocLinkRequest[] = [];
+  const made: WorkMadeReport[] = [];
   const notesReported: NotesReport[] = [];
   const ciLogsAsked: CiLogRequest[] = [];
   const recalled: RecallRequest[] = [];
@@ -70,6 +72,7 @@ export function createFakeOffice(
     ticketPrsAsked,
     prListsAsked,
     docsLinked,
+    made,
     notesReported,
     ciLogsAsked,
     recalled,
@@ -83,6 +86,9 @@ export function createFakeOffice(
     },
     async docLink(request) {
       docsLinked.push(request);
+    },
+    async workMade(report) {
+      made.push(report);
     },
     async notesChanged(report) {
       notesReported.push(report);

@@ -103,11 +103,14 @@ export type OpSpec =
   | { link_pr: true }
   | { link_doc: true };
 
-/** What `ctx.wake` wakes: a person, the kind of run, and its subject (the event's, or the agent's next ready ticket). */
+/**
+ * What `ctx.wake` wakes: a person, the kind of run, and its subject: the event's; the agent's next ready ticket (for
+ * a sub-ticket, its parent, whose work orders its sub-tickets); or the parent of the event's ticket.
+ */
 export interface WakeSpec {
   person: PersonSpec;
   kind: string;
-  subject?: "event" | "next_ready_ticket" | undefined;
+  subject?: "event" | "next_ready_ticket" | "parent" | undefined;
 }
 
 /** What `ctx.act` changes, for whom, and whether it then wakes them with the policy's instruction. */

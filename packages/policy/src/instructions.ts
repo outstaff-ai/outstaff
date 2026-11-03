@@ -1,4 +1,5 @@
 import {
+  openSubTickets,
   renderTemplate,
   TEMPLATE_VARIABLES,
   type TemplateError,
@@ -33,6 +34,8 @@ export const INSTRUCTION_VARIABLES = [
   "closer",
   "closed",
   "closed.at",
+  "parent",
+  "parent.open",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -84,6 +87,15 @@ function closedVariables(type: string, data: Record<string, unknown>): Record<st
   };
 }
 
+/** The parent of the event's ticket, and the parent's sub-tickets still open; empty without a parent. */
+function parentVariables({ ticket, state }: EvaluationContext): Record<string, string> {
+  const parent = ticket ? state.parentOf(ticket) : undefined;
+  return {
+    parent: parent ?? "",
+    "parent.open": parent ? openSubTickets(state, parent).join(", ") : "",
+  };
+}
+
 /** The human who asked for the ticket's work, else the team's first human, as a hand-back assigns it. */
 const requesterOf = ({ ticket, state, opts }: EvaluationContext): string =>
   (ticket ? state.requester(ticket) : undefined) ?? opts.fallbackRequester ?? "";
@@ -107,6 +119,7 @@ export function instructionVariables(
     checks: checksOf(event.data["failing"]),
     closer: closerOf(event.data["closedBy"]),
     ...closedVariables(event.type, event.data),
+    ...parentVariables(ctx),
   };
 }
 

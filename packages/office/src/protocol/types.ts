@@ -11,6 +11,7 @@ import type {
   Messaging,
   Recall,
   TicketPrs,
+  WorkMade,
   WorkSource,
 } from "./source.types.js";
 
@@ -36,6 +37,9 @@ export interface ProtocolServerOptions {
 
   /** Answers `ticket_prs` and `pr_list`. Without it the requests are refused as unsupported. */
   tickets?: TicketPrs;
+
+  /** Takes `work_made`. Without it the report is refused as unsupported. */
+  made?: WorkMade;
 
   /** Takes `doc_link`. Without it the request is refused as unsupported. */
   docs?: DocLinks;

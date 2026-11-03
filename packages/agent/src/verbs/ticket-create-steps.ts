@@ -205,6 +205,25 @@ export async function fileInOffice(
   };
 }
 
+/**
+ * Tells the office that a ticket created in a work item other than a chat session (which files it as work instead)
+ * is the item's, so the item's hand-back gives it to the requester once it is in review. The ticket exists already:
+ * a refusal costs only that.
+ */
+export async function recordMade(
+  env: AgentEnv,
+  current: OfficeWorkItem | undefined,
+  key: string,
+): Promise<void> {
+  if (!env.office || !current || current.kind === "chat") {
+    return;
+  }
+
+  await env.office.workMade({ workItemId: current.id, ticket: key }).catch((error: unknown) => {
+    env.log?.warn(`could not tell the office about ${key}`, { error: String(error) });
+  });
+}
+
 /** The lines after the ticket's summary: its parent, how it was filed, and a reminder to name a follow-up. */
 export function closingLines(
   key: string,
