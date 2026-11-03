@@ -9,7 +9,10 @@ import type { WorkState } from "./workstate/index.js";
 export interface HandBackResult {
   summary: string;
   links: Link[];
-  status: "done" | "waiting" | "blocked" | "interrupted";
+  status: "done" | "waiting" | "blocked" | "silent" | "interrupted";
+
+  /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
+  toReview?: string[] | undefined;
 }
 
 export interface WorkSourceOptions {
@@ -18,8 +21,11 @@ export interface WorkSourceOptions {
   team: Pick<TeamConfig, "people" | "humans"> & Partial<Pick<TeamConfig, "pipeline">>;
   ports?: { tracker?: Tracker; vcs?: Vcs };
 
-  /** The work state, whose pull requests a merge's context names. */
-  workState?: Pick<WorkState, "repoPrs">;
+  /**
+   * The work state, whose pull requests a merge's context names. A `done` hand-back that does not say what it leaves
+   * to review (an older agent) is checked against it, and taken as `blocked` when it leaves nothing.
+   */
+  workState?: Pick<WorkState, "repoPrs" | "ticket" | "prsOfTicket" | "refreshTicket">;
   roles?: RosterOptions["roles"];
 
   /** Where the event pipeline keeps its traces; what each wake's bundle carried is added to them. */

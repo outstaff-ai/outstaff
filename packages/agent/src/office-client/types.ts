@@ -124,7 +124,10 @@ export interface OfficeConnection extends OfficeClient {
     result: {
       summary: string;
       links?: Link[];
-      status: "done" | "waiting" | "blocked" | "interrupted";
+      status: "done" | "waiting" | "blocked" | "silent" | "interrupted";
+
+      /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
+      toReview?: string[];
     },
   ): Promise<void>;
   fail(workItemId: string, reason: string): Promise<void>;

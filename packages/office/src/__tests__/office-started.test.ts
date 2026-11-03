@@ -39,6 +39,10 @@ describe("the start of an item", () => {
 
           refreshed.push(key);
         },
+        ticket: (key: string) =>
+          key === "ACME-1"
+            ? { status: "review", assignee: { id: "ada.admin", kind: "human" } }
+            : undefined,
       } as unknown as WorkState,
       async judge(event, meta) {
         if (judgeFails) {
@@ -69,6 +73,13 @@ describe("the start of an item", () => {
       },
     ]);
 
+    // The ticket as the round found it, which a silent finish puts it back to.
+    expect((await store.getSubject("round_start", w.id))?.data).toEqual({
+      ticket: "ACME-1",
+      status: "review",
+      assignee: { id: "ada.admin", kind: "human" },
+    });
+
     const run = await store.startRun(w.id);
     await started()(w);
     expect(judged[1]?.externalId).toBe(`started:${w.id}:${run.id}`);
@@ -86,6 +97,8 @@ describe("the start of an item", () => {
     expect(judged.map((j) => j.event.subject)).toEqual([
       { pr: { repo: REPO, number: 4 }, ticket: "ACME-4" },
     ]);
+
+    expect((await store.getSubject("round_start", onPr.id))?.data).toEqual({ ticket: "ACME-4" });
 
     for (const subject of [
       { type: "pr", ref: "acme/app#5" },

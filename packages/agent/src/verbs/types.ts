@@ -38,6 +38,14 @@ export interface NetworkAccess {
   fetch?: typeof fetch;
 }
 
+/** How the agent says a work item ends; waiting is not said, it follows from a question asked with `ost ask`. */
+export type DeclaredHandBack = "done" | "blocked" | "silent";
+
+export interface HandBackTarget {
+  kind: string;
+  declare(status: DeclaredHandBack): void;
+}
+
 /** Everything a verb touches: who is acting, the team, and the ports built from its config. */
 export interface AgentEnv {
   /** Handle of the person (agent) this process runs as. */
@@ -50,6 +58,9 @@ export interface AgentEnv {
   chat?: Chat;
   office?: OfficeClient;
   network?: NetworkAccess;
+
+  /** The work item a run is on, for `ost handback`: its kind, and where the status the agent states goes. */
+  handBack?: HandBackTarget;
 
   /**
    * The person's Policy and directory layout. Verbs that read a file the caller names (`--body-file`) refuse

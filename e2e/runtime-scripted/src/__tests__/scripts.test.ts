@@ -8,6 +8,7 @@ import {
   keepBoth,
   merge,
   mergedFeedback,
+  nothingToReview,
   reviewFeedback,
   ticketComment,
   unblock,
@@ -111,9 +112,38 @@ describe("assigned, on a ticket that says it is blocked", () => {
         tool: "ticket_comment",
         input: { key: "SHOP-1", body: "Resumed with: friendly" },
       },
+      {
+        type: "tool",
+        tool: "doc_create",
+        input: {
+          path: "decisions/SHOP-1.md",
+          title: "SHOP-1: decided",
+          body: "# Decided\n\nfriendly\n",
+        },
+      },
     ]);
 
-    expect(resumed.text).toBe("Resumed: friendly");
+    expect(resumed.text).toBe("Resumed: friendly. The decision is .");
+  });
+
+  it("asks a human on the ticket and stops, with nothing to review", async () => {
+    const shown = "SHOP-1 Tone\nStatus: In Progress (active)\nask human: Which tone, Ada?";
+    const asked = await play(assigned(ctx), () => shown);
+    expect(asked.seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Question: Which tone, Ada?" },
+      },
+    ]);
+
+    expect(asked.text).toBe("Waiting on an answer: Which tone, Ada? Nothing changed yet.");
+    expect(nothingToReview(asked.text)).toBe(
+      "Blocked: Waiting on an answer: Which tone, Ada? Nothing changed yet. I need the answer from a human before I go on.",
+    );
+
+    expect(nothingToReview("")).toContain("nothing to review yet");
   });
 });
 
@@ -323,6 +353,11 @@ describe("assigned, for a ticket that asks for the granted services", () => {
     );
 
     expect(text).toContain("other was refused");
+    expect(seen.at(-1)).toEqual({
+      type: "tool",
+      tool: "ticket_move",
+      input: { key: "SHOP-1", to: "done" },
+    });
   });
 
   it("fails when the ungranted service is not refused", async () => {
@@ -973,22 +1008,44 @@ describe("doc feedback", () => {
 });
 
 describe("ticket comment", () => {
-  it("answers the comment on the ticket", async () => {
-    const { seen, text } = await play(
-      ticketComment({
-        ...ctx,
-        kind: "ticket_comment",
-        feedback: [{ kind: "ticket_comment", body: "Mobile too?", threads: [] }],
-      }),
+  const comment = (kind: string, body: string) =>
+    play(
+      ticketComment({ ...ctx, kind, feedback: [{ kind: "ticket_comment", body, threads: [] }] }),
       () => "",
     );
 
-    expect(seen.at(-1)).toMatchObject({
-      tool: "ticket_comment",
-      input: { key: "SHOP-1", body: "Noted: Mobile too?" },
-    });
+  it("answers the comment on its own ticket and moves the ticket to review", async () => {
+    const { seen, text } = await comment("ticket_comment", "Mobile too?");
+    expect(seen.map((a) => (a as { input?: unknown }).input)).toEqual([
+      { key: "SHOP-1", body: "Noted: Mobile too?" },
+      { key: "SHOP-1", to: "review" },
+    ]);
 
     expect(text).toContain("SHOP-1");
+  });
+
+  it("posts nothing for a thanks and finishes silently", async () => {
+    const { seen } = await comment("ticket_comment", "Thanks!");
+    expect(seen).toEqual([{ type: "tool", tool: "handback", input: { status: "silent" } }]);
+  });
+
+  it("answers a mention and finishes silently", async () => {
+    const { seen } = await comment("asked", "@sam Mobile too?");
+    expect(seen.at(-1)).toEqual({ type: "tool", tool: "handback", input: { status: "silent" } });
+  });
+
+  it("asks for a decision and says it is done, with nothing to review", async () => {
+    const { seen, text } = await comment("ticket_comment", "decide: Formal or casual?");
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Question: Formal or casual?" },
+      },
+      { type: "tool", tool: "handback", input: { status: "done" } },
+    ]);
+
+    expect(text).toBe("Asked: Formal or casual?");
   });
 });
 

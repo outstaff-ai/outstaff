@@ -2,13 +2,14 @@ import type { Logger } from "@outstaff/core";
 import type { Filed } from "@outstaff/protocol";
 import type { FiledWhat } from "./chat.types.js";
 import type { Offer } from "#/office-client/index.js";
-import type { AgentEnv } from "#/verbs/types.js";
+import type { AgentEnv, DeclaredHandBack } from "#/verbs/types.js";
 import type { Attachment } from "./types.js";
 import { saveTicketFiles } from "./attachments.js";
 import { safeId } from "#/repos/workspaces.js";
 import { join } from "node:path";
 import type { WorkLoopOptions, ItemEnv } from "./loop.types.js";
 import { reason } from "./reason.js";
+import { producedTracker } from "./item-produced.js";
 
 /** The files of the chat message the item came from, saved under `dir`; none when it has none or there is no chat. */
 async function chatAttachments(
@@ -111,6 +112,15 @@ export function itemEnv(
       })
     : undefined;
 
+  // What the agent made this run, through its verbs: a done hand-back needs a result to review.
+  const made = producedTracker();
+  const vcs = opts.env.vcs ? { vcs: made.vcs(opts.env.vcs) } : {};
+  // The hand-back the agent states with `ost handback`; the last one counts.
+  let declared: DeclaredHandBack | undefined;
+  const handBack = {
+    handBack: { kind: offer.workItem.kind, declare: (s: DeclaredHandBack) => (declared = s) },
+  };
+
   const base = opts.env.office;
   const files = {
     ...(attachments.length ? { attachments } : {}),
@@ -121,9 +131,12 @@ export function itemEnv(
     ? {
         ...opts.env,
         ...files,
+        ...vcs,
+        ...handBack,
         ...(tracker ? { tracker } : {}),
         office: {
           ...base,
+          docLink: made.docLink(base),
           async ask(q) {
             const r = await base.ask(q);
             asked ||= r.status === "pending";
@@ -152,9 +165,14 @@ export function itemEnv(
           },
         },
       }
-    : tracker
-      ? { ...opts.env, ...files, tracker }
-      : { ...opts.env, ...files };
+    : { ...opts.env, ...files, ...vcs, ...handBack, ...(tracker ? { tracker } : {}) };
 
-  return { env, moved, asked: () => asked, filedWork: () => filedWork };
+  return {
+    env,
+    moved,
+    asked: () => asked,
+    filedWork: () => filedWork,
+    produced: made.produced,
+    declared: () => declared,
+  };
 }

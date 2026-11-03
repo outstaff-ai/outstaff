@@ -1,6 +1,7 @@
 import { PortError, type RuntimeTool } from "@outstaff/core";
 import { ciLog } from "./ci-log.js";
 import { docVerbs } from "./doc.js";
+import { handBack } from "./handback.js";
 import { http } from "./http.js";
 import { me } from "./me.js";
 import { noteVerbs } from "./note.js";
@@ -41,6 +42,7 @@ export const VERBS: readonly Verb[] = [
   recall,
   me,
   ...officeVerbs,
+  handBack,
   http,
 ];
 

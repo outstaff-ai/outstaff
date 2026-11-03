@@ -7,18 +7,23 @@ import { linksIn } from "./links.js";
 import { reason } from "./reason.js";
 import { createRounds } from "./work-round.js";
 import { setUpItem } from "./work-setup.js";
-import { handBackStatus } from "./work-status.js";
-import type { HandBackStatus, ItemRun, Outcome } from "./work.types.js";
+import { guardedHandBack } from "./work-done-guard.js";
+import type { HandBack, HandBackStatus, ItemRun, Outcome } from "./work.types.js";
 
 export { CHAT_KIND } from "./work-setup.js";
 
 /** What the requester is told about a finished item, by status; waiting items report once they are done. */
 const REPORTS: Partial<Record<HandBackStatus, { kind: "result" | "blocked"; fallback: string }>> = {
   done: { kind: "result", fallback: "Done." },
+  // A silent finish leaves the ticket alone; a chat request still gets its answer in the thread.
+  silent: { kind: "result", fallback: "Done." },
   // The office says whether the agent tells the requester about a blocked item (when the team has no PM to route it
   // to, or the switch says so); the runner posts it, so it does not depend on the model.
   blocked: { kind: "blocked", fallback: "Blocked." },
 };
+
+/** Statuses that end the item: its worktree and scratch directory go. */
+const FINISHED = new Set<HandBackStatus>(["done", "silent"]);
 
 /** The agent shut down while the item ran. */
 const wasInterrupted = (run: ItemRun, outcome: Outcome | undefined) =>
@@ -129,24 +134,24 @@ export function createWorker(ctx: WorkerContext) {
     await report(offer, "failed", why);
   }
 
-  async function handBackFinished(run: ItemRun, text: string) {
+  async function handBackFinished(run: ItemRun, { status, summary, toReview }: HandBack) {
     const { offer, item } = run;
     const id = offer.workItem.id;
-    const status = await handBackStatus(ctx, run);
-    await appendJournal(id, await entryFor(run, text, true));
+    await appendJournal(id, await entryFor(run, summary, true));
     await opts.office.handBack(id, {
-      summary: text || "Finished without a message.",
-      links: linksIn(text),
+      summary: summary || "Finished without a message.",
+      links: linksIn(summary),
       status,
+      ...(status === "done" ? { toReview } : {}),
     });
 
     const tell = REPORTS[status];
     if (tell && !item.filedWork()) {
-      await report(offer, tell.kind, text || tell.fallback, linksIn(text));
+      await report(offer, tell.kind, summary || tell.fallback, linksIn(summary));
     }
 
     // Waiting and blocked items keep their worktree for the next round.
-    if (status === "done") {
+    if (FINISHED.has(status)) {
       await opts.workspaces?.release(id).catch((err) => {
         log.warn("could not clean up after an item", { workItemId: id, error: reason(err) });
       });
@@ -166,6 +171,12 @@ export function createWorker(ctx: WorkerContext) {
       return;
     }
 
-    await handBackFinished(run, outcome.text || run.lastText);
+    const handBack = await guardedHandBack(ctx, run, outcome.text || run.lastText);
+    if (handBack.interrupted) {
+      await handBackInterrupted(run, handBack.summary);
+      return;
+    }
+
+    await handBackFinished(run, handBack);
   };
 }

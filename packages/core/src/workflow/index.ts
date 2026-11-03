@@ -1,4 +1,5 @@
-export { DEFAULT_NEEDS_HUMAN_LABEL, WORKFLOW_EVENT_TYPES } from "./constants.js";
+export { DEFAULT_NEEDS_HUMAN_LABEL, SILENT_KINDS, WORKFLOW_EVENT_TYPES } from "./constants.js";
+
 export {
   TEMPLATE_VARIABLES,
   TemplateError,

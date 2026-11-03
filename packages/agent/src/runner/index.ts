@@ -3,6 +3,7 @@ export type { IdentityInput, IdentityRole } from "./types.js";
 export { agentLayout } from "./layout.js";
 export { createWorkLoop } from "./loop.js";
 export { linksIn } from "./links.js";
+export { NOTHING_TO_REVIEW } from "./work-review.js";
 export type { WorkConnection, WorkLoop, WorkLoopOptions } from "./loop.types.js";
 
 export { buildWorkPrompt } from "./prompt.js";

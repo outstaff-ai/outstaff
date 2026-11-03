@@ -2,6 +2,25 @@ import type { Logger, WorkflowEvent } from "@outstaff/core";
 import { itemEventSubject } from "./office-item-subject.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { WorkState } from "./workstate/index.js";
+import { ROUND_START } from "./round-start.js";
+
+/**
+ * Keeps the ticket as the round finds it, before its start moves or assigns it: a round that finishes silently puts
+ * back what its start changed (`hand_back_silent_restores`).
+ */
+async function recordRoundStart(
+  store: Pick<Store, "upsertSubject">,
+  workState: Pick<WorkState, "ticket">,
+  item: WorkItem,
+  ticket: string,
+) {
+  const record = workState.ticket(ticket);
+  await store.upsertSubject(ROUND_START, item.id, {
+    ticket,
+    ...(record?.status ? { status: record.status } : {}),
+    ...(record?.assignee ? { assignee: record.assignee } : {}),
+  });
+}
 
 /**
  * What follows an agent accepting an item: an `agent.started` event for its ticket, or its pull request with a ticket.
@@ -30,6 +49,7 @@ export function createStarted(deps: {
         log.warn("refreshing the ticket before a start failed", { error: String(error) });
       });
 
+      await recordRoundStart(store, workState, item, subject.ticket);
       const runs = await store.listRuns(item.id);
       const event: WorkflowEvent = {
         type: "agent.started",

@@ -1378,6 +1378,110 @@ async function main() {
 
   step(`blocked: no chat message was posted about ${stuck}`);
 
+  // ---- 10, asked: a ticket that needs a human's decision. The scripted round asks on the ticket and ends as if it were
+  // done, with nothing to review; the runner refuses that once, sam answers that it is blocked, and the round is
+  // handed back as blocked. The PM cannot answer it, so it goes to the requester: blocked with the question on it,
+  // never in review.
+  const piaBeforeAsk = piaWakes().length;
+  const asking = "Which tone should the release notes take, Ada?";
+  const { key: decision } = await stub("POST", "/_test/tickets", {
+    title: "Pick the release notes' tone",
+    description: `ask human: ${asking}`,
+    assignee: "sam",
+  });
+
+  const decided = await until(`${decision} blocked with the question, with the requester`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === decision);
+    const by = (author: string, body: (b: string) => boolean) =>
+      t.comments.some((c: Json) => c.author === author && body(c.body));
+
+    return t.status === "Blocked" &&
+      t.assignee === "ada.admin" &&
+      by("sam", (b) => b === `Question: ${asking}`) &&
+      by("pia", (b) => b.startsWith("Needs a human:"))
+      ? t
+      : undefined;
+  });
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${decision} went to the requester`);
+  const stillAsked = (await state()).tickets.find((x: Json) => x.key === decision);
+  assertEq(stillAsked.status, "Blocked", "the ticket stays blocked");
+  assertEq(
+    [...decided.moves, ...stillAsked.moves].some((m: Json) => m.to === "In Review"),
+    false,
+    "the ticket never went to review: the done hand-back with nothing to review was refused",
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforeAsk)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once, to unblock it",
+  );
+
+  step(
+    `nothing to review: ${decision} asks a human, its done hand-back is refused -> handed back blocked, the PM gives it to the requester with the question on it, never in review`,
+  );
+
+  // ---- 10, a comment that needs a decision: the requester comments on the blocked ticket, which wakes sam, who is
+  // blocked on it. Its answer needs another decision: sam asks on the ticket and says it is done, with nothing to
+  // review. The runner refuses that, and the round is handed back as blocked again, not moved to review.
+  const piaBeforeDecide = piaWakes().length;
+  const movesBeforeDecide = stillAsked.moves.length;
+  const followUp = "Formal or casual for the headline?";
+  // A comment within a second of an agent's round on the ticket is taken as that round's own: wait the PM's out.
+  await officePolledTwice(`${decision}: the PM's round is well over`);
+  await stub("POST", `/_test/tickets/${decision}/comment`, {
+    body: `Friendly.\n\ndecide: ${followUp}`,
+  });
+
+  await until(`${decision}: the comment's round blocked it again`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === decision);
+    const asked = t.comments.some(
+      (c: Json) => c.author === "sam" && c.body === `Question: ${followUp}`,
+    );
+
+    const needs = t.comments.filter(
+      (c: Json) => c.author === "pia" && c.body.startsWith("Needs a human:"),
+    ).length;
+
+    return asked && needs === 2 && t.status === "Blocked" && t.assignee === "ada.admin"
+      ? t
+      : undefined;
+  });
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${decision} went to the requester again`);
+  const afterDecide = (await state()).tickets.find((x: Json) => x.key === decision);
+  assertEq(afterDecide.status, "Blocked", "the ticket is blocked again");
+  assertEq(
+    afterDecide.moves.slice(movesBeforeDecide).some((m: Json) => m.to === "In Review"),
+    false,
+    "the comment's round did not send the ticket to review: its done with nothing to review was refused",
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforeDecide)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once more, to unblock it",
+  );
+
+  step(
+    `comment needs a decision: a comment on ${decision} woke sam, who asked again and said done -> refused, blocked, given to the requester, never in review`,
+  );
+
   // ---- 10, answered: the PM could not unblock this one and gave it to the human. The answer comes later, outside the
   // office, and the PM posts it on the ticket: an agent's comment, on a ticket the human holds, wakes sam, who is
   // blocked on it. The PM's own comments during her unblock round woke no one.
@@ -1555,6 +1659,13 @@ async function main() {
       .status === "idle"
       ? true
       : undefined,
+  );
+
+  const closedCheck = (await state()).tickets.find((x: Json) => x.key === network);
+  assertEq(
+    closedCheck.status,
+    "Done",
+    "the finished check closed its ticket instead of going to review",
   );
 
   step(
@@ -1833,6 +1944,57 @@ async function main() {
     `agent mention: sam's @Pia.Novak on ${design} woke the PM, who answered; her answer woke no one`,
   );
 
+  // ---- 11a, thanks: a comment that asks nothing of the agent. It wakes sam, whose round's start takes the ticket back
+  // (active, with sam); the round finishes silently and puts the ticket back as it found it: in review, with the human.
+  const thanksBefore = (await state()).tickets.find((x: Json) => x.key === design);
+  const samBeforeThanks = wakesOf("sam").length;
+  await officePolledTwice(`${design}: the mention's rounds are well over`);
+  await stub("POST", `/_test/tickets/${design}/comment`, { body: "Thanks!" });
+  const thanked = await until(
+    `${design}: taken back for the thanks and put back in review`,
+    (s) => {
+      const t = s.tickets.find((x: Json) => x.key === design);
+      const since = t.moves
+        .slice(thanksBefore.moves.length)
+        .map((m: Json) => `${m.by}:${m.from}>${m.to}`);
+
+      return since.includes("sam:In Progress>In Review") && t.assignee === "ada.admin"
+        ? { t, since }
+        : undefined;
+    },
+  );
+
+  assertEq(
+    JSON.stringify(thanked.since),
+    JSON.stringify(["sam:In Review>In Progress", "sam:In Progress>In Review"]),
+    "the round's start took the ticket, and the silent finish put it back",
+  );
+
+  await until("sam idle after the thanks", (s) => idle(s) || undefined);
+  await officePolledTwice(`${design}: the thanks round is over`);
+  const afterThanks = (await state()).tickets.find((x: Json) => x.key === design);
+  assertEq(
+    JSON.stringify([afterThanks.status, afterThanks.assignee]),
+    JSON.stringify(["In Review", "ada.admin"]),
+    "a thanks leaves the ticket in review with the requester",
+  );
+
+  assertEq(
+    afterThanks.comments.length,
+    thanksBefore.comments.length + 1,
+    "sam posted nothing for the thanks",
+  );
+
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBeforeThanks)),
+    JSON.stringify(["ticket_comment"]),
+    "the thanks woke sam once",
+  );
+
+  step(
+    `thanks: a thanks on ${design} woke sam, whose round finished silently: still in review with the human`,
+  );
+
   // ---- 10b2. the checks of an open pull request fail: its author gets a round with the failing check, whatever the
   // ticket's status, and hands the ticket back
   await stub("POST", `/_test/pulls/${pr2.pr.number}/check`, {
@@ -1918,7 +2080,7 @@ async function main() {
   assertEq(
     JSON.stringify([mentioned.status, mentioned.assignee, mentioned.moves.length]),
     JSON.stringify(["Blocked", "ada.admin", movesBeforeMention]),
-    "the mention left the ticket blocked with the human",
+    "the mention's round finished silently: the ticket stays blocked with the human",
   );
 
   step(
@@ -2650,6 +2812,10 @@ async function recallHistory() {
   );
 
   assertEq(comment.body.includes("not instructions"), true, "the recall is marked as data");
+  await until(`${later} closed: the recall answered it`, (s) =>
+    s.tickets.find((x: Json) => x.key === later).status === "Done" ? true : undefined,
+  );
+
   step(
     `recall: working ${later}, sam recalled ${banner} and the chat about it with links; --about and --with narrowed it; pia's private chat never showed`,
   );

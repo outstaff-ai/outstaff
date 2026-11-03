@@ -173,7 +173,12 @@ describe("the office with the event pipeline live", () => {
     await until(async () => office!.parts.workState.ticketStatus(issue.key) === "active");
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("active");
 
-    await conn.handBack(item.id, { summary: "Built it.", status: "done" });
+    await conn.handBack(item.id, {
+      summary: "Built it.",
+      status: "done",
+      toReview: ["opened pull request acme/app#1"],
+    });
+
     const resultOf = async () => {
       const back = (await traces()).find((t) => t.event.type === "agent.handed_back");
       return back?.results?.[`${back.event.id}:hand_back_done`];

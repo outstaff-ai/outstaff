@@ -12,6 +12,7 @@ export const refSchema = z.strictObject({
     .enum(["open", "closed", "merged"])
     .optional()
     .describe("For a pull request: whether it is open, closed or merged."),
+  draft: z.boolean().optional().describe("For a pull request: whether it is a draft."),
   own: z
     .boolean()
     .optional()

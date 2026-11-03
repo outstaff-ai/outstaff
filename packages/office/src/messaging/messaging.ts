@@ -24,7 +24,7 @@ const MIRRORED: Record<string, string> = {
 };
 
 /** The statuses a hand-back leaves the asker in that let it take the answers that came in meanwhile. */
-const RESUMING = new Set<string>(["waiting", "queued", "done"]);
+const RESUMING = new Set<string>(["waiting", "queued", "done", "silent"]);
 
 /** What the person asked sees first: the question, who asks it and from which work, and how to answer. */
 function questionBrief(

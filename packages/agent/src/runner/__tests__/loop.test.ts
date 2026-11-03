@@ -29,6 +29,7 @@ import type { ManualClientClock } from "#/office-client/types.js";
 import { fakeEnv } from "@outstaff/testing.agent";
 import type { ClonedRepo, Workspaces } from "#/repos/index.js";
 import { JOURNAL_PROMPT } from "#/runner/journal.js";
+import { NOTHING_TO_REVIEW } from "#/runner/work-review.js";
 import type { NotesReader } from "#/notes/types.js";
 import type { ChatRelay } from "#/runner/chat.types.js";
 import { createWorkLoop } from "#/runner/loop.js";
@@ -44,6 +45,9 @@ interface OfferExtras {
   files?: Record<string, unknown>[];
   kind?: string;
   feedback?: Record<string, unknown>[];
+
+  /** The pull requests of the item; by default one open for review, so a done hand-back has something to review. */
+  prs?: Record<string, unknown>[];
 }
 
 type Reply = [type: string, payload?: unknown];
@@ -81,6 +85,8 @@ const chatOrigin = (files: Record<string, unknown>[] | undefined) => ({
   ...(files ? { files } : {}),
 });
 
+const OPEN_PR = { type: "pr", ref: "acme/app#1", title: "Checkout", state: "open", draft: false };
+
 const offeredItem = (id: string, extra: OfferExtras) => ({
   id,
   kind: extra.kind ?? (extra.origin ? "chat" : "ticket"),
@@ -100,6 +106,7 @@ const offerContext = (extra: OfferExtras) => ({
       title: "Checkout",
       url: "https://t.acme.example/SHOP-1",
     },
+    ...(extra.prs ?? [OPEN_PR]),
   ],
   links: [],
   ...(extra.feedback ? { feedback: extra.feedback } : {}),
@@ -434,6 +441,7 @@ describe("work loop", () => {
       summary: "Fixed. See https://git.acme.example/shop/pull/7.",
       links: [{ url: "https://git.acme.example/shop/pull/7" }],
       status: "done",
+      toReview: ["pull request acme/app#1 is open for review"],
     });
 
     const req = runtime.requests[0]!;
@@ -876,6 +884,38 @@ describe("work loop", () => {
     await until(() => sentOf("handback").length === 1);
     expect(sentOf("ask")[0]?.payload).toMatchObject({ to: "mira", workItemId: "w1" });
     expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "waiting" });
+    await loop.stop();
+    await conn.stop();
+  });
+
+  it("refuses a done hand-back with nothing to review once, then hands it back as blocked", async () => {
+    await connect();
+    const prompts: string[] = [];
+    const runtime: Runtime = {
+      async *run(req) {
+        if (req.tools.length === 0) {
+          yield { type: "finished", ok: true, text: "Journal." };
+          return;
+        }
+
+        prompts.push(req.prompt);
+        yield { type: "started", sessionId: "s" };
+        const text = prompts.length === 1 ? "Waiting on Ada." : "Blocked: need the tone from Ada.";
+        yield { type: "finished", ok: true, text };
+      },
+    };
+
+    start(runtime);
+    socket.offerWith("w1", { kind: "assigned", prs: [] });
+    await until(() => sentOf("handback").length === 1);
+    expect(prompts[1]?.split("\n")[0]).toBe(NOTHING_TO_REVIEW);
+    expect(sentOf("handback")[0]?.payload).toEqual({
+      workItemId: "w1",
+      summary: "Blocked: need the tone from Ada.",
+      links: [],
+      status: "blocked",
+    });
+
     await loop.stop();
     await conn.stop();
   });
