@@ -226,6 +226,18 @@ Do not make these moves or assignments yourself, not even when your round starts
 - When a decision changes what a ticket will do, edit its title and description (`ost ticket edit`) so they say what will be done; a comment alone leaves the ticket saying the old thing.
 - One ticket per piece of work. Never file a ticket for work an existing ticket covers, not to get around something you cannot change, nor because the existing one waits on something unrelated: change that ticket (`ost ticket assign`, `move`, `edit`), or ask a human to. `ost ticket create` warns when an open ticket has a similar title; if it is the same work, cancel the new ticket with a comment that links the existing one, and if it is not, say on the new ticket why it is separate.
 
+## Planning work for others
+
+When you plan work that others will build (a design, an initiative, a re-plan), the plan comes before its tickets:
+
+1. Write the breakdown into the plan: the pieces, their order, their dependencies and any stacks.
+2. Share the plan for review: link it from the ticket and ask a trusted human to confirm it. List each open decision with its options and your recommendation.
+3. Iterate on it: answer their comments and revise the plan. Comments on the document reach you as in `/work/dir/process/doc-feedback.md`, comments on the ticket as in "Rules" above.
+4. File the tickets for its pieces only once a trusted human has confirmed the plan, or said it needs no confirmation. Until then, keep working: on the plan, on feedback and on other work. Hand back as `/work/dir/process/hand-back.md` says.
+5. Then file the tickets from the confirmed breakdown, each linking the plan. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
+
+Splitting your own ticket into sub-tickets for its pull requests is different: follow "One pull request per ticket" below.
+
 ## One pull request per ticket
 
 The office moves a ticket to `done` when its last open pull request merges into the default branch and the checks on the merge commit pass (a merge into another pull request's branch, or while another pull request of the ticket is open, leaves it where it is), so in acme a ticket has one open pull request at a time. `ost pr open` refuses a pull request for a ticket that already has an open one, and says which one, or that is done or canceled. A merged one does not count while the ticket is open: a fix for a check that failed after the merge goes on the same ticket. A pull request a person opens for such a ticket is not refused; the last of them to merge closes the ticket.
@@ -247,7 +259,7 @@ Use this when a teammate handed a ticket back as blocked and the office gave you
    - Answer from what you know: the tickets, documents and conversations you can read, and your memory.
    - Find the information: search the tickets and documents for where it was decided or written down.
    - Ask the teammate who can answer with `ost ask` (`/work/dir/references/team.md`). Ask once, with the question and the ticket link.
-   - Re-plan when the plan is the problem: split the ticket, change its scope or order, or create the ticket that removes the dependency.
+   - Re-plan when the plan is the problem: split the ticket, change its scope or order, or add the ticket that removes the dependency. Write the new plan on the ticket first, and file or change tickets for others as `/work/dir/process/ticket-lifecycle.md` says ("Planning work for others"). A new plan that needs a trusted human's confirmation is step 4.
 3. When it is unblocked, comment on the ticket with the answer or the new plan, then assign the ticket back to the agent who was blocked with `ost ticket assign <ticket> <agent>`. The assignment wakes the agent, and your comment reaches it with the ticket.
 4. Only when you cannot unblock it (it needs a decision, access, spend or anything irreversible from a human, or no teammate has the answer), comment on the ticket saying exactly what is needed from the human, what you tried and what waits meanwhile, then assign the ticket to the requester with `ost ticket assign <ticket> <requester>`. Their reply or comment on the ticket sends the work back to the agent.
 5. Hand back as in `/work/dir/process/hand-back.md`, as `done`: the ticket is with whoever acts next. Say in the journal what you tried and whom you gave the ticket to.
@@ -562,9 +574,10 @@ A change needs a solution design before anyone builds it.
 
 1. Read the requirements and the architecture documents. Look at the code that will change.
 2. Write the design as a document: the approach, the main components and how they interact, data and interfaces, risks, and the alternatives you rejected with reasons.
-3. Break it into pieces that can be built and reviewed on their own, in order. Note where a stack is needed (`/work/dir/references/git.md`).
+3. Add the breakdown to the document: the pieces that can be built and reviewed on their own, their order and dependencies, and where a stack is needed (`/work/dir/references/git.md`). The breakdown is a section of the design, not tickets yet.
 4. Ask product to check it against the requirements, and the designer when users see the result (`ost ask`).
-5. Link the design from the ticket and wait for a trusted human where the change needs approval.
+5. Link the design from the ticket and ask a trusted human to confirm it. List each open decision with the options and your recommendation. Answer their comments and revise the design (`/work/dir/process/doc-feedback.md`); meanwhile keep working on feedback and other work.
+6. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation: from the breakdown, each linking the design (`/work/dir/process/ticket-lifecycle.md`, "Planning work for others"). When the design changes, edit or cancel the tickets it affects.
 
 ### design-review
 
@@ -599,7 +612,7 @@ Follow `/work/dir/process/direct-requests.md`. Questions from other roles about 
 
 ## Hand back
 
-Follow `/work/dir/process/hand-back.md`. Link the design, the pull requests and the tickets. Say what needs a decision.
+Follow `/work/dir/process/hand-back.md`. Link the design, the pull requests and the tickets. Say what needs a decision, with the options and your recommendation.
 
 === skills/developer/SKILL.md ===
 ---

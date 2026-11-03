@@ -213,6 +213,38 @@ describe("golden output per acme person", () => {
     expect(files.get("references/ost.md")).toContain("A denial covers exactly the command");
   });
 
+  it("files a plan's tickets only once a human confirmed it, without blocking the author", () => {
+    const files = (handle: string) =>
+      renderPerson({ team: acme, handle, catalog: real, workdir: "/work/dir" }).files;
+
+    const architect = files("mira");
+    const design = architect.get("skills/architect/SKILL.md") ?? "";
+    expect(design).not.toMatch(/Break it into pieces/);
+    expect(design).toContain("The breakdown is a section of the design, not tickets yet.");
+    expect(design).toContain("List each open decision with the options and your recommendation.");
+    expect(design).toContain(
+      "File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation",
+    );
+
+    const lifecycle = architect.get("process/ticket-lifecycle.md") ?? "";
+    expect(lifecycle).toContain("## Planning work for others");
+    expect(lifecycle).toContain(
+      "Until then, keep working: on the plan, on feedback and on other work.",
+    );
+
+    // A plan waiting for confirmation does not block its author.
+    for (const text of [design, lifecycle]) {
+      expect(text).not.toMatch(/hand back as `blocked` \(|file no tickets for it: hand back/);
+    }
+
+    // A developer's split of its own ticket for several pull requests is unchanged.
+    expect(lifecycle).toContain("Plan the split before you start.");
+
+    const pm = files("priya");
+    expect(pm.get("skills/pm/SKILL.md")).toContain('"Planning work for others"');
+    expect(pm.get("process/unblock.md")).toContain('"Planning work for others"');
+  });
+
   it("has no stale golden files", () => {
     expect(readdirSync(GOLDEN).toSorted()).toEqual(
       acme.people.map((p) => `${p.handle}.txt`).toSorted(),

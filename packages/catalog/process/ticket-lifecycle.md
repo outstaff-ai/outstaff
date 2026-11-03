@@ -35,6 +35,18 @@ Do not make these moves or assignments yourself, not even when your round starts
 - When a decision changes what a ticket will do, edit its title and description (`ost ticket edit`) so they say what will be done; a comment alone leaves the ticket saying the old thing.
 - One ticket per piece of work. Never file a ticket for work an existing ticket covers, not to get around something you cannot change, nor because the existing one waits on something unrelated: change that ticket (`ost ticket assign`, `move`, `edit`), or ask a human to. `ost ticket create` warns when an open ticket has a similar title; if it is the same work, cancel the new ticket with a comment that links the existing one, and if it is not, say on the new ticket why it is separate.
 
+## Planning work for others
+
+When you plan work that others will build (a design, an initiative, a re-plan), the plan comes before its tickets:
+
+1. Write the breakdown into the plan: the pieces, their order, their dependencies and any stacks.
+2. Share the plan for review: link it from the ticket and ask a trusted human to confirm it. List each open decision with its options and your recommendation.
+3. Iterate on it: answer their comments and revise the plan. Comments on the document reach you as in `process/doc-feedback.md`, comments on the ticket as in "Rules" above.
+4. File the tickets for its pieces only once a trusted human has confirmed the plan, or said it needs no confirmation. Until then, keep working: on the plan, on feedback and on other work. Hand back as `process/hand-back.md` says.
+5. Then file the tickets from the confirmed breakdown, each linking the plan. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
+
+Splitting your own ticket into sub-tickets for its pull requests is different: follow "One pull request per ticket" below.
+
 ## One pull request per ticket
 
 {{#if policies.tickets.many_prs}}A ticket in {{ team.name }} may have several pull requests. The office moves it to `done` when its last open pull request merges into the default branch and the checks on the merge commit pass, so open every pull request the ticket needs before the first one merges, and list them in the hand-back. Prefer one pull request per ticket: when the parts can be reviewed on their own, split them into sub-tickets as below.
