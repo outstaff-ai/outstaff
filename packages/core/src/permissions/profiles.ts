@@ -35,6 +35,7 @@ export const CHAT_VERBS = [
   "pr.conversation",
   "pr.diff",
   "pr.comment",
+  "recall",
 ];
 
 const WORK_TOOLS: ToolKind[] = [

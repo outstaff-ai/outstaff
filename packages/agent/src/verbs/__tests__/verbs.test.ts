@@ -2054,6 +2054,7 @@ describe("verb catalogue", () => {
       "pr.diff",
       "pr.merge",
       "ci.log",
+      "recall",
       "me",
       "ask",
       "question.answer",

@@ -4,6 +4,7 @@ import { eventCases } from "./contract/events.js";
 import { orderingCases } from "./contract/ordering.js";
 import { pauseCases } from "./contract/pauses.js";
 import { queueCases } from "./contract/queue.js";
+import { recallCases } from "./contract/recall.js";
 import { recordCases } from "./contract/records.js";
 import { refCases } from "./contract/refs.js";
 import { traceCases } from "./contract/traces.js";
@@ -44,5 +45,6 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
     traceCases(ctx);
     doctorCases(ctx);
     refCases(ctx);
+    recallCases(ctx);
   });
 }

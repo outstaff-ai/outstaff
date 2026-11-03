@@ -138,6 +138,20 @@ export interface DoctorChecksTable {
   last_seen: string;
 }
 
+export interface RecallMomentsTable {
+  key: string;
+  person: string | null;
+  at: string;
+  kind: string;
+  subject_type: string | null;
+  subject_ref: string | null;
+  work_item_id: string | null;
+  actor: string | null;
+  actor_name: string | null;
+  text: string;
+  url: string | null;
+}
+
 export interface Database {
   cursors: CursorsTable;
   events: EventsTable;
@@ -152,6 +166,7 @@ export interface Database {
   pipeline_traces: PipelineTracesTable;
   doctor_checks: DoctorChecksTable;
   work_item_refs: WorkItemRefsTable;
+  recall_moments: RecallMomentsTable;
 }
 
 export type Db = Kysely<Database>;

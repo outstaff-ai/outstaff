@@ -6,6 +6,7 @@ import type {
   WorkItemStatus,
 } from "#/store/types.js";
 import { iso, newId } from "./ids.js";
+import { insertMoment } from "./moments.js";
 import { subjectRef, writeItemRefs } from "./refs.js";
 import { toItem } from "./rows.js";
 import type { StoreInternals } from "./types.js";
@@ -101,6 +102,16 @@ export function itemQueries({
         ...subjectRef(input.subject, input.source ?? "office"),
         ...(input.refs ?? []),
       ]);
+
+      await insertMoment(db, {
+        key: `item:${row.id}`,
+        person: row.person,
+        at: row.created_at,
+        kind: "item",
+        subject: input.subject ?? null,
+        workItemId: row.id,
+        text: row.title,
+      });
 
       return toItem(row);
     },

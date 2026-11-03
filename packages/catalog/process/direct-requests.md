@@ -20,7 +20,7 @@ Never say you will do something "later" or "in a later round" unless that work e
 
 ## Decide what the message is
 
-1. **A question or a discussion** ("why is CI failing?", "would X be integrated in Y?", "what are you on?"): answer it in your last message. Look at the code, the tickets and your current work to be right. Nothing is filed: no ticket, no work item, no queue. You are done.
+1. **A question or a discussion** ("why is CI failing?", "would X be integrated in Y?", "what are you on?"): answer it in your last message. Look at the code, the tickets and your current work to be right. When it refers to something earlier ("as we agreed", "like last time"), find it with `ost recall` (`process/work-items.md`, "Earlier work"). Nothing is filed: no ticket, no work item, no queue. You are done.
 
    A status question ("what are the blockers?", "where are we?", "what is left?") is answered from the current state, never from earlier messages alone. The messages in your context are past and may be out of date: what they call blocked or pending may be done or merged by now. List the work as it is now{{#if integrations.has.tracker}}, the tickets (`ost ticket list`, for example `--status blocked`) and{{/if}} the pull requests (`ost pr list`), and check each item before you name it{{#if integrations.has.tracker}} (`ost ticket show`, `ost pr status`){{else}} (`ost pr status`){{/if}}. Say in the answer what you checked and when, for example "from the open tickets and pull requests just now".
 

@@ -334,6 +334,50 @@ describe("assigned, for a ticket that asks for the granted services", () => {
   });
 });
 
+describe("assigned, for a ticket that asks what the agent recalls", () => {
+  it("recalls the words, about the ticket and with the person, and reports all three on the ticket", async () => {
+    const { seen, text } = await play(assigned(ctx), (a) => {
+      if (a.type === "shell") {
+        return "9.0.0";
+      }
+
+      if (a.type === "tool" && a.tool === "ticket_show") {
+        return "SHOP-7\nrecall: marigold banner\nrecall about ticket: 1\nrecall with: Ada";
+      }
+
+      return a.type === "tool" && a.tool === "recall" ? `found ${JSON.stringify(a.input)}` : "ok";
+    });
+
+    const recalls = seen
+      .filter((a) => isTool(a, "recall"))
+      .map((a) => (a as { input: unknown }).input);
+
+    expect(recalls).toEqual([
+      { query: "marigold banner" },
+      { query: "marigold banner", about: "SHOP-1" },
+      { query: "marigold banner", with: "Ada" },
+    ]);
+
+    const comment = seen.find((a) => isTool(a, "ticket_comment")) as unknown as {
+      input: { key: string; body: string };
+    };
+
+    expect(comment.input.body).toBe(
+      [
+        'Recall:\nfound {"query":"marigold banner"}',
+        'Recall about SHOP-1:\nfound {"query":"marigold banner","about":"SHOP-1"}',
+        'Recall with Ada:\nfound {"query":"marigold banner","with":"Ada"}',
+      ].join("\n\n"),
+    );
+
+    expect(seen.some((a) => a.type === "shell" && /git (switch|commit)/.test(a.command))).toBe(
+      false,
+    );
+
+    expect(text).toBe("Recalled marigold banner.");
+  });
+});
+
 describe("assigned, for a ticket that needs two pull requests", () => {
   const answer = answerBy(
     [

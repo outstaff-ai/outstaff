@@ -54,6 +54,10 @@ export type CiLogRequest = PayloadOf<"ci_log">;
 
 export type CiLogResult = PayloadOf<"ci_log_result">;
 
+export type RecallRequest = PayloadOf<"recall">;
+
+export type RecallResult = PayloadOf<"recall_result">;
+
 export type Placement = Pick<PayloadOf<"work_place">, "position" | "relativeTo">;
 
 export interface OfficeClient {
@@ -99,6 +103,9 @@ export interface OfficeClient {
 
   /** The log of a check on one of the team's repositories, by its link, read with the office's credentials. */
   ciLog(request: CiLogRequest): Promise<CiLogResult>;
+
+  /** The caller's own history that matches, as the office stores it: newest first. */
+  recall(request: RecallRequest): Promise<RecallResult>;
 
   /**
    * Files the ticket a chat session created as work. Refused for anything but a chat session, and for filing the same
@@ -151,6 +158,7 @@ export interface FakeOffice extends OfficeClient {
   docsLinked: DocLinkRequest[];
   notesReported: NotesReport[];
   ciLogsAsked: CiLogRequest[];
+  recalled: RecallRequest[];
 }
 
 export type { Attached, Filed } from "@outstaff/protocol";

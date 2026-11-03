@@ -5,6 +5,8 @@ import { eventQueries } from "./sql/events.js";
 import { guardQueries } from "./sql/guards.js";
 import { itemQueries } from "./sql/items.js";
 import { linkQueries } from "./sql/links.js";
+import { momentQueries } from "./sql/moments.js";
+import { recallQueries } from "./sql/recall.js";
 import { refQueries } from "./sql/refs.js";
 import { runQueries } from "./sql/runs.js";
 import { traceQueries } from "./sql/traces.js";
@@ -23,6 +25,8 @@ export function createSqlStore(internals: StoreInternals): Store {
     ...conversationQueries(internals),
     ...traceQueries(internals),
     ...doctorQueries(internals),
+    ...momentQueries(internals),
+    ...recallQueries(internals),
 
     async close() {
       await db.destroy();

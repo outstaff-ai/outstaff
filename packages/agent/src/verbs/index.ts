@@ -6,6 +6,7 @@ import { me } from "./me.js";
 import { noteVerbs } from "./note.js";
 import { officeVerbs } from "./office-verbs.js";
 import { prVerbs } from "./pr.js";
+import { recall } from "./recall.js";
 import { ticketVerbs } from "./ticket.js";
 import type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 
@@ -37,6 +38,7 @@ export const VERBS: readonly Verb[] = [
   ...noteVerbs,
   ...prVerbs,
   ciLog,
+  recall,
   me,
   ...officeVerbs,
   http,

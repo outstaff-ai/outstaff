@@ -1,12 +1,14 @@
 import type { Run, RunRuntime } from "./runs.types.js";
 import type { DoctorStore } from "./doctor.types.js";
 import type { ItemRefStore, NewItemRef } from "./refs.types.js";
+import type { RecallStore } from "./recall.types.js";
 import type { ConversationStatus, WorkItemStatus, WorkItemTrigger } from "./schema.js";
 
 export type { ConversationStatus, WorkItemStatus, WorkItemTrigger };
 export type { NewDoctorCheck, StoredDoctorCheck } from "./doctor.types.js";
 export type { Run, RunRuntime } from "./runs.types.js";
 export type { ItemRef, ItemRefRole, ItemRefType, NewItemRef } from "./refs.types.js";
+export type { Moment, MomentQuery, MomentRef, NewMoment, RecallStore } from "./recall.types.js";
 
 export interface NewEvent {
   source: string;
@@ -179,7 +181,7 @@ export interface TraceWindow {
   before?: string | undefined;
 }
 
-export interface Store extends DoctorStore, ItemRefStore {
+export interface Store extends DoctorStore, ItemRefStore, RecallStore {
   readonly dialect: "postgres" | "sqlite";
 
   getCursor(source: string, key: string): Promise<string | undefined>;

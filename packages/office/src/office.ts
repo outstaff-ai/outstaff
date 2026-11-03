@@ -2,7 +2,7 @@ import { configuredAdapters, silentLogger, type WorkflowEvent } from "@outstaff/
 import type { QueuedAct } from "@outstaff/protocol";
 import { createChatDesk } from "./chat/index.js";
 import { createIntake } from "./intake/index.js";
-import { createMessaging, type RoleInfo } from "./messaging/index.js";
+import { createMessaging } from "./messaging/index.js";
 import { createChatEntry } from "./office-chat.js";
 import { officeDocDesks } from "./office-doc-links.js";
 import { doctorForOffice } from "./office-doctor.js";
@@ -15,8 +15,10 @@ import { officeLifecycle } from "./office-lifecycle.js";
 import { requesterChat } from "./office-requester.js";
 import { officeTicketPrs } from "./office-ticket-prs.js";
 import { officeCiLogs } from "./office-ci-log.js";
-import type { CreateOfficeInput, Office, OfficeOptions } from "./office.types.js";
+import { roleInfo, webhookOptions } from "./office-config.js";
+import type { CreateOfficeInput, Office } from "./office.types.js";
 import { createOfficePorts } from "./ports.js";
+import { createRecall } from "./recall/index.js";
 import { createOfficePipeline, stoppedWork } from "./pipeline/office-pipeline.js";
 import { createLinkForOffice } from "./office-link.js";
 import {
@@ -33,19 +35,6 @@ import { itemRefs } from "./item-refs.js";
 import { notifyingScheduler } from "./office-scheduler.js";
 import { schedulerWorkSource } from "./work-source.js";
 import { createWorkState } from "./workstate/index.js";
-
-function webhookOptions(o: OfficeOptions) {
-  return { webhook: { port: o.webhookPort ?? 8082, ...defined({ host: o.webhookHost }) } };
-}
-
-function roleInfo(catalog: CreateOfficeInput["catalog"]): Map<string, RoleInfo> {
-  const roles = new Map<string, RoleInfo>();
-  for (const [key, role] of Object.entries(catalog?.roles ?? {})) {
-    roles.set(key, { title: role.title, summary: role.summary });
-  }
-
-  return roles;
-}
 
 export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const { team, store, clock } = input;
@@ -134,8 +123,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   };
 
   const { runner: pipeline, traces, acts } = createOfficePipeline(pipelineOptions);
+  // Every event judged is also a moment agents can recall (`ost recall`), indexed first; indexing never fails one.
+  const recall = createRecall({ store, team, workState, clock, log, ...tracker });
   const judge = (event: WorkflowEvent, meta: { source: string; externalId: string }) =>
-    track(pipeline.handle(event, meta));
+    track(recall.record(event, meta).then(() => pipeline.handle(event, meta)));
 
   // At-least-once and in order: the state reflects the event before the pipeline judges it. A ticket change that
   // gives an agent a ready ticket is checked for an idle pull once the event is judged. A chat message changes nothing
@@ -247,6 +238,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ...officeDocDesks({ store, workState, log }),
     tickets: officeTicketPrs({ workState, team, log }),
     ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
+    recall,
     acts,
     onConnected: (person) => void track(idle.check(person)),
     auth: agentAuthFromSecrets(
@@ -280,6 +272,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     notify,
     onBlocked,
     onTick: () => track(idle.sweep()),
+    onStarted: () => void track(recall.catchUp()),
   });
 
   return {

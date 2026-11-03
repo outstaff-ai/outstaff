@@ -244,6 +244,24 @@ Every wake hands the agent what the office already knows about the work, so the 
 
 **Traced.** What the bundle carried is added to the trace of the event that woke the item: every linked item with its link, role, source and how many comments, threads or messages went in, and for a merge the pull requests and merges its merge context named. `ost explain <event>` prints it under "Context handed over".
 
+## Recall
+
+`ost recall <query>` searches an agent's own history in what the office stores, and returns the matching moments, newest first, each with when, where, who, a short excerpt and a link. The agent asks over its connection (`recall`); the office answers from its store, so the search needs no access to the tracker, the code host or the chat history of its own.
+
+**What is indexed.** The store keeps one row per moment in `recall_moments`, with a full-text index beside it: a `tsvector` with a GIN index on Postgres, an FTS5 table on SQLite (both stem English words, so "greeting" finds "greetings"). A moment is written as the office records it:
+
+- a work item's title when it is created, each journal entry, and what a run handed back (its outcome);
+- each event the office judges that someone said or did on a ticket, pull request or document: comments, reviews, moves, assignments, new tickets and pull requests, merges and closes (not CI results or the office's own events);
+- each chat message an agent passed on to the office. The office already keeps every such message as a `chat.message` event, one per agent it was written to; the agent's own replies are posted by the agent and not kept.
+
+The migration that adds the table fills it from the work items, journals and runs already stored, and the office indexes the events recorded before it on its next start.
+
+**Whose history.** A moment of a work item, its journal and outcome, and a chat message belong to their agent. An event about a ticket, pull request or document belongs to every agent with a work item that refers to it (`work_item_refs`). An agent never sees another agent's chat messages, even in a thread its own work refers to.
+
+**Filters.** `--with` takes a trusted human's name (or its first word) or identity, or a teammate's handle, and matches the moments by any of their names and identities. `--about` takes a ticket key, a pull request (number, `#number`, `owner/repo#number` or its link) or a document id, and matches the moments that happened there, those of the agent's work items that refer to it, and those on a pull request, document or chat thread such a work item also refers to (the pull requests of the ticket, the chat thread that named it). `--since` takes a date or time, and `--limit` how many to return (20 by default, at most 100).
+
+**Trust.** Results are data: the verb's output says so above them, and old comments or chat text never become an instruction.
+
 ## Work state
 
 The work state is the office's picture of the world: every live ticket and pull request, who owns it, whether CI is green, whether it merges cleanly, how many review threads are open, and which pull requests are stacked on which. It is built from intake events and from reading the ports, and it implements the read-only `WorkflowState` that the pipeline's policies are evaluated against.

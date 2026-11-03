@@ -67,4 +67,8 @@ export const serviceHandlers: RequestHandlers = {
     const logs = required(ctx.opts.ciLogs, "This office does not read check logs.");
     reply("ci_log_result", await logs.read(person, payload));
   },
+  async recall({ ctx, person, payload, reply }) {
+    const recall = required(ctx.opts.recall, "This office keeps no history to recall.");
+    reply("recall_result", await recall.search(person, payload));
+  },
 };

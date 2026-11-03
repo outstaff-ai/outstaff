@@ -11,6 +11,7 @@ export type {
   Offer,
   TicketPrs,
   CiLogs,
+  Recall,
   WorkSource,
 } from "./source.types.js";
 

@@ -760,6 +760,53 @@ describe("protocol server with a ticket desk", () => {
   });
 });
 
+describe("protocol server with recall", () => {
+  it("searches the caller's own history, and says recall is unsupported without it", async () => {
+    const asked: unknown[] = [];
+    const open = async (withRecall: boolean) => {
+      const server = createProtocolServer({
+        source: createFakeSource(),
+        team: fakeTeam(),
+        ...(withRecall
+          ? {
+              recall: {
+                async search(person, request) {
+                  asked.push({ person, request });
+                  return {
+                    moments: [{ at: "2026-10-01T10:00:00.000Z", kind: "item", excerpt: "x" }],
+                    more: false,
+                  };
+                },
+              },
+            }
+          : {}),
+        auth: createAgentAuth(tokens),
+        clock: manualClock(),
+        port: 0,
+        host: "127.0.0.1",
+      });
+
+      await server.start();
+      const a = await Agent.connect(server.port());
+      await a.hello("ada", tokens.ada);
+      await a.next("welcome");
+      a.send("recall", { query: "cart", limit: 5 });
+      return { server, a };
+    };
+
+    const on = await open(true);
+    expect((await on.a.next("recall_result")).payload).toMatchObject({ more: false });
+    expect(asked).toEqual([{ person: "ada", request: { query: "cart", limit: 5 } }]);
+    on.a.ws.terminate();
+    await on.server.stop();
+
+    const off = await open(false);
+    expect((await off.a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    off.a.ws.terminate();
+    await off.server.stop();
+  });
+});
+
 describe("protocol server with messaging", () => {
   it("routes ask and answer", async () => {
     const asked: unknown[] = [];
