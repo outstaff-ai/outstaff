@@ -2,6 +2,7 @@ import type { Run, RunRuntime } from "./runs.types.js";
 import type { DoctorStore } from "./doctor.types.js";
 import type { ItemRefStore, NewItemRef } from "./refs.types.js";
 import type { RecallStore } from "./recall.types.js";
+import type { UsageStore } from "./usage.types.js";
 import type { ConversationStatus, WorkItemStatus, WorkItemTrigger } from "./schema.js";
 
 export type { ConversationStatus, WorkItemStatus, WorkItemTrigger };
@@ -9,6 +10,7 @@ export type { NewDoctorCheck, StoredDoctorCheck } from "./doctor.types.js";
 export type { Run, RunRuntime } from "./runs.types.js";
 export type { ItemRef, ItemRefRole, ItemRefType, NewItemRef } from "./refs.types.js";
 export type { Moment, MomentQuery, MomentRef, NewMoment, RecallStore } from "./recall.types.js";
+export type { ModelCounts, RunUsageFilter, RunUsageRow } from "./usage.types.js";
 
 export interface NewEvent {
   source: string;
@@ -181,7 +183,7 @@ export interface TraceWindow {
   before?: string | undefined;
 }
 
-export interface Store extends DoctorStore, ItemRefStore, RecallStore {
+export interface Store extends DoctorStore, ItemRefStore, RecallStore, UsageStore {
   readonly dialect: "postgres" | "sqlite";
 
   getCursor(source: string, key: string): Promise<string | undefined>;
@@ -217,10 +219,7 @@ export interface Store extends DoctorStore, ItemRefStore, RecallStore {
   updateItem(id: string, patch: WorkItemPatch): Promise<WorkItem>;
 
   startRun(workItemId: string): Promise<Run>;
-  finishRun(
-    id: string,
-    result: { outcome: string; error?: string; usage?: unknown },
-  ): Promise<void>;
+  finishRun(id: string, result: { outcome: string; error?: string }): Promise<void>;
   listRuns(workItemId: string): Promise<Run[]>;
 
   /** Records the runtime and model on the item's open run; does nothing when the item has none. */

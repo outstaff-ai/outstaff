@@ -25,6 +25,7 @@ trackerContract("fake", async () => {
       "tracker.assign",
       "tracker.attachments",
       "tracker.development",
+      "tracker.fields",
     ],
   };
 });

@@ -22,6 +22,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
           "tracker.assign",
           "tracker.attachments",
           "tracker.development",
+          "tracker.fields",
         ],
         options,
         secrets: none,

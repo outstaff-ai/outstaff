@@ -35,6 +35,7 @@ import { itemRefs } from "./item-refs.js";
 import { notifyingScheduler } from "./office-scheduler.js";
 import { schedulerWorkSource } from "./work-source.js";
 import { createWorkState } from "./workstate/index.js";
+import { officeUsage } from "./office-usage.js";
 
 export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const { team, store, clock } = input;
@@ -125,6 +126,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const { runner: pipeline, traces, acts } = createOfficePipeline(pipelineOptions);
   // Every event judged is also a moment agents can recall (`ost recall`), indexed first; indexing never fails one.
   const recall = createRecall({ store, team, workState, clock, log, ...tracker });
+  const tracked = officeUsage({ ...pipelineOptions, ports, acts, log, options: o });
+
   const judge = (event: WorkflowEvent, meta: { source: string; externalId: string }) =>
     track(recall.record(event, meta).then(() => pipeline.handle(event, meta)));
 
@@ -177,6 +180,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     notify,
     onBlocked,
     onAccepted: started,
+    ...defined({ recordUsage: tracked.recordUsage }),
     onHandedBack: async (item, result) => {
       // An interrupted item is still the same round: nothing is reported or judged, no follow-up starts.
       if (result.status === "interrupted") {
@@ -239,6 +243,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     ...officeTicketDesks({ store, workState, team, log }),
     ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
     recall,
+    ticketUsage: tracked.ticketUsage,
     acts,
     onConnected: (person) => void track(idle.check(person)),
     auth: agentAuthFromSecrets(
@@ -257,7 +262,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   });
 
   const protocol = server;
-  const link = createLinkForOffice({ input, ports, protocol, doctor, log });
+  const link = createLinkForOffice({ input, ports, protocol, doctor, usage: tracked.link, log });
   const lifecycle = officeLifecycle({
     link,
     doctor,
@@ -273,6 +278,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     onBlocked,
     onTick: () => track(idle.sweep()),
     onStarted: () => void track(recall.catchUp()),
+    onStop: tracked.stop,
   });
 
   return {

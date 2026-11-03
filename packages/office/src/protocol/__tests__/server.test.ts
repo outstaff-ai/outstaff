@@ -584,6 +584,12 @@ describe("protocol server", () => {
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
 
+    it("says ticket_usage is unsupported without usage tracking", async () => {
+      const a = await login("ada", tokens.ada);
+      a.send("ticket_usage", { ticket: "ACME-1" });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+
     it("says doctor_report is unsupported without a doctor", async () => {
       const a = await login("ada", tokens.ada);
       a.send("doctor_report", { checks: [] });
@@ -731,6 +737,12 @@ describe("protocol server with a ticket desk", () => {
           return { prs: [], more: 2 };
         },
       },
+      ticketUsage: {
+        async read(ticket) {
+          asked.push({ usage: ticket });
+          return USAGE;
+        },
+      },
       auth: createAgentAuth(tokens),
       clock: manualClock(),
       port: 0,
@@ -741,6 +753,9 @@ describe("protocol server with a ticket desk", () => {
     const a = await Agent.connect(server.port());
     await a.hello("ada", tokens.ada);
     await a.next("welcome");
+    a.send("ticket_usage", { ticket: "ACME-1" });
+    expect((await a.next("ticket_usage_result")).payload).toEqual(USAGE);
+    asked.length = 0;
     a.send("ticket_prs", { headRef: "feat/x", title: "x", body: "Closes ACME-1" });
     expect((await a.next("ticket_prs_result")).payload).toMatchObject({
       ticket: "ACME-1",
@@ -806,6 +821,26 @@ describe("protocol server with recall", () => {
     await off.server.stop();
   });
 });
+
+const NO_USAGE = {
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheCreationTokens: 0,
+  tokens: 0,
+  costUsd: 0,
+  runs: 0,
+};
+
+const USAGE = {
+  ticket: "ACME-1",
+  own: NO_USAGE,
+  total: NO_USAGE,
+  subTickets: [],
+  byPerson: [],
+  byModel: [],
+  byKind: [],
+};
 
 describe("protocol server with messaging", () => {
   it("routes ask and answer", async () => {

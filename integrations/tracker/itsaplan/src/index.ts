@@ -6,6 +6,7 @@ import {
   itsaplanSecrets,
   itsaplanSetupGuide,
 } from "@outstaff/integration.shared.itsaplan";
+import { fieldChecks, prepareFields } from "./fields.js";
 import { validateItsaplanIdentities } from "./identities.js";
 import { createItsaplanTracker } from "./tracker.js";
 
@@ -19,12 +20,19 @@ export const trackerOptions = connectionOptions;
 export const itsaplanTracker = defineAdapter({
   port: "tracker",
   name: "itsaplan",
-  capabilities: ["tracker.issues", "tracker.assign", "tracker.attachments", "tracker.development"],
+  capabilities: [
+    "tracker.issues",
+    "tracker.assign",
+    "tracker.attachments",
+    "tracker.development",
+    "tracker.fields",
+  ],
   options: trackerOptions,
   secrets: itsaplanSecrets,
   create: (ctx) => createItsaplanTracker(ctx),
   validateIdentities: validateItsaplanIdentities,
   setupGuide: itsaplanSetupGuide,
   derive: deriveItsaplan,
-  doctor: doctorItsaplan,
+  prepare: prepareFields,
+  doctor: (secrets, ctx) => doctorItsaplan(secrets, ctx, fieldChecks),
 });

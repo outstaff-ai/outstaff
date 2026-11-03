@@ -242,6 +242,7 @@ Result:
 | `item.runs[].error`                    | string or null                                                           | yes      |                                                                                                                                                                                                                              |
 | `item.runs[].runtime`                  | string or null                                                           | yes      | The runtime adapter that ran it, for example `claude`; null until the agent said.                                                                                                                                            |
 | `item.runs[].model`                    | string or null                                                           | yes      | The model that ran it: the concrete id the runtime reported, else the one the person is configured with; null when neither is known.                                                                                         |
+| `item.runs[].usage`                    | object (totals, models) or null                                          | yes      | The tokens and API-equivalent cost of the run; null when the agent reported none (an unfinished run, or one that ended without the agent).                                                                                   |
 | `item.journal`                         | object                                                                   | yes      | The item's journal, in short.                                                                                                                                                                                                |
 | `item.journal.entries`                 | integer                                                                  | yes      | How many entries the journal has.                                                                                                                                                                                            |
 | `item.journal.latest`                  | list of objects                                                          | yes      | The latest few entries, oldest first; long ones are cut.                                                                                                                                                                     |
@@ -310,6 +311,124 @@ Result:
 | `windows[].since`   | string          | yes      | Where the window starts: `at` minus `seconds`.         |
 | `windows[].events`  | integer         | yes      | Events that happened in the window.                    |
 | `windows[].items`   | integer         | yes      | Work items created in the window.                      |
+
+### `usage`
+
+Tokens and API-equivalent cost of agent runs that finished in a window (default all of them): per person, with the part of each person's runs that names no ticket (unattributed), and per day. The cost is what the tokens cost at API list prices, not what a subscription bills.
+
+Params:
+
+| Field   | Type   | Required | Description                                             |
+| ------- | ------ | -------- | ------------------------------------------------------- |
+| `since` | string | no       | Count runs that finished at or after this time.         |
+| `until` | string | no       | Count runs that finished before this time. Default now. |
+
+Result:
+
+| Field                                         | Type            | Required | Description                                                                                                  |
+| --------------------------------------------- | --------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
+| `since`                                       | string or null  | yes      | As asked; null for since the start.                                                                          |
+| `until`                                       | string          | yes      | ISO-8601 time, UTC.                                                                                          |
+| `byPerson`                                    | list of objects | yes      | Each person with runs in the window, largest cost first.                                                     |
+| `byPerson[].person`                           | string          | yes      |                                                                                                              |
+| `byPerson[].totals`                           | object          | yes      | Every run of the person.                                                                                     |
+| `byPerson[].totals.inputTokens`               | integer         | yes      |                                                                                                              |
+| `byPerson[].totals.outputTokens`              | integer         | yes      |                                                                                                              |
+| `byPerson[].totals.cacheReadTokens`           | integer         | yes      |                                                                                                              |
+| `byPerson[].totals.cacheCreationTokens`       | integer         | yes      |                                                                                                              |
+| `byPerson[].totals.tokens`                    | integer         | yes      | All four token counts added up.                                                                              |
+| `byPerson[].totals.costUsd`                   | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed. |
+| `byPerson[].totals.runs`                      | integer         | yes      | Runs counted.                                                                                                |
+| `byPerson[].unattributed`                     | object          | yes      | The person's runs of work items that name no ticket, for example a chat that filed nothing.                  |
+| `byPerson[].unattributed.inputTokens`         | integer         | yes      |                                                                                                              |
+| `byPerson[].unattributed.outputTokens`        | integer         | yes      |                                                                                                              |
+| `byPerson[].unattributed.cacheReadTokens`     | integer         | yes      |                                                                                                              |
+| `byPerson[].unattributed.cacheCreationTokens` | integer         | yes      |                                                                                                              |
+| `byPerson[].unattributed.tokens`              | integer         | yes      | All four token counts added up.                                                                              |
+| `byPerson[].unattributed.costUsd`             | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed. |
+| `byPerson[].unattributed.runs`                | integer         | yes      | Runs counted.                                                                                                |
+| `byDay`                                       | list of objects | yes      | Each day with runs in the window, by when the runs finished, oldest first.                                   |
+| `byDay[].day`                                 | string          | yes      | YYYY-MM-DD, UTC.                                                                                             |
+| `byDay[].totals`                              | object          | yes      |                                                                                                              |
+| `byDay[].totals.inputTokens`                  | integer         | yes      |                                                                                                              |
+| `byDay[].totals.outputTokens`                 | integer         | yes      |                                                                                                              |
+| `byDay[].totals.cacheReadTokens`              | integer         | yes      |                                                                                                              |
+| `byDay[].totals.cacheCreationTokens`          | integer         | yes      |                                                                                                              |
+| `byDay[].totals.tokens`                       | integer         | yes      | All four token counts added up.                                                                              |
+| `byDay[].totals.costUsd`                      | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed. |
+| `byDay[].totals.runs`                         | integer         | yes      | Runs counted.                                                                                                |
+
+### `ticket_usage`
+
+One ticket's tokens and API-equivalent cost: its own runs (the runs of every work item whose subject or references name it) by person, model and kind of round, and its total with its sub-tickets rolled up, as the tracker says which they are.
+
+Params:
+
+| Field    | Type   | Required | Description        |
+| -------- | ------ | -------- | ------------------ |
+| `ticket` | string | yes      | Key of the ticket. |
+
+Result:
+
+| Field                                    | Type            | Required | Description                                                                                                                                                                         |
+| ---------------------------------------- | --------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ticket`                                 | string          | yes      | Key of the ticket.                                                                                                                                                                  |
+| `own`                                    | object          | yes      | Every run of every work item whose subject or references name the ticket: its own rounds, reviews and merges of its pull requests, comment rounds and chat sessions attached to it. |
+| `own.inputTokens`                        | integer         | yes      |                                                                                                                                                                                     |
+| `own.outputTokens`                       | integer         | yes      |                                                                                                                                                                                     |
+| `own.cacheReadTokens`                    | integer         | yes      |                                                                                                                                                                                     |
+| `own.cacheCreationTokens`                | integer         | yes      |                                                                                                                                                                                     |
+| `own.tokens`                             | integer         | yes      | All four token counts added up.                                                                                                                                                     |
+| `own.costUsd`                            | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed.                                                                        |
+| `own.runs`                               | integer         | yes      | Runs counted.                                                                                                                                                                       |
+| `total`                                  | object          | yes      | The ticket's own usage plus its sub-tickets' totals.                                                                                                                                |
+| `total.inputTokens`                      | integer         | yes      |                                                                                                                                                                                     |
+| `total.outputTokens`                     | integer         | yes      |                                                                                                                                                                                     |
+| `total.cacheReadTokens`                  | integer         | yes      |                                                                                                                                                                                     |
+| `total.cacheCreationTokens`              | integer         | yes      |                                                                                                                                                                                     |
+| `total.tokens`                           | integer         | yes      | All four token counts added up.                                                                                                                                                     |
+| `total.costUsd`                          | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed.                                                                        |
+| `total.runs`                             | integer         | yes      | Runs counted.                                                                                                                                                                       |
+| `subTickets`                             | list of objects | yes      | The sub-tickets rolled into `total`, each with its own total.                                                                                                                       |
+| `subTickets[].ticket`                    | string          | yes      |                                                                                                                                                                                     |
+| `subTickets[].total`                     | object          | yes      |                                                                                                                                                                                     |
+| `subTickets[].total.inputTokens`         | integer         | yes      |                                                                                                                                                                                     |
+| `subTickets[].total.outputTokens`        | integer         | yes      |                                                                                                                                                                                     |
+| `subTickets[].total.cacheReadTokens`     | integer         | yes      |                                                                                                                                                                                     |
+| `subTickets[].total.cacheCreationTokens` | integer         | yes      |                                                                                                                                                                                     |
+| `subTickets[].total.tokens`              | integer         | yes      | All four token counts added up.                                                                                                                                                     |
+| `subTickets[].total.costUsd`             | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed.                                                                        |
+| `subTickets[].total.runs`                | integer         | yes      | Runs counted.                                                                                                                                                                       |
+| `byPerson`                               | list of objects | yes      | The ticket's own usage per person, largest cost first.                                                                                                                              |
+| `byPerson[].key`                         | string          | yes      | The person's handle, the model id, or the kind of round.                                                                                                                            |
+| `byPerson[].totals`                      | object          | yes      |                                                                                                                                                                                     |
+| `byPerson[].totals.inputTokens`          | integer         | yes      |                                                                                                                                                                                     |
+| `byPerson[].totals.outputTokens`         | integer         | yes      |                                                                                                                                                                                     |
+| `byPerson[].totals.cacheReadTokens`      | integer         | yes      |                                                                                                                                                                                     |
+| `byPerson[].totals.cacheCreationTokens`  | integer         | yes      |                                                                                                                                                                                     |
+| `byPerson[].totals.tokens`               | integer         | yes      | All four token counts added up.                                                                                                                                                     |
+| `byPerson[].totals.costUsd`              | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed.                                                                        |
+| `byPerson[].totals.runs`                 | integer         | yes      | Runs counted.                                                                                                                                                                       |
+| `byModel`                                | list of objects | yes      | The ticket's own usage per model id, largest cost first.                                                                                                                            |
+| `byModel[].key`                          | string          | yes      | The person's handle, the model id, or the kind of round.                                                                                                                            |
+| `byModel[].totals`                       | object          | yes      |                                                                                                                                                                                     |
+| `byModel[].totals.inputTokens`           | integer         | yes      |                                                                                                                                                                                     |
+| `byModel[].totals.outputTokens`          | integer         | yes      |                                                                                                                                                                                     |
+| `byModel[].totals.cacheReadTokens`       | integer         | yes      |                                                                                                                                                                                     |
+| `byModel[].totals.cacheCreationTokens`   | integer         | yes      |                                                                                                                                                                                     |
+| `byModel[].totals.tokens`                | integer         | yes      | All four token counts added up.                                                                                                                                                     |
+| `byModel[].totals.costUsd`               | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed.                                                                        |
+| `byModel[].totals.runs`                  | integer         | yes      | Runs counted.                                                                                                                                                                       |
+| `byKind`                                 | list of objects | yes      | The ticket's own usage per kind of round (the work item's kind, for example `assigned` or `review_feedback`), largest cost first.                                                   |
+| `byKind[].key`                           | string          | yes      | The person's handle, the model id, or the kind of round.                                                                                                                            |
+| `byKind[].totals`                        | object          | yes      |                                                                                                                                                                                     |
+| `byKind[].totals.inputTokens`            | integer         | yes      |                                                                                                                                                                                     |
+| `byKind[].totals.outputTokens`           | integer         | yes      |                                                                                                                                                                                     |
+| `byKind[].totals.cacheReadTokens`        | integer         | yes      |                                                                                                                                                                                     |
+| `byKind[].totals.cacheCreationTokens`    | integer         | yes      |                                                                                                                                                                                     |
+| `byKind[].totals.tokens`                 | integer         | yes      | All four token counts added up.                                                                                                                                                     |
+| `byKind[].totals.costUsd`                | number          | yes      | What the tokens cost at API list prices, in USD. API-equivalent: on a subscription it is not what is billed.                                                                        |
+| `byKind[].totals.runs`                   | integer         | yes      | Runs counted.                                                                                                                                                                       |
 
 ### `health`
 

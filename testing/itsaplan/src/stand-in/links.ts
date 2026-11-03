@@ -67,5 +67,9 @@ export function issueView(s: ItsaplanStore, issue: StoredIssue) {
     .filter((l) => l.from === issue.identifier || l.to === issue.identifier)
     .map((l) => linkOf(s, issue, l));
 
-  return { ...issue, links };
+  const fieldValues = s.fieldValues
+    .filter((v) => v.issueId === issue.id)
+    .map(({ fieldId, value, valueEnd, optionIds }) => ({ fieldId, value, valueEnd, optionIds }));
+
+  return { ...issue, links, fieldValues };
 }

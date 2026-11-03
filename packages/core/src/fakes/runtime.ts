@@ -87,6 +87,7 @@ function finished(step: Extract<FakeRunStep, { type: "finish" }>, last: string):
     text: step.text ?? last,
     ...(step.error !== undefined ? { error: step.error } : {}),
     ...(step.costUsd !== undefined ? { costUsd: step.costUsd } : {}),
+    ...(step.usage ? { usage: step.usage } : {}),
     ...(step.sessionLost ? { sessionLost: true } : {}),
   };
 }

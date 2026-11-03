@@ -53,6 +53,10 @@ export const LINK_METHOD_META: Record<LinkMethod, string> = {
   item: "One work item with its runs, the end of its journal and the traces of the events that queued or joined it. `not_found` when there is no such item.",
   activity:
     "How much happened in each of the last few windows of time (default the last hour and the last day): events that happened and work items created. Exact, since the office counts them in its store.",
+  usage:
+    "Tokens and API-equivalent cost of agent runs that finished in a window (default all of them): per person, with the part of each person's runs that names no ticket (unattributed), and per day. The cost is what the tokens cost at API list prices, not what a subscription bills.",
+  ticket_usage:
+    "One ticket's tokens and API-equivalent cost: its own runs (the runs of every work item whose subject or references name it) by person, model and kind of round, and its total with its sub-tickets rolled up, as the tracker says which they are.",
   health:
     "The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at`, on demand and, while one fails or warns, every `office.doctor.retry_minutes`, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.",
 };

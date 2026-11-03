@@ -2,6 +2,7 @@ import { PortError, type CanonicalStatus } from "#/ports/index.js";
 import type { Comment, Issue, LinkedIssue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
 import { fakeDevelopment } from "./tracker-development.js";
+import { fakeFields } from "./tracker-fields.js";
 import { listIssues } from "./tracker-listing.js";
 import type { FakeTracker, FakeTrackerOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
@@ -78,8 +79,12 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   };
 
   const { connected, development, ...developmentMethods } = fakeDevelopment(need, () => actor.id);
+  const { fields, fieldValues, ...fieldMethods } = fakeFields(need, () => actor.id);
   const tracker: FakeTracker = {
     links,
+    fields,
+    fieldValues,
+    ...fieldMethods,
     relations,
     parents,
     attached,

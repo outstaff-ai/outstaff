@@ -3,6 +3,12 @@ import { itemSchema, itemSubjectSchema, itemSummarySchema, personSchema } from "
 import { traceSchema } from "./trace.js";
 import { time } from "./fields.js";
 import { healthSchema } from "./health.js";
+import {
+  ticketUsageParamsSchema,
+  ticketUsageResultSchema,
+  usageParamsSchema,
+  usageResultSchema,
+} from "./usage.js";
 
 /** Version of the office link; the office sends it as the `Outstaff-Link-Version` header. */
 export const LINK_VERSION = 2;
@@ -122,6 +128,12 @@ export const requestSchema = z.discriminatedUnion("method", [
       })
       .optional(),
   }),
+  z.strictObject({ id: requestId, method: z.literal("usage"), params: usageParamsSchema }),
+  z.strictObject({
+    id: requestId,
+    method: z.literal("ticket_usage"),
+    params: ticketUsageParamsSchema,
+  }),
 ]);
 
 const results = {
@@ -167,6 +179,8 @@ const results = {
       .describe("The events whose wakes queued or joined the item, oldest first."),
   }),
   health: healthSchema,
+  usage: usageResultSchema,
+  ticket_usage: ticketUsageResultSchema,
 };
 
 export const responseSchema = z.union([
@@ -180,6 +194,8 @@ export const responseSchema = z.union([
       results.items,
       results.item,
       results.health,
+      results.usage,
+      results.ticket_usage,
     ]),
   }),
   z.strictObject({

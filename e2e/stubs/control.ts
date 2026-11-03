@@ -115,6 +115,15 @@ function trackerControls({ tracker }: World): Route[] {
       },
     },
     {
+      // The human makes this ticket a sub-ticket of `parent`.
+      method: "POST",
+      path: "/_test/tickets/:key/parent",
+      handler: (r) => {
+        tracker.setParent(r.params["key"]!, r.json.parent);
+        return ok();
+      },
+    },
+    {
       // A person moves a ticket to a status (by name): the human, or `as`.
       method: "POST",
       path: "/_test/tickets/:key/move",

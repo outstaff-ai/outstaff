@@ -11,7 +11,7 @@ export {
 } from "./options.js";
 
 export { nextCursor, OVERLAP_MS, parseCursor } from "./cursor.js";
-export { doctorItsaplan } from "./doctor.js";
+export { connectItsaplan, doctorItsaplan } from "./doctor.js";
 export { deriveItsaplan, itsaplanSetupGuide } from "./setup.js";
 export { itsaplanSecrets } from "./secrets.js";
 export type {
@@ -21,6 +21,7 @@ export type {
   ConnectionOptions,
   EventCursor,
   HttpConfig,
+  ItsaplanMe,
   OptionalConnectionOptions,
   RequestOptions,
 } from "./types.js";

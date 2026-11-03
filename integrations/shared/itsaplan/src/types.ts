@@ -67,3 +67,10 @@ export type {
   Page,
   PmNode,
 } from "./api.types.js";
+
+/** Who an API key belongs to, wherever this version of `/me` puts it. */
+export interface ItsaplanMe {
+  id?: number | string;
+  username?: string;
+  user?: { id?: number | string; username?: string };
+}

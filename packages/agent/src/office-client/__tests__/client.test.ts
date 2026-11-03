@@ -351,6 +351,27 @@ describe("office connection", () => {
 
       current().reply(current().last(), "pr_list_result", { prs: [], more: 0 });
       expect(await listing).toEqual({ prs: [], more: 0 });
+
+      const usage = conn.ticketUsage("ACME-1");
+      expect(current().last()).toMatchObject({
+        type: "ticket_usage",
+        payload: { ticket: "ACME-1" },
+      });
+
+      const none = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0 };
+      const totals = { ...none, tokens: 0, costUsd: 0, runs: 0 };
+      const answer = {
+        ticket: "ACME-1",
+        own: totals,
+        total: totals,
+        subTickets: [],
+        byPerson: [],
+        byModel: [],
+        byKind: [],
+      };
+
+      current().reply(current().last(), "ticket_usage_result", answer);
+      expect(await usage).toEqual(answer);
     });
 
     it("maps ask, work and team onto the protocol", async () => {

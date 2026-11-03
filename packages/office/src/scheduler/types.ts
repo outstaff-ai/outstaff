@@ -102,7 +102,6 @@ export interface FinishInput {
   /** What the item becomes. Default "done". */
   status?: "done" | "waiting" | "queued" | "canceled";
   error?: string;
-  usage?: unknown;
 }
 
 export interface FailResult {

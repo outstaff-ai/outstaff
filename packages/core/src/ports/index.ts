@@ -32,6 +32,7 @@ export type {
 
 export type {
   Comment,
+  FieldEnsureOutcome,
   Issue,
   IssueChanges,
   IssueFilter,
@@ -45,6 +46,7 @@ export type {
   TicketAttachment,
   Tracker,
   TrackerEvent,
+  TrackerField,
 } from "./tracker.js";
 
 export type {
@@ -92,5 +94,14 @@ export type {
 export { splitAtLines } from "./split-lines.js";
 export type { Chat, ChatFile, ChatMessage, AgentProfile } from "./chat.js";
 
-export type { RunRequest, Runtime, RuntimeEvent, RuntimeTool, UsageEvent } from "./runtime.js";
+export type {
+  ModelUsage,
+  RunRequest,
+  Runtime,
+  RuntimeEvent,
+  RuntimeTool,
+  SessionUsage,
+  UsageEvent,
+} from "./runtime.js";
+
 export type { Avatars } from "./avatars.js";

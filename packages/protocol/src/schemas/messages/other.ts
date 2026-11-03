@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ticketUsageSchema } from "#/schemas/usage.js";
 import { ERROR_CODES } from "#/constants.js";
 import { doctorCheckSchema } from "#/schemas/doctor.js";
 import { empty, itemId, message } from "#/schemas/fields.js";
@@ -275,6 +276,13 @@ export const otherMessages = [
       more: z.boolean().describe("Whether older moments match beyond the limit."),
     }),
   ),
+  message(
+    "ticket_usage",
+    z.strictObject({
+      ticket: z.string().min(1).max(100).describe("Key of the ticket, for example ACME-123."),
+    }),
+  ),
+  message("ticket_usage_result", ticketUsageSchema),
   message("ack", empty),
   message(
     "error",

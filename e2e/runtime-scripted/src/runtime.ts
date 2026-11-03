@@ -6,9 +6,11 @@ import {
   silentLogger,
   type Decision,
   type Logger,
+  type ModelUsage,
   type RunRequest,
   type Runtime,
   type RuntimeEvent,
+  type SessionUsage,
   type ToolCall,
   type UsageEvent,
 } from "@outstaff/core";
@@ -175,6 +177,26 @@ async function* playScript(round: Round): AsyncGenerator<RuntimeEvent, string | 
   return step.value;
 }
 
+/** The model the scripted runtime says it runs, in its usage. */
+export const SCRIPTED_MODEL = "claude-scripted";
+
+/** What every scripted run spends: 10,000 tokens and two cents, API-equivalent. */
+export const RUN_USAGE: ModelUsage = {
+  inputTokens: 1000,
+  outputTokens: 500,
+  cacheReadTokens: 8000,
+  cacheCreationTokens: 500,
+  costUsd: 0.02,
+};
+
+const scaled = (u: ModelUsage, n: number): ModelUsage => ({
+  inputTokens: u.inputTokens * n,
+  outputTokens: u.outputTokens * n,
+  cacheReadTokens: u.cacheReadTokens * n,
+  cacheCreationTokens: u.cacheCreationTokens * n,
+  costUsd: Math.round((u.costUsd ?? 0) * n * 100) / 100,
+});
+
 export interface ScriptedConfig {
   log?: Logger;
 }
@@ -253,9 +275,23 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
       : undefined;
   }
 
+  // Each run spends the same, and a session reports its running total, as the Claude Agent SDK does.
+  const spent = new Map<string, number>();
+  const usageAfterRun = (session: string): SessionUsage => {
+    const runs = (spent.get(session) ?? 0) + 1;
+    spent.set(session, runs);
+    return { [SCRIPTED_MODEL]: scaled(RUN_USAGE, runs) };
+  };
+
   async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
     const session = req.sessionId ?? `scripted-${++sessions}-${Date.now()}`;
-    yield { type: "started", sessionId: session };
+    yield { type: "started", sessionId: session, model: SCRIPTED_MODEL };
+    for await (const e of play(req, session)) {
+      yield e.type === "finished" ? { ...e, usage: usageAfterRun(session) } : e;
+    }
+  }
+
+  async function* play(req: RunRequest, session: string): AsyncGenerator<RuntimeEvent> {
     yield USAGE;
     const answer = fixedAnswer(req, session);
     if (answer !== undefined) {

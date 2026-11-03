@@ -23,6 +23,7 @@ export { documentedCodes } from "./config/documented-codes.js";
 export { WARNING_CODES } from "./config/warning-codes.js";
 export { identitiesOf, identityWarning, vcsAgentLogins } from "./config/identities.js";
 export { parseYaml } from "./config/locate.js";
+export { USAGE_FIELDS, usageSettings, wantedTrackerFields } from "./config/usage-fields.js";
 export type {
   AdapterInfo,
   AdapterPort,

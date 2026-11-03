@@ -163,6 +163,30 @@ describe("assigned, on a ticket that says to hold", () => {
   });
 });
 
+describe("assigned, on a ticket that asks for usage", () => {
+  it("posts what ost usage prints for the ticket it names, and does nothing else", async () => {
+    const { seen, text } = await play(assigned(ctx), (a) =>
+      isTool(a, "ticket_show")
+        ? "SHOP-1 Cost\nStatus: In Progress (active)\nusage: SHOP-7"
+        : isTool(a, "usage")
+          ? "SHOP-7: 0 tokens"
+          : "",
+    );
+
+    expect(seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      { type: "tool", tool: "usage", input: { ticket: "SHOP-7" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "ost usage:\nSHOP-7: 0 tokens" },
+      },
+    ]);
+
+    expect(text).toBe("Posted the usage of SHOP-7 on SHOP-1.");
+  });
+});
+
 describe("unblock", () => {
   const pm = {
     ...ctx,

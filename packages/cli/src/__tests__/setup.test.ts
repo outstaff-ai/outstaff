@@ -245,7 +245,12 @@ const SECRET_VALUE = "super-secret-derived-value";
 
 /** Adapters whose hooks are fakes; each declares one derivable key. */
 function fakes(): AdapterRegistry {
-  const fake = (port: string, name: string, derive?: AnyDef["derive"]): AnyDef =>
+  const fake = (
+    port: string,
+    name: string,
+    derive?: AnyDef["derive"],
+    prepare?: AnyDef["prepare"],
+  ): AnyDef =>
     ({
       port,
       name,
@@ -255,6 +260,7 @@ function fakes(): AdapterRegistry {
         { key: `${name.toUpperCase()}_ID`, description: "d", where: "w", derivable: true },
       ],
       derive,
+      prepare,
       create: () => ({}),
     }) as unknown as AnyDef;
 
@@ -271,6 +277,15 @@ function fakes(): AdapterRegistry {
     .register(
       fake("chat", "slack", async () => {
         throw new Error("auth.test failed");
+      }),
+    )
+    .register(
+      fake("tracker", "itsaplan", undefined, async (secrets) => {
+        if (!secrets.get("ITSAPLAN_TOKEN")) {
+          throw new Error("cannot create fields");
+        }
+
+        return ['created the custom number field "Agent tokens"'];
       }),
     );
 }
@@ -290,6 +305,7 @@ describe("ost setup --derive", () => {
     expect(r.out).toContain("Wrote GITHUB_ID");
     expect(r.out).toContain("warning  github: not installed yet");
     expect(r.out).toContain("warning  slack: auth.test failed");
+    expect(r.out).toContain("warning  itsaplan: cannot create fields");
     expect(r.out + r.err).not.toContain(SECRET_VALUE);
     expect(r.out + r.err).not.toContain("tok-");
 
@@ -330,10 +346,11 @@ describe("ost setup --derive", () => {
     const dir = project();
     const r = await ost(dir, ["setup", "mira", "--derive"], {
       registry: fakes(),
-      env: { GITHUB_TOKEN: "from-env" },
+      env: { GITHUB_TOKEN: "from-env", ITSAPLAN_TOKEN: "t" },
     });
 
     expect(r.code).toBe(0);
+    expect(r.out).toContain('made     itsaplan: created the custom number field "Agent tokens"');
     expect(readFileSync(join(dir, ".outstaff", "secrets", "mira", "GITHUB_ID"), "utf8")).toContain(
       "from-env-",
     );

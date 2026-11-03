@@ -13,6 +13,7 @@ import { join } from "node:path";
 import { envSecretSource, type SecretSource, type TeamConfig } from "@outstaff/core";
 import type { Context } from "#/types.js";
 import type { Scope } from "#/commands/types.js";
+import { runPrepare } from "./prepare.js";
 import type { Configured, DeriveReport, DeriveRun } from "./types.js";
 
 /** Prefixes of the GitHub App key sets, whose downloaded `<slug>.<date>.private-key.pem` can be picked up. */
@@ -145,7 +146,7 @@ export async function runDerive(
   dir: string,
   yes: boolean,
 ): Promise<DeriveReport> {
-  const report: DeriveReport = { written: [], warnings: [] };
+  const report: DeriveReport = { written: [], prepared: [], warnings: [] };
   const secrets: SecretSource = envSecretSource(ctx.env, dir);
   const run: DeriveRun = { ctx, team, scope, person, dir, yes, secrets, report };
 
@@ -168,5 +169,6 @@ export async function runDerive(
     }
   }
 
+  await runPrepare(run, found);
   return report;
 }

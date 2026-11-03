@@ -8,6 +8,8 @@ import type {
   Link,
   Member,
   PayloadOf,
+  SessionUsageReport,
+  TicketUsage,
   WorkState,
   WorkSummary,
 } from "@outstaff/protocol";
@@ -59,11 +61,19 @@ export interface WorkSource {
 
       /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
       toReview?: string[] | undefined;
+
+      /** What the round used, per runtime session, recorded on its run. */
+      usage?: SessionUsageReport[] | undefined;
     },
   ): Promise<void>;
 
   /** Counts a failed run: the item is held back with backoff, and blocked after repeated failures. */
-  fail(person: string, workItemId: string, reason: string): Promise<void>;
+  fail(
+    person: string,
+    workItemId: string,
+    reason: string,
+    usage?: SessionUsageReport[],
+  ): Promise<void>;
 
   roster(): Promise<Member[]>;
   list(person: string, q: { workItemId?: string }): Promise<WorkSummary[]>;
@@ -158,6 +168,12 @@ export interface TicketPrs {
 }
 
 /** The logs of checks on the team's repositories, read with the office's credentials. Optional: without it `ci_log` is unsupported. */
+/** Answers `ticket_usage`. Optional: without it the request is unsupported. */
+export interface TicketUsageDesk {
+  /** Refuses (`invalid`) when the team does not track usage. */
+  read(ticket: string): Promise<TicketUsage>;
+}
+
 export interface CiLogs {
   /** Refuses (`invalid`) a link that is not a check with a log on one of the team's repositories. */
   read(person: string, request: PayloadOf<"ci_log">): Promise<PayloadOf<"ci_log_result">>;

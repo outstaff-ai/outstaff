@@ -16,6 +16,13 @@ function ticketState(s: ItsaplanStore, i: StoredIssue) {
     status: columnOf(s, i.columnId)?.name,
     assignee: usernameOf(s, i.assigneeUserId),
     parent: s.issues.find((p) => p.id === i.parentId)?.identifier ?? null,
+    fields: s.fieldValues
+      .filter((v) => v.issueId === i.id)
+      .map((v) => ({
+        name: s.customFields.find((f) => f.id === v.fieldId)?.name,
+        value: v.value,
+        by: usernameOf(s, v.by),
+      })),
     links: s.links.filter((l) => l.from === i.identifier),
     development: s.development
       .filter((l) => l.issueId === i.id)

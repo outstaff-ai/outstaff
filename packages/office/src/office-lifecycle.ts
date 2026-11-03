@@ -43,6 +43,9 @@ export function officeLifecycle(deps: {
 
   /** Once the office runs; never throws, and stopping waits for what it tracks. */
   onStarted?: () => void;
+
+  /** While stopping, once nothing is in flight: drops timers of the office's own. */
+  onStop?: () => void;
 }): Pick<Office, "start" | "stop" | "health"> {
   const { team, link, doctor, store, log, intake, workState, scheduler, protocol } = deps;
   const { inFlight, notify, onBlocked, onTick, onStarted } = deps;
@@ -58,6 +61,7 @@ export function officeLifecycle(deps: {
     }
 
     await Promise.allSettled(inFlight);
+    deps.onStop?.();
     if (up.workState) {
       await workState.stop();
     }

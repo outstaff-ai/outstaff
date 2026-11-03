@@ -7,6 +7,7 @@ export const LACKING: Record<Capability, string> = {
   "tracker.webhooks": "react to ticket changes instantly",
   "tracker.attachments": "attach files to tickets",
   "tracker.development": "link its pull requests on their tickets",
+  "tracker.fields": "show agent tokens and cost on tickets",
   "knowledge.docs": "write design docs",
   "knowledge.issueLinks": "link its documents on their tickets",
   "knowledge.notes": "keep its notes in the knowledge base",

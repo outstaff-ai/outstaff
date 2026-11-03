@@ -5,9 +5,9 @@ import { createActEchoes } from "./echoes.js";
 import { createActQueue } from "./pending.js";
 import { actRecords } from "./results.js";
 
-/** The tickets whose state the ops change; a comment changes none. */
+/** The tickets whose state the ops change; a comment or a custom field changes none the office follows. */
 const changedTickets = (ops: ActOp[]): string[] => [
-  ...new Set(ops.flatMap((o) => (o.op === "comment" ? [] : [o.ticket]))),
+  ...new Set(ops.flatMap((o) => (o.op === "comment" || o.op === "set_field" ? [] : [o.ticket]))),
 ];
 
 const wire = (act: PendingAct): QueuedAct => ({ id: act.id, ops: act.ops });

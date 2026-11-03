@@ -10,6 +10,7 @@ import { recallQueries } from "./sql/recall.js";
 import { refQueries } from "./sql/refs.js";
 import { runQueries } from "./sql/runs.js";
 import { traceQueries } from "./sql/traces.js";
+import { usageQueries } from "./sql/usage.js";
 import type { StoreInternals } from "./sql/types.js";
 
 export function createSqlStore(internals: StoreInternals): Store {
@@ -27,6 +28,7 @@ export function createSqlStore(internals: StoreInternals): Store {
     ...doctorQueries(internals),
     ...momentQueries(internals),
     ...recallQueries(internals),
+    ...usageQueries(internals),
 
     async close() {
       await db.destroy();

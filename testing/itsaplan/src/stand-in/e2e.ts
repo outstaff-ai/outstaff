@@ -90,6 +90,13 @@ function controls(s: ItsaplanStore, human: string) {
       touch(s, issue);
     },
 
+    /** The human makes `keyName` a sub-ticket of `parentKey`. */
+    setParent(keyName: string, parentKey: string) {
+      const issue = issueNamed(s, keyName);
+      issue.parentId = issueNamed(s, parentKey).id;
+      touch(s, issue);
+    },
+
     /** The human links two tickets, `kind` read from `from`'s side: `blocks` means `from` blocks `to`. */
     linkTickets(from: string, to: string, kind: string) {
       if (!addLink(s, issueNamed(s, from), issueNamed(s, to), kind)) {

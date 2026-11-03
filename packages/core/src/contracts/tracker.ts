@@ -82,6 +82,24 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       await expectPortError(s.subject.attachments!("NOPE-99999"), "not_found");
     });
 
+    it("makes sure a number field exists and sets it on an issue", async (t) => {
+      const s = get();
+      requireCapability(t, s, "tracker.issues", "tracker.fields");
+      const field = { name: "Agent tokens", type: "number" as const };
+      expect(["created", "exists"]).toContain(await s.subject.ensureField!(field));
+      expect(await s.subject.ensureField!({ ...field, name: "agent TOKENS" })).toBe("exists");
+      expect(await s.subject.hasField!(field)).toBe(true);
+      expect(await s.subject.hasField!({ name: "No such field here", type: "number" })).toBe(false);
+      const issue = await s.subject.createIssue({ title: "Counted", body: "" });
+      expect(await s.subject.fieldValue!(issue.key, field.name)).toBeNull();
+      await s.subject.setField!(issue.key, field.name, 1234);
+      expect(await s.subject.fieldValue!(issue.key, field.name)).toBe(1234);
+      await s.subject.setField!(issue.key, field.name, 12.5);
+      expect(await s.subject.fieldValue!(issue.key, field.name)).toBe(12.5);
+      await expectPortError(s.subject.setField!(issue.key, "No such field here", 1), "not_found");
+      await expectPortError(s.subject.setField!("NOPE-99999", field.name, 1), "not_found");
+    });
+
     it("links a pull request of a connected repository to an issue once", async (t) => {
       const s = get();
       requireCapability(t, s, "tracker.issues", "tracker.development");

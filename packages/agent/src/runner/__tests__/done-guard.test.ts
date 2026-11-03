@@ -51,6 +51,7 @@ const runOf = (o: Offer, item: ItemEnv): ItemRun => ({
   prompt: () => "work",
   current: "s1",
   lastText: "",
+  usage: new Map(),
 });
 
 describe("toReview", () => {

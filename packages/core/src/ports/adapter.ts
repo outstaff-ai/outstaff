@@ -109,6 +109,13 @@ export interface AdapterDefinition<P extends PortName, Options, Impl> {
   derive?: (secrets: SecretSource, ctx: DeriveContext) => Promise<Record<string, string>>;
 
   /**
+   * Makes what the team file needs in the provider and is missing there, for example the tracker's custom fields.
+   * `ost setup --derive` calls it with the scope's secrets. Idempotent; returns one line per thing it made, and throws
+   * when it cannot, saying what a human can do instead. Never put secrets in it.
+   */
+  prepare?: (secrets: SecretSource, ctx: DeriveContext) => Promise<string[]>;
+
+  /**
    * Live checks for `ost doctor`: calls the provider with the person's (or the office's) secrets and compares the
    * answers with the team file. Skip what needs a secret that is missing, since doctor reports that itself. Never put a
    * secret value in a check.

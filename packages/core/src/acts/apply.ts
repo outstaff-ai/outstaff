@@ -82,6 +82,16 @@ const linkDoc: Make<"link_doc"> = async (op, ports) => {
     : `doc ${op.doc} was already linked on ${op.ticket}`;
 };
 
+const setField: Make<"set_field"> = async (op, ports) => {
+  const tracker = need(ports.tracker, "tracker");
+  if (!tracker.setField) {
+    throw new Error("the tracker has no custom fields (tracker.fields)");
+  }
+
+  await tracker.setField(op.ticket, op.field, op.value);
+  return `set ${op.field} of ${op.ticket} to ${op.value ?? "nothing"}`;
+};
+
 function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
   switch (op.op) {
     case "move":
@@ -96,6 +106,8 @@ function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {
       return linkPr(op, ports, member);
     case "link_doc":
       return linkDoc(op, ports, member);
+    case "set_field":
+      return setField(op, ports, member);
   }
 }
 

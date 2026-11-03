@@ -18,6 +18,14 @@ describe("describeOp and describeDecision", () => {
     ).toBe("assign ACME-1 to human ada.admin");
 
     expect(describeOp({ op: "assign", ticket: "ACME-1", to: null })).toBe("unassign ACME-1");
+    expect(describeOp({ op: "set_field", ticket: "ACME-1", field: "Agent tokens", value: 5 })).toBe(
+      "set Agent tokens of ACME-1 to 5",
+    );
+
+    expect(
+      describeOp({ op: "set_field", ticket: "ACME-1", field: "Agent tokens", value: null }),
+    ).toBe("set Agent tokens of ACME-1 to nothing");
+
     expect(describeOp({ op: "comment", on: { ticket: "ACME-1" }, body: "x" })).toBe(
       "comment on ACME-1",
     );

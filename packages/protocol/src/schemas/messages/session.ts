@@ -4,6 +4,7 @@ import { linkSchema, workItemSchema } from "#/schemas/common.js";
 import { offerContextSchema } from "#/schemas/feedback.js";
 import { itemId, message, text } from "#/schemas/fields.js";
 import { usageWindowSchema } from "#/schemas/team.js";
+import { runUsageReportSchema } from "#/schemas/usage.js";
 import { queuedReportSchema } from "#/schemas/work.js";
 
 export const sessionMessages = [
@@ -133,7 +134,11 @@ export const sessionMessages = [
         .describe(
           "For a done hand-back: what the agent's check found to review or finished, for example a pull request opened or ready for review, a document linked, the ticket closed, or a kind of work that finishes without one. The office takes a done hand-back without it as blocked when it finds nothing to review itself.",
         ),
+      usage: runUsageReportSchema.optional(),
     }),
   ),
-  message("fail", z.strictObject({ workItemId: itemId, reason: text })),
+  message(
+    "fail",
+    z.strictObject({ workItemId: itemId, reason: text, usage: runUsageReportSchema.optional() }),
+  ),
 ] as const;

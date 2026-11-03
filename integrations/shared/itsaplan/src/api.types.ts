@@ -51,6 +51,29 @@ export interface ApiIssue {
 
   /** The issue's relations to other issues; only reading one issue carries them. */
   links?: ApiIssueLink[];
+
+  /** The issue's custom field values; reading one issue carries them. */
+  fieldValues?: ApiFieldValue[];
+}
+
+/** A project's custom field. A field of no issue type (`issueTypeId` null) is on every issue. */
+export interface ApiCustomField {
+  id: number;
+  issueTypeId: number | null;
+  name: string;
+  fieldType: string;
+  memberScope?: string | null;
+  showInBody?: boolean;
+  position?: number;
+  options?: { id: number; value: string; color: string; position: number }[];
+}
+
+/** One custom field's value on an issue. */
+export interface ApiFieldValue {
+  fieldId: number;
+  value: string | number | boolean | null;
+  valueEnd?: string | null;
+  optionIds?: number[];
 }
 
 /**

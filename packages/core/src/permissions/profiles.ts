@@ -32,6 +32,7 @@ export const CHAT_VERBS = [
   "pr.status",
   "pr.checks",
   "ci.log",
+  "usage",
   "pr.threads",
   "pr.conversation",
   "pr.diff",

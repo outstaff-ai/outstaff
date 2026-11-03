@@ -13,9 +13,9 @@ export function recordCases(ctx: ContractContext): void {
 
     const run = await ctx.store.startRun(item.id);
     expect(run.finishedAt).toBeNull();
-    await ctx.store.finishRun(run.id, { outcome: "ok", usage: { tokens: 5 } });
+    await ctx.store.finishRun(run.id, { outcome: "ok" });
     const [done] = await ctx.store.listRuns(item.id);
-    expect(done).toMatchObject({ outcome: "ok", usage: { tokens: 5 }, error: null });
+    expect(done).toMatchObject({ outcome: "ok", error: null });
     expect(done?.finishedAt).not.toBeNull();
     await expect(ctx.store.finishRun("missing", { outcome: "ok" })).rejects.toThrow(/./);
   });

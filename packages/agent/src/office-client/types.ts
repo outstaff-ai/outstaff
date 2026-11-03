@@ -5,6 +5,7 @@ import type {
   Message,
   MessageType,
   PayloadOf,
+  SessionUsageReport,
   QueuedAct,
   QueuedReport,
   WorkState,
@@ -128,9 +129,12 @@ export interface OfficeConnection extends OfficeClient {
 
       /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
       toReview?: string[];
+
+      /** The round's usage per runtime session, in the latest running totals the runtime reported. */
+      usage?: SessionUsageReport[];
     },
   ): Promise<void>;
-  fail(workItemId: string, reason: string): Promise<void>;
+  fail(workItemId: string, reason: string, usage?: SessionUsageReport[]): Promise<void>;
 
   /** Reports the runtime's usage windows; the office keeps the latest. */
   usage(windows: PayloadOf<"usage">["windows"]): Promise<void>;

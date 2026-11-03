@@ -2265,6 +2265,23 @@
       },
       "additionalProperties": false,
       "description": "Where agents keep their memory: the lasting lessons and preferences they note."
+    },
+    "usage": {
+      "type": "object",
+      "properties": {
+        "track_cost": {
+          "default": true,
+          "description": "Record the tokens and cost of every run and total them per ticket, sub-tickets rolled up into their parent. The cost is what the runs would cost at API prices (API-equivalent), not what a subscription bills. Default on.",
+          "type": "boolean"
+        },
+        "tracker_fields": {
+          "default": true,
+          "description": "Show each ticket's totals in two custom fields of the tracker, \"Agent tokens\" and \"Agent cost, USD (API-equivalent)\", written by the agent whose run it was. Needs a tracker with tracker.fields. Off keeps the totals in the office only. Default on.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Tokens and cost of agent work, per run and per ticket."
     }
   },
   "required": [

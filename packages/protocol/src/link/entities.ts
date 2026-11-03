@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { time } from "./fields.js";
+import { runUsageSchema } from "./usage.js";
 
 export const itemSubjectSchema = z
   .strictObject({ type: z.string(), ref: z.string() })
@@ -105,6 +106,7 @@ export const itemSchema = z.strictObject({
         error: z.string().nullable(),
         runtime: runtimeField,
         model: modelField,
+        usage: runUsageSchema,
       }),
     )
     .describe("Every run, oldest first."),

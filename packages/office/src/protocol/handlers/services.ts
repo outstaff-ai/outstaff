@@ -71,6 +71,10 @@ export const serviceHandlers: RequestHandlers = {
   async pr_list({ ctx, person, payload, reply }) {
     reply("pr_list_result", await required(ctx.opts.tickets, NO_PRS).list(person, payload));
   },
+  async ticket_usage({ ctx, payload, reply }) {
+    const usage = required(ctx.opts.ticketUsage, "This office does not track usage.");
+    reply("ticket_usage_result", await usage.read(payload.ticket));
+  },
   async ci_log({ ctx, person, payload, reply }) {
     const logs = required(ctx.opts.ciLogs, "This office does not read check logs.");
     reply("ci_log_result", await logs.read(person, payload));

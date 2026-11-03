@@ -184,6 +184,53 @@ describe("applyActOps: link_doc", () => {
   });
 });
 
+describe("applyActOps: set_field", () => {
+  it("sets a custom number field, and clears it", async () => {
+    const tracker = createFakeTracker();
+    await tracker.ensureField!({ name: "Agent tokens", type: "number" });
+    const issue = await tracker.createIssue({ title: "t", body: "" });
+    const set = { op: "set_field" as const, ticket: issue.key, field: "Agent tokens" };
+    expect(
+      await applyActOps(
+        [
+          { ...set, value: 42 },
+          { ...set, value: null },
+          { ...set, value: 7 },
+        ],
+        { tracker },
+        async (t) => t.id,
+      ),
+    ).toEqual({
+      ok: true,
+      results: [
+        `set Agent tokens of ${issue.key} to 42`,
+        `set Agent tokens of ${issue.key} to nothing`,
+        `set Agent tokens of ${issue.key} to 7`,
+      ],
+    });
+
+    expect(tracker.fieldValues.get(issue.key)?.get("Agent tokens")).toEqual({
+      value: 7,
+      by: "u-bot",
+    });
+  });
+
+  it("fails for a field the project does not have, and without the capability", async () => {
+    const tracker = createFakeTracker();
+    const issue = await tracker.createIssue({ title: "t", body: "" });
+    const op = { op: "set_field" as const, ticket: issue.key, field: "Agent tokens", value: 1 };
+    expect(await applyActOps([op], { tracker }, async (t) => t.id)).toMatchObject({
+      ok: false,
+      error: `set_field ${issue.key}: No custom field Agent tokens.`,
+    });
+
+    const { setField: _set, ...plain } = tracker;
+    expect(await applyActOps([op], { tracker: plain }, async (t) => t.id)).toMatchObject({
+      error: `set_field ${issue.key}: the tracker has no custom fields (tracker.fields)`,
+    });
+  });
+});
+
 describe("trackerMemberOf", () => {
   const team = {
     people: [{ handle: "sam", identities: { tracker: "sam.duarte" } }, { handle: "noor" }],

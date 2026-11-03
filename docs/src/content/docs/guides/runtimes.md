@@ -63,6 +63,10 @@ policies:
 
 A group stands for one credential, and a credential belongs to one runtime, so every member of a group must run on the same runtime adapter; `ost validate` rejects a group that mixes them (`policies.usage_shared_mixed_runtime`). The office applies a usage report from one member to the members on the reporter's runtime only. People on different runtimes are never in one group, and a person in no group counts alone.
 
+## Tokens and cost
+
+When a run ends, a runtime reports the tokens its session used per model (input, output, cache read and cache write) and their cost, and the office totals them per ticket ([Tokens and cost per ticket](/architecture/office/#tokens-and-cost-per-ticket)). The `claude-agent-sdk` runtime reads them from the SDK's result, which counts every model call of the session, subagents included, and takes the SDK's cost; for a model the SDK has no price for, it prices the tokens with a list-price table it ships. The cost is API-equivalent: what the tokens would cost at API list prices. On a subscription (`CLAUDE_CODE_OAUTH_TOKEN`) that is not what is billed; the tokens are exact either way. A runtime that reports no usage leaves its runs without it. `usage.track_cost: false` turns the tracking off.
+
 ## Which runtimes an image carries
 
 A runtime adapter is code, so it has to be in the agent image the person runs in. The published `agent` image carries `claude-agent-sdk`. The label `work.outstaff.runtimes` lists an image's runtimes, and `ost-agent --runtimes` prints them; see [Container images](/guides/images/#runtimes-an-image-carries). An agent whose person names a runtime its image does not carry stops at start:
