@@ -24,6 +24,45 @@ export const otherMessages = [
     }),
   ),
   message(
+    "notes_changed",
+    z.strictObject({
+      change: z
+        .enum(["added", "updated", "removed", "migrated", "edit_ignored"])
+        .describe(
+          "What happened: the caller added, changed or removed a note, wrote the notes it had on its volume to the knowledge base on first start, or found a version of its notes by someone it does not trust, which it does not use.",
+        ),
+      note: z
+        .string()
+        .max(2000)
+        .optional()
+        .describe("The note added, changed (its new text) or removed."),
+      count: z.number().int().min(0).optional().describe("For `migrated`: how many notes."),
+      doc: z
+        .strictObject({
+          id: z.string().min(1).max(500).describe("Id of the page in the knowledge base."),
+          title: z.string().max(500).describe("Title of the page."),
+          url: z.string().min(1).describe("Absolute URL of the page."),
+        })
+        .optional()
+        .describe(
+          "The page that shows the notes, when they are kept in the knowledge base; comments on it reach the caller.",
+        ),
+      edit: z
+        .strictObject({
+          author: z
+            .string()
+            .min(1)
+            .max(300)
+            .describe("Who wrote the version, as the knowledge base names them."),
+          at: z.string().describe("When."),
+          version: z.string().min(1).max(100).describe("The version that is not used."),
+        })
+        .optional()
+        .describe("For `edit_ignored`: the version that is not used."),
+      workItemId: itemId.optional().describe("The work item the caller was on, if any."),
+    }),
+  ),
+  message(
     "doctor_report",
     z.strictObject({
       checks: z

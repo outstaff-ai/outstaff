@@ -29,6 +29,7 @@ import type { ManualClientClock } from "#/office-client/types.js";
 import { fakeEnv } from "@outstaff/testing.agent";
 import type { ClonedRepo, Workspaces } from "#/repos/index.js";
 import { JOURNAL_PROMPT } from "#/runner/journal.js";
+import type { NotesReader } from "#/notes/types.js";
 import type { ChatRelay } from "#/runner/chat.types.js";
 import { createWorkLoop } from "#/runner/loop.js";
 import { linksIn } from "#/runner/links.js";
@@ -223,6 +224,7 @@ describe("work loop", () => {
       layout?: Layout;
       tracker?: Tracker;
       repos?: ClonedRepo[];
+      notes?: NotesReader;
     } = {},
   ) {
     fake = fakeEnv();
@@ -384,6 +386,23 @@ describe("work loop", () => {
       const unblocked = "Answered on the ticket and gave it back to sam.";
       expect((await retry(unblocked, undefined, "blocked", "unblock")).status).toBe("done");
     });
+  });
+
+  it("starts each round with the agent's notes, read for that item", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    const read: string[] = [];
+    const notes: NotesReader = async (id) => {
+      read.push(id);
+      return { store: "volume", notes: [{ id: "3f9a2c1b", text: "Ask first." }] };
+    };
+
+    start(runtime, { notes });
+    socket.offerWith("w1", { journal: true });
+    await until(() => sentOf("handback").length === 1);
+    expect(read).toEqual(["w1"]);
+    expect(runtime.requests[0]!.prompt).toContain("- [3f9a2c1b] Ask first.");
+    await loop.stop();
   });
 
   it("accepts an offer, runs it and hands back with the summary and links", async () => {

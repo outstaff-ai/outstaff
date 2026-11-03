@@ -590,11 +590,42 @@ describe("protocol server", () => {
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
 
+    it("says notes_changed is unsupported without a notes desk", async () => {
+      const a = await login("ada", tokens.ada);
+      a.send("notes_changed", { change: "added", note: "Ask first." });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+
     it("says doc_link is unsupported without a document desk", async () => {
       const a = await login("ada", tokens.ada);
       a.send("doc_link", { workItemId: "w1", doc: { id: "d1", title: "T", url: "https://x/d1" } });
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
+  });
+});
+
+describe("protocol server with a notes desk", () => {
+  it("passes the caller's report to the desk", async () => {
+    const reported: unknown[] = [];
+    const server = createProtocolServer({
+      source: createFakeSource(),
+      team: fakeTeam(),
+      notes: { changed: async (person, report) => void reported.push({ person, report }) },
+      auth: createAgentAuth(tokens),
+      clock: manualClock(),
+      port: 0,
+      host: "127.0.0.1",
+    });
+
+    await server.start();
+    const a = await Agent.connect(server.port());
+    await a.hello("ada", tokens.ada);
+    await a.next("welcome");
+    a.send("notes_changed", { change: "migrated", count: 2 });
+    expect(await a.next("ack")).toBeDefined();
+    expect(reported).toEqual([{ person: "ada", report: { change: "migrated", count: 2 } }]);
+    a.ws.terminate();
+    await server.stop();
   });
 });
 

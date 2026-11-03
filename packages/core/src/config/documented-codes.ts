@@ -21,6 +21,8 @@ export const documentedCodes: Record<ConfigCode | WarningCode, string> = {
   "people.invalid_grant_key": "A repo grant key is not a repo name, kind:<kind> or *.",
   "people.unknown_repo": "A repo grant names a repo that is not listed in repos.",
   "email.missing_placeholder": "email.pattern does not contain {handle}.",
+  "memory.store_unsupported":
+    "memory.store is knowledge, but no knowledge integration is configured or it does not provide knowledge.notes.",
   "policies.usage_threshold_order": "defer_scheduled_at is higher than pause_automatic_at.",
   "policies.retry_backoff_order": "base_minutes is higher than cap_minutes.",
   "policies.usage_shared_unknown_person":

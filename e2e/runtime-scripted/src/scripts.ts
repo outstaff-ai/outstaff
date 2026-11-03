@@ -1003,14 +1003,36 @@ async function* attachToPr(
   }
 }
 
+/** What the agent remembers, from the notes the session started with and the line about a change it does not use. */
+function recall(ctx: ItemContext): string {
+  const list = ctx.notes?.list ?? [];
+  const head = list.length ? `I remember: ${list.join(" | ")}` : "I remember nothing yet.";
+  return ctx.notes?.ignored ? `${head}\nNot used: ${ctx.notes.ignored}` : head;
+}
+
 /**
- * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
- * view of it; a request to change a ticket is made on that ticket; a request about an open pull request is attached
- * to it, after asking when the pull request is in review. Nothing is ever filed as a new ticket.
+ * A trusted human's word about how the agent works: `remember: <text>` is noted with `ost note add`; `what do you
+ * remember?` is answered from the notes. Undefined for any other message.
  */
-export async function* chat(ctx: ItemContext): Script {
-  const talk = ctx.conversation ?? [];
-  const latest = talk.findLast((m) => !m.agent)?.text ?? "";
+async function* notes(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const remember = /^remember: (.+)$/i.exec(latest)?.[1];
+  if (remember) {
+    yield { type: "tool", tool: "note_add", input: { text: remember } };
+    return "Noted.";
+  }
+
+  return /^what do you remember\??$/i.test(latest) ? recall(ctx) : undefined;
+}
+
+/** What the chat message asks of the work: a pull request's status, a reply about work, or a change to file. */
+async function* aboutWork(
+  ctx: ItemContext,
+  talk: Message[],
+  latest: string,
+): AsyncGenerator<Action, string, string> {
   const statusOf = /^what is the status of PR #(\d+)/i.exec(latest)?.[1];
   if (statusOf) {
     return yield* prStatus(statusOf);
@@ -1022,6 +1044,18 @@ export async function* chat(ctx: ItemContext): Script {
 
   const done = yield* changeOrFile(ctx, latest);
   return done ?? (yield* attachToPr(talk, latest));
+}
+
+/**
+ * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
+ * view of it; a request to change a ticket is made on that ticket; a request about an open pull request is attached
+ * to it, after asking when the pull request is in review. A trusted human's
+ * word about the agent's notes is noted or answered from them. Nothing is ever filed as a new ticket.
+ */
+export async function* chat(ctx: ItemContext): Script {
+  const talk = ctx.conversation ?? [];
+  const latest = talk.findLast((m) => !m.agent)?.text ?? "";
+  return (yield* notes(ctx, latest)) ?? (yield* aboutWork(ctx, talk, latest));
 }
 
 /**

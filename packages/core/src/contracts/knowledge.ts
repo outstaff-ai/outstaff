@@ -1,5 +1,6 @@
 import { expect, it } from "vitest";
 import type { Knowledge } from "#/ports/index.js";
+import { knowledgeNotesCases } from "./knowledge-notes.js";
 import type { KnowledgeSeed } from "./seeds.js";
 import {
   contractSuite,
@@ -125,5 +126,7 @@ export function knowledgeContract(
       const times = page.events.map((e) => Date.parse(e.at));
       expect(times).toEqual(times.toSorted((a, b) => a - b));
     });
+
+    knowledgeNotesCases(get);
   });
 }

@@ -17,6 +17,37 @@ const offer = (kind: string): Offer =>
 
 // The scripts read the prompt the agent builds. This keeps them in step with its template.
 describe("parsePrompt", () => {
+  it("reads the notes the round started with, and a version of them that is not used", () => {
+    const prompt = buildWorkPrompt(offer("chat"), {
+      resumed: false,
+      notes: {
+        store: "knowledge",
+        notes: [
+          { id: "3f9a2c1b", text: "Ask first." },
+          { id: "0a1b2c3d", text: "Keep it small." },
+        ],
+        ignored: {
+          author: { id: "u-pia", name: "Pia Novak", kind: "agent" },
+          at: "2026-01-02T00:00:00Z",
+          version: "3",
+        },
+      },
+    });
+
+    expect(parsePrompt(prompt)?.notes).toEqual({
+      list: ["Ask first.", "Keep it small."],
+      ignored: expect.stringMatching(/^Pia Novak changed your notes at .* version 3\./),
+    });
+
+    const none = buildWorkPrompt(offer("chat"), {
+      resumed: false,
+      notes: { store: "volume", notes: [] },
+    });
+
+    expect(parsePrompt(none)?.notes).toEqual({ list: [] });
+    expect(parsePrompt(buildWorkPrompt(offer("chat"), { resumed: false }))?.notes).toBeUndefined();
+  });
+
   it("reads what the agent's work prompt says", () => {
     const prompt = buildWorkPrompt(offer("review_feedback"), {
       resumed: false,

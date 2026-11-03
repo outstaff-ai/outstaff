@@ -13,6 +13,7 @@ import { d, slug, SLUG } from "./schema-meta.js";
 import { workflowSchema } from "./workflow-schema.js";
 import { linkSchema } from "./link.js";
 import { pipelineSchema } from "./pipeline.js";
+import { memorySchema } from "./memory-schema.js";
 import { checkWorkflowConfig } from "#/workflow/validate.js";
 import { usageSharedIssues } from "./usage-shared.js";
 
@@ -152,6 +153,7 @@ export const teamConfigSchema = z
     pipeline: pipelineSchema.optional(),
     link: linkSchema.optional(),
     policies: policiesSchema.optional(),
+    memory: memorySchema.optional(),
   })
   .superRefine((cfg, ctx) => {
     const seenRepos = new Map<string, number>();

@@ -174,6 +174,11 @@ export interface DocLinks {
   ): Promise<void>;
 }
 
+/** What agents report about their notes. Optional: without it `notes_changed` is unsupported. */
+export interface AgentNotesDesk {
+  changed(person: string, report: PayloadOf<"notes_changed">): Promise<void>;
+}
+
 /** Agent-to-agent questions. Optional until the messaging component exists; without it `ask` is unsupported. */
 export interface Messaging {
   ask(

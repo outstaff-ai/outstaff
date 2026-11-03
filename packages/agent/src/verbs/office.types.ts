@@ -48,6 +48,8 @@ export type PrListResult = PayloadOf<"pr_list_result">;
 
 export type DocLinkRequest = PayloadOf<"doc_link">;
 
+export type NotesReport = PayloadOf<"notes_changed">;
+
 export type CiLogRequest = PayloadOf<"ci_log">;
 
 export type CiLogResult = PayloadOf<"ci_log_result">;
@@ -91,6 +93,9 @@ export interface OfficeClient {
    * come back as work for the caller.
    */
   docLink(request: DocLinkRequest): Promise<void>;
+
+  /** Tells the office the caller's notes changed, or have a version it does not use. */
+  notesChanged(report: NotesReport): Promise<void>;
 
   /** The log of a check on one of the team's repositories, by its link, read with the office's credentials. */
   ciLog(request: CiLogRequest): Promise<CiLogResult>;
@@ -144,6 +149,7 @@ export interface FakeOffice extends OfficeClient {
   ticketPrsAsked: TicketPrsRequest[];
   prListsAsked: PrListRequest[];
   docsLinked: DocLinkRequest[];
+  notesReported: NotesReport[];
   ciLogsAsked: CiLogRequest[];
 }
 

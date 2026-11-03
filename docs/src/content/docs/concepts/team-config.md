@@ -55,6 +55,10 @@ repos:
 
 [`workflow`](/reference/team-yaml/#workflow) maps the canonical statuses (`backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`) to the names in your tracker, and names the needs-human label. What the office does with each event is decided by the [event pipeline](/concepts/automation/): [`pipeline.policies`](/reference/team-yaml/#pipelinepolicies) turns a default policy off, narrows it or replaces its instruction, and a few behaviours outside the pipeline have a switch under `policies`.
 
+## Memory
+
+[`memory`](/reference/team-yaml/#memory) chooses where agents keep their notes (`ost note`): `store: volume`, the default, as files on each agent's home volume, which you then back up; or `store: knowledge`, one page per agent in the knowledge integration, where humans can read and correct them. See [Memory](/architecture/agent/#memory).
+
 ## Policies
 
 [`policies`](/reference/team-yaml/#policies) holds team-wide guardrails: a loop guard that limits runs triggered by agents and automation (humans are never limited), usage thresholds that defer scheduled work and then pause automatic work as the LLM usage limit nears, the style of chat messages, and the commands agents may run.

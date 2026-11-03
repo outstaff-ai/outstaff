@@ -4,7 +4,7 @@ Use this when a teammate handed a ticket back as blocked and the office gave you
 
 1. Read the ticket, its comments and what the blocked agent handed back (`ost ticket show <ticket>`). Decide what is missing: an answer, a decision, access, a dependency, or a plan that no longer fits.
 2. Try everything before you involve a human:
-   - Answer from what you know: the tickets, documents and conversations you can read, and your memory.
+   - Answer from what you know: the tickets, documents and conversations you can read, and your notes.
    - Find the information: search the tickets and documents for where it was decided or written down.
    - Ask the teammate who can answer with `ost ask` (`references/team.md`). Ask once, with the question and the ticket link.
    - Re-plan when the plan is the problem: split the ticket, change its scope or order, or add the ticket that removes the dependency. Write the new plan on the ticket first, and file or change tickets for others as `process/ticket-lifecycle.md` says ("Planning work for others"). A new plan that needs a trusted human's confirmation is step 4.

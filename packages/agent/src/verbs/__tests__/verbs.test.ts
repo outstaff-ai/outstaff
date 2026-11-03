@@ -2036,6 +2036,10 @@ describe("verb catalogue", () => {
       "doc.update",
       "doc.reply",
       "doc.resolve",
+      "note.list",
+      "note.add",
+      "note.update",
+      "note.remove",
       "pr.list",
       "pr.status",
       "pr.checks",
@@ -2061,8 +2065,9 @@ describe("verb catalogue", () => {
       "http",
     ]);
 
-    // The one verb that merges is opt-in and gated by the team's policy; nothing else may.
-    const names = VERBS.map((v) => v.name).filter((n) => n !== "pr.merge");
+    // The one verb that merges is opt-in and gated by the team's policy; nothing else may. Removing a note changes
+    // only the agent's own notes, which keep their history where the knowledge base keeps them.
+    const names = VERBS.map((v) => v.name).filter((n) => n !== "pr.merge" && n !== "note.remove");
     expect(names.join(" ")).not.toMatch(/delete|remove|merge|close|push|force/);
   });
 

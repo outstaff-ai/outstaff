@@ -128,7 +128,7 @@ describe("prepareAgent", () => {
     expect(existsSync(join(work, ".agent/skills/developer/SKILL.md"))).toBe(true);
     expect(existsSync(join(work, "skills"))).toBe(false);
     expect(readFileSync(join(work, "references/ost.md"), "utf8")).toContain("ost");
-    for (const d of ["repos", "worktrees", "scratch", "memory"]) {
+    for (const d of ["repos", "worktrees", "scratch"]) {
       expect(existsSync(join(home, d))).toBe(true);
     }
 

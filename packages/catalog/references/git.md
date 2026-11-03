@@ -45,6 +45,7 @@ These are outstaff's mechanics, whatever the conventions say.
 - New work gets one branch per item, the one you create. Work on an open pull request of yours (review feedback, a conflict, a failing check, more work on its ticket) happens on that pull request's own branch, which your worktree already has checked out: push to it, and never create a second branch for the same pull request. Report the pull request, not the branch name.
 - Push to your own branch only, and to the head branch of the pull request you work on. Never push to anyone else's branch or a shared one.
 - After you rewrite commits that are already pushed (an amend, a rebase), push with `git push --force-with-lease`. Never force-push anyone else's branch or a shared one.
+- Push work in progress early. Your home volume may be lost, and only pushed work survives it. When a round ends with the work unfinished (waiting, blocked or not done yet), commit it, push the branch and open its pull request as a draft (`ost pr open --draft`), unless the repository's conventions say otherwise. Mark it ready when it is (`ost pr update <n> --ready`).
 
 ### A push GitHub rejects for a missing permission
 

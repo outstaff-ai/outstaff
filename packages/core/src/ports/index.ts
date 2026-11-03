@@ -51,8 +51,12 @@ export type {
   DocComment,
   DocEvent,
   DocIssueLinkOutcome,
+  IgnoredNotesEdit,
   IssueDoc,
   Knowledge,
+  KnowledgeNotes,
+  NotesOwner,
+  NotesPage,
 } from "./knowledge.js";
 
 export type { Check, CheckLog, CheckLogStep } from "./vcs-checks.js";

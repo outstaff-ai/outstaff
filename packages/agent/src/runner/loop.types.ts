@@ -1,4 +1,5 @@
 import type { Logger, Policy, Runtime, TeamConfig, ToolKind } from "@outstaff/core";
+import type { NotesReader } from "#/notes/types.js";
 import type { OfficeConnection } from "#/office-client/index.js";
 import type { ClonedRepo, Workspaces } from "#/repos/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
@@ -39,6 +40,9 @@ export interface WorkLoopOptions {
    * no worktree. Without it a chat item runs like any other item.
    */
   chatSession?: { policy: Policy; builtinTools: ToolKind[] };
+
+  /** Reads the agent's notes at the start of each round, for its prompt. Without it the prompt has none. */
+  notes?: NotesReader;
 
   /** Per-item worktree and scratch directory. Without it items run in `workdir` alone. */
   workspaces?: Workspaces;

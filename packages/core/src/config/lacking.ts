@@ -9,6 +9,7 @@ export const LACKING: Record<Capability, string> = {
   "tracker.development": "link its pull requests on their tickets",
   "knowledge.docs": "write design docs",
   "knowledge.issueLinks": "link its documents on their tickets",
+  "knowledge.notes": "keep its notes in the knowledge base",
   "vcs.pullRequests": "open or update pull requests",
   "vcs.reviewThreads": "reply to review threads",
   "vcs.workflows": "push changes to CI workflow files",

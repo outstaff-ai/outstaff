@@ -18,6 +18,7 @@ import {
   type ClonedRepo,
   type Workspaces,
 } from "#/repos/index.js";
+import { createNotesReader } from "#/notes/index.js";
 import { createSweeper, type Sweeper } from "#/sweep/index.js";
 import type { ToolStatus } from "#/tools/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
@@ -80,7 +81,6 @@ export function prepareDirs(layout: Layout, capabilities: Capability[]): string[
     layout.reposDir,
     layout.worktreesDir,
     layout.scratchDir,
-    layout.memoryDir,
     ...(capabilities.includes("design.canvas") ? [artifactsDir(layout)] : []),
   ];
 
@@ -194,6 +194,7 @@ export function workLoop({ team, log }: StartupContext, parts: LoopParts): WorkL
     repos,
     workspaces: parts.workspaces,
     addDirs: parts.addDirs,
+    notes: createNotesReader({ ...parts.env, layout }),
     model,
     ...(team.policies ? { policies: team.policies } : {}),
     log,

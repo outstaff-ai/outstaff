@@ -281,7 +281,7 @@ describe("isolation between work items", () => {
 });
 
 describe("memory", () => {
-  it("is in the runtime's directories and the only place besides scratch and repositories that can be written", () => {
+  it("is never written by the runtime's tools: notes change with `ost note` only", () => {
     // A home outside the temp folder: /tmp is writable on purpose, and CI's tmpdir is /tmp.
     const { env } = fakeEnv();
     const layout = layoutOf("/home/outstaff");
@@ -293,7 +293,8 @@ describe("memory", () => {
     });
 
     const write = (path: string) => evaluate(policy, { kind: "write", path }).effect;
-    expect(write(join(layout.memoryDir, "lessons.md"))).toBe("allow");
+    expect(write(join(layout.memoryDir, "notes.md"))).toBe("deny");
+    expect(write(join(layout.scratchDir, "w1", "x.md"))).toBe("allow");
     expect(write(join(layout.home, "notes.md"))).toBe("deny");
     expect(write(join(layout.home, ".bashrc"))).toBe("deny");
     expect(write(join(layout.workDir, "skills", "x.md"))).toBe("deny");
@@ -331,7 +332,7 @@ describe("memory", () => {
       policy,
       builtinTools: ["read"],
       workdir: layout.workDir,
-      addDirs: [layout.memoryDir],
+      addDirs: [],
     });
 
     const running = loop.run();

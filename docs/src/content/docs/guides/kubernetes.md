@@ -172,7 +172,7 @@ These are the starting points from the [container contract](/reference/container
 | Agent                       | 1 CPU, 2 GiB         | 4 GiB         | 20 GiB home volume (`<handle>-home`)                                                 |
 | Agent that builds and tests | 2 CPU, 4 GiB or more | 8 GiB or more | Size the volume for the clones and worktrees of every repository the person works in |
 
-Give an agent that runs your tests the memory of your biggest test run, not of the agent. Raise it with a patch in that person's `people/<handle>/kustomization.yaml`, so one person can differ from the rest. Size the home volume for the installed tools, the clones and the worktrees, and cap `ephemeral-storage` so one runaway job cannot fill a node. The first start of an agent installs its tools and takes longer than later ones.
+Give an agent that runs your tests the memory of your biggest test run, not of the agent. Raise it with a patch in that person's `people/<handle>/kustomization.yaml`, so one person can differ from the rest. Size the home volume for the installed tools, the clones and the worktrees, and cap `ephemeral-storage` so one runaway job cannot fill a node. With `memory.store: volume` (the default) the home volume also holds the agent's notes, so back it up; with `memory.store: knowledge` the notes are in the knowledge integration, and a single-replica storage class without backups is enough. The first start of an agent installs its tools and takes longer than later ones.
 
 ## Check it works
 

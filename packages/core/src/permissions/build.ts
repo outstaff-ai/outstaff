@@ -98,7 +98,6 @@ export function buildPolicy({
   const tools: ToolKind[] = [...spec.tools, ...(canvas ? (["artifact"] as const) : [])];
   const writeAllow = [
     `${layout.scratchDir}/**`,
-    `${layout.memoryDir}/**`,
     // Claude Code's session memory and tool-result spill files; the rest of ~/.claude is configuration.
     `${layout.home}/.claude/projects/**`,
     "/tmp/**",

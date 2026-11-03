@@ -1,5 +1,6 @@
 import { effectiveTools } from "@outstaff/core";
 import type { StartupOptions, PreparedAgent } from "./startup.types.js";
+import { migrateMemory } from "#/notes/index.js";
 import { createAgentEnv } from "#/verbs/env.js";
 import { createActMaker } from "./acts.js";
 import { buildIdentityPrompt } from "./identity.js";
@@ -59,6 +60,8 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   const runtimeDef = runtimeAdapter(ctx);
   const capabilities = roleCapabilities(ctx, roles, rendered.extends, runtimeDef);
   const addDirs = prepareDirs(layout, capabilities);
+  // Notes kept in memory/ before go to the notes store on the first start that has none.
+  await migrateMemory({ ...env, layout });
   const repos = await cloneRepositories(ctx, env, rendered, layout);
   writeWorkdirFiles(runtimeDef, rendered, layout.workDir);
   const runtime = await createRuntime(ctx, runtimeDef);

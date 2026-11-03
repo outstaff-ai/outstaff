@@ -33,7 +33,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "knowledge",
         name: "fake",
-        capabilities: ["knowledge.docs", "knowledge.issueLinks"],
+        capabilities: ["knowledge.docs", "knowledge.issueLinks", "knowledge.notes"],
         options,
         secrets: none,
         create: (ctx) => createFakeKnowledge({ now: ctx.now }),

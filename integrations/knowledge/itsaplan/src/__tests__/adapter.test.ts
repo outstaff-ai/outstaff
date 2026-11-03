@@ -74,6 +74,14 @@ describe("tracker", () => {
   });
 });
 
+/** Who made a page pushed into the stand-in by hand. */
+const authored = {
+  isPrivate: false,
+  ownerUserId: "u-rio",
+  createdByUserId: "u-rio",
+  updatedByUserId: "u-rio",
+};
+
 describe("knowledge", () => {
   it("resolves pages made in the web app by their titles, and keeps replies tied to their document", async () => {
     const fake = createItsaplanFake();
@@ -87,6 +95,7 @@ describe("knowledge", () => {
         version: 1,
         content: "",
         contentJson: null,
+        ...authored,
         createdAt: "",
         updatedAt: "",
       },
@@ -98,6 +107,7 @@ describe("knowledge", () => {
         version: 3,
         content: "Welcome aboard, friend",
         contentJson: null,
+        ...authored,
         createdAt: "",
         updatedAt: "",
       },

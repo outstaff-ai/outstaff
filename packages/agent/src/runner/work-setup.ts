@@ -6,6 +6,7 @@ import type { AgentEnv } from "#/verbs/types.js";
 import { itemEnv, itemFiles } from "./item-env.js";
 import type { WorkerContext, WorkLoopOptions } from "./loop.types.js";
 import { buildWorkPrompt } from "./prompt.js";
+import type { RoundNotes } from "#/notes/types.js";
 import type { Attachment } from "./types.js";
 import type { ItemRun } from "./work.types.js";
 
@@ -59,6 +60,7 @@ function buildRequest(
 
 interface PromptParts {
   storedSession: string | undefined;
+  notes: RoundNotes | undefined;
   workspace: Workspace | undefined;
   heads: RepoHead[] | undefined;
   attachments: Attachment[];
@@ -90,6 +92,7 @@ function buildPrompt(
     ...(context ? { chatContext: context } : {}),
     attachments: parts.attachments,
     ticketFiles: parts.ticketFiles,
+    ...(parts.notes ? { notes: parts.notes } : {}),
   });
 }
 
@@ -105,6 +108,10 @@ async function chatContextFor(
 
   return opts.chat?.context(offer);
 }
+
+/** The agent's notes, read once per run: a session restarted from the journal keeps those the run started with. */
+const notesFor = (opts: WorkLoopOptions, id: string) =>
+  opts.notes ? opts.notes(id) : Promise.resolve(undefined);
 
 /** Everything an accepted item runs with: its session, policy, worktree, files and verbs' environment. */
 export async function setUpItem(
@@ -123,9 +130,10 @@ export async function setUpItem(
   const heads = session ? await opts.workspaces?.refresh() : undefined;
   const chatContext = await chatContextFor(opts, offer, storedSession);
   const files = await itemFiles(opts, offer, log);
+  const notes = await notesFor(opts, id);
   const item = itemEnv(opts, offer, files, log);
   const requestParts = { id, policy, session, workspace, env: item.env, abort };
-  const promptParts = { storedSession, workspace, heads, ...files };
+  const promptParts = { storedSession, notes, workspace, heads, ...files };
 
   return {
     offer,

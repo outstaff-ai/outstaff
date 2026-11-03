@@ -61,6 +61,10 @@ export function docsState(s: ItsaplanStore) {
     id: String(d.id),
     title: d.title,
     path: d.metadata["path"],
+    parentId: d.parentId === null ? null : String(d.parentId),
+    isPrivate: d.isPrivate,
+    owner: usernameOf(s, d.ownerUserId),
+    author: usernameOf(s, d.updatedByUserId),
     body: d.content,
     version: d.version,
     comments: s.docComments

@@ -3,7 +3,9 @@ import type { KnowledgeSeed, TrackerSeed } from "@outstaff/core/contracts";
 import { createStubFetch } from "./http-stub.js";
 import { createItsaplanStandIn, err } from "./stand-in/index.js";
 import { createIssue } from "./stand-in/model.js";
-import type { ItsaplanStore, StoredDoc } from "./stand-in/index.js";
+import { addDoc, changeDoc } from "./stand-in/doc-model.js";
+import { NOTES_ROOT } from "./stand-in/notes.js";
+import type { ItsaplanStore } from "./stand-in/index.js";
 import type { FakeOptions, Markdown, Route } from "./types.js";
 
 // The Its a Plan stand-in in process: served through the stub fetch, with the seeds of the contract kits and an
@@ -52,25 +54,57 @@ const trackerSeed = (s: ItsaplanStore): TrackerSeed => ({
   forbiddenCall: () => Promise.reject(new Error("bound by the test")),
 });
 
+/** The page of `owner`'s notes under the reserved root, as the knowledge adapter lays them out. */
+const notesPage = (s: ItsaplanStore, owner: string) => {
+  const root = s.docs.find((d) => d.title === NOTES_ROOT && d.parentId === null);
+  return root && s.docs.find((d) => d.parentId === root.id && d.title === owner);
+};
+
+/** Writes `owner`'s notes as a new member named `by.name`, creating the page (and the root) when missing. */
+function editNotes(
+  s: ItsaplanStore,
+  markdown: Markdown | undefined,
+  owner: string,
+  notes: string[],
+  by: { name: string; kind: Member["kind"] },
+): Member {
+  const userId = `u-${s.members.length + 1}`;
+  const kind = by.kind === "agent" ? "agent" : "member";
+  s.members.push({ userId, name: by.name, username: by.name.toLowerCase(), kind });
+  const content = notes.map((n) => `- ${n}\n`).join("");
+  const contentJson = markdown?.toDoc(content) ?? null;
+  const page = notesPage(s, owner);
+  if (page) {
+    changeDoc(s, page, { content, contentJson }, userId);
+  } else {
+    const root =
+      s.docs.find((d) => d.title === NOTES_ROOT && d.parentId === null) ??
+      addDoc(s, { title: NOTES_ROOT }, userId);
+
+    addDoc(s, { title: owner, parentId: root.id, content, contentJson }, userId);
+  }
+
+  return { id: userId, name: by.name, username: by.name.toLowerCase(), kind: by.kind };
+}
+
 const knowledgeSeed = (s: ItsaplanStore, markdown: Markdown | undefined): KnowledgeSeed => ({
+  notesEdit: async (owner, notes, by) => editNotes(s, markdown, owner, notes, by),
   async issue() {
     return createIssue(s, s.members[0]!.userId, { title: "Linked", columnId: s.columns[0]!.id })
       .identifier;
   },
   async doc(d) {
-    const row: StoredDoc = {
-      id: ++s.counters.doc,
-      parentId: null,
-      title: d.title,
-      metadata: { path: d.path },
-      version: 1,
-      content: d.body,
-      contentJson: markdown?.toDoc(d.body) ?? null,
-      createdAt: s.now(),
-      updatedAt: s.now(),
-    };
+    const row = addDoc(
+      s,
+      {
+        title: d.title,
+        metadata: { path: d.path },
+        content: d.body,
+        contentJson: markdown?.toDoc(d.body) ?? null,
+      },
+      s.members[0]!.userId,
+    );
 
-    s.docs.push(row);
     return {
       id: String(row.id),
       path: d.path,

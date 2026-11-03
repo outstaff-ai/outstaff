@@ -12,6 +12,7 @@ import {
   touch,
 } from "./model.js";
 import { addLink } from "./links.js";
+import { changeDoc } from "./doc-model.js";
 import { createItsaplanStandIn } from "./stand-in.js";
 import type { ItsaplanStore } from "./types.js";
 
@@ -116,6 +117,16 @@ function controls(s: ItsaplanStore, human: string) {
       }
 
       commentIssue(s, issue, actor === undefined ? human : member(s, actor).userId, body);
+    },
+
+    /** A person (by username) changes a document's text, as a new version. */
+    editDoc(id: string, content: string, actor: string) {
+      const d = docById(s, id);
+      if (!d) {
+        throw new Error(`No document ${id}.`);
+      }
+
+      changeDoc(s, d, { content, contentJson: null }, member(s, actor).userId);
     },
 
     /** A person comments on a document (a reply when `parentId` is given). */
