@@ -98,9 +98,6 @@ const worktreesOf = (clone: string) =>
     .map((p) => p.split("/").at(-1))
     .toSorted();
 
-/** Lets a sweep that has begun finish and schedule the next one. */
-const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
-
 const ITEMS = ["ACME-12", "ACME-15", "ACME-18", "ACME-20", "ACME-22"];
 const STATES: Record<string, WorkState["state"]> = {
   "ACME-12": "done",
@@ -226,10 +223,12 @@ describe("sweeper", () => {
 
   it("sweeps at start and then once a day, until stopped", async () => {
     const t = await restarted();
+    // A sweep is over once it has scheduled the next one.
+    const swept = t.clock.scheduled(DAY);
     t.sweeper.start();
     t.sweeper.start();
-    await vi.waitFor(() => expect(worktreesOf(t.clone)).toEqual(["ACME-20", "ACME-22"]));
-    await settled();
+    await swept;
+    expect(worktreesOf(t.clone)).toEqual(["ACME-20", "ACME-22"]);
     expect(t.asked).toHaveLength(1);
 
     // ACME-20 is done while the agent is up; the next sweep is a day later.
@@ -237,9 +236,10 @@ describe("sweeper", () => {
     t.clock.advance(DAY - 1);
     expect(t.asked).toHaveLength(1);
 
+    const again = t.clock.scheduled(DAY);
     t.clock.advance(1);
-    await vi.waitFor(() => expect(worktreesOf(t.clone)).toEqual(["ACME-22"]));
-    await settled();
+    await again;
+    expect(worktreesOf(t.clone)).toEqual(["ACME-22"]);
     expect(t.asked).toHaveLength(2);
 
     t.sweeper.stop();
@@ -253,18 +253,19 @@ describe("sweeper", () => {
   it("logs a failed sweep and tries again at the next one", async () => {
     const t = await restarted();
     t.office.workStatus.mockRejectedValueOnce(new Error("Not connected to the office."));
+    const failed = t.clock.scheduled(DAY);
     t.sweeper.start();
-    await vi.waitFor(() =>
-      expect(t.log.warn).toHaveBeenCalledWith("could not sweep the workspaces", {
-        error: "Not connected to the office.",
-      }),
-    );
+    await failed;
+    expect(t.log.warn).toHaveBeenCalledWith("could not sweep the workspaces", {
+      error: "Not connected to the office.",
+    });
 
     expect(worktreesOf(t.clone)).toEqual(ITEMS);
 
-    await settled();
+    const swept = t.clock.scheduled(DAY);
     t.clock.advance(DAY);
-    await vi.waitFor(() => expect(worktreesOf(t.clone)).toEqual(["ACME-20", "ACME-22"]));
+    await swept;
+    expect(worktreesOf(t.clone)).toEqual(["ACME-20", "ACME-22"]);
     t.sweeper.stop();
   });
 
@@ -281,11 +282,15 @@ describe("sweeper", () => {
       everyMs: 1000,
     });
 
+    const swept = clock.scheduled(1000);
     sweeper.start();
-    await vi.waitFor(() => expect(fake.asked).toHaveLength(1));
-    await settled();
+    await swept;
+    expect(fake.asked).toHaveLength(1);
+
+    const again = clock.scheduled(1000);
     clock.advance(1000);
-    await vi.waitFor(() => expect(fake.asked).toHaveLength(2));
+    await again;
+    expect(fake.asked).toHaveLength(2);
     sweeper.stop();
   });
 });

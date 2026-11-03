@@ -237,12 +237,16 @@ people:`,
     // The office is connected: answer the journal note of a done item at once instead of waiting for the office.
     options.connection.journal = async () => {};
     const agent = await prepareAgent({ ...options, clock, sweepEveryMs: 1000 });
+    // A sweep is over once it has scheduled the next one.
+    const swept = clock.scheduled(1000);
     agent.sweeper.start();
-    await vi.waitFor(() => expect(asked).toHaveLength(1));
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await swept;
+    expect(asked).toEqual([["ACME-12"]]);
     mkdirSync(join(home, "scratch", "ACME-13"), { recursive: true });
+    const again = clock.scheduled(1000);
     clock.advance(1000);
-    await vi.waitFor(() => expect(asked).toEqual([["ACME-12"], ["ACME-13"]]));
+    await again;
+    expect(asked).toEqual([["ACME-12"], ["ACME-13"]]);
     agent.sweeper.stop();
   });
 

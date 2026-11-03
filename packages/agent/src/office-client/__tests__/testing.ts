@@ -11,11 +11,18 @@ import type {
 export function createManualClock(): ManualClientClock {
   let now = Date.parse("2030-01-01T00:00:00.000Z");
   let timers: { at: number; fn: () => void }[] = [];
+  let waiters: { ms: number; resolve: () => void }[] = [];
   return {
     now: () => new Date(now),
     setTimeout(fn, ms) {
       const t = { at: now + ms, fn };
       timers.push(t);
+      const woken = waiters.filter((w) => w.ms === ms);
+      waiters = waiters.filter((w) => !woken.includes(w));
+      for (const w of woken) {
+        w.resolve();
+      }
+
       return () => {
         timers = timers.filter((x) => x !== t);
       };
@@ -34,6 +41,9 @@ export function createManualClock(): ManualClientClock {
       }
 
       now = target;
+    },
+    scheduled(ms) {
+      return new Promise((resolve) => waiters.push({ ms, resolve }));
     },
   };
 }

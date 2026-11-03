@@ -142,6 +142,9 @@ export interface OfficeConnection extends OfficeClient {
 
 export interface ManualClientClock extends ClientClock {
   advance(ms: number): void;
+
+  /** Resolves at the next `setTimeout` call of `ms`, not at one made before. */
+  scheduled(ms: number): Promise<void>;
 }
 
 /** Sends one request and resolves to the office's answer. */
