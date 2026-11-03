@@ -59,6 +59,8 @@ describe("Claude credential files in the bubblewrap sandbox", () => {
     expect(calls[0]!.options.settings).toEqual({
       disableClaudeAiConnectors: true,
       disableBundledSkills: true,
+      autoMemoryEnabled: false,
+      autoDreamEnabled: false,
       enableArtifact: false,
       sandbox: {
         credentials: {
@@ -91,6 +93,8 @@ describe("Claude credential files in the bubblewrap sandbox", () => {
     expect(calls[1]!.options.settings).toEqual({
       disableClaudeAiConnectors: true,
       disableBundledSkills: true,
+      autoMemoryEnabled: false,
+      autoDreamEnabled: false,
       enableArtifact: false,
     });
   });

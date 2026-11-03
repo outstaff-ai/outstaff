@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createFakeAdapterRegistry } from "@outstaff/core/fakes";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createOfficeConnection } from "#/office-client/index.js";
 import {
   FakeSocket,
@@ -32,12 +32,13 @@ integrations:
 `;
 
 const tick = () => new Promise((resolve) => setImmediate(resolve));
-async function until(cond: () => boolean) {
-  for (let i = 0; i < 500 && !cond(); i++) {
-    await tick();
-  }
 
-  expect(cond()).toBe(true);
+/**
+ * Waits for what preparing the agent does with real files (rendering, the notes migration, the workspaces). No clock
+ * of the test times that, so the bound is real time, not a count of event-loop turns, which under load is too short.
+ */
+async function until(cond: () => boolean) {
+  await vi.waitFor(() => expect(cond()).toBe(true), { timeout: 5000, interval: 1 });
 }
 
 /** Sam's container: only the office URL, the person and the token; no team file. */

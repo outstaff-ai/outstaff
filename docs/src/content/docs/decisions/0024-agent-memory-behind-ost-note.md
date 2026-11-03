@@ -14,9 +14,10 @@ An agent's memory, its lasting lessons and the team's preferences ([0010](/decis
 ## Decision
 
 - **One interface.** Agents read and change their notes only through `ost note` (`list`, `add`, `update`, `remove`), never by editing files. The policy no longer lets the runtime's tools write `memory/`. Every round, work item or chat session, starts with the notes in its prompt.
+- **No second memory.** A runtime's own memory is off: the Claude runtime sets Claude Code's `autoMemoryEnabled` (and `autoDreamEnabled`) to false in every session, and the policy denies writes under `~/.claude/**/memory/`. That memory is not shown to humans, not subject to the trust check, and not covered by `store: knowledge`.
 - **Two stores, chosen by `memory.store`.** `volume`, the default because it is how memory worked before, keeps the notes in `memory/notes.md`. `knowledge` keeps them through the knowledge port's `knowledge.notes` capability, apart from its documents; `ost validate` fails when the team's knowledge integration lacks it, and there is no fallback and no store in the office's database.
 - **Trust.** A page in the knowledge base can be edited by others, and the notes are guidance in every run. A version is used only when the agent itself or a trusted human wrote it; otherwise the newest earlier version that one of them wrote, and the agent is told. The knowledge port never judges trust: the caller passes its rule.
-- **Migration.** On a start where the store has no notes yet, the notes in the files of `memory/` are written to it; the files stay.
+- **Migration.** On a start where the store has no notes yet, the notes in the files of `memory/` are written to it. Once per agent, whether the store has notes or not, each file Claude Code's auto-memory kept (`~/.claude/projects/*/memory/*.md`, except its index `MEMORY.md`) becomes one note, added after the others. The files stay.
 - **The office is told** of every change and of every ignored version (`notes_changed`), logs them, and records a notes page as the agent's document so comments on it reach the agent.
 
 ## Consequences

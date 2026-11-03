@@ -68,6 +68,9 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
       env["CLAUDE_CODE_DISABLE_ARTIFACT"] = "1";
     }
 
+    // Claude Code's own auto-memory is off (see `autoMemoryEnabled` below); an inherited value never turns it back on.
+    env["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1";
+
     return env;
   }
 
@@ -96,6 +99,10 @@ export function createAgentSdkRuntime(config: AgentSdkRuntimeConfig): Runtime {
         disableClaudeAiConnectors: true,
         disableBundledSkills: true,
         enableArtifact: canvas,
+        // Notes are the agent's only memory, kept with `ost note`. Claude Code neither reads nor writes its own
+        // auto-memory folder (~/.claude/projects/<project>/memory/), nor consolidates it in the background.
+        autoMemoryEnabled: false,
+        autoDreamEnabled: false,
         ...(files.length > 0
           ? {
               sandbox: {

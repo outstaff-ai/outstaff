@@ -91,3 +91,27 @@ export async function removeNote(store: NotesStore, id: string): Promise<NoteCha
 
   return { change: "removed", note: toNote(removed), ...done };
 }
+
+/**
+ * Adds the notes that are not there yet, after the others, as one change; those past MAX_NOTES are left out. Returns
+ * how many were added.
+ */
+export async function addNotes(
+  store: NotesStore,
+  texts: readonly string[],
+): Promise<{ page: NotesPage; added: number }> {
+  let added = 0;
+  const { page } = await apply(store, (notes) => {
+    const next = [...notes];
+    for (const note of texts.map(normalizeNote)) {
+      if (note && !next.includes(note) && next.length < MAX_NOTES) {
+        next.push(note);
+      }
+    }
+
+    added = next.length - notes.length;
+    return added > 0 ? next : undefined;
+  });
+
+  return { page, added };
+}

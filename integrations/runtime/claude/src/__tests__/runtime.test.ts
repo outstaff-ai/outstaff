@@ -259,6 +259,24 @@ describe("options passed to the SDK", () => {
     expect(o.allowedTools).toBeUndefined();
   });
 
+  it("turns Claude Code's own auto-memory off, whatever the environment says", async () => {
+    const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+    const runtime = createAgentSdkRuntime({
+      options,
+      query,
+      env: { PATH: "/bin", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "0" },
+    });
+
+    await collect(runtime.run(req()));
+    await runtime.probeUsage!().catch(() => undefined);
+    for (const { options: o } of calls) {
+      expect(o.settings).toMatchObject({ autoMemoryEnabled: false, autoDreamEnabled: false });
+      expect(o.env).toMatchObject({ CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" });
+    }
+
+    expect(calls).toHaveLength(2);
+  });
+
   it("never passes the switch that loads CLAUDE.md from added directories", async () => {
     const { query, calls } = fakeQuery(() => [init("s1"), result()]);
     await collect(
@@ -489,6 +507,7 @@ describe("child process environment", () => {
       HOME: "/home/agent",
       ENABLE_CLAUDEAI_MCP_SERVERS: "false",
       CLAUDE_CODE_DISABLE_ARTIFACT: "1",
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
     });
   });
 
@@ -501,6 +520,7 @@ describe("child process environment", () => {
       ANTHROPIC_API_KEY: "key",
       ENABLE_CLAUDEAI_MCP_SERVERS: "false",
       CLAUDE_CODE_DISABLE_ARTIFACT: "1",
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
     });
   });
 
@@ -515,6 +535,7 @@ describe("child process environment", () => {
       ENABLE_CLAUDEAI_MCP_SERVERS: "false",
       CLAUDE_CODE_DISABLE_ARTIFACT: "1",
       CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1",
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1",
     });
   });
 
