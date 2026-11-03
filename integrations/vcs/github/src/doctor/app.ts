@@ -6,6 +6,7 @@ import { bad, ok } from "./findings.js";
 import { permissionChecks } from "./permissions.js";
 import { repositoryChecks } from "./repositories.js";
 import type { AppExpectation, Installation } from "./types.js";
+import { workflowRepos, workflowsCheck } from "./workflows.js";
 
 /** Signs the App's JWT from its stored id and key; findings instead when the key is unusable, none when either is unset. */
 function signJwt(
@@ -142,11 +143,16 @@ async function installationChecks(
     ];
   }
 
-  const { checks, writes } = permissionChecks(want, inst.data.permissions ?? {});
+  const granted = inst.data.permissions ?? {};
+  const repos = await workflowRepos(ctx, jwt, installationId, want);
+  const withWorkflows = { ...want, workflowRepos: repos };
+
+  const { checks, writes } = permissionChecks(withWorkflows, granted);
   const selection = inst.data.repository_selection;
   return [
     ok(`${label}: installation`, `${prefix}INSTALLATION_ID is an installation of the App.`),
     ...checks,
+    ...workflowsCheck(want, slug, granted, repos),
     ...(await repositoryChecks(ctx, jwt, installationId, want, selection, writes)),
   ];
 }

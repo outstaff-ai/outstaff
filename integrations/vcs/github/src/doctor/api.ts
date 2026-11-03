@@ -28,12 +28,12 @@ export async function call<T>(
   return res.ok ? { ok: true, data: (await res.json()) as T } : { ok: false, status: res.status };
 }
 
-/** Lower-case `owner/name` of every repository the installation covers, or the failing HTTP status. */
-export async function installedRepos(
+/** An installation token for the installation, or the failing HTTP status. */
+export async function mintToken(
   ctx: DeriveContext,
   jwt: string,
   installationId: string,
-): Promise<string[] | number> {
+): Promise<string | number> {
   const minted = await call<{ token: string }>(
     ctx,
     "POST",
@@ -41,8 +41,18 @@ export async function installedRepos(
     jwt,
   );
 
-  if (!minted.ok) {
-    return minted.status;
+  return minted.ok ? minted.data.token : minted.status;
+}
+
+/** Lower-case `owner/name` of every repository the installation covers, or the failing HTTP status. */
+export async function installedRepos(
+  ctx: DeriveContext,
+  jwt: string,
+  installationId: string,
+): Promise<string[] | number> {
+  const token = await mintToken(ctx, jwt, installationId);
+  if (typeof token === "number") {
+    return token;
   }
 
   const names: string[] = [];
@@ -51,7 +61,7 @@ export async function installedRepos(
       ctx,
       "GET",
       `/installation/repositories?per_page=100&page=${page}`,
-      minted.data.token,
+      token,
     );
 
     if (!r.ok) {

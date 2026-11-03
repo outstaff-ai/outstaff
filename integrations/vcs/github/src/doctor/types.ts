@@ -30,6 +30,12 @@ export interface AppExpectation {
   /** The person's role changes CI workflow files, so the App needs the Workflows permission. */
   wantWorkflows?: boolean;
 
+  /**
+   * Repositories of `repos` that have a `.github/workflows/` directory. GitHub refuses a push from the App that changes
+   * a file there without the Workflows permission, so the App needs it there too, even when the role does not.
+   */
+  workflowRepos?: string[];
+
   /** The bot login the team file names for this App. */
   login?: string;
 }
