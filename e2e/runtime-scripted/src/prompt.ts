@@ -43,6 +43,9 @@ export interface ItemContext {
 
   /** For checks that failed after a merge: each check's link and the end of its failed step's log. */
   failedChecks?: { name: string; url?: string; lines: string[] }[];
+
+  /** The agent's notes the round started with, and the line about a version of them that is not used. */
+  notes?: { list: string[]; ignored?: string };
 }
 
 /** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
@@ -264,6 +267,19 @@ function parseFailedChecks(prompt: string): Pick<ItemContext, "failedChecks"> {
   return checks.length ? { failedChecks: checks } : {};
 }
 
+// "Your notes, kept <where> across work items. ..." then `- [<id>] <text>` per note, and a line "<who> changed your
+// notes ..." for a version that is not used.
+function parseNotes(prompt: string): Pick<ItemContext, "notes"> {
+  const block = /^Your notes, kept [^\n]*\n((?:- \[[0-9a-f]{8}\] [^\n]*\n?)*)/m.exec(prompt);
+  if (!block) {
+    return {};
+  }
+
+  const list = [...(block[1] ?? "").matchAll(/^- \[[0-9a-f]{8}\] (.*)$/gm)].map((m) => m[1]!);
+  const ignored = /^.* changed your notes\b.*$/m.exec(prompt)?.[0];
+  return { notes: { list, ...(ignored ? { ignored } : {}) } };
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {
@@ -293,5 +309,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseUnblocked(prompt),
     ...parseMerge(prompt),
     ...parseFailedChecks(prompt),
+    ...parseNotes(prompt),
   };
 }

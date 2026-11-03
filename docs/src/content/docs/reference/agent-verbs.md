@@ -382,6 +382,91 @@ Examples:
 ost doc resolve specs/checkout.md c-3
 ```
 
+## note.list
+
+List your notes.
+
+Lists your notes, the lasting lessons and preferences you keep across work items, with their ids. Each round starts with them already.
+
+```
+ost note list
+```
+
+Runtime tool: `note_list`
+
+Examples:
+
+```sh
+ost note list
+```
+
+## note.add
+
+Add a note.
+
+Adds a lasting lesson or preference to your notes (see references/memory.md). A note you already have is not added twice.
+
+```
+ost note add <text>
+```
+
+Runtime tool: `note_add`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `text` | string | yes | The note: one lasting lesson or preference, in one or two sentences with the reason. |
+
+Examples:
+
+```sh
+ost note add "Run pnpm test before pushing: CI does not run the slow suite."
+```
+
+## note.update
+
+Change a note.
+
+Replaces the text of one of your notes, by its id. The id changes with the text.
+
+```
+ost note update <id> <text>
+```
+
+Runtime tool: `note_update`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | string | yes | Id of the note, as `ost note list` shows it. |
+| `text` | string | yes | The note: one lasting lesson or preference, in one or two sentences with the reason. |
+
+Examples:
+
+```sh
+ost note update 3f9a2c1b "Run pnpm test and pnpm lint before pushing."
+```
+
+## note.remove
+
+Remove a note.
+
+Removes one of your notes, by its id, when it turns out wrong or outdated.
+
+```
+ost note remove <id>
+```
+
+Runtime tool: `note_remove`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | string | yes | Id of the note, as `ost note list` shows it. |
+
+Examples:
+
+```sh
+ost note remove 3f9a2c1b
+```
+
 ## pr.list
 
 List the team's pull requests: open ones and recently merged or closed ones.

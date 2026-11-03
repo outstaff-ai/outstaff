@@ -176,6 +176,12 @@ integrations:
     adapter: dicebear
     style: notionists
 
+# Where agents keep their memory: the lasting lessons and preferences they note.
+memory:
+  # Each agent's notes on a page of its own in the knowledge integration. The default, volume, keeps them in memory/ on
+  # each agent's home volume, which you then back up.
+  store: knowledge
+
 # How the tracker's statuses and labels map onto outstaff's.
 workflow:
   statuses:
@@ -1946,3 +1952,19 @@ Name of an installed npm package, for example @acme/outstaff-policy-oncall.
 - Type: `string`
 - Required
 - Minimum length 1
+
+## memory
+
+Where agents keep their memory: the lasting lessons and preferences they note.
+
+- Type: `object`
+- Optional
+
+### memory.store
+
+Where agents keep their notes (`ost note`): `volume`, files in `memory/` on each agent's home volume, which must then be backed up; or `knowledge`, a page per agent in the knowledge integration, which must provide knowledge.notes.
+
+- Type: `string`
+- Optional
+- Default: `volume`
+- Allowed values: `volume`, `knowledge`

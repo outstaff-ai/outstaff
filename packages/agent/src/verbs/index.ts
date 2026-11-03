@@ -3,6 +3,7 @@ import { ciLog } from "./ci-log.js";
 import { docVerbs } from "./doc.js";
 import { http } from "./http.js";
 import { me } from "./me.js";
+import { noteVerbs } from "./note.js";
 import { officeVerbs } from "./office-verbs.js";
 import { prVerbs } from "./pr.js";
 import { ticketVerbs } from "./ticket.js";
@@ -33,6 +34,7 @@ export type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 export const VERBS: readonly Verb[] = [
   ...ticketVerbs,
   ...docVerbs,
+  ...noteVerbs,
   ...prVerbs,
   ciLog,
   me,

@@ -17,12 +17,18 @@ interface Message {
   thread?: string;
   authorId: string;
   authorName: string;
+
+  /** False for a member of the workspace who is not a trusted human; the agent ignores what they write. */
+  trusted: boolean;
   text: string;
   at: string;
   files?: { id: string; name: string; mimetype: string; size: number; url: string }[];
 }
 
 export const HUMAN = { id: "U0ADA00001", name: "Ada Admin" };
+
+/** A member of the workspace who is not a trusted human. */
+const GUEST = { id: "U0GUEST001", name: "Guest" };
 
 /** The direct message of the human with an agent. */
 export const directWith = (agent: string) => `D-${agent}-${HUMAN.id}`;
@@ -123,7 +129,7 @@ export function createChat() {
             id: m.id,
             channel: m.channel,
             ...(m.thread ? { thread: m.thread } : {}),
-            author: { id: m.authorId, name: m.authorName, trusted: true, bot: false },
+            author: { id: m.authorId, name: m.authorName, trusted: m.trusted, bot: false },
             text: m.text,
             at: m.at,
             ...(m.files ? { files: m.files } : {}),
@@ -155,8 +161,9 @@ export function createChat() {
           to,
           channel: directWith(to),
           ...(r.json.thread ? { thread: r.json.thread } : {}),
-          authorId: HUMAN.id,
-          authorName: HUMAN.name,
+          ...(r.json.trusted === false
+            ? { authorId: GUEST.id, authorName: GUEST.name, trusted: false }
+            : { authorId: HUMAN.id, authorName: HUMAN.name, trusted: true }),
           text: r.json.text,
           at: new Date().toISOString(),
         };

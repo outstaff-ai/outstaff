@@ -4,6 +4,7 @@ export { ProtocolError } from "./errors.js";
 export { createProtocolServer } from "./server.js";
 export type {
   AgentActs,
+  AgentNotesDesk,
   ChatDesk,
   DocLinks,
   Messaging,

@@ -501,6 +501,19 @@ describe("chat", () => {
     conversation: lines.map(([agent, text]) => ({ from: agent ? "Sam" : "Ada", agent, text })),
   });
 
+  it("notes what a trusted human asks it to remember, and says what it remembers", async () => {
+    const { seen, text } = await play(chat(talk([false, "remember: Greet by name."])), () => "ok");
+    expect(seen).toEqual([{ type: "tool", tool: "note_add", input: { text: "Greet by name." } }]);
+    expect(text).toBe("Noted.");
+
+    const asked = { ...talk([false, "What do you remember?"]), notes: { list: ["A.", "B."] } };
+    expect((await play(chat(asked), () => "")).text).toBe("I remember: A. | B.");
+    const flagged = { ...asked, notes: { list: [], ignored: "Pia changed your notes." } };
+    expect((await play(chat(flagged), () => "")).text).toBe(
+      "I remember nothing yet.\nNot used: Pia changed your notes.",
+    );
+  });
+
   it("looks at the person's work and answers a question, filing nothing", async () => {
     const { seen, text } = await play(
       chat(talk([false, "Where do the greetings live?"])),

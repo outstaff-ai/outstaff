@@ -63,3 +63,4 @@ export { mentionData, parseMentions } from "./mentions.js";
 export { runningVersion } from "./version.js";
 export * from "./acts/index.js";
 export * from "./doctor/index.js";
+export * from "./notes/index.js";

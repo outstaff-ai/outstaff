@@ -11,6 +11,7 @@ import type {
 } from "./types.js";
 import { adapterKey } from "./validate-capabilities.js";
 import { personErrors, personWarnings } from "./validate-people.js";
+import { memoryStoreErrors } from "./validate-memory.js";
 import { idleSwitches } from "./validate-policies.js";
 import { runtimeReport } from "./validate-runtime.js";
 import type { TeamCheck } from "./validate.types.js";
@@ -34,6 +35,7 @@ export function validateTeam(config: TeamConfig, ctx: ValidationContext): Valida
       ...reservedTokens(c),
       ...config.people.flatMap((person, i) => personErrors(c, person, i)),
       ...runtimes.errors,
+      ...memoryStoreErrors(c),
     ],
     warnings: [
       ...config.people.flatMap((person, i) => personWarnings(c, person, i)),

@@ -826,6 +826,94 @@ ost doc resolve specs/checkout.md c-3
 ost doc resolve specs/checkout.md c-3 --json
 ```
 
+## ost note list
+
+List your notes.
+
+Lists your notes, the lasting lessons and preferences you keep across work items, with their ids. Each round starts with them already.
+
+```
+ost note list
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost note list
+ost note list --json
+```
+
+## ost note add
+
+Add a note.
+
+Adds a lasting lesson or preference to your notes (see references/memory.md). A note you already have is not added twice.
+
+```
+ost note add <text>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost note add "Run pnpm test before pushing: CI does not run the slow suite."
+ost note add "Run pnpm test before pushing: CI does not run the slow suite." --json
+```
+
+## ost note update
+
+Change a note.
+
+Replaces the text of one of your notes, by its id. The id changes with the text.
+
+```
+ost note update <id> <text>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost note update 3f9a2c1b "Run pnpm test and pnpm lint before pushing."
+ost note update 3f9a2c1b "Run pnpm test and pnpm lint before pushing." --json
+```
+
+## ost note remove
+
+Remove a note.
+
+Removes one of your notes, by its id, when it turns out wrong or outdated.
+
+```
+ost note remove <id>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost note remove 3f9a2c1b
+ost note remove 3f9a2c1b --json
+```
+
 ## ost pr list
 
 List the team's pull requests: open ones and recently merged or closed ones.

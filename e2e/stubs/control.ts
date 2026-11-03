@@ -139,6 +139,15 @@ function trackerControls({ tracker }: World): Route[] {
         id: tracker.commentDoc(r.params["id"]!, r.json.body, r.json.quote ?? "", r.json.parentId),
       }),
     },
+    {
+      // A member (`as`, a username) changes a document's text, as a new version.
+      method: "POST",
+      path: "/_test/docs/:id/edit",
+      handler: (r) => {
+        tracker.editDoc(r.params["id"]!, r.json.content, r.json.as);
+        return ok();
+      },
+    },
   ];
 }
 

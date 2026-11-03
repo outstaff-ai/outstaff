@@ -59,6 +59,51 @@ export interface IssueDoc {
 /** What linking a document on a ticket did: linked it now, or found it linked already. */
 export type DocIssueLinkOutcome = "linked" | "already_linked";
 
+/** Whose notes are read or written: the calling agent, and whose versions of them count. */
+export interface NotesOwner {
+  /** The agent's name; the knowledge base may show the notes under it. */
+  name: string;
+
+  /** Whether a version written by `author` may be used: the agent itself or a trusted human. */
+  trusted(author: Member): boolean;
+}
+
+/** A version of the notes that was not used, because `NotesOwner.trusted` refused its author. */
+export interface IgnoredNotesEdit {
+  author: Member;
+  at: string;
+  version: string;
+}
+
+/** The calling agent's notes as the knowledge base keeps them. */
+export interface NotesPage {
+  /** The notes of the newest version a trusted author wrote, in order; empty when there is none. */
+  notes: string[];
+
+  /** The current version, which a write must name; absent while the agent has no notes yet. */
+  version?: string;
+
+  /** The document that shows the notes, when there is one: comments on it reach the agent as document comments. */
+  doc?: { id: string; title: string; url: string };
+
+  /** A newer version than the one used, by an author who is not trusted; the newest such one. */
+  ignored?: IgnoredNotesEdit;
+}
+
+/**
+ * Capability `knowledge.notes`: an agent's notes, kept apart from the documents. The knowledge base stores and shows
+ * them as it likes; it never decides whom to trust, the caller's `NotesOwner` does.
+ */
+export interface KnowledgeNotes {
+  read(owner: NotesOwner): Promise<NotesPage>;
+
+  /**
+   * Replaces the notes. `version` is the one read: absent creates the notes, and a stale one, or notes created
+   * meanwhile, is a `conflict`.
+   */
+  write(owner: NotesOwner, notes: string[], version: string | undefined): Promise<NotesPage>;
+}
+
 export interface Knowledge {
   links: Pick<Links, "doc" | "comment">;
   search(query: string, limit?: number): Promise<Doc[]>;
@@ -88,4 +133,7 @@ export interface Knowledge {
 
   /** Capability `knowledge.issueLinks`. The documents linked on the ticket. */
   issueDocs?(ticketKey: string): Promise<IssueDoc[]>;
+
+  /** Capability `knowledge.notes`. The calling agent's notes. */
+  notes?: KnowledgeNotes;
 }

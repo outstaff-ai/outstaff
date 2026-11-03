@@ -214,6 +214,12 @@ export const MESSAGE_META = {
       "Tells the office that the caller wrote a document for the ticket of a work item (or the ticket it names), so comments people leave on the document reach the caller as work, and the document is linked on the ticket in the tracker.",
     replies: ["ack", "error"],
   },
+  notes_changed: {
+    from: "agent",
+    summary:
+      "Tells the office that the caller's notes changed (`ost note`), were moved to the knowledge base, or have a version by someone it does not trust. The office logs it and, for notes kept in the knowledge base, records the page as the caller's document, so comments on it reach the caller.",
+    replies: ["ack", "error"],
+  },
   doctor_report: {
     from: "agent",
     summary:

@@ -4,6 +4,7 @@ import type { WebSocket } from "ws";
 import type { Clock } from "#/types.js";
 import type {
   AgentActs,
+  AgentNotesDesk,
   ChatDesk,
   CiLogs,
   DocLinks,
@@ -37,6 +38,9 @@ export interface ProtocolServerOptions {
 
   /** Takes `doc_link`. Without it the request is refused as unsupported. */
   docs?: DocLinks;
+
+  /** Takes `notes_changed`. Without it the report is refused as unsupported. */
+  notes?: AgentNotesDesk;
 
   /** Answers `ci_log`. Without it the request is refused as unsupported. */
   ciLogs?: CiLogs;

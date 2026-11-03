@@ -4,7 +4,7 @@ import { createChatDesk } from "./chat/index.js";
 import { createIntake } from "./intake/index.js";
 import { createMessaging, type RoleInfo } from "./messaging/index.js";
 import { createChatEntry } from "./office-chat.js";
-import { officeDocLinks } from "./office-doc-links.js";
+import { officeDocDesks } from "./office-doc-links.js";
 import { doctorForOffice } from "./office-doctor.js";
 import { createHandedBack } from "./office-handback.js";
 import { trackerHumans } from "./office-humans.js";
@@ -244,7 +244,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     messaging,
     usage,
     chat: { ...chatDesk, message: chatEntry.message },
-    docs: officeDocLinks({ store, workState, log }),
+    ...officeDocDesks({ store, workState, log }),
     tickets: officeTicketPrs({ workState, team, log }),
     ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
     acts,

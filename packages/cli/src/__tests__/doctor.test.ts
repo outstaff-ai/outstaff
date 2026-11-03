@@ -396,10 +396,16 @@ describe("ost doctor with the shipped adapters", () => {
       );
     };
 
-    const tracker = (u: URL) =>
-      u.pathname.startsWith("/projects/")
+    // The project has no documents yet.
+    const tracker = (u: URL) => {
+      if (u.pathname.endsWith("/documents")) {
+        return json([]);
+      }
+
+      return u.pathname.startsWith("/projects/")
         ? json({ project: { key: "SHOP", ref: "acme.SHOP", teamRef: "acme" } })
         : json({ id: 5, username: "mira.okafor" });
+    };
 
     const appOf = (init?: RequestInit) => {
       const bearer = String((init!.headers as Record<string, string>)["authorization"]).slice(7);

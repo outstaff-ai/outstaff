@@ -45,6 +45,14 @@ export const serviceHandlers: RequestHandlers = {
     await docs.link(person, payload.workItemId, payload.doc, payload.ticket);
     reply("ack", {});
   },
+  async notes_changed({ ctx, person, payload, reply }) {
+    await required(ctx.opts.notes, "This office does not take notes reports.").changed(
+      person,
+      payload,
+    );
+
+    reply("ack", {});
+  },
   async act_result({ ctx, person, payload, reply }) {
     await required(ctx.opts.acts, "This office sends no acts.").result(person, payload);
     reply("ack", {});

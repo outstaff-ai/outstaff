@@ -11,6 +11,7 @@ import type {
   Chat,
   ChatMessage,
   Knowledge,
+  KnowledgeNotes,
   Member,
   NewAttachment,
   PullRequestToLink,
@@ -53,6 +54,14 @@ export interface FakeKnowledgeOptions {
   baseUrl?: string;
   author?: string;
   now?: () => Date;
+}
+
+/** The fake knowledge base's notes and the seed that edits them as someone else. */
+export interface FakeNotes {
+  notes: KnowledgeNotes;
+
+  /** Writes `owner`'s notes as `author`, creating them when there are none yet. */
+  edit(owner: string, notes: string[], author: Member): void;
 }
 
 export interface FakeKnowledge extends Knowledge {

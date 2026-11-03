@@ -123,6 +123,14 @@ export interface ApiDocSummary {
   title: string;
   metadata?: { path?: string } | null;
   version: number;
+
+  /** A private page is visible to its owner only. */
+  isPrivate?: boolean;
+  ownerUserId?: string | null;
+  createdByUserId?: string | null;
+
+  /** Who wrote the current version. */
+  updatedByUserId?: string | null;
   createdAt?: string;
   updatedAt: string;
 }
@@ -130,6 +138,23 @@ export interface ApiDocSummary {
 export interface ApiDoc extends ApiDocSummary {
   content?: string | null;
   contentJson?: PmNode | null;
+}
+
+/** One saved version of a page, as `GET /projects/{key}/documents/{id}/revisions` lists it. */
+export interface ApiDocRevision {
+  id: number;
+  documentId: number;
+  version: number;
+  title: string;
+
+  /** Who wrote this version. */
+  createdByUserId: string | null;
+  createdAt: string;
+}
+
+/** A revision with its text, as `GET /projects/{key}/documents/{id}/revisions/{revisionId}` answers. */
+export interface ApiDocRevisionContent extends ApiDocRevision {
+  content: string;
 }
 
 export interface ApiDocComment {

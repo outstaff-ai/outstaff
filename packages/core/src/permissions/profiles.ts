@@ -2,8 +2,8 @@ import type { Profile, ProfileSpec, ToolKind } from "./types.js";
 
 /**
  * The verbs a chat session may call: look at the team, the work, tickets, documents and pull requests, comment, file
- * work, place queued work where the requester says, and change a ticket (assign, move, re-parent, edit) on a trusted
- * human's request. Nothing that changes a pull request, a document or code.
+ * work, place queued work where the requester says, change a ticket (assign, move, re-parent, edit) on a trusted
+ * human's request, and keep the agent's own notes. Nothing that changes a pull request, a document or code.
  */
 export const CHAT_VERBS = [
   "me",
@@ -14,6 +14,10 @@ export const CHAT_VERBS = [
   "work.move",
   "doc.search",
   "doc.show",
+  "note.list",
+  "note.add",
+  "note.update",
+  "note.remove",
   "ticket.show",
   "ticket.list",
   "ticket.comment",
@@ -55,7 +59,7 @@ const WORK_TOOLS: ToolKind[] = [
  * chat:     a chat session beside a running work item. The same tools as a work session, but read-only git, no
  *           repository edits, and only the `ost` verbs in CHAT_VERBS.
  *
- * Every profile may write its scratch, memory, harness (`~/.claude`) and tmp folders.
+ * Every profile may write its scratch, harness (`~/.claude`) and tmp folders. Memory is changed with `ost note` only.
  */
 export const PROFILE_SPECS: Record<Profile, ProfileSpec> = {
   readonly: { tools: WORK_TOOLS, honoursWrite: false, writable: "none" },

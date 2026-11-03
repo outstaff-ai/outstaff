@@ -30,7 +30,7 @@ When the agent reconnects and the `welcome` brings a different team config (the 
 
 A team with an ejected catalog builds its own agent image with the catalog in it ([Customizing the catalog](/guides/customizing-the-catalog/#build-your-image)); the agent reads it from `/opt/outstaff/team/.outstaff`, at the `catalog.path` of the team config.
 
-The layout below `$HOME`: `work` (rendered files, the runtime's working directory), `repos`, `worktrees`, `scratch` and `memory`. The secrets directory is `OUTSTAFF_SECRETS_DIR`.
+The layout below `$HOME`: `work` (rendered files, the runtime's working directory), `repos`, `worktrees`, `scratch` and `memory` (the notes, with `memory.store: volume`). The secrets directory is `OUTSTAFF_SECRETS_DIR`.
 
 ## Identity
 
@@ -133,7 +133,20 @@ If the answer does not follow the format, or the extra turn fails, the entry is 
 
 ## Memory
 
-`~/memory` is per person, shared by all items, and holds lasting lessons only ([0010](/decisions/0010-context-per-work-item/)). The agent process never writes there: item details go to the journal, and memory changes only when the model itself writes a file with its tools. The directory is one of the runtime's added directories and the policy allows writes to it, to scratch and to granted repositories, and nowhere else in the layout.
+An agent's memory is its notes: lasting lessons and preferences, per person, shared by all its items ([0010](/decisions/0010-context-per-work-item/)). Item details go to the journal. The agent reads and changes its notes only with `ost note` (`list`, `add`, `update`, `remove`), never by writing files: the permission policy lets the runtime's tools write scratch, `/tmp`, Claude Code's session folders and the granted worktrees, and not `memory/`. `memory.store` in the team file chooses where the notes are kept, and the verbs and the catalog text are the same for both:
+
+- **`volume`** (the default): a Markdown list in `~/memory/notes.md` on the agent's home volume. The volume then holds something that cannot be rebuilt, so back it up.
+- **`knowledge`**: in the knowledge integration, which must provide the `knowledge.notes` capability (`ost validate` fails otherwise; there is no fallback to the volume). Its a Plan keeps one public page per agent, `Agent notes/<name>`, created by (so owned by) the agent's own key. Humans can read it, a trusted human can edit it, every change is a revision with its author, and a comment on it reaches the agent like a comment on any document it wrote (`process/doc-feedback.md`).
+
+**Who can have a note written.** Chat sessions may use `ost note` too, so a trusted human can say "remember ..." in chat. A chat session starts only for a trusted human's message: the chat adapter drops everyone else's, and the agent's relay drops them again. Text from anyone else that a round reads (an untrusted message in the thread, a ticket, a document) is data, and the catalog tells the agent never to note what it asks.
+
+**Each round starts with the notes.** At the start of every round, a work item or a chat session, the agent reads its notes and puts them in the prompt, each with its id (a short hash of its text). Notes that cannot be read are logged, and the prompt says so; the round runs without them.
+
+**Only trusted versions are used.** A page in the knowledge base can be edited by any member with access to the documents, other agents included, and the notes are guidance in every run. So a version is used only when its author is the agent itself or a trusted human: the agent's own account is known by its `identities.tracker` (or its handle as the member's username), and a trusted human as for comments on tickets (`humans` with a tracker identity, else every human member). Otherwise the agent uses the newest earlier version a trusted author wrote, from the page's revisions, and the prompt says who changed the notes, the version and the page, so the agent can review the change. The agent's next `ost note` change starts from the notes it uses, so it replaces the ignored version on the page; the revision history keeps it.
+
+**The office sees every change.** Each `ost note` change, the move from the volume and an ignored version are reported to the office (`notes_changed`). The office logs them, an ignored version at warn with its author, and records the notes page as the agent's document, so comments on it reach the agent. The event pipeline's trace does not show them: a trace is per pipeline event, and notes changes are not pipeline events.
+
+**Moving existing notes.** On a start where the store has no notes yet (no `notes.md`, or no page), the notes in the files of `~/memory` (each top-level list item or paragraph of a text file; headings are left out) are written to the store. The files are left in place. With `store: knowledge`, the home volume then holds only state that can be rebuilt and work that was not pushed yet; the catalog asks agents to push work in progress early, to a draft pull request.
 
 ## Repositories and credentials
 

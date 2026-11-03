@@ -1,3 +1,4 @@
+import type { RoundNotes } from "#/notes/types.js";
 import type { ClonedRepo, RepoHead, Workspace } from "#/repos/index.js";
 import type { Attachment } from "./types.js";
 
@@ -23,6 +24,9 @@ export interface WorkPromptOptions {
 
   /** Files attached to the tickets the item concerns, by ticket key. */
   ticketFiles?: Record<string, Attachment[]>;
+
+  /** The agent's notes, read at the start of the round. */
+  notes?: RoundNotes;
 }
 
 /** The path of a catalog document as the prompt names it. */

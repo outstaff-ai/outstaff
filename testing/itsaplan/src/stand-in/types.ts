@@ -9,6 +9,7 @@ import type {
   ApiLabel,
   ApiDoc,
   ApiDocComment,
+  ApiDocRevisionContent,
   ApiProject,
   PmNode,
 } from "@outstaff/integration.shared.itsaplan";
@@ -37,9 +38,32 @@ export type StoredActivity = ApiActivityItem &
 
 /** A document as the stand-in stores it: the full form, with the fields the API may leave out always set. */
 export type StoredDoc = ApiDoc &
-  Required<Pick<ApiDoc, "parentId" | "createdAt" | "content" | "contentJson">> & {
+  Required<
+    Pick<
+      ApiDoc,
+      | "parentId"
+      | "createdAt"
+      | "content"
+      | "contentJson"
+      | "isPrivate"
+      | "ownerUserId"
+      | "createdByUserId"
+      | "updatedByUserId"
+    >
+  > & {
     metadata: NonNullable<ApiDoc["metadata"]>;
   };
+
+/** What a new page is made from; anything left out takes the service's default. */
+export type NewDoc = Partial<
+  Pick<StoredDoc, "parentId" | "metadata" | "content" | "contentJson" | "isPrivate">
+> & { title?: string };
+
+/** The fields a change of a page may set. */
+export type DocChange = Partial<Pick<StoredDoc, "title" | "content" | "contentJson">>;
+
+/** A saved version of a page: every create and change saves one. */
+export type StoredDocRevision = ApiDocRevisionContent;
 
 /** A comment on a document; the stand-in always knows its author. */
 export type StoredDocComment = ApiDocComment &
@@ -166,6 +190,7 @@ export interface ItsaplanStore {
   /** Public ids of the attachments that were downloaded, in order. */
   served: string[];
   docs: StoredDoc[];
+  docRevisions: StoredDocRevision[];
   docComments: StoredDocComment[];
   repositories: StoredRepository[];
 
@@ -174,7 +199,14 @@ export interface ItsaplanStore {
   pullRequestsOf: PullRequestSource;
   development: StoredDevelopmentLink[];
   docIssues: StoredDocIssue[];
-  counters: { activity: number; label: number; doc: number; comment: number; link: number };
+  counters: {
+    activity: number;
+    label: number;
+    doc: number;
+    comment: number;
+    link: number;
+    revision: number;
+  };
 }
 
 /** A route handler; `actor` is the userId the request's API key acts as. */

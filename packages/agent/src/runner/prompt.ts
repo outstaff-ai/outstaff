@@ -2,6 +2,7 @@ import type { JournalLine, Link, OfferContext, OfferedWorkItem } from "@outstaff
 import type { Offer } from "#/office-client/index.js";
 import { attachmentLines } from "./attachments.js";
 import { conversationLines, feedbackLines } from "./prompt-feedback.js";
+import { notesLines } from "./prompt-notes.js";
 import { originLines } from "./prompt-origin.js";
 import { wakeLines } from "./prompt-wake.js";
 import { repoLines, workspaceLines } from "./prompt-workspace.js";
@@ -101,6 +102,7 @@ export function buildWorkPrompt(offer: Offer, opts: WorkPromptOptions): string {
     ...conversationLines(context.conversation),
     ...wakeLines(context.wake),
     ...journalLines(context.journal),
+    ...notesLines(opts.notes, doc),
     ...originLines(item, opts, doc),
     ...repoLines(item.kind, opts.repos, opts.heads),
     ...workspaceLines(offer, opts, doc),

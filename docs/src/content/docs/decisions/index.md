@@ -7,28 +7,29 @@ sidebar:
 
 Each record explains one decision: the context, what was decided, and what follows from it. Records are not rewritten when a decision changes. A new record replaces the old one and links back to it.
 
-| #                                                         | Decision                                                                      |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| [0001](/decisions/0001-agency-model/)                     | The agency model: catalog, team, people, office                               |
-| [0002](/decisions/0002-ports-and-adapters/)               | Ports and adapters, one package per adapter                                   |
-| [0003](/decisions/0003-office-schedules-work/)            | The office is the only scheduler; agents connect out; the tracker is optional |
-| [0004](/decisions/0004-trust-model/)                      | Trusted humans, with no owner role                                            |
-| [0005](/decisions/0005-catalog-baked-and-ejectable/)      | The catalog is baked into images and can be ejected                           |
-| [0006](/decisions/0006-runtime-neutral-permissions/)      | A runtime-neutral permission policy                                           |
-| [0007](/decisions/0007-store-postgres-and-sqlite/)        | The office store supports Postgres and SQLite                                 |
-| [0008](/decisions/0008-hosting-and-secrets-out-of-scope/) | Hosting and secret storage are out of scope                                   |
-| [0009](/decisions/0009-agent-sdk-runtime/)                | The Claude Agent SDK is the primary runtime; the CLI is a fallback            |
-| [0010](/decisions/0010-context-per-work-item/)            | Each work item has its own context                                            |
-| [0011](/decisions/0011-configurable-workflow/)            | Workflows are configured, not hard-coded                                      |
-| [0012](/decisions/0012-apache-license/)                   | The project is licensed under the Apache License 2.0                          |
-| [0013](/decisions/0013-subprocess-sandbox-opt-in/)        | The subprocess sandbox is opt-in                                              |
-| [0014](/decisions/0014-bubblewrap-sandbox-containers/)    | What the bubblewrap sandbox needs from a container                            |
-| [0015](/decisions/0015-allow-by-default-in-the-sandbox/)  | Allow by default inside the sandbox, with a short list of hard denies         |
-| [0016](/decisions/0016-event-pipeline/)                   | One event pipeline with three decisions                                       |
-| [0017](/decisions/0017-no-bespoke-protocol-verbs/)        | Network and identity are the boundary, not verbs per protocol                 |
-| [0018](/decisions/0018-pipeline-only/)                    | The event pipeline is the only way the office decides                         |
-| [0019](/decisions/0019-agents-make-their-acts/)           | Agents make the pipeline's acts as themselves                                 |
-| [0020](/decisions/0020-office-marks-work-started/)        | The office marks a ticket active for the agent when its work starts           |
-| [0021](/decisions/0021-merging-is-the-agents-decision/)   | Merging is the agent's decision, woken when its pull request may be ready     |
-| [0022](/decisions/0022-act-echoes-wake-no-one/)           | The tracker's echo of an act wakes no one                                     |
-| [0023](/decisions/0023-ticket-closes-after-merge-checks/) | A ticket closes once the checks on its merge commit pass                      |
+| #                                                         | Decision                                                                       |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [0001](/decisions/0001-agency-model/)                     | The agency model: catalog, team, people, office                                |
+| [0002](/decisions/0002-ports-and-adapters/)               | Ports and adapters, one package per adapter                                    |
+| [0003](/decisions/0003-office-schedules-work/)            | The office is the only scheduler; agents connect out; the tracker is optional  |
+| [0004](/decisions/0004-trust-model/)                      | Trusted humans, with no owner role                                             |
+| [0005](/decisions/0005-catalog-baked-and-ejectable/)      | The catalog is baked into images and can be ejected                            |
+| [0006](/decisions/0006-runtime-neutral-permissions/)      | A runtime-neutral permission policy                                            |
+| [0007](/decisions/0007-store-postgres-and-sqlite/)        | The office store supports Postgres and SQLite                                  |
+| [0008](/decisions/0008-hosting-and-secrets-out-of-scope/) | Hosting and secret storage are out of scope                                    |
+| [0009](/decisions/0009-agent-sdk-runtime/)                | The Claude Agent SDK is the primary runtime; the CLI is a fallback             |
+| [0010](/decisions/0010-context-per-work-item/)            | Each work item has its own context                                             |
+| [0011](/decisions/0011-configurable-workflow/)            | Workflows are configured, not hard-coded                                       |
+| [0012](/decisions/0012-apache-license/)                   | The project is licensed under the Apache License 2.0                           |
+| [0013](/decisions/0013-subprocess-sandbox-opt-in/)        | The subprocess sandbox is opt-in                                               |
+| [0014](/decisions/0014-bubblewrap-sandbox-containers/)    | What the bubblewrap sandbox needs from a container                             |
+| [0015](/decisions/0015-allow-by-default-in-the-sandbox/)  | Allow by default inside the sandbox, with a short list of hard denies          |
+| [0016](/decisions/0016-event-pipeline/)                   | One event pipeline with three decisions                                        |
+| [0017](/decisions/0017-no-bespoke-protocol-verbs/)        | Network and identity are the boundary, not verbs per protocol                  |
+| [0018](/decisions/0018-pipeline-only/)                    | The event pipeline is the only way the office decides                          |
+| [0019](/decisions/0019-agents-make-their-acts/)           | Agents make the pipeline's acts as themselves                                  |
+| [0020](/decisions/0020-office-marks-work-started/)        | The office marks a ticket active for the agent when its work starts            |
+| [0021](/decisions/0021-merging-is-the-agents-decision/)   | Merging is the agent's decision, woken when its pull request may be ready      |
+| [0022](/decisions/0022-act-echoes-wake-no-one/)           | The tracker's echo of an act wakes no one                                      |
+| [0023](/decisions/0023-ticket-closes-after-merge-checks/) | A ticket closes once the checks on its merge commit pass                       |
+| [0024](/decisions/0024-agent-memory-behind-ost-note/)     | Agent memory is kept behind `ost note`, on the volume or in the knowledge base |

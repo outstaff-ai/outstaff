@@ -896,6 +896,27 @@ Sent by: agent. Answered by: `ack`, `error`.
 | `doc.url`    | string | yes      | Absolute URL of the document.                                                   |
 | `ticket`     | string | no       | Key of the ticket the document is for; without it, the ticket of the work item. |
 
+### `notes_changed`
+
+Tells the office that the caller's notes changed (`ost note`), were moved to the knowledge base, or have a version by someone it does not trust. The office logs it and, for notes kept in the knowledge base, records the page as the caller's document, so comments on it reach the caller.
+
+Sent by: agent. Answered by: `ack`, `error`.
+
+| Field          | Type                                                              | Required | Description                                                                                                                                                                                                                 |
+| -------------- | ----------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `change`       | `added` or `updated` or `removed` or `migrated` or `edit_ignored` | yes      | What happened: the caller added, changed or removed a note, wrote the notes it had on its volume to the knowledge base on first start, or found a version of its notes by someone it does not trust, which it does not use. |
+| `note`         | string                                                            | no       | The note added, changed (its new text) or removed.                                                                                                                                                                          |
+| `count`        | integer                                                           | no       | For `migrated`: how many notes.                                                                                                                                                                                             |
+| `doc`          | object                                                            | no       | The page that shows the notes, when they are kept in the knowledge base; comments on it reach the caller.                                                                                                                   |
+| `doc.id`       | string                                                            | yes      | Id of the page in the knowledge base.                                                                                                                                                                                       |
+| `doc.title`    | string                                                            | yes      | Title of the page.                                                                                                                                                                                                          |
+| `doc.url`      | string                                                            | yes      | Absolute URL of the page.                                                                                                                                                                                                   |
+| `edit`         | object                                                            | no       | For `edit_ignored`: the version that is not used.                                                                                                                                                                           |
+| `edit.author`  | string                                                            | yes      | Who wrote the version, as the knowledge base names them.                                                                                                                                                                    |
+| `edit.at`      | string                                                            | yes      | When.                                                                                                                                                                                                                       |
+| `edit.version` | string                                                            | yes      | The version that is not used.                                                                                                                                                                                               |
+| `workItemId`   | string                                                            | no       | The work item the caller was on, if any.                                                                                                                                                                                    |
+
 ### `doctor_report`
 
 Reports the checks only the agent's own container can make, run once at start: its declared tools installed, its granted services and devices answer, and its home volume has room. The office stores them with its own checks.

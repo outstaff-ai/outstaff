@@ -113,7 +113,7 @@ The office URL is the only address an agent needs. Use `wss://` when the connect
 | office    | `/var/lib/outstaff`                            | The SQLite store, when `OUTSTAFF_STORE_URL` is not set. The folder is created when missing.           | Yes, unless you use Postgres, which needs no volume.         |
 | agent     | `$HOME/repos`                                  | Clones of the repositories the person may read or write.                                              | Optional; a cache that is cloned again when missing.         |
 | agent     | `$HOME/worktrees`                              | One git worktree per work item.                                                                       | Yes, if unpushed work should survive a restart.              |
-| agent     | `$HOME/memory`                                 | The person's notes between work items.                                                                | Yes.                                                         |
+| agent     | `$HOME/memory`                                 | The person's notes (`ost note`) in `notes.md`, with `memory.store: volume`, the default.              | Yes, and back it up. With `store: knowledge`, no.            |
 | agent     | `$HOME/artifacts`                              | Files a role with `design.canvas` publishes to its Design canvas. Created only for such roles.        | Yes, so the canvas files survive a restart.                  |
 | agent     | `$HOME/scratch`                                | Throwaway files.                                                                                      | No.                                                          |
 | agent     | `$HOME/work`                                   | The person's rendered working files (skills, references, templates), written on every start.          | No.                                                          |
@@ -122,7 +122,7 @@ The office URL is the only address an agent needs. Use `wss://` when the connect
 | agent     | `$HOME/.config/mise`                           | The global mise config the agent writes at start, which makes the declared tools active.              | No. Written on every start.                                  |
 | office    | `$HOME/.cache/outstaff/teams`                  | Clone of the team repository when `OUTSTAFF_TEAM_REPO` is used (`XDG_CACHE_HOME` moves it).           | No.                                                          |
 
-The agent's own directories are all below `$HOME`, so mount that writable if you run with a read-only root filesystem. The agent keeps no session or journal on its own disk: the office stores both, and a replaced container resumes from them. What a lost volume costs is work that was never pushed, which is why `worktrees` is worth keeping.
+The agent's own directories are all below `$HOME`, so mount that writable if you run with a read-only root filesystem. The agent keeps no session or journal on its own disk: the office stores both, and a replaced container resumes from them. What a lost volume costs is work that was never pushed, which is why `worktrees` is worth keeping, and, with `memory.store: volume`, the person's notes. With `memory.store: knowledge` the notes live in the knowledge integration, so the home volume can be a single-replica volume without backups.
 
 ## Ports
 

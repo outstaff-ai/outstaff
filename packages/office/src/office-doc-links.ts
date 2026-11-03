@@ -1,5 +1,6 @@
 import type { Logger } from "@outstaff/core";
-import { ProtocolError, type DocLinks } from "./protocol/index.js";
+import { officeNotes } from "./office-notes.js";
+import { ProtocolError, type AgentNotesDesk, type DocLinks } from "./protocol/index.js";
 import { itemTicket } from "./item-ticket.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { WorkState } from "./workstate/index.js";
@@ -53,4 +54,12 @@ export function officeDocLinks(deps: {
       });
     },
   };
+}
+
+/** The office's desks for what agents write in the knowledge base: their documents and their notes. */
+export function officeDocDesks(deps: { store: Store; workState: WorkState; log: Logger }): {
+  docs: DocLinks;
+  notes: AgentNotesDesk;
+} {
+  return { docs: officeDocLinks(deps), notes: officeNotes(deps) };
 }

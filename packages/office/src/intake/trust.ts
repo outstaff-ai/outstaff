@@ -1,4 +1,4 @@
-import { PortError, repoKey, vcsAgentLogins } from "@outstaff/core";
+import { PortError, repoKey, trackerActors, vcsAgentLogins } from "@outstaff/core";
 import type { RepoRef } from "@outstaff/core";
 import type { Trust, TrustOptions } from "./types.js";
 
@@ -14,25 +14,11 @@ export function createTrust(opts: TrustOptions): Trust {
   const ttl = opts.ttlMs ?? DEFAULT_TRUST_TTL_MS;
   // Agents are recognized only by the identities declared in team.yaml, never by how a login looks.
   const vcsAgents = vcsAgentLogins(opts.team);
-  const trackerAgents = new Map<string, string>();
-  for (const p of opts.team.people) {
-    if (p.identities?.tracker) {
-      trackerAgents.set(p.identities.tracker, p.handle);
-    }
-  }
-
+  const trackerActor = trackerActors(opts.team);
   const explicitVcs =
     opts.team.humans &&
     new Set(
       opts.team.humans.flatMap((h) => (h.identities.vcs ? [h.identities.vcs.toLowerCase()] : [])),
-    );
-
-  const explicitTracker =
-    opts.team.humans &&
-    new Set(
-      opts.team.humans.flatMap((h) =>
-        h.identities.tracker ? [h.identities.tracker.toLowerCase()] : [],
-      ),
     );
 
   const agentHandle = (login: string): string | undefined =>
@@ -85,26 +71,6 @@ export function createTrust(opts: TrustOptions): Trust {
       const level = await permission(repo, login);
       return { kind: "human", id: login, trusted: level === "write" || level === "admin" };
     },
-    trackerActor(member) {
-      const names = [member.username, member.name, member.id].filter((x) => x !== undefined);
-      const handle = [member.id, member.username]
-        .map((n) => (n === undefined ? undefined : trackerAgents.get(n)))
-        .find((h) => h !== undefined);
-
-      if (handle !== undefined) {
-        return { kind: "agent", id: handle, trusted: false };
-      }
-
-      if (member.kind === "agent") {
-        return { kind: "automation", id: member.username ?? member.id, trusted: false };
-      }
-
-      const id = member.username ?? member.id;
-      const trusted = explicitTracker
-        ? names.some((n) => explicitTracker.has(n.toLowerCase()))
-        : true;
-
-      return { kind: "human", id, trusted };
-    },
+    trackerActor,
   };
 }

@@ -150,6 +150,11 @@ integrations:
     adapter: dicebear
     style: notionists
 
+memory:
+  # Each agent's notes on a page of its own in the knowledge integration. The default, volume, keeps them in memory/ on
+  # each agent's home volume, which you then back up.
+  store: knowledge
+
 workflow:
   statuses:
     backlog: Backlog

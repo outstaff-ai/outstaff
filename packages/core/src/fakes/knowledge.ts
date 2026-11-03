@@ -2,6 +2,7 @@ import { PortError } from "#/ports/index.js";
 import type { Doc, DocComment, DocEvent, Knowledge } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
 import type { FakeKnowledge, FakeKnowledgeOptions } from "./types.js";
+import { createFakeNotes } from "./knowledge-notes.js";
 import { steppingClock } from "./util.js";
 
 export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowledge {
@@ -93,10 +94,24 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     return issueLinks.get(key) ?? [];
   };
 
+  const self = { id: author, name: author, username: author, kind: "agent" } as const;
+  const notes = createFakeNotes(self, now, links.doc);
+
   return {
     links,
     issueLinks,
+    notes: notes.notes,
     seed: {
+      notesEdit: async (owner, list, by) => {
+        const member = {
+          id: `member-${by.name.toLowerCase().replaceAll(/\W+/g, "-")}`,
+          name: by.name,
+          kind: by.kind,
+        };
+
+        notes.edit(owner, list, member);
+        return member;
+      },
       doc: create,
       async issue() {
         const key = `ACME-${issues.size + 1}`;

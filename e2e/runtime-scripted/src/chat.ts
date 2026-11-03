@@ -10,14 +10,15 @@ interface Inbound {
   thread?: string;
   authorId: string;
   authorName: string;
+  trusted: boolean;
   text: string;
   at: string;
   files?: ChatFile[];
 }
 
 /**
- * A chat for the end-to-end test: the messages one trusted human writes to `agent` come from the stub workspace over
- * HTTP, and what the agent posts goes there as the agent's.
+ * A chat for the end-to-end test: the messages one trusted human (or, when the driver says so, an untrusted guest)
+ * writes to `agent` come from the stub workspace over HTTP, and what the agent posts goes there as the agent's.
  */
 export function createStubChat(baseUrl: string, agent: string): Chat {
   let timer: NodeJS.Timeout | undefined;
@@ -55,7 +56,7 @@ export function createStubChat(baseUrl: string, agent: string): Chat {
                 id: m.id,
                 channel: m.channel,
                 ...(m.thread ? { thread: m.thread } : {}),
-                author: { id: m.authorId, name: m.authorName, trusted: true, bot: false },
+                author: { id: m.authorId, name: m.authorName, trusted: m.trusted, bot: false },
                 text: m.text,
                 at: m.at,
                 ...(m.files ? { files: m.files } : {}),
