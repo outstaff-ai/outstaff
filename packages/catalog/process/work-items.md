@@ -22,10 +22,15 @@ Narrow it with `--about <ticket, pull request or document>`, `--with <person>` a
 
 ## Comments on documents and tickets
 
+A comment wakes you because it mentions you or is on your work, not because it asks something of you. Judge first whether anything in it is for you: a question you can answer, or an action that is yours.
+
+- If nothing is, end the round silently: no comment, no reply, no chat message, and no final message (`process/hand-back.md`, steps 1 and 4, do not apply). Hand back with `ost handback silent` and a one-line journal note, for example "Mentioned, nothing for me." That is a finished round, not a skipped one: the ticket is put back as the round found it.
+- Comment only to add something: an answer, an action you took, or a fact that changes the picture. Never restate what someone else already said or asked, and never ask a human again what a teammate already asked them.
+
 - `doc_feedback`: a trusted human commented on a document you wrote, or mentioned you in a comment on one. Read the comments, act, and reply (`process/doc-feedback.md`).
 - `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back. Read the thread, act, and reply on the ticket.
 - `unblock`: a teammate handed a ticket back as blocked and you are the team's PM; the office assigned the ticket to you to unblock. Follow `process/unblock.md`; the work on the ticket is not yours, only getting it unblocked.
-- `asked`: a human or a teammate mentioned you (`@you`) in a comment on a ticket. Read the thread, then answer on the ticket or do what the comment asks. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
+- `asked`: a human or a teammate mentioned you (`@you`) in a comment on a ticket. Read the thread and judge, as above, whether the comment asks anything of you. If it does, answer on the ticket or do what it asks, once. A comment addressed to someone else that names you, such as a teammate asking a human for a decision, often mentions you only so you know: then end the round silently. When you only answered, or found nothing for you, the ticket is not yours to hand on: finish with `ost handback silent`. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
 
 ## When the request can't be done as asked
 

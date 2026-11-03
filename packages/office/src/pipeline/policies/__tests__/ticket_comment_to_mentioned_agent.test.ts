@@ -32,7 +32,7 @@ describe("ticket_comment_to_mentioned_agent", () => {
         person: "mira",
         kind: "asked",
         instruction:
-          "sam mentioned you in a comment on ACME-1. Read the comment and answer it, or do what it asks, on the ticket. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.",
+          "sam mentioned you in a comment on ACME-1. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.",
       },
     ]);
 

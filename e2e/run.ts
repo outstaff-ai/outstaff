@@ -468,6 +468,29 @@ const wakesOf = (person: string) =>
 
 const piaWakes = () => wakesOf("pia");
 
+/** The id of the last work item the office queued for a person of that kind, from its log. */
+const lastItemOf = (person: string, kind: string) =>
+  [
+    ...logs("office").matchAll(
+      new RegExp(`pipeline: queued work item (\\S+) for ${person} \\(${kind}\\)`, "g"),
+    ),
+  ].at(-1)?.[1];
+
+/** A work item's status in the office's store. */
+const itemStatus = (id: string) =>
+  dc(
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "outstaff",
+    "-d",
+    "outstaff",
+    "-tAc",
+    `select status from work_items where id = '${id.replace(/'/g, "")}'`,
+  ).stdout.trim();
+
 const connected = (person: string) =>
   new RegExp(`"agent connected","person":"${person}"`).test(logs("office"));
 
@@ -1904,7 +1927,9 @@ async function main() {
   // ---- 11a. an agent mentions the PM on a ticket, by her name written as a tracker username (`@Pia.Novak`): the PM
   // is woken with the comment and answers; her answer mentions only herself, so it wakes no one.
   const piaBeforeMention = piaWakes().length;
-  const movesBeforePm = (await state()).tickets.find((x: Json) => x.key === design).moves.length;
+  const beforePm = (await state()).tickets.find((x: Json) => x.key === design);
+  const movesBeforePm = beforePm.moves.length;
+  const piaAnswersBefore = beforePm.comments.filter((c: Json) => c.author === "pia").length;
   const pmQuestion = "does the mobile layout ship first?";
   await stub("POST", `/_test/tickets/${design}/comment`, { body: `ask Pia.Novak: ${pmQuestion}` });
   const askedPm = await until(`${design}: sam asked the PM, and the PM answered`, (s) => {
@@ -1927,10 +1952,13 @@ async function main() {
     "pia was woken once, by sam's mention, and not by her own answer",
   );
 
+  const piaAnswers = (await state()).tickets
+    .find((x: Json) => x.key === design)
+    .comments.filter((c: Json) => c.author === "pia").length;
+
+  assertEq(piaAnswers, piaAnswersBefore + 1, "the PM answered the question once");
   assertEq(
-    (await state()).tickets
-      .find((x: Json) => x.key === design)
-      .comments.filter((c: Json) => c.author === "pia").length,
+    piaAnswers,
     askedPm.comments.filter((c: Json) => c.author === "pia").length,
     "the PM's answer started nothing more",
   );
@@ -1994,6 +2022,73 @@ async function main() {
 
   step(
     `thanks: a thanks on ${design} woke sam, whose round finished silently: still in review with the human`,
+  );
+
+  // ---- 11a2. sam asks the human a question on the ticket and names the PM only so she knows (`FYI @Pia.Novak`): the
+  // PM is woken, finds nothing in it for her, posts nothing and finishes her round silently (`ost handback silent`),
+  // which the office stores as a finished item and which leaves the ticket as it was.
+  await officePolledTwice(`${design}: the thanks round is well over`);
+  const piaBeforeFyi = piaWakes().length;
+  const beforeFyi = await state();
+  const piaCommentsBeforeFyi = beforeFyi.tickets
+    .find((x: Json) => x.key === design)
+    .comments.filter((c: Json) => c.author === "pia").length;
+
+  const piaPostsBeforeFyi = beforeFyi.chat.posts.filter((p: Json) => p.agent === "pia").length;
+  const humanQuestion = "is the launch still on the first of the month?";
+  await stub("POST", `/_test/tickets/${design}/comment`, {
+    body: `ask ada.admin, cc Pia.Novak: ${humanQuestion}`,
+  });
+
+  await until(`${design}: sam asked the human and named the PM for information`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === design);
+    const bySam = t.comments.some(
+      (c: Json) => c.author === "sam" && c.body === `@ada.admin ${humanQuestion} FYI @Pia.Novak`,
+    );
+
+    return bySam && t.status === "In Review" && t.assignee === "ada.admin" ? t : undefined;
+  });
+
+  const movesBeforePia = (await state()).tickets.find((x: Json) => x.key === design).moves.length;
+
+  const fyiItem = await waitFor(
+    "the PM's round on the FYI mention finished",
+    async () => {
+      const id = piaWakes().length > piaBeforeFyi ? lastItemOf("pia", "asked") : undefined;
+      return { id, status: id ? itemStatus(id) : undefined };
+    },
+    (r) => (r.status === "done" ? r.id : undefined),
+  );
+
+  await officePolledTwice(`pia's round on ${fyiItem}`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforeFyi)),
+    JSON.stringify(["asked"]),
+    "the FYI mention woke the PM once",
+  );
+
+  const afterFyi = await state();
+  const fyiTicket = afterFyi.tickets.find((x: Json) => x.key === design);
+  assertEq(
+    JSON.stringify([fyiTicket.status, fyiTicket.assignee, fyiTicket.moves.length]),
+    JSON.stringify(["In Review", "ada.admin", movesBeforePia]),
+    "the silent finish left the ticket as it was",
+  );
+
+  assertEq(
+    fyiTicket.comments.filter((c: Json) => c.author === "pia").length,
+    piaCommentsBeforeFyi,
+    "the PM posted nothing on the ticket",
+  );
+
+  assertEq(
+    afterFyi.chat.posts.filter((p: Json) => p.agent === "pia").length,
+    piaPostsBeforeFyi,
+    "the PM posted nothing in chat",
+  );
+
+  step(
+    `agent mention, for information only: sam's FYI @Pia.Novak on ${design} woke the PM, who posted nothing and finished silently; the ticket is unchanged`,
   );
 
   // ---- 10b2. the checks of an open pull request fail: its author gets a round with the failing check, whatever the
