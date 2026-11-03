@@ -2128,6 +2128,7 @@ describe("verb catalogue", () => {
       "work.queue",
       "work.attach",
       "team",
+      "handback",
       "http",
     ]);
 

@@ -12,7 +12,17 @@ export interface Outcome {
 }
 
 /** What an item is handed back as, once its run finished. */
-export type HandBackStatus = "waiting" | "blocked" | "done";
+export type HandBackStatus = "waiting" | "blocked" | "done" | "silent";
+
+/** How a finished run is handed back: its status, the summary, and for `done` what there is to review. */
+export interface HandBack {
+  status: HandBackStatus;
+  summary: string;
+  toReview: string[];
+
+  /** The agent shut down during the extra turn: the item goes back as interrupted, not with this status. */
+  interrupted?: boolean;
+}
 
 /** One accepted item while it runs: what it was set up with, and what its rounds left behind. */
 export interface ItemRun {

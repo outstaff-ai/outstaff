@@ -39,6 +39,7 @@ export function itemRefs(store: Store, ports?: { tracker?: Tracker; vcs?: Vcs })
       headRef: rec.headRef,
       baseRef: rec.baseRef,
       state: rec.state,
+      draft: rec.draft,
       ...(person !== undefined ? { own: rec.author.person === person } : {}),
     };
   };

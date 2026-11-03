@@ -40,6 +40,10 @@ export async function handBackStatus(
   { opts, log }: WorkerContext,
   { offer, item }: ItemRun,
 ): Promise<HandBackStatus> {
+  if (item.declared() === "blocked") {
+    return "blocked";
+  }
+
   if (item.asked()) {
     return "waiting";
   }

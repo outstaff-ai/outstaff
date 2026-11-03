@@ -1269,14 +1269,14 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 
 - Type: `list of string`
 - Required
-- Allowed values: `done`, `waiting`, `blocked`
+- Allowed values: `done`, `waiting`, `blocked`, `silent`
 - Minimum items 1
 
 #### pipeline.policies.<key>.when.hand_back_status[]
 
 - Type: `string`
 - Optional
-- Allowed values: `done`, `waiting`, `blocked`
+- Allowed values: `done`, `waiting`, `blocked`, `silent`
 
 #### pipeline.policies.<key>.when.work_kind
 

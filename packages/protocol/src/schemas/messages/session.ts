@@ -122,9 +122,16 @@ export const sessionMessages = [
       summary: text.describe("What was done, decisions and open points."),
       links: z.array(linkSchema).describe("Pull requests, documents and tickets touched."),
       status: z
-        .enum(["done", "waiting", "blocked", "interrupted"])
+        .enum(["done", "waiting", "blocked", "silent", "interrupted"])
         .describe(
-          "Whether the item is finished, waits for something, is stuck, or was cut short by the agent shutting down. An interrupted item goes back to the front of the queue and is offered again with its session.",
+          "Whether the item is finished with a result to review, waits for something, is stuck, finished silently (nothing to hand on: the item is done and its ticket is put back as the round found it), or was cut short by the agent shutting down. An interrupted item goes back to the front of the queue and is offered again with its session.",
+        ),
+      toReview: z
+        .array(z.string().min(1).max(500))
+        .max(50)
+        .optional()
+        .describe(
+          "For a done hand-back: what the agent's check found to review or finished, for example a pull request opened or ready for review, a document linked, the ticket closed, or a kind of work that finishes without one. The office takes a done hand-back without it as blocked when it finds nothing to review itself.",
         ),
     }),
   ),

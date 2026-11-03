@@ -35,7 +35,7 @@ Two requirements conflict, something asked for does not exist, or the only way t
 - the options, including keeping the requirement at a cost;
 - your recommendation.
 
-Then hand back as `waiting` and do not do the work that depends on the answer. Never build one route and ask afterwards. Choices that keep everything asked for, add nothing new to maintain and follow the repository's conventions stay yours: which of two equivalent libraries, naming, structure.
+Then hand back as `blocked` and do not do the work that depends on the answer. Never build one route and ask afterwards. Choices that keep everything asked for, add nothing new to maintain and follow the repository's conventions stay yours: which of two equivalent libraries, naming, structure.
 
 Check before you conclude. Before you say something does not exist, read the vendor's own documentation and link what you found. Before you say you can't check something, use the access you have (the repository, documentation, read-only access to systems) and say exactly what you checked. When an option removes the constraint that ruled out an earlier preference, go back to that preference before you settle.
 

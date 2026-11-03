@@ -184,6 +184,7 @@ describe("createOffice", () => {
       summary: "Built the search page.",
       links: [{ url: "https://git.acme.example/acme/app/pull/1", title: "PR" }],
       status: "done",
+      toReview: ["opened pull request acme/app#1"],
     });
 
     // Sam's own process made the changes, as sam.
@@ -206,6 +207,35 @@ describe("createOffice", () => {
     expect(chat.posts).toEqual([]);
   });
 
+  it("puts the ticket back as the round found it on a silent finish", async () => {
+    const sam = connect("sam");
+    await sam.whenConnected();
+    const issue = await tracker.createIssue({
+      title: "Search page",
+      body: "",
+      status: "ready",
+      assignee: "u-2",
+    });
+
+    await office.parts.intake.pollOnce();
+    const offer = await next(sam);
+    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("active"),
+    );
+
+    await sam.handBack(offer.workItem.id, { summary: "Nothing for me.", status: "silent" });
+    expect((await store.getItem(offer.workItem.id))?.status).toBe("done");
+    // The start moved it to active; sam had it already, so only the status goes back.
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("ready"),
+    );
+
+    const moved = (await tracker.events()).events.filter((e) => e.type === "moved");
+    expect(moved.map((e) => e.data["to"])).toEqual(["active", "ready"]);
+    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-2");
+  });
+
   it("moves a ticket the agent took back during its round to review on a done hand-back, before the next poll", async () => {
     const sam = connect("sam");
     await sam.whenConnected();
@@ -219,7 +249,12 @@ describe("createOffice", () => {
     await office.parts.intake.pollOnce();
     const first = await next(sam);
     await sam.accept(first.workItem.id, { runtime: "claude", model: "sonnet" });
-    await sam.handBack(first.workItem.id, { summary: "Built it.", status: "done" });
+    await sam.handBack(first.workItem.id, {
+      summary: "Built it.",
+      status: "done",
+      toReview: ["opened pull request acme/app#1"],
+    });
+
     await vi.waitFor(async () =>
       expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1"),
     );
@@ -241,13 +276,65 @@ describe("createOffice", () => {
     const self = tracker.as({ id: "u-2", name: "Sam", kind: "agent" });
     await self.assign(issue.key, "u-2");
     await self.transition(issue.key, "active");
-    await sam.handBack(round.workItem.id, { summary: "Answered.", status: "done" });
+    await sam.handBack(round.workItem.id, {
+      summary: "Answered.",
+      status: "done",
+      toReview: ["moved the ticket to review"],
+    });
 
     await vi.waitFor(async () =>
       expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1"),
     );
 
     expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
+  });
+
+  it("leaves a ticket in review with the requester after a silent round on a thanks comment", async () => {
+    const sam = connect("sam");
+    await sam.whenConnected();
+    const issue = await tracker.createIssue({
+      title: "Search page",
+      body: "",
+      status: "ready",
+      assignee: "u-2",
+    });
+
+    await office.parts.intake.pollOnce();
+    const first = await next(sam);
+    await sam.accept(first.workItem.id, { runtime: "claude", model: "sonnet" });
+    await sam.handBack(first.workItem.id, {
+      summary: "Built it.",
+      status: "done",
+      toReview: ["opened pull request acme/app#1"],
+    });
+
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1"),
+    );
+
+    await office.parts.intake.pollOnce();
+    // "Thanks!" on the ticket: the round's start takes the ticket back, active and with sam.
+    await office.parts.scheduler.enqueue({
+      person: "sam",
+      kind: "ticket_comment",
+      title: "comment",
+      trigger: "human",
+      subject: { type: "ticket", ref: issue.key },
+    });
+
+    const round = await next(sam);
+    await sam.accept(round.workItem.id, { runtime: "claude", model: "sonnet" });
+    await vi.waitFor(async () => {
+      const now = await tracker.getIssue(issue.key);
+      expect([now.status.canonical, now.assignee?.id]).toEqual(["active", "u-2"]);
+    });
+
+    // Nothing in it was for sam: the silent finish puts the ticket back as the round found it.
+    await sam.handBack(round.workItem.id, { summary: "Nothing for me.", status: "silent" });
+    await vi.waitFor(async () => {
+      const now = await tracker.getIssue(issue.key);
+      expect([now.status.canonical, now.assignee?.id]).toEqual(["review", "u-1"]);
+    });
   });
 
   it("has an idle agent start the ready tickets it assigned to itself: on connect, then after the hand-back", async () => {

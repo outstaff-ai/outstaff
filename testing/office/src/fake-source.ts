@@ -59,7 +59,12 @@ export function createFakeSource(members: Member[] = []): FakeSource {
     enqueue(person, id, title = `Item ${id}`) {
       const offer: Offer = {
         workItem: { id, kind: "ticket", title, priority: 100, trigger: "human" },
-        context: { journal: [], subjects: [], links: [] },
+        // An open pull request, so a done hand-back has something to review.
+        context: {
+          journal: [],
+          subjects: [{ type: "pr", ref: `acme/app#${id}`, state: "open", draft: false }],
+          links: [],
+        },
       };
 
       items.set(id, { person, offer, state: "queued", title });
@@ -115,7 +120,10 @@ export function createFakeSource(members: Member[] = []): FakeSource {
     },
     async handBack(person, id, result) {
       record("handback", person, id);
-      find(person, id).state = result.status === "interrupted" ? "queued" : result.status;
+      // An interrupted item is queued again; a silent finish ends it like done.
+      const { status } = result;
+      const queued = status === "interrupted" ? "queued" : status;
+      find(person, id).state = queued === "silent" ? "done" : queued;
       handBacks.push({ id, ...result });
     },
     async fail(person, id) {

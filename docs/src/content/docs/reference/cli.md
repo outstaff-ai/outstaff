@@ -1567,6 +1567,29 @@ ost roster
 ost roster --json
 ```
 
+## ost handback
+
+Say how the work item ends when this round stops: done, blocked or silent.
+
+States the hand-back of the work item you are on; the last one you state counts. done: there is a result to review (a pull request open for review, a document linked, the ticket moved to review with your answer) or the work is finished (the ticket closed); a round that leaves none is not done. blocked: you need a decision or an answer from a human, or anything outside your control; say what and from whom in a comment first. silent: the round needed nothing handed on (a comment or mention that asks nothing of you, a merge that waits); the ticket is put back as the round found it. Only rounds of comments, mentions, questions, chat, reviews, merges and pull request upkeep may finish silently. Without it, a round with a result is done, a round of those kinds without one is silent, and any other is told it has nothing to review. To wait for another agent, ask it with ost ask instead.
+
+```
+ost handback <status>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost handback blocked
+ost handback silent
+ost handback blocked --json
+```
+
 ## ost http
 
 Call a service your team granted you, over HTTP.

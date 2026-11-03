@@ -62,7 +62,12 @@ class OfficeSocket extends FakeSocket {
       type: "offer",
       payload: {
         workItem: { id, kind: "ticket", title: `Fix ${id}`, priority: 1, trigger: "human" },
-        context: { journal: [], subjects: [], links: [] },
+        // An open pull request, so each done hand-back has something to review.
+        context: {
+          journal: [],
+          subjects: [{ type: "pr", ref: `acme/app#${id}`, state: "open", draft: false }],
+          links: [],
+        },
         ...(sessionId ? { sessionId } : {}),
       },
     });

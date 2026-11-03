@@ -2593,7 +2593,8 @@
                 "enum": [
                   "done",
                   "waiting",
-                  "blocked"
+                  "blocked",
+                  "silent"
                 ]
               }
             }

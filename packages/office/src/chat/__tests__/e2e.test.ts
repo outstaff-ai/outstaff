@@ -95,6 +95,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
   let running: Promise<void> | undefined;
   let runtime: ReturnType<typeof createFakeRuntime>;
   let env: AgentEnv;
+  let vcs: ReturnType<typeof createFakeVcs>;
 
   const dana = (text: string, thread?: string) =>
     agentChat.seed.inbound({
@@ -151,7 +152,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     officeChat = createFakeChat({ now: clock.now });
     agentChat = createFakeChat({ now: clock.now });
     runtime = createFakeRuntime();
-    const vcs = createFakeVcs({ now: clock.now });
+    vcs = createFakeVcs({ now: clock.now });
     const stock = createFakeAdapterRegistry();
     const instances = { vcs, tracker, chat: officeChat } as Record<string, unknown>;
     const registry = new AdapterRegistry();
@@ -181,7 +182,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     conn.start();
     await conn.whenConnected();
     // The agent reaches the tracker with its own credentials, so its calls carry it as the actor.
-    env = { person: "sam", team: team(), tracker: tracker.as(sam), office: conn };
+    env = { person: "sam", team: team(), tracker: tracker.as(sam), vcs, office: conn };
     relay = createChatRelay({
       chat: agentChat,
       office: conn,
@@ -204,6 +205,13 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     await office.stop();
   });
 
+  /** The draft pull request the work marks ready, which sam may write to. */
+  const seedDraftPr = async () => {
+    const app = { owner: "acme", name: "app" };
+    await vcs.seed.permission(app, "sam", "write");
+    await vcs.seed.pullRequest(app, { title: "Search page", draft: true });
+  };
+
   /**
    * What the agent does with a chat message that is work: the chat session files a ticket, and the work item for it
    * ends with the result. `onWork` can hold the work item back.
@@ -225,11 +233,17 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       }
 
       await onWork?.();
+      // The work marks its draft pull request ready for review: a done hand-back needs something to review.
+      await req.tools
+        .find((t) => t.name === "pr_update")
+        ?.handler({ repo: "app", number: 1, ready: true }, { workItemId: req.workItemId! });
+
       yield { type: "finished", ok: true, text: result };
     },
   });
 
   it("files work from a chat session, starts it as today for an idle agent, and reports the result in the thread", async () => {
+    await seedDraftPr();
     const sent = await dana("please add a search page to the shop");
     startLoop(
       filesAndWorks("The search page is up for review: https://git.acme.example/acme/app/pull/4"),
@@ -285,6 +299,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
   });
 
   it("does not post twice when the message or the hand-back is delivered again", async () => {
+    await seedDraftPr();
     const sent = await dana("please add a search page");
     startLoop(filesAndWorks("Done: https://git.acme.example/acme/app/pull/4"));
     await until(() => agentChat.posts.length === 2);
@@ -382,8 +397,9 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     const items = await store.listItems({ person: "sam" });
     expect(items.map((i) => i.kind).toSorted()).toEqual(["chat", "ticket", "ticket"]);
 
+    // The work left nothing to review, so it is handed back as blocked, not done.
     releaseMain?.();
-    await until(async () => (await store.getItem(main.id))!.status === "done");
+    await until(async () => (await store.getItem(main.id))!.status === "blocked");
   });
 
   it("asks where work goes when the agent is busy, and the agent moves it with the verb", async () => {

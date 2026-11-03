@@ -170,7 +170,18 @@ async function* blockIfStuck(
       input: { key, body: `Resumed with: ${unblocked}` },
     };
 
-    return `Resumed: ${unblocked}`;
+    // The decision is the result to review: a done hand-back needs one.
+    const written = yield {
+      type: "tool",
+      tool: "doc_create",
+      input: {
+        path: `decisions/${key}.md`,
+        title: `${key}: decided`,
+        body: `# Decided\n\n${unblocked}\n`,
+      },
+    };
+
+    return `Resumed: ${unblocked}. The decision is ${firstUrl(written)}.`;
   }
 
   yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
@@ -266,6 +277,24 @@ async function* recallHistory(key: string, shown: string): AsyncGenerator<Action
   };
 
   return `Recalled ${query}.`;
+}
+
+/**
+ * A ticket whose whole work is a check, answered in a comment (`network:`, `recall:`): the answer is conclusive, so
+ * the agent closes the ticket and the round is done. Returns the message to stop with, or undefined to go on.
+ */
+async function* answerOnTicket(
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const network = /^network: /m.test(shown);
+  if (!network && !/^recall: /m.test(shown)) {
+    return undefined;
+  }
+
+  const answer = network ? yield* checkNetwork(key) : yield* recallHistory(key, shown);
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "done" } };
+  return answer;
 }
 
 /**
@@ -503,6 +532,28 @@ async function* followUpOnTicket(
   return `Opened ${url}`;
 }
 
+/**
+ * A ticket that says `ask human: <question>` needs a human's decision first: the agent asks on the ticket and stops,
+ * with nothing to review. It ends the round as if it were done; the runner refuses that, and the agent's answer to the
+ * refusal (`nothingToReview`) is handed back as blocked. Returns the message to stop with, or undefined to go on.
+ */
+async function* askHuman(
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const question = /^ask human: (.+)$/m.exec(shown)?.[1];
+  if (!question) {
+    return undefined;
+  }
+
+  yield { type: "tool", tool: "ticket_comment", input: { key, body: `Question: ${question}` } };
+  return `Waiting on an answer: ${question} Nothing changed yet.`;
+}
+
+/** What the agent answers when the runner refuses a done hand-back with nothing to review. */
+export const nothingToReview = (last: string) =>
+  `Blocked: ${last || "nothing to review yet"} I need the answer from a human before I go on.`;
+
 /** A ticket that says `hold: <gate>` keeps its round running until the driver opens that gate. */
 async function* holdIfAsked(shown: string): AsyncGenerator<Action, void, string> {
   const hold = /^hold: (\S+)$/m.exec(shown)?.[1];
@@ -528,18 +579,15 @@ async function* workOnTicket(ctx: ItemContext, key: string): Script {
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   yield* holdIfAsked(shown);
-  const stopped = yield* blockIfStuck(key, shown, ctx.unblocked);
+  const stopped = (yield* blockIfStuck(key, shown, ctx.unblocked)) ?? (yield* askHuman(key, shown));
   if (stopped !== undefined) {
     return stopped;
   }
 
   yield* checkSandbox(cwd);
-  if (/^network: /m.test(shown)) {
-    return yield* checkNetwork(key);
-  }
-
-  if (/^recall: /m.test(shown)) {
-    return yield* recallHistory(key, shown);
+  const checked = yield* answerOnTicket(key, shown);
+  if (checked !== undefined) {
+    return checked;
   }
 
   const unclear = yield* askWhichRepo(ctx, key, shown);
@@ -779,6 +827,17 @@ export async function* docFeedback(ctx: ItemContext): Script {
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const feedback = need(ctx.feedback[0], "the comment");
+  const decide = /^decide: (.+)$/m.exec(feedback.body)?.[1];
+  if (decide) {
+    return yield* askForDecision(key, decide);
+  }
+
+  // A thanks asks nothing of the agent: it posts nothing and finishes silently, leaving the ticket as it was.
+  if (/^thanks\b/i.test(feedback.body.trim())) {
+    yield { type: "tool", tool: "handback", input: { status: "silent" } };
+    return `Nothing for me in the comment on ${key}.`;
+  }
+
   const ask = /^ask (\S+): (.+)$/m.exec(feedback.body);
   yield {
     type: "tool",
@@ -786,7 +845,26 @@ export async function* ticketComment(ctx: ItemContext): Script {
     input: { key, body: ask ? `@${ask[1]} ${ask[2]}` : `Noted: ${feedback.body}` },
   };
 
+  // A mention on someone else's ticket needs nothing handed on: the round finishes silently. On its own ticket the
+  // agent's answer is for the human to review, so it moves the ticket to review.
+  yield ctx.kind === "asked"
+    ? { type: "tool", tool: "handback", input: { status: "silent" } }
+    : { type: "tool", tool: "ticket_move", input: { key, to: "review" } };
+
   return ask ? `Asked ${ask[1]} on ${key}.` : `Answered the comment on ${key}.`;
+}
+
+/**
+ * A comment that says `decide: <question>` needs a human's decision: the agent asks on the ticket and says it is done,
+ * with nothing to review. The runner refuses that, and the agent's answer to the refusal is handed back as blocked.
+ */
+async function* askForDecision(
+  key: string,
+  question: string,
+): AsyncGenerator<Action, string, string> {
+  yield { type: "tool", tool: "ticket_comment", input: { key, body: `Question: ${question}` } };
+  yield { type: "tool", tool: "handback", input: { status: "done" } };
+  return `Asked: ${question}`;
 }
 
 /** The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own. */

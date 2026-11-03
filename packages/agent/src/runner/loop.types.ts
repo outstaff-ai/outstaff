@@ -2,7 +2,7 @@ import type { Logger, Policy, Runtime, TeamConfig, ToolKind } from "@outstaff/co
 import type { NotesReader } from "#/notes/types.js";
 import type { OfficeConnection } from "#/office-client/index.js";
 import type { ClonedRepo, Workspaces } from "#/repos/index.js";
-import type { AgentEnv } from "#/verbs/types.js";
+import type { AgentEnv, DeclaredHandBack } from "#/verbs/types.js";
 import type { ChatRelay } from "./chat.types.js";
 import type { ProfilePublisher, SessionManager, UsageReporter } from "./types.js";
 
@@ -106,4 +106,10 @@ export interface ItemEnv {
 
   /** Whether a chat session filed its request as work. */
   filedWork(): boolean;
+
+  /** What the agent made through its verbs in this run: pull requests opened, updated or merged, documents linked. */
+  produced(): string[];
+
+  /** The hand-back the agent stated with `ost handback`, the last one; undefined when it stated none. */
+  declared(): DeclaredHandBack | undefined;
 }

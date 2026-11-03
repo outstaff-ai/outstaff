@@ -27,5 +27,29 @@ export const WORKFLOW_EVENT_TYPES = [
 
 export const DEFAULT_NEEDS_HUMAN_LABEL = "needs-human";
 
-/** How an agent ended its turn on a work item: finished, waiting for an answer, or unable to continue. */
-export const HAND_BACK_STATUSES = ["done", "waiting", "blocked"] as const;
+/**
+ * How an agent ended its turn on a work item: finished with a result to review, waiting for an answer, unable to
+ * continue, or finished silently, with nothing to hand on and the ticket put back as the round found it.
+ */
+export const HAND_BACK_STATUSES = ["done", "waiting", "blocked", "silent"] as const;
+
+/**
+ * Work item kinds whose round may finish silently, with nothing to hand on and the ticket put back as the round found it: answering a
+ * question, a chat request, a comment or a mention, an unblock, a merge, or work on a pull request that already exists
+ * (its feedback, a rebase, failing checks). Any other kind (a ticket to work on, a request filed without a tracker)
+ * never does. A `done` hand-back, of any kind, needs a result to review or finished work.
+ */
+export const SILENT_KINDS: readonly string[] = [
+  "chat",
+  "question",
+  "asked",
+  "ticket_comment",
+  "doc_feedback",
+  "unblock",
+  "merge",
+  "review_feedback",
+  "merged_feedback",
+  "rebase",
+  "ci_failed",
+  "merge_checks_failed",
+];

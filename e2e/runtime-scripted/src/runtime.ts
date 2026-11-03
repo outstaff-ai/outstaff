@@ -13,7 +13,8 @@ import {
   type UsageEvent,
 } from "@outstaff/core";
 import { latestChatMessage, parsePrompt, type ItemContext } from "./prompt.js";
-import { SCRIPTS, type Action } from "./scripts.js";
+import { NOTHING_TO_REVIEW } from "@outstaff/agent";
+import { SCRIPTS, nothingToReview, type Action } from "./scripts.js";
 
 const sh = (command: string, cwd: string): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -189,6 +190,9 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
   // What a model would remember: the conversation of each chat session, which a resumed prompt does not repeat.
   const talks = new Map<string, NonNullable<ItemContext["conversation"]>>();
 
+  // The last message of each session, which the answer to a refused done hand-back repeats.
+  const lasts = new Map<string, string>();
+
   /** Keeps the conversation of a chat session, and gives a resumed prompt the one it does not repeat. */
   function recall(session: string, ctx: ItemContext | undefined, prompt: string): void {
     if (ctx?.kind !== "chat") {
@@ -220,6 +224,7 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
       }
 
       round.last = text;
+      lasts.set(session, text);
       if (ctx.kind === "chat") {
         talks.get(session)?.push({ from: "agent", agent: true, text });
       }
@@ -233,18 +238,29 @@ export function createScriptedRuntime(config: ScriptedConfig = {}): Runtime {
     }
   }
 
+  /**
+   * The answer to a turn that runs no script: the journal entry the loop asks for in the same session (no tools, one
+   * turn), or what the agent says when the runner refused a done hand-back with nothing to review (the script already
+   * said what it needs).
+   */
+  function fixedAnswer(req: RunRequest, session: string): string | undefined {
+    if (req.tools.length === 0) {
+      return "Scripted round done; the details are in the pull request and the ticket.";
+    }
+
+    return req.prompt.startsWith(NOTHING_TO_REVIEW)
+      ? nothingToReview(lasts.get(session) ?? "")
+      : undefined;
+  }
+
   async function* run(req: RunRequest): AsyncGenerator<RuntimeEvent> {
     const session = req.sessionId ?? `scripted-${++sessions}-${Date.now()}`;
     yield { type: "started", sessionId: session };
     yield USAGE;
-    // The loop asks for a journal entry in the same session, with no tools and one turn.
-    if (req.tools.length === 0) {
-      yield {
-        type: "finished",
-        ok: true,
-        text: "Scripted round done; the details are in the pull request and the ticket.",
-      };
-
+    const answer = fixedAnswer(req, session);
+    if (answer !== undefined) {
+      yield { type: "text", text: answer };
+      yield { type: "finished", ok: true, text: answer };
       return;
     }
 

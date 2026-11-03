@@ -8,6 +8,7 @@ import { policy as docCommentToMentionedAgent } from "./doc_comment_to_mentioned
 import { policy as handBackBlocked } from "./hand_back_blocked.js";
 import { policy as handBackBlockedToPm } from "./hand_back_blocked_to_pm.js";
 import { policy as handBackDone } from "./hand_back_done.js";
+import { policy as handBackSilentRestores } from "./hand_back_silent_restores.js";
 import { policy as idlePullsNext } from "./idle_pulls_next.js";
 import { policy as linkDocOnTicket } from "./link_doc_on_ticket.js";
 import { policy as linkPrOnTicket } from "./link_pr_on_ticket.js";
@@ -60,6 +61,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   linkDocOnTicket,
   startMarksActive,
   handBackDone,
+  handBackSilentRestores,
   handBackBlocked,
   handBackBlockedToPm,
   idlePullsNext,
