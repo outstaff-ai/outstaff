@@ -235,6 +235,16 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       need(otherKey);
       relations.push({ key, otherKey, relation });
     },
+    async unlink(key, otherKey, relation) {
+      need(key);
+      need(otherKey);
+      const same = (r: (typeof relations)[number]) =>
+        r.relation === relation &&
+        ((r.key === key && r.otherKey === otherKey) ||
+          (relation === "relates" && r.key === otherKey && r.otherKey === key));
+
+      relations.splice(0, relations.length, ...relations.filter((r) => !same(r)));
+    },
     async setParent(key, parentKey) {
       need(parentKey);
       const issue = need(key);

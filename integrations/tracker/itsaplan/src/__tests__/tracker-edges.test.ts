@@ -228,3 +228,41 @@ describe("events", () => {
     expect(eventType({ ...base, kind: "history" })).toBeUndefined();
   });
 });
+
+describe("unlink", () => {
+  const link = (id: number, kind: string, direction: string, identifier: string) => ({
+    id,
+    kind,
+    direction,
+    issue: { id: 1000 + id, sequenceNumber: id, identifier, title: "Other", columnId: 10 },
+  });
+
+  it("deletes the matching links only: blocks as stated, relates either way", async () => {
+    const { tracker, stub } = await trackerOver([
+      route("GET", "/projects/SHOP/issues/2", () => issue({ id: 1002, identifier: "SHOP-2" })),
+      route("GET", "/projects/SHOP/issues/3", () =>
+        issue({
+          id: 1003,
+          identifier: "SHOP-3",
+          links: [
+            link(1, "blocks", "inward", "SHOP-2"),
+            link(2, "blocks", "outward", "SHOP-2"),
+            link(3, "relates", "inward", "SHOP-2"),
+            link(4, "relates", "outward", "SHOP-9"),
+          ],
+        }),
+      ),
+      route("DELETE", "/issues/1003/links/2", () => ({ status: 204 })),
+      route("DELETE", "/issues/1003/links/3", () => ({ status: 204 })),
+    ]);
+
+    await tracker.unlink("SHOP-3", "SHOP-2", "blocks");
+    await tracker.unlink("SHOP-3", "SHOP-2", "relates");
+    await tracker.unlink("SHOP-3", "SHOP-2", "duplicates");
+    expect(stub.called("DELETE", "/issues/1003/links/2")).toHaveLength(1);
+    expect(stub.called("DELETE", "/issues/1003/links/3")).toHaveLength(1);
+    // An issue whose answer carries no links has nothing to delete.
+    await tracker.unlink("SHOP-1", "SHOP-2", "blocks");
+    expect(stub.called("DELETE", "/issues/1001/links/2")).toHaveLength(0);
+  });
+});

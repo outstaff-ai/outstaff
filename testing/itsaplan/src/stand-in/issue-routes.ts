@@ -1,4 +1,4 @@
-import { addLink, issueView, linkOf } from "./links.js";
+import { addLink, issueView, linkIndex, linkOf } from "./links.js";
 import { assignIssue, commentIssue, issueById, moveIssue, page, touch } from "./model.js";
 import { err } from "./store.js";
 import type { ActorRoute, ItsaplanStore, StoredIssue } from "./types.js";
@@ -92,6 +92,20 @@ export function issueRoutes(s: ItsaplanStore): ActorRoute[] {
 
         const link = addLink(s, from, to, String(r.json.kind));
         return link ? { status: 201, body: linkOf(s, from, link) } : err(400, "unknown link kind");
+      },
+    },
+    {
+      method: "DELETE",
+      path: "/issues/:id/links/:linkId",
+      handler: (r) => {
+        const issue = issueById(s, r.params["id"]!);
+        const at = issue ? linkIndex(s, issue, Number(r.params["linkId"])) : -1;
+        if (at < 0) {
+          return err(404, "link not found");
+        }
+
+        s.links.splice(at, 1);
+        return { status: 204 };
       },
     },
     {

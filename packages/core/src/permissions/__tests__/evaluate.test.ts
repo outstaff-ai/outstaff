@@ -108,6 +108,7 @@ const rows: Row[] = [
   ["chat may assign a ticket", "chat", { kind: "ost", command: "ticket.assign" }, "allow"],
   ["chat may re-parent a ticket", "chat", { kind: "ost", command: "ticket.parent" }, "allow"],
   ["chat may edit a ticket", "chat", { kind: "ost", command: "ticket.edit" }, "allow"],
+  ["chat may link tickets", "chat", { kind: "ost", command: "ticket.link" }, "allow"],
   [
     "chat may not merge a pull request",
     "chat",

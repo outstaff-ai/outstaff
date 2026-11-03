@@ -88,6 +88,27 @@ describe("work state: closing a ticket unblocks the tickets it blocks", () => {
     expect(unblocked()).toHaveLength(2);
   });
 
+  it("names the parent and its agent when the ticket and its blocker are sub-tickets of one parent", async () => {
+    const agent = await tracker.seed.member({ name: "Sam", username: "sam", kind: "agent" });
+    const parent = await ticket("Fonts", "active");
+    await tracker.assign(parent, agent.id);
+    const [first, second] = [await ticket("Pick", "active"), await ticket("Set", "blocked")];
+    const elsewhere = await ticket("Size", "blocked");
+    for (const key of [first, second]) {
+      await tracker.setParent!(key, parent);
+    }
+
+    await tracker.link(first, second, "blocks");
+    await tracker.link(first, elsewhere, "blocks");
+    await Promise.all([moved(first), moved(second), moved(elsewhere)]);
+
+    await close(first);
+    const [sibling, other] = unblocked();
+    expect(sibling).toMatchObject({ ticket: second, parent, parentAgent: agent.id });
+    expect(other).toMatchObject({ ticket: elsewhere });
+    expect(other).not.toHaveProperty("parent");
+  });
+
   it("waits for the last open blocker, and counts a canceled one as closed", async () => {
     const [first, second] = [await ticket("One", "active"), await ticket("Two", "review")];
     const blocked = await ticket("Both", "blocked");

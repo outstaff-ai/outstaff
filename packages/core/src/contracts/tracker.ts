@@ -9,12 +9,14 @@ import {
   requireCapability,
   requireSeed,
 } from "./harness.js";
+import { trackerLinkCases } from "./tracker-links.js";
 import { trackerListingCases } from "./tracker-listing.js";
 import type { ContractSetupFn } from "./types.js";
 
 export function trackerContract(name: string, setup: ContractSetupFn<Tracker, TrackerSeed>): void {
   contractSuite(`tracker contract: ${name}`, setup, (get) => {
     trackerListingCases(get);
+    trackerLinkCases(get);
     it("creates an issue that can be read back with an absolute url", async (t) => {
       const s = get();
       requireCapability(t, s, "tracker.issues");
@@ -132,30 +134,6 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
       expect(other.map((i) => i.key)).not.toContain(issue.key);
     });
 
-    it("reads the tickets an issue blocks and is blocked by, with their status", async (t) => {
-      const s = get();
-      requireCapability(t, s, "tracker.issues");
-      const blocker = await s.subject.createIssue({ title: "Pick the font", body: "" });
-      const blocked = await s.subject.createIssue({ title: "Set the font", body: "" });
-      const related = await s.subject.createIssue({ title: "Font size", body: "" });
-      await s.subject.link(blocker.key, blocked.key, "blocks");
-      await s.subject.link(blocker.key, related.key, "relates");
-      await s.subject.transition(blocker.key, "done");
-      await s.subject.transition(blocked.key, "blocked");
-
-      const from = await s.subject.getIssue(blocker.key);
-      expect(from.blocks?.map((l) => [l.key, l.status.canonical])).toEqual([
-        [blocked.key, "blocked"],
-      ]);
-
-      expect(from.blockedBy).toEqual([]);
-      const to = await s.subject.getIssue(blocked.key);
-      expect(to.blocks).toEqual([]);
-      expect(to.blockedBy?.map((l) => [l.key, l.status.canonical])).toEqual([
-        [blocker.key, "done"],
-      ]);
-    });
-
     it("searches by title and honours the limit", async (t) => {
       const s = get();
       requireCapability(t, s, "tracker.issues");
@@ -191,15 +169,6 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
 
       const comments = await s.subject.listComments(issue.key);
       expect(comments.map((c) => c.body)).toEqual(["one", "two"]);
-    });
-
-    it("links issues and rejects unknown targets", async (t) => {
-      const s = get();
-      requireCapability(t, s, "tracker.issues");
-      const a = await s.subject.createIssue({ title: "A", body: "" });
-      const b = await s.subject.createIssue({ title: "B", body: "" });
-      await expect(s.subject.link(a.key, b.key, "blocks")).resolves.toBeUndefined();
-      await expectPortError(s.subject.link(a.key, "NOPE-99999", "relates"), "not_found");
     });
 
     it("assigns and unassigns a member", async (t) => {

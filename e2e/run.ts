@@ -2138,7 +2138,8 @@ async function main() {
 
 /**
  * A ticket that needs several pull requests: the agent splits it into a sub-ticket it starts now, with its own pull
- * request, and one for later, ready; the parent stays with the agent until its last sub-ticket closes.
+ * request, and one for later, filed blocked by the first (a tracker link, not a line of text); the parent stays with
+ * the agent until its last sub-ticket closes.
  */
 async function splitWork() {
   const pullsBeforeSplit = (await state()).github.pulls.length;
@@ -2180,7 +2181,7 @@ async function splitWork() {
   );
 
   // The hand-back as done gives the sub-ticket in review to the human who asked; the parent, with open sub-tickets,
-  // stays active with the agent, and the part for later stays ready.
+  // stays active with the agent, and the part for later stays blocked.
   const split = await until(
     "the sub-ticket in review with the human, the parent active with sam",
     (s) => {
@@ -2200,8 +2201,22 @@ async function splitWork() {
   );
 
   assertEq(split.child.parent, parent, "the sub-ticket has its parent as a real parent");
-  assertEq(JSON.stringify(split.child.links), "[]", "no relates link where the parent is real");
-  assertEq(split.later.status, "Ready", "the part for later is ready, not in the backlog");
+  assertEq(split.later.parent, parent, "the part for later has its parent as a real parent");
+  assertEq(
+    JSON.stringify(split.child.links.map((l: Json) => [l.kind, l.to])),
+    JSON.stringify([["blocks", split.later.key]]),
+    "the first sub-ticket blocks the part for later, as a tracker link; no relates link where the parent is real",
+  );
+
+  for (const t of [split.child, split.later]) {
+    assertEq(
+      /Part of|Depends on/.test(t.description),
+      false,
+      `${t.key}'s description says nothing about its parent or dependency`,
+    );
+  }
+
+  assertEq(split.later.status, "Blocked", "the part for later starts blocked, not in the backlog");
   assertEq(split.later.assignee, "sam", "the part for later is the agent's");
   assertEq(
     split.t.comments.some(
@@ -2216,7 +2231,7 @@ async function splitWork() {
   await officePolledTwice("the split");
   const afterSplit = await state();
   assertEq(ticketOf(afterSplit, split.child.key).development.length, 1, "exactly one link");
-  assertEq(ticketOf(afterSplit, split.later.key).status, "Ready", "the later part waits");
+  assertEq(ticketOf(afterSplit, split.later.key).status, "Blocked", "the later part waits");
   assertEq(
     afterSplit.github.pulls.length,
     pullsBeforeSplit + 2,
@@ -2236,7 +2251,7 @@ async function splitWork() {
   );
 
   step(
-    `split: ${parent} split into ${split.child.key} (#${split.forChild.number}, in review with the human, linked once before the next poll) and ${split.later.key} (ready); ${parent} has #${split.forParent.number} and stays active with sam; a second for ${parent} refused`,
+    `split: ${parent} split into ${split.child.key} (#${split.forChild.number}, in review with the human, linked once before the next poll) and ${split.later.key} (blocked by it, a tracker link); ${parent} has #${split.forParent.number} and stays active with sam; a second for ${parent} refused`,
   );
 
   // Merging the parent's own pull request leaves it active: it still has open sub-tickets.
@@ -2249,7 +2264,9 @@ async function splitWork() {
   );
 
   // Merging the sub-ticket's closes it, with the agent who did the work, and wakes the agent on the parent: it starts
-  // the later part on its own, with no human acting.
+  // the later part on its own, with no human acting. The close also unblocks the later part: the office moves it to
+  // ready, as sam, but does not wake sam for it too, since the wake on the parent covers that close.
+  const samBeforeClose = wakesOf("sam").length;
   await stub("POST", `/_test/pulls/${split.forChild.number}/merge`);
   const next = await until(`${split.child.key} done and the later part's pull request`, (s) => {
     const child = ticketOf(s, split.child.key);
@@ -2271,8 +2288,28 @@ async function splitWork() {
   });
 
   assertEq(nextLater.development.length, 1, "the later part's pull request is linked on it once");
+  assertEq(
+    logs("office").includes(
+      `workstate: ticket.unblocked on ${split.later.key}, its last blocker ${split.child.key} closed`,
+    ),
+    true,
+    `the office recorded ticket.unblocked for ${split.later.key}`,
+  );
+
+  assertIncludes(
+    nextLater.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`),
+    "sam:Blocked>Ready",
+    "the office moved the unblocked part to ready, as sam",
+  );
+
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBeforeClose)),
+    JSON.stringify(["assigned"]),
+    "sam was woken once for the close, on the parent, and not again for the ticket it unblocked",
+  );
+
   step(
-    `split next: #${split.forChild.number} merged -> ${split.child.key} done with sam; sam woken on ${parent} opened #${next.pr.number} for ${split.later.key}; ${parent} still active with sam`,
+    `split next: #${split.forChild.number} merged -> ${split.child.key} done with sam, ${split.later.key} unblocked to ready; sam woken once, on ${parent}, opened #${next.pr.number} for ${split.later.key}; ${parent} still active with sam`,
   );
 
   // The last sub-ticket closing moves the parent on: its own pull request merged, so it is done, with the agent.

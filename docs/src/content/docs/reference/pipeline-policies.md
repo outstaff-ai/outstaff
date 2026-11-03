@@ -34,7 +34,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`subticket_closed_to_agent`](#subticket_closed_to_agent) | `ticket.closed` | wake `assignee`, else `last_worker`, else the parent's agent (kind `assigned`) on the ticket's parent, the first of them with more unfinished sub-tickets of the parent |
 | [`subtickets_closed_move_parent`](#subtickets_closed_move_parent) | `ticket.closed` | act for the parent's agent: move the parent to `done` and assign it to the agent, when its own pull requests merged, else to `review` and assign it to the requester; when the closed ticket was its last open sub-ticket |
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
-| [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready` |
+| [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`), unless the blocker is a sub-ticket of the same parent and the parent is with that agent (`parentAgent`): then only move it; with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`doc_comment_to_mentioned_agent`](#doc_comment_to_mentioned_agent) | `doc.commented` | wake `mentioned` (kind `doc_feedback`) |
 | [`link_doc_on_ticket`](#link_doc_on_ticket) | `doc.linked` | act for `doc_author`, else `actor`: link the document on the ticket, when the knowledge base can link documents on tickets (`knowledge.issueLinks`) |
@@ -469,9 +469,9 @@ Instruction:
 
 ### unblocked_to_ready
 
-A blocked ticket whose last open blocker was closed, with no agent blocked on it, was only waiting on its blockers: it moves to ready, for the agent it is assigned to, who is then woken; else for the agent who closed the blocker.
+A blocked ticket whose last open blocker was closed, with no agent blocked on it, was only waiting on its blockers: it moves to ready, for the agent it is assigned to, who is then woken; else for the agent who closed the blocker. When the blocker is a sub-ticket of the same parent and that parent is with the same agent, the ticket is only moved and no one is woken here: the agent holding the parent coordinates its sub-tickets, and the idle pull starts this one when it has nothing queued.
 
-Listens to `ticket.unblocked`. Decides: act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`); with no agent assigned, act for `closer`: move the ticket to `ready`.
+Listens to `ticket.unblocked`. Decides: act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`), unless the blocker is a sub-ticket of the same parent and the parent is with that agent (`parentAgent`): then only move it; with no agent assigned, act for `closer`: move the ticket to `ready`.
 
 When:
 

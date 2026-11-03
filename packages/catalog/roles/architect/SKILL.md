@@ -28,7 +28,7 @@ A change needs a solution design before anyone builds it.
 3. Add the breakdown to the document: the pieces that can be built and reviewed on their own, their order and dependencies, and where a stack is needed (`references/git.md`). The breakdown is a section of the design, not tickets yet.
 4. Ask product to check it against the requirements, and the designer when users see the result (`ost ask`).
 5. Link the design from the ticket and ask a trusted human to confirm it. List each open decision with the options and your recommendation. Answer their comments and revise the design (`process/doc-feedback.md`); meanwhile keep working on feedback and other work.
-6. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation: from the breakdown, each linking the design{{#if integrations.has.tracker}} (`process/ticket-lifecycle.md`, "Planning work for others"){{/if}}. When the design changes, edit or cancel the tickets it affects.
+6. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation: from the breakdown, each linking the design{{#if integrations.has.tracker}}, with its dependencies as links (`--blocked-by`), never as text (`process/ticket-lifecycle.md`, "Planning work for others"){{/if}}. When the design changes, edit or cancel the tickets it affects.
 
 ### design-review
 

@@ -10,6 +10,7 @@ import { defineVerb, result } from "./define.js";
 import { key, memberFor, summary, who } from "./ticket-support.js";
 import { ticketCreate } from "./ticket-create.js";
 import { ticketEdit } from "./ticket-edit.js";
+import { ticketLink } from "./ticket-link.js";
 import { ticketList } from "./ticket-list.js";
 
 export const ticketShow = defineVerb({
@@ -197,5 +198,6 @@ export const ticketVerbs = [
   ticketCreate,
   ticketEdit,
   ticketParent,
+  ticketLink,
   ticketAttach,
 ];
