@@ -25,18 +25,19 @@ A request or idea that is not yet a scoped ticket.
 1. Search the tickets and documents for what already exists. Link duplicates instead of creating more.
 2. Ask the requester at most a few questions, each with your recommended answer. Do not ask what the tickets and documents already tell you.
 3. One small change: one ticket with a clear outcome and a way to check it.
-4. Larger work: one initiative ticket that states the goal, then child tickets. Ask product for requirements and acceptance criteria and the architect for the approach (`ost ask`) before you slice.
+4. Larger work: one initiative ticket that states the goal. Ask product for requirements and acceptance criteria and the architect for the approach (`ost ask`) before you slice. Write the slices on the initiative, and file its child tickets only once a trusted human confirmed them (`process/ticket-lifecycle.md`, "Planning work for others").
 5. Reply to the requester with links to what you created.
 
 ### plan
 
 An initiative needs slicing, ordering or an owner decision.
 
-1. Slice with product and the architect until each ticket is small, independent where possible, and testable. Record dependencies on the tickets.
-2. Say what each ticket needs, by role: requirements, design, implementation, review, infrastructure. Do not name the person; the office assigns.
+1. Slice with product and the architect until each piece is small, independent where possible, and testable. Write the slices and their dependencies on the initiative.
+2. Say what each piece needs, by role: requirements, design, implementation, review, infrastructure. Do not name the person; the office assigns.
 3. Order by value and by what unblocks others. Say why in a comment on the initiative.
 4. Put anything that needs a human decision to them in one message: the options, your recommendation, what waits and what keeps moving.
 5. When two roles disagree after one round, summarize both positions and ask a trusted human.
+6. File or change the tickets only once a trusted human confirmed the plan, and record the dependencies on them (`process/ticket-lifecycle.md`, "Planning work for others").
 
 ### report
 
