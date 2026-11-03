@@ -77,7 +77,7 @@ function surplusCheck(want: AppExpectation, granted: Record<string, string>): Do
   const needed = new Set<string>([
     ...READ_PERMISSIONS,
     ...(want.wantActions ? ["actions"] : []),
-    ...(want.wantWorkflows ? ["workflows"] : []),
+    ...(want.wantWorkflows || want.workflowRepos?.length ? ["workflows"] : []),
   ]);
 
   const surplus = Object.entries(granted)
