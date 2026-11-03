@@ -1,5 +1,5 @@
 import type { ActOp } from "@outstaff/core";
-import type { WakeSubject } from "@outstaff/policy";
+import type { NotifyProposal, WakeSubject } from "@outstaff/policy";
 import type { Feedback } from "@outstaff/protocol";
 
 export type { ActOp, ActTarget } from "@outstaff/core";
@@ -78,4 +78,13 @@ export interface Stop {
   noticed?: string[] | undefined;
 }
 
-export type Decision = Wake | Act | Drop | Stop;
+/**
+ * Tell a human in chat that work landed on them, from the agent's own chat account. The office holds it briefly and
+ * merges a human's notices from one agent into one direct message (see `pipeline/notify`).
+ */
+export interface Notify extends Omit<NotifyProposal, "type" | "reason"> {
+  type: "notify";
+  policy: string;
+}
+
+export type Decision = Wake | Act | Drop | Stop | Notify;

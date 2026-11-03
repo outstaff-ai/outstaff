@@ -105,9 +105,8 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
 
   const { inFlight, track } = inFlightTracker();
 
-  // The event pipeline decides what the office does with every event (decision 0018). An error propagates, so the
-  // event is delivered again; its trace, its wakes and its acts are idempotent per event.
-  // Its acts go to the agents they are for, which make them as themselves; the office's tracker account only reads.
+  // The event pipeline decides what the office does with every event (decision 0018); an error propagates, so the event
+  // is delivered again. Its acts go to the agents they are for, made as themselves; the office's tracker only reads.
   const push = (person: string, act: QueuedAct) => server?.act(person, act) ?? false;
   const pipelineOptions = {
     team,
@@ -121,9 +120,10 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
       (a) => a.def.capabilities,
     ),
     ...defined({ policies: input.policies }),
+    ...tracker,
   };
 
-  const { runner: pipeline, traces, acts } = createOfficePipeline(pipelineOptions);
+  const { runner: pipeline, traces, acts, notices } = createOfficePipeline(pipelineOptions);
   // Every event judged is also a moment agents can recall (`ost recall`), indexed first; indexing never fails one.
   const recall = createRecall({ store, team, workState, clock, log, ...tracker });
   const tracked = officeUsage({ ...pipelineOptions, ports, acts, log, options: o });
@@ -152,7 +152,6 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const roles = roleInfo(input.catalog);
 
   const humans = trackerHumans(ports, log);
-
   const started = createStarted({ store, workState, judge, log });
   const handedBack = createHandedBack({ store, workState, judge, log });
   const idle = createIdlePull({ ...pipelineOptions, pipeline });
@@ -276,9 +275,9 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     inFlight,
     notify,
     onBlocked,
-    onTick: () => track(idle.sweep()),
+    onTick: () => track(Promise.all([idle.sweep(), notices.flush()])),
     onStarted: () => void track(recall.catchUp()),
-    onStop: tracked.stop,
+    onStop: () => void [tracked.stop(), notices.stop()],
   });
 
   return {

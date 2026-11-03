@@ -178,15 +178,17 @@ function parseShared(prompt: string): Pick<ItemContext, "files"> {
   return shared.length ? { files: shared } : {};
 }
 
-// "Recent messages of this conversation..." then `- Name: text` or `- Name (agent): text`, one per message.
+// "Recent messages of this conversation..." then `- Name: text` or `- Name (agent): text`, one per message; a message's
+// later lines are indented under it.
 function parseConversation(prompt: string): Pick<ItemContext, "conversation"> {
-  const recent = /^Recent messages of this conversation[^\n]*\n((?:- [^\n]*\n?)+)/m.exec(
+  const recent = /^Recent messages of this conversation[^\n]*\n((?:(?:- |  )[^\n]*\n?)+)/m.exec(
     prompt,
   )?.[1];
 
   const conversation = recent
     ?.trim()
-    .split("\n")
+    .split(/\n(?=- )/)
+    .map((m) => m.replaceAll("\n  ", "\n"))
     .map((line) => /^- (.+?)( \(agent\))?: ([\s\S]*)$/.exec(line))
     .filter((m) => m !== null)
     .map((m) => ({ from: m[1]!, agent: m[2] !== undefined, text: m[3]! }));

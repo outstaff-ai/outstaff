@@ -70,6 +70,7 @@ export type RenderOptions = { file?: string };
  *   policies.messages.{max_lines,always_link,omit[]}
  *   policies.tickets.many_prs (true when policies.tickets.prs_per_ticket is many)
  *   policies.design.canvas (true unless policies.design.canvas is switched off)
+ *   policies.notify_handoff (true unless policies.notify_handoff is switched off)
  */
 export type RepoContext = {
   name: string;
@@ -120,6 +121,7 @@ export type CatalogContext = {
     messages: { max_lines: number; always_link: boolean; omit: string[] };
     tickets: { many_prs: boolean };
     design: { canvas: boolean };
+    notify_handoff: boolean;
   };
 };
 

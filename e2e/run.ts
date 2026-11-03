@@ -283,6 +283,9 @@ humans:
     identities: { vcs: ada-admin, tracker: ada.admin, chat: U0ADA00001 }
   - name: Grace Lead
     identities: { vcs: grace-lead }
+  # A trusted human with no chat identity: work handed back to her is not told in chat.
+  - name: Ivy Ops
+    identities: { tracker: ivy.ops }
   - name: Mona Merge
     identities: { vcs: merge-approver }
 catalog: { version: 0.0.0 }
@@ -322,6 +325,9 @@ office:
 # Each event wakes the agent at once: the run waits for every step, and a batch of comments arrives as one review.
 pipeline:
   wake: { coalesce_seconds: 0 }
+  # A direct message to a human waits for more for 15 seconds instead of a minute: longer than the poll, so a pull
+  # request the office reads after the hand-back still joins its message.
+  notify: { debounce_seconds: 15 }
 policies:
   # Only this approver's approval wakes an author to merge: the other steps approve nothing, and a human here changes
   # none of them. The stub's ruleset needs one approval and its merge queue merges what joins it.
@@ -619,6 +625,19 @@ async function main() {
 
   step(
     `assignment: ${first} -> sam cloned, committed, pushed and opened pull request #${pr1.pr.number}; ticket in review`,
+  );
+
+  await notifiedOnce(
+    first,
+    "sam",
+    (text) =>
+      text.startsWith(`Ready for your review: [${first}](`) &&
+      text.includes(`acme/shop#${pr1.pr.number}`),
+    "the pull request opened in the round and the hand-back as done",
+  );
+
+  step(
+    `notify: sam told the requester once, in a direct message, with ${first} and pull request #${pr1.pr.number}`,
   );
 
   // ---- 2. the same for a second ticket, which also asks the architect; its pull request edits the same line
@@ -1393,14 +1412,24 @@ async function main() {
   step(`blocked: pia ran exactly one round for ${stuck}, the unblock`);
 
   // The team has a PM (policies.hand_back.blocked_notify: pm), so the blocked agent leaves telling the requester to
-  // the PM, who does it on the ticket, and the office posts nothing.
-  assertEq(
-    stays.chat.posts.some((p: Json) => p.text.includes(stuck)),
-    false,
-    "no chat message about the blocked ticket: the office posts nothing, and the agent leaves it to the PM",
+  // the PM, who does it on the ticket; when she gives the ticket to the human, her agent tells them in a direct message
+  // what is needed. The office posts nothing, and sam sends nothing.
+  await notifiedOnce(
+    stuck,
+    "pia",
+    (text) =>
+      text.startsWith(`Blocked, needs you: [${stuck}](`) &&
+      text.includes("Needs a human: the staging credentials are missing."),
+    "the blocked ticket the PM gave to the human",
   );
 
-  step(`blocked: no chat message was posted about ${stuck}`);
+  assertEq(
+    (await state()).chat.posts.some((p: Json) => p.agent === "sam" && p.text.includes(stuck)),
+    false,
+    "the blocked agent posted nothing about the blocked ticket",
+  );
+
+  step(`blocked: pia told the requester once, in a direct message, what ${stuck} needs`);
 
   // ---- 10, asked: a ticket that needs a human's decision. The scripted round asks on the ticket and ends as if it were
   // done, with nothing to review; the runner refuses that once, sam answers that it is blocked, and the round is
@@ -2364,6 +2393,7 @@ async function main() {
   await mergeChecks();
   await recallHistory();
   await usagePerTicket();
+  await handedToHumanWithoutChat();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -3255,6 +3285,67 @@ async function notesInTheKnowledgeBase() {
   );
 
   step("notes trust: an edit by a trusted human is used");
+}
+
+/**
+ * Waits for the agent's one direct message to the human about the ticket, checks it with `says`, then waits past the
+ * debounce window and two polls of the office: no second message about the ticket follows.
+ */
+async function notifiedOnce(
+  key: string,
+  agent: string,
+  says: (text: string) => boolean,
+  what: string,
+) {
+  const direct = `D-${agent}-U0ADA00001`;
+  const about = (s: Json) =>
+    s.chat.posts.filter(
+      (p: Json) => p.agent === agent && p.channel === direct && !p.thread && p.text.includes(key),
+    );
+
+  const sent = await until(`${agent}'s direct message about ${key}: ${what}`, (s) => about(s)[0]);
+  assertEq(says(sent.text), true, `the direct message says what is needed: ${sent.text}`);
+  await officePolledTwice(`${agent} told the human about ${key}`);
+  assertEq(about(await state()).length, 1, `one direct message about ${key}: ${what}`);
+}
+
+/**
+ * 13d. a ticket from a trusted human with no chat identity: sam hands it back to her as usual, and nothing is sent in
+ * chat; the office logs why.
+ */
+async function handedToHumanWithoutChat() {
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  const { key } = await stub("POST", "/_test/tickets", {
+    title: "Add a greeting for the lead",
+    assignee: "sam",
+    as: "ivy.ops",
+  });
+
+  await until(`${key} handed back to the human who asked, with no chat identity`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === key);
+    return t.status === "In Review" && t.assignee === "ivy.ops" ? t : undefined;
+  });
+
+  await until("the office logging that the human has no chat identity", () =>
+    /notify: ivy\.ops has no chat identity/.test(logs("office")) ? true : undefined,
+  );
+
+  await officePolledTwice(`${key} handed back`);
+  assertEq(
+    (await state()).chat.posts.some((p: Json) => p.text.includes(key)),
+    false,
+    "no chat message about a ticket handed to a human with no chat identity",
+  );
+
+  step(
+    `notify: ${key} handed back to a human with no chat identity -> nothing sent, the office logged it`,
+  );
 }
 
 /** A chat reply says `expected`; the chat may add to what the agent wrote. */

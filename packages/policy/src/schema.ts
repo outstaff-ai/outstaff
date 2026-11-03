@@ -87,4 +87,17 @@ export const proposalSchema = z.discriminatedUnion("type", [
     except: z.array(text).optional(),
     reason: text,
   }),
+  z.strictObject({
+    type: z.literal("notify"),
+    as: text,
+    human: text,
+    need: z.enum(["review", "blocked"]),
+    ticket: text.optional(),
+    prs: z
+      .array(z.strictObject({ ref: text, url: text.optional(), title: z.string().optional() }))
+      .optional(),
+    text: z.string().optional(),
+    told: z.boolean().optional(),
+    reason: text,
+  }),
 ]);

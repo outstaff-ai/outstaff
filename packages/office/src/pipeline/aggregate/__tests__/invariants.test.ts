@@ -37,6 +37,21 @@ describe("the invariants", () => {
     ]);
   });
 
+  it("has only an agent on the team tell a human, never the office", () => {
+    const notice = (as: string) =>
+      ({ type: "notify", as, human: "ada.admin", need: "review", reason: "r" }) as const;
+
+    const trace = aggregated([proposing("p", [notice("office"), notice("sam")])]);
+    expect(trace.decisions).toEqual([
+      {
+        type: "drop",
+        policy: "p",
+        reason: "never message as the office: office is not an agent on the team",
+      },
+      { type: "notify", policy: "p", as: "sam", human: "ada.admin", need: "review" },
+    ]);
+  });
+
   it("suppresses only the wakes of agents on the team", () => {
     const trace = aggregated([
       proposing("p", [{ type: "suppress", person: "office", reason: "r" }, wake("sam")]),

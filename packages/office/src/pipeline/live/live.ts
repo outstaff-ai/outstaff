@@ -1,10 +1,14 @@
 import { configurePipeline } from "#/pipeline/configure.js";
 import { evaluatePipeline } from "#/pipeline/evaluate.js";
 import { toPipelineEvent } from "#/pipeline/from-workflow.js";
+import type { Act, Decision, Notify } from "#/pipeline/decisions.types.js";
 import type { PipelineRunner } from "#/pipeline/runner.types.js";
 import type { LiveOptions } from "./live.types.js";
 import { stopWork } from "./stop.js";
 import { enqueueWake } from "./wake.js";
+
+/** The decisions the agents carry out: acts, and notices to humans. */
+const handedOn = (d: Decision): d is Act | Notify => d.type === "act" || d.type === "notify";
 
 /**
  * The pipeline deciding on every event: each event is judged and traced, its wakes are queued, its acts carried out
@@ -22,6 +26,16 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
   for (const issue of issues) {
     logger.warn(`pipeline: ${issue}`);
   }
+
+  /**
+   * The agent makes an act; the office reads its tickets again when the agent answers (see the act desk). A notice is
+   * held a moment, merged with the human's other notices, then sent by the agent as one direct message.
+   */
+  const handOn = async (d: Act | Notify, event: { id: string; at: string }) => {
+    await (d.type === "act"
+      ? executor.execute(d, event.id)
+      : opts.notices?.add(d, event.id, event.at));
+  };
 
   const runner: PipelineRunner = {
     async handle(raw, meta) {
@@ -47,9 +61,8 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
           continue;
         }
 
-        if (d.type === "act") {
-          // The agent makes the act; the office reads its tickets again when the agent answers (see the act desk).
-          await executor.execute(d, event.id);
+        if (handedOn(d)) {
+          await handOn(d, event);
           continue;
         }
 

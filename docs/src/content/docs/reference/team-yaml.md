@@ -1346,6 +1346,22 @@ Wakes for the same person and subject within this many seconds of the first beco
 - Minimum 0
 - Maximum 3600
 
+### pipeline.notify
+
+How the direct messages that tell a human about work that landed on them are batched.
+
+- Type: `object`
+- Optional
+
+#### pipeline.notify.debounce_seconds
+
+How long a direct message to a human about work that landed on them (the notify_human_on_handoff policy) waits for more to join it: an agent's messages to one human within this many seconds of the latest go as one. A message also waits while the agent's round on its ticket runs, so a pull request opened in a round goes with the round's hand-back. Default 60, or office.poll_interval_seconds plus 15 when that is longer, so a pull request the office reads after the hand-back still joins its message.
+
+- Type: `integer`
+- Optional
+- Minimum 0
+- Maximum 3600
+
 ### pipeline.context
 
 The context bundle every wake carries: the tickets, pull requests and chat threads the work is linked to, with their recent comments, threads and messages.
@@ -1575,6 +1591,14 @@ How many pull requests a ticket may have. one: ost pr open refuses a second one 
 - Optional
 - Default: `one`
 - Allowed values: `one`, `many`
+
+### policies.notify_handoff
+
+Have an agent tell a human in a direct message in chat when work lands on them: a ticket it hands back to them for review, a blocked ticket given to them (a PM that cannot unblock it, for example), or a pull request it opens for their review. The message links the ticket and the pull requests and says, in a line or two from the hand-back, what is needed. One agent's messages to one human are batched (pipeline.notify.debounce_seconds). A human with no identities.chat is sent nothing, and the office logs it. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
 
 ### policies.pull_ready
 

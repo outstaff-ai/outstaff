@@ -63,6 +63,17 @@ describe("checkProposals", () => {
       },
       { type: "drop", reason: "r" },
       { type: "suppress", person: "sam", kind: "chat", reason: "r" },
+      {
+        type: "notify",
+        as: "sam",
+        human: "ada.admin",
+        need: "review",
+        ticket: "ACME-1",
+        prs: [{ ref: "acme/shop#7", url: "https://x.example/7", title: "Search" }],
+        text: "Done.",
+        told: false,
+        reason: "r",
+      },
     ];
 
     const checked = checkProposals(list);

@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const ticket = z.string().min(1).max(100).describe("Key of the ticket, for example ACME-123.");
 
-/** One tracker or knowledge-base change of an act. */
+/** One tracker or knowledge-base change of an act, or a direct message in chat. */
 export const actOpSchema = z.discriminatedUnion("op", [
   z.strictObject({
     op: z.literal("move"),
@@ -70,9 +70,22 @@ export const actOpSchema = z.discriminatedUnion("op", [
     field: z.string().min(1).max(200).describe("Name of the ticket's custom number field."),
     value: z.number().nullable().describe("The value to set; null clears it."),
   }),
+  z.strictObject({
+    op: z.literal("chat_dm"),
+    to: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe("The chat member to write to: a human's chat identity from the team file."),
+    body: z
+      .string()
+      .min(1)
+      .max(4000)
+      .describe("The message, in Markdown, as the agent sends it in a direct message."),
+  }),
 ]);
 
-/** Tracker or knowledge-base changes for the agent to make as itself, without a model run. */
+/** Tracker or knowledge-base changes, or direct messages, for the agent to make as itself, without a model run. */
 export const queuedActSchema = z.strictObject({
   id: z
     .string()

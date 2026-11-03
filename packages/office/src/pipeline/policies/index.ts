@@ -18,6 +18,7 @@ import { policy as mergeReady } from "./merge_ready.js";
 import { policy as mergedFeedbackToAuthor } from "./merged_feedback_to_author.js";
 import { policy as movedActiveToAssignee } from "./moved_active_to_assignee.js";
 import { policy as movedActiveToLastWorker } from "./moved_active_to_last_worker.js";
+import { policy as notifyHumanOnHandoff } from "./notify_human_on_handoff.js";
 import { policy as openedToReview } from "./opened_to_review.js";
 import { policy as rebaseToAuthor } from "./rebase_to_author.js";
 import { policy as reviewToAuthor } from "./review_to_author.js";
@@ -64,14 +65,17 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   handBackSilentRestores,
   handBackBlocked,
   handBackBlockedToPm,
+  // After the hand-back policies: the message tells the human what they decided.
+  notifyHumanOnHandoff,
   idlePullsNext,
 ];
 
 /**
- * Built-in policies that are on only while a `policies` switch is: the merge wake (`policies.merge.on_approval`) and the
- * idle pull (`policies.pull_ready`).
+ * Built-in policies that are on only while a `policies` switch is: the merge wake (`policies.merge.on_approval`), the
+ * idle pull (`policies.pull_ready`) and the message to a human that work landed on (`policies.notify_handoff`).
  */
 export const POLICY_SWITCH_OF: Readonly<Record<string, string>> = {
   merge_ready: "merge.on_approval",
   idle_pulls_next: "pull_ready",
+  notify_human_on_handoff: "notify_handoff",
 };

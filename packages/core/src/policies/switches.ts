@@ -81,6 +81,14 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "When an agent has nothing queued or running (when a ticket is created or assigned to it or moves into ready, after a hand-back, on the scheduler's tick, when it connects), the office starts its next ready ticket: one assigned to it, in the ready status, the highest tracker priority first, then the one that entered ready the longest ago. A ticket in backlog, one assigned to someone else, and one the agent already worked on since it entered ready are never pulled. It counts as automatic work: usage above `usage.pause_automatic_at` stops it, and the loop guard covers each item.",
   },
   {
+    path: "notify_handoff",
+    default: true,
+    off: false,
+    kind: "agent",
+    behaviour:
+      "When work lands on a human, the agent tells them in a direct message from its own chat account: a ticket handed back to them for review, a blocked ticket given to them (by a PM that cannot unblock it, for example), or a pull request opened for their review, which is the requester of its ticket. The message links the ticket and the pull requests, and says in a line or two from the hand-back what is needed. One agent's messages to one human are batched: a message waits `pipeline.notify.debounce_seconds` (default 60, or longer than one poll of the office) for more, and while the agent's round on the ticket runs, so a pull request opened in a round goes with its hand-back. A human with no `identities.chat` is sent nothing, and the office logs it. A blocked hand-back on a team without a PM is told by the blocked agent itself (`hand_back.blocked_notify`).",
+  },
+  {
     path: "merge.on_approval",
     default: false,
     off: false,

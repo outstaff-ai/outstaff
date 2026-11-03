@@ -131,6 +131,7 @@ describe("parseTeamConfig", () => {
       feedback: { follow_up_round: true },
       hand_back: { blocked_notify: "pm", fallback: "first_human" },
       tickets: { prs_per_ticket: "one" },
+      notify_handoff: true,
       pull_ready: true,
       merge: { on_approval: false, approvers: ["humans"] },
       merge_checks: { wait_for_start_minutes: 5, timeout_minutes: 120, settle_minutes: 2 },
