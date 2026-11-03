@@ -62,7 +62,8 @@ const WORK_TOOLS: ToolKind[] = [
  * chat:     a chat session beside a running work item. The same tools as a work session, but read-only git, no
  *           repository edits, and only the `ost` verbs in CHAT_VERBS.
  *
- * Every profile may write its scratch, harness (`~/.claude`) and tmp folders. Memory is changed with `ost note` only.
+ * Every profile may write its scratch, harness (`~/.claude/projects`) and tmp folders. Memory, `memory/` and Claude
+ * Code's own auto-memory alike, is changed with `ost note` only.
  */
 export const PROFILE_SPECS: Record<Profile, ProfileSpec> = {
   readonly: { tools: WORK_TOOLS, honoursWrite: false, writable: "none" },

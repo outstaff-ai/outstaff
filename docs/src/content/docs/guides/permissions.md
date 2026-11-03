@@ -11,7 +11,7 @@ Every tool call an agent makes is judged by its permission policy before it runs
 - Use any shell syntax: `$VAR`, `$(...)`, subshells, pipes, here-documents such as `git commit -F - <<'EOF'`.
 - Reach the network with `curl`, `wget`, `nc`, a WebSocket client in its own script, or a declared tool such as `adb` or a vendor CLI. What it reaches is decided by the deployment's network policy. [Network grants](/guides/network-grants/) name services for `ost http`, which adds a token the agent never sees.
 - Read any file except credentials, including its own tool-result files and memory under `~/.claude`.
-- Write its scratch folder, `/tmp`, Claude Code's session folders (`~/.claude/projects`, where its memory and tool-result files live) with the edit tools, and the worktrees its profile allows ([profiles](#profiles)). Shell commands are not limited to those folders; the hard denies below still apply to them. Its notes (`~/memory` with `memory.store: volume`) change only through `ost note`.
+- Write its scratch folder, `/tmp`, Claude Code's session folders (`~/.claude/projects`, where its transcripts and tool-result files live) with the edit tools, and the worktrees its profile allows ([profiles](#profiles)). Shell commands are not limited to those folders; the hard denies below still apply to them. Its notes (`~/memory` with `memory.store: volume`) change only through `ost note`; Claude Code's own auto-memory is off, and its folders (`~/.claude/**/memory/`) are not writable.
 
 ## Hard denies
 

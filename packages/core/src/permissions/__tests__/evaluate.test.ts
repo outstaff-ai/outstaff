@@ -220,9 +220,23 @@ const rows: Row[] = [
   ["code writes scratch", "code", { kind: "write", path: "/work/scratch/n.txt" }, "allow"],
   ["code writes tmp", "code", { kind: "write", path: "/tmp/x/n.txt" }, "allow"],
   [
-    "write Claude Code memory",
+    "write Claude Code's auto-memory",
     "readonly",
     { kind: "write", path: "/home/agent/.claude/projects/-work-main/memory/MEMORY.md" },
+    "deny",
+    "paths.write.deny",
+  ],
+  [
+    "write an auto-memory file",
+    "code",
+    { kind: "write", path: "/home/agent/.claude/projects/x/memory/push-policy.md" },
+    "deny",
+    "paths.write.deny",
+  ],
+  [
+    "read an auto-memory file",
+    "code",
+    { kind: "read", path: "/home/agent/.claude/projects/x/memory/push-policy.md" },
     "allow",
   ],
   [
@@ -393,10 +407,11 @@ const rows: Row[] = [
   ["read a rendered reference", "code", sh("cat /work/main/references/git.md"), "allow"],
   ["sed without -i reads", "code", sh("sed -n 1,5p /work/main/references/git.md"), "allow"],
   [
-    "write memory through the shell",
+    "write auto-memory through the shell",
     "code",
     sh("echo note >> ~/.claude/projects/p/memory/MEMORY.md"),
-    "allow",
+    "deny",
+    "paths.write.deny",
   ],
   [
     "write Claude Code's credential",

@@ -21,7 +21,7 @@ Almost none were risky. The limits that matter already sit outside the agent: th
 
 ## Decision
 
-- **Any program, any arguments, any shell syntax.** The policy allows what no rule denies. That includes `curl`, `wget`, `nc`, WebSocket clients and raw `adb`: what the network reaches is the deployment's network policy's job. The agent reads anything but credentials, and writes its scratch, memory and tmp folders and Claude Code's session folders (`~/.claude/projects`); the edit tools still write only where the profile allows (worktrees of write repos, docs files for the `docs` profile).
+- **Any program, any arguments, any shell syntax.** The policy allows what no rule denies. That includes `curl`, `wget`, `nc`, WebSocket clients and raw `adb`: what the network reaches is the deployment's network policy's job. The agent reads anything but credentials, and writes its scratch and tmp folders and Claude Code's session folders (`~/.claude/projects`, but not its auto-memory, see [0024](/decisions/0024-agent-memory-behind-ost-note/)); the edit tools still write only where the profile allows (worktrees of write repos, docs files for the `docs` profile).
 - **A short list of hard denies**, which no rule can lift:
   - reading the secrets folder or credential files (`.env`, `*.pem`, `.netrc`, `.git-credentials`, ssh keys, Claude Code's `.credentials.json`) and printing the environment (`env`, `printenv`, `export -p`, `set`, `ps e`, `/proc/*/environ`, and expanding a variable whose name says it is a credential);
   - git pushes outside the push rules: a force push without a lease, a push to a default branch, a push to a read-only repository or from outside the granted repositories, and the config changes that could redirect a push;

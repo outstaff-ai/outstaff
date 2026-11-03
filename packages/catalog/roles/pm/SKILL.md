@@ -53,7 +53,7 @@ An initiative is done.
 
 1. Read its tickets, pull requests and comments.
 2. Write a short document: what went well, what did not, and changes to try. Be specific; no blame.
-3. Put lasting lessons in memory. Ask the architect or a trusted human before changing how the team works.
+3. Put lasting lessons in your notes with `ost note` (`references/memory.md`). Ask the architect or a trusted human before changing how the team works.
 4. Link the document on the initiative and tell the humans.
 
 ### unblock
