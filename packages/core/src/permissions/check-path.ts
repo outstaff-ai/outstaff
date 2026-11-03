@@ -21,11 +21,21 @@ export function checkPath(
   }
 
   if (verdict === "outside") {
+    const hint = access === "write" ? ownerHint(policy, abs) : undefined;
     return deny(
-      `${abs} is outside the paths this person may ${access} with the ${access === "write" ? "edit" : "read"} tools.`,
+      `${abs} is outside the paths this person may ${access} with the ${access === "write" ? "edit" : "read"} tools.${hint ? ` ${hint}` : ""}`,
       `paths.${access}.outside`,
     );
   }
 
   return allow(`${abs} is ${access}able.`, `paths.${access}.allow`);
+}
+
+/** What a write in another work item's worktree should do instead: the hint of the deepest worktree holding `abs`. */
+function ownerHint(policy: Policy, abs: string): string | undefined {
+  const owners = (policy.worktrees ?? []).filter(
+    (w) => abs === w.root || abs.startsWith(`${w.root}/`),
+  );
+
+  return owners.toSorted((a, b) => b.root.length - a.root.length)[0]?.hint;
 }

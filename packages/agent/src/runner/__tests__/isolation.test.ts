@@ -143,6 +143,10 @@ describe("isolation between work items", () => {
       },
       held: () => [],
       refresh: async () => [],
+      add: async () => {
+        throw new Error("no worktree is added here");
+      },
+      worktrees: () => [],
       async release(id) {
         rmSync(join(layout.worktreesDir, "shop", id), { recursive: true, force: true });
         rmSync(join(layout.scratchDir, id), { recursive: true, force: true });

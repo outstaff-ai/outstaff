@@ -16,6 +16,7 @@ import type { OfficeClient } from "./office.types.js";
 import type { z } from "zod";
 import type { Attachment } from "#/runner/types.js";
 import type { ToolStatus } from "#/tools/types.js";
+import type { Workspaces } from "#/repos/types.js";
 
 /** What every verb returns; `text` already contains every URL in `links`. */
 export interface VerbResult {
@@ -87,6 +88,9 @@ export interface AgentEnv {
 
   /** The clock verbs read to say how long ago something was. Default: the system clock. */
   now?: () => Date;
+
+  /** The work items' worktrees, for `ost worktree add`; only the agent's work loop has them. */
+  workspaces?: Pick<Workspaces, "add">;
 }
 
 export interface VerbContext {

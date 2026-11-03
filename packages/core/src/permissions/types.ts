@@ -114,6 +114,21 @@ export interface Policy {
 
   /** The `ost` verbs the profile may call, by verb name (`ticket.create`). Every verb when omitted. */
   ost?: { allow: string[] };
+
+  /**
+   * The worktrees of the person's other work items, set per round. A write refused under one of them adds its hint,
+   * which names the work it belongs to and how to change it there.
+   */
+  worktrees?: WorktreeOwner[];
+}
+
+/** The worktree of another work item, and what a write refused there should say. */
+export interface WorktreeOwner {
+  /** Absolute worktree root. */
+  root: string;
+
+  /** For example "This is the worktree of ACME-150 (shop-kit#1). To change it, ...". */
+  hint: string;
 }
 
 export interface ToolCall {

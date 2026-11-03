@@ -5,7 +5,7 @@
 // request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs several pull
 // requests is split into sub-tickets first, one pull request each: the one in review goes to the human with the
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
-// for the next, until the last one closes the parent, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent. The office, Postgres and the agent are the real images; GitHub,
+// for the next, until the last one closes the parent, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -1051,6 +1051,45 @@ async function main() {
     "thread: a question in the thread of a running round is answered at once, an instruction is noted for the next round",
   );
 
+  // ---- 3f. a chat request to change a file in the worktree of that running round: a chat session edits no repository
+  // file, and the refusal names the work the worktree belongs to and the attach command, which the session follows
+  const elsewhere = await stub("POST", "/_test/chat/say", {
+    text: `Change greeting.txt in the worktree of pull request ${pr1.pr.number}: wave goodbye.`,
+  });
+
+  const pointed = await until(
+    "the edit refused in the round's worktree, and the request attached to its pull request",
+    (s) =>
+      s.chat.posts.find(
+        (p: Json) => p.thread === elsewhere.id && p.text.startsWith("This is the worktree of "),
+      ),
+  );
+
+  assertEq(
+    // The office links the ticket key in the posted line: compare the words without the links.
+    pointed.text
+      .replaceAll(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .startsWith(`This is the worktree of ${first} (shop#${pr1.pr.number}).`),
+    true,
+    `the refusal named the item's ticket and pull request (${pointed.text})`,
+  );
+
+  assertEq(
+    pointed.text.includes(`PR #${pr1.pr.number}`),
+    true,
+    `the reply links the pull request the refusal named (${pointed.text})`,
+  );
+
+  assertEq(
+    (await state()).github.pulls.find((p: Json) => p.number === pr1.pr.number).head.sha,
+    sha5,
+    "the chat session changed nothing in the worktree",
+  );
+
+  step(
+    `worktree denial: a chat edit in the worktree of #${pr1.pr.number} was refused naming that work, and the session attached the request to it`,
+  );
+
   await stub("POST", "/_test/gates/review/open");
   const roundTwo = await until(
     "the follow-up round answered both requests on the pull request, the ticket back in review",
@@ -1087,6 +1126,24 @@ async function main() {
   );
 
   assertEq(roundTwo.tickets, ticketsBefore, "no ticket was created for the instruction");
+  const landed = await until(
+    "the request the refusal pointed to, answered on the pull request",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const note = pr.conversation.find((c: Json) => c.body.includes("wave goodbye"));
+      const result = s.chat.posts.find(
+        (p: Json) => p.thread === elsewhere.id && p.text.includes("Addressed"),
+      );
+
+      return note && result ? { pr } : undefined;
+    },
+  );
+
+  assertEq(landed.pr.head.sha !== sha5, true, "the change was pushed to the pull request");
+  step(
+    `worktree denial: following the refusal put the change on #${pr1.pr.number}, in the round of the work that owns it`,
+  );
+
   step(
     "thread: the instruction became one follow-up round after the running round, answered on the pull request",
   );
@@ -1694,6 +1751,42 @@ async function main() {
 
   step(
     `network grants: ${network} -> sam called the granted hub and (with its token, never shown) the home service; an ungranted service was refused`,
+  );
+
+  // ---- 10a2. work that spans repositories: the round adds a worktree in ops with `ost worktree add`, edits and pushes
+  // there; a repository without a grant is refused
+  const { key: spans } = await stub("POST", "/_test/tickets", {
+    title: "Note the ops side of the greeting",
+    description: "cross-repo: note it in ops too",
+    assignee: "sam",
+  });
+
+  const spanned = await until(`${spans} commented with the change in ops`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === spans);
+    return t.comments.find((c: Json) => c.body.includes("Cross-repo:"));
+  });
+
+  assertEq(
+    /pushed [0-9a-f]{40} to ops chore\/\S+-ops from \S+\/worktrees\/ops\/\S+;/.test(spanned.body),
+    true,
+    `the round edited, committed and pushed in its added ops worktree (${spanned.body})`,
+  );
+
+  assertEq(
+    spanned.body.includes("acme/billing refused: no grant"),
+    true,
+    "a repository without a write grant was refused",
+  );
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  step(
+    `worktree add: ${spans} -> sam added an ops worktree, edited and pushed there; a repository without a grant was refused`,
   );
 
   // ---- 10b. a ticket that names no repository, for an agent that can write to two: it asks and waits

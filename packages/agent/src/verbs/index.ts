@@ -11,6 +11,7 @@ import { prVerbs } from "./pr.js";
 import { recall } from "./recall.js";
 import { ticketVerbs } from "./ticket.js";
 import type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
+import { worktreeAdd } from "./worktree-add.js";
 
 export { createAgentEnv } from "./env.js";
 export type { CreateAgentEnvOptions } from "./types.js";
@@ -45,6 +46,7 @@ export const VERBS: readonly Verb[] = [
   me,
   ...officeVerbs,
   handBack,
+  worktreeAdd,
   http,
 ];
 

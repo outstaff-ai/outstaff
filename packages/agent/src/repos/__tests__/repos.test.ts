@@ -768,6 +768,84 @@ describe("workspaces", () => {
 
     expect(await readOnly.prepare(offer("w5"))).toBeUndefined();
   });
+
+  describe("a worktree added to an item in another repository", () => {
+    /** sam may write design-system too in these tests. */
+    async function wider() {
+      const s = await setup();
+      const repos = s.repos.map((r) =>
+        r.name === "design-system" ? { ...r, access: "write" as const } : r,
+      );
+
+      return { ...s, workspaces: createWorkspaces({ layout: s.layout, repos }) };
+    }
+
+    it("is added detached at the default branch, found again, listed in later rounds and released", async () => {
+      const s = await wider();
+      await s.workspaces.prepare(offer("x1"));
+      const added = await s.workspaces.add("x1", "design-system");
+      const worktree = join(s.layout.worktreesDir, "design-system/x1");
+      expect(added).toEqual({ repo: "design-system", worktree, branch: undefined, existed: false });
+      expect(sh(worktree, "rev-parse", "--abbrev-ref", "HEAD").trim()).toBe("HEAD");
+
+      expect(await s.workspaces.add("x1", "acme-example/design-system")).toMatchObject({
+        existed: true,
+      });
+
+      const next = await s.workspaces.prepare(offer("x1"));
+      expect(next!.others).toEqual([{ repo: "design-system", worktree }]);
+      expect(s.workspaces.worktrees()).toEqual(
+        expect.arrayContaining([
+          { repo: "shop", dir: "x1", root: join(s.layout.worktreesDir, "shop/x1") },
+          { repo: "design-system", dir: "x1", root: worktree },
+        ]),
+      );
+
+      await s.workspaces.release("x1");
+      expect(existsSync(worktree)).toBe(false);
+    });
+
+    it("checks out a branch: the remote one when it exists, else a new one", async () => {
+      const s = await wider();
+      const seed = join(s.dir, "seed/design-system");
+      sh(seed, "checkout", "-q", "-b", "feat/kit");
+      writeFileSync(join(seed, "KIT.md"), "kit\n");
+      sh(seed, "add", ".");
+      sh(seed, "commit", "-q", "-m", "kit");
+      sh(seed, "push", "-q", s.bare("design-system"), "feat/kit");
+
+      const remote = await s.workspaces.add("x2", "design-system", "feat/kit");
+      expect(remote).toMatchObject({ branch: "feat/kit", existed: false });
+      expect(existsSync(join(s.layout.worktreesDir, "design-system/x2/KIT.md"))).toBe(true);
+
+      const fresh = await s.workspaces.add("x3", "design-system", "feat/new");
+      expect(fresh).toMatchObject({ branch: "feat/new" });
+    });
+
+    it("refuses a branch another item's worktree has checked out, naming that worktree", async () => {
+      const s = await wider();
+      await s.workspaces.add("x4", "design-system", "feat/held");
+      expect(await s.workspaces.add("x5", "design-system", "feat/held")).toEqual({
+        repo: "design-system",
+        heldBy: expect.stringMatching(/worktrees\/design-system\/x4$/) as string,
+      });
+
+      expect(existsSync(join(s.layout.worktreesDir, "design-system/x5"))).toBe(false);
+    });
+
+    it("refuses a repository the person can only read, or has no grant on", async () => {
+      const s = await setup();
+      await expect(s.workspaces.add("x6", "design-system")).rejects.toMatchObject({
+        code: "forbidden",
+        message: expect.stringMatching(/only read design-system/) as string,
+      });
+
+      await expect(s.workspaces.add("x6", "infra")).rejects.toMatchObject({
+        code: "forbidden",
+        message: expect.stringMatching(/no grant on "infra".*shop, design-system/) as string,
+      });
+    });
+  });
 });
 
 describe("convention files", () => {

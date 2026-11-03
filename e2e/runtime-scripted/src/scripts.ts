@@ -298,6 +298,56 @@ async function* answerOnTicket(
 }
 
 /**
+ * A ticket that says `cross-repo: <what>` also needs a change in ops: the round adds a worktree there with
+ * `ost worktree add`, edits, commits and pushes in it. A repository without a grant is refused first.
+ */
+async function* crossRepo(key: string): AsyncGenerator<Action, string, string> {
+  let refusal = "";
+  try {
+    yield { type: "tool", tool: "worktree_add", input: { repo: "acme/billing" } };
+  } catch (e) {
+    refusal = String(e);
+  }
+
+  if (!/no grant on "acme\/billing", so no worktree is added/.test(refusal)) {
+    throw new Error(`A repository without a grant was not refused: ${refusal}`);
+  }
+
+  const branch = `chore/${key}-ops`;
+  const added = yield { type: "tool", tool: "worktree_add", input: { repo: "ops", branch } };
+  const cwd = need(/: (\/\S+), on /.exec(added)?.[1], "the added worktree");
+  yield { type: "write", path: `${cwd}/NOTES.md`, text: `Notes for ${key}.\n` };
+  yield { type: "shell", command: `git add -A && git commit -q -m ${q(`${key}: ops notes`)}`, cwd };
+  yield { type: "shell", command: `git push -q origin HEAD:${q(branch)}`, cwd };
+  const pushed = (yield {
+    type: "shell",
+    command: `git ls-remote origin ${q(branch)}`,
+    cwd,
+  }).trim();
+
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `Cross-repo: pushed ${pushed.split(/\s+/)[0] ?? "?"} to ops ${branch} from ${cwd}; acme/billing refused: no grant.`,
+    },
+  };
+
+  // The change in ops is the whole work: the ticket is done.
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "done" } };
+  return `Changed ops on ${branch}.`;
+}
+
+/** A ticket that asks for a change in a second repository, or else none; undefined for any other ticket. */
+async function* crossRepoIfAsked(
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  return /^cross-repo: /m.test(shown) ? yield* crossRepo(key) : undefined;
+}
+
+/**
  * A ticket that says `which repo: unclear` names no repository, and there are two the agent can write to: the agent
  * asks in the ticket, linking the candidates, and waits. It does not take whichever one it was given. Returns the
  * message to stop with, or undefined when the repository is clear.
@@ -602,7 +652,7 @@ async function* workOnTicket(ctx: ItemContext, key: string): Script {
   }
 
   yield* checkSandbox(cwd);
-  const checked = yield* answerOnTicket(key, shown);
+  const checked = (yield* answerOnTicket(key, shown)) ?? (yield* crossRepoIfAsked(key, shown));
   if (checked !== undefined) {
     return checked;
   }
@@ -1244,6 +1294,56 @@ async function* notes(
   return /^what do you remember\??$/i.test(latest) ? recall(ctx) : undefined;
 }
 
+/** The refusal of a write a chat session must not make; it fails the script when the write goes through. */
+async function* refusedWrite(path: string): AsyncGenerator<Action, string, string> {
+  try {
+    yield { type: "write", path, text: "changed from chat\n" };
+  } catch (e) {
+    return String(e);
+  }
+
+  throw new Error(`A chat session wrote ${path}.`);
+}
+
+/**
+ * "Change <file> in the worktree of pull request <n>: <what>". A chat session edits no repository file: the write is
+ * refused, and the refusal in that item's worktree names the work and the attach command, which the session runs.
+ */
+async function* changeInWorktree(
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const asked = /^change (\S+) in the worktree of pull request (\d+): (.+)$/i.exec(latest);
+  if (!asked) {
+    return undefined;
+  }
+
+  const [, file, number] = asked;
+  const root = `${homedir()}/worktrees/shop`;
+  const dirs = (yield { type: "shell", command: `ls -1 ${q(root)}`, cwd: homedir() })
+    .split("\n")
+    .map((d) => d.trim())
+    .filter(Boolean);
+
+  for (const dir of dirs) {
+    const refusal = yield* refusedWrite(`${root}/${dir}/${file}`);
+    const target = /ost work attach (\S+) --confirmed\./.exec(refusal)?.[1];
+    if (target?.endsWith(`#${number}`)) {
+      // The refusal names the work; the reply says it in the agent's own line.
+      const say = need(/This is the worktree of [^.]+\./.exec(refusal)?.[0], "whose worktree");
+
+      yield {
+        type: "tool",
+        tool: "work_attach",
+        input: { target, confirmed: true, request: latest, say },
+      };
+
+      return `The worktree is that pull request's work, so I added the request to ${target}.`;
+    }
+  }
+
+  throw new Error(`No refusal named the work of pull request ${number}.`);
+}
+
 /** What the chat message asks of the work: a pull request's status, a reply about work, or a change to file. */
 async function* aboutWork(
   ctx: ItemContext,
@@ -1257,6 +1357,11 @@ async function* aboutWork(
 
   if (ctx.about) {
     return yield* replyAboutWork(ctx, talk, latest);
+  }
+
+  const elsewhere = yield* changeInWorktree(latest);
+  if (elsewhere !== undefined) {
+    return elsewhere;
   }
 
   const done = yield* changeOrFile(ctx, latest);

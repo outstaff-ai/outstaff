@@ -32,4 +32,5 @@ export type {
   ToolRuleInput,
   Tools,
   Toolset,
+  WorktreeOwner,
 } from "./types.js";

@@ -4,6 +4,7 @@ import type { RepoHead, Workspace } from "#/repos/index.js";
 import { VERBS, createRuntimeTools } from "#/verbs/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import { itemEnv, itemFiles } from "./item-env.js";
+import { withWorktreeOwners } from "./worktree-policy.js";
 import type { WorkerContext, WorkLoopOptions } from "./loop.types.js";
 import { buildWorkPrompt } from "./prompt.js";
 import type { RoundNotes } from "#/notes/types.js";
@@ -124,8 +125,9 @@ export async function setUpItem(
 
   // A chat session reads and answers; it has no worktree and runs under the chat policy.
   const session = offer.workItem.kind === CHAT_KIND ? opts.chatSession : undefined;
-  const policy = session?.policy ?? opts.policy;
   const workspace = session ? undefined : await opts.workspaces?.prepare(offer);
+  // A write in another item's worktree is refused with the work it belongs to.
+  const policy = await withWorktreeOwners(opts, session?.policy ?? opts.policy, id, log);
   // A chat session reads the base clones, so they are brought up to date first.
   const heads = session ? await opts.workspaces?.refresh() : undefined;
   const chatContext = await chatContextFor(opts, offer, storedSession);

@@ -611,6 +611,10 @@ describe("work loop", () => {
       },
       held: () => [],
       refresh: async () => [],
+      add: async () => {
+        throw new Error("no worktree is added here");
+      },
+      worktrees: () => [],
       async release(id) {
         released.push(id);
       },
@@ -1220,6 +1224,7 @@ describe("work loop", () => {
           return [{ name: "shop", commit: "0123456789abcdef", atDefault: true }];
         },
         async release() {},
+        worktrees: () => [],
       } as unknown as Workspaces;
 
       const repos: ClonedRepo[] = [
