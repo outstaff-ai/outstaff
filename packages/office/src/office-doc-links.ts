@@ -15,11 +15,17 @@ export function officeDocLinks(deps: {
   log: Logger;
 }): DocLinks {
   const { store, workState, log } = deps;
-  // A document written while answering comments on another document is for that document's ticket.
-  const ticketOf = async (item: WorkItem) =>
-    item.subject?.type === "doc"
+  // A document written while answering comments on another document is for that document's ticket. One the PM writes
+  // on a finished milestone (the roadmap) is the team's, not the closed ticket's: its comments must still reach the PM.
+  const ticketOf = async (item: WorkItem) => {
+    if (item.kind === "milestone") {
+      return undefined;
+    }
+
+    return item.subject?.type === "doc"
       ? workState.doc(item.subject.ref)?.ticket
       : await itemTicket(store, item);
+  };
 
   /** A ticket the agent named: one the office knows, read from the tracker if it is new. */
   const named = async (key: string) => {

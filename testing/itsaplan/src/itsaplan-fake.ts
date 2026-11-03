@@ -93,6 +93,21 @@ const knowledgeSeed = (s: ItsaplanStore, markdown: Markdown | undefined): Knowle
     return createIssue(s, s.members[0]!.userId, { title: "Linked", columnId: s.columns[0]!.id })
       .identifier;
   },
+  async initiative() {
+    const at = s.now();
+    const id = 300 + s.initiatives.length + 1;
+    s.initiatives.push({
+      id,
+      projectId: 1,
+      title: "Planned",
+      description: "",
+      status: "planned",
+      createdAt: at,
+      updatedAt: at,
+    });
+
+    return String(id);
+  },
   async doc(d) {
     const row = addDoc(
       s,
@@ -126,6 +141,7 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
   const stub = createStubFetch([...forbidden, ...routes]);
   const { issues, activity, columns, labels, members, attachments, docs, docComments } = store;
   const { repositories, pullRequests, development, docIssues, customFields, fieldValues } = store;
+  const { initiatives, docInitiatives } = store;
   return {
     fetch: stub.fetch,
     calls: stub.calls,
@@ -143,6 +159,8 @@ export function createItsaplanFake({ markdown, ...opts }: FakeOptions = {}) {
       pullRequests,
       development,
       docIssues,
+      initiatives,
+      docInitiatives,
       customFields,
       fieldValues,
     },

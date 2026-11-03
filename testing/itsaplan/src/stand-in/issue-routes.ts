@@ -1,7 +1,22 @@
+import { knownInitiative, withInitiative } from "./initiative-routes.js";
 import { addLink, issueView, linkIndex, linkOf } from "./links.js";
 import { assignIssue, commentIssue, issueById, moveIssue, page, touch } from "./model.js";
 import { err } from "./store.js";
 import type { ActorRoute, ItsaplanStore, StoredIssue } from "./types.js";
+
+/** The fields a change sets as they are given; `initiativeId: null` takes the issue out of its initiative. */
+function copied(b: Partial<StoredIssue>): Partial<StoredIssue> {
+  const given = (["parentId", "title", "description", "labelIds"] as const).filter(
+    (k) => b[k] !== undefined,
+  );
+
+  return {
+    ...Object.fromEntries(given.map((k) => [k, b[k]])),
+    ...(b.initiativeId === undefined
+      ? {}
+      : { initiativeId: b.initiativeId === null ? null : Number(b.initiativeId) }),
+  };
+}
 
 /** Applies a `PATCH /issues/:id` body; moves and assignments land in the feed, title and description edits do not. */
 function patchIssue(s: ItsaplanStore, issue: StoredIssue, actor: string, b: Partial<StoredIssue>) {
@@ -13,22 +28,7 @@ function patchIssue(s: ItsaplanStore, issue: StoredIssue, actor: string, b: Part
     assignIssue(s, issue, actor, b.assigneeUserId);
   }
 
-  if (b.parentId !== undefined) {
-    issue.parentId = b.parentId;
-  }
-
-  if (b.title !== undefined) {
-    issue.title = b.title;
-  }
-
-  if (b.description !== undefined) {
-    issue.description = b.description;
-  }
-
-  if (b.labelIds) {
-    issue.labelIds = b.labelIds;
-  }
-
+  Object.assign(issue, copied(b));
   touch(s, issue);
   return issue;
 }
@@ -50,7 +50,13 @@ export function issueRoutes(s: ItsaplanStore): ActorRoute[] {
       path: "/issues/:id",
       handler: (r, actor) => {
         const issue = issueById(s, r.params["id"]!);
-        return issue ? patchIssue(s, issue, actor, r.json) : missing;
+        if (!issue) {
+          return missing;
+        }
+
+        return knownInitiative(s, r.json.initiativeId)
+          ? withInitiative(s, patchIssue(s, issue, actor, r.json))
+          : err(404, "initiative not found");
       },
     },
     {

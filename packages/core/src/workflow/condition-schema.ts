@@ -120,6 +120,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
         ),
       ),
     z
+      .strictObject({ in_milestone: z.boolean() })
+      .meta(
+        d(
+          "The ticket is in a milestone of the roadmap, a tracker initiative (or, with false, it is in none).",
+        ),
+      ),
+    z
       .strictObject({ ticket_handed_back: z.boolean() })
       .meta(
         d(

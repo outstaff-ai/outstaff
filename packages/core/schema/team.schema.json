@@ -2726,6 +2726,19 @@
         {
           "type": "object",
           "properties": {
+            "in_milestone": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "in_milestone"
+          ],
+          "additionalProperties": false,
+          "description": "The ticket is in a milestone of the roadmap, a tracker initiative (or, with false, it is in none)."
+        },
+        {
+          "type": "object",
+          "properties": {
             "ticket_handed_back": {
               "type": "boolean"
             }

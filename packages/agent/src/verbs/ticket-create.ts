@@ -3,6 +3,7 @@ import { uploadAttachments, uploadedLines } from "./attachments.js";
 import { requireOffice, requireTracker } from "./support.js";
 import { defineVerb, result } from "./define.js";
 import { chatLine, sayInput } from "./chat-line.js";
+import { milestoneFor, milestoneId } from "./milestone-support.js";
 import { key, summary } from "./ticket-support.js";
 import { similarOpenTickets, similarWarning } from "./ticket-similar.js";
 import { blockerIssues, linkBlockers, startsBlocked } from "./ticket-create-blockers.js";
@@ -24,7 +25,7 @@ export const ticketCreate = defineVerb({
   name: "ticket.create",
   summary: "Create a ticket; a follow-up goes to the backlog, unassigned.",
   description:
-    'Creates a ticket. Inside a work item that has a ticket, it is a follow-up: it lands in the backlog, unassigned, as a sub-ticket of the ticket you are working (pass parent for another one). File what you find while working instead of asking someone else to; name each follow-up in your hand-back. A follow-up that stands on its own, not part of the ticket\'s scope, passes related (the ticket it came from) instead: it is then a separate ticket with a relates link. Pass assignee to give it to someone ("me" for yourself) and status to start it elsewhere; use that for a part of the current ticket you will do yourself. The parent is set in the tracker\'s own parent field where it has one and is otherwise a "relates" link; never write it into the description. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each, all assigned to you: the part you start now active, the later ones ready (never backlog), and say their order on the parent. Pass blocked-by (repeatable) with each ticket that must be done first: it is linked as blocking this one, never written as text. Outside a chat session, a ticket to be worked (ready or active) with an open blocker starts blocked and moves to ready when its last blocker closes. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). The ticket files the request as work for you: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. When the requester asks for it to go to someone else, pass assignee: the ticket is then theirs, the assignment wakes them, and nothing is filed as your work; tell the requester who has it. A chat session may file several requests of one message, one ticket each; filing the same request twice is refused before anything is created. When an open ticket has a similar title, the ticket is still created and the result warns, listing it: never file a ticket for work an existing ticket already covers; change that ticket instead (ost ticket assign, move or edit). Create a ticket only for a request that is work; answer a question directly.',
+    'Creates a ticket. Inside a work item that has a ticket, it is a follow-up: it lands in the backlog, unassigned, as a sub-ticket of the ticket you are working (pass parent for another one). File what you find while working instead of asking someone else to; name each follow-up in your hand-back. A ticket of the roadmap passes milestone (an id from ost milestone list): it goes in that milestone, and is not a sub-ticket of the ticket you are working; file one only when the work can start now (what it extends exists, the decisions it needs are made, the work before it is done). A follow-up that stands on its own, not part of the ticket\'s scope, passes related (the ticket it came from) instead: it is then a separate ticket with a relates link. Pass assignee to give it to someone ("me" for yourself) and status to start it elsewhere; use that for a part of the current ticket you will do yourself. The parent is set in the tracker\'s own parent field where it has one and is otherwise a "relates" link; never write it into the description. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each, all assigned to you: the part you start now active, the later ones ready (never backlog), and say their order on the parent. Pass blocked-by (repeatable) with each ticket that must be done first: it is linked as blocking this one, never written as text. Outside a chat session, a ticket to be worked (ready or active) with an open blocker starts blocked and moves to ready when its last blocker closes. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). The ticket files the request as work for you: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. When the requester asks for it to go to someone else, pass assignee: the ticket is then theirs, the assignment wakes them, and nothing is filed as your work; tell the requester who has it. A chat session may file several requests of one message, one ticket each; filing the same request twice is refused before anything is created. When an open ticket has a similar title, the ticket is still created and the result warns, listing it: never file a ticket for work an existing ticket already covers; change that ticket instead (ost ticket assign, move or edit). Create a ticket only for a request that is work; answer a question directly.',
   input: z.strictObject({
     title: z.string().min(1).max(300).describe("Short title."),
     body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),
@@ -44,6 +45,9 @@ export const ticketCreate = defineVerb({
       .describe(
         "Key of a ticket this one only relates to: an independent follow-up. It is then not a subtask of the current ticket.",
       ),
+    milestone: milestoneId
+      .optional()
+      .describe("Id of the roadmap milestone it belongs to, from ost milestone list."),
     blockedBy: z
       .array(key)
       .max(20)
@@ -68,6 +72,7 @@ export const ticketCreate = defineVerb({
     'ost ticket create --parent ACME-12 --title "Add the search index" --assignee me --status active --body "The index half of ACME-12."',
     'ost ticket create --parent ACME-12 --blocked-by ACME-13 --title "Search the index" --assignee me --status ready',
     'ost ticket create --title "Export orders as CSV" --body "Asked in chat." --say "Will do, starting on the export next."',
+    'ost ticket create --milestone 8 --title "Collect resource metrics" --body "From the monitoring plan."',
   ],
   async run(env, input, ctx) {
     const tracker = requireTracker(env);
@@ -82,6 +87,7 @@ export const ticketCreate = defineVerb({
       await requireOffice(env).checkFiling(chat.id, input.title);
     }
 
+    await milestoneFor(tracker, input.milestone);
     const parent = await parentIssue(tracker, input, current, !!chat);
     const to = await assigneeFor(env, tracker, input, !!chat);
     const files = chatFiles(env, !!chat);

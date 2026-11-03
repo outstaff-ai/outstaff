@@ -16,6 +16,7 @@ function ticketState(s: ItsaplanStore, i: StoredIssue) {
     status: columnOf(s, i.columnId)?.name,
     assignee: usernameOf(s, i.assigneeUserId),
     parent: s.issues.find((p) => p.id === i.parentId)?.identifier ?? null,
+    initiative: i.initiativeId === null ? null : String(i.initiativeId),
     fields: s.fieldValues
       .filter((v) => v.issueId === i.id)
       .map((v) => ({
@@ -83,6 +84,23 @@ export function docsState(s: ItsaplanStore) {
         body: c.body,
         quote: c.quote,
         resolved: c.resolvedAt !== null,
+      })),
+  }));
+}
+
+/** Every initiative with its tickets and the documents linked to it, as the test driver checks them. */
+export function initiativesState(s: ItsaplanStore) {
+  return s.initiatives.map((i) => ({
+    id: String(i.id),
+    title: i.title,
+    status: i.status,
+    tickets: s.issues.filter((t) => t.initiativeId === i.id).map((t) => t.identifier),
+    docs: s.docInitiatives
+      .filter((l) => l.initiativeId === i.id)
+      .map((l) => ({
+        id: String(l.docId),
+        title: s.docs.find((d) => d.id === l.docId)?.title,
+        by: usernameOf(s, l.by),
       })),
   }));
 }

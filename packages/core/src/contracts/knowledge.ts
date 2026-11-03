@@ -96,6 +96,27 @@ export function knowledgeContract(
       await expectPortError(s.subject.linkIssue!("999999", ticket), "not_found");
     });
 
+    it("links a document to an initiative once, and lists the initiative's documents", async (t) => {
+      const s = get();
+      requireCapability(t, s, "knowledge.docs", "knowledge.issueLinks");
+      if (!s.subject.linkInitiative) {
+        t.skip();
+        return;
+      }
+
+      const initiative = await requireSeed(t, s.seed, "initiative")();
+      const doc = await s.subject.create({ path: "n/planned", title: "Planned", body: "" });
+      expect(await s.subject.initiativeDocs!(initiative)).toEqual([]);
+      expect(await s.subject.linkInitiative(doc.id, initiative)).toBe("linked");
+      expect(await s.subject.linkInitiative(doc.id, initiative)).toBe("already_linked");
+      expect(await s.subject.initiativeDocs!(initiative)).toEqual([
+        { id: doc.id, title: "Planned" },
+      ]);
+
+      await expectPortError(s.subject.linkInitiative("999999", initiative), "not_found");
+      await expectPortError(s.subject.linkInitiative(doc.id, "999999"), "not_found");
+    });
+
     it("reports the comments and replies of the named documents after a cursor, oldest first", async (t) => {
       const s = get();
       requireCapability(t, s, "knowledge.docs");

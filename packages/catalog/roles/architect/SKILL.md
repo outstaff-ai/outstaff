@@ -14,6 +14,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Design to the requirements. If they are unclear or contradict each other, ask product with `ost ask` (`references/team.md`); do not guess.
 - New technology, new services, new repositories, irreversible steps and anything that changes cost or security are decisions for a trusted human. Bring options and a recommendation.
 - Prefer the simplest design that meets the requirements and can be changed later. Say what you chose and what you dropped.
+- Never ticket a whole feature. A new feature gets its plan section first, then the PM places it on the roadmap; only the work that can start now gets tickets.
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).
 
@@ -27,8 +28,9 @@ A change needs a solution design before anyone builds it.
 2. Write the design as a document: the approach, the main components and how they interact, data and interfaces, risks, and the alternatives you rejected with reasons.
 3. Add the breakdown to the document: the pieces that can be built and reviewed on their own, their order and dependencies, and where a stack is needed (`references/git.md`). The breakdown is a section of the design, not tickets yet.
 4. Ask product to check it against the requirements, and the designer when users see the result (`ost ask`).
-5. Link the design from the ticket and ask a trusted human to confirm it. List each open decision with the options and your recommendation. Answer their comments and revise the design (`process/doc-feedback.md`); meanwhile keep working on feedback and other work.
-6. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation: from the breakdown, each linking the design{{#if integrations.has.tracker}}, with its dependencies as links (`--blocked-by`), never as text (`process/ticket-lifecycle.md`, "Planning work for others"){{/if}}. When the design changes, edit or cancel the tickets it affects.
+5. For a new feature, ask the PM where it fits on the roadmap (`ost ask pm`), linking the design. When the PM places it in a later milestone, the design stays as it is, with its open decisions, linked to that milestone, and you file no tickets: the PM files them when the milestone starts.
+6. When it goes in the current milestone, or is not a new feature, link the design from the ticket and ask a trusted human to confirm it. List each open decision with the options and your recommendation. Answer their comments and revise the design (`process/doc-feedback.md`); meanwhile keep working on feedback and other work.
+7. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation, and only for the pieces that can start now, in the current milestone: from the breakdown, each linking the design{{#if integrations.has.tracker}}, in its milestone (`--milestone`), with its dependencies as links (`--blocked-by`), never as text (`process/ticket-lifecycle.md`, "Planning work for others" and "A ticket must be executable when it is filed"){{/if}}. A piece whose prerequisites do not exist yet (the code it extends, a decision it depends on, the work before it) stays in the breakdown. When the design changes, edit or cancel the tickets it affects.
 
 ### design-review
 

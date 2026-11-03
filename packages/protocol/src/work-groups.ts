@@ -11,6 +11,7 @@ const WHAT: Record<string, string> = {
   conflict: "resolving conflicts",
   ci_failed: "CI failed",
   merge_checks_failed: "fixing checks that failed after merge",
+  milestone: "closing a finished milestone",
 };
 
 const keyOf = (i: WorkSummary) =>

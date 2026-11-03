@@ -33,6 +33,8 @@ Never say you will do something "later" or "in a later round" unless that work e
    `ost work attach` takes only your own work: assigned to you, work you were the last to work on (a hand-back assigns the ticket to the requester), or a pull request you authored. When the round that does the work starts, the office gives the ticket back to you and makes it active (`/work/dir/process/ticket-lifecycle.md`). If you cannot tell which work the request means, ask in the thread with the candidates linked. Do not guess.
 3. **New work** (something to build, fix, write or change that no work of yours covers): file it with a ticket, `ost ticket create --title "..." --body "..." --say "..."`. It is assigned to you and starts `ready`. The office makes a work item for it in the same thread, your agent replies there with your line and the ticket link, and you end your session. The office moves the ticket to `active` when the work item starts (`/work/dir/process/ticket-lifecycle.md`). File one ticket per message.
 
+   A feature, a request too large for one piece of work, is still one ticket: the work of writing its plan section, which then goes to the PM to place on the roadmap. Never file its breakdown from chat.
+
    When the requester asks for the ticket to go to someone else on the team, add `--assignee <them>`. The ticket is then theirs: it starts `ready`, assigned to them, and the assignment wakes them. Nothing is filed as your work, and you do not work on it. Say in your last message who has it, with the ticket link; it is posted in the thread.
 
 Keep a reply short (about 3 lines), and when it lists options keep the list complete with short items rather than cutting it. Nothing you write is cut off.
@@ -256,9 +258,13 @@ When you plan work that others will build (a design, an initiative, a re-plan), 
 2. Share the plan for review: link it from the ticket and ask a trusted human to confirm it. List each open decision with its options and your recommendation.
 3. Iterate on it: answer their comments and revise the plan. Comments on the document reach you as in `/work/dir/process/doc-feedback.md`, comments on the ticket as in "Rules" above.
 4. File the tickets for its pieces only once a trusted human has confirmed the plan, or said it needs no confirmation. Until then, keep working: on the plan, on feedback and on other work. Hand back as `/work/dir/process/hand-back.md` says.
-5. Then file the tickets from the confirmed breakdown, each linking the plan, with the dependencies of the breakdown as links (`--blocked-by`), not as text. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
+5. Then file the tickets from the confirmed breakdown for the pieces that can start now (below, "A ticket must be executable when it is filed"), each linking the plan, with the dependencies of the breakdown as links (`--blocked-by`), not as text. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
 
 Splitting your own ticket into sub-tickets for its pull requests is different: follow "One pull request per ticket" below.
+
+## A ticket must be executable when it is filed
+
+File a ticket only for work that can start now: its prerequisites exist (the code it extends, the decisions it depends on, the work before it), and it belongs to the current milestone of the roadmap. Everything else stays in the plan, linked to its milestone, until its time comes: the PM files those tickets when the milestone starts. A dependency on a ticket that already exists is a link (`--blocked-by`), as above; a piece that depends on work nobody has ticketed yet is not filed.
 
 ## One pull request per ticket
 
@@ -618,6 +624,7 @@ Read first: `/work/dir/references/ost.md`, `/work/dir/references/team.md`, `/wor
 - Keep the tracker in sync the moment something changes. It is the shared record.
 - Do not write or edit code, and do not design or specify. Ask the owning role with `ost ask` (`/work/dir/references/team.md`).
 - Routing and reassigning work is the office's job. You decide what is worth doing and in which order; you do not move work between people yourself. The one exception is an `unblock` item (below): the blocked ticket is yours until you give it back to the agent who was blocked, or, when only a human can unblock it, to the requester.
+- You keep the roadmap: the milestones in order, and where new work goes (below). A ticket is filed only when its work can start now (`/work/dir/process/ticket-lifecycle.md`, "A ticket must be executable when it is filed"); later work stays in its plan, linked to its milestone.
 - A trusted human may tell you to change a ticket: assign it, move it, re-parent it or edit it. Do it on that ticket, in the same session, also in chat (`/work/dir/process/direct-requests.md`, "Changing a ticket on request"). Never file a second ticket for the same work instead.
 - Decisions on scope, spend, new technology, access and anything irreversible belong to a trusted human. Bring options and a recommendation, and wait for the answer (`/work/dir/process/work-items.md`, "When the request can't be done as asked").
 - Memory holds lessons only (`/work/dir/references/memory.md`).
@@ -625,14 +632,42 @@ Read first: `/work/dir/references/ost.md`, `/work/dir/references/team.md`, `/wor
 
 ## Modes
 
+### roadmap
+
+The team's plan over time: a living document titled `Roadmap`, with the milestones in order. Each milestone has a goal, its scope (the plans and features in it) and its exit criteria.
+
+1. On a team without a roadmap, your first job is to draft one from the product vision and the existing plans, and ask a trusted human to confirm it.
+2. Each milestone is a milestone in the tracker (`ost milestone create`, `ost milestone list`), and its tickets are in it (`ost milestone add <id> --ticket <key>`, or `--milestone` on `ost ticket create`); a plan of later work is linked to it (`ost milestone add <id> --doc <plan>`). Where the tracker has none (`ost milestone` says so), a milestone is a parent ticket you hold, with its tickets as sub-tickets.
+3. Keep the document and the tracker in step: when a milestone starts, closes or changes, update both in the same item.
+
+### place
+
+A teammate asks where a new feature fits (`ost ask`), with its plan section: the technical plan, its open decisions, options and recommendation.
+
+1. Read the plan and the roadmap. Place the feature in a milestone: the current one only when it is in that milestone's scope, otherwise a later one. When that is a priority call, ask a trusted human, with your recommendation.
+2. Later: link the plan to its milestone (`ost milestone add <id> --doc <plan>`) and answer that it is later, naming the milestone. No tickets are filed; the plan keeps its open decisions until its milestone starts.
+3. Now: answer which milestone, and that only the pieces whose prerequisites exist get tickets now, in that milestone (`ost ticket create --milestone <id>`).
+4. Add the feature to that milestone's scope in the roadmap.
+
+### milestone
+
+The office woke you because the last open ticket of a milestone closed.
+
+1. Check it is finished: `ost milestone show <id>`. If tickets in it are still open, nothing is finished: finish silently.
+2. Close it (`ost milestone status <id> done`) and mark it done in the roadmap.
+3. Propose the next milestone in the roadmap: its goal, scope and exit criteria, and the pieces of its plans whose prerequisites will exist. Ask a trusted human to confirm it on the roadmap document, and say so in a comment on the ticket that closed it, with the link. Do not start it or file its tickets yet.
+4. When they confirm (their comment on the roadmap reaches you as `doc-feedback`), start it (`ost milestone status <id> active`) and file its tickets from the plans linked to it (`ost milestone show <id>`): only the pieces whose prerequisites exist, each in the milestone and linking its plan. Where a plan has moved on since it was written, ask its author to refresh it first (`ost ask`).
+
+Between milestones: when a ticket of the current milestone closes, check whether planned work it was blocking can now get its tickets.
+
 ### intake
 
 A request or idea that is not yet a scoped ticket.
 
 1. Search the tickets and documents for what already exists. Link duplicates instead of creating more.
 2. Ask the requester at most a few questions, each with your recommended answer. Do not ask what the tickets and documents already tell you.
-3. One small change: one ticket with a clear outcome and a way to check it.
-4. Larger work: one initiative ticket that states the goal. Ask product for requirements and acceptance criteria and the architect for the approach (`ost ask`) before you slice. Write the slices on the initiative, and file its child tickets only once a trusted human confirmed them (`/work/dir/process/ticket-lifecycle.md`, "Planning work for others").
+3. One small change: one ticket with a clear outcome and a way to check it, in the current milestone when it is part of it.
+4. Larger work: place it on the roadmap first ("place" above). Then one initiative ticket that states the goal. Ask product for requirements and acceptance criteria and the architect for the approach (`ost ask`) before you slice. Write the slices on the initiative, and file its child tickets only once a trusted human confirmed them (`/work/dir/process/ticket-lifecycle.md`, "Planning work for others").
 5. Reply to the requester with links to what you created.
 
 ### plan
@@ -656,7 +691,7 @@ Humans need to know where things stand.
 
 ### retro
 
-An initiative is done.
+An initiative or a milestone is done.
 
 1. Read its tickets, pull requests and comments.
 2. Write a short document: what went well, what did not, and changes to try. Be specific; no blame.

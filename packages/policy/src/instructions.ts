@@ -37,6 +37,8 @@ export const INSTRUCTION_VARIABLES = [
   "parent",
   "parent.open",
   "parent.closed",
+  "milestone",
+  "milestone.id",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -104,6 +106,12 @@ function parentVariables({ ticket, state }: EvaluationContext): Record<string, s
   };
 }
 
+/** The milestone (initiative) of the event's ticket: its title and its id; empty when it is in none. */
+function milestoneVariables({ ticket, state }: EvaluationContext): Record<string, string> {
+  const milestone = ticket ? state.initiativeOf(ticket) : undefined;
+  return { milestone: milestone?.title ?? "", "milestone.id": milestone?.id ?? "" };
+}
+
 /** The human who asked for the ticket's work, else the team's first human, as a hand-back assigns it. */
 const requesterOf = ({ ticket, state, opts }: EvaluationContext): string =>
   (ticket ? state.requester(ticket) : undefined) ?? opts.fallbackRequester ?? "";
@@ -128,6 +136,7 @@ export function instructionVariables(
     closer: closerOf(event.data["closedBy"]),
     ...closedVariables(event.type, event.data),
     ...parentVariables(ctx),
+    ...milestoneVariables(ctx),
   };
 }
 

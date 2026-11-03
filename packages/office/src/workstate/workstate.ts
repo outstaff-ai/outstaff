@@ -262,6 +262,9 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     hasLabel: (t, label) => tickets.get(t)?.labels.includes(label) ?? false,
     parentOf: (t) => tickets.get(t)?.parent,
     subTickets: (t) => [...tickets.values()].filter((r) => r.parent === t).map((r) => r.key),
+    initiativeOf: (t) => tickets.get(t)?.initiative,
+    initiativeTickets: (id) =>
+      [...tickets.values()].filter((r) => r.initiative?.id === id).map((r) => r.key),
 
     defaultBranch(repo) {
       const i = repos.findIndex((r) => sameRepo(r, repo));

@@ -85,6 +85,21 @@ describe("work state: a ticket it had read open closing raises ticket.closed", (
     expect(ws.parentOf("ACME-404")).toBeUndefined();
   });
 
+  it("knows a ticket's milestone and a milestone's tickets, and forgets one the ticket left", async () => {
+    const m = await tracker.createInitiative!({ title: "Foundations", status: "active" });
+    const { key } = await tracker.createIssue({ title: "Store", body: "", initiative: m.id });
+    const loose = await ticket("ready");
+    await moved(key);
+    expect(ws.initiativeOf(key)).toEqual({ id: m.id, title: "Foundations" });
+    expect(ws.initiativeTickets(m.id)).toEqual([key]);
+    expect(ws.initiativeOf(loose)).toBeUndefined();
+
+    await tracker.setInitiative!(key, null);
+    await moved(key);
+    expect(ws.initiativeOf(key)).toBeUndefined();
+    expect(ws.initiativeTickets(m.id)).toEqual([]);
+  });
+
   it("names the agent whose act or hand-back the ticket was read for", async () => {
     const key = await ticket("review");
     await tracker.transition(key, "done");

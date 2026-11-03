@@ -9,6 +9,7 @@ import {
   requireCapability,
   requireSeed,
 } from "./harness.js";
+import { trackerInitiativeCases } from "./tracker-initiatives.js";
 import { trackerLinkCases } from "./tracker-links.js";
 import { trackerListingCases } from "./tracker-listing.js";
 import { trackerParentCases } from "./tracker-parents.js";
@@ -19,6 +20,7 @@ export function trackerContract(name: string, setup: ContractSetupFn<Tracker, Tr
     trackerListingCases(get);
     trackerLinkCases(get);
     trackerParentCases(get);
+    trackerInitiativeCases(get);
     it("creates an issue that can be read back with an absolute url", async (t) => {
       const s = get();
       requireCapability(t, s, "tracker.issues");

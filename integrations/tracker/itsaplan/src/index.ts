@@ -26,6 +26,7 @@ export const itsaplanTracker = defineAdapter({
     "tracker.attachments",
     "tracker.development",
     "tracker.fields",
+    "tracker.initiatives",
   ],
   options: trackerOptions,
   secrets: itsaplanSecrets,

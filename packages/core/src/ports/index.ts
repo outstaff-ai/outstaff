@@ -31,6 +31,15 @@ export type {
 } from "./types.js";
 
 export type {
+  Initiative,
+  InitiativeChanges,
+  InitiativeFilter,
+  InitiativeRef,
+  InitiativeStatus,
+  NewInitiative,
+} from "./initiative.js";
+
+export type {
   Comment,
   FieldEnsureOutcome,
   Issue,

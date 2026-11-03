@@ -30,6 +30,9 @@ export interface KnowledgeSeed {
   /** Add a ticket documents can be linked on, and return its key. */
   issue?(): Promise<string>;
 
+  /** Add an initiative (milestone) of the tracker documents can be linked to, and return its id. */
+  initiative?(): Promise<string>;
+
   /**
    * Write the notes of the agent named `owner` as another member (`by`), creating them when there are none yet.
    * Resolves to the member the notes were written as, as the knowledge base reports it.

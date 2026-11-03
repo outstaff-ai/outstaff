@@ -49,6 +49,15 @@ export interface ItemContext {
 
   /** For a wake on a parent after one of its sub-tickets closed: the parent's open sub-tickets, as the wake lists them. */
   openSubtickets?: string[];
+
+  /** For a question a teammate asked: its id, who asked, and the question's first line, as the office's brief has them. */
+  question?: { id: string; from: string; text: string };
+
+  /** An answer to a question the agent asked, as the office put it in the journal: its first line. */
+  answer?: string;
+
+  /** For the PM's wake after the last open ticket of a milestone closed: the milestone's id and title. */
+  milestone?: { id: string; title: string };
 }
 
 /** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
@@ -291,6 +300,21 @@ function parseOpenSubtickets(prompt: string): Pick<ItemContext, "openSubtickets"
   return open ? { openSubtickets: open.split(", ") } : {};
 }
 
+// The office's brief of a question: "Question <id> from <asker> (<role>):" over the question; an answer the asker gets:
+// "<who> answered question <id> (<question>):" over the answer; and the milestone wake's instruction.
+function parseConversations(
+  prompt: string,
+): Pick<ItemContext, "question" | "answer" | "milestone"> {
+  const q = /Question (\S+) from (\S+) \([^)\n]*\):\n(.+)/.exec(prompt);
+  const a = /answered question \S+ \([^\n]*\):\n(.+)/.exec(prompt)?.[1];
+  const m = /the last open ticket of milestone "(.+?)" \((\S+?)\)/.exec(prompt);
+  return {
+    ...(q ? { question: { id: q[1]!, from: q[2]!, text: q[3]! } } : {}),
+    ...(a ? { answer: a } : {}),
+    ...(m ? { milestone: { title: m[1]!, id: m[2]! } } : {}),
+  };
+}
+
 export function parsePrompt(prompt: string): ItemContext | undefined {
   const head = /^Work item (\S+) \(([\w-]+)\): (.*)$/m.exec(prompt);
   if (!head) {
@@ -322,5 +346,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseFailedChecks(prompt),
     ...parseNotes(prompt),
     ...parseOpenSubtickets(prompt),
+    ...parseConversations(prompt),
   };
 }

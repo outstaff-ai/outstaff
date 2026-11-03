@@ -22,6 +22,7 @@ import {
 import { developmentHelpers } from "./development.js";
 import { fieldHelpers } from "./fields.js";
 import { readEvents } from "./events.js";
+import { initiativeHelpers } from "./initiatives.js";
 import { issueHelpers } from "./issues.js";
 import { issueListing } from "./listing.js";
 import { teamStatuses } from "./statuses.js";
@@ -82,6 +83,7 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
   return {
     ...developmentHelpers(api, fetchIssue),
     ...fieldHelpers(api, fetchIssue),
+    ...initiativeHelpers(api, patch),
     links: {
       issue: (key) => api.issueUrl(key),
       comment: (key, id) => api.issueCommentUrl(key, id),
@@ -117,6 +119,10 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
 
       if (issue.parent) {
         body["parentId"] = (await fetchIssue(issue.parent)).id;
+      }
+
+      if (issue.initiative) {
+        body["initiativeId"] = Number(issue.initiative);
       }
 
       if (issue.labels?.length) {

@@ -10,6 +10,7 @@ import type {
   AgentProfile,
   Chat,
   ChatMessage,
+  Initiative,
   Knowledge,
   KnowledgeNotes,
   Member,
@@ -66,11 +67,17 @@ export interface FakeNotes {
   edit(owner: string, notes: string[], author: Member): void;
 }
 
+/** Who linked which document on a target (a ticket or an initiative), by the target. */
+export type FakeDocLinks = Map<string, { doc: string; by: string }[]>;
+
 export interface FakeKnowledge extends Knowledge {
   seed: KnowledgeSeed;
 
   /** The documents linked on each ticket with `linkIssue`, by ticket key, with who linked each. */
   issueLinks: Map<string, { doc: string; by: string }[]>;
+
+  /** The documents linked to each initiative with `linkInitiative`, by initiative id, with who linked each. */
+  initiativeLinks: Map<string, { doc: string; by: string }[]>;
 }
 
 export type FakeRunStep =
@@ -134,6 +141,12 @@ export interface FakeTracker extends Tracker {
 
   /** The code repositories connected to the tracker; `seed.repository` adds one. */
   connected: RepoRef[];
+
+  /** The initiatives, by id, in the order they were made. */
+  initiativeList: Map<string, Initiative>;
+
+  /** The initiative each ticket is in: ticket key to initiative id. */
+  ticketInitiatives: Map<string, string>;
 }
 
 export interface FakeVcsOptions {

@@ -41,8 +41,9 @@ async function madeTickets(
 }
 
 // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
-// Trying to unblock a ticket is not a hand-back on it either: the ticket stays as it is.
-const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock"]);
+// Trying to unblock a ticket is not a hand-back on it either, nor the PM's round on a milestone its closing finished:
+// the ticket stays as it is.
+const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock", "milestone"]);
 
 /** The hand-back's status: the item's, except a silent finish, which leaves the item done and the ticket alone. */
 const statusOf = (item: WorkItem, result: Pick<HandBackResult, "status">) =>

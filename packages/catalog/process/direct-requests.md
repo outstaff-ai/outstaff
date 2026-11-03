@@ -35,6 +35,8 @@ Never say you will do something "later" or "in a later round" unless that work e
 {{#if integrations.has.tracker}}
 3. **New work** (something to build, fix, write or change that no work of yours covers): file it with a ticket, `ost ticket create --title "..." --body "..." --say "..."`. It is assigned to you and starts `ready`. The office makes a work item for it in the same thread, your agent replies there with your line and the ticket link, and you end your session. The office moves the ticket to `active` when the work item starts (`process/ticket-lifecycle.md`). File one ticket per message.
 
+   A feature, a request too large for one piece of work, is still one ticket: the work of writing its plan section, which then goes to the PM to place on the roadmap. Never file its breakdown from chat.
+
    When the requester asks for the ticket to go to someone else on the team, add `--assignee <them>`. The ticket is then theirs: it starts `ready`, assigned to them, and the assignment wakes them. Nothing is filed as your work, and you do not work on it. Say in your last message who has it, with the ticket link; it is posted in the thread.
 {{else}}
 3. **New work** (something to build, fix, write or change that no work of yours covers): this team has no tracker, so file it as a work item, `ost work queue "<title>" "<what is asked and why>"`. The office makes the work item in the same thread, your agent replies there, and you end your session. File one request per message.

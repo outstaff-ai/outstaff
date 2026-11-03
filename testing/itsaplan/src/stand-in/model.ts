@@ -61,6 +61,7 @@ export function createIssue(s: ItsaplanStore, actor: string, b: IssueInput): Sto
     assigneeUserId: b.assigneeUserId ?? null,
     labelIds: b.labelIds ?? [],
     parentId: b.parentId ?? null,
+    initiativeId: b.initiativeId ?? null,
     createdAt: s.now(),
     updatedAt: s.now(),
   };

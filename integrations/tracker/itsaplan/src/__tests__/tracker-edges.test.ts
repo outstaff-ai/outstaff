@@ -266,3 +266,19 @@ describe("unlink", () => {
     expect(stub.called("DELETE", "/issues/1001/links/2")).toHaveLength(0);
   });
 });
+
+describe("initiatives", () => {
+  it("reads a status the port does not know as planned", async () => {
+    const raw = {
+      id: 301,
+      projectId: 1,
+      title: "Someday",
+      description: "",
+      status: "paused",
+      updatedAt: "2026-01-01T00:00:00Z",
+    };
+
+    const { tracker } = await trackerOver([route("GET", "/initiatives/301", () => raw)]);
+    expect(await tracker.getInitiative!("301")).toMatchObject({ id: "301", status: "planned" });
+  });
+});

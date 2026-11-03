@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
+import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
 const body = (text: string) => /\n\n(\{.*\})\n/.exec(text)?.[1] ?? "(no body)";
@@ -640,13 +641,27 @@ export async function* assigned(ctx: ItemContext): Script {
   return next ? yield* nextSubTicket(ctx, key, next) : yield* workOnTicket(ctx, key);
 }
 
+/** A ticket to plan a feature; the work item's title may not carry the ticket's title yet, the ticket does. */
+async function* planIfAsked(
+  ctx: ItemContext,
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const feature = new RegExp(`^${key}: Plan: (.+)$`, "m").exec(shown)?.[1];
+  return feature ? yield* planFeature(ctx, key, feature) : undefined;
+}
+
 /** The ticket's own work, as `assigned` describes it. */
 async function* workOnTicket(ctx: ItemContext, key: string): Script {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   yield* holdIfAsked(shown);
-  const stopped = (yield* stopsEarly(ctx, key, shown)) ?? (yield* askHuman(key, shown));
+  const stopped =
+    (yield* planIfAsked(ctx, key, shown)) ??
+    (yield* stopsEarly(ctx, key, shown)) ??
+    (yield* askHuman(key, shown));
+
   if (stopped !== undefined) {
     return stopped;
   }
@@ -869,6 +884,11 @@ export async function* docFeedback(ctx: ItemContext): Script {
 
   const shown = yield { type: "tool", tool: "doc_show", input: { id: doc } };
   const open = openComments(shown);
+  const confirmed = /^confirmed: start (.+?)\.?$/i.exec(feedback.body.trim())?.[1];
+  if (confirmed) {
+    return yield* startMilestone(ctx, doc, open[0]!, confirmed);
+  }
+
   yield {
     type: "tool",
     tool: "doc_update",
@@ -1180,7 +1200,27 @@ async function* changeOrFile(
   ctx: ItemContext,
   latest: string,
 ): AsyncGenerator<Action, string | undefined, string> {
-  return (yield* changeTicket(latest)) ?? (yield* fileRequest(ctx, latest));
+  return (
+    (yield* changeTicket(latest)) ??
+    (yield* fileFeature(latest)) ??
+    (yield* fileRequest(ctx, latest))
+  );
+}
+
+/** A feature is one ticket, to plan it; never its breakdown. Undefined for any other message. */
+async function* fileFeature(latest: string): AsyncGenerator<Action, string | undefined, string> {
+  const feature = /^feature: (.+)$/i.exec(latest)?.[1];
+  if (!feature) {
+    return undefined;
+  }
+
+  yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: { title: `Plan: ${feature}`, body: feature },
+  };
+
+  return "Filed a ticket to plan it.";
 }
 
 /**
@@ -1539,5 +1579,7 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   ci_failed: ciFailed,
   merge_checks_failed: mergeChecksFailed,
   unblock,
+  question: placeFeature,
+  milestone: milestoneDone,
   chat,
 };

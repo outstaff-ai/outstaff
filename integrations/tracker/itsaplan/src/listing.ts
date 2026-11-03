@@ -57,6 +57,7 @@ export function issueListing(api: Itsaplan, statuses: Statuses, h: Helpers): Tra
       assigneeUserId: filter.assignee ? api.resolveMemberId(setup, filter.assignee) : undefined,
       labelIds,
       parentId: filter.parent ? (await h.fetchIssue(filter.parent)).id : undefined,
+      initiativeId: filter.initiative,
       updatedFrom: filter.updatedSince,
       limit: limitQuery(filter),
     };

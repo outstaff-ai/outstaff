@@ -1,4 +1,5 @@
 import type { TeamConfig } from "#/config/types.js";
+import type { InitiativeRef } from "#/ports/initiative.js";
 import type { CanonicalStatus, RepoRef } from "#/ports/types.js";
 import type { HAND_BACK_STATUSES, WORKFLOW_EVENT_TYPES } from "./constants.js";
 
@@ -119,6 +120,12 @@ export interface WorkflowState {
 
   /** The ticket's sub-tickets the state knows, in any status. */
   subTickets(ticket: string): string[];
+
+  /** The initiative (milestone) the ticket is in, as the tracker last said. */
+  initiativeOf(ticket: string): InitiativeRef | undefined;
+
+  /** The tickets the state knows in the initiative, by its id, in any status. */
+  initiativeTickets(initiative: string): string[];
 }
 
 /**
@@ -188,6 +195,7 @@ export type Condition =
   | { ticket_prs_several: boolean }
   | { ticket_handed_back: boolean }
   | { open_subtickets: boolean }
+  | { in_milestone: boolean }
   | { blocked_agent: boolean }
   | { actor_in_round: boolean };
 
@@ -211,6 +219,9 @@ export interface StaticTicket {
 
   /** The ticket it is a sub-ticket of. */
   parent?: string;
+
+  /** The initiative (milestone) it is in. */
+  initiative?: InitiativeRef;
 }
 
 /** One agent's round on a ticket: from when it was queued until it ended (ISO-8601), still under way without `to`. */

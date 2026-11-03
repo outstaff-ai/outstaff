@@ -94,8 +94,15 @@ function trackerControls({ tracker }: World): Route[] {
           r.json.status ?? "Ready",
           r.json.assignee,
           r.json.as,
+          r.json.initiative,
         ),
       }),
+    },
+    {
+      // The human makes an initiative, a milestone of the roadmap, in an Its a Plan status (default `planned`).
+      method: "POST",
+      path: "/_test/initiatives",
+      handler: (r) => ({ id: tracker.createInitiative(r.json.title, r.json.status ?? "planned") }),
     },
     {
       method: "POST",
@@ -172,6 +179,7 @@ export function controlRoutes(world: World): Route[] {
         github: await github.state(),
         tickets: tracker.state(),
         docs: tracker.docs(),
+        initiatives: tracker.initiatives(),
         chat: chat.state(),
         attachmentsServed: tracker.served(),
       }),

@@ -5,6 +5,7 @@ import { docVerbs } from "./doc.js";
 import { handBack } from "./handback.js";
 import { http } from "./http.js";
 import { me } from "./me.js";
+import { milestoneVerbs } from "./milestone.js";
 import { noteVerbs } from "./note.js";
 import { officeVerbs } from "./office-verbs.js";
 import { prVerbs } from "./pr.js";
@@ -37,6 +38,7 @@ export type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 
 export const VERBS: readonly Verb[] = [
   ...ticketVerbs,
+  ...milestoneVerbs,
   ...docVerbs,
   ...noteVerbs,
   ...prVerbs,

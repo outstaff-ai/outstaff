@@ -23,6 +23,8 @@ export type {
   StoredFieldValue,
   StoredDocComment,
   StoredDocIssue,
+  StoredDocInitiative,
+  StoredInitiative,
   StoredIssue,
   StoredLabel,
   StoredLink,

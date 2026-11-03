@@ -1,8 +1,10 @@
 import { PortError, type CanonicalStatus } from "#/ports/index.js";
 import type { Comment, Issue, LinkedIssue, Member, NewIssue, TrackerEvent } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
+import { fakeAttachments } from "./tracker-attachments.js";
 import { fakeDevelopment } from "./tracker-development.js";
 import { fakeFields } from "./tracker-fields.js";
+import { fakeInitiatives } from "./tracker-initiatives.js";
 import { listIssues } from "./tracker-listing.js";
 import type { FakeTracker, FakeTrackerOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
@@ -21,7 +23,6 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
   const log = new EventLog<TrackerEvent>();
   const relations: FakeTracker["relations"] = [];
   const parents: FakeTracker["parents"] = new Map();
-  const attached: FakeTracker["attached"] = new Map();
   let counter = 0;
   let eventCounter = 0;
 
@@ -60,7 +61,9 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
   const linked = (key: string): LinkedIssue => ({ key, status: { ...need(key).status } });
 
-  /** The issue with its `blocks` links both ways and its parent, as the relations have them now. */
+  const { initiativeRef, place, ...initiativeMethods } = fakeInitiatives(now, base);
+
+  /** The issue with its `blocks` links both ways, its parent and its initiative, as the relations have them now. */
   const withLinks = (issue: Issue): Issue => {
     const blocking = relations.filter((r) => r.relation === "blocks");
     const parent = parents.get(issue.key);
@@ -69,6 +72,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       blocks: blocking.filter((r) => r.key === issue.key).map((r) => linked(r.otherKey)),
       blockedBy: blocking.filter((r) => r.otherKey === issue.key).map((r) => linked(r.key)),
       ...(parent ? { parent } : {}),
+      initiative: initiativeRef(issue.key),
     };
   };
 
@@ -85,9 +89,10 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
     fields,
     fieldValues,
     ...fieldMethods,
+    ...fakeAttachments(need),
+    ...initiativeMethods,
     relations,
     parents,
-    attached,
     connected,
     development,
     ...developmentMethods,
@@ -132,7 +137,13 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
       return structuredClone(withLinks(need(key)));
     },
     async listIssues(f) {
-      return structuredClone(listIssues([...issues.values()], parents, f));
+      return structuredClone(
+        listIssues(
+          [...issues.values()],
+          { parents, initiatives: initiativeMethods.ticketInitiatives },
+          f,
+        ),
+      );
     },
     async search(q, limit) {
       const needle = q.toLowerCase();
@@ -163,6 +174,10 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
       if (input.assignee !== undefined) {
         issue.assignee = member(input.assignee);
+      }
+
+      if (input.initiative !== undefined) {
+        place(key, input.initiative);
       }
 
       issues.set(key, issue);
@@ -261,33 +276,14 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
       return touch(issue);
     },
+    async setInitiative(key, initiativeId) {
+      const issue = need(key);
+      place(key, initiativeId);
+      touch(issue);
+      return structuredClone(withLinks(issue));
+    },
     async members() {
       return structuredClone([...members.values()]);
-    },
-    async attach(key, file) {
-      need(key);
-      const list = attached.get(key) ?? [];
-      list.push({ name: file.name, mimetype: file.mimetype, data: file.data.slice() });
-      attached.set(key, list);
-    },
-    async attachments(key) {
-      need(key);
-      return (attached.get(key) ?? []).map((a, i) => ({
-        id: `${key}-a${i + 1}`,
-        name: a.name,
-        mimetype: a.mimetype,
-        size: a.data.byteLength,
-      }));
-    },
-    async download(attachment) {
-      for (const [key, list] of attached) {
-        const hit = list.find((_, i) => `${key}-a${i + 1}` === attachment.id);
-        if (hit) {
-          return hit.data.slice();
-        }
-      }
-
-      throw new PortError("not_found", `Attachment ${attachment.id} not found.`);
     },
     async events(cursor) {
       return log.since(cursor);

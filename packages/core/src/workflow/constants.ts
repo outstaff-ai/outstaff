@@ -35,8 +35,8 @@ export const HAND_BACK_STATUSES = ["done", "waiting", "blocked", "silent"] as co
 
 /**
  * Work item kinds whose round may finish silently, with nothing to hand on and the ticket put back as the round found it: answering a
- * question, a chat request, a comment or a mention, an unblock, a merge, or work on a pull request that already exists
- * (its feedback, a rebase, failing checks). Any other kind (a ticket to work on, a request filed without a tracker)
+ * question, a chat request, a comment or a mention, an unblock, a finished milestone, a merge, or work on a pull request
+ * that already exists (its feedback, a rebase, failing checks). Any other kind (a ticket to work on, a request filed without a tracker)
  * never does. A `done` hand-back, of any kind, needs a result to review or finished work.
  */
 export const SILENT_KINDS: readonly string[] = [
@@ -46,6 +46,7 @@ export const SILENT_KINDS: readonly string[] = [
   "ticket_comment",
   "doc_feedback",
   "unblock",
+  "milestone",
   "merge",
   "review_feedback",
   "merged_feedback",

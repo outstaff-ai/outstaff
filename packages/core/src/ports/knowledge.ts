@@ -134,6 +134,15 @@ export interface Knowledge {
   /** Capability `knowledge.issueLinks`. The documents linked on the ticket. */
   issueDocs?(ticketKey: string): Promise<IssueDoc[]>;
 
+  /**
+   * Capability `knowledge.issueLinks`, where the knowledge base shares the tracker's initiatives (`tracker.initiatives`).
+   * Links the document to the initiative (a milestone), once. An unknown document or initiative is `not_found`.
+   */
+  linkInitiative?(docId: string, initiativeId: string): Promise<DocIssueLinkOutcome>;
+
+  /** With `linkInitiative`: the documents linked to the initiative. */
+  initiativeDocs?(initiativeId: string): Promise<IssueDoc[]>;
+
   /** Capability `knowledge.notes`. The calling agent's notes. */
   notes?: KnowledgeNotes;
 }

@@ -49,6 +49,12 @@ export interface ApiIssue {
   createdAt?: string;
   updatedAt: string;
 
+  /** The initiative it is in, by id; a listing carries it, reading one issue gives `initiative` instead. */
+  initiativeId?: number | null;
+
+  /** The initiative it is in; reading, creating or changing one issue carries it, a listing does not. */
+  initiative?: ApiInitiativeRef | null;
+
   /** The issue's relations to other issues; only reading one issue carries them. */
   links?: ApiIssueLink[];
 
@@ -256,4 +262,26 @@ export interface ApiIssueDoc {
   isPrivate: boolean;
   archived: boolean;
   createdAt: string;
+}
+
+/** An initiative as an issue names it. */
+export interface ApiInitiativeRef {
+  id: number;
+  title: string;
+  status: string;
+}
+
+/** An initiative of the project: `proposed`, `planned`, `active`, `completed` or `canceled`. */
+export interface ApiInitiative extends ApiInitiativeRef {
+  projectId: number;
+  description: string;
+  updatedAt: string;
+}
+
+/** A page of `GET /projects/{key}/initiatives`. */
+export interface ApiInitiativePage {
+  items: ApiInitiative[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
