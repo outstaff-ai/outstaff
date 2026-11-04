@@ -27,10 +27,10 @@ function told(b: NoticeBook, n: Notify, at: string): NoticeBook {
 
 /**
  * The book with the notice an event decided: joined to what the human holds from the same agent, else held on its own.
- * The same event delivered again changes nothing.
+ * The same event delivered again changes nothing; one event may tell the human about several tickets, one notice each.
  */
 export function holdNotice(b: NoticeBook, n: Notify, eventId: string, at: string): NoticeBook {
-  const key = `event:${eventId}|${n.as}|${n.human}`;
+  const key = `event:${eventId}|${n.as}|${n.human}|${n.ticket ?? ""}`;
   if (recentSent(b, Date.parse(at)).some((s) => s.key === key)) {
     return b;
   }

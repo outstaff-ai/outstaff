@@ -67,6 +67,26 @@ describe("the notice desk", () => {
     ]);
   });
 
+  it("lists every ticket one hand-back gave the human, and adds the event delivered again once", async () => {
+    const h = deskHarness();
+    const sub = notice({ ticket: "ACME-2", prs: [{ ref: "acme/shop#11" }] });
+    for (const n of [HAND_BACK, sub, HAND_BACK, sub]) {
+      await h.desk.add(n, "e:back");
+    }
+
+    await h.pass(31_000);
+    expect(h.bodies()).toEqual([
+      [
+        [
+          "U0ADA: Waiting for you:",
+          "- Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)",
+          "  Added the greeting. @U0BOSS please look.",
+          "- Ready for your review: [ACME-2](https://tracker.example/ACME-2), pull request acme/shop#11",
+        ].join("\n"),
+      ],
+    ]);
+  });
+
   it("sends nothing to a human without a chat identity, and logs it", async () => {
     const h = deskHarness();
     await h.desk.add(notice({ human: "grace.lead" }), "e:1");

@@ -36,6 +36,7 @@ export const INSTRUCTION_VARIABLES = [
   "closed.at",
   "parent",
   "parent.open",
+  "parent.closed",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -87,12 +88,19 @@ function closedVariables(type: string, data: Record<string, unknown>): Record<st
   };
 }
 
-/** The parent of the event's ticket, and the parent's sub-tickets still open; empty without a parent. */
+const CLOSED = new Set(["done", "canceled"]);
+
+/** The parent of the event's ticket, and the parent's sub-tickets still open and closed; empty without a parent. */
 function parentVariables({ ticket, state }: EvaluationContext): Record<string, string> {
   const parent = ticket ? state.parentOf(ticket) : undefined;
+  const closed = parent
+    ? state.subTickets(parent).filter((t) => CLOSED.has(state.ticketStatus(t) ?? ""))
+    : [];
+
   return {
     parent: parent ?? "",
     "parent.open": parent ? openSubTickets(state, parent).join(", ") : "",
+    "parent.closed": closed.join(", "),
   };
 }
 

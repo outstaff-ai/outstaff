@@ -59,6 +59,45 @@ describe("notify_human_on_handoff", () => {
     ]);
   });
 
+  it("lists every ticket the hand-back gives the requester: its sub-tickets in review and the tickets of its pull requests", () => {
+    const split = (owner = "sam") => ({
+      ...world("active", owner),
+      tickets: {
+        "ACME-1": t("active", owner, { requester: "ada.admin" }),
+        "ACME-2": t("review", "sam", { parent: "ACME-1" }),
+        "ACME-3": t("backlog", "sam", { parent: "ACME-1" }),
+        "ACME-4": t("active", "sam"),
+      },
+      prs: [pr(9), pr(11), pr(12)],
+      links: { 9: "ACME-1", 11: "ACME-2", 12: "ACME-4" },
+    });
+
+    const handedBack = (data: Record<string, unknown> = {}) =>
+      back("done", { created: ["ACME-2", "ACME-3"], opened: ["ACME-4"], ...data });
+
+    expect(judge(ID, handedBack(), split())).toEqual([
+      "notify ada.admin in chat, as sam (review) of ACME-1 with acme-example/shop#9",
+      "notify ada.admin in chat, as sam (review) of ACME-2 with acme-example/shop#11",
+      "notify ada.admin in chat, as sam (review) of ACME-4 with acme-example/shop#12",
+    ]);
+
+    expect(judge(ID, handedBack({ chat: true }), split())).toEqual([
+      "notify ada.admin of nothing more of ACME-1: told in the chat thread the work came from",
+      "notify ada.admin of nothing more of ACME-2: told in the chat thread the work came from",
+      "notify ada.admin of nothing more of ACME-4: told in the chat thread the work came from",
+    ]);
+
+    // Handed over to another human: the item's ticket goes to them, its other tickets to the requester. With no
+    // requester known, those stay as they are, and no one is told of them.
+    const { fallbackRequester: _none, ...noFallback } = OPTS;
+    const w = split("grace.lead");
+    w.tickets["ACME-1"] = t("active", "grace.lead");
+    const trace = evaluatePipeline(handedBack(), stateOf(w), BUILT_IN_POLICIES, noFallback);
+    expect(trace.decisions.filter((d) => d.policy === ID)).toMatchObject([
+      { type: "notify", human: "grace.lead", ticket: "ACME-1" },
+    ]);
+  });
+
   it("tells the human the agent handed the ticket over to, and no one for an agent", () => {
     expect(judge(ID, back("done"), world("active", "grace.lead"))).toEqual([
       "notify grace.lead in chat, as sam (review) of ACME-1 with acme-example/shop#9",

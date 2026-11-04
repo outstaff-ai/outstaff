@@ -1,5 +1,6 @@
 import type { WorkflowPr } from "@outstaff/core";
 import { definePolicy, type NoticePr, type PolicyContext, type Proposal } from "@outstaff/policy";
+import { handedIn } from "./hand-in.js";
 import { handedOver, requesterOf } from "./handover.js";
 
 const drop = (reason: string): Proposal[] => [{ type: "drop", reason }];
@@ -67,7 +68,31 @@ function handBack(ctx: PolicyContext): Proposal[] {
       ...(told ? { told } : {}),
       reason: `${ctx.event.actor.id} handed ${ticket} back to ${human} for review${where}`,
     },
+    ...handedInNotices(ctx),
   ];
+}
+
+/**
+ * The item's other tickets the hand-back gives to the requester for review (`hand_back_done`): its sub-tickets in
+ * review and the tickets of the pull requests it opened, one notice each, so the message lists them all.
+ */
+function handedInNotices(ctx: PolicyContext): Proposal[] {
+  const human = requesterOf(ctx);
+  if (!human) {
+    return [];
+  }
+
+  const told = ctx.event.data["chat"] === true;
+  return handedIn(ctx, human).map((key): Proposal => ({
+    type: "notify",
+    as: ctx.event.actor.id,
+    human,
+    need: "review",
+    ticket: key,
+    prs: reviewPrs(ctx, key),
+    ...(told ? { told } : {}),
+    reason: `${ctx.event.actor.id}'s hand-back of ${ctx.ticket} gave ${key} to ${human} for review`,
+  }));
 }
 
 /** An agent gave a ticket in review or blocked to a human itself: a PM that cannot unblock it, for example. */
@@ -126,7 +151,7 @@ function opened(ctx: PolicyContext): Proposal[] {
 export const policy = definePolicy({
   id: "notify_human_on_handoff",
   summary:
-    "When work lands on a human, the agent tells them in a direct message in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. The office batches one agent's messages to one human.",
+    "When work lands on a human, the agent tells them in a direct message in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, listing every ticket it gives them (the item's sub-tickets in review and the tickets of the pull requests it opened too), a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. The office batches one agent's messages to one human.",
   on: ["agent.handed_back", "ticket.assigned", "pr.opened"],
   when: {
     any: [
@@ -147,7 +172,7 @@ export const policy = definePolicy({
     ],
   },
   decides:
-    "notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff`",
+    "notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), with every other ticket of the item the hand-back gives the requester for review, the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff`",
   decide(event, ctx) {
     if (event.type === "pr.opened") {
       return opened(ctx);

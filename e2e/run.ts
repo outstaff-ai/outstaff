@@ -2632,6 +2632,14 @@ async function splitWork() {
     "the parent's own pull request leaves it active",
   );
 
+  // The hand-back's direct message lists every ticket it gave the human: the sub-ticket in review too.
+  const splitDm = await dmAbout(parent, split.child.key);
+  assertEq(
+    splitDm.includes(`acme/shop#${split.forChild.number}`),
+    true,
+    `the direct message names the sub-ticket's pull request: ${splitDm}`,
+  );
+
   step(
     `split: ${parent} split into ${split.child.key} (#${split.forChild.number}, in review with the human, linked once before the next poll) and ${split.later.key} (blocked by it, a tracker link); ${parent} has #${split.forParent.number} and stays active with sam; a second for ${parent} refused`,
   );
@@ -2694,7 +2702,16 @@ async function splitWork() {
     `split next: #${split.forChild.number} merged -> ${split.child.key} done with sam, ${split.later.key} unblocked to ready; sam woken once, on ${parent}, opened #${next.pr.number} for ${split.later.key}; ${parent} still active with sam`,
   );
 
-  // The last sub-ticket closing moves the parent on: its own pull request merged, so it is done, with the agent.
+  // That round's hand-back on the parent tells the human of the part for later too, in one direct message, with its
+  // pull request: only that round's message can name it.
+  await dmAbout(parent, `acme/shop#${next.pr.number}`);
+
+  // The human moves the parent to review once sam's round on it is over. The last sub-ticket closing closes it: it
+  // has no open pull request of its own, so it is done, as sam, the agent that last worked it, with a note.
+  await agentIdle();
+  await stub("POST", `/_test/tickets/${parent}/move`, { to: "In Review" });
+  await officePolledTwice(`${parent} moved to review by the human`);
+  assertEq(ticketOf(await state(), parent).status, "In Review", "the human moved the parent");
   await stub("POST", `/_test/pulls/${next.pr.number}/merge`);
   const finished = await until(`${parent} done`, (s) => {
     const t = ticketOf(s, parent);
@@ -2703,8 +2720,49 @@ async function splitWork() {
 
   assertEq(ticketOf(await state(), split.later.key).status, "Done", "the later part is done");
   assertEq(finished.assignee, "sam", "the parent ends with the agent who did the work");
+  assertIncludes(
+    finished.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`),
+    "sam:In Review>Done",
+    "the office closed the parent in review, as sam",
+  );
+
+  assertEq(
+    finished.comments.some(
+      (c: Json) =>
+        c.author === "sam" && c.body.includes(split.child.key) && c.body.includes(split.later.key),
+    ),
+    true,
+    "sam's note on the parent lists its closed sub-tickets",
+  );
+
   step(
-    `split end: #${next.pr.number} merged -> ${split.later.key} done, the last sub-ticket; ${parent} left active and is done`,
+    `split end: the DM about ${parent} listed ${split.later.key}; ${parent} moved to review by the human; #${next.pr.number} merged -> ${split.later.key} done, the last sub-ticket; ${parent} closed as sam, with a note listing ${split.child.key} and ${split.later.key}`,
+  );
+}
+
+/** Waits for sam's direct message to the human that names `key` and `also`, and returns its text. */
+async function dmAbout(key: string, also: string): Promise<string> {
+  const sent = await until(`sam's direct message about ${key} listing ${also}`, (s) =>
+    s.chat.posts.find(
+      (p: Json) =>
+        p.agent === "sam" &&
+        p.channel === "D-sam-U0ADA00001" &&
+        !p.thread &&
+        p.text.includes(key) &&
+        p.text.includes(also),
+    ),
+  );
+
+  return sent.text as string;
+}
+
+/** Waits for sam to be idle, as the trusted human's chat profile shows it. */
+async function agentIdle() {
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
   );
 }
 

@@ -33,6 +33,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`closed_stops_work`](#closed_stops_work) | `ticket.closed` | stop the work on the ticket of every agent but the one who closed it; a ticket closed as done by an unknown closer or an automation stops nothing |
 | [`subticket_closed_to_agent`](#subticket_closed_to_agent) | `ticket.closed` | wake `assignee`, else `last_worker`, else the parent's agent (kind `assigned`) on the ticket's parent, the first of them with more unfinished sub-tickets of the parent |
 | [`subtickets_closed_move_parent`](#subtickets_closed_move_parent) | `ticket.closed` | act for the parent's agent: move the parent to `done` and assign it to the agent, when its own pull requests merged, else to `review` and assign it to the requester; when the closed ticket was its last open sub-ticket |
+| [`subtickets_closed_close_parent`](#subtickets_closed_close_parent) | `ticket.closed` | act for the parent's agent (the one it is assigned to, else the one that last worked it, else the closed sub-ticket's): move the parent to `done` and assign it to the agent, when it has no open pull request of its own, else to `review` and assign it to the requester; when the closed ticket was its last open sub-ticket |
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`), unless the blocker is a sub-ticket of the same parent and the parent is with that agent (`parentAgent`): then only move it; with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
@@ -43,7 +44,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`hand_back_silent_restores`](#hand_back_silent_restores) | `agent.handed_back` | act for the agent: move the ticket back to the status it had before the round, and assign it back to whom it had, for each of the two still as the round's start set it; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester |
 | [`hand_back_blocked`](#hand_back_blocked) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to the requester, when no PM unblocks it, unless the agent handed the ticket over to someone else; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester |
 | [`hand_back_blocked_to_pm`](#hand_back_blocked_to_pm) | `agent.handed_back` | act for `actor`: move the ticket to `blocked`, assign it to `role:pm`; then wake `role:pm` (kind `unblock`), when the PM is not the blocked agent, unless the agent handed the ticket over to someone else; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester |
-| [`notify_human_on_handoff`](#notify_human_on_handoff) | `agent.handed_back`, `ticket.assigned`, `pr.opened` | notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff` |
+| [`notify_human_on_handoff`](#notify_human_on_handoff) | `agent.handed_back`, `ticket.assigned`, `pr.opened` | notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), with every other ticket of the item the hand-back gives the requester for review, the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff` |
 | [`idle_pulls_next`](#idle_pulls_next) | `agent.idle` | wake `actor` (kind `assigned`), with its next ready ticket (for a sub-ticket, on its parent) |
 
 ## Policies
@@ -453,6 +454,24 @@ When:
 
 Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.subtickets_closed_move_parent.instruction`.
 
+### subtickets_closed_close_parent
+
+The last open sub-ticket of a parent in review or blocked closing closes the parent, for the agent that last worked it, with a note listing the closed sub-tickets: to done, with the agent, when the parent has no open pull request of its own; otherwise to review, with the requester. A parent canceled or done is left alone.
+
+Listens to `ticket.closed`. Decides: act for the parent's agent (the one it is assigned to, else the one that last worked it, else the closed sub-ticket's): move the parent to `done` and assign it to the agent, when it has no open pull request of its own, else to `review` and assign it to the requester; when the closed ticket was its last open sub-ticket.
+
+When:
+
+- all of:
+  - `ticket_status: done, canceled`
+  - `parent_status: review, blocked`
+
+Note posted with the change:
+
+```text
+{{ticket}} was the last open sub-ticket of {{parent}}. Its closed sub-tickets: {{parent.closed}}.
+```
+
 ### unblocked_to_blocked_agent
 
 A blocked ticket whose last open blocker was closed wakes the agent blocked on it, to check whether it can go on; the ticket stays where it is, since it may be blocked for other reasons too.
@@ -627,9 +646,9 @@ Note posted with the change: none; the instruction is the wake's.
 
 ### notify_human_on_handoff
 
-When work lands on a human, the agent tells them in a direct message in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. The office batches one agent's messages to one human.
+When work lands on a human, the agent tells them in a direct message in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, listing every ticket it gives them (the item's sub-tickets in review and the tickets of the pull requests it opened too), a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. The office batches one agent's messages to one human.
 
-Listens to `agent.handed_back`, `ticket.assigned`, `pr.opened`. Decides: notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff`.
+Listens to `agent.handed_back`, `ticket.assigned`, `pr.opened`. Decides: notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), with every other ticket of the item the hand-back gives the requester for review, the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff`.
 
 On only while `policies.notify_handoff` is on.
 
@@ -730,3 +749,4 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `closed.at`
 - `parent`
 - `parent.open`
+- `parent.closed`
