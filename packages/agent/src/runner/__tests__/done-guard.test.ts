@@ -77,10 +77,11 @@ describe("toReview", () => {
     expect(finishesSilently(runOf(offer(kind), itemOf({ declared: "done" })))).toBe(false);
   });
 
-  it("finds nothing for a ticket the round left without a result, which never finishes silently", () => {
+  it("finds nothing for a ticket the round left without a result, which finishes silently only when said", () => {
     for (const kind of ["assigned", "unblocked", "request"]) {
       expect(found(offer(kind))).toEqual([]);
-      expect(finishesSilently(runOf(offer(kind), itemOf({ declared: "silent" })))).toBe(false);
+      expect(finishesSilently(runOf(offer(kind), itemOf({})))).toBe(false);
+      expect(finishesSilently(runOf(offer(kind), itemOf({ declared: "silent" })))).toBe(true);
     }
   });
 
@@ -236,6 +237,24 @@ describe("guardedHandBack", () => {
     expect(await guardedHandBack(ctx, run, "Nothing for me.")).toEqual({
       status: "silent",
       summary: "Nothing for me.",
+      toReview: [],
+    });
+
+    expect(requests).toEqual([]);
+  });
+
+  it("keeps a silent the agent said on ticket work whose pull request waits on a review", async () => {
+    const { runtime, requests } = rounds();
+    const { ctx } = contextOf(runtime);
+    const inReview = offer("assigned", [
+      { type: "pr", ref: "acme/app#2", state: "open", draft: false },
+    ]);
+
+    expect(
+      await guardedHandBack(ctx, runOf(inReview, itemOf({ declared: "silent" })), "Waiting."),
+    ).toEqual({
+      status: "silent",
+      summary: "Waiting.",
       toReview: [],
     });
 

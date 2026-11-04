@@ -27,6 +27,7 @@ import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as subticketClosedToAgent } from "./subticket_closed_to_agent.js";
 import { policy as subticketsClosedCloseParent } from "./subtickets_closed_close_parent.js";
 import { policy as subticketsClosedMoveParent } from "./subtickets_closed_move_parent.js";
+import { policy as subticketsInReviewMoveParent } from "./subtickets_in_review_move_parent.js";
 import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
 import { policy as ticketCommentToBlockedAgent } from "./ticket_comment_to_blocked_agent.js";
 import { policy as ticketCommentToLastWorker } from "./ticket_comment_to_last_worker.js";
@@ -58,6 +59,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   subticketClosedToAgent,
   subticketsClosedMoveParent,
   subticketsClosedCloseParent,
+  subticketsInReviewMoveParent,
   milestoneDoneToPm,
   unblockedToBlockedAgent,
   unblockedToReady,

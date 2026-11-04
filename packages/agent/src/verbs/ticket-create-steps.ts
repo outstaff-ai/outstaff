@@ -33,19 +33,27 @@ export async function currentItem(
   return items.find((i) => i.id === ctx.workItemId);
 }
 
-/**
- * The parent ticket: the one passed, else the ticket of the current work item. A chat ticket, an independent
- * follow-up (`related`) and a ticket of a milestone get no default parent.
- */
+/** The parent ticket: only the one passed. A follow-up is its own ticket, related to the one it came from. */
 export async function parentIssue(
   tracker: Tracker,
   input: TicketCreateInput,
+): Promise<Issue | undefined> {
+  return input.parent ? tracker.getIssue(input.parent) : undefined;
+}
+
+/**
+ * The ticket this one relates to: the one passed, else, for a follow-up filed in a work item that has a ticket, that
+ * ticket. A sub-ticket (`parent`), a chat ticket and a ticket of a milestone relate to none by default.
+ */
+export function relatedKey(
+  input: TicketCreateInput,
   current: OfficeWorkItem | undefined,
   chat: boolean,
-): Promise<Issue | undefined> {
-  const defaultKey = chat || input.related || input.milestone ? undefined : current?.ticketKey;
-  const key = input.parent ?? defaultKey;
-  return key ? tracker.getIssue(key) : undefined;
+): string | undefined {
+  return (
+    input.related ??
+    (chat || input.parent || input.milestone ? undefined : (current?.ticketKey ?? undefined))
+  );
 }
 
 /**

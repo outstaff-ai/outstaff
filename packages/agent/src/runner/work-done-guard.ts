@@ -6,10 +6,15 @@ import type { HandBack, ItemRun, Outcome } from "./work.types.js";
 
 /**
  * The status the run ends in now, and what it leaves to review when that is `done`. A `done` with nothing to review
- * is a silent finish for a kind that may finish silently, unless the agent said `done`.
+ * is a silent finish for a kind that may finish silently, unless the agent said `done`. A `silent` the agent said
+ * stays silent even beside a pull request open for review: it waits on that review, which the office checks.
  */
 async function settle(ctx: WorkerContext, run: ItemRun): Promise<Omit<HandBack, "summary">> {
   const status = await handBackStatus(ctx, run);
+  if (status === "done" && run.item.declared() === "silent") {
+    return { status: "silent", toReview: [] };
+  }
+
   const found = status === "done" ? toReview(run) : [];
   const silent = status === "done" && !found.length && finishesSilently(run);
   return { status: silent ? "silent" : status, toReview: found };

@@ -33,6 +33,7 @@ function workStateOf() {
     ticket: (key: string) => tickets.get(key) as TicketRecord | undefined,
     prsOfTicket: (key: string) => prs.get(key) ?? [],
     repoPrs: () => [],
+    subTickets: () => [],
     refreshTicket: async (key: string, by?: unknown) => void refreshed.push([key, by]),
   };
 }

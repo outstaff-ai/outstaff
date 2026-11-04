@@ -1610,7 +1610,7 @@ describe("office verbs", () => {
     ]);
   });
 
-  it("files a follow-up from a work item that has a ticket: backlog, unassigned, under that ticket", async () => {
+  it("files a follow-up from a work item that has a ticket: backlog, unassigned, related to that ticket", async () => {
     const f = fakeEnv();
     await f.tracker.seed.member({ name: "sam", kind: "agent" });
     await f.tracker.createIssue({ title: "Fix checkout", body: "" });
@@ -1618,7 +1618,14 @@ describe("office verbs", () => {
     const issue = await f.tracker.getIssue("SHOP-2");
     expect(issue.status.canonical).toBe("backlog");
     expect(issue.assignee).toBeUndefined();
-    expect(f.tracker.parents.get("SHOP-2")).toBe("SHOP-1");
+    // A follow-up is its own ticket, not a sub-ticket: it never holds the ticket it came from open.
+    expect(f.tracker.parents.size).toBe(0);
+    expect(f.tracker.relations).toContainEqual({
+      key: "SHOP-2",
+      otherKey: "SHOP-1",
+      relation: "relates",
+    });
+
     expect(r.text).toContain("hand-back");
     expect(f.office.checked).toEqual([]);
 

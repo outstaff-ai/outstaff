@@ -2,10 +2,12 @@
 // request, a human asks for changes while another asks a question in chat (answered by a chat session before the round ends), the agent fixes and resolves the thread, a review with only a summary gets a
 // pull request comment, a batch review with two inline comments gets a reply in each thread, a short "yes" to the agent's own earlier comment is answered from the conversation, the human merges, a
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
-// request gets a reply and a follow-up pull request (for a sub-ticket of its own), and a ticket that needs several pull
+// request gets a reply and a follow-up pull request (for a follow-up ticket of its own), and a ticket that needs several pull
 // requests is split into sub-tickets first, one pull request each: the one in review goes to the human with the
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
-// for the next, until the last one closes the parent, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
+// for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
+// the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -786,15 +788,22 @@ async function main() {
     "the review round pushed to the pull request's branch, no branch of its own",
   );
 
-  // The agent filed the reviewer's follow-up itself: one ticket, in the backlog, unassigned, under the reviewed ticket.
+  // The agent filed the reviewer's follow-up itself: one ticket, in the backlog, unassigned, related to the reviewed
+  // ticket: a follow-up is its own ticket, not a sub-ticket that holds the reviewed one open.
   const farewells = (await state()).tickets.filter((x: Json) => x.title === "Add a farewell");
 
   assertEq(farewells.length, 1, "the review round filed the follow-up once");
   assertEq(farewells[0].status, "Backlog", "the follow-up is in the backlog");
   assertEq(farewells[0].assignee ?? null, null, "the follow-up is unassigned");
-  assertEq(farewells[0].parent, first, "the follow-up has the reviewed ticket as its real parent");
+  assertEq(farewells[0].parent ?? null, null, "the follow-up is no sub-ticket");
+  assertEq(
+    JSON.stringify(farewells[0].links.map((l: Json) => [l.kind, l.to])),
+    JSON.stringify([["relates", first]]),
+    "the follow-up relates to the reviewed ticket, as a tracker link",
+  );
+
   step(
-    `follow-up: the review round filed ${farewells[0].key} itself, in the backlog, unassigned, under ${first}`,
+    `follow-up: the review round filed ${farewells[0].key} itself, in the backlog, unassigned, related to ${first}`,
   );
 
   assertEq(fixed.thread.comments.at(-1).author, "acme-sam[bot]", "the agent replied in the thread");
@@ -1352,6 +1361,9 @@ async function main() {
 
   // ---- 8. a ticket that needs several pull requests (see splitWork)
   await splitWork();
+
+  // ---- 8b. waiting on a human's review is not blocked (see waitingOnReview)
+  await waitingOnReview();
 
   // ---- 9. a direct message with a picture: it is answered (it used to be dropped), the ticket it becomes gets the
   // picture, and the agent that works the ticket downloads the picture from the tracker.
@@ -2792,8 +2804,6 @@ async function splitWork() {
     "the merged sub-ticket ends with the agent who did the work",
   );
 
-  assertEq(next.t.status, "In Progress", "the parent is still active");
-  assertEq(next.t.assignee, "sam", "the parent is still the agent's");
   const nextLater = await until(`${split.later.key} in review with the human`, (s) => {
     const later = ticketOf(s, split.later.key);
     return later.status === "In Review" && later.assignee === "ada.admin" ? later : undefined;
@@ -2821,19 +2831,31 @@ async function splitWork() {
   );
 
   step(
-    `split next: #${split.forChild.number} merged -> ${split.child.key} done with sam, ${split.later.key} unblocked to ready; sam woken once, on ${parent}, opened #${next.pr.number} for ${split.later.key}; ${parent} still active with sam`,
+    `split next: #${split.forChild.number} merged -> ${split.child.key} done with sam, ${split.later.key} unblocked to ready; sam woken once, on ${parent}, opened #${next.pr.number} for ${split.later.key}`,
   );
 
   // That round's hand-back on the parent tells the human of the part for later too, in one direct message, with its
   // pull request: only that round's message can name it.
   await dmAbout(parent, `acme/shop#${next.pr.number}`);
 
-  // The human moves the parent to review once sam's round on it is over. The last sub-ticket closing closes it: it
-  // has no open pull request of its own, so it is done, as sam, the agent that last worked it, with a note.
+  // Every sub-ticket is done or in review now, and the parent's own pull request merged: the parent goes to review
+  // with the human, as sam, and sam's hand-back leaves it there. The last sub-ticket closing closes it: it has no open
+  // pull request of its own, so it is done, as sam, the agent that last worked it, with a note.
   await agentIdle();
-  await stub("POST", `/_test/tickets/${parent}/move`, { to: "In Review" });
-  await officePolledTwice(`${parent} moved to review by the human`);
-  assertEq(ticketOf(await state(), parent).status, "In Review", "the human moved the parent");
+  await officePolledTwice(`sam's round on ${parent} handed back`);
+  const inReview = ticketOf(await state(), parent);
+  assertEq(
+    [inReview.status, inReview.assignee].join(" "),
+    "In Review ada.admin",
+    "with every sub-ticket in review or done, the parent is in review with the human",
+  );
+
+  assertIncludes(
+    inReview.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`),
+    "sam:In Progress>In Review",
+    "the office moved the parent to review, as sam",
+  );
+
   await stub("POST", `/_test/pulls/${next.pr.number}/merge`);
   const finished = await until(`${parent} done`, (s) => {
     const t = ticketOf(s, parent);
@@ -2858,7 +2880,103 @@ async function splitWork() {
   );
 
   step(
-    `split end: the DM about ${parent} listed ${split.later.key}; ${parent} moved to review by the human; #${next.pr.number} merged -> ${split.later.key} done, the last sub-ticket; ${parent} closed as sam, with a note listing ${split.child.key} and ${split.later.key}`,
+    `split end: the DM about ${parent} listed ${split.later.key}; ${parent} in review with the human once every sub-ticket was; #${next.pr.number} merged -> ${split.later.key} done, the last sub-ticket; ${parent} closed as sam, with a note listing ${split.child.key} and ${split.later.key}`,
+  );
+}
+
+/**
+ * 8b. waiting on a human's review is not blocked: sam holds a parent with three sub-tickets, one active, one in review
+ * with the human and one in sam's backlog. The active one closes, which wakes sam on the parent; the next part waits
+ * on the human's review, and sam hands back blocked. The office takes it as silent: the parent stays active with sam,
+ * the PM is not woken and nobody is told again. Once every sub-ticket is in review the parent goes to review with the
+ * human, and once they are all done the parent is done.
+ */
+async function waitingOnReview() {
+  await agentIdle();
+  await officePolledTwice("the last round handed back");
+  const filed = (title: string, description: string, status: string, assignee: string) =>
+    stub("POST", "/_test/tickets", { title, description, status, assignee, as: "sam" });
+
+  // Filed as sam, the tickets wake no one.
+  const { key: parent } = await filed("Add a thank-you page", "Three parts.", "In Progress", "sam");
+  const { key: first } = await filed("Add the thank-you header", "", "In Progress", "sam");
+  const { key: inReview } = await filed(
+    "Add the thank-you footer",
+    "waits: review",
+    "In Review",
+    "ada.admin",
+  );
+
+  const { key: later } = await filed("Add the thank-you banner", "", "Backlog", "sam");
+  for (const key of [first, inReview, later]) {
+    await stub("POST", `/_test/tickets/${key}/parent`, { parent });
+  }
+
+  await officePolledTwice(`${parent} and its sub-tickets were filed`);
+  const samBefore = wakesOf("sam").length;
+  const piaBefore = piaWakes().length;
+  const postsBefore = (await state()).chat.posts.length;
+  const about = (s: Json) =>
+    s.chat.posts
+      .slice(postsBefore)
+      .filter((p: Json) => (p.agent === "sam" || p.agent === "pia") && p.text.includes(parent));
+
+  // The first part closing wakes sam on the parent: the next part waits on the human's review.
+  await stub("POST", `/_test/tickets/${first}/move`, { to: "Done" });
+  await until("sam's blocked hand-back on the parent taken as silent", () =>
+    logs("office").includes(`a blocked hand-back waits on work in flight (${inReview} is in review`)
+      ? true
+      : undefined,
+  );
+
+  await agentIdle();
+  await officePolledTwice(`sam's round on ${parent} handed back`);
+  const waited = await state();
+  const t = waited.tickets.find((x: Json) => x.key === parent);
+  assertEq(
+    [t.status, t.assignee].join(" "),
+    "In Progress sam",
+    "waiting on a review is not blocked: the parent stays active with sam",
+  );
+
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore)),
+    JSON.stringify(["assigned"]),
+    "sam was woken once, on the parent",
+  );
+
+  assertEq(JSON.stringify(piaWakes().slice(piaBefore)), "[]", "the PM was not woken");
+  assertEq(JSON.stringify(about(waited)), "[]", "nobody was told again about the parent");
+  step(
+    `waiting: ${first} closed -> sam woken on ${parent}, whose next part ${inReview} waits on the human's review; sam's blocked hand-back taken as silent: ${parent} active with sam, the PM not woken, no message`,
+  );
+
+  // The last part going to review puts every sub-ticket in review or done: the parent goes to review with the human.
+  await stub("POST", `/_test/tickets/${later}/move`, { to: "In Review" });
+  const reviewed = await until(`${parent} in review with the human`, (s) => {
+    const p = s.tickets.find((x: Json) => x.key === parent);
+    return p.status === "In Review" && p.assignee === "ada.admin" ? p : undefined;
+  });
+
+  assertIncludes(
+    reviewed.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`),
+    "sam:In Progress>In Review",
+    "the office moved the parent to review, as sam",
+  );
+
+  // Every part done: the parent is done.
+  for (const key of [later, inReview]) {
+    await stub("POST", `/_test/tickets/${key}/move`, { to: "Done" });
+    await officePolledTwice(`${key} done`);
+  }
+
+  await until(`${parent} done`, (s) =>
+    s.tickets.find((x: Json) => x.key === parent).status === "Done" ? true : undefined,
+  );
+
+  assertEq(JSON.stringify(piaWakes().slice(piaBefore)), "[]", "the PM was never woken");
+  step(
+    `waiting end: ${later} in review -> ${parent} in review with the human, as sam; ${later} and ${inReview} done -> ${parent} done`,
   );
 }
 
