@@ -637,13 +637,17 @@ ost ticket edit ACME-41 --title "Cache the search results in Redis" --json
 
 ## ost ticket parent
 
-Make a ticket a subtask of another ticket.
+Make a ticket a subtask of another ticket, or clear the parent of tickets.
 
-Sets the parent of an existing ticket in the tracker's own parent field, so it shows as a subtask of the parent. Use it for work that is part of another ticket's scope. Refused when the tracker has no parent field; link independent follow-ups with a relates link instead.
+Sets the parent of an existing ticket in the tracker's own parent field, so it shows as a subtask of the parent: pass the ticket, then its parent. Use it for work that is part of another ticket's scope. With clear, each ticket given loses its parent instead, and each is reported: a ticket without a parent is left as it is, and one that fails does not stop the others (the verb fails only when every one failed). Refused when the tracker has no parent field; link independent follow-ups with a relates link instead.
 
 ```
-ost ticket parent <key> <parent>
+ost ticket parent <tickets...> [options]
 ```
+
+| Option | Description |
+| --- | --- |
+| `--clear` | Clear the parent of each ticket given. |
 
 Exit codes:
 
@@ -654,6 +658,7 @@ Examples:
 
 ```sh
 ost ticket parent ACME-120 ACME-118
+ost ticket parent ACME-120 ACME-121 --clear
 ost ticket parent ACME-120 ACME-118 --json
 ```
 

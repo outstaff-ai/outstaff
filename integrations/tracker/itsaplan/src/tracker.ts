@@ -206,13 +206,14 @@ function buildTracker(api: Itsaplan, statuses: Statuses): Tracker {
     },
 
     async setParent(key, parentKey) {
-      const [child, parent] = [await fetchIssue(key), await fetchIssue(parentKey)];
+      const child = await fetchIssue(key);
+      const parentId = parentKey === null ? null : (await fetchIssue(parentKey)).id;
       const updated = await api.http.request<ApiIssue>("PATCH", `/issues/${child.id}`, {
-        body: { parentId: parent.id },
+        body: { parentId },
       });
 
       // An API that ignores the field answers with the issue unchanged: say so, so the caller relates them instead.
-      if (updated.parentId !== parent.id) {
+      if ((updated.parentId ?? null) !== parentId) {
         throw new PortError("unsupported", "The tracker did not set the parent.");
       }
 

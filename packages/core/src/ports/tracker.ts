@@ -183,10 +183,11 @@ export interface Tracker {
 
   /**
    * Capability `tracker.parents`: the tracker has a real parent (subtask) field. Makes `parentKey` the parent of
-   * `key`; `createIssue` takes the same through `parent`. Absent when the tracker has none: callers then fall back to
-   * a "relates" link. Throws `unsupported` when the tracker did not take the parent.
+   * `key`, or with `null` clears its parent; clearing a ticket that has none changes nothing. `createIssue` takes the
+   * same through `parent`. Absent when the tracker has none: callers then fall back to a "relates" link. Throws
+   * `unsupported` when the tracker did not take the change.
    */
-  setParent?(key: string, parentKey: string): Promise<Issue>;
+  setParent?(key: string, parentKey: string | null): Promise<Issue>;
 
   /** Capability `tracker.attachments`. Adds a file to the ticket. */
   attach?(key: string, file: NewAttachment): Promise<void>;

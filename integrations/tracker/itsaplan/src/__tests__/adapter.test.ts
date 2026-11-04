@@ -497,6 +497,32 @@ describe("parent", () => {
   });
 });
 
+describe("clearing a parent", () => {
+  it("sends parentId null, and refuses an API that keeps the parent", async () => {
+    const fake = createItsaplanFake();
+    const tracker = await createItsaplanTracker(trackerCtx(fake));
+    const parent = await tracker.createIssue({ title: "Parent", body: "" });
+    const child = await tracker.createIssue({ title: "Child", body: "", parent: parent.key });
+    const stored = () => fake.state.issues.find((i) => i.identifier === child.key)?.parentId;
+    const keeping = await createItsaplanTracker({
+      ...trackerCtx(fake),
+      fetch: (async (input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+        init?.method === "PATCH"
+          ? fake.fetch(input, { ...init, body: "{}" })
+          : fake.fetch(input, init)) as typeof fetch,
+    });
+
+    await expect(keeping.setParent!(child.key, null)).rejects.toMatchObject({
+      code: "unsupported",
+    });
+
+    expect(stored()).toBe(Number(parent.id));
+    await tracker.setParent!(child.key, null);
+    expect(stored()).toBeNull();
+    expect((await tracker.getIssue(child.key)).parent).toBeUndefined();
+  });
+});
+
 describe("parent key", () => {
   it("reads an issue's parent key, and none when it has none or the parent cannot be read", async () => {
     const fake = createItsaplanFake();

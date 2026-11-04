@@ -12,6 +12,7 @@ import { ticketCreate } from "./ticket-create.js";
 import { ticketEdit } from "./ticket-edit.js";
 import { ticketLink } from "./ticket-link.js";
 import { ticketList } from "./ticket-list.js";
+import { ticketParent } from "./ticket-parent.js";
 
 export const ticketShow = defineVerb({
   name: "ticket.show",
@@ -135,26 +136,6 @@ export const ticketAssign = defineVerb({
     const issue = await tracker.assign(input.key, memberId);
     const url = tracker.links.issue(issue.key);
     return result([`Assigned ${issue.key} to ${who(issue.assignee)}.`, url], { issue }, [url]);
-  },
-});
-
-export const ticketParent = defineVerb({
-  name: "ticket.parent",
-  summary: "Make a ticket a subtask of another ticket.",
-  description:
-    "Sets the parent of an existing ticket in the tracker's own parent field, so it shows as a subtask of the parent. Use it for work that is part of another ticket's scope. Refused when the tracker has no parent field; link independent follow-ups with a relates link instead.",
-  input: z.strictObject({ key, parent: key.describe("Key of the parent ticket.") }),
-  args: ["key", "parent"],
-  examples: ["ost ticket parent ACME-120 ACME-118"],
-  async run(env, input) {
-    const tracker = requireTracker(env);
-    if (!tracker.setParent) {
-      throw new PortError("unsupported", "This tracker has no parent field.");
-    }
-
-    const issue = await tracker.setParent(input.key, input.parent);
-    const url = tracker.links.issue(issue.key);
-    return result([`${issue.key} is now a subtask of ${input.parent}.`, url], { issue }, [url]);
   },
 });
 

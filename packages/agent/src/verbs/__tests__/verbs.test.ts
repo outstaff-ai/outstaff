@@ -1593,20 +1593,6 @@ describe("office verbs", () => {
     expect((await f.tracker.getIssue("SHOP-2")).body).toBe("");
   });
 
-  it("sets a parent on an existing ticket, and refuses a tracker without parents", async () => {
-    const f = fakeEnv();
-    const parent = await f.tracker.createIssue({ title: "Parent", body: "" });
-    const child = await f.tracker.createIssue({ title: "Child", body: "" });
-    await run("ticket.parent", f.env, { key: child.key, parent: parent.key });
-    expect(f.tracker.parents.get(child.key)).toBe(parent.key);
-
-    delete (f.tracker as { setParent?: unknown }).setParent;
-    await rejects(
-      run("ticket.parent", f.env, { key: child.key, parent: parent.key }),
-      "unsupported",
-    );
-  });
-
   it("files an independent follow-up with a relates link and no parent", async () => {
     const f = fakeEnv();
     await f.tracker.seed.member({ name: "sam", kind: "agent" });
