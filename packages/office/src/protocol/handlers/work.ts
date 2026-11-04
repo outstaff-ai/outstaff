@@ -34,7 +34,6 @@ export const workHandlers: RequestHandlers = {
   async handback({ ctx, person, payload, reply }) {
     const { workItemId, ...result } = payload;
     await ctx.opts.source.handBack(person, workItemId, result);
-    await ctx.opts.messaging?.onHandBack?.(workItemId, result.status);
     reply("ack", {});
     ctx.deliver(person);
   },

@@ -47,11 +47,12 @@ export function teamConfig(office?: Record<string, unknown>): TeamConfig {
   return result.config;
 }
 
-/** A work source over the real store and scheduler, as the composition root will build it. */
+/** A work source over the real store and scheduler, as the composition root builds it; `onHandedBack` runs the office's rounds. */
 export function storeSource(
   store: Store,
   scheduler: ReturnType<typeof createScheduler>,
   team: TeamConfig,
+  onHandedBack?: (itemId: string) => Promise<void>,
 ): WorkSource {
   const offerOf = async (item: WorkItem): Promise<Offer> => ({
     workItem: {
@@ -117,6 +118,8 @@ export function storeSource(
         outcome: result.summary,
         status: result.status === "done" ? "done" : "waiting",
       });
+
+      await onHandedBack?.(id);
     },
     async fail(person, id, reason) {
       await own(person, id);

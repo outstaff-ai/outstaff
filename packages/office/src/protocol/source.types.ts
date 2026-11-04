@@ -218,12 +218,6 @@ export interface Messaging {
   ): Promise<AnswerState>;
   answer(from: string, questionId: string, answer: string): Promise<void>;
 
-  /**
-   * Called after an agent handed an item back. Answers that arrived while the item was running are delivered then:
-   * the item is queued again with them in its journal.
-   */
-  onHandBack?(itemId: string, status: string): Promise<void>;
-
   /** The team as agents see it, including the trusted humans. Without it the work source's members are shown. */
   roster?(): Promise<{ members: Member[]; humans: Human[] }>;
 }

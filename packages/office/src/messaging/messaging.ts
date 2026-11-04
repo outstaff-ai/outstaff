@@ -2,7 +2,8 @@ import { silentLogger } from "@outstaff/core";
 import type { AnswerState } from "@outstaff/protocol";
 import { ProtocolError } from "#/protocol/errors.js";
 import type { Messaging } from "#/protocol/source.types.js";
-import type { Conversation, WorkItem } from "#/store/types.js";
+import { lateRound } from "#/late-round.js";
+import type { WorkItem } from "#/store/types.js";
 import { mirror } from "./mirror.js";
 import { loadByPerson, readRoster } from "./roster.js";
 import { routeQuestion } from "./routing.js";
@@ -23,8 +24,8 @@ const MIRRORED: Record<string, string> = {
   journal: "the work journal only",
 };
 
-/** The statuses a hand-back leaves the asker in that let it take the answers that came in meanwhile. */
-const RESUMING = new Set<string>(["waiting", "queued", "done", "silent"]);
+/** The statuses of an asker that an answer gets going again; a queued, running or blocked one keeps its place. */
+const RESUMES = new Set<string>(["waiting", "done", "canceled"]);
 
 /** What the person asked sees first: the question, who asks it and from which work, and how to answer. */
 function questionBrief(
@@ -44,21 +45,13 @@ function questionBrief(
   ].join("\n");
 }
 
-/** The answers that arrived while the asker was working, for its journal. */
-function lateAnswers(pending: Conversation[]): string {
-  const lines = pending.map(
-    (c) => `- ${c.target} on question ${c.id} (${c.question}): ${c.answer ?? ""}`,
-  );
-
-  return `Answers that arrived while you were working:\n${lines.join("\n")}`;
-}
-
 export function createMessaging(
   opts: MessagingOptions,
-): Required<Pick<Messaging, "ask" | "answer" | "roster" | "onHandBack">> {
+): Required<Pick<Messaging, "ask" | "answer" | "roster">> {
   const { store, scheduler } = opts;
   const log = opts.logger ?? silentLogger;
   const maxDepth = opts.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const take = lateRound({ store, scheduler });
   const channel = opts.channel ?? opts.team.office?.channel;
   const mirrorOpts = {
     chat: opts.chat,
@@ -184,7 +177,7 @@ export function createMessaging(
         throw new ProtocolError("failed", `The item that asked question ${questionId} is gone.`);
       }
 
-      await store.answerConversation(questionId, text);
+      const answered = await store.answerConversation(questionId, text);
       await store.appendJournal(
         asker.id,
         from,
@@ -199,36 +192,17 @@ export function createMessaging(
 
       await store.appendJournal(asker.id, "office", `Answer mirrored to ${where}.`);
 
-      // A running asker cannot take the answer now; `onHandBack` delivers it when the asker stops.
+      // A running asker cannot take the answer now; its hand-back gives it the round (`OfficeRounds.followUp`).
       if (asker.status !== "active") {
-        await resume(asker, from);
+        if (RESUMES.has(asker.status)) {
+          await take(asker, { feedback: [], answers: [answered] });
+        }
+
         await store.markDelivered(questionId);
         opts.notify?.(asker.person);
       }
 
       log.info("question answered", { id: questionId, from, asker: asker.id });
-    },
-
-    async onHandBack(itemId, status) {
-      if (!RESUMING.has(status)) {
-        return;
-      }
-
-      const pending = await store.listUndelivered(itemId);
-      const item = pending.length > 0 ? await store.getItem(itemId) : undefined;
-      if (!item || item.status === "active") {
-        return;
-      }
-
-      await store.appendJournal(item.id, "office", lateAnswers(pending));
-
-      await resume(item, [...new Set(pending.map((c) => c.target))].join(", "));
-      for (const c of pending) {
-        await store.markDelivered(c.id);
-      }
-
-      opts.notify?.(item.person);
-      log.info("answers delivered after hand-back", { item: item.id, count: pending.length });
     },
 
     roster: async () =>
@@ -240,33 +214,4 @@ export function createMessaging(
         ...(opts.usage ? { usage: opts.usage } : {}),
       }),
   };
-
-  /**
-   * Gets the asker's work going again. A waiting item is queued again and continues its session; a finished one gets
-   * a follow-up item that takes over the session. An item that is queued, running or blocked keeps its place and
-   * sees the answer in its journal the next time it runs.
-   */
-  async function resume(asker: WorkItem, from: string): Promise<WorkItem> {
-    if (asker.status === "waiting") {
-      return store.updateItem(asker.id, { status: "queued" });
-    }
-
-    if (asker.status === "done" || asker.status === "canceled") {
-      const followUp = await scheduler.enqueue({
-        person: asker.person,
-        kind: asker.kind,
-        title: `Answer from ${from}: ${asker.title}`,
-        trigger: "agent",
-        parentId: asker.id,
-        ...(asker.subject ? { subject: asker.subject } : {}),
-      });
-
-      return store.updateItem(followUp.id, {
-        sessionId: asker.sessionId,
-        workspace: asker.workspace,
-      });
-    }
-
-    return asker;
-  }
 }

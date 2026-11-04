@@ -2488,6 +2488,7 @@ async function main() {
   await usagePerTicket();
   await handedToHumanWithoutChat();
   await roadmap();
+  await lateInputOneRound();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2638,6 +2639,100 @@ async function roadmap() {
   );
 
   step(`roadmap: a human confirmed Monitoring -> pia started it and filed ${filed[0].key} only`);
+}
+
+const DECISION = "the cache size";
+
+/**
+ * 13f. while a round runs, the PM answers its question and the requester writes in the thread: after the hand-back,
+ * exactly one more round takes both, the ticket ends where that round put it, and the requester hears once.
+ */
+async function lateInputOneRound() {
+  await agentIdle();
+  const answered = () => logs("office").match(/question answered/g)?.length ?? 0;
+  const answeredBefore = answered();
+  await stub("POST", "/_test/gates/decide/close");
+  const request = await stub("POST", "/_test/chat/say", {
+    text: `New work: Decide with the PM: ${DECISION}`,
+  });
+
+  const { key } = await until("sam's round asked the PM and is held at the gate", (s) => {
+    const t = s.tickets.find((x: Json) => x.title === `Decide with the PM: ${DECISION}`);
+    return t && s.chat.gates.decide?.arrived ? t : undefined;
+  });
+
+  await until(`pia answered sam's question on ${key}, while sam's round still runs`, () =>
+    answered() > answeredBefore ? true : undefined,
+  );
+
+  const inThread = (s: Json) => s.chat.posts.filter((p: Json) => p.thread === request.id).length;
+  const seen = inThread(await state());
+  await stub("POST", "/_test/chat/say", { text: "Also keep it under 64 MB.", thread: request.id });
+  const noted = await until("the requester's message noted for the running round", (s) =>
+    inThread(s) > seen ? s.chat.posts.findLast((p: Json) => p.thread === request.id) : undefined,
+  );
+
+  assertSays(
+    noted.text,
+    "I'll pick it up when the current round ends.",
+    "the message is added to the running round",
+  );
+
+  const before = (await state()).chat.posts.length;
+  await stub("POST", "/_test/gates/decide/open");
+  await until(`${key} decided and handed back to the requester`, (s) => {
+    const t = ticketOf(s, key);
+    return t.status === "In Review" && t.assignee === "ada.admin" ? t : undefined;
+  });
+
+  await officePolledTwice(`${key} handed back`);
+  const after = await state();
+  const t = ticketOf(after, key);
+  const decided = t.comments.filter(
+    (c: Json) => c.author === "sam" && c.body.startsWith("Decided with the PM"),
+  );
+
+  assertEq(decided.length, 1, "one more round decided it");
+  assertSays(
+    decided[0].body,
+    "Decided with the PM: The smallest option that works; we revisit it next milestone.",
+    "the round had the PM's answer",
+  );
+
+  assertSays(
+    decided[0].body,
+    "Requester: Also keep it under 64 MB.",
+    "and the requester's message",
+  );
+
+  assertEq(
+    `${t.status} ${t.assignee}`,
+    "In Review ada.admin",
+    "the ticket stays where that round put it",
+  );
+
+  const office = logs("office");
+  const again = [
+    ...office.matchAll(
+      /queued work item (\S+) for sam again: 1 new feedback and 1 answer while it ran/g,
+    ),
+  ];
+
+  assertEq(again.length, 1, "the round that asked was queued again once, with both");
+  assertEq(
+    new RegExp(`queued follow-up work item \\S+ for sam: .* after ${again[0]![1]}`).test(office),
+    false,
+    "no follow-up round of its own was queued beside it",
+  );
+
+  const told = after.chat.posts
+    .slice(before)
+    .filter((p: Json) => p.agent === "sam" && (p.thread === request.id || p.text.includes(key)));
+
+  assertEq(told.length, 1, `the requester hears once about ${key}: ${JSON.stringify(told)}`);
+  step(
+    `late input: pia answered and the requester wrote while sam's round on ${key} ran -> one more round, ${key} in review, one message`,
+  );
 }
 
 /**

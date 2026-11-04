@@ -1,20 +1,22 @@
 import { policyOn } from "@outstaff/core";
-import { CHAT_ORIGIN_SUBJECT, readOrigin } from "./chat/origin.js";
-import type { ChatOriginRecord } from "./chat/types.js";
+import { lateAnswers, lateRound } from "./late-round.js";
 import type { OfficeRounds, OfficeRoundsOptions } from "./office-rounds.types.js";
 import type { WorkItem } from "./store/types.js";
-import { addFeedback, FOLLOW_UP_SUBJECT, undeliveredFeedback } from "./work-feedback.js";
+import { undeliveredFeedback } from "./work-feedback.js";
 
 /** Kinds that only answer something on a ticket, or start from it: finishing one settles nothing. */
 const ANSWERS = new Set(["asked", "doc_feedback", "unblock", "milestone"]);
 
+/** The statuses a hand-back leaves an asker in that take the answers that came while it ran; a blocked one keeps them. */
+const TAKES_ANSWERS = new Set<string>(["waiting", "done"]);
+
 /**
  * The office's bookkeeping of an item's rounds after a hand-back, which decides nothing and changes nothing outside the
- * office: feedback that came after the offer gets a round of its own, and blocked items the finished work made moot
- * are closed.
+ * office: what reached the item while it ran (feedback after its offer, answers to its questions) gets one more round,
+ * and blocked items the finished work made moot are closed.
  */
 export function createOfficeRounds(opts: OfficeRoundsOptions): OfficeRounds {
-  const { store, scheduler, workState, team, logger } = opts;
+  const { store, scheduler, workState, team, logger, notify } = opts;
 
   // One hand-back at a time: both read the work queue.
   let chain: Promise<unknown> = Promise.resolve();
@@ -36,56 +38,44 @@ export function createOfficeRounds(opts: OfficeRoundsOptions): OfficeRounds {
       : undefined;
   };
 
+  const take = lateRound({ store, scheduler });
+
+  /** What reached the item after its offer: feedback (`policies.feedback.follow_up_round`) and answers it may take. */
+  const lateInput = async (item: WorkItem) => ({
+    feedback: policyOn(team.policies, "feedback.follow_up_round")
+      ? await undeliveredFeedback(store, item.id)
+      : [],
+    answers: TAKES_ANSWERS.has(item.status) ? await store.listUndelivered(item.id) : [],
+  });
+
   const followUp = async (itemId: string): Promise<void> => {
-    if (
-      !policyOn(team.policies, "feedback.follow_up_round") ||
-      (await store.getSubject(FOLLOW_UP_SUBJECT, itemId)) !== undefined
-    ) {
-      return;
-    }
-
-    const late = await undeliveredFeedback(store, itemId);
     const item = await store.getItem(itemId);
-    if (!item || late.length === 0) {
+    if (!item) {
       return;
     }
 
-    // A request from chat that reached the item late is answered in the same threads.
-    const origin = await readOrigin(store, itemId);
-    const next = await scheduler.enqueue({
-      person: item.person,
-      kind: item.kind,
-      title: item.title,
-      trigger: item.trigger,
-      priority: item.priority,
-      parentId: item.id,
-      ...(item.subject ? { subject: item.subject } : {}),
-      // Stored before the item can be offered: an offer without its feedback or origin would never be repeated.
-      init: async (created) => {
-        await store.addItemRefs(created.id, await store.listItemRefs(itemId));
-        for (const feedback of late) {
-          await addFeedback(store, created.id, feedback);
-        }
+    const late = await lateInput(item);
+    if (late.answers.length > 0) {
+      await store.appendJournal(itemId, "office", lateAnswers(late.answers));
+    }
 
-        if (origin) {
-          await store.upsertSubject(CHAT_ORIGIN_SUBJECT, created.id, {
-            channel: origin.channel,
-            thread: origin.thread,
-            requester: origin.requester,
-            direct: origin.direct,
-            participant: origin.participant,
-            awaitingPlacement: false,
-            claimed: [],
-            ...(origin.also ? { also: origin.also } : {}),
-          } satisfies ChatOriginRecord);
-        }
-      },
-    });
+    const round = await take(item, late);
+    if (!round) {
+      return;
+    }
 
-    await store.upsertSubject(FOLLOW_UP_SUBJECT, itemId, { itemId: next.id });
+    for (const c of late.answers) {
+      await store.markDelivered(c.id);
+    }
+
+    notify?.(item.person);
+    const answers = late.answers.length;
+    const what = `${late.feedback.length} new feedback and ${answers} answer${answers === 1 ? "" : "s"}`;
     logger.info(
-      `queued follow-up work item ${next.id} for ${item.person}: ${late.length} new feedback after ${item.id} was offered`,
-      { person: item.person, item: next.id, after: item.id },
+      round.id === item.id
+        ? `queued work item ${item.id} for ${item.person} again: ${what} while it ran`
+        : `queued follow-up work item ${round.id} for ${item.person}: ${what} after ${item.id} was offered`,
+      { person: item.person, item: round.id, after: item.id },
     );
   };
 

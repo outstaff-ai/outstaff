@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
+import { answerTeammate, decideTopic, decideWithPm } from "./decide.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
@@ -641,14 +642,27 @@ export async function* assigned(ctx: ItemContext): Script {
   return next ? yield* nextSubTicket(ctx, key, next) : yield* workOnTicket(ctx, key);
 }
 
-/** A ticket to plan a feature; the work item's title may not carry the ticket's title yet, the ticket does. */
+/**
+ * A ticket to plan a feature, or a decision to make with the PM; the work item's title may not carry the ticket's
+ * title yet, the ticket does.
+ */
 async function* planIfAsked(
   ctx: ItemContext,
   key: string,
   shown: string,
 ): AsyncGenerator<Action, string | undefined, string> {
   const feature = new RegExp(`^${key}: Plan: (.+)$`, "m").exec(shown)?.[1];
-  return feature ? yield* planFeature(ctx, key, feature) : undefined;
+  return feature ? yield* planFeature(ctx, key, feature) : yield* decideIfAsked(ctx, key, shown);
+}
+
+/** A decision to make with the PM, when the ticket is one. */
+async function* decideIfAsked(
+  ctx: ItemContext,
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const topic = decideTopic(key, shown);
+  return topic ? yield* decideWithPm(ctx, key, topic) : undefined;
 }
 
 /** The ticket's own work, as `assigned` describes it. */
@@ -1579,7 +1593,8 @@ export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
   ci_failed: ciFailed,
   merge_checks_failed: mergeChecksFailed,
   unblock,
-  question: placeFeature,
+  question: (ctx) =>
+    /Its plan: /.test(ctx.question?.text ?? "") ? placeFeature(ctx) : answerTeammate(ctx),
   milestone: milestoneDone,
   chat,
 };
