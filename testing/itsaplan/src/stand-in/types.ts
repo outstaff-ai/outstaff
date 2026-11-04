@@ -2,6 +2,7 @@ import type {
   ApiCustomField,
   ApiFieldValue,
   ApiActivityItem,
+  ApiInitiative,
   ApiAssignee,
   ApiColumn,
   ApiDevPullRequest,
@@ -26,8 +27,20 @@ export type StoredLabel = Required<ApiLabel>;
 export type StoredMember = Required<ApiAssignee> & { username: string };
 
 /** An issue as the stand-in stores it: the full form, with the fields the API may leave out always set. */
-export type StoredIssue = ApiIssue &
-  Required<Pick<ApiIssue, "assigneeUserId" | "labelIds" | "createdAt">> & { description: string };
+export type StoredIssue = Omit<ApiIssue, "initiative"> &
+  Required<Pick<ApiIssue, "assigneeUserId" | "labelIds" | "createdAt" | "initiativeId">> & {
+    description: string;
+  };
+
+/** An initiative as the stand-in stores it. */
+export type StoredInitiative = ApiInitiative & { createdAt: string };
+
+/** A document linked to an initiative, with who linked it. */
+export interface StoredDocInitiative {
+  docId: number;
+  initiativeId: number;
+  by: string;
+}
 
 /** A row of the activity feed; the stand-in always serves the optional fields. */
 export type StoredActivity = ApiActivityItem &
@@ -207,6 +220,8 @@ export interface ItsaplanStore {
   pullRequestsOf: PullRequestSource;
   development: StoredDevelopmentLink[];
   docIssues: StoredDocIssue[];
+  initiatives: StoredInitiative[];
+  docInitiatives: StoredDocInitiative[];
   customFields: StoredCustomField[];
   fieldValues: StoredFieldValue[];
   counters: {
@@ -237,4 +252,5 @@ export interface IssueInput {
   assigneeUserId?: string;
   labelIds?: number[];
   parentId?: number;
+  initiativeId?: number | null;
 }

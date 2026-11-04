@@ -1,4 +1,4 @@
-import { docsState, ticketsState } from "./e2e-state.js";
+import { docsState, initiativesState, ticketsState } from "./e2e-state.js";
 import type { ItsaplanE2eOptions } from "./e2e.types.js";
 import {
   assignIssue,
@@ -64,6 +64,7 @@ function controls(s: ItsaplanStore, human: string) {
       status: string,
       assignee?: string,
       actor?: string,
+      initiative?: string,
     ) {
       const col = columnNamed(s, status);
       if (!col) {
@@ -76,7 +77,25 @@ function controls(s: ItsaplanStore, human: string) {
         description,
         columnId: col.id,
         ...(who ? { assigneeUserId: who.userId } : {}),
+        ...(initiative === undefined ? {} : { initiativeId: Number(initiative) }),
       }).identifier;
+    },
+
+    /** The human makes an initiative (a milestone of the roadmap), in a status Its a Plan knows; returns its id. */
+    createInitiative(title: string, status: string) {
+      const at = s.now();
+      const id = 300 + s.initiatives.length + 1;
+      s.initiatives.push({
+        id,
+        projectId: 1,
+        title,
+        description: "",
+        status,
+        createdAt: at,
+        updatedAt: at,
+      });
+
+      return String(id);
     },
 
     assignTicket(keyName: string, username: string) {
@@ -184,5 +203,6 @@ export function createItsaplanE2e(opts: ItsaplanE2eOptions) {
     served: () => store.served,
     docs: () => docsState(store),
     state: () => ticketsState(store),
+    initiatives: () => initiativesState(store),
   };
 }

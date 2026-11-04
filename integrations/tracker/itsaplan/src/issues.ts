@@ -7,6 +7,7 @@ import type {
   Itsaplan,
   Page,
 } from "@outstaff/integration.shared.itsaplan";
+import { initiativeOfIssue } from "./initiatives.js";
 import type { Statuses } from "./types.js";
 
 const HYDRATE_CONCURRENCY = 5;
@@ -48,6 +49,7 @@ export function issueHelpers(api: Itsaplan, statuses: Statuses) {
       url: api.issueUrl(raw.identifier),
       updatedAt: raw.updatedAt,
       ...blocking(raw, setup),
+      ...initiativeOfIssue(raw),
     };
   };
 

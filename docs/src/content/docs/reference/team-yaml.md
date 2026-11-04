@@ -1315,6 +1315,11 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 - Type: `boolean`
 - Required
 
+#### pipeline.policies.<key>.when.in_milestone
+
+- Type: `boolean`
+- Required
+
 #### pipeline.policies.<key>.when.ticket_handed_back
 
 - Type: `boolean`

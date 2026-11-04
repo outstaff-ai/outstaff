@@ -2,6 +2,7 @@ import { PortError } from "#/ports/index.js";
 import type { Doc, DocComment, DocEvent, Knowledge } from "#/ports/index.js";
 import { mentionData } from "#/mentions.js";
 import type { FakeKnowledge, FakeKnowledgeOptions } from "./types.js";
+import { fakeDocLinks } from "./knowledge-links.js";
 import { createFakeNotes } from "./knowledge-notes.js";
 import { steppingClock } from "./util.js";
 
@@ -83,23 +84,17 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     return structuredClone(doc);
   };
 
-  // The tickets documents can be linked on: the seed adds them, as the fake has no tracker of its own.
-  const issues = new Set<string>();
-  const issueLinks: FakeKnowledge["issueLinks"] = new Map();
-  const needIssue = (key: string) => {
-    if (!issues.has(key)) {
-      throw new PortError("not_found", `Ticket ${key} not found.`);
-    }
-
-    return issueLinks.get(key) ?? [];
-  };
+  // The tickets and initiatives documents can be linked on: the seed adds them, as the fake has no tracker of its own.
+  const tickets = fakeDocLinks("Ticket", find, author);
+  const initiatives = fakeDocLinks("Initiative", find, author);
 
   const self = { id: author, name: author, username: author, kind: "agent" } as const;
   const notes = createFakeNotes(self, now, links.doc);
 
   return {
     links,
-    issueLinks,
+    issueLinks: tickets.links,
+    initiativeLinks: initiatives.links,
     notes: notes.notes,
     seed: {
       notesEdit: async (owner, list, by) => {
@@ -114,9 +109,14 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
       },
       doc: create,
       async issue() {
-        const key = `ACME-${issues.size + 1}`;
-        issues.add(key);
+        const key = `ACME-${tickets.known.size + 1}`;
+        tickets.known.add(key);
         return key;
+      },
+      async initiative() {
+        const id = String(initiatives.known.size + 1);
+        initiatives.known.add(id);
+        return id;
       },
       forbiddenCall: () => Promise.reject(new PortError("forbidden", "Forbidden.")),
     },
@@ -167,19 +167,10 @@ export function createFakeKnowledge(opts: FakeKnowledgeOptions = {}): FakeKnowle
     async resolve(commentId) {
       needComment(commentId).resolved = true;
     },
-    async linkIssue(docId, ticketKey) {
-      const doc = find(docId);
-      const list = needIssue(ticketKey);
-      if (list.some((l) => l.doc === doc.id)) {
-        return "already_linked";
-      }
-
-      issueLinks.set(ticketKey, [...list, { doc: doc.id, by: author }]);
-      return "linked";
-    },
-    async issueDocs(ticketKey) {
-      return needIssue(ticketKey).map((l) => ({ id: l.doc, title: docs.get(l.doc)!.title }));
-    },
+    linkIssue: tickets.link,
+    issueDocs: tickets.docs,
+    linkInitiative: initiatives.link,
+    initiativeDocs: initiatives.docs,
     async events(ids, cursor) {
       const after = cursor === undefined ? undefined : (JSON.parse(cursor) as { since: string });
       const wanted = new Set(ids.map((id) => find(id).id));

@@ -2487,6 +2487,7 @@ async function main() {
   await recallHistory();
   await usagePerTicket();
   await handedToHumanWithoutChat();
+  await roadmap();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2516,6 +2517,127 @@ async function main() {
   await notesInTheKnowledgeBase();
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
+
+/** The pieces of the monitoring plan the scripted architect writes: one can start now, one waits for the dashboard. */
+const PIECE_NOW = "Collect resource metrics on the server";
+const PIECE_LATER = "Show the history in the dashboard";
+const FEATURE = "resource monitoring with history and scaling suggestions";
+
+/**
+ * A feature request in chat on a team with a roadmap: the agent who receives it files one ticket to plan it, writes
+ * the plan and asks the PM where it fits; the PM places it in a later milestone, so no build tickets are filed. When
+ * the current milestone's last ticket closes, the PM is woken, closes it and proposes the next one; once a human
+ * confirms it, the PM starts it and files only the tickets whose prerequisites exist.
+ */
+async function roadmap() {
+  const { id: current } = await stub("POST", "/_test/initiatives", {
+    title: "Foundations",
+    status: "active",
+  });
+
+  const { id: later } = await stub("POST", "/_test/initiatives", { title: "Monitoring" });
+  const { key: last } = await stub("POST", "/_test/tickets", {
+    title: "Store the settings",
+    status: "Backlog",
+    initiative: current,
+  });
+
+  await until("sam idle before the feature request", (s) => (idle(s) ? true : undefined));
+  const before = (await state()).tickets.length;
+  await stub("POST", "/_test/chat/say", { text: `Feature: ${FEATURE}` });
+  const plan = await until("the plan ticket handed back, placed by the PM", (s) => {
+    const t = s.tickets.find((x: Json) => x.title === `Plan: ${FEATURE}`);
+    return t && t.status === "In Review" && t.assignee !== "sam" ? t : undefined;
+  });
+
+  const placed = await state();
+  assertEq(placed.tickets.length, before + 1, "the feature became one ticket, not a breakdown");
+  assertSame(
+    placed.tickets.filter((t: Json) => [PIECE_NOW, PIECE_LATER].includes(t.title)),
+    [],
+    "no build tickets were filed for a feature placed in a later milestone",
+  );
+
+  const monitoring = placed.initiatives.find((i: Json) => i.id === later);
+  assertSame(
+    monitoring.docs.map((d: Json) => [d.title, d.by]),
+    [[`Plan: ${FEATURE}`, "pia"]],
+    "the PM linked the plan to the later milestone",
+  );
+
+  assertSame(monitoring.tickets, [], "the later milestone has no tickets yet");
+  assertEq(monitoring.status, "planned", "the later milestone is still planned");
+  assertIncludes(
+    plan.comments.map((c: Json) => `${c.author}: ${c.body}`),
+    `sam: The PM placed it: Later: milestone Monitoring (${later}), after Foundations. Its plan is linked there. No build tickets until then.`,
+    "sam says on the ticket where the PM placed the feature",
+  );
+
+  step(
+    `roadmap: a feature from chat -> ${plan.key} only, its plan linked to Monitoring by pia; no build tickets`,
+  );
+
+  // ---- the current milestone's last ticket closes: the PM is woken to close it and propose the next one
+  const milestoneWakes = piaWakes().filter((k) => k === "milestone").length;
+  await stub("POST", `/_test/tickets/${last}/move`, { to: "Done" });
+  const proposed = await until("pia closed Foundations and proposed the next milestone", (s) => {
+    const done = s.initiatives.find((i: Json) => i.id === current);
+    const doc = s.docs.find((d: Json) => d.title === "Roadmap" && d.owner === "pia");
+    const t = s.tickets.find((x: Json) => x.key === last);
+    const asked = t.comments.find((c: Json) => c.author === "pia");
+    return done.status === "completed" && doc && asked ? { doc, asked } : undefined;
+  });
+
+  assertEq(
+    piaWakes().filter((k) => k === "milestone").length,
+    milestoneWakes + 1,
+    "the PM was woken once, for the milestone",
+  );
+
+  assertSays(
+    proposed.asked.body,
+    "Foundations is done. Proposed next: Monitoring. Please confirm it on the roadmap:",
+    "the PM asks a human to confirm the next milestone",
+  );
+
+  const waiting = await state();
+  assertEq(
+    waiting.initiatives.find((i: Json) => i.id === later).status,
+    "planned",
+    "the next milestone waits for a human to confirm it",
+  );
+
+  assertEq(waiting.tickets.length, placed.tickets.length, "no tickets before the human confirms");
+  step(`roadmap: ${last} closed, the last of Foundations -> pia closed it and proposed Monitoring`);
+
+  // ---- a human confirms the next milestone on the roadmap: the PM starts it and files only what can start now
+  await stub("POST", `/_test/docs/${proposed.doc.id}/comments`, {
+    body: "Confirmed: start Monitoring.",
+    quote: "Monitoring: proposed next",
+  });
+
+  const started = await until("pia started Monitoring and filed its tickets", (s) => {
+    const m = s.initiatives.find((i: Json) => i.id === later);
+    const doc = s.docs.find((d: Json) => d.id === proposed.doc.id);
+    const resolved = doc.comments.some((c: Json) => c.author === "ada.admin" && c.resolved);
+    return m.status === "active" && m.tickets.length > 0 && resolved ? s : undefined;
+  });
+
+  const filed = started.tickets.filter((t: Json) => t.initiative === later);
+  assertSame(
+    filed.map((t: Json) => [t.title, t.parent, t.status]),
+    [[PIECE_NOW, null, "Backlog"]],
+    "only the piece whose prerequisites exist got a ticket, in the milestone, as no one's sub-ticket",
+  );
+
+  assertSame(
+    started.tickets.filter((t: Json) => t.title === PIECE_LATER),
+    [],
+    "the piece that waits for the dashboard stays in the plan",
+  );
+
+  step(`roadmap: a human confirmed Monitoring -> pia started it and filed ${filed[0].key} only`);
 }
 
 /**

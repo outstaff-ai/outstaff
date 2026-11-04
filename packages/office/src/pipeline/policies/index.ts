@@ -14,6 +14,7 @@ import { policy as linkDocOnTicket } from "./link_doc_on_ticket.js";
 import { policy as linkPrOnTicket } from "./link_pr_on_ticket.js";
 import { policy as mergeChecksFailedToAgent } from "./merge_checks_failed_to_agent.js";
 import { policy as mergedClosesTicket } from "./merged_closes_ticket.js";
+import { policy as milestoneDoneToPm } from "./milestone_done_to_pm.js";
 import { policy as mergeReady } from "./merge_ready.js";
 import { policy as mergedFeedbackToAuthor } from "./merged_feedback_to_author.js";
 import { policy as movedActiveToAssignee } from "./moved_active_to_assignee.js";
@@ -57,6 +58,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   subticketClosedToAgent,
   subticketsClosedMoveParent,
   subticketsClosedCloseParent,
+  milestoneDoneToPm,
   unblockedToBlockedAgent,
   unblockedToReady,
   docCommentToAgent,

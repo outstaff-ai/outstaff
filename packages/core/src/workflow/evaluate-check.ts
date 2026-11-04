@@ -225,6 +225,11 @@ const CHECKS: ConditionChecks = {
       detail: `ticket has ${plural(open.length, "open sub-ticket")}${open.length ? ` (${open.join(", ")})` : ""}, wanted ${wanted ? "some" : "none"}`,
     };
   },
+  in_milestone: (wanted, ctx) => {
+    const milestone = ctx.ticket ? ctx.state.initiativeOf(ctx.ticket) : undefined;
+    const shown = milestone ? `milestone ${milestone.title}` : "no milestone";
+    return { ok: (milestone !== undefined) === wanted, detail: `ticket in ${shown}` };
+  },
   ticket_handed_back: (wanted, ctx) => {
     const back = ctx.ticket ? ctx.state.handedBack(ctx.ticket) : false;
     return {

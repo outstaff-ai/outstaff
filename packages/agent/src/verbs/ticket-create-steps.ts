@@ -15,6 +15,7 @@ interface TicketCreateInput {
   status?: "backlog" | "ready" | "active" | undefined;
   parent?: string | undefined;
   related?: string | undefined;
+  milestone?: string | undefined;
   assignee?: string | undefined;
   blockedBy?: string[] | undefined;
 }
@@ -33,8 +34,8 @@ export async function currentItem(
 }
 
 /**
- * The parent ticket: the one passed, else the ticket of the current work item. A chat ticket and an independent
- * follow-up (`related`) get no default parent.
+ * The parent ticket: the one passed, else the ticket of the current work item. A chat ticket, an independent
+ * follow-up (`related`) and a ticket of a milestone get no default parent.
  */
 export async function parentIssue(
   tracker: Tracker,
@@ -42,7 +43,7 @@ export async function parentIssue(
   current: OfficeWorkItem | undefined,
   chat: boolean,
 ): Promise<Issue | undefined> {
-  const defaultKey = chat || input.related ? undefined : current?.ticketKey;
+  const defaultKey = chat || input.related || input.milestone ? undefined : current?.ticketKey;
   const key = input.parent ?? defaultKey;
   return key ? tracker.getIssue(key) : undefined;
 }
@@ -123,6 +124,7 @@ export function newIssue(
     status: startStatus(input.status ?? (to.chat ? "ready" : "backlog"), to.blocked),
     ...(assignee ? { assignee: assignee.id } : {}),
     ...(parent && tracker.setParent ? { parent: parent.key } : {}),
+    ...(input.milestone ? { initiative: input.milestone } : {}),
   };
 }
 

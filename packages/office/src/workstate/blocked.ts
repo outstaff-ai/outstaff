@@ -2,8 +2,8 @@ import type { WorkItem } from "#/store/index.js";
 import type { TicketWork } from "./core.types.js";
 import type { TicketRecord } from "./types.js";
 
-/** Answering a question on a ticket, or trying to unblock it, is not working on it. */
-const NOT_WORK = new Set(["asked", "unblock"]);
+/** Answering a question on a ticket, trying to unblock it, or the PM's round on its milestone, is not working on it. */
+const NOT_WORK = new Set(["asked", "unblock", "milestone"]);
 
 /** Whether an item of this kind works on its ticket. */
 export const worksOnTicket = (kind: string) => !NOT_WORK.has(kind);

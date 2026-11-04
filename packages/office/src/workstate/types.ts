@@ -1,5 +1,6 @@
 import type {
   CanonicalStatus,
+  InitiativeRef,
   Logger,
   PrRef,
   PrVerdict,
@@ -38,6 +39,9 @@ export interface TicketRecord {
 
   /** The ticket this one is a sub-ticket of, as the tracker last said. */
   parent?: string;
+
+  /** The initiative (milestone) it is in, as the tracker last said. */
+  initiative?: InitiativeRef;
 
   /** The tickets this one blocks, as the tracker last said. */
   blocks?: string[];

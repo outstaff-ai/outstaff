@@ -178,6 +178,15 @@ export class Itsaplan {
     );
   }
 
+  initiativeUrl(id: string): string {
+    return this.link(
+      undefined,
+      "{url}/{workspace}/{project}/initiatives/{id}",
+      "{url}/{project}/initiatives/{id}",
+      { id },
+    );
+  }
+
   /**
    * Builds a link. While the workspace is unknown, a template that needs it gives way to `bare` (the shape without
    * the workspace), warns once, and starts resolving the workspace in the background.

@@ -38,10 +38,10 @@ describe("the office's document links", () => {
     await store.close();
   });
 
-  const itemOn = (ticket?: string) =>
+  const itemOn = (ticket?: string, kind = "assigned") =>
     store.enqueue({
       person: "sam",
-      kind: "assigned",
+      kind,
       title: "t",
       trigger: "human",
       ...(ticket ? { subject: { type: "ticket", ref: ticket } } : {}),
@@ -83,6 +83,16 @@ describe("the office's document links", () => {
       code: "invalid",
       message: "No ticket ACME-404 is known to the office.",
     });
+  });
+
+  it("links the roadmap a PM writes on a finished milestone to no ticket, so its comments keep coming", async () => {
+    const issue = await tracker.createIssue({ title: "Last of the milestone", body: "" });
+    await ws.refreshTicket(issue.key);
+    const item = await itemOn(issue.key, "milestone");
+    await officeDocLinks({ store, workState: ws, log: silent }).link("sam", item.id, doc);
+    expect(ws.doc("42")).toMatchObject({ author: "sam" });
+    expect(ws.doc("42")?.ticket).toBeUndefined();
+    expect(seen).toEqual([]);
   });
 
   it("refuses a work item that is not the caller's", async () => {

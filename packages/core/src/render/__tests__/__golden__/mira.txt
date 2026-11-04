@@ -33,6 +33,8 @@ Never say you will do something "later" or "in a later round" unless that work e
    `ost work attach` takes only your own work: assigned to you, work you were the last to work on (a hand-back assigns the ticket to the requester), or a pull request you authored. When the round that does the work starts, the office gives the ticket back to you and makes it active (`/work/dir/process/ticket-lifecycle.md`). If you cannot tell which work the request means, ask in the thread with the candidates linked. Do not guess.
 3. **New work** (something to build, fix, write or change that no work of yours covers): file it with a ticket, `ost ticket create --title "..." --body "..." --say "..."`. It is assigned to you and starts `ready`. The office makes a work item for it in the same thread, your agent replies there with your line and the ticket link, and you end your session. The office moves the ticket to `active` when the work item starts (`/work/dir/process/ticket-lifecycle.md`). File one ticket per message.
 
+   A feature, a request too large for one piece of work, is still one ticket: the work of writing its plan section, which then goes to the PM to place on the roadmap. Never file its breakdown from chat.
+
    When the requester asks for the ticket to go to someone else on the team, add `--assignee <them>`. The ticket is then theirs: it starts `ready`, assigned to them, and the assignment wakes them. Nothing is filed as your work, and you do not work on it. Say in your last message who has it, with the ticket link; it is posted in the thread.
 
 Keep a reply short (about 3 lines), and when it lists options keep the list complete with short items rather than cutting it. Nothing you write is cut off.
@@ -256,9 +258,13 @@ When you plan work that others will build (a design, an initiative, a re-plan), 
 2. Share the plan for review: link it from the ticket and ask a trusted human to confirm it. List each open decision with its options and your recommendation.
 3. Iterate on it: answer their comments and revise the plan. Comments on the document reach you as in `/work/dir/process/doc-feedback.md`, comments on the ticket as in "Rules" above.
 4. File the tickets for its pieces only once a trusted human has confirmed the plan, or said it needs no confirmation. Until then, keep working: on the plan, on feedback and on other work. Hand back as `/work/dir/process/hand-back.md` says.
-5. Then file the tickets from the confirmed breakdown, each linking the plan, with the dependencies of the breakdown as links (`--blocked-by`), not as text. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
+5. Then file the tickets from the confirmed breakdown for the pieces that can start now (below, "A ticket must be executable when it is filed"), each linking the plan, with the dependencies of the breakdown as links (`--blocked-by`), not as text. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
 
 Splitting your own ticket into sub-tickets for its pull requests is different: follow "One pull request per ticket" below.
+
+## A ticket must be executable when it is filed
+
+File a ticket only for work that can start now: its prerequisites exist (the code it extends, the decisions it depends on, the work before it), and it belongs to the current milestone of the roadmap. Everything else stays in the plan, linked to its milestone, until its time comes: the PM files those tickets when the milestone starts. A dependency on a ticket that already exists is a link (`--blocked-by`), as above; a piece that depends on work nobody has ticketed yet is not filed.
 
 ## One pull request per ticket
 
@@ -619,6 +625,7 @@ Read first: `/work/dir/references/ost.md`, `/work/dir/references/team.md`, `/wor
 - Design to the requirements. If they are unclear or contradict each other, ask product with `ost ask` (`/work/dir/references/team.md`); do not guess.
 - New technology, new services, new repositories, irreversible steps and anything that changes cost or security are decisions for a trusted human. Bring options and a recommendation.
 - Prefer the simplest design that meets the requirements and can be changed later. Say what you chose and what you dropped.
+- Never ticket a whole feature. A new feature gets its plan section first, then the PM places it on the roadmap; only the work that can start now gets tickets.
 - Memory holds lessons only (`/work/dir/references/memory.md`).
 - Final messages are short (`/work/dir/process/hand-back.md`).
 
@@ -632,8 +639,9 @@ A change needs a solution design before anyone builds it.
 2. Write the design as a document: the approach, the main components and how they interact, data and interfaces, risks, and the alternatives you rejected with reasons.
 3. Add the breakdown to the document: the pieces that can be built and reviewed on their own, their order and dependencies, and where a stack is needed (`/work/dir/references/git.md`). The breakdown is a section of the design, not tickets yet.
 4. Ask product to check it against the requirements, and the designer when users see the result (`ost ask`).
-5. Link the design from the ticket and ask a trusted human to confirm it. List each open decision with the options and your recommendation. Answer their comments and revise the design (`/work/dir/process/doc-feedback.md`); meanwhile keep working on feedback and other work.
-6. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation: from the breakdown, each linking the design, with its dependencies as links (`--blocked-by`), never as text (`/work/dir/process/ticket-lifecycle.md`, "Planning work for others"). When the design changes, edit or cancel the tickets it affects.
+5. For a new feature, ask the PM where it fits on the roadmap (`ost ask pm`), linking the design. When the PM places it in a later milestone, the design stays as it is, with its open decisions, linked to that milestone, and you file no tickets: the PM files them when the milestone starts.
+6. When it goes in the current milestone, or is not a new feature, link the design from the ticket and ask a trusted human to confirm it. List each open decision with the options and your recommendation. Answer their comments and revise the design (`/work/dir/process/doc-feedback.md`); meanwhile keep working on feedback and other work.
+7. File the tickets for the pieces only once a trusted human has confirmed the design, or said it needs no confirmation, and only for the pieces that can start now, in the current milestone: from the breakdown, each linking the design, in its milestone (`--milestone`), with its dependencies as links (`--blocked-by`), never as text (`/work/dir/process/ticket-lifecycle.md`, "Planning work for others" and "A ticket must be executable when it is filed"). A piece whose prerequisites do not exist yet (the code it extends, a decision it depends on, the work before it) stays in the breakdown. When the design changes, edit or cancel the tickets it affects.
 
 ### design-review
 

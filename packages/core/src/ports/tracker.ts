@@ -1,4 +1,11 @@
 import type { EventPage } from "./events.js";
+import type {
+  Initiative,
+  InitiativeChanges,
+  InitiativeFilter,
+  InitiativeRef,
+  NewInitiative,
+} from "./initiative.js";
 import type { Links } from "./links.js";
 import type { CanonicalStatus, RepoRef } from "./types.js";
 
@@ -37,6 +44,12 @@ export interface Issue {
 
   /** Key of the ticket this one is a subtask of. Absent when it has none or the tracker did not say, as in a listing. */
   parent?: string;
+
+  /**
+   * Capability `tracker.initiatives`: the initiative (milestone) the ticket belongs to; `null` when it belongs to none.
+   * Absent when the tracker did not say, as in a listing, or has no initiatives.
+   */
+  initiative?: InitiativeRef | null;
 }
 
 export interface Comment {
@@ -67,6 +80,9 @@ export interface NewIssue {
 
   /** Key of the ticket this one is a subtask of. Only for a tracker with `setParent`; others ignore it. */
   parent?: string;
+
+  /** Id of the initiative it belongs to. Only for a tracker with `tracker.initiatives`; others ignore it. */
+  initiative?: string;
 }
 
 /** What `updateIssue` changes; a field left out stays as it is. */
@@ -88,6 +104,9 @@ export interface IssueFilter {
 
   /** Subtasks of this ticket, by key. */
   parent?: string;
+
+  /** Tickets of this initiative, by id. Only for a tracker with `tracker.initiatives`. */
+  initiative?: string;
 
   /** Updated at or after this time (ISO-8601). */
   updatedSince?: string;
@@ -222,6 +241,24 @@ export interface Tracker {
 
   /** Capability `tracker.fields`. The value of a number field of the ticket; null when it has none. */
   fieldValue?(key: string, field: string): Promise<number | null>;
+
+  /** Capability `tracker.initiatives`. The project's initiatives (the roadmap's milestones), in the tracker's order. */
+  initiatives?(filter?: InitiativeFilter): Promise<Initiative[]>;
+
+  /** Capability `tracker.initiatives`. An initiative by id; an unknown one is `not_found`. */
+  getInitiative?(id: string): Promise<Initiative>;
+
+  /** Capability `tracker.initiatives`. Creates an initiative, `planned` unless the status says otherwise. */
+  createInitiative?(initiative: NewInitiative): Promise<Initiative>;
+
+  /** Capability `tracker.initiatives`. Changes the title, description or status of an initiative. */
+  updateInitiative?(id: string, changes: InitiativeChanges): Promise<Initiative>;
+
+  /**
+   * Capability `tracker.initiatives`. Puts the ticket in the initiative, out of any other one; `null` takes it out of
+   * its initiative. The initiative's tickets are `listIssues({ initiative })`.
+   */
+  setInitiative?(key: string, initiativeId: string | null): Promise<Issue>;
   events(cursor?: string): Promise<EventPage<TrackerEvent>>;
 
   /** Webhook mode; same contract as `Vcs.parseWebhook`. */

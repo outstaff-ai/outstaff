@@ -6,7 +6,14 @@ needs:
   - tracker.issues
 optional_needs:
   - knowledge.docs
+  - tracker.initiatives
 modes:
+  - name: roadmap
+    when: The team needs a roadmap, or a milestone starts, closes or changes.
+  - name: place
+    when: A teammate asks where a new feature fits on the roadmap.
+  - name: milestone
+    when: The last open ticket of a milestone closed.
   - name: intake
     when: A request or idea arrives that is not yet a scoped ticket.
   - name: plan

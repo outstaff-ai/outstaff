@@ -1,4 +1,5 @@
 import type { ApiIssueLink } from "@outstaff/integration.shared.itsaplan";
+import { withInitiative } from "./initiative-routes.js";
 import type { ItsaplanStore, StoredIssue, StoredLink } from "./types.js";
 
 /** The kinds a link is made with that state the relation from the other issue's side. */
@@ -71,5 +72,5 @@ export function issueView(s: ItsaplanStore, issue: StoredIssue) {
     .filter((v) => v.issueId === issue.id)
     .map(({ fieldId, value, valueEnd, optionIds }) => ({ fieldId, value, valueEnd, optionIds }));
 
-  return { ...issue, links, fieldValues };
+  return { ...withInitiative(s, issue), links, fieldValues };
 }

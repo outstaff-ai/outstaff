@@ -573,7 +573,7 @@ ost ticket assign ACME-12 me --json
 
 Create a ticket; a follow-up goes to the backlog, unassigned.
 
-Creates a ticket. Inside a work item that has a ticket, it is a follow-up: it lands in the backlog, unassigned, as a sub-ticket of the ticket you are working (pass parent for another one). File what you find while working instead of asking someone else to; name each follow-up in your hand-back. A follow-up that stands on its own, not part of the ticket's scope, passes related (the ticket it came from) instead: it is then a separate ticket with a relates link. Pass assignee to give it to someone ("me" for yourself) and status to start it elsewhere; use that for a part of the current ticket you will do yourself. The parent is set in the tracker's own parent field where it has one and is otherwise a "relates" link; never write it into the description. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each, all assigned to you: the part you start now active, the later ones ready (never backlog), and say their order on the parent. Pass blocked-by (repeatable) with each ticket that must be done first: it is linked as blocking this one, never written as text. Outside a chat session, a ticket to be worked (ready or active) with an open blocker starts blocked and moves to ready when its last blocker closes. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). The ticket files the request as work for you: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. When the requester asks for it to go to someone else, pass assignee: the ticket is then theirs, the assignment wakes them, and nothing is filed as your work; tell the requester who has it. A chat session may file several requests of one message, one ticket each; filing the same request twice is refused before anything is created. When an open ticket has a similar title, the ticket is still created and the result warns, listing it: never file a ticket for work an existing ticket already covers; change that ticket instead (ost ticket assign, move or edit). Create a ticket only for a request that is work; answer a question directly.
+Creates a ticket. Inside a work item that has a ticket, it is a follow-up: it lands in the backlog, unassigned, as a sub-ticket of the ticket you are working (pass parent for another one). File what you find while working instead of asking someone else to; name each follow-up in your hand-back. A ticket of the roadmap passes milestone (an id from ost milestone list): it goes in that milestone, and is not a sub-ticket of the ticket you are working; file one only when the work can start now (what it extends exists, the decisions it needs are made, the work before it is done). A follow-up that stands on its own, not part of the ticket's scope, passes related (the ticket it came from) instead: it is then a separate ticket with a relates link. Pass assignee to give it to someone ("me" for yourself) and status to start it elsewhere; use that for a part of the current ticket you will do yourself. The parent is set in the tracker's own parent field where it has one and is otherwise a "relates" link; never write it into the description. Use it when the work of a ticket needs several pull requests: split it into sub-tickets, one pull request each, all assigned to you: the part you start now active, the later ones ready (never backlog), and say their order on the parent. Pass blocked-by (repeatable) with each ticket that must be done first: it is linked as blocking this one, never written as text. Outside a chat session, a ticket to be worked (ready or active) with an open blocker starts blocked and moves to ready when its last blocker closes. In a chat session, the files the requester shared in their message are attached to the ticket automatically and listed in its description; mention the pictures where they belong in the description you write (for example "see the attached screenshot"). The ticket files the request as work for you: the office creates the work item for it, the requester is told about it, and when you are busy they are asked where it goes. When the requester asks for it to go to someone else, pass assignee: the ticket is then theirs, the assignment wakes them, and nothing is filed as your work; tell the requester who has it. A chat session may file several requests of one message, one ticket each; filing the same request twice is refused before anything is created. When an open ticket has a similar title, the ticket is still created and the result warns, listing it: never file a ticket for work an existing ticket already covers; change that ticket instead (ost ticket assign, move or edit). Create a ticket only for a request that is work; answer a question directly.
 
 ```
 ost ticket create [options]
@@ -586,6 +586,7 @@ ost ticket create [options]
 | `--status <status>` | Where it starts: backlog (the default), or ready or active when it is to be worked. |
 | `--parent <parent>` | Key of the ticket this one is part of. Defaults to the ticket of the work item you are in. |
 | `--related <related>` | Key of a ticket this one only relates to: an independent follow-up. It is then not a subtask of the current ticket. |
+| `--milestone <milestone>` | Id of the roadmap milestone it belongs to, from ost milestone list. |
 | `--blocked-by <blockedBy...>` | Keys of the tickets that must be done before this one; repeat the flag for each. Linked as blocking it. |
 | `--assignee <assignee>` | Member username, name or id; "me" for yourself. Unassigned when omitted, except in a chat session, where it is yours unless you name someone else. |
 | `--say <say>` | In a chat session, one short line your agent posts in the thread, followed by the links: answer what the human actually said, in their terms (for example "Reworking it from your new comment."). No links, no greeting. Without it a fixed line is posted. |
@@ -603,6 +604,7 @@ ost ticket create --related ACME-48 --title "Rate-limit the search endpoint" --b
 ost ticket create --parent ACME-12 --title "Add the search index" --assignee me --status active --body "The index half of ACME-12."
 ost ticket create --parent ACME-12 --blocked-by ACME-13 --title "Search the index" --assignee me --status ready
 ost ticket create --title "Export orders as CSV" --body "Asked in chat." --say "Will do, starting on the export next."
+ost ticket create --milestone 8 --title "Collect resource metrics" --body "From the monitoring plan."
 ost ticket create --title "Add a search index" --body "Index the product names." --json
 ```
 
@@ -713,6 +715,134 @@ Examples:
 ```sh
 ost ticket attach ACME-12 /scratch/w1/files/1-screenshot.png
 ost ticket attach ACME-12 /scratch/w1/files/1-screenshot.png --json
+```
+
+## ost milestone list
+
+List the roadmap's milestones, in order.
+
+A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Lists them in the roadmap's order with their status: planned, active, done or canceled. Pass status to list only those.
+
+```
+ost milestone list [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--status <status...>` | Only milestones in these statuses. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost milestone list
+ost milestone list --status active
+ost milestone list --json
+```
+
+## ost milestone show
+
+Show a milestone with its tickets and its documents.
+
+A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Shows one: its status and description, every ticket in it with its status, and the documents linked to it (the plans of its later work).
+
+```
+ost milestone show <id>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost milestone show 7
+ost milestone show 7 --json
+```
+
+## ost milestone create
+
+Create a milestone of the roadmap.
+
+A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Creates one, planned unless status says otherwise. Its description says its goal and its exit criteria.
+
+```
+ost milestone create [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--title <title>` | Short title. |
+| `--description <description>` | Goal and exit criteria, Markdown. |
+| `--status <status>` | Where it starts. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost milestone create --title "Monitoring" --description "Goal: see resource use over time."
+ost milestone create --title "Monitoring" --description "Goal: see resource use over time." --json
+```
+
+## ost milestone add
+
+Put a ticket, or link a plan document, in a milestone.
+
+A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Puts a ticket in the milestone (out of any other), or links a document to it: the plan of work that waits for this milestone, with no tickets yet. Pass ticket, doc, or both.
+
+```
+ost milestone add <id> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--ticket <ticket>` | Key of the ticket to put in the milestone. |
+| `--doc <doc>` | Id or path of a document to link. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost milestone add 7 --ticket ACME-31
+ost milestone add 8 --doc plans/monitoring.md
+ost milestone add 7 --ticket ACME-31 --json
+```
+
+## ost milestone status
+
+Start, close or drop a milestone.
+
+A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Moves it to planned, active (started), done (closed) or canceled. Start the next one only once a trusted human confirmed it.
+
+```
+ost milestone status <id> <to>
+```
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost milestone status 7 done
+ost milestone status 8 active
+ost milestone status 7 done --json
 ```
 
 ## ost doc search

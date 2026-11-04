@@ -5,8 +5,8 @@ import type { OfficeRounds, OfficeRoundsOptions } from "./office-rounds.types.js
 import type { WorkItem } from "./store/types.js";
 import { addFeedback, FOLLOW_UP_SUBJECT, undeliveredFeedback } from "./work-feedback.js";
 
-/** Kinds that only answer something on a ticket: finishing one settles nothing. */
-const ANSWERS = new Set(["asked", "doc_feedback", "unblock"]);
+/** Kinds that only answer something on a ticket, or start from it: finishing one settles nothing. */
+const ANSWERS = new Set(["asked", "doc_feedback", "unblock", "milestone"]);
 
 /**
  * The office's bookkeeping of an item's rounds after a hand-back, which decides nothing and changes nothing outside the

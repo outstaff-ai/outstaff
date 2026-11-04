@@ -61,6 +61,12 @@ function parentOf(issue: Issue, prev?: TicketRecord): Pick<TicketRecord, "parent
   return parent ? { parent } : {};
 }
 
+/** The initiative the tracker gives; `null` is none, and a read that does not say (a listing) keeps the one known. */
+function initiativeOf(issue: Issue, prev?: TicketRecord): Pick<TicketRecord, "initiative"> {
+  const initiative = issue.initiative === undefined ? prev?.initiative : issue.initiative;
+  return initiative ? { initiative: { id: initiative.id, title: initiative.title } } : {};
+}
+
 /** When the tracker says the event happened, if it says. */
 const eventAt = (event?: WorkflowEvent): string | undefined => {
   const at = event?.data["at"];
@@ -130,6 +136,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
       labels: [...issue.labels],
       ...linksOf(issue, prev),
       ...parentOf(issue, prev),
+      ...initiativeOf(issue, prev),
       ...keptRequester(prev),
       updatedAt: clock.now().toISOString(),
     };

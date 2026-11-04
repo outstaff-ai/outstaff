@@ -1,4 +1,5 @@
 import type { ApiProject } from "@outstaff/integration.shared.itsaplan";
+import { knownInitiative, withInitiative } from "./initiative-routes.js";
 import { issueView } from "./links.js";
 import { columnOf, createIssue, memberOf } from "./model.js";
 import { err } from "./store.js";
@@ -65,11 +66,13 @@ export function projectRoutes(s: ItsaplanStore): ActorRoute[] {
         const who = r.query.get("assigneeUserId");
         const since = r.query.get("updatedFrom");
         const parent = r.query.get("parentId");
+        const initiative = r.query.get("initiativeId");
         const labels = (r.query.get("labelIds") ?? "").split(",").filter(Boolean).map(Number);
         return s.issues
           .filter((i) => (col ? i.columnId === Number(col) : true))
           .filter((i) => (who ? i.assigneeUserId === who : true))
           .filter((i) => (parent ? i.parentId === Number(parent) : true))
+          .filter((i) => (initiative ? i.initiativeId === Number(initiative) : true))
           .filter((i) => labels.every((l) => (i.labelIds ?? []).includes(l)))
           .filter((i) => (since ? i.updatedAt >= since : true))
           .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -80,10 +83,15 @@ export function projectRoutes(s: ItsaplanStore): ActorRoute[] {
     {
       method: "POST",
       path: "/projects/:p/issues",
-      handler: (r, actor) =>
-        columnOf(s, Number(r.json.columnId))
-          ? { status: 201, body: createIssue(s, actor, r.json) }
-          : err(400, "unknown column"),
+      handler: (r, actor) => {
+        if (!columnOf(s, Number(r.json.columnId))) {
+          return err(400, "unknown column");
+        }
+
+        return knownInitiative(s, r.json.initiativeId)
+          ? { status: 201, body: withInitiative(s, createIssue(s, actor, r.json)) }
+          : err(404, "initiative not found");
+      },
     },
   ];
 }

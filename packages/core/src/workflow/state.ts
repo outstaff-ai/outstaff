@@ -37,5 +37,10 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
       Object.entries(data.tickets ?? {})
         .filter(([, ticket]) => ticket.parent === t)
         .map(([key]) => key),
+    initiativeOf: (t) => data.tickets?.[t]?.initiative,
+    initiativeTickets: (id) =>
+      Object.entries(data.tickets ?? {})
+        .filter(([, ticket]) => ticket.initiative?.id === id)
+        .map(([key]) => key),
   };
 }
