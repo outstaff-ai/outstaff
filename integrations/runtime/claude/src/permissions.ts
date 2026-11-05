@@ -37,6 +37,32 @@ function artifactSources(input: Input): { path?: string; paths?: string[] } {
   return { ...(path === undefined ? {} : { path }), ...(paths.length ? { paths } : {}) };
 }
 
+/**
+ * The actions that only read, checked against the inputs of Claude Code 2.1.312. `Artifact` publishes when it has no
+ * `action`; its `comments` action reads the threads in builds that serve comments on `Artifact` itself.
+ * `ArtifactComments` takes read, reply, resolve and watch, and only read leaves everything as it was. Anything not
+ * listed is a write, so an action a later build adds is denied to a reader until it is listed here.
+ */
+const READ_ACTIONS: Record<string, readonly string[]> = {
+  Artifact: ["read", "list", "comments"],
+  ArtifactComments: ["read"],
+};
+
+const access = (tool: string, input: Input): "read" | "write" =>
+  READ_ACTIONS[tool]?.includes(str(input["action"]) ?? "") ? "read" : "write";
+
+/** An Artifact call: what it publishes from disk, where a read saves files, and whether it only reads. */
+function artifactCall(input: Input, cwd: string): ToolCall {
+  const outDir = str(input["out_dir"]);
+  return {
+    kind: "artifact",
+    cwd,
+    access: access("Artifact", input),
+    ...artifactSources(input),
+    ...(outDir === undefined ? {} : { writes: [outDir] }),
+  };
+}
+
 type Build = (input: Input, cwd: string) => ToolCall;
 
 /** A call of `kind` on the path in `key`, when the input names one. */
@@ -68,9 +94,13 @@ const BY_TOOL = new Map<string, Build>([
   ["WebFetch", plain("web_fetch")],
   ["Task", plain("subagent")],
   ["Agent", plain("subagent")],
-  ["Artifact", (input, cwd) => ({ kind: "artifact", cwd, ...artifactSources(input) })],
-  ["ArtifactComments", plain("artifact")],
-  ["ToolSearch", plain("artifact")],
+  ["Artifact", artifactCall],
+  [
+    "ArtifactComments",
+    (input, cwd) => ({ kind: "artifact", cwd, access: access("ArtifactComments", input) }),
+  ],
+  // ToolSearch only loads deferred tools such as ArtifactComments; using them is judged on their own calls.
+  ["ToolSearch", (_input, cwd) => ({ kind: "artifact", cwd, access: "read" })],
 ]);
 
 /** A verb's tool name is its name with the dots as underscores (`ticket_create` for `ticket.create`). */

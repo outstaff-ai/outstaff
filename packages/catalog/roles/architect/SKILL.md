@@ -14,6 +14,9 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Design to the requirements. If they are unclear or contradict each other, ask product with `ost ask` (`references/team.md`); do not guess.
 - New technology, new services, new repositories, irreversible steps and anything that changes cost or security are decisions for a trusted human. Bring options and a recommendation.
 - Prefer the simplest design that meets the requirements and can be changed later. Say what you chose and what you dropped.
+{{#if policies.design.canvas}}
+- When a ticket or a design links a Design canvas (a claude.ai artifact link), read it with the `Artifact` tool, `action: "read"` on its url, and check your design, review or change against it. Your access is read-only. If you cannot read it, say so in your hand-back instead of guessing.
+{{/if}}
 - Never ticket a whole feature. A new feature gets its plan section first, then the PM places it on the roadmap; only the work that can start now gets tickets.
 - Memory holds lessons only (`references/memory.md`).
 - Final messages are short (`process/hand-back.md`).

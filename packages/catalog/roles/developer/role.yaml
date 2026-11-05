@@ -5,6 +5,8 @@ permissions: code
 needs:
   - vcs.pullRequests
   - vcs.reviewThreads
+optional_needs:
+  - design.canvas.read
 modes:
   - name: implement
     when: A ticket is assigned and ready.

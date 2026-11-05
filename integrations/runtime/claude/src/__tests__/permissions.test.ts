@@ -106,6 +106,90 @@ describe("the Design canvas in the SDK hook", () => {
   });
 });
 
+describe("a read-only Design canvas in the SDK hook", () => {
+  const build = (capabilities: ("design.canvas" | "design.canvas.read")[]) =>
+    buildPolicy({
+      profile: "code",
+      person: { repos: {} },
+      team: { repos: [] },
+      layout,
+      capabilities,
+    });
+
+  const reader = build(["design.canvas.read"]);
+  const plain = build([]);
+  const url = "https://claude.ai/artifact/acme-landing";
+
+  it.each([
+    ["Artifact", { action: "read", url }],
+    ["Artifact", { action: "read", url, prompt: "the hero section" }],
+    ["Artifact", { action: "list" }],
+    ["Artifact", { action: "list", scope: "shared", limit: 10 }],
+    ["Artifact", { action: "comments", url }],
+    ["ArtifactComments", { action: "read", url }],
+    ["ArtifactComments", { action: "read", url, thread_id: "t1" }],
+    ["ToolSearch", { query: "select:ArtifactComments" }],
+  ])("allows %s %j", (tool, input) => {
+    expect(decide(reader, tool, input, "/work/main").effect).toBe("allow");
+  });
+
+  it.each([
+    ["Artifact", { file_path: "/tmp/page.html" }],
+    ["Artifact", { action: "publish", file_path: "/tmp/page.html" }],
+    ["Artifact", { url, file_path: "/tmp/page.html" }],
+    ["Artifact", { action: "delete", url }],
+    ["Artifact", { action: "pin", url }],
+    ["Artifact", { action: "unpin", url }],
+    ["Artifact", { action: "share", url }],
+    ["Artifact", { action: "upload_asset", url, file_path: "/tmp/a.png" }],
+    ["Artifact", { action: "delete_asset", url, asset_id: "a" }],
+    ["Artifact", { action: "copy_from", url }],
+    ["Artifact", { action: "list_types" }],
+    ["Artifact", { action: "quickstart" }],
+    ["Artifact", { action: "watch", url }],
+    ["Artifact", { action: "reply", url, text: "ok" }],
+    ["Artifact", { action: "resolve", url }],
+    ["Artifact", { action: "write_db", url }],
+    ["Artifact", { action: "run_script", url }],
+    ["Artifact", { action: "READ", url }],
+    ["Artifact", { action: 7, url }],
+    ["ArtifactComments", { action: "reply", url, thread_id: "t1", text: "done" }],
+    ["ArtifactComments", { action: "resolve", url, thread_id: "t1" }],
+    ["ArtifactComments", { action: "watch", url }],
+    ["ArtifactComments", { url }],
+  ])("denies %s %j", (tool, input) => {
+    expect(decide(reader, tool, input, "/work/main")).toMatchObject({
+      effect: "deny",
+      rule: "artifact.read-only",
+    });
+  });
+
+  it("saves a fetched file only where the person may write", () => {
+    const into = (out_dir: string) => ({ action: "read", url, out_dir });
+    expect(decide(reader, "Artifact", into("/tmp/canvas"), "/work/main").effect).toBe("allow");
+    expect(decide(reader, "Artifact", into("/work/main"), "/work/main").effect).toBe("deny");
+  });
+
+  it.each([
+    ["Artifact", { action: "read", url }],
+    ["Artifact", { action: "list" }],
+    ["ArtifactComments", { action: "read", url }],
+    ["ToolSearch", { query: "select:ArtifactComments" }],
+  ])("denies %s %j to a role without the capability", (tool, input) => {
+    expect(decide(plain, tool, input, "/work/main")).toMatchObject({
+      effect: "deny",
+      rule: "tools.allow",
+    });
+  });
+
+  it.each(["ArtifactData", "ArtifactCheck"])("knows no %s", (tool) => {
+    expect(decide(reader, tool, { action: "read", url }, "/work/main")).toMatchObject({
+      effect: "deny",
+      rule: "runtime.unknown-tool",
+    });
+  });
+});
+
 describe("mapping SDK tools to neutral calls", () => {
   const cwd = "/work/main";
 
@@ -125,8 +209,14 @@ describe("mapping SDK tools to neutral calls", () => {
     ["WebFetch", { url: "https://acme.example" }, { kind: "web_fetch", cwd }],
     ["Task", {}, { kind: "subagent", cwd }],
     ["Agent", {}, { kind: "subagent", cwd }],
-    ["ArtifactComments", {}, { kind: "artifact", cwd }],
-    ["ToolSearch", {}, { kind: "artifact", cwd }],
+    ["ArtifactComments", {}, { kind: "artifact", cwd, access: "write" }],
+    ["ArtifactComments", { action: "read" }, { kind: "artifact", cwd, access: "read" }],
+    ["ToolSearch", {}, { kind: "artifact", cwd, access: "read" }],
+    [
+      "Artifact",
+      { action: "read", url: "https://claude.ai/artifact/x", out_dir: "/tmp/a" },
+      { kind: "artifact", cwd, access: "read", writes: ["/tmp/a"] },
+    ],
   ])("maps %s %j", (tool, input, call) => {
     expect(toToolCall(tool, input, cwd)).toEqual(call);
   });
@@ -140,10 +230,11 @@ describe("mapping SDK tools to neutral calls", () => {
     const sources = (input: unknown) => toToolCall("Artifact", input, cwd);
 
     it("is just the call without any file", () => {
-      expect(sources({ action: "list" })).toEqual({ kind: "artifact", cwd });
+      expect(sources({ action: "list" })).toEqual({ kind: "artifact", cwd, access: "read" });
       expect(sources({ file_path: "", file_paths: [], files: [] })).toEqual({
         kind: "artifact",
         cwd,
+        access: "write",
       });
     });
 
@@ -153,6 +244,7 @@ describe("mapping SDK tools to neutral calls", () => {
       ).toEqual({
         kind: "artifact",
         cwd,
+        access: "write",
         path: "/p.html",
         paths: ["/r", "/a.png", "/b.png"],
       });
@@ -164,13 +256,19 @@ describe("mapping SDK tools to neutral calls", () => {
           root: "/r",
           files: [{ path: "a.css" }, { path: "/abs/b.css" }, { path: "" }, null, {}],
         }),
-      ).toEqual({ kind: "artifact", cwd, paths: ["/r", "/r/a.css", "/abs/b.css"] });
+      ).toEqual({
+        kind: "artifact",
+        cwd,
+        access: "write",
+        paths: ["/r", "/r/a.css", "/abs/b.css"],
+      });
     });
 
     it("keeps a files array as given when there is no root", () => {
       expect(sources({ files: [{ path: "a.css" }] })).toEqual({
         kind: "artifact",
         cwd,
+        access: "write",
         paths: ["a.css"],
       });
     });
@@ -181,7 +279,12 @@ describe("mapping SDK tools to neutral calls", () => {
           root: "/r",
           files: { "x.css": "x.css", "y.png": { from: "img/y.png" }, "z.js": null, "w.js": {} },
         }),
-      ).toEqual({ kind: "artifact", cwd, paths: ["/r", "/r/x.css", "/r/img/y.png"] });
+      ).toEqual({
+        kind: "artifact",
+        cwd,
+        access: "write",
+        paths: ["/r", "/r/x.css", "/r/img/y.png"],
+      });
     });
   });
 });

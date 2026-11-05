@@ -27,6 +27,7 @@ export const CAPABILITIES = [
   "runtime.permissions",
   "avatars.generate",
   "design.canvas",
+  "design.canvas.read",
 ] as const;
 
 /** The port that provides each capability; the part before the dot. */
@@ -56,4 +57,5 @@ export const CAPABILITY_PORT: Record<Capability, AdapterPort> = {
   "runtime.permissions": "runtime",
   "avatars.generate": "avatars",
   "design.canvas": "runtime",
+  "design.canvas.read": "runtime",
 };

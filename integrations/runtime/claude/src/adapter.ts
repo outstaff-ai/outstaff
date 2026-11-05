@@ -77,39 +77,60 @@ function credentialCheck(secrets: SecretSource): DoctorCheck {
   };
 }
 
-// Claude Code serves the Artifact tool to a Claude account login only: not to an API key or a cloud provider. The check
+/** What the person's role does with the Design canvas while the team leaves it on, if anything. */
+function canvasUse(ctx: DeriveContext): "uses" | "reads" | undefined {
+  if (!policyOn(ctx.team.policies, "design.canvas")) {
+    return undefined;
+  }
+
+  const caps = ctx.roleCapabilities ?? [];
+  if (caps.includes("design.canvas")) {
+    return "uses";
+  }
+
+  return caps.includes("design.canvas.read") ? "reads" : undefined;
+}
+
+function signedIn(secrets: SecretSource): string {
+  const other = [...SIGN_IN, ...PROVIDER_SWITCHES].filter(
+    (k) => k !== "CLAUDE_CODE_OAUTH_TOKEN" && secrets.get(k),
+  );
+
+  if (other.length === 0) {
+    return "no Claude credential is set";
+  }
+
+  return `only ${other.join(", ")} ${other.length === 1 ? "is" : "are"} set`;
+}
+
+// Claude Code serves the Artifact tool to a Claude account login only: not to an API key or a cloud provider. A canvas
+// belongs to that account, so a role that reads canvases needs the same login as the designer who made them. The check
 // reads which credential is set; it cannot tell whether the account's plan or organisation allows artifacts.
 function canvasCheck(secrets: SecretSource, ctx: DeriveContext): DoctorCheck[] {
-  if (
-    !ctx.roleCapabilities?.includes("design.canvas") ||
-    !policyOn(ctx.team.policies, "design.canvas")
-  ) {
+  const use = canvasUse(ctx);
+  if (!use) {
     return [];
   }
 
   const name = "Design canvas";
+  const reads = use === "reads";
   if (secrets.get("CLAUDE_CODE_OAUTH_TOKEN")) {
     return [
       {
         key: "CLAUDE_CODE_OAUTH_TOKEN",
         name,
         status: "ok",
-        detail:
-          "CLAUDE_CODE_OAUTH_TOKEN is set, a Claude account login. Canvases belong to that account.",
+        detail: `CLAUDE_CODE_OAUTH_TOKEN is set, a Claude account login. Canvases belong to that account${reads ? ": the agent reads only the canvases of the account it signs in with" : ""}.`,
       },
     ];
   }
-
-  const other = [...SIGN_IN, ...PROVIDER_SWITCHES].filter(
-    (k) => k !== "CLAUDE_CODE_OAUTH_TOKEN" && secrets.get(k),
-  );
 
   return [
     {
       name,
       status: "warn",
-      detail: `The role uses the Design canvas, which needs a Claude account login, but ${other.length > 0 ? `only ${other.join(", ")} ${other.length === 1 ? "is" : "are"} set` : "no Claude credential is set"}. Without it the agent has no Artifact tools.`,
-      fix: "Give this agent CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token` on a machine signed in to a Claude Pro, Max, Team or Enterprise account), or set policies.design.canvas to false.",
+      detail: `The role ${use} the Design canvas, which needs a Claude account login, but ${signedIn(secrets)}. Without it the agent has no Artifact tools.`,
+      fix: `Give this agent CLAUDE_CODE_OAUTH_TOKEN (from \`claude setup-token\` on a machine signed in to a Claude Pro, Max, Team or Enterprise account${reads ? ", the account the designer's canvases belong to" : ""}), or set policies.design.canvas to false.`,
     },
   ];
 }
@@ -154,7 +175,13 @@ function requireSandbox(): void {
 export const claudeAgentSdk = defineAdapter({
   port: "runtime",
   name: "claude-agent-sdk",
-  capabilities: ["runtime.sessions", "runtime.usage", "runtime.permissions", "design.canvas"],
+  capabilities: [
+    "runtime.sessions",
+    "runtime.usage",
+    "runtime.permissions",
+    "design.canvas",
+    "design.canvas.read",
+  ],
   options: agentSdkOptions,
   secrets: () => secrets,
   setupGuide,

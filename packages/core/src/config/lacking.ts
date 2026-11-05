@@ -27,4 +27,5 @@ export const LACKING: Record<Capability, string> = {
   "runtime.permissions": "run under its permission policy",
   "avatars.generate": "get a generated avatar",
   "design.canvas": "work on a Design canvas",
+  "design.canvas.read": "read the Design canvas it builds from",
 };

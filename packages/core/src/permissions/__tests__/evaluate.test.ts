@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildPolicy,
+  type Capability,
   type CommandRule,
   evaluate,
   globToRegExp,
@@ -1161,5 +1162,59 @@ describe("design.canvas", () => {
     expect(
       evaluate(designer, { kind: "artifact", paths: ["/home/agent/artifacts/a.css"] }).effect,
     ).toBe("allow");
+  });
+
+  it("saves what an artifact call fetches only where the role may write", () => {
+    expect(
+      evaluate(designer, { kind: "artifact", access: "read", writes: ["/tmp/x"] }).effect,
+    ).toBe("allow");
+
+    expect(
+      evaluate(designer, { kind: "artifact", access: "read", writes: ["/work/CLAUDE.md"] }).effect,
+    ).toBe("deny");
+  });
+
+  it("lets a role with the capability write as well as read", () => {
+    expect(designer.artifact).toBe("write");
+    expect(evaluate(designer, { kind: "artifact", access: "write" }).effect).toBe("allow");
+  });
+});
+
+describe("design.canvas.read", () => {
+  const reader = (capabilities: Capability[]) =>
+    buildPolicy({ profile: "code", person: { repos: {} }, team, layout, capabilities });
+
+  it("adds the artifact tool limited to reads, and no artifacts folder", () => {
+    const p = reader(["design.canvas.read"]);
+    expect(p.tools.allow).toContain("artifact");
+    expect(p.artifact).toBe("read");
+    expect(p.paths.write.allow).not.toContain("/home/agent/artifacts/**");
+  });
+
+  it("allows reads and denies everything else", () => {
+    const p = reader(["design.canvas.read"]);
+    expect(evaluate(p, { kind: "artifact", access: "read" }).effect).toBe("allow");
+    for (const call of [
+      { kind: "artifact", access: "write" },
+      { kind: "artifact" },
+      { kind: "artifact", access: "write", path: "/tmp/page.html" },
+    ] as const) {
+      expect(evaluate(p, call)).toMatchObject({ effect: "deny", rule: "artifact.read-only" });
+    }
+  });
+
+  it("gives the full tool when the role also has design.canvas", () => {
+    const p = reader(["design.canvas.read", "design.canvas"]);
+    expect(p.artifact).toBe("write");
+    expect(evaluate(p, { kind: "artifact", access: "write" }).effect).toBe("allow");
+  });
+
+  it("leaves a role with neither capability without the tool", () => {
+    const p = reader([]);
+    expect(p.artifact).toBeUndefined();
+    expect(evaluate(p, { kind: "artifact", access: "read" })).toMatchObject({
+      effect: "deny",
+      rule: "tools.allow",
+    });
   });
 });

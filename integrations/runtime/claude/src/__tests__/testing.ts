@@ -1,5 +1,5 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { buildPolicy, type Policy } from "@outstaff/core";
+import { buildPolicy, type Capability, type Policy } from "@outstaff/core";
 import type { Call, QueryFn } from "#/types.js";
 
 const layout = {
@@ -12,7 +12,7 @@ const layout = {
   secretsDir: "/work/secrets",
 };
 
-export function codePolicy(): Policy {
+export function codePolicy(capabilities: Capability[] = []): Policy {
   return buildPolicy({
     profile: "code",
     person: { repos: { acme: "write" } },
@@ -20,6 +20,7 @@ export function codePolicy(): Policy {
       repos: [{ name: "acme", url: "https://github.com/acme/app", default_branch: "main" }],
     } as never,
     layout,
+    capabilities,
   });
 }
 

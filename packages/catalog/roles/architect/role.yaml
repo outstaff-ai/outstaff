@@ -6,6 +6,7 @@ needs:
   - vcs.pullRequests
 optional_needs:
   - knowledge.docs
+  - design.canvas.read
 extends:
   - developer
 modes:

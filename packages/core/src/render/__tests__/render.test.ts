@@ -552,7 +552,8 @@ describe("designer skill: Design canvas", () => {
     expect(text).toContain("#### The Design canvas");
     expect(text).toContain("`ArtifactComments`");
     expect(text).toContain("link");
-    expect(text).toContain("Attach the exports");
+    expect(text).toContain("Attach the other exports");
+    expect(text).toContain("post a screenshot of each screen and each state to the ticket");
     expect(text).toContain("You do not read code.");
     expect(text).toContain("Do not ask for the code.");
   });
@@ -571,5 +572,32 @@ describe("designer skill: Design canvas", () => {
   it("drops the canvas guidance when the team switches the canvas off", () => {
     const off = { ...acme, policies: { ...acme.policies!, design: { canvas: false } } };
     expect(skill(off)).not.toContain("Design canvas");
+  });
+});
+
+describe("reading a linked Design canvas", () => {
+  const skills = (team: TeamConfig) =>
+    acme.people.flatMap((p) => {
+      const files = renderPerson({ team, handle: p.handle, catalog: real }).files;
+      return ["developer", "architect", "pm"].flatMap((role) => {
+        const text = files.get(`skills/${role}/SKILL.md`);
+        return text === undefined ? [] : [[role, text] as const];
+      });
+    });
+
+  it("tells the developer, architect and PM to read it, and to say when they cannot", () => {
+    const found = skills(acme);
+    expect(new Set(found.map(([role]) => role))).toEqual(new Set(["developer", "architect", "pm"]));
+    for (const [, text] of found) {
+      expect(text).toContain('`action: "read"` on its url');
+      expect(text).toContain("say so in your hand-back");
+    }
+  });
+
+  it("drops the guidance when the team switches the canvas off", () => {
+    const off = { ...acme, policies: { ...acme.policies!, design: { canvas: false } } };
+    for (const [, text] of skills(off)) {
+      expect(text).not.toContain("Design canvas");
+    }
   });
 });

@@ -9,6 +9,7 @@ const roles = {
     optional_needs: ["design.canvas", "runtime.usage"],
   },
   developer: { needs: ["runtime.sessions", "vcs.pullRequests"], optional_needs: [] },
+  reader: { needs: [], optional_needs: ["design.canvas.read"] },
 };
 
 const context = (policies?: TeamConfig["policies"]) =>
@@ -47,5 +48,15 @@ describe("roleCapabilities", () => {
     const off = { design: { canvas: false } } as unknown as TeamConfig["policies"];
     const caps = roleCapabilities(context(off), roles, undefined, runtime(["design.canvas"]));
     expect(caps).toEqual([]);
+  });
+
+  it("keeps design.canvas.read under the design.canvas switch", () => {
+    const provided = runtime(["design.canvas.read"]);
+    expect(roleCapabilities(context(), roles, ["reader"], provided)).toEqual([
+      "design.canvas.read",
+    ]);
+
+    const off = { design: { canvas: false } } as unknown as TeamConfig["policies"];
+    expect(roleCapabilities(context(off), roles, ["reader"], provided)).toEqual([]);
   });
 });
