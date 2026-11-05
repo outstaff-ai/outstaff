@@ -242,7 +242,11 @@ describe("golden output per acme person", () => {
 
     const pm = files("priya");
     expect(pm.get("skills/pm/SKILL.md")).toContain('"Planning work for others"');
-    expect(pm.get("process/unblock.md")).toContain('"Planning work for others"');
+    // An unblock round starts no new work: a workaround is a proposal for the human.
+    expect(pm.get("process/unblock.md")).not.toContain('"Planning work for others"');
+    expect(pm.get("process/unblock.md")).toContain(
+      "You never commission new work in an unblock round",
+    );
   });
 
   it("has no stale golden files", () => {

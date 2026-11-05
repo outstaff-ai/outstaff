@@ -313,7 +313,7 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
+{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
 ```
 
 ### ticket_comment_to_blocked_agent
@@ -675,7 +675,7 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} handed {{ticket}} back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to {{actor.id}}. Only if a human is needed, assign it to the requester, {{requester}}, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent.
+{{actor.id}} handed {{ticket}} back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to {{actor.id}}. Only if a human is needed, assign it to the requester, {{requester}}, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent.
 ```
 
 Note posted with the change: none; the instruction is the wake's.

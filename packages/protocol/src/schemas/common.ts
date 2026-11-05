@@ -85,7 +85,11 @@ export const workItemSchema = z.strictObject({
     .describe("What the work is, for example a ticket, a review round or a question."),
   title: z.string(),
   priority: z.number().describe("Lower runs first."),
-  trigger: z.enum(["human", "agent", "automation", "schedule"]),
+  trigger: z
+    .enum(["human", "agent", "automation", "schedule"])
+    .describe(
+      "Who started the item: for a mention (`asked`), who mentioned. A question, an unblock and an agent's mention are started by another agent: their round starts no new work.",
+    ),
   parentId: z.string().optional().describe("The item this one was split from, for questions."),
   subject: z.strictObject({ type: z.string(), ref: z.string() }).optional(),
   origin: chatOriginSchema

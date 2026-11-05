@@ -11,6 +11,7 @@ import type {
   PortName,
   Tracker,
 } from "@outstaff/core";
+import type { OfferedWorkItem } from "@outstaff/protocol";
 import type { OfficeClient } from "./office.types.js";
 
 import type { z } from "zod";
@@ -47,6 +48,9 @@ export interface HandBackTarget {
   declare(status: DeclaredHandBack): void;
 }
 
+/** The work item a run is on: what kind of work it is and who started it (for a mention, who mentioned). */
+export type Round = Pick<OfferedWorkItem, "kind" | "trigger">;
+
 /** Everything a verb touches: who is acting, the team, and the ports built from its config. */
 export interface AgentEnv {
   /** Handle of the person (agent) this process runs as. */
@@ -62,6 +66,9 @@ export interface AgentEnv {
 
   /** The work item a run is on, for `ost handback`: its kind, and where the status the agent states goes. */
   handBack?: HandBackTarget;
+
+  /** The work item a run is on; the verbs that start new work refuse in a round another agent started. */
+  round?: Round;
 
   /**
    * The person's Policy and directory layout. Verbs that read a file the caller names (`--body-file`) refuse

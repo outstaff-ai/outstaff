@@ -21,7 +21,7 @@ export const policy = definePolicy({
   on: ["agent.handed_back"],
   when: BLOCKED_HAND_BACK,
   instruction:
-    "{{actor.id}} handed {{ticket}} back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. When it is unblocked, comment the answer on the ticket and assign it back to {{actor.id}}. Only if a human is needed, assign it to the requester, {{requester}}, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent.",
+    "{{actor.id}} handed {{ticket}} back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to {{actor.id}}. Only if a human is needed, assign it to the requester, {{requester}}, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent.",
   decides: `${acts(toPm).decides}; then ${wakes(unblock).decides}, when the PM is not the blocked agent, ${UNLESS_HANDED_OVER}; ${HANDED_IN}`,
   decide: (_event, ctx) => {
     const pm = unblocker(ctx);

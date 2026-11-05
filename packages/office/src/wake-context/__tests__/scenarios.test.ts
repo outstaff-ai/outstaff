@@ -280,7 +280,8 @@ describe(
       await poll();
 
       const offer = await next();
-      expect(offer.workItem).toMatchObject({ kind: "asked" });
+      // Who mentioned is the round's trigger: a human here, so the round may start new work.
+      expect(offer.workItem).toMatchObject({ kind: "asked", trigger: "human" });
       expect(offer.context.wake!.prs[0]).toMatchObject({
         ref: key,
         url: pr.url,

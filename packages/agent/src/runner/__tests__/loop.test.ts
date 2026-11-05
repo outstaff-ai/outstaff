@@ -44,6 +44,7 @@ interface OfferExtras {
   origin?: boolean;
   files?: Record<string, unknown>[];
   kind?: string;
+  trigger?: string;
   feedback?: Record<string, unknown>[];
 
   /** The pull requests of the item; by default one open for review, so a done hand-back has something to review. */
@@ -93,7 +94,7 @@ const offeredItem = (id: string, extra: OfferExtras) => ({
   ...(extra.feedback ? { subject: { type: "pr", ref: "git.acme.example/acme/app#1" } } : {}),
   title: `Fix ${id}`,
   priority: 1,
-  trigger: "human",
+  trigger: extra.trigger ?? "human",
   ...(extra.origin ? { origin: chatOrigin(extra.files) } : {}),
 });
 
@@ -964,6 +965,37 @@ describe("work loop", () => {
     await loop.stop();
     await conn.stop();
   });
+
+  it.each([
+    ["unblock", "agent", "forbidden"],
+    ["asked", "agent", "forbidden"],
+    ["asked", "human", "created"],
+    ["ticket", "agent", "created"],
+  ])(
+    "tells the verbs who started a %s round (%s): a new ticket is %s",
+    async (kind, trigger, want) => {
+      await connect();
+      let got = "";
+      const runtime: Runtime = {
+        async *run(req) {
+          const create = req.tools.find((t) => t.name === "ticket_create")!;
+          got = await create.handler({ title: "Add a CI screenshot job" }, {}).then(
+            () => "created",
+            (e: unknown) => (e as { code?: string }).code ?? String(e),
+          );
+
+          yield { type: "finished", ok: true, text: "Done." };
+        },
+      };
+
+      start(runtime);
+      socket.offerWith("w1", { kind, trigger });
+      await until(() => sentOf("handback").length === 1);
+      expect(got).toBe(want);
+      await loop.stop();
+      await conn.stop();
+    },
+  );
 
   it("refuses a done hand-back with nothing to review once, then hands it back as blocked", async () => {
     await connect();

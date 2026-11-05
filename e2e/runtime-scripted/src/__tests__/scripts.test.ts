@@ -231,6 +231,44 @@ describe("unblock", () => {
     expect(bare.text).toBe("SHOP-1 needs a human: see the ticket. Gave it to ada.admin.");
   });
 
+  it("proposes a workaround to the human when filing it is refused, then gives the ticket to the requester", async () => {
+    const shown = "SHOP-1 Shots\nblocked: no browser\npm would file: Add a CI screenshot job";
+    const refusal =
+      "This round is an unblock, started by a teammate's blocked hand-back, not a trusted human's request, so it does not file a ticket: only a trusted human starts new work.";
+
+    const proposed = await play(
+      unblock(pm),
+      () => shown,
+      (a) => a.type === "tool" && a.tool === "ticket_create" && refusal,
+    );
+
+    expect(tools(proposed.seen)).toEqual([
+      ["ticket_show", { key: "SHOP-1" }],
+      ["ticket_create", { title: "Add a CI screenshot job", related: "SHOP-1" }],
+      [
+        "ticket_comment",
+        {
+          key: "SHOP-1",
+          body: "Proposal for a human: Add a CI screenshot job. Filing it myself was refused: This round is an unblock, started by a teammate's blocked hand-back, not a trusted human's request, so it does not file a ticket.",
+        },
+      ],
+      [
+        "ticket_comment",
+        {
+          key: "SHOP-1",
+          body: "Needs a human: no browser. Nobody on the team can provide it; sam carries on once it is here.",
+        },
+      ],
+      ["ticket_assign", { key: "SHOP-1", to: "ada.admin" }],
+    ]);
+
+    const filed = await play(unblock(pm), () => shown);
+    expect(tools(filed.seen)[2]).toEqual([
+      "ticket_comment",
+      { key: "SHOP-1", body: "Filed: Add a CI screenshot job." },
+    ]);
+  });
+
   it("needs the blocked agent and the requester", async () => {
     await expect(play(unblock({ ...pm, feedback: [] }), () => "")).rejects.toThrow(
       "the agent who is blocked",
