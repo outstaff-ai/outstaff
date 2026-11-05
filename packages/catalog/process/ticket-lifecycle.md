@@ -40,7 +40,7 @@ Do not make these moves or assignments yourself, not even when your round starts
 
 ## Planning work for others
 
-When you plan work that others will build (a design, an initiative, a re-plan), the plan comes before its tickets:
+When you plan work that others will build (a design, a milestone, a re-plan), the plan comes before its tickets, in chat too (`process/direct-requests.md`, "Planning"):
 
 1. Write the breakdown into the plan: the pieces, their order, their dependencies and any stacks.
 2. Share the plan for review: link it from the ticket and ask a trusted human to confirm it. List each open decision with its options and your recommendation.

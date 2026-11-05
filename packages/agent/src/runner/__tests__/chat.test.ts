@@ -136,8 +136,8 @@ describe("chat relay", () => {
     expect(chat.posts).toEqual([]);
 
     const idle = { item: { id: "w1", title: "x", status: "queued" }, waiting: false, work: [] };
-    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, idle);
-    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, idle);
+    await relay.acknowledge(offerOf(), [{ what: { key: "ACME-1", title: "ACME-1" }, filed: idle }]);
+    await relay.acknowledge(offerOf(), [{ what: { key: "ACME-1", title: "ACME-1" }, filed: idle }]);
     expect(office.chatReports.map((r) => r.kind)).toEqual(["ack", "ack"]);
     expect(chat.posts[0]).toMatchObject({ channel: "D-U0DANA0001", thread: "m1" });
     expect(chat.posts[0]!.text).toContain("On it. Tracked in");
@@ -182,10 +182,34 @@ describe("chat relay", () => {
       work: [],
     };
 
-    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, filed);
-    await relay.acknowledge(offerOf(), { key: "ACME-1", title: "ACME-1" }, filed);
+    await relay.acknowledge(offerOf(), [{ what: { key: "ACME-1", title: "ACME-1" }, filed }]);
+    await relay.acknowledge(offerOf(), [{ what: { key: "ACME-1", title: "ACME-1" }, filed }]);
     expect(chat.posts).toHaveLength(1);
     expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
+  });
+
+  it("acknowledges every filing of a session in one reply, asking where the work goes once", async () => {
+    await setup();
+    const busy = {
+      item: { id: "w3", title: "assigned: ACME-2", status: "queued" },
+      waiting: true,
+      work: [{ id: "w1", title: "Checkout bug", status: "active", ticketKey: "ACME-1" }],
+    };
+
+    const joined = { ...busy, waiting: false, work: [] };
+    await relay.acknowledge(offerOf(), [
+      { what: { key: "ACME-2", title: "ACME-2" }, filed: busy },
+      { what: { key: "ACME-3", title: "ACME-3" }, filed: joined },
+    ]);
+
+    expect(office.chatReports.map((r) => r.kind)).toEqual(["ack"]);
+    expect(chat.posts).toHaveLength(1);
+    const text = chat.posts[0]!.text;
+    expect(text).toContain(
+      `On it. Tracked in [ACME-2](${tracker.links.issue("ACME-2")}) and [ACME-3](${tracker.links.issue("ACME-3")}).`,
+    );
+
+    expect(text.match(/Where does this go/g)).toHaveLength(1);
   });
 
   it("tags the requester in the acknowledgement and placement question only where it adds a notification", async () => {
@@ -197,15 +221,21 @@ describe("chat relay", () => {
     };
 
     const what = { key: "ACME-2", title: "Fix the footer" };
-    await relay.acknowledge(offerOf("c1", true, { direct: true, participant: true }), what, filed);
+    await relay.acknowledge(offerOf("c1", true, { direct: true, participant: true }), [
+      { what, filed },
+    ]);
+
     expect(chat.posts[0]!.text).toMatch(/^On it\./);
     expect(chat.posts[0]!.text).toContain("Where does this go");
     expect(chat.posts[0]!.text).not.toContain("<@");
 
-    await relay.acknowledge(offerOf("c2", true, { direct: false, participant: true }), what, filed);
+    await relay.acknowledge(offerOf("c2", true, { direct: false, participant: true }), [
+      { what, filed },
+    ]);
+
     expect(chat.posts[1]!.text).not.toContain("<@");
 
-    await relay.acknowledge(offerOf("c3"), what, filed);
+    await relay.acknowledge(offerOf("c3"), [{ what, filed }]);
     expect(chat.posts[2]!.text).toMatch(/^<@U0DANA0001> On it\./);
   });
 
@@ -256,25 +286,26 @@ describe("chat relay", () => {
 
   it("answers a request filed while busy with the grouped work and asks where it goes", async () => {
     await setup();
-    await relay.acknowledge(
-      offerOf(),
-      { key: "ACME-2", title: "Fix the footer" },
+    await relay.acknowledge(offerOf(), [
       {
-        url: tracker.links.issue("ACME-2"),
-        item: { id: "w3", title: "assigned: ACME-2", status: "queued" },
-        waiting: true,
-        work: [
-          { id: "w1", title: "Checkout bug", status: "active", ticketKey: "ACME-1" },
-          {
-            id: "w2",
-            title: "Search page",
-            status: "queued",
-            pr: "app#4",
-            prUrl: "https://git.acme.example/acme/app/pull/4",
-          },
-        ],
+        what: { key: "ACME-2", title: "Fix the footer" },
+        filed: {
+          url: tracker.links.issue("ACME-2"),
+          item: { id: "w3", title: "assigned: ACME-2", status: "queued" },
+          waiting: true,
+          work: [
+            { id: "w1", title: "Checkout bug", status: "active", ticketKey: "ACME-1" },
+            {
+              id: "w2",
+              title: "Search page",
+              status: "queued",
+              pr: "app#4",
+              prUrl: "https://git.acme.example/acme/app/pull/4",
+            },
+          ],
+        },
       },
-    );
+    ]);
 
     const text = chat.posts[0]!.text;
     expect(text).toContain(`On it. Tracked in [ACME-2](${tracker.links.issue("ACME-2")}).`);
@@ -287,21 +318,22 @@ describe("chat relay", () => {
 
   it("tells the requester the request joined existing work, linking the pull request and the ticket", async () => {
     await setup();
-    await relay.acknowledge(
-      offerOf(),
+    await relay.acknowledge(offerOf(), [
       {
-        title: "Adding",
-        attached: {
-          pr: {
-            type: "pr",
-            ref: "#11",
-            url: "https://git.acme.example/acme/app/pull/11",
+        what: {
+          title: "Adding",
+          attached: {
+            pr: {
+              type: "pr",
+              ref: "#11",
+              url: "https://git.acme.example/acme/app/pull/11",
+            },
+            ticket: { type: "ticket", ref: "ACME-11" },
           },
-          ticket: { type: "ticket", ref: "ACME-11" },
         },
+        filed: { item: { id: "w1", title: "x", status: "queued" }, waiting: false, work: [] },
       },
-      { item: { id: "w1", title: "x", status: "queued" }, waiting: false, work: [] },
-    );
+    ]);
 
     expect(chat.posts[0]!.text).toBe(
       `<@U0DANA0001> Adding this to [PR #11](https://git.acme.example/acme/app/pull/11) for [ACME-11](${tracker.links.issue("ACME-11")}).`,
@@ -310,11 +342,12 @@ describe("chat relay", () => {
 
   it("says the request is picked up when the round ends when the work it joined is running", async () => {
     await setup();
-    await relay.acknowledge(
-      offerOf(),
-      { title: "Adding", attached: { ticket: { type: "ticket", ref: "ACME-11" } } },
-      { item: { id: "w1", title: "x", status: "active" }, waiting: false, work: [] },
-    );
+    await relay.acknowledge(offerOf(), [
+      {
+        what: { title: "Adding", attached: { ticket: { type: "ticket", ref: "ACME-11" } } },
+        filed: { item: { id: "w1", title: "x", status: "active" }, waiting: false, work: [] },
+      },
+    ]);
 
     expect(chat.posts[0]!.text).toBe(
       `<@U0DANA0001> Adding this to [ACME-11](${tracker.links.issue("ACME-11")}). I'll pick it up when the current round ends.`,
@@ -323,15 +356,16 @@ describe("chat relay", () => {
 
   it("never offers the PM where filed work goes", async () => {
     await setup();
-    await relay.acknowledge(
-      offerOf(),
-      { title: "Fix the footer" },
+    await relay.acknowledge(offerOf(), [
       {
-        item: { id: "w3", title: "Fix the footer", status: "queued" },
-        waiting: true,
-        work: [{ id: "w1", title: "Checkout bug", status: "active" }],
+        what: { title: "Fix the footer" },
+        filed: {
+          item: { id: "w3", title: "Fix the footer", status: "queued" },
+          waiting: true,
+          work: [{ id: "w1", title: "Checkout bug", status: "active" }],
+        },
       },
-    );
+    ]);
 
     expect(chat.posts[0]!.text).toContain("Queued: Fix the footer.");
     expect(chat.posts[0]!.text).not.toContain("PM");

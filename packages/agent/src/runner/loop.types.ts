@@ -107,6 +107,9 @@ export interface ItemEnv {
   /** Whether a chat session filed its request as work. */
   filedWork(): boolean;
 
+  /** Posts the one acknowledgement of everything the chat session filed, when it filed anything; never throws. */
+  acknowledge(): Promise<void>;
+
   /** What the agent made through its verbs in this run: pull requests opened, updated or merged, documents linked. */
   produced(): string[];
 

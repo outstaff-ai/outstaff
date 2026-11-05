@@ -1050,7 +1050,7 @@ describe("work loop", () => {
 
   const relay = () => {
     const reports: { kind: string; text: string; links: unknown; item: string }[] = [];
-    const acks: { item: string; key: string; say?: string }[] = [];
+    const acks: { item: string; key: string; say?: string }[][] = [];
     const chat: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments"> = {
       async attachments() {
         return [];
@@ -1058,12 +1058,14 @@ describe("work loop", () => {
       async context() {
         return "Recent messages:\n- Dana: add search\n\nYour current work:\nTicket ACME-9";
       },
-      async acknowledge(offer, what) {
-        acks.push({
-          item: offer.workItem.id,
-          key: what.key ?? what.title,
-          ...(what.say ? { say: what.say } : {}),
-        });
+      async acknowledge(offer, filings) {
+        acks.push(
+          filings.map(({ what }) => ({
+            item: offer.workItem.id,
+            key: what.key ?? what.title,
+            ...(what.say ? { say: what.say } : {}),
+          })),
+        );
       },
       async report(offer, kind, text, links) {
         reports.push({ kind, text, links, item: offer.workItem.id });
@@ -1343,8 +1345,35 @@ describe("work loop", () => {
       socket.offerWith("c1", { origin: true });
       await until(() => sentOf("handback").length === 1);
       expect(sentOf("work_link")[0]?.payload).toMatchObject({ workItemId: "c1" });
-      expect(acks).toEqual([{ item: "c1", key: expect.stringMatching(/^SHOP-/) as string }]);
+      expect(acks).toEqual([[{ item: "c1", key: expect.stringMatching(/^SHOP-/) as string }]]);
       expect(reports).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("acknowledges everything a chat session filed once, when the session ends", async () => {
+      await connect();
+      const { chat, acks } = relay();
+      const runtime: Runtime = {
+        async *run(req) {
+          yield { type: "started", sessionId: "s" };
+          const create = req.tools.find((t) => t.name === "ticket_create")!;
+          for (const title of ["Add search", "Add filters", "Add sorting"]) {
+            await create.handler({ title }, { workItemId: req.workItemId! });
+          }
+
+          // Nothing is posted while the session runs.
+          expect(acks).toEqual([]);
+          yield { type: "finished", ok: true, text: "Filed the three." };
+        },
+      };
+
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("work_link")).toHaveLength(3);
+      expect(acks).toHaveLength(1);
+      expect(acks[0]!.map((a) => a.item)).toEqual(["c1", "c1", "c1"]);
       await loop.stop();
       await conn.stop();
     });
@@ -1375,7 +1404,7 @@ describe("work loop", () => {
         confirmed: false,
       });
 
-      expect(acks).toEqual([{ item: "c1", key: "Filed", say: "Reworking it now." }]);
+      expect(acks).toEqual([[{ item: "c1", key: "Filed", say: "Reworking it now." }]]);
       await loop.stop();
       await conn.stop();
     });

@@ -1,5 +1,5 @@
 import type { Filed } from "@outstaff/protocol";
-import type { FiledWhat } from "./chat.types.js";
+import type { FiledWhat, Filing } from "./chat.types.js";
 
 type IssueUrl = (key: string) => string | undefined;
 type Attachment = NonNullable<FiledWhat["attached"]>;
@@ -53,4 +53,38 @@ export function acknowledgement(what: FiledWhat, filed: Filed, issueUrl: IssueUr
   }
 
   return filedText(what, filed, issueUrl);
+}
+
+/** "A", "A and B", "A, B and C". */
+const listed = (items: string[]) =>
+  items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+
+/** The tickets a session filed, in one line: the agent's own lines lead when it wrote any, then the links. */
+function ticketsText(filings: Filing[], issueUrl: IssueUrl): string {
+  const links = filings.map(({ what, filed }) => link(filed.url ?? issueUrl(what.key!), what.key!));
+  const says = [...new Set(filings.flatMap(({ what }) => (what.say ? [what.say] : [])))];
+  return says.length
+    ? `${says.join(" ")} ${links.join(", ")}`
+    : `On it. Tracked in ${listed(links)}.`;
+}
+
+/**
+ * The whole acknowledgement of a chat session: one reply for everything it filed. One filing reads as
+ * `acknowledgement` says; several put the new tickets in one line, the requests queued without a ticket in another,
+ * and each piece of existing work a request joined in a line of its own.
+ */
+export function acknowledgements(filings: Filing[], issueUrl: IssueUrl): string {
+  if (filings.length === 1) {
+    return acknowledgement(filings[0]!.what, filings[0]!.filed, issueUrl);
+  }
+
+  const tickets = filings.filter((f) => !f.what.attached && f.what.key);
+  const queued = filings.filter((f) => !f.what.attached && !f.what.key);
+  const attached = filings.filter((f) => f.what.attached);
+
+  return [
+    ...(tickets.length ? [ticketsText(tickets, issueUrl)] : []),
+    ...(queued.length ? [`On it. Queued: ${listed(queued.map((f) => f.what.title))}.`] : []),
+    ...attached.map((f) => attachedText(f.what.attached!, f.filed, issueUrl, f.what.say)),
+  ].join("\n");
 }

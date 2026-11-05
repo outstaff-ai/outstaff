@@ -166,6 +166,8 @@ export function createWorker(ctx: WorkerContext) {
   return async function work(offer: Offer, abort: AbortController) {
     const run = await setUpItem(ctx, offer, abort);
     const outcome = await runRounds(run);
+    // Whatever the round ended in, what the session filed exists: the requester hears of it once, before anything else.
+    await run.item.acknowledge();
     if (wasInterrupted(run, outcome)) {
       await handBackInterrupted(run, outcome?.text || run.lastText);
       return;

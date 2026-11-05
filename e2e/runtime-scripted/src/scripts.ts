@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
 import { answerTeammate, decideTopic, decideWithPm } from "./decide.js";
+import { planInChat, plannedTickets } from "./plan.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
@@ -645,6 +646,11 @@ async function* holdIfAsked(shown: string): AsyncGenerator<Action, void, string>
  */
 export async function* assigned(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
+  // The PM has no repositories: her own tickets are the ones she filed from a confirmed plan.
+  if (!ctx.worktree) {
+    return yield* plannedTickets(ctx, key);
+  }
+
   const next = ctx.openSubtickets?.[0];
   return next ? yield* nextSubTicket(ctx, key, next) : yield* workOnTicket(ctx, key);
 }
@@ -1438,7 +1444,11 @@ async function* aboutWork(
 export async function* chat(ctx: ItemContext): Script {
   const talk = ctx.conversation ?? [];
   const latest = talk.findLast((m) => !m.agent)?.text ?? "";
-  return (yield* notes(ctx, latest)) ?? (yield* aboutWork(ctx, talk, latest));
+  return (
+    (yield* notes(ctx, latest)) ??
+    (yield* planInChat(talk, latest)) ??
+    (yield* aboutWork(ctx, talk, latest))
+  );
 }
 
 /**

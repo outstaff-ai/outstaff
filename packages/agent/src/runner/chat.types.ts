@@ -27,6 +27,12 @@ export interface FiledWhat {
   say?: string;
 }
 
+/** One filing of a chat session: what it filed, and the office's answer. */
+export interface Filing {
+  what: FiledWhat;
+  filed: Filed;
+}
+
 export interface ChatRelayOptions {
   chat: Chat;
   office: ChatOffice;
@@ -60,10 +66,11 @@ export interface ChatRelay {
   context(offer: Offer): Promise<string | undefined>;
 
   /**
-   * First reply in the thread, once the chat session filed the request as work: what tracks it, and when the person
-   * is busy the work in the order it runs and the question where it goes. Posted once per item.
+   * First reply in the thread, once the chat session ends having filed requests as work: one reply for all of them,
+   * saying what tracks each, and when the person is busy the work in the order it runs and the question where it goes.
+   * Posted once per session round.
    */
-  acknowledge(offer: Offer, what: FiledWhat, filed: Filed): Promise<void>;
+  acknowledge(offer: Offer, filings: Filing[]): Promise<void>;
 
   /**
    * Tells the requester how an item ended, as the agent: a chat item in the thread it came from, and a blocked

@@ -8,7 +8,7 @@ import {
 } from "@outstaff/protocol";
 import type { ChatReportKind } from "#/verbs/office.types.js";
 import { saveAttachments } from "./attachments.js";
-import { acknowledgement } from "./chat-acknowledge.js";
+import { acknowledgements } from "./chat-acknowledge.js";
 import { fromTrustedHuman, linksToList, officeMessage, reportBody } from "./chat-report.js";
 import type { ChatRelayOptions, ChatRelay, ReportDestination, ReportTarget } from "./chat.types.js";
 import { chatContext } from "./chat-context.js";
@@ -184,9 +184,9 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
     context: (offer) => chatContext({ chat, office, log, historyLimit, now, describe }, offer),
 
-    async acknowledge(offer, what, filed) {
+    async acknowledge(offer, filings) {
       const origin = offer.workItem.origin;
-      if (!origin) {
+      if (!origin || filings.length === 0) {
         return;
       }
 
@@ -195,13 +195,15 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         return;
       }
 
+      // The first filing found the person busy; the others joined it, so the question is asked once.
+      const waiting = filings.find((f) => f.filed.waiting)?.filed;
       await post(
         origin.channel,
         origin.thread,
         linked(
           [
-            `${tag(origin)}${acknowledgement(what, filed, ticketUrl)}`,
-            ...(filed.waiting ? [placementQuestion(describe, filed.work)] : []),
+            `${tag(origin)}${acknowledgements(filings, ticketUrl)}`,
+            ...(waiting ? [placementQuestion(describe, waiting.work)] : []),
           ].join("\n"),
         ),
       );

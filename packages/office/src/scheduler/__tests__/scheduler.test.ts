@@ -307,6 +307,29 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       expect((await sched.next("ann"))?.title).toBe("later");
     });
 
+    it("holds the work a chat session files until the session ends", async () => {
+      const chat = await add("chat", "human", { kind: "chat" });
+      await sched.markActive(chat.id);
+      const filed = await sched.enqueue({
+        person: "ann",
+        kind: "assigned",
+        title: "filed",
+        trigger: "human",
+        parentId: chat.id,
+      });
+
+      expect(await sched.next("ann")).toBeNull();
+      expect(await sched.markActive(filed.id)).toMatchObject({
+        started: false,
+        reason: "busy",
+        detail:
+          "The chat session that filed it is still running; it starts once that session ends.",
+      });
+
+      await sched.finish(chat.id, { outcome: "answered" });
+      expect((await sched.next("ann"))?.id).toBe(filed.id);
+    });
+
     it("answers humans in a chat session whatever the usage", async () => {
       usage.windows = [{ name: "5h", utilization: 0.99 }];
       const chat = await add("c", "human", { kind: "chat" });

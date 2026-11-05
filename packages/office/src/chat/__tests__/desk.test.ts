@@ -431,28 +431,51 @@ describe("chat requests", () => {
       ).rejects.toMatchObject({ code: "invalid" });
     });
 
-    it("files each request of one message as its own work item", async () => {
+    it("files the tickets of one message as one round: later ones join the queued work item", async () => {
       const first = await fileWork("Add a search page", "ACME-5");
       await desk.checkFiling("sam", first.session.id, "Fix the footer");
       const second = await desk.linkTicket("sam", first.session.id, "ACME-6", "Fix the footer");
+      const third = await desk.linkTicket("sam", first.session.id, "ACME-7", "Tidy the header");
 
-      expect(second.item.id).not.toBe(first.item.id);
-      expect(await store.getItem(second.item.id)).toMatchObject({
-        parentId: first.session.id,
-        subject: { type: "ticket", ref: "ACME-6" },
-        status: "queued",
-      });
+      expect(second.item.id).toBe(first.item.id);
+      expect(third.item.id).toBe(first.item.id);
+      expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([
+        expect.objectContaining({ id: first.item.id, subject: { type: "ticket", ref: "ACME-5" } }),
+      ]);
+
+      expect(
+        (await store.listItemRefs(first.item.id))
+          .filter((r) => r.type === "ticket" && r.role === "attached")
+          .map((r) => r.ref),
+      ).toEqual(["ACME-6", "ACME-7"]);
+
+      expect((await store.readJournal(first.item.id)).map((j) => j.text).at(-1)).toContain(
+        "The chat session also filed ACME-7 for this request. One round covers the request",
+      );
 
       expect(await readOrigin(store, first.session.id)).toMatchObject({
-        filed: second.item.id,
-        requests: ["add a search page", "fix the footer"],
+        filed: first.item.id,
+        group: first.item.id,
+        requests: ["add a search page", "fix the footer", "tidy the header"],
       });
 
       // The first filing does not make the person busy for the second: nothing is asked.
       expect(second.waiting).toBe(false);
       await expect(
-        desk.linkTicket("sam", first.session.id, "ACME-7", "Fix the footer"),
+        desk.linkTicket("sam", first.session.id, "ACME-8", "Fix the footer"),
       ).rejects.toMatchObject({ code: "invalid" });
+    });
+
+    it("files a ticket as a round of its own once the session's round has started", async () => {
+      const first = await fileWork("Add a search page", "ACME-5");
+      await store.updateItem(first.item.id, { status: "active" });
+      const second = await desk.linkTicket("sam", first.session.id, "ACME-6", "Fix the footer");
+
+      expect(second.item.id).not.toBe(first.item.id);
+      expect(await readOrigin(store, first.session.id)).toMatchObject({
+        filed: second.item.id,
+        group: second.item.id,
+      });
     });
 
     it("records a ticket filed for someone else against the request, with no work item for the caller", async () => {
@@ -554,9 +577,11 @@ describe("chat requests", () => {
       expect(await readOrigin(store, item.id)).toMatchObject({ awaitingPlacement: true });
     });
 
-    it("starts at once for an idle person and asks nothing", async () => {
-      const { item, filed } = await fileWork();
+    it("starts once the session ends for an idle person, and asks nothing", async () => {
+      const { item, filed, session } = await fileWork();
       expect(filed).toMatchObject({ waiting: false, work: [] });
+      expect(await scheduler.next("sam")).toBeNull();
+      await scheduler.finish(session.id, { outcome: "answered" });
       expect((await scheduler.next("sam"))?.id).toBe(item.id);
     });
   });
@@ -758,6 +783,7 @@ describe("chat requests", () => {
         url: "https://git.acme.example/acme/app/pull/11",
       });
 
+      await scheduler.finish(s.id, { outcome: "answered" });
       expect((await scheduler.next("sam"))?.id).toBe(item.id);
     });
 

@@ -26,6 +26,7 @@ const itemOf = (did: Did): ItemEnv => ({
   moved: new Map(did.moved ?? []),
   asked: () => did.asked ?? false,
   filedWork: () => false,
+  acknowledge: async () => {},
   produced: () => did.produced ?? [],
   declared: () => did.declared,
 });

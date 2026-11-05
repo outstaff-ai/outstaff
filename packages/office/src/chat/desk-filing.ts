@@ -8,6 +8,9 @@ import { CHAT_ORIGIN_SUBJECT, CHAT_THREAD_SUBJECT, readOrigin, threadKey } from 
 import { chatRefsOf } from "./refs.js";
 import type { ChatOriginRecord } from "./types.js";
 
+/** The filings that join one round per session: tickets the agent filed for itself. */
+const GROUPED_SOURCE = "work_link";
+
 /** Filing from a chat session: the session a verb was called from, and the work item it files. */
 export function createFiling(opts: ChatDeskOptions): DeskFiling {
   const { store, scheduler } = opts;
@@ -52,12 +55,69 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
     return { session, origin };
   }
 
+  /** The work item the session's earlier tickets were filed as, while it still waits to start; a ticket joins it. */
+  async function groupOf(origin: ChatOriginRecord, spec: FileSpec): Promise<WorkItem | undefined> {
+    if (spec.source !== GROUPED_SOURCE || !origin.group) {
+      return undefined;
+    }
+
+    const group = await store.getItem(origin.group);
+    return group?.status === "queued" ? group : undefined;
+  }
+
+  /**
+   * A further ticket the session filed for the agent: one more ticket of the round already queued for the request, not
+   * a round of its own. Nothing new is asked of the requester; the first filing asked already.
+   */
+  async function join(
+    session: WorkItem,
+    origin: ChatOriginRecord,
+    group: WorkItem,
+    spec: FileSpec,
+  ): Promise<Filed> {
+    const key = spec.subject.ref;
+    const title = ((await store.getSubject("ticket", key))?.data as { title?: string } | undefined)
+      ?.title;
+
+    await store.addItemRefs(group.id, [
+      { type: "ticket", ref: key, role: "attached", source: spec.source },
+    ]);
+
+    await store.appendJournal(
+      group.id,
+      "office",
+      `The chat session also filed ${key}${title ? ` ${title}` : ""} for this request. One round covers the request: work its tickets in order, or plan them; a ticket left ready is picked up on its own once you are idle.`,
+    );
+
+    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, {
+      ...origin,
+      requests: [...(origin.requests ?? []), requestKey(spec.request)],
+    });
+
+    return {
+      item: await summarizeItem(store, (await store.getItem(group.id)) ?? group),
+      waiting: false,
+      work: [],
+    };
+  }
+
   /**
    * Files the work a chat session decided a message is: a work item of its own, in the session's thread. The thread
-   * belongs to the new item from here on, so the requester's answer about its place and later replies reach it.
+   * belongs to the new item from here on, so the requester's answer about its place and later replies reach it. The
+   * agent's further tickets of the session join that item while it waits (`join`).
    */
   async function file(person: string, sessionId: string, spec: FileSpec): Promise<Filed> {
     const { session, origin } = await sessionOf(person, sessionId, spec.request);
+    const group = await groupOf(origin, spec);
+    return group ? join(session, origin, group, spec) : create(person, { session, origin }, spec);
+  }
+
+  /** A new work item for the filing, first in the queue when the person is idle, else last until the requester says. */
+  async function create(
+    person: string,
+    { session, origin }: DeskSession,
+    spec: FileSpec,
+  ): Promise<Filed> {
     const all = await open(person, session.id);
     // Work this session filed earlier is queue order, not a reason to ask the requester where this one goes.
     const others = all.filter((i) => i.parentId !== session.id);
@@ -87,6 +147,7 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, {
       ...origin,
       filed: created.id,
+      ...(spec.source === GROUPED_SOURCE ? { group: created.id } : {}),
       requests: [...(origin.requests ?? []), requestKey(spec.request)],
     });
 

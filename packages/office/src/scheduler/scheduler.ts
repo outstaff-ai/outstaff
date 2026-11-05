@@ -5,7 +5,7 @@ import type { SchedulerDeps } from "./checks.types.js";
 import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
 import { enqueueItem, releaseHold } from "./enqueue.js";
 import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";
-import { CHAT_KIND, DEFAULT_RETRY, isLoopGuarded, orderQueue } from "./policy.js";
+import { DEFAULT_RETRY, isLoopGuarded, orderQueue } from "./policy.js";
 import type { UsageWindow } from "./policy.types.js";
 import { runTick } from "./tick.js";
 import type { PauseState, Scheduler, SchedulerOptions, StartResult } from "./types.js";
@@ -61,7 +61,6 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
 
   const {
     hasRoom,
-    mergeRunning,
     backingOff,
     getWindows,
     pauseBlock,
@@ -91,19 +90,6 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     holds.add(cancel);
   };
 
-  /** Why the person has no room for the item: a full lane, or another merge running in the repository. */
-  const busyDetail = async (item: WorkItem): Promise<string> => {
-    if (item.kind === CHAT_KIND) {
-      return `${item.person} already runs ${chatSessions} chat sessions.`;
-    }
-
-    const own = await store.listItems({ person: item.person, status: "active" });
-    const merging = own.some((i) => i.kind !== CHAT_KIND) ? undefined : await mergeRunning(item);
-    return merging
-      ? `${merging.person} is merging in the same repository (${merging.subject!.ref}); one merge runs per repository at a time.`
-      : `${item.person} already has an active item.`;
-  };
-
   /** Why the item cannot start now: it is not queued, its person has no room, or it backs off after a failure. */
   const notReady = async (item: WorkItem): Promise<StartResult | undefined> => {
     if (item.status !== "queued") {
@@ -111,7 +97,7 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     }
 
     if (!(await hasRoom(item))) {
-      return { started: false, reason: "busy", detail: await busyDetail(item) };
+      return { started: false, reason: "busy", detail: await checks.busyDetail(item) };
     }
 
     return backingOff(item)

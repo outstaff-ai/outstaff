@@ -268,3 +268,61 @@ describe("stoppedWork: the start-time check", () => {
     expect(await stopped(blocked)).toBeUndefined();
   });
 });
+
+describe("stoppedWork: a ticket closed after its round was queued", () => {
+  /** ACME-144 entered its closed status now, as the work state read it. */
+  const closeNow = (opts: LiveOptions, clock: ManualClock) => {
+    const at = clock.now().toISOString();
+    Object.assign(opts.workState.ticket("ACME-144")!, { key: "ACME-144", statusSince: at });
+    return at;
+  };
+
+  it("drops a round queued before the ticket was canceled, though the agent canceled it itself", async () => {
+    const { store: s, opts, clock } = await setup("canceled");
+    const queued = await item(s, "pia", "assigned", ON_TICKET);
+    clock.advance(1_000);
+    await createLivePipeline(opts).handle(closed("canceled", { kind: "agent", id: "pia" }), {
+      source: "workstate",
+      externalId: "c5",
+    });
+
+    // The stop spares the agent who canceled it, so its round is still queued.
+    expect((await s.getItem(queued.id))?.status).toBe("queued");
+    const at = closeNow(opts, clock);
+    expect(await stoppedWork({ store: s, workState: opts.workState })(queued)).toBe(
+      `Dropped: ACME-144 was canceled at ${at}, after this work was queued and before it started.`,
+    );
+  });
+
+  it("drops a round on a ticket closed as done after it was queued", async () => {
+    const { store: s, opts, clock } = await setup("done");
+    const queued = await item(s, "sam", "ticket_comment", ON_TICKET);
+    clock.advance(1_000);
+    const at = closeNow(opts, clock);
+
+    expect(await stoppedWork({ store: s, workState: opts.workState })(queued)).toBe(
+      `Dropped: ACME-144 was closed as done at ${at}, after this work was queued and before it started.`,
+    );
+  });
+
+  it("starts work that reacts to the close, work queued after it, and work on an open pull request", async () => {
+    const { store: s, opts, clock } = await setup("canceled");
+    const notice = await item(s, "sam", "ticket_closed", ON_TICKET);
+    const milestone = await item(s, "pia", "milestone", ON_TICKET);
+    const merged = await item(s, "sam", "merged_feedback", { type: "pr", ref: PR });
+    const checks = await item(s, "sam", "merge_checks_failed", { type: "pr", ref: PR });
+    const chat = await item(s, "sam", "chat", ON_TICKET);
+    const open = "github.com/acme-example/shop#10";
+    await s.upsertSubject("pr", open, { ticket: "ACME-144", state: "open" });
+    const review = await item(s, "sam", "review_feedback", { type: "pr", ref: open });
+    clock.advance(1_000);
+    closeNow(opts, clock);
+
+    clock.advance(1_000);
+    const after = await item(s, "sam", "ticket_comment", ON_TICKET);
+    const stopped = stoppedWork({ store: s, workState: opts.workState });
+    for (const i of [notice, milestone, merged, checks, chat, review, after]) {
+      expect(await stopped(i)).toBeUndefined();
+    }
+  });
+});

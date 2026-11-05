@@ -32,13 +32,50 @@ export function createChecks(opts: ChecksOptions): Checks {
     return active.find((i) => i.id !== item.id && mergeRepo(i) === repo);
   };
 
-  const hasRoom = async (item: Pick<WorkItem, "id" | "person" | "kind" | "subject">) => {
+  /**
+   * The chat session that filed the item, while it still runs: the work it files waits for it to end, so the tickets of
+   * one request join one round instead of the first starting while the session files the rest.
+   */
+  const filingSession = async (item: Pick<WorkItem, "kind" | "parentId">) => {
+    if (item.kind === CHAT_KIND || !item.parentId) {
+      return undefined;
+    }
+
+    const parent = await store.getItem(item.parentId);
+    return parent?.kind === CHAT_KIND && parent.status === "active" ? parent : undefined;
+  };
+
+  const hasRoom = async (
+    item: Pick<WorkItem, "id" | "person" | "kind" | "subject" | "parentId">,
+  ) => {
     const active = await store.listItems({ person: item.person, status: "active" });
     if (item.kind === CHAT_KIND) {
       return active.filter((i) => i.kind === CHAT_KIND).length < chatSessions;
     }
 
-    return !active.some((i) => i.kind !== CHAT_KIND) && !(await mergeRunning(item));
+    return (
+      !active.some((i) => i.kind !== CHAT_KIND) &&
+      !(await mergeRunning(item)) &&
+      !(await filingSession(item))
+    );
+  };
+
+  /** Why the person has no room for the item: a full lane, its chat session still running, or another merge running. */
+  const busyDetail = async (item: WorkItem): Promise<string> => {
+    if (item.kind === CHAT_KIND) {
+      return `${item.person} already runs ${chatSessions} chat sessions.`;
+    }
+
+    const own = await store.listItems({ person: item.person, status: "active" });
+    const idle = !own.some((i) => i.kind !== CHAT_KIND);
+    if (idle && (await filingSession(item))) {
+      return "The chat session that filed it is still running; it starts once that session ends.";
+    }
+
+    const merging = idle ? await mergeRunning(item) : undefined;
+    return merging
+      ? `${merging.person} is merging in the same repository (${merging.subject!.ref}); one merge runs per repository at a time.`
+      : `${item.person} already has an active item.`;
   };
 
   const backingOff = (item: Pick<WorkItem, "notBefore">) =>
@@ -152,6 +189,7 @@ export function createChecks(opts: ChecksOptions): Checks {
 
   return {
     hasRoom,
+    busyDetail,
     mergeRunning,
     backingOff,
     getWindows,
