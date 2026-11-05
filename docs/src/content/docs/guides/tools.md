@@ -84,7 +84,7 @@ The other options (`bin_path`, `strip_components`, `format` and the rest) are mi
 
 ## The stock toolsets
 
-The agent image carries only Node, git, curl and mise. A role does not name its toolsets: the agent installs every toolset whose `profiles` include the role's permission profile (`permissions` in `role.yaml`), and a toolset without `profiles` goes to every role.
+The agent image carries only Node, git, curl and mise, and the system libraries and fonts a headless browser needs ([below](#headless-browser)). A role does not name its toolsets: the agent installs every toolset whose `profiles` include the role's permission profile (`permissions` in `role.yaml`), and a toolset without `profiles` goes to every role.
 
 | Toolset | Profiles           | Installs                                                 | Stock roles                     |
 | ------- | ------------------ | -------------------------------------------------------- | ------------------------------- |
@@ -95,6 +95,18 @@ The agent image carries only Node, git, curl and mise. A role does not name its 
 kubectl is narrowed to `get`, `describe`, `logs`, `diff`, `version`, `api-resources`, `api-versions`, `explain` and `auth can-i`.
 
 So a devops agent has the code toolchains as well as the infrastructure CLIs, and runs a repository's own tests, typecheck and lint before it opens a pull request. The `profiles` of a toolset also limit its rules to those profiles. An ejected `toolsets/<name>.yaml` replaces the stock file of that name, and a new file in the ejected `toolsets/` adds a toolset; its `name` must equal the file name. Native build toolchains (`make`, `g++`, a C library for packages that compile) are not provided. A team that needs them builds a prebuilt image or installs them from a tool source; anything on the `PATH` runs.
+
+## Headless browser
+
+The agent image can run a headless Chromium, so an agent can take screenshots of UI work and run a repository's browser tests. It carries no browser: the browser version belongs to each repository's Playwright, not to Outstaff. Chromium needs shared libraries and fonts that only root can install, so those are in the image; the browser is a user-space download:
+
+```sh
+npx playwright install chromium
+```
+
+Do not add `--with-deps`: it installs the same libraries with `apt-get`, which needs root, and the agent runs as an unprivileged user. The browser lands in `~/.cache/ms-playwright` on the home volume (about 700 MB), so a restarted agent keeps it, and a new Playwright version downloads its own. An agent without a repository, such as a designer rendering its canvas, installs Playwright at an exact version in its scratch directory first.
+
+Keep Playwright's default launch options. Chromium's own sandbox cannot run in the agent container, and Playwright leaves it off unless `chromiumSandbox: true` is set; that works with and without the [subprocess sandbox](/reference/container-contract/#headless-browser). The download needs egress to `cdn.playwright.dev` and the npm registry ([egress](#egress)).
 
 ## Narrowing a tool
 
@@ -202,7 +214,7 @@ A repository can ask for its own pnpm: `packageManager` in `package.json`, or `d
 
 ## Egress
 
-Installing needs outbound HTTPS to the tool sources: mise's registry and release hosts, `github.com` and `api.github.com` for `github:` (and the older `ubi:`), the download host of each `http:` source, and the package registries of the backends you use. Only the first start and a version change need them. Package installs in the agent's work are different: `pnpm install`, `yarn install`, `pip install` and `go mod download` reach the package registries (`registry.npmjs.org`, `pypi.org` and `files.pythonhosted.org`, `proxy.golang.org`, or your own mirror) every time a lockfile changes, so keep those open for roles that build or test code. The [example network policy](/guides/kubernetes/#network-policy) allows HTTPS to any public address, which covers them. See [egress](/reference/container-contract/#egress).
+Installing needs outbound HTTPS to the tool sources: mise's registry and release hosts, `github.com` and `api.github.com` for `github:` (and the older `ubi:`), the download host of each `http:` source, and the package registries of the backends you use. Only the first start and a version change need them. Package installs in the agent's work are different: `pnpm install`, `yarn install`, `pip install` and `go mod download` reach the package registries (`registry.npmjs.org`, `pypi.org` and `files.pythonhosted.org`, `proxy.golang.org`, or your own mirror) every time a lockfile changes, so keep those open for roles that build or test code. A browser download reaches `cdn.playwright.dev`. The [example network policy](/guides/kubernetes/#network-policy) allows HTTPS to any public address, which covers them. See [egress](/reference/container-contract/#egress).
 
 ## Prebuilt images instead
 

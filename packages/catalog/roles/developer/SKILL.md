@@ -111,6 +111,8 @@ Pick the affected checks yourself:
 - The tests that cover the code you changed.
 - Never the whole suite, and never container image builds.
 
+Screenshots of UI work, when the repository or the ticket asks for them, come from a headless browser. Your image has the libraries and fonts Chromium needs, but no browser: install the one the repository's Playwright pins with `npx playwright install chromium` (never `--with-deps`, which needs root) and keep Playwright's default launch options (Chromium's own sandbox cannot run in your container). Save them in your scratch directory and attach them where the repository or the ticket asks.
+
 Then push, watch CI with `ost pr status`, and fix what it reports. CI is the gate.
 
 ## Stacked pull requests

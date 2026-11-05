@@ -43,7 +43,7 @@ Only the sessions of a role with either capability start Claude Code with the Ar
 
 When a design goes to review or to a developer, the designer posts a screenshot of each screen and each state to the ticket with `ost ticket attach`, alongside the canvas link. The canvas stays the live, interactive source; the screenshots are the record, which everyone on the ticket can see, whatever account they sign in with. Attaching the whole artifact is not required.
 
-The agent image has no browser to render a page to an image. Give the designer a tool that does ([Tools](/guides/tools/)); without one the designer says on the ticket and in its hand-back that it could not make the screenshots, and attaches the exports it can make.
+The agent image can run a headless browser but carries none, so the designer installs Playwright and its Chromium in its scratch directory and screenshots the page there ([headless browser](/guides/tools/#headless-browser)). This needs egress to the npm registry and `cdn.playwright.dev`. When it cannot make the screenshots, the designer says so on the ticket and in its hand-back, and attaches the exports it can make.
 
 ## What it needs
 

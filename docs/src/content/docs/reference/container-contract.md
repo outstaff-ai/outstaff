@@ -22,6 +22,14 @@ Images never contain secrets. A client image that needs one at build time takes 
 
 Docker is not assumed inside the containers: nothing in the office or the agent starts containers, and the images do not carry a Docker client.
 
+### Headless browser
+
+The agent image can run a headless Chromium, but carries no browser. It has the shared libraries Playwright's Chromium and headless shell need on Debian 12 (the libraries `npx playwright install-deps chromium` installs, without its X server and extra fonts) and fonts for Latin text, symbols and emoji (Liberation, DejaVu, Noto Color Emoji). The browser version stays with each repository's Playwright: the agent downloads it into its home with `npx playwright install chromium`, without `--with-deps`, which needs root. The image's smoke test downloads Playwright's Chromium as the image's user and takes a screenshot with both browsers it installs.
+
+Chromium's own sandbox does not run in the agent container: it needs user namespaces or a setuid helper, which the container does not allow, and with `sandbox: bubblewrap` Claude Code also forbids nested user namespaces inside each command's sandbox. Playwright's default launch leaves it off (`chromiumSandbox: false`), and that works both with and without `sandbox: bubblewrap`. Do not set `chromiumSandbox: true`; a launcher that turns the sandbox on by default needs `--no-sandbox`. The container, and the bubblewrap sandbox when it is on, are the isolation.
+
+A browser in an agent's home takes about 700 MB of the home volume for `chromium` (the full browser and the headless shell), and memory beyond the agent's own while it runs (see [resources](#resources)). Its download needs egress to Playwright's CDN (`cdn.playwright.dev`) and the npm registry ([egress](#egress)).
+
 ## Secrets
 
 Secrets are files first. Each container reads a secret named `KEY` from `/run/secrets/outstaff/KEY`, or from the directory in `OUTSTAFF_SECRETS_DIR`. Whoever puts the file there is up to you: Docker Compose `secrets:`, a mounted Kubernetes Secret, a cloud secret manager. Trailing whitespace is trimmed, and an empty file counts as missing.
@@ -180,6 +188,6 @@ Allow what a container needs and block the rest. An agent can run shell commands
 
 Agents also need the **tool sources**: the registries and release hosts of the tools the team declares. They are only needed on the first start and when a declared version changes, because later starts reuse the installed tools on the home volume. A team that prebuilds its image with the tools can leave them blocked.
 
-Agents that build or test code (the `code` and `infra` profiles) also need the **package registries** their repositories install from, every time a lockfile changes: `registry.npmjs.org` for pnpm, yarn and npm, `pypi.org` and `files.pythonhosted.org` for pip, `proxy.golang.org` and `sum.golang.org` for Go, or your own mirror. Without them `pnpm install` fails, and so do the repository's tests.
+Agents that build or test code (the `code` and `infra` profiles) also need the **package registries** their repositories install from, every time a lockfile changes: `registry.npmjs.org` for pnpm, yarn and npm, `pypi.org` and `files.pythonhosted.org` for pip, `proxy.golang.org` and `sum.golang.org` for Go, or your own mirror. Without them `pnpm install` fails, and so do the repository's tests. An agent that downloads a browser for screenshots or browser tests also needs Playwright's CDN, `cdn.playwright.dev`, once per browser version.
 
 Everything else stays blocked: allow the registry hosts you name and nothing broader.
