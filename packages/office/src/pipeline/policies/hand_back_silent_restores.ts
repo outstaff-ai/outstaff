@@ -36,6 +36,14 @@ const assigneeBack = (ticket: string, before: Before, agent: string, now: string
     ? [{ op: "assign" as const, ticket, to: before.assignee ?? null }]
     : [];
 
+/** A blocked hand-back the office took as silent: the work in flight it waits on, which is why, as the trace says. */
+function waitingOn(event: PipelineEvent): string | undefined {
+  const waiting = event.data["waitingOn"];
+  return Array.isArray(waiting) && waiting.length > 0
+    ? `handed back blocked, but it waits on work in flight (${waiting.join("; ")}), which is not blocked`
+    : undefined;
+}
+
 /** What puts the item's ticket back as the round found it, or a drop that says why nothing does. */
 function restore(event: PipelineEvent, ctx: PolicyContext): Proposal[] {
   const ticket = ctx.ticket;
@@ -54,7 +62,12 @@ function restore(event: PipelineEvent, ctx: PolicyContext): Proposal[] {
     return [
       {
         type: "drop",
-        reason: `nothing the round's start changed on ${ticket} is left to restore`,
+        reason: [
+          waitingOn(event),
+          `nothing the round's start changed on ${ticket} is left to restore`,
+        ]
+          .filter(Boolean)
+          .join(": "),
       },
     ];
   }
@@ -64,7 +77,7 @@ function restore(event: PipelineEvent, ctx: PolicyContext): Proposal[] {
       type: "act",
       as: agent,
       ops,
-      reason: `the round finished silently: ${ticket} goes back to how the round found it`,
+      reason: `${waitingOn(event) ?? "the round finished silently"}: ${ticket} goes back to how the round found it`,
     },
   ];
 }
@@ -72,7 +85,7 @@ function restore(event: PipelineEvent, ctx: PolicyContext): Proposal[] {
 export const policy = definePolicy({
   id: "hand_back_silent_restores",
   summary:
-    "A silent hand-back leaves the ticket as it was before the round: what the round's start changed (the move to active, the assignment to the agent) is undone, for the agent. A field someone changed since is left alone, and so is a parent the agent kept active for its open sub-tickets. The work item's other tickets awaiting review go to review and to the requester too.",
+    "A silent hand-back leaves the ticket as it was before the round: what the round's start changed (the move to active, the assignment to the agent) is undone, for the agent. A field someone changed since is left alone, and so is a parent the agent kept active for its open sub-tickets. The work item's other tickets awaiting review go to review and to the requester too. A blocked hand-back the office found waiting on work in flight (the ticket's pull requests open for review, its sub-tickets in review or with an agent) comes as silent, and its trace names that work: no PM is woken, and no human is told again.",
   on: ["agent.handed_back"],
   when: { all: [{ hand_back_status: ["silent"] }, NOT_CLOSED] },
   decides: `act for the agent: move the ticket back to the status it had before the round, and assign it back to whom it had, for each of the two still as the round's start set it; ${HANDED_IN}`,

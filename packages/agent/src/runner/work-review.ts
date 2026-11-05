@@ -28,11 +28,13 @@ export function toReview({ offer, item }: ItemRun): string[] {
 }
 
 /**
- * Whether a round with nothing to review finishes silently, leaving the ticket as it is: a kind that may (a comment,
- * a mention, a question, chat, a review, a merge, pull request upkeep), unless the agent said `done`.
+ * Whether a round with nothing to review finishes silently, leaving the ticket as it is: the agent said `silent`, or
+ * the round is of a kind that may (a comment, a mention, a question, chat, a review, a merge, pull request upkeep) and
+ * the agent did not say `done`. Work on a ticket said `silent` only while it waits on work in flight; the office checks.
  */
 export const finishesSilently = ({ offer, item }: ItemRun) =>
-  SILENT_KINDS.includes(offer.workItem.kind) && item.declared() !== "done";
+  item.declared() === "silent" ||
+  (SILENT_KINDS.includes(offer.workItem.kind) && item.declared() !== "done");
 
 /** The first line of the prompt that refuses a `done` hand-back; the rest says what to do instead. */
 export const NOTHING_TO_REVIEW = "Nothing to review: this round cannot be handed back as done.";
@@ -46,7 +48,7 @@ export const NOTHING_TO_REVIEW_PROMPT = [
   "- If you need a decision or an answer from a human, or anything outside your control: comment where the work came from (the ticket, or the chat thread) with what you need and from whom, and end the round. It is handed back as `blocked` (`ost handback blocked`).",
   "- If you wait for another agent's answer, ask it with `ost ask`; the item then waits for it.",
   "- If you did make a result, open or link it now: `ost pr open`, `ost pr update --ready`, `ost doc create`. An answer that needs a human's review: comment it on the ticket and move the ticket to review (`ost ticket move <key> review`).",
-  "- If the work needed nothing from you (a comment or mention that asks nothing of you), and the item may finish silently, say `ost handback silent`: the ticket is put back as the round found it.",
+  "- If the work needed nothing from you (a comment or mention that asks nothing of you), or you wait on a human's review of a pull request or on sub-tickets someone else holds, say `ost handback silent`: the ticket is put back as the round found it. Waiting on a review is not blocked.",
   "",
   "End with one line that says where the work is and what is needed.",
 ].join("\n");

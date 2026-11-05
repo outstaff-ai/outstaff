@@ -57,3 +57,29 @@ export function finishOps(
       : []),
   ];
 }
+
+const CLOSED = new Set(["done", "canceled"]);
+
+/**
+ * Whether the parent's work is all with the requester to review: every sub-ticket is done, canceled or in review, with
+ * at least one in review, and each open pull request of its own is open for review, not a draft. The reason when not.
+ */
+export function inReviewWhole(ctx: PolicyContext, parent: string): { reason: string } | undefined {
+  const subs = ctx.state.subTickets(parent);
+  const status = (t: string) => ctx.state.ticketStatus(t) ?? "unknown";
+  const outside = subs.filter((t) => !CLOSED.has(status(t)) && status(t) !== "review");
+  if (outside.length > 0) {
+    return {
+      reason: `${parent} has sub-tickets not in review: ${outside.map((t) => `${t} is ${status(t)}`).join(", ")}`,
+    };
+  }
+
+  if (!subs.some((t) => status(t) === "review")) {
+    return { reason: `${parent} has no sub-ticket in review` };
+  }
+
+  const drafts = ctx.state.pullRequestsOf(parent).filter((p) => p.state === "open" && p.draft);
+  return drafts.length > 0
+    ? { reason: `${parent}'s own pull request is a draft: #${drafts[0]!.ref.number}` }
+    : undefined;
+}

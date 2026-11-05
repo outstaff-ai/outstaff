@@ -464,7 +464,14 @@ async function* nextSubTicket(
 ): AsyncGenerator<Action, string, string> {
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
-  yield { type: "tool", tool: "ticket_show", input: { key: sub } };
+  const shown = yield { type: "tool", tool: "ticket_show", input: { key: sub } };
+  // A part that waits on the human's review leaves nothing to do now. This agent hands back blocked, as one did live:
+  // the office takes it as silent, since the parent only waits on work in flight.
+  if (/^waits: review$/m.test(shown)) {
+    yield { type: "tool", tool: "handback", input: { status: "blocked" } };
+    return `Blocked until the human reviews ${sub}.`;
+  }
+
   const rules = yield* conventions(ctx, cwd);
   const branch = branchFor(rules, sub, "the next part");
   yield { type: "shell", command: "git fetch --prune origin", cwd };
@@ -733,7 +740,7 @@ async function* proposalApproved(
   return proposal;
 }
 
-/** Files a reviewer's "follow-up: <title>" under this ticket; returns the key of the ticket filed. */
+/** Files a reviewer's "follow-up: <title>", related to this ticket; returns the key of the ticket filed. */
 async function* fileFollowUp(
   key: string,
   conversational: Feedback[],
@@ -809,7 +816,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   // A short "yes" answers an earlier comment (the agent's own proposal): read the conversation to know what it says.
   const approval = conversational.find((f) => f.kind === "comment" && /^yes\b/i.test(f.body));
   const proposal = approval ? yield* proposalApproved(repo, number) : undefined;
-  // A reviewer's "follow-up: <title>" is work for later: filed from here, under this ticket, not asked of anyone.
+  // A reviewer's "follow-up: <title>" is work for later: filed from here, related to this ticket, not asked of anyone.
   const filedFollowUp = yield* fileFollowUp(key, conversational);
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
@@ -974,7 +981,7 @@ export async function* mentioned(ctx: ItemContext): Script {
   return yield* ticketComment(ctx);
 }
 
-/** The merged pull request's ticket has its pull request, so the follow-up is a sub-ticket with its own. */
+/** The merged pull request's ticket has its pull request, so the follow-up is a ticket of its own, related to it. */
 async function* fileFollowUpTicket(
   ticket: string | undefined,
   number: number,
@@ -989,7 +996,7 @@ async function* fileFollowUpTicket(
     input: {
       title: `Follow up on #${number}`,
       body: `Feedback on the merged #${number}.`,
-      parent: ticket,
+      related: ticket,
       assignee: "me",
       status: "active",
     },

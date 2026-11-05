@@ -5,8 +5,7 @@ import { ProtocolError } from "./protocol/errors.js";
 import type { WorkSource } from "./protocol/source.types.js";
 import type { Scheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
-import { SILENT_KINDS } from "@outstaff/core";
-import { officeToReview } from "./hand-back-review.js";
+import { checkedResult } from "./hand-back-checks.js";
 import { workMoves } from "./work-moves.js";
 import { workStatus } from "./work-status.js";
 import { offerBuilder } from "./work-offer.js";
@@ -43,34 +42,6 @@ async function settle(scheduler: Scheduler, id: string, result: HandBackResult) 
   // A silent finish ends the item like done; only the ticket is left as it is.
   const status = result.status === "silent" ? "done" : result.status;
   return scheduler.finish(id, { outcome: result.summary, status });
-}
-
-/**
- * A `done` hand-back from an agent that did not check what it leaves to review (an older one), when the office sees
- * nothing to review either, must not send the ticket to review with nothing in it: it is taken as a silent finish for
- * a kind that may finish silently, and as `blocked` for any other.
- */
-async function checkedResult(
-  opts: WorkSourceOptions,
-  item: WorkItem,
-  result: HandBackResult,
-): Promise<HandBackResult> {
-  const { workState, store } = opts;
-  if (result.status !== "done" || result.toReview || !workState) {
-    return result;
-  }
-
-  if ((await officeToReview({ store, workState })(item)).length > 0) {
-    return result;
-  }
-
-  const status = SILENT_KINDS.includes(item.kind) ? "silent" : "blocked";
-  opts.logger?.warn(`a done hand-back left nothing to review; taking it as ${status}`, {
-    item: item.id,
-    person: item.person,
-  });
-
-  return { ...result, status };
 }
 
 /** A hand-back the office already took: an interruption, or the item already left `active` for it. */

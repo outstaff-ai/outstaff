@@ -32,10 +32,10 @@ describe("ost handback", () => {
     expect(i.said).toEqual(["silent"]);
   });
 
-  it("refuses a silent finish for work on a ticket", async () => {
+  it("lets work on a ticket finish silently: the office checks it waits on work in flight", async () => {
     const i = item("assigned");
-    await expect(i.run("silent")).rejects.toThrow("cannot finish silently");
-    expect(i.said).toEqual([]);
+    await i.run("silent");
+    expect(i.said).toEqual(["silent"]);
   });
 
   it("refuses outside a work item", async () => {

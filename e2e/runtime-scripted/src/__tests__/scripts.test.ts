@@ -569,6 +569,21 @@ describe("assigned, for a ticket split into a part now and a part later", () => 
       "Opened https://git.example/acme/shop/pull/4 for SHOP-3, the next part of SHOP-1.",
     );
   });
+
+  it("woken on the parent when the next part waits on the human's review, hands back blocked and opens nothing", async () => {
+    const woken = { ...ctx, openSubtickets: ["SHOP-3"] };
+    const { seen, text } = await play(
+      assigned(woken),
+      answerBy([[(a) => isTool(a, "ticket_show"), "SHOP-3 Add a footer\n\nwaits: review"]], ""),
+    );
+
+    expect(seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-3" } },
+      { type: "tool", tool: "handback", input: { status: "blocked" } },
+    ]);
+
+    expect(text).toBe("Blocked until the human reviews SHOP-3.");
+  });
 });
 
 describe("branchFor", () => {
@@ -655,7 +670,7 @@ describe("mergedFeedback", () => {
 
     expect(steps.at(-2)).toBe("pr_open");
     expect(seen.find((a) => a.type === "tool" && a.tool === "ticket_create")).toMatchObject({
-      input: { parent: "SHOP-1" },
+      input: { related: "SHOP-1" },
     });
 
     expect(seen.find((a) => a.type === "tool" && a.tool === "pr_open")).toMatchObject({

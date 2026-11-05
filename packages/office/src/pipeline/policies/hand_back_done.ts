@@ -1,6 +1,7 @@
 import { openSubTickets } from "@outstaff/core";
 import { definePolicy, type PipelineEvent, type PolicyContext } from "@outstaff/policy";
 import { HANDED_IN, withHandedIn } from "./hand-in.js";
+import { inReviewWhole } from "./parent-moves.js";
 import { handedOver, requesterOf, UNLESS_HANDED_OVER } from "./handover.js";
 import { acts } from "./spec.js";
 
@@ -10,11 +11,11 @@ const staysActive = acts({ as: "actor", ops: [{ move: "active" }, { assign: "sel
 
 /**
  * The item's own ticket: to review with the requester; a parent with open sub-tickets stays active with the agent
- * instead, until its last sub-ticket closes.
+ * instead, until every one of them is in review or closed (`subtickets_in_review_move_parent`).
  */
 function ownTicket(event: PipelineEvent, ctx: PolicyContext) {
   const open = ctx.ticket ? openSubTickets(ctx.state, ctx.ticket) : [];
-  if (open.length === 0) {
+  if (open.length === 0 || !inReviewWhole(ctx, ctx.ticket!)) {
     return toReview.decide(event, ctx);
   }
 
@@ -28,7 +29,7 @@ function ownTicket(event: PipelineEvent, ctx: PolicyContext) {
 export const policy = definePolicy({
   id: "hand_back_done",
   summary:
-    "A hand-back as done moves the ticket to review and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work; a ticket with open sub-tickets stays active with the agent instead. The work item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) go to review and to the requester too. A merge round's hand-back leaves the ticket as it is: nothing in it is left for the human.",
+    "A hand-back as done moves the ticket to review and gives it to the requester, for the agent, unless the agent handed the ticket over to someone else during the work; a ticket with open sub-tickets stays active with the agent instead, unless every sub-ticket is in review or closed. The work item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) go to review and to the requester too. A merge round's hand-back leaves the ticket as it is: nothing in it is left for the human.",
   on: ["agent.handed_back"],
   when: {
     all: [
@@ -37,7 +38,7 @@ export const policy = definePolicy({
       { not: { ticket_status: ["blocked", "done", "canceled"] } },
     ],
   },
-  decides: `${toReview.decides}, ${UNLESS_HANDED_OVER}; a ticket with open sub-tickets stays \`active\` with the agent instead; ${HANDED_IN}`,
+  decides: `${toReview.decides}, ${UNLESS_HANDED_OVER}; a ticket with open sub-tickets stays \`active\` with the agent instead, unless every sub-ticket is in review or closed; ${HANDED_IN}`,
   decide: (event, ctx) => {
     const to = requesterOf(ctx);
     const kept = handedOver(ctx, to);

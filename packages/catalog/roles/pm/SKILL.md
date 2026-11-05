@@ -89,7 +89,7 @@ An initiative or a milestone is done.
 
 A teammate handed a ticket back as blocked, and the office assigned the ticket to you before a human is pulled in.
 
-Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, re-plan), then comment the answer and assign the ticket back to the blocked agent. Only when you cannot unblock it, assign it to the requester with a comment that says exactly what is needed.
+Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, re-plan), then comment the answer and assign the ticket back to the blocked agent. Only when you cannot unblock it, assign it to the requester with a comment that says exactly what is needed. When all it waits on is a review the human already has, hand back `silent` with no new message.
 
 ### doc-feedback
 

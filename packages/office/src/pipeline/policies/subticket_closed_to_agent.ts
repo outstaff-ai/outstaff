@@ -41,7 +41,7 @@ export const policy = definePolicy({
     ],
   },
   instruction:
-    "{{ticket}} was {{closed}}. The open sub-tickets of {{parent}}: {{parent.open}}. Continue with the next one in the order you planned, the way the repository asks.",
+    "{{ticket}} was {{closed}}. The open sub-tickets of {{parent}}: {{parent.open}}. Continue with the next one in the order you planned, the way the repository asks. When none is for you to do now (it waits on a human's review, or on a sub-ticket someone else has), you are waiting, not blocked: hand back silent, with no new message.",
   decides:
     "wake `assignee`, else `last_worker`, else the parent's agent (kind `assigned`) on the ticket's parent, the first of them with more unfinished sub-tickets of the parent",
   decide(_event, ctx): Proposal[] {

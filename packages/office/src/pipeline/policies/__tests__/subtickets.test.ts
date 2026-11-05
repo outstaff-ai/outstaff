@@ -57,7 +57,7 @@ describe("a sub-ticket closing", () => {
 
     expect(wake).toMatchObject({
       instruction:
-        "ACME-49 was closed as done. The open sub-tickets of ACME-48: ACME-50, ACME-51. Continue with the next one in the order you planned, the way the repository asks.",
+        "ACME-49 was closed as done. The open sub-tickets of ACME-48: ACME-50, ACME-51. Continue with the next one in the order you planned, the way the repository asks. When none is for you to do now (it waits on a human's review, or on a sub-ticket someone else has), you are waiting, not blocked: hand back silent, with no new message.",
     });
 
     expect(judge("subtickets_closed_move_parent", closed(), w)).toEqual([
@@ -179,6 +179,13 @@ describe("a done hand-back on a parent with open sub-tickets", () => {
     w.tickets!["ACME-48"] = t("ready", "ada.admin", { requester: "ada.admin" });
     expect(judge("hand_back_done", back(), w)).toEqual([
       "act for sam: move ACME-48 to active, assign ACME-48 to agent sam, assign ACME-49 to human ada.admin",
+    ]);
+  });
+
+  it("sends the parent to review with the requester when every sub-ticket is in review or closed", () => {
+    const w = world("active", { "ACME-49": sub("review"), "ACME-50": sub("done") });
+    expect(judge("hand_back_done", back(), w)).toEqual([
+      "act for sam: move ACME-48 to review, assign ACME-48 to human ada.admin, assign ACME-49 to human ada.admin",
     ]);
   });
 

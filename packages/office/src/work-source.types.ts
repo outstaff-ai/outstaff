@@ -14,6 +14,12 @@ export interface HandBackResult {
   /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
   toReview?: string[] | undefined;
 
+  /**
+   * For a `blocked` (or ticket work's `silent`) hand-back the office took as `silent`: the work in flight the ticket
+   * waits on, which is why nothing is blocked. The hand-back's event carries it, so its trace says why.
+   */
+  waitingOn?: string[] | undefined;
+
   /** What the round used, per runtime session. */
   usage?: SessionUsageReport[] | undefined;
 }
@@ -26,9 +32,13 @@ export interface WorkSourceOptions {
 
   /**
    * The work state, whose pull requests a merge's context names. A `done` hand-back that does not say what it leaves
-   * to review (an older agent) is checked against it, and taken as `blocked` when it leaves nothing.
+   * to review (an older agent) is checked against it, and taken as `blocked` when it leaves nothing. A `blocked`
+   * hand-back on a ticket whose open work is all in flight (in review, or with an agent) is taken as `silent`.
    */
-  workState?: Pick<WorkState, "repoPrs" | "ticket" | "prsOfTicket" | "refreshTicket">;
+  workState?: Pick<
+    WorkState,
+    "repoPrs" | "ticket" | "prsOfTicket" | "refreshTicket" | "subTickets"
+  >;
   roles?: RosterOptions["roles"];
 
   /** Where the event pipeline keeps its traces; what each wake's bundle carried is added to them. */

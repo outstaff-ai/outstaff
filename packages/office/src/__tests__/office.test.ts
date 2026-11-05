@@ -217,6 +217,14 @@ describe("createOffice", () => {
       assignee: "u-2",
     });
 
+    // Ticket work finishes silently only while it waits on work in flight: here a sub-ticket in review.
+    await tracker.createIssue({
+      title: "Search index",
+      body: "",
+      status: "review",
+      parent: issue.key,
+    });
+
     await office.parts.intake.pollOnce();
     const offer = await next(sam);
     await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
