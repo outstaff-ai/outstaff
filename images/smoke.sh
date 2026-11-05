@@ -4,7 +4,8 @@
 # Example: images/smoke.sh ost dev agent office   (images default to all four)
 # Images run with a read-only root filesystem and only /tmp and HOME writable, as the docs advise.
 # SMOKE_VERSION, when set, is the OUTSTAFF_VERSION build argument the images were built with: --version must print it.
-# The agent check installs pnpm and yarn from the code toolset with mise, so it needs outbound HTTPS to the tool sources.
+# The agent check installs pnpm and yarn from the code toolset with mise, and Playwright with its Chromium from npm and
+# Playwright's CDN (a few hundred MB), so it needs outbound HTTPS to the tool sources.
 set -euo pipefail
 
 prefix="${1:?usage: smoke.sh <repository-prefix> <tag> [image...]}"
@@ -61,6 +62,7 @@ smoke_agent() {
   expect "$image" '^not setuid$' sh -c 'test -u "$(command -v bwrap)" && echo setuid || echo not setuid'
   expect "$image" 'socat version' socat -V
   smoke_toolset "$image"
+  smoke_browser "$image"
 }
 
 # The runtimes the image's label says it carries are exactly the ones the agent has installed.
@@ -103,6 +105,61 @@ smoke_toolset() {
   for tool in pnpm yarn; do
     grep -Eq "^$tool [0-9]+\.[0-9]+\.[0-9]+" <<<"$out" || fail "$image: '$tool --version' printed '$out'"
     echo "ok   $image: $tool --version resolves after the toolset is installed"
+  done
+}
+
+# The image carries what a headless Chromium needs, but no browser: a repository's Playwright downloads the one it pins.
+# This installs Playwright and its Chromium the way a repository does (no --with-deps, which needs root), as the agent
+# user, then checks both browsers it downloads find every shared library and screenshot a local page. A library
+# missing from the image fails here.
+PLAYWRIGHT_VERSION=1.64.1
+BROWSER_CHECK='
+set -eu
+mkdir -p "$HOME/pw" && cd "$HOME/pw"
+npm init -y >/dev/null
+npm install --no-audit --no-fund --loglevel=error "playwright@$0" >/dev/null
+npx playwright install chromium >/dev/null
+for bin in "$HOME"/.cache/ms-playwright/chromium-*/chrome-linux*/chrome \
+           "$HOME"/.cache/ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell; do
+  [ -x "$bin" ] || { echo "no browser at $bin"; exit 1; }
+  if ldd "$bin" | grep "not found"; then echo "$bin is missing the libraries above"; exit 1; fi
+done
+cat >/tmp/page.html <<HTML
+<!doctype html><meta charset="utf-8">
+<body style="margin:40px;background:#1d4ed8;color:#fff;font:32px sans-serif">
+<h1>acme smoke &#x2713; &#x2192; &#x2605; &#x1F600;</h1><p>The quick brown fox jumps over the lazy dog.</p></body>
+HTML
+cat >shot.mjs <<JS
+import { readFileSync } from "node:fs";
+import { chromium } from "playwright";
+// The default launch runs the headless shell; channel "chromium" runs the full browser in its new headless mode.
+for (const channel of ["chromium-headless-shell", "chromium"]) {
+  const browser = await chromium.launch({ channel });
+  const page = await browser.newPage({ viewport: { width: 800, height: 400 } });
+  await page.goto("file:///tmp/page.html");
+  await page.screenshot({ path: "/tmp/" + channel + ".png" });
+  await browser.close();
+  const png = readFileSync("/tmp/" + channel + ".png");
+  // A page of one flat colour compresses to a few hundred bytes; text and an emoji take tens of kilobytes.
+  const ok = png.subarray(1, 4).toString() === "PNG" && png.length > 10000;
+  console.log(channel + " " + browser.version() + " " + png.length + " " + (ok ? "ok" : "too small"));
+}
+JS
+node shot.mjs
+'
+
+smoke_browser() {
+  local image="$1" out channel
+  # No browser in the image itself: as root, and in the image's volumes too (find -xdev does not cross into them).
+  out="$(docker run --rm --user 0 "$(ref "$image")" sh -c \
+    'find / /home/outstaff /tmp -xdev \( -name ms-playwright -o -name "chrome-headless-shell*" -o -name "chrome-linux*" \) -print -quit; command -v chromium chrome' 2>&1)" || true
+  [ -z "$out" ] || fail "$image: the image ships a browser: $out"
+  echo "ok   $image: no browser in the image"
+  out="$(run_exec "$image" sh -c "$BROWSER_CHECK" "$PLAYWRIGHT_VERSION" 2>&1)" \
+    || fail "$image: Playwright's Chromium did not take a screenshot: $out"
+  for channel in chromium-headless-shell chromium; do
+    grep -Eq "^$channel [0-9.]+ [0-9]+ ok$" <<<"$out" || fail "$image: the $channel screenshot: $out"
+    echo "ok   $image: $(grep "^$channel " <<<"$out") (Playwright $PLAYWRIGHT_VERSION, as the agent user)"
   done
 }
 

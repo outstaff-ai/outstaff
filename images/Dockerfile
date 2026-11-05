@@ -68,13 +68,45 @@ ARG BUBBLEWRAP_VERSION=0.8.0-2+deb12u1
 LABEL work.outstaff.runtimes="claude-agent-sdk"
 ARG SOCAT_VERSION=1.7.4.4-2
 ARG CURL_VERSION=7.88.1-10+deb12u15
+# What a headless Chromium needs to run, but no browser: a repository's own Playwright downloads the browser it pins
+# (`npx playwright install chromium`, without --with-deps, which needs root). These are the shared libraries of
+# Playwright's install-deps for chromium and chromium-headless-shell on Debian 12 (playwright-core 1.64.1, nativeDeps,
+# the same list on amd64 and arm64), its fontconfig and freetype, and fonts for Latin text (Liberation), symbols
+# (DejaVu) and emoji (Noto Color Emoji). Each version is the same on both architectures.
+ARG BROWSER_PACKAGES="\
+libasound2=1.2.8-1+b1 \
+libatk-bridge2.0-0=2.46.0-5 \
+libatk1.0-0=2.46.0-5 \
+libatspi2.0-0=2.46.0-5 \
+libcairo2=1.16.0-7 \
+libcups2=2.4.2-3+deb12u9 \
+libdbus-1-3=1.14.10-1~deb12u1 \
+libdrm2=2.4.114-1+b1 \
+libgbm1=22.3.6-1+deb12u2 \
+libglib2.0-0=2.74.6-2+deb12u9 \
+libnspr4=2:4.35-1 \
+libnss3=2:3.87.1-1+deb12u4 \
+libpango-1.0-0=1.50.12+ds-1 \
+libx11-6=2:1.8.4-2+deb12u2 \
+libxcb1=1.15-1 \
+libxcomposite1=1:0.4.5-1 \
+libxdamage1=1:1.1.6-1 \
+libxext6=2:1.3.4-1+b1 \
+libxfixes3=1:6.0.0-2 \
+libxkbcommon0=1.5.0-1 \
+libxrandr2=2:1.5.2-2+b1 \
+libfontconfig1=2.14.1-4 \
+libfreetype6=2.12.1+dfsg-5+deb12u4 \
+fonts-liberation=1:1.07.4-11 \
+fonts-dejavu-core=2.37-6 \
+fonts-noto-color-emoji=2.042-0+deb12u1"
 # Claude Code runs each of the agent's commands in a bubblewrap sandbox (user and PID namespaces, a fresh /proc) so
 # they cannot read its credential; it needs socat for that sandbox too. bwrap must not be setuid: it works through an
 # unprivileged user namespace, which the container's seccomp and AppArmor profiles allow (examples/k8s).
 # curl is for the agent's own commands (runbooks, health checks, APIs); what it reaches is the network policy's call.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends "bubblewrap=${BUBBLEWRAP_VERSION}" "socat=${SOCAT_VERSION}" \
-      "curl=${CURL_VERSION}" \
+      "curl=${CURL_VERSION}" ${BROWSER_PACKAGES} \
  && rm -rf /var/lib/apt/lists/* \
  && test ! -u /usr/bin/bwrap
 # mise installs the tools a team's toolsets ask for at agent start; keep its data on the home volume.
