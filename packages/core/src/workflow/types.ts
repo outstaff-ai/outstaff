@@ -55,6 +55,9 @@ export interface WorkflowPr {
   title: string;
   url?: string;
   headRef: string;
+
+  /** The commit its branch points at, when the office has read it. */
+  head?: string;
   baseRef: string;
   draft: boolean;
   state: "open" | "closed" | "merged";

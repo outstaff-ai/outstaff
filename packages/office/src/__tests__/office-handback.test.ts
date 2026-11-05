@@ -25,41 +25,68 @@ describe("the hand-back of an item", () => {
       workState: {
         refreshWorkers: async () => {},
         refreshTicket: async () => {},
+        refreshPrsOf: async () => {},
       } as unknown as WorkState,
       judge: async (event) => void judged.push(event),
       log: silentLogger,
     });
 
-  const done = async () => {
+  const done = async (o: { subject?: { type: string; ref: string }; kind?: string } = {}) => {
     const w = await store.enqueue({
       person: "sam",
-      kind: "assigned",
+      kind: o.kind ?? "assigned",
       title: "t",
       trigger: "human",
-      subject: { type: "ticket", ref: "ACME-1" },
+      subject: o.subject ?? { type: "ticket", ref: "ACME-1" },
     });
 
     return store.updateItem(w.id, { status: "done" });
   };
 
-  const base = (workItem: string) => ({
+  const base = (workItem: string, kind = "assigned") => ({
     workItem,
-    kind: "assigned",
+    kind,
     status: "done",
     summary: "Built it.",
     created: [],
     opened: [],
   });
 
-  it("says when the work came from a chat thread, which gets its result", async () => {
+  const fromChat = (id: string, requester: string) =>
+    store.upsertSubject(CHAT_ORIGIN_SUBJECT, id, {
+      channel: "C1",
+      thread: "T1",
+      requester: { id: requester },
+      claimed: [],
+    });
+
+  it("names the chat members of the threads the round's own result goes to", async () => {
     const plain = await done();
     await handedBack()(plain, { summary: "Built it.", status: "done" });
-    const fromChat = await done();
-    await store.upsertSubject(CHAT_ORIGIN_SUBJECT, fromChat.id, { channel: "C1", claimed: [] });
-    await handedBack()(fromChat, { summary: "Built it.", status: "done" });
+    const filed = await done();
+    await fromChat(filed.id, "U0ADA");
+    await handedBack()(filed, { summary: "Built it.", status: "done" });
     expect(judged.map((e) => e.data)).toEqual([
       { ...base(plain.id) },
-      { ...base(fromChat.id), chat: true },
+      { ...base(filed.id), chat: ["U0ADA"] },
     ]);
+  });
+
+  it("gives a later round the ticket as the round found it and the last notice about it", async () => {
+    await store.upsertSubject("pr", "pr:9", { ref: { number: 9 }, ticket: "ACME-1" });
+    const merge = await done({ kind: "merge", subject: { type: "pr", ref: "pr:9" } });
+    await store.upsertSubject("round_start", merge.id, {
+      ticket: "ACME-1",
+      status: "review",
+      assignee: { id: "ada.admin", kind: "human" },
+    });
+
+    await store.upsertSubject("handoff_notified", "ACME-1", { human: "ada.admin", prs: {} });
+    await handedBack()(merge, { summary: "Built it.", status: "done" });
+    expect(judged.at(-1)?.data).toEqual({
+      ...base(merge.id, "merge"),
+      before: { status: "review", assignee: { id: "ada.admin", kind: "human" } },
+      notified: { human: "ada.admin", prs: {} },
+    });
   });
 });

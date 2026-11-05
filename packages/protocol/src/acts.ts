@@ -83,9 +83,19 @@ export const actOpSchema = z.discriminatedUnion("op", [
       .max(4000)
       .describe("The message, in Markdown, as the agent sends it in a direct message."),
   }),
+  z.strictObject({
+    op: z.literal("chat_reply"),
+    channel: z.string().min(1).max(200).describe("The chat channel the thread is in."),
+    thread: z.string().min(1).max(200).describe("The thread to reply in: its first message's id."),
+    body: z
+      .string()
+      .min(1)
+      .max(4000)
+      .describe("The message, in Markdown, as the agent posts it in the thread."),
+  }),
 ]);
 
-/** Tracker or knowledge-base changes, or direct messages, for the agent to make as itself, without a model run. */
+/** Tracker or knowledge-base changes, or chat messages, for the agent to make as itself, without a model run. */
 export const queuedActSchema = z.strictObject({
   id: z
     .string()

@@ -129,6 +129,73 @@ describe("the notice desk", () => {
     ]);
   });
 
+  it("posts a notice about a ticket tied to a chat thread with the human as a reply there, not a direct message", async () => {
+    const h = deskHarness();
+    h.item({ id: "chat-1", kind: "chat", with: "U0ADA" });
+    h.item({ id: "w-1", kind: "assigned", parentId: "chat-1", on: { ticket: "ACME-1" } });
+    // Another ticket filed from a thread with someone else goes in the direct message.
+    h.item({ id: "chat-2", kind: "chat", with: "U0MONA" });
+    h.item({ id: "w-2", kind: "assigned", parentId: "chat-2", on: { ticket: "ACME-2" } });
+    // A thread that only mentioned a ticket ties nothing.
+    h.item({
+      id: "chat-3",
+      kind: "chat",
+      with: "U0ADA",
+      on: { ticket: "ACME-3", role: "mentioned" },
+    });
+
+    // A later round with a new head on ACME-1, and notices on the other two.
+    await h.desk.add(HAND_BACK, "e:rebase");
+    await h.desk.add(notice({ ticket: "ACME-2" }), "e:2");
+    await h.desk.add(notice({ ticket: "ACME-3" }), "e:3");
+    await h.pass(31_000);
+    expect(h.sent.map((s) => s.act.ops)).toEqual([
+      [
+        {
+          op: "chat_reply",
+          channel: "D-sam",
+          thread: "chat-1",
+          body: "Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)\nAdded the greeting. @U0BOSS please look.",
+        },
+      ],
+      [
+        {
+          op: "chat_dm",
+          to: "U0ADA",
+          body: [
+            "Waiting for you:",
+            "- Ready for your review: [ACME-2](https://tracker.example/ACME-2)",
+            "- Ready for your review: [ACME-3](https://tracker.example/ACME-3)",
+          ].join("\n"),
+        },
+      ],
+    ]);
+
+    expect(h.sent[0]?.act.id).toBe("notify:e:rebase:sam:ada.admin:D-sam:chat-1");
+    expect(h.logged).toContain("notify: sam tells ada.admin in chat (thread D-sam:chat-1)");
+  });
+
+  it("posts nothing in the thread for a round that reported its own result there", async () => {
+    const h = deskHarness();
+    h.item({ id: "chat-1", kind: "chat", with: "U0ADA" });
+    h.item({ id: "w-1", kind: "assigned", parentId: "chat-1", on: { ticket: "ACME-1" } });
+    await h.desk.add(notice({ prs: [PR9] }), "e:pr");
+    await h.desk.add(notice({ prs: [PR9], told: true }), "e:back");
+    await h.pass(31_000);
+    expect(h.sent).toEqual([]);
+  });
+
+  it("remembers what each notice about a ticket put in front of its human, told or not", async () => {
+    const h = deskHarness();
+    const seen = { human: "ada.admin", prs: { "acme/shop#9": "a1" } };
+    await h.desk.add(notice({ prs: [PR9], seen }), "e:back");
+    await h.desk.add(notice({ ticket: "ACME-2", told: true, seen: { ...seen, prs: {} } }), "e:2");
+    await h.desk.add(notice({ ticket: undefined, seen }), "e:no-ticket");
+    expect(h.subjects.get("handoff_notified/ACME-1")?.data).toEqual(seen);
+    expect(h.subjects.get("handoff_notified/ACME-2")?.data).toEqual({ ...seen, prs: {} });
+    expect([...h.subjects.keys()].filter((k) => k.startsWith("handoff_notified/"))).toHaveLength(2);
+  });
+
   it("says what is needed from the agent's latest comment when a ticket is given to a human with no hand-back", async () => {
     const author = (id: string) => ({ id, name: id, kind: "agent" as const });
     const comment = (id: string, by: string, body: string, at: string) => ({

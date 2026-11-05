@@ -153,6 +153,23 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       });
     });
 
+    it("reads a ticket's open pull requests again for a head pushed since, and leaves others alone", async () => {
+      const issue = await tracker.createIssue({ title: "Search", body: "", assignee: "u-sam" });
+      const p = await pr({
+        title: "Add search",
+        head: { ref: `sam/${issue.key.toLowerCase()}-x` },
+      });
+
+      await ws.apply(prEvent("pr.opened", p.number), meta());
+      const head = ws.prsOfTicket(issue.key)[0]?.headSha;
+      await vcs.seed.push(REPO, p.number, SAM);
+      await ws.refreshPrsOf("ACME-404");
+      expect(ws.prsOfTicket(issue.key)[0]?.headSha).toBe(head);
+      await ws.refreshPrsOf(issue.key);
+      expect(ws.prsOfTicket(issue.key)[0]?.headSha).not.toBe(head);
+      expect(ws.pullRequest(prRef(p.number))?.head).toBe(ws.prsOfTicket(issue.key)[0]?.headSha);
+    });
+
     it("raises pr.linked once when an open pull request is first linked after it was opened", async () => {
       const p = await pr({ title: "ACME-1: search" });
       await ws.apply(prEvent("pr.opened", p.number), meta());

@@ -7,7 +7,7 @@ import { blockedAgent, inRound } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
 import { createMergeChecks } from "./merge-checks.js";
-import { visible } from "./open.js";
+import { isOpen, visible } from "./open.js";
 import { createPrs } from "./prs.js";
 import { readyTickets } from "./ready.js";
 import { createRequesters } from "./requesters.js";
@@ -180,6 +180,19 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
       const ctx: RefreshCtx = { fresh: [] };
       try {
         await locked(() => unblockOps.refreshAndUnblock(ctx, key, { by }));
+      } finally {
+        await deliver(ctx.fresh);
+      }
+    },
+
+    async refreshPrsOf(key) {
+      const ctx: RefreshCtx = { fresh: [] };
+      try {
+        await locked(async () => {
+          for (const rec of [...prs.values()].filter((p) => p.ticket === key && isOpen(p))) {
+            await refreshPr(ctx, rec.ref);
+          }
+        });
       } finally {
         await deliver(ctx.fresh);
       }

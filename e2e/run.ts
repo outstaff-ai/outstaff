@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done, and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2325,6 +2325,44 @@ async function main() {
   // ---- 12. merge on approval (policies.merge.on_approval): the approval wakes the author to decide (kind `merge`),
   // with the merge context; nothing else is approved, so it merges: `ost pr merge` joins the merge queue, the queue
   // merges it and the ticket is done
+  // First a review round on it: the ticket was filed from a chat thread, so the new head it pushes is told as a reply
+  // in that thread, never in a direct message.
+  const reviewed12 = "Also say who signs off.";
+  const pull12 = (await state()).github.pulls.find((p: Json) => p.number === made.pr.number);
+  const sha12 = pull12.head.sha;
+  await stub("POST", `/_test/pulls/${made.pr.number}/review`, {
+    state: "commented",
+    body: reviewed12,
+  });
+
+  await until(`the review on #${made.pr.number} answered, ${made.t.key} back in review`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.number === made.pr.number);
+    const t = s.tickets.find((x: Json) => x.key === made.t.key);
+    const reply = pr.conversation.find((c: Json) => c.body.includes(reviewed12));
+    return reply && pr.head.sha !== sha12 && t.status === "In Review" && t.assignee !== "sam"
+      ? true
+      : undefined;
+  });
+
+  const inThread12 = (s: Json) =>
+    s.chat.posts.filter(
+      (p: Json) =>
+        p.agent === "sam" &&
+        p.thread === request.id &&
+        p.text.startsWith(`Ready for your review: [${made.t.key}](`),
+    );
+
+  const notice12 = await until(
+    `the review round's notice in the thread ${made.t.key} came from`,
+    (s) => inThread12(s)[0],
+  );
+
+  assertEq(
+    notice12.text.includes(`acme/shop#${made.pr.number}`),
+    true,
+    `the thread notice names the pull request: ${notice12.text}`,
+  );
+
   const before12 = (await state()).github.pulls.find((p: Json) => p.number === made.pr.number);
   assertEq(before12.autoMerge, false, "marking the pull request ready set nothing to merge");
   assertEq(before12.queued, false, "nothing joined the merge queue before the approval");
@@ -2348,6 +2386,36 @@ async function main() {
   assertEq(done12.state, "merged", "the pull request merged");
   step(
     `merge on approval: #${made.pr.number} approved -> its author woken to merge, it joined the queue, merged, ${made.t.key} done`,
+  );
+
+  // Work filed from a chat thread is told in that thread: its filing round, the attached round, the review round and
+  // the merge round sent the human no direct message about it, and the merge round, with nothing new, nothing at all.
+  await until("the agent idle after the merge", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${made.t.key} merged`);
+  const told12 = (await state()).chat.posts.filter(
+    (p: Json) => p.agent === "sam" && p.text.includes(made.t.key),
+  );
+
+  assertEq(
+    told12.filter((p: Json) => p.channel === "D-sam-U0ADA00001" && !p.thread).length,
+    0,
+    `no direct message about ${made.t.key}: ${JSON.stringify(told12.map((p: Json) => p.text))}`,
+  );
+
+  assertEq(
+    inThread12(await state()).length,
+    1,
+    `one notice about ${made.t.key} in its thread: the review round's new head, nothing for the merge round`,
+  );
+
+  step(
+    `one channel: ${made.t.key}, filed from a chat thread, went through review and merge rounds -> the new head told once in the thread, no direct message`,
   );
 
   // ---- 13. two approved pull requests that change the same file: one merge at a time. The older one merges; the

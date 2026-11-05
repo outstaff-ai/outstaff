@@ -98,6 +98,7 @@ export const proposalSchema = z.discriminatedUnion("type", [
       .optional(),
     text: z.string().optional(),
     told: z.boolean().optional(),
+    seen: z.strictObject({ human: text, prs: z.record(z.string(), z.string()) }).optional(),
     reason: text,
   }),
 ]);

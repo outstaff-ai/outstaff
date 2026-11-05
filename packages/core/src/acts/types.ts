@@ -8,7 +8,8 @@ export type ActTarget = { kind: "agent" | "human"; id: string };
 
 /**
  * A tracker or knowledge-base change, or a direct message in chat, made with the acting agent's own identity.
- * `chat_dm` sends `body` (Markdown) to the chat member `to` (their `identities.chat`) in a direct message.
+ * `chat_dm` sends `body` (Markdown) to the chat member `to` (their `identities.chat`) in a direct message;
+ * `chat_reply` posts it as a reply in the thread `thread` of the chat channel `channel`.
  */
 export type ActOp =
   | { op: "move"; ticket: string; to: CanonicalStatus }
@@ -18,7 +19,8 @@ export type ActOp =
   | { op: "link_pr"; ticket: string; pr: PullRequestToLink }
   | { op: "link_doc"; ticket: string; doc: string }
   | { op: "set_field"; ticket: string; field: string; value: number | null }
-  | { op: "chat_dm"; to: string; body: string };
+  | { op: "chat_dm"; to: string; body: string }
+  | { op: "chat_reply"; channel: string; thread: string; body: string };
 
 /** What applying an act did: one line per change made, and the error that stopped it, if any. */
 export interface ActOutcome {

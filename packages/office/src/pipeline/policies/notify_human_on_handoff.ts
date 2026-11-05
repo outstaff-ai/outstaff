@@ -1,5 +1,11 @@
 import type { WorkflowPr } from "@outstaff/core";
-import { definePolicy, type NoticePr, type PolicyContext, type Proposal } from "@outstaff/policy";
+import {
+  definePolicy,
+  type NoticePr,
+  type NoticeSeen,
+  type PolicyContext,
+  type Proposal,
+} from "@outstaff/policy";
 import { handedIn } from "./hand-in.js";
 import { handedOver, requesterOf } from "./handover.js";
 
@@ -11,12 +17,59 @@ const noticePr = (pr: WorkflowPr): NoticePr => ({
   title: pr.title,
 });
 
+const openForReview = (ctx: PolicyContext, ticket: string) =>
+  ctx.state.pullRequestsOf(ticket).filter((p) => p.state === "open" && !p.draft);
+
 /** The ticket's pull requests open for review, to link in the message. */
-const reviewPrs = (ctx: PolicyContext, ticket: string) =>
-  ctx.state
-    .pullRequestsOf(ticket)
-    .filter((p) => p.state === "open" && !p.draft)
-    .map(noticePr);
+const reviewPrs = (ctx: PolicyContext, ticket: string) => openForReview(ctx, ticket).map(noticePr);
+
+/** What a notice about the ticket puts in front of the human: the head of each pull request open for review. */
+const seenOf = (ctx: PolicyContext, ticket: string, human: string): NoticeSeen => ({
+  human,
+  prs: Object.fromEntries(openForReview(ctx, ticket).map((p) => [noticePr(p).ref, p.head ?? ""])),
+});
+
+/**
+ * Whether the round's own result goes to a chat thread with the human: the hand-back names the chat members whose
+ * threads the item came from or was attached from, where the chat desk posts its result.
+ */
+function inThread(ctx: PolicyContext, human: string): boolean {
+  const members = ctx.event.data["chat"];
+  const chat = ctx.options.humans?.find(
+    (h) => h.identities.tracker === human || h.identities.vcs === human || h.name === human,
+  )?.identities.chat;
+
+  return Array.isArray(members) && chat !== undefined && members.includes(chat);
+}
+
+const sameHolder = (holder: unknown, human: string) =>
+  typeof holder === "object" &&
+  holder !== null &&
+  (holder as { status?: unknown }).status === "review" &&
+  (holder as { assignee?: { id?: unknown } }).assignee?.id === human;
+
+/**
+ * Why a hand-back puts nothing new in front of the human, decided from the state, not from the agent's words: the round
+ * found the ticket in review with them already, and no pull request is open for review with a head they were not told
+ * of (`data.notified`, the last notice about the ticket). A merge round on a merged pull request, or a rebase that
+ * pushed nothing, is such a round. Undefined when there is something new.
+ */
+function nothingNew(ctx: PolicyContext, ticket: string, seen: NoticeSeen): string | undefined {
+  if (!sameHolder(ctx.event.data["before"], seen.human)) {
+    return undefined;
+  }
+
+  const heads = Object.entries(seen.prs);
+  if (heads.length === 0) {
+    return `${ticket} was in review with ${seen.human} already, and no pull request of it is open for review`;
+  }
+
+  const notified = ctx.event.data["notified"] as NoticeSeen | undefined;
+  const told = notified?.human === seen.human ? notified.prs : undefined;
+  return told && heads.every(([ref, head]) => told[ref] === head)
+    ? `${ticket} was in review with ${seen.human} already, with the pull request heads they were told of`
+    : undefined;
+}
 
 /** The human a hand-back as done gives the ticket to: the requester, or the human the agent handed it over to. */
 function handedTo(ctx: PolicyContext, ticket: string): string | undefined {
@@ -53,21 +106,26 @@ function handBack(ctx: PolicyContext): Proposal[] {
     );
   }
 
-  // The chat thread the work came from gets the result, which tells the requester.
-  const told = ctx.event.data["chat"] === true && human === requesterOf(ctx);
-  const where = told ? ", in the chat thread the work came from" : "";
+  // The round posts its result in a chat thread with the human: nothing more.
+  const told = inThread(ctx, human);
+  const seen = seenOf(ctx, ticket, human);
+  const stale = told ? undefined : nothingNew(ctx, ticket, seen);
+  const where = told ? ", in the chat thread the round reports to" : "";
   return [
-    {
-      type: "notify",
-      as: ctx.event.actor.id,
-      human,
-      need: "review",
-      ticket,
-      prs: reviewPrs(ctx, ticket),
-      ...summaryOf(ctx),
-      ...(told ? { told } : {}),
-      reason: `${ctx.event.actor.id} handed ${ticket} back to ${human} for review${where}`,
-    },
+    stale
+      ? { type: "drop", reason: `nothing new for ${human}: ${stale}` }
+      : {
+          type: "notify",
+          as: ctx.event.actor.id,
+          human,
+          need: "review",
+          ticket,
+          prs: reviewPrs(ctx, ticket),
+          ...summaryOf(ctx),
+          ...(told ? { told } : {}),
+          seen,
+          reason: `${ctx.event.actor.id} handed ${ticket} back to ${human} for review${where}`,
+        },
     ...handedInNotices(ctx),
   ];
 }
@@ -82,7 +140,7 @@ function handedInNotices(ctx: PolicyContext): Proposal[] {
     return [];
   }
 
-  const told = ctx.event.data["chat"] === true;
+  const told = inThread(ctx, human);
   return handedIn(ctx, human).map((key): Proposal => ({
     type: "notify",
     as: ctx.event.actor.id,
@@ -151,7 +209,7 @@ function opened(ctx: PolicyContext): Proposal[] {
 export const policy = definePolicy({
   id: "notify_human_on_handoff",
   summary:
-    "When work lands on a human, the agent tells them in a direct message in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, listing every ticket it gives them (the item's sub-tickets in review and the tickets of the pull requests it opened too), a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. The office batches one agent's messages to one human.",
+    "When work lands on a human, the agent tells them in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, listing every ticket it gives them (the item's sub-tickets in review and the tickets of the pull requests it opened too), a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. It is a direct message, or a reply in the chat thread of the agent with that human the ticket's work is tied to (work filed or attached from chat, and its later rounds). Nothing more is sent for a round that posts its own result in a chat thread with that human, nor for a round that put nothing new in front of them: it found the ticket in review with them and left no pull request open for review with a head they were not told of, such as a merge round on a merged pull request or a rebase that pushed nothing. The office batches one agent's messages to one human.",
   on: ["agent.handed_back", "ticket.assigned", "pr.opened"],
   when: {
     any: [
@@ -172,7 +230,7 @@ export const policy = definePolicy({
     ],
   },
   decides:
-    "notify the human in chat, as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the work came from a chat thread, which gets the result), with every other ticket of the item the hand-back gives the requester for review, the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff`",
+    "notify the human in chat (a direct message, or a reply in the chat thread with them the ticket's work is tied to), as the agent: the requester on a hand-back as done (or the human the agent handed the ticket over to; nothing more when the round posts its own result in a chat thread with that human; nothing at all when the round found the ticket in review with them and left no pull request open for review with a head the last notice did not name), with every other ticket of the item the hand-back gives the requester for review, the assignee when an agent gives a ticket in review or blocked to a human (not the echo of an office act, nor the agent blocked on it), the requester of the ticket of an agent's pull request opened for review; on `policies.notify_handoff`",
   decide(event, ctx) {
     if (event.type === "pr.opened") {
       return opened(ctx);

@@ -98,13 +98,24 @@ const chatDm: Make<"chat_dm"> = async (op, ports) => {
   return `sent a direct message to ${op.to}`;
 };
 
+const chatReply: Make<"chat_reply"> = async (op, ports) => {
+  const chat = need(ports.chat, "chat");
+  await chat.post(op.channel, op.body, { thread: op.thread });
+  return `replied in chat thread ${op.channel}:${op.thread}`;
+};
+
 /** What a failed change was, for the error. */
 function what(op: ActOp): string {
-  if (op.op === "comment") {
-    return "comment";
+  switch (op.op) {
+    case "comment":
+      return "comment";
+    case "chat_dm":
+      return `chat_dm ${op.to}`;
+    case "chat_reply":
+      return `chat_reply ${op.channel}:${op.thread}`;
+    default:
+      return `${op.op} ${op.ticket}`;
   }
-
-  return op.op === "chat_dm" ? `chat_dm ${op.to}` : `${op.op} ${op.ticket}`;
 }
 
 /** How each kind of change is made. */
@@ -117,6 +128,7 @@ const MAKERS: { [K in ActOp["op"]]: Make<K> } = {
   link_doc: linkDoc,
   set_field: setField,
   chat_dm: chatDm,
+  chat_reply: chatReply,
 };
 
 function one(op: ActOp, ports: ActPorts, member: Member): Promise<string> {

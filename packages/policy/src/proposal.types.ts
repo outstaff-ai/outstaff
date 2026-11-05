@@ -79,6 +79,16 @@ export interface NoticePr {
 }
 
 /**
+ * What a notice about a ticket put in front of the human: who, and the head commit of each of its pull requests open
+ * for review, by `owner/name#n`. The office keeps the last one per ticket and hands it to the next hand-back as
+ * `data.notified`, so a round that leaves the same heads with the same human tells them nothing new.
+ */
+export interface NoticeSeen {
+  human: string;
+  prs: Record<string, string>;
+}
+
+/**
  * Tell a human in chat that work landed on them: a direct message from the agent's own chat account. The office
  * holds a human's notices from one agent for a short while, and while that agent's round on the ticket still runs,
  * then sends them as one message.
@@ -105,6 +115,9 @@ export interface NotifyProposal {
    * ticket are dropped.
    */
   told?: boolean | undefined;
+
+  /** What the notice puts in front of the human, for the office to remember for the ticket. */
+  seen?: NoticeSeen | undefined;
   reason: string;
 }
 
