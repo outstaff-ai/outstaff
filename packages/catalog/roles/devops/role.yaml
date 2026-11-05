@@ -1,6 +1,6 @@
 name: devops
 title: DevOps
-summary: Changes infrastructure through pull requests, runs deploys and keeps runbooks.
+summary: Owns deploys, DNS, CI and infrastructure as code; changes infrastructure through pull requests, runs deploys and keeps runbooks.
 permissions: infra
 needs:
   - vcs.pullRequests

@@ -73,6 +73,12 @@ export interface OfficeClient {
   work(q: { workItemId?: string }): Promise<OfficeWorkItem[]>;
   team(): Promise<OfficeTeam>;
 
+  /**
+   * The handle of the person who gets work for a role: the least busy person with it, never the caller for its own
+   * role. Refused when nobody fits.
+   */
+  resolveRole(role: string): Promise<string>;
+
   /** Puts one of the caller's queued items at a place in the queue. */
   place(workItemId: string, placement: Placement): Promise<OfficeWorkItem>;
 
@@ -148,6 +154,7 @@ export interface OfficeClient {
 
 export interface FakeOffice extends OfficeClient {
   asked: { to: string; question: string; workItemId?: string }[];
+  rolesResolved: string[];
   answered: { questionId: string; answer: string }[];
   placed: { workItemId: string; placement: Placement }[];
   linked: { workItemId: string; ticket: string; request: string; say?: string }[];

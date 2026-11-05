@@ -226,6 +226,25 @@ describe("conditions", () => {
     expect(ok({ blocked_agent: false }, noTicket())).toBe(true);
   });
 
+  it("read the open tickets that block the ticket", () => {
+    const waits = world({ status: "blocked", ticket: { openBlockers: ["ACME-2", "ACME-4"] } });
+    expect(ok({ open_blockers: true }, ev("ticket.assigned", tk), waits)).toBe(true);
+    expect(holds({ open_blockers: true }, ev("ticket.assigned", tk), waits).detail).toBe(
+      "ACME-2, ACME-4 still block the ticket, wanted an open blocker",
+    );
+
+    const one = world({ status: "blocked", ticket: { openBlockers: ["ACME-2"] } });
+    expect(holds({ open_blockers: false }, ev("ticket.assigned", tk), one).detail).toBe(
+      "ACME-2 still blocks the ticket, wanted none",
+    );
+
+    expect(holds({ open_blockers: true }).detail).toBe(
+      "no open ticket blocks the ticket, wanted an open blocker",
+    );
+
+    expect(ok({ open_blockers: false }, noTicket())).toBe(true);
+  });
+
   it("read whether the actor was in a round on the ticket when the event happened", () => {
     const rounds = world({
       ticket: {

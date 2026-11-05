@@ -1,6 +1,6 @@
 name: developer
 title: Developer
-summary: Implements tickets, fixes review feedback, keeps stacks rebased and tests the work.
+summary: Owns app and library code, including frontend tracking and instrumentation; implements tickets, fixes review feedback, keeps stacks rebased and tests the work.
 permissions: code
 needs:
   - vcs.pullRequests

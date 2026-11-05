@@ -1,9 +1,8 @@
-import { parseRepoUrl, repoKey, vcsAgentLogins } from "@outstaff/core";
-import type { PrRef, RepoRef } from "@outstaff/core";
+import { parseRepoUrl, repoKey, vcsAgentLogins, type PrRef, type RepoRef } from "@outstaff/core";
 import type { Cancel } from "#/types.js";
 import type { RefreshCtx, WorkstateCore } from "./core.types.js";
 import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
-import { blockedAgent, inRound } from "./blocked.js";
+import { blockedAgent, inRound, openBlockers } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
 import { createMergeChecks } from "./merge-checks.js";
@@ -270,6 +269,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     lastWorker: (t) => workers.get(t),
     blockedAgent: (t) => blockedAgent(tickets.get(t), work.get(t) ?? []),
+    openBlockers: (t) => openBlockers(tickets.get(t)),
     inRound: (t, person, at) => inRound(work.get(t) ?? [], person, at),
     requester: (t) => tickets.get(t)?.requester,
     hasLabel: (t, label) => tickets.get(t)?.labels.includes(label) ?? false,

@@ -7,6 +7,14 @@ export const UNFINISHED: CanonicalStatus[] = ["backlog", "ready", "active", "rev
 export const HUMAN: PipelineCondition = { actor_kind: "human" };
 export const NOT_CLOSED: PipelineCondition = { not: { ticket_status: ["done", "canceled"] } };
 
+/**
+ * Not a ticket in the blocked status because a ticket that blocks it is still open, which waits for that ticket, not
+ * for work. When it fails, the trace names the open blockers.
+ */
+export const NOT_WAITING_ON_BLOCKERS: PipelineCondition = {
+  any: [{ not: { ticket_status: ["blocked"] } }, { open_blockers: false }],
+};
+
 /** A blocked ticket an agent is blocked on: a comment on it goes to that agent. */
 export const BLOCKED_ON_AGENT: PipelineCondition = { blocked_agent: true };
 

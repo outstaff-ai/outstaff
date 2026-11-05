@@ -55,7 +55,7 @@ export function createChatDesk(opts: ChatDeskOptions): ChatRequests {
       await store.appendJournal(
         workItemId,
         "office",
-        `Filed ${ticket} for ${assignee}: their work, not yours. The assignment wakes them; this session is not tied to it.`,
+        `Filed ${ticket} for ${assignee}; this session is not tied to it.`,
       );
     },
 

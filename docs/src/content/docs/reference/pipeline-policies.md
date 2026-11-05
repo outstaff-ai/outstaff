@@ -252,7 +252,7 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### assigned_to_assignee
 
-A ticket assigned to an agent, by anyone but that agent, wakes the agent.
+A ticket assigned to an agent, by anyone but that agent, wakes the agent. A ticket that is blocked because a ticket that blocks it is still open wakes no one: `unblocked_to_ready` wakes the agent when its last blocker closes.
 
 Listens to `ticket.assigned`, `ticket.created`. Decides: wake `assignee` (kind `assigned`).
 
@@ -266,6 +266,10 @@ When:
     - `actor_is: assignee`
   - not:
     - `ticket_status: done, canceled`
+  - any of:
+    - not:
+      - `ticket_status: blocked`
+    - `open_blockers: false`
 
 Instruction:
 

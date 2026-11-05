@@ -1,5 +1,7 @@
 import { PortError, type Issue, type Member, type Tracker } from "@outstaff/core";
 import { z } from "zod";
+import { requireOffice } from "./support.js";
+import type { ResolvedAssignee } from "./ticket-create.types.js";
 import type { AgentEnv } from "./types.js";
 
 export const key = z
@@ -33,3 +35,55 @@ export async function memberFor(env: AgentEnv, tracker: Tracker, to: string): Pr
 
   return hit;
 }
+
+/** The prefix of an assignee that names a role rather than a person: `role:developer`. */
+export const ROLE_PREFIX = "role:";
+
+/** The teammate's tracker member: by the tracker identity team.yaml gives them, else by their handle. */
+export async function teammateOnTracker(
+  env: AgentEnv,
+  tracker: Tracker,
+  handle: string,
+): Promise<Member> {
+  const identity = env.team.people.find((p) => p.handle === handle)?.identities?.tracker;
+  if (!identity) {
+    return memberFor(env, tracker, handle);
+  }
+
+  const hit = (await tracker.members()).find((m) => m.id === identity || m.username === identity);
+  if (!hit) {
+    throw new PortError(
+      "not_found",
+      `No tracker member matches ${handle}'s tracker identity "${identity}".`,
+    );
+  }
+
+  return hit;
+}
+
+/**
+ * The member an assignee names. `role:<role>` goes to the person the office routes the role to, as `ost ask` routes a
+ * question: the least busy person with it, never the caller for its own role; a role nobody has is refused. Anything
+ * else is a member's username, name or id, or "me".
+ */
+export async function resolveAssignee(
+  env: AgentEnv,
+  tracker: Tracker,
+  to: string,
+): Promise<ResolvedAssignee> {
+  if (!to.toLowerCase().startsWith(ROLE_PREFIX)) {
+    return { member: await memberFor(env, tracker, to) };
+  }
+
+  const name = to.slice(ROLE_PREFIX.length).trim().toLowerCase();
+  if (!name) {
+    throw new PortError("invalid", 'Name the role after "role:", for example role:developer.');
+  }
+
+  const handle = await requireOffice(env).resolveRole(name);
+  return { member: await teammateOnTracker(env, tracker, handle), role: { name, handle } };
+}
+
+/** The line that says who a role went to; none for an assignee named directly. */
+export const roleLine = (to: Pick<ResolvedAssignee, "role"> | undefined): string[] =>
+  to?.role ? [`Role ${to.role.name} went to ${to.role.handle}.`] : [];

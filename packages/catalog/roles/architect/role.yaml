@@ -1,6 +1,6 @@
 name: architect
 title: Architect
-summary: Owns architecture docs and solution design, reviews designs and builds the core work.
+summary: Owns architecture and technical plans; writes architecture docs and solution designs, reviews designs and builds the core work.
 permissions: code
 needs:
   - vcs.pullRequests

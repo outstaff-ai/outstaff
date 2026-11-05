@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2631,6 +2631,7 @@ async function main() {
     `change a ticket from chat: pia retitled ${picked} and assigned it to sam -> sam was woken and opened #${pr13c.pr.number}; no new ticket`,
   );
 
+  await byRole();
   await unblockDependents();
   await canceledWhileQueued();
   await mergeChecks();
@@ -2745,6 +2746,97 @@ async function planInChat() {
 
   step(
     `plan in chat: the human confirmed -> pia filed ${PLAN_MILESTONE} with ${filed.tickets.map((t: Json) => t.key).join(", ")}, one reply, one round`,
+  );
+}
+
+/**
+ * 13b3. a human asks the PM in chat for work that spans two roles: she files one ticket per role, assigned by role,
+ * and the office gives each to the person with that role: the plan to mira, the architect, and the app work, which
+ * waits on the plan, to sam, the developer. The app ticket starts blocked, so sam is not woken while the plan is open;
+ * when the human closes the plan, it moves to ready as sam and sam is woken once, and opens a pull request. Mira runs
+ * no agent here, so her wake stays queued.
+ */
+async function byRole() {
+  const piaBefore = piaWakes().length;
+  const samBefore = wakesOf("sam").length;
+  const plan = "Plan where the landing page analytics are stored";
+  const app = "Track page views and clicks on the landing page";
+  const asked = await stub("POST", "/_test/chat/say", {
+    to: "pia",
+    text: `New work by role: architect: ${plan}; then developer: ${app}`,
+  });
+
+  const reply = await until("pia's reply in her thread, naming who has each ticket", (s) =>
+    s.chat.posts.find(
+      (p: Json) => p.agent === "pia" && p.thread === asked.id && /for mira/.test(p.text),
+    ),
+  );
+
+  const tickets = (await state()).tickets;
+  const planned = tickets.find((t: Json) => t.title === plan);
+  const built = tickets.find((t: Json) => t.title === app);
+  assertEq(
+    JSON.stringify([planned?.assignee, built?.assignee]),
+    JSON.stringify(["mira", "sam"]),
+    "each ticket is assigned to the person with its role",
+  );
+
+  assertEq(
+    JSON.stringify(planned.links.map((l: Json) => [l.kind, l.to])),
+    JSON.stringify([["blocks", built.key]]),
+    "the plan blocks the app work, as a tracker link",
+  );
+
+  assertEq(built.status, "Blocked", "the app work starts blocked on the open plan");
+  assertEq(
+    reply.text.includes(planned.key) &&
+      reply.text.includes(built.key) &&
+      /for sam/.test(reply.text),
+    true,
+    `pia's reply names both tickets and who has them (${reply.text})`,
+  );
+
+  await until(
+    `the office woke mira on ${planned.key}`,
+    () => wakesOf("mira").includes("assigned") || undefined,
+  );
+
+  // The office has read both tickets, the app work blocked by the open plan: its assignment woke no one.
+  await officePolledTwice(`${planned.key} and ${built.key} were filed`);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore)),
+    "[]",
+    `sam was not woken on ${built.key} while ${planned.key} is open`,
+  );
+
+  await stub("POST", `/_test/tickets/${planned.key}/move`, { to: "Done" });
+  const pr = await until(`sam's pull request for ${built.key}, handed back`, (s) => {
+    const found = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${built.key}`));
+    const t = s.tickets.find((x: Json) => x.key === built.key);
+    return found && t.status === "In Review" ? { pr: found, t } : undefined;
+  });
+
+  assertEq(pr.pr.author, "acme-sam[bot]", "sam opened the pull request for the app work");
+  assertEq(
+    JSON.stringify(pr.t.moves.map((m: Json) => `${m.by}:${m.from}>${m.to}`)),
+    JSON.stringify(["sam:Blocked>Ready", "sam:Ready>In Progress", "sam:In Progress>In Review"]),
+    `${built.key} moved to ready as sam when ${planned.key} closed, then sam worked it`,
+  );
+
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore)),
+    JSON.stringify(["assigned"]),
+    `closing ${planned.key} woke sam once, on ${built.key}`,
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore)),
+    JSON.stringify(["chat"]),
+    "pia ran only the chat session: neither ticket is her work",
+  );
+
+  step(
+    `by role: pia filed ${planned.key} as role:architect and ${built.key} as role:developer -> mira and sam got them; ${built.key} waited blocked, sam woke once ${planned.key} closed and opened #${pr.pr.number}`,
   );
 }
 

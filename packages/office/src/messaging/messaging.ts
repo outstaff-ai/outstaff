@@ -6,7 +6,7 @@ import { lateRound } from "#/late-round.js";
 import type { WorkItem } from "#/store/types.js";
 import { mirror } from "./mirror.js";
 import { loadByPerson, readRoster } from "./roster.js";
-import { routeQuestion } from "./routing.js";
+import { routeQuestion, routeRole } from "./routing.js";
 import type { MessagingOptions } from "./types.js";
 
 export const QUESTION_KIND = "question";
@@ -48,7 +48,7 @@ function questionBrief(
 
 export function createMessaging(
   opts: MessagingOptions,
-): Required<Pick<Messaging, "ask" | "answer" | "roster">> {
+): Required<Pick<Messaging, "ask" | "answer" | "resolveRole" | "roster">> {
   const { store, scheduler } = opts;
   const log = opts.logger ?? silentLogger;
   const maxDepth = opts.maxDepth ?? DEFAULT_MAX_DEPTH;
@@ -204,6 +204,22 @@ export function createMessaging(
       }
 
       log.info("question answered", { id: questionId, from, asker: asker.id });
+    },
+
+    async resolveRole(from, role) {
+      const route = routeRole({
+        from,
+        to: role,
+        people: opts.team.people,
+        load: await loadByPerson(store),
+      });
+
+      if (!route.ok) {
+        throw new ProtocolError(route.code, route.message);
+      }
+
+      log.info("role resolved", { from, role, to: route.handle });
+      return route.handle;
     },
 
     roster: async () =>

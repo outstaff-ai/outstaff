@@ -1,7 +1,7 @@
 import { PortError, type Issue, type Member, type Tracker } from "@outstaff/core";
 import { attachmentsSection, canAttach } from "./attachments.js";
 import { filedLine, requireOffice } from "./support.js";
-import { memberFor } from "./ticket-support.js";
+import { resolveAssignee } from "./ticket-support.js";
 import type { Filed, OfficeWorkItem } from "./office.types.js";
 import type { Assignee } from "./ticket-create.types.js";
 import type { AgentEnv, Uploaded, VerbContext } from "./types.js";
@@ -58,7 +58,7 @@ export function relatedKey(
 
 /**
  * A chat ticket is the chat session's own work, unless it names someone else: then it is theirs. Any other ticket
- * belongs to nobody until it is given.
+ * belongs to nobody until it is given. `role:<role>` names the person the office gives the role to.
  */
 export async function assigneeFor(
   env: AgentEnv,
@@ -70,10 +70,9 @@ export async function assigneeFor(
     return chatAssignee(env, tracker, input.assignee);
   }
 
-  return {
-    member: input.assignee ? await memberFor(env, tracker, input.assignee) : undefined,
-    forOther: false,
-  };
+  return input.assignee
+    ? { ...(await resolveAssignee(env, tracker, input.assignee)), forOther: false }
+    : { member: undefined, forOther: false };
 }
 
 /** The caller, unless the chat session names someone else. */
@@ -87,8 +86,8 @@ async function chatAssignee(
     return { member: self, forOther: false };
   }
 
-  const member = await memberFor(env, tracker, named);
-  return { member, forOther: member.id !== self?.id };
+  const to = await resolveAssignee(env, tracker, named);
+  return { ...to, forOther: to.member.id !== self?.id };
 }
 
 /** The caller as a tracker member, by the tracker identity team.yaml gives them. */
@@ -194,15 +193,31 @@ export async function noteFailedUploads(
     .catch(() => {});
 }
 
+/** What a chat session is told after filing a ticket that is not its work now: someone else's, or one that waits. */
+function filedForLine(assignee: string, forOther: boolean, waitsOn: string[]): string {
+  const whose = forOther ? `Filed for ${assignee}: it is their work` : "Filed as your ticket";
+  const wakes = waitsOn.length
+    ? `It starts blocked on ${waitsOn.join(", ")}: ${forOther ? `${assignee} is` : "you are"} woken on it when the last one closes, not now.`
+    : "The assignment wakes them.";
+
+  return `${whose}. ${wakes} Your chat work is not tied to it; do not work on it. Tell the requester who has it${waitsOn.length ? " and what it waits on" : ""}, then finish with a short note.`;
+}
+
 /**
- * Tells the office about a chat ticket: the caller's own is filed as its work, with the agent's line for the reply;
- * one for someone else is only recorded against the request. Returns the line that says which, and the filing for
- * the verb's data.
+ * Tells the office about a chat ticket. The caller's own ticket, ready to work, is filed as its work, with the agent's
+ * line for the reply. One for someone else, or one that starts blocked on open tickets (`waitsOn`), is only recorded
+ * against the request: the assignment wakes its assignee, or, for a blocked one, the close of its last blocker
+ * (`unblocked_to_ready`). Returns the line that says which, and the filing for the verb's data.
  */
 export async function fileInOffice(
   env: AgentEnv,
   chat: OfficeWorkItem | undefined,
-  { key, request, say }: { key: string; request: string; say?: string | undefined },
+  {
+    key,
+    request,
+    say,
+    waitsOn,
+  }: { key: string; request: string; say?: string | undefined; waitsOn: string[] },
   to: Assignee,
 ): Promise<{ line?: string; data: { filed?: Filed; filedFor?: string } }> {
   if (!chat) {
@@ -210,17 +225,15 @@ export async function fileInOffice(
   }
 
   const office = requireOffice(env);
-  if (!to.forOther || !to.member) {
+  const forOther = to.forOther && !!to.member;
+  if (!forOther && waitsOn.length === 0) {
     const filed = await office.linkTicket(chat.id, key, request, say);
     return { line: filedLine(filed), data: { filed } };
   }
 
-  const assignee = to.member.username ?? to.member.name;
+  const assignee = to.member ? (to.member.username ?? to.member.name) : env.person;
   await office.fileFor(chat.id, { ticket: key, request, assignee });
-  return {
-    line: `Filed for ${assignee}: it is their work, and the assignment wakes them. Your chat work is not tied to it; do not work on it. Tell the requester who has it, then finish with a short note.`,
-    data: { filedFor: assignee },
-  };
+  return { line: filedForLine(assignee, forOther, waitsOn), data: { filedFor: assignee } };
 }
 
 /**

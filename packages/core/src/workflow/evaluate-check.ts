@@ -244,6 +244,13 @@ const CHECKS: ConditionChecks = {
       detail: `${agent ? `${agent} is` : "no agent is"} blocked on the ticket, wanted ${wanted ? "an agent" : "none"}`,
     };
   },
+  open_blockers: (wanted, ctx) => {
+    const open = ctx.ticket ? ctx.state.openBlockers(ctx.ticket) : [];
+    return {
+      ok: open.length > 0 === wanted,
+      detail: `${open.length ? `${open.join(", ")} still ${open.length === 1 ? "blocks" : "block"} the ticket` : "no open ticket blocks the ticket"}, wanted ${wanted ? "an open blocker" : "none"}`,
+    };
+  },
   actor_in_round: (wanted, ctx) => {
     const { actor } = ctx.event;
     const [inRound, why] = roundOf(ctx);

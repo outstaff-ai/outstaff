@@ -1,6 +1,6 @@
 name: pm
 title: Project Manager
-summary: Turns requests into scoped tickets, orders the work and keeps humans posted.
+summary: Owns scope and priorities; turns requests into scoped tickets, orders the work and keeps humans posted.
 permissions: docs
 needs:
   - tracker.issues

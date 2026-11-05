@@ -1206,6 +1206,47 @@ async function* fileFor(assignee: string, title: string): AsyncGenerator<Action,
   return `Filed ${/Created (\S+)\./.exec(created)?.[1] ?? "it"} for ${assignee}; it is theirs.`;
 }
 
+/** The key of the ticket a `ticket_create` result names, and whom its role went to. */
+const createdFor = (created: string) => ({
+  key: need(/Created (\S+)\./.exec(created)?.[1], "the created ticket"),
+  to: need(/Role \S+ went to (\S+)\./.exec(created)?.[1], "whom the role went to"),
+});
+
+/**
+ * Work that spans two roles is one ticket per role, each assigned by role; the second needs the first, so the first
+ * blocks it.
+ */
+async function* fileByRole([
+  ,
+  firstRole,
+  first,
+  secondRole,
+  second,
+]: RegExpExecArray): AsyncGenerator<Action, string, string> {
+  const one = createdFor(
+    yield {
+      type: "tool",
+      tool: "ticket_create",
+      input: { title: first, body: first, assignee: `role:${firstRole}` },
+    },
+  );
+
+  const two = createdFor(
+    yield {
+      type: "tool",
+      tool: "ticket_create",
+      input: {
+        title: second,
+        body: second,
+        assignee: `role:${secondRole}`,
+        blockedBy: [one.key],
+      },
+    },
+  );
+
+  return `Filed ${one.key} for ${one.to} and ${two.key} for ${two.to}, which waits on it.`;
+}
+
 /** A change to a ticket that exists is made on that ticket: retitled when asked, then assigned. Nothing is filed. */
 async function* changeTicket(latest: string): AsyncGenerator<Action, string | undefined, string> {
   const asked = /^assign (\S+) to (\w+)(?:, retitled "(.+)")?\.?$/i.exec(latest);
@@ -1250,6 +1291,17 @@ async function* fileFeature(latest: string): AsyncGenerator<Action, string | und
   return "Filed a ticket to plan it.";
 }
 
+/** Work for a teammate, or for roles; undefined for any other message. */
+async function* fileForOthers(latest: string): AsyncGenerator<Action, string | undefined, string> {
+  const byRole = /^new work by role: (\w+): (.+?); then (\w+): (.+)$/i.exec(latest);
+  if (byRole) {
+    return yield* fileByRole(byRole);
+  }
+
+  const forOther = /^new work for (\w+): (.+)$/i.exec(latest);
+  return forOther ? yield* fileFor(forOther[1] ?? "", forOther[2] ?? "") : undefined;
+}
+
 /**
  * New work is filed as a ticket, which the office turns into the work; a message with pictures is a request to file,
  * and the ticket gets the files, which the agent attaches itself. Returns undefined when the message asks for neither.
@@ -1264,9 +1316,9 @@ async function* fileRequest(
     return "Filed.";
   }
 
-  const forOther = /^new work for (\w+): (.+)$/i.exec(latest);
-  if (forOther) {
-    return yield* fileFor(forOther[1] ?? "", forOther[2] ?? "");
+  const forOthers = yield* fileForOthers(latest);
+  if (forOthers !== undefined) {
+    return forOthers;
   }
 
   if (!ctx.files?.length) {

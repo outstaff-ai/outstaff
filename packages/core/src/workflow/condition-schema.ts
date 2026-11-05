@@ -141,6 +141,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
         ),
       ),
     z
+      .strictObject({ open_blockers: z.boolean() })
+      .meta(
+        d(
+          "A ticket that blocks this one is still open, not done or canceled (or, with false, none is).",
+        ),
+      ),
+    z
       .strictObject({ actor_in_round: z.boolean() })
       .meta(
         d(

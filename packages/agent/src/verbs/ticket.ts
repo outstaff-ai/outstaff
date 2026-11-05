@@ -7,7 +7,8 @@ import { readInputBytes } from "./files.js";
 import { mentionGuard } from "./mentions.js";
 import { requireTracker, ticketLinker } from "./support.js";
 import { defineVerb, result } from "./define.js";
-import { key, memberFor, summary, who } from "./ticket-support.js";
+import { key, resolveAssignee, roleLine, summary, who } from "./ticket-support.js";
+import type { ResolvedAssignee } from "./ticket-create.types.js";
 import { ticketCreate } from "./ticket-create.js";
 import { ticketEdit } from "./ticket-edit.js";
 import { ticketLink } from "./ticket-link.js";
@@ -117,25 +118,37 @@ export const ticketMove = defineVerb({
 
 export const ticketAssign = defineVerb({
   name: "ticket.assign",
-  summary: "Assign a ticket to a member, to yourself or to nobody.",
+  summary: "Assign a ticket to a member, a role, yourself or nobody.",
   description:
-    'Assigns a ticket. "to" is a tracker member (username, name or id), "me" for yourself, or "none" to unassign.',
+    'Assigns a ticket. "to" is a tracker member (username, name or id), "me" for yourself, "none" to unassign, or role:<role> for the least busy person with that role: the office picks them as ost ask routes a question, never you for your own role, and refuses a role nobody has. The result says who it went to.',
   input: z.strictObject({
     key,
-    to: z.string().min(1).max(200).describe('Member username, name or id; "me"; or "none".'),
+    to: z
+      .string()
+      .min(1)
+      .max(200)
+      .describe('Member username, name or id; "me"; "none"; or role:<role>, such as role:devops.'),
   }),
   args: ["key", "to"],
-  examples: ["ost ticket assign ACME-12 me", "ost ticket assign ACME-12 none"],
+  examples: [
+    "ost ticket assign ACME-12 me",
+    "ost ticket assign ACME-12 role:devops",
+    "ost ticket assign ACME-12 none",
+  ],
   async run(env, input) {
     const tracker = requireTracker(env);
-    let memberId: string | null = null;
+    let to: ResolvedAssignee | undefined;
     if (input.to.toLowerCase() !== "none") {
-      memberId = (await memberFor(env, tracker, input.to)).id;
+      to = await resolveAssignee(env, tracker, input.to);
     }
 
-    const issue = await tracker.assign(input.key, memberId);
+    const issue = await tracker.assign(input.key, to?.member.id ?? null);
     const url = tracker.links.issue(issue.key);
-    return result([`Assigned ${issue.key} to ${who(issue.assignee)}.`, url], { issue }, [url]);
+    return result(
+      [`Assigned ${issue.key} to ${who(issue.assignee)}.`, ...roleLine(to), url],
+      { issue, ...(to?.role ? { role: to.role } : {}) },
+      [url],
+    );
   },
 });
 

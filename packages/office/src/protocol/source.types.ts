@@ -218,6 +218,9 @@ export interface Messaging {
   ): Promise<AnswerState>;
   answer(from: string, questionId: string, answer: string): Promise<void>;
 
+  /** The person who gets work for a role, routed as a question to that role is. Refused when nobody fits. */
+  resolveRole(from: string, role: string): Promise<string>;
+
   /** The team as agents see it, including the trusted humans. Without it the work source's members are shown. */
   roster?(): Promise<{ members: Member[]; humans: Human[] }>;
 }

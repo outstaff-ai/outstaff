@@ -1,6 +1,6 @@
 name: reviewer
 title: Reviewer
-summary: Reviews pull requests for correctness, security and consistency, and gives a verdict.
+summary: Owns pull request review; checks correctness, security and consistency, and gives a verdict.
 permissions: readonly
 needs:
   - vcs.pullRequests

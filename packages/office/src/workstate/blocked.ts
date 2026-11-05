@@ -1,5 +1,6 @@
 import type { WorkItem } from "#/store/index.js";
 import type { TicketWork } from "./core.types.js";
+import { isTerminal } from "./derive.js";
 import type { TicketRecord } from "./types.js";
 
 /** Answering a question on a ticket, trying to unblock it, or the PM's round on its milestone, is not working on it. */
@@ -77,3 +78,7 @@ export function blockedAgent(
     .filter((w) => endedBlocked(w, rec))
     .toSorted((a, b) => time(b.to) - time(a.to))[0]?.person;
 }
+
+/** The tickets that block the ticket and are still open, as last read. */
+export const openBlockers = (rec: TicketRecord | undefined): string[] =>
+  (rec?.blockedBy ?? []).filter((b) => !isTerminal(b.status)).map((b) => b.key);

@@ -39,6 +39,9 @@ describe("office verbs through the real client and server", () => {
           : { id: "q2", to: q.to, status: "pending" };
       },
       async answer() {},
+      async resolveRole() {
+        return "noor";
+      },
     };
 
     const clock = manualClock();

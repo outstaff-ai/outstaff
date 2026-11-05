@@ -50,6 +50,20 @@ describe("unblocked_to_ready", () => {
     expect(trace.decisions[0]).not.toHaveProperty("note");
   });
 
+  it("starts a ticket that was filed blocked, whose assignee was never woken, once its last blocker closes", () => {
+    // Filed blocked on ACME-2: no rounds on it and no agent blocked on it. ACME-2 closed, so nothing open blocks it.
+    const filed = world("blocked", "sam", { openBlockers: [] });
+    expect(judge("unblocked_to_ready", unblocked(ADA), filed)).toEqual([
+      "act for sam: move ACME-3 to ready",
+      "wake sam (assigned) on ticket ACME-3",
+    ]);
+
+    expect(decisions(unblocked(ADA), filed)).toEqual([
+      "unblocked_to_ready: act sam",
+      "unblocked_to_ready: wake sam",
+    ]);
+  });
+
   it("wakes the agent even when that agent closed the blocker itself", () => {
     expect(decisions(unblocked(SAM), world("blocked", "sam"))).toEqual([
       "unblocked_to_ready: act sam",

@@ -1330,6 +1330,11 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 - Type: `boolean`
 - Required
 
+#### pipeline.policies.<key>.when.open_blockers
+
+- Type: `boolean`
+- Required
+
 #### pipeline.policies.<key>.when.actor_in_round
 
 - Type: `boolean`
