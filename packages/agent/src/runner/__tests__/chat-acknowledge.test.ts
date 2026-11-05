@@ -1,6 +1,6 @@
 import type { Filed } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
-import { acknowledgement } from "#/runner/chat-acknowledge.js";
+import { acknowledgement, acknowledgements } from "#/runner/chat-acknowledge.js";
 import { linksToList, reportBody } from "#/runner/chat-report.js";
 
 const filed = (over: Partial<Filed> = {}) =>
@@ -100,5 +100,48 @@ describe("reports", () => {
     const a = { url: "https://a.example" };
     const b = { url: "https://b.example" };
     expect(linksToList([a, b, a], "see https://b.example")).toEqual([a]);
+  });
+});
+
+describe("acknowledgements: one reply for a chat session", () => {
+  const ticket = (key: string, say?: string) => ({
+    what: { key, title: key, ...(say ? { say } : {}) },
+    filed: filed(),
+  });
+
+  it("reads like one acknowledgement for one filing", () => {
+    expect(acknowledgements([ticket("ACME-1")], issueUrl)).toBe(
+      "On it. Tracked in [ACME-1](https://t.acme.example/ACME-1).",
+    );
+  });
+
+  it("names every ticket the session filed in one line", () => {
+    expect(acknowledgements([ticket("ACME-1"), ticket("ACME-2"), ticket("ACME-3")], issueUrl)).toBe(
+      "On it. Tracked in [ACME-1](https://t.acme.example/ACME-1), [ACME-2](https://t.acme.example/ACME-2) and [ACME-3](https://t.acme.example/ACME-3).",
+    );
+  });
+
+  it("leads with the agent's own lines, then the links", () => {
+    const filings = [ticket("ACME-1", "Filed the plan."), ticket("ACME-2", "Filed the plan.")];
+    expect(acknowledgements(filings, issueUrl)).toBe(
+      "Filed the plan. [ACME-1](https://t.acme.example/ACME-1), [ACME-2](https://t.acme.example/ACME-2)",
+    );
+  });
+
+  it("gives queued requests and joined work lines of their own", () => {
+    const filings = [
+      ticket("ACME-1"),
+      { what: { title: "Tidy up" }, filed: filed() },
+      { what: { title: "Sort it" }, filed: filed() },
+      { what: { title: "x", attached: { ticket: { ref: "ACME-9" } } }, filed: filed() },
+    ] as Parameters<typeof acknowledgements>[0];
+
+    expect(acknowledgements(filings, issueUrl)).toBe(
+      [
+        "On it. Tracked in [ACME-1](https://t.acme.example/ACME-1).",
+        "On it. Queued: Tidy up and Sort it.",
+        "Adding this to [ACME-9](https://t.acme.example/ACME-9).",
+      ].join("\n"),
+    );
   });
 });

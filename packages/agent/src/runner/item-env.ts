@@ -1,6 +1,6 @@
 import type { Logger } from "@outstaff/core";
 import type { Filed } from "@outstaff/protocol";
-import type { FiledWhat } from "./chat.types.js";
+import type { FiledWhat, Filing } from "./chat.types.js";
 import type { Offer } from "#/office-client/index.js";
 import type { AgentEnv, DeclaredHandBack } from "#/verbs/types.js";
 import type { Attachment } from "./types.js";
@@ -81,17 +81,24 @@ export function itemEnv(
   log: Logger,
 ): ItemEnv {
   const id = offer.workItem.id;
-  // A chat session that filed its request as work tells the requester in the thread. The work reports its own result.
-  let filedWork = false;
+  // A chat session that filed its request as work tells the requester in the thread, once for everything it filed,
+  // when the session ends. The work reports its own result.
+  const filings: Filing[] = [];
+  let acknowledged = 0;
   const filed = async (workItemId: string, what: FiledWhat, f: Filed) => {
-    if (workItemId !== id || !offer.workItem.origin) {
-      return;
+    if (workItemId === id && offer.workItem.origin) {
+      filings.push({ what, filed: f });
     }
+  };
 
-    filedWork = true;
-    await opts.chat?.acknowledge(offer, what, f).catch((err) => {
-      log.warn("could not acknowledge in chat", { workItemId: id, error: reason(err) });
-    });
+  const acknowledge = async () => {
+    const pending = filings.slice(acknowledged);
+    acknowledged = filings.length;
+    if (pending.length) {
+      await opts.chat?.acknowledge(offer, pending).catch((err) => {
+        log.warn("could not acknowledge in chat", { workItemId: id, error: reason(err) });
+      });
+    }
   };
 
   // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
@@ -172,7 +179,8 @@ export function itemEnv(
     env,
     moved,
     asked: () => asked,
-    filedWork: () => filedWork,
+    filedWork: () => filings.length > 0,
+    acknowledge,
     produced: made.produced,
     declared: () => declared,
   };

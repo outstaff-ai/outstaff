@@ -41,7 +41,7 @@ export function createReports(opts: ChatDeskOptions): Reports {
     opts.team.people.some((p) => p.handle === item.person && p.role === PM_ROLE);
 
   const claim = async (item: WorkItem, origin: ChatOriginRecord, kind: string) => {
-    // Each request a chat session files is acknowledged once, so a message with two requests gets two replies.
+    // The agent acknowledges everything a session filed in one reply, keyed by how many requests it had filed then.
     const key =
       kind === "ack"
         ? `ack:${origin.requests?.length ?? 0}`

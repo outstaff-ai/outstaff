@@ -3,7 +3,7 @@ import { itemTicket } from "#/item-ticket.js";
 import type { Stop } from "#/pipeline/decisions.types.js";
 import { CHAT_KIND, priorityFor, TICKET_CLOSED_KIND } from "#/scheduler/index.js";
 import type { Store, WorkItem } from "#/store/types.js";
-import { isTerminal, type WorkState } from "#/workstate/index.js";
+import { isTerminal, type PrRecord, type TicketRecord, type WorkState } from "#/workstate/index.js";
 import type { LiveOptions, StopRecord } from "./live.types.js";
 
 /** The subject type that keeps the latest stop of each closed ticket, by ticket key. */
@@ -16,6 +16,17 @@ const PENDING = new Set<string>(["queued", "waiting"]);
 const SPARED_KINDS = new Set([CHAT_KIND, TICKET_CLOSED_KIND]);
 
 type Reader = Pick<Store, "getSubject">;
+
+/**
+ * Work that exists to react to a closed ticket or a merged pull request, so a close never drops it: the notice round a
+ * stop queues, the PM's round on a finished milestone, feedback on a merged pull request and its failed merge checks.
+ */
+const REACTS_TO_CLOSE = new Set([
+  TICKET_CLOSED_KIND,
+  "milestone",
+  "merged_feedback",
+  "merge_checks_failed",
+]);
 
 const readStop = async (store: Reader, ticket: string) =>
   (await store.getSubject(STOP_SUBJECT, ticket))?.data as StopRecord | undefined;
@@ -117,10 +128,48 @@ export async function stopWork(
   return record;
 }
 
+/** When the ticket entered its closed status, as the work state last read it. */
+const closedAt = (rec: TicketRecord) => rec.statusSince ?? rec.updatedAt;
+
+/** Whether the item is about an open pull request: its work goes on whatever the ticket says (a stack can close it early). */
+async function onOpenPr(store: Reader, item: WorkItem): Promise<boolean> {
+  if (item.subject?.type !== "pr") {
+    return false;
+  }
+
+  return (
+    ((await store.getSubject("pr", item.subject.ref))?.data as PrRecord | undefined)?.state ===
+    "open"
+  );
+}
+
 /**
- * The start-time check: why a queued item must not start any more, or undefined. It must not when its ticket is still
- * closed and a stop of that ticket came after the item was queued and does not spare its person; work queued after the
- * stop (feedback on a merged pull request, a notice round) is new and starts.
+ * Why the item must not start because its ticket closed after it was queued, whoever closed it (the agent itself too),
+ * or undefined. Work queued after the close is new and starts.
+ */
+async function closedSinceQueued(
+  store: Reader,
+  item: WorkItem,
+  rec: TicketRecord | undefined,
+): Promise<string | undefined> {
+  if (!rec || !isTerminal(rec.status) || REACTS_TO_CLOSE.has(item.kind)) {
+    return undefined;
+  }
+
+  const at = closedAt(rec);
+  if (!at || Date.parse(at) <= Date.parse(item.createdAt) || (await onOpenPr(store, item))) {
+    return undefined;
+  }
+
+  const how = rec.status === "canceled" ? "canceled" : "closed as done";
+  return `Dropped: ${rec.key} was ${how} at ${at}, after this work was queued and before it started.`;
+}
+
+/**
+ * The start-time check: why a queued item must not start any more, or undefined. It must not when its ticket is closed
+ * and was closed after the item was queued, whoever closed it; a stop of the ticket recorded after the item was queued
+ * says who closed it. Work that reacts to the close (a notice round, a finished milestone, feedback on a merged pull
+ * request) and work queued after the close (feedback on a merged pull request) start.
  */
 export function stoppedWork(deps: { store: Reader; workState: Pick<WorkState, "ticket"> }) {
   return async (item: WorkItem): Promise<string | undefined> => {
@@ -129,11 +178,16 @@ export function stoppedWork(deps: { store: Reader; workState: Pick<WorkState, "t
     }
 
     const ticket = await itemTicket(deps.store, item);
-    const stop = ticket ? await readStop(deps.store, ticket) : undefined;
-    if (!stop || stop.except.includes(item.person) || item.createdAt > stop.at) {
+    if (!ticket) {
       return undefined;
     }
 
-    return isTerminal(deps.workState.ticket(ticket!)?.status) ? stop.line : undefined;
+    const rec = deps.workState.ticket(ticket);
+    const stop = await readStop(deps.store, ticket);
+    if (stop && !stop.except.includes(item.person) && item.createdAt <= stop.at) {
+      return isTerminal(rec?.status) ? stop.line : undefined;
+    }
+
+    return closedSinceQueued(deps.store, item, rec);
   };
 }

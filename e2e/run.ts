@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2639,6 +2639,7 @@ async function main() {
   await handedToHumanWithoutChat();
   await roadmap();
   await lateInputOneRound();
+  await planInChat();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2668,6 +2669,83 @@ async function main() {
   await notesInTheKnowledgeBase();
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
+}
+
+/** The milestone and tickets the scripted PM proposes when asked to re-plan (e2e/runtime-scripted/src/plan.ts). */
+const PLAN_MILESTONE = "Checkout cleanup";
+const PLAN_TICKETS = ["Split the cart totals", "Show the order summary"];
+
+/**
+ * 13g. a human asks the PM in chat for better planning: she answers with a proposal (the milestone and the tickets in
+ * it) and files nothing. Once the human confirms in the thread, she files the milestone and its tickets, and the thread
+ * gets one reply naming them all; the tickets she filed for herself are one round of hers, not one each.
+ */
+async function planInChat() {
+  const piaBefore = piaWakes().length;
+  const before = await state();
+  const asked = await stub("POST", "/_test/chat/say", {
+    to: "pia",
+    text: "The checkout tickets need better planning. Can you regroup them?",
+  });
+
+  const inThread = (s: Json) =>
+    s.chat.posts.filter((p: Json) => p.agent === "pia" && p.thread === asked.id);
+
+  const proposal = await until("pia's proposal in her thread", (s) =>
+    inThread(s).find((p: Json) => p.text.includes("Proposal: milestone")),
+  );
+
+  assertEq(
+    proposal.text.includes(`"${PLAN_TICKETS[0]}" and "${PLAN_TICKETS[1]}"`),
+    true,
+    "the proposal names the tickets that go in the milestone",
+  );
+
+  await officePolledTwice("the proposal handed back");
+  const proposed = await state();
+  assertEq(proposed.tickets.length, before.tickets.length, "the proposal filed no ticket");
+  assertEq(
+    proposed.initiatives.length,
+    before.initiatives.length,
+    "the proposal made no milestone",
+  );
+
+  step("plan in chat: a request for better planning -> a proposal from pia, nothing filed");
+
+  await stub("POST", "/_test/chat/say", { to: "pia", text: "Yes, go ahead.", thread: asked.id });
+  const filed = await until("the plan filed and pia's round on it done", (s) => {
+    const milestone = s.initiatives.find((i: Json) => i.title === PLAN_MILESTONE);
+    const tickets = s.tickets.filter((t: Json) => PLAN_TICKETS.includes(t.title));
+    const planned =
+      milestone &&
+      tickets.length === PLAN_TICKETS.length &&
+      tickets.every((t: Json) => t.initiative === milestone.id && t.status === "In Review");
+
+    return planned ? { s, milestone, tickets } : undefined;
+  });
+
+  await officePolledTwice("pia's round handed back");
+  const acks = inThread(await state()).filter((p: Json) => p.text.includes("Tracked in"));
+  assertEq(acks.length, 1, "the thread got one acknowledgement for everything pia filed");
+  for (const t of filed.tickets) {
+    assertEq(acks[0].text.includes(t.key), true, `the acknowledgement names ${t.key}`);
+  }
+
+  // The office starts a round by moving its ticket to active: one of the plan's tickets was, the other joined it.
+  const started = filed.tickets.filter((t: Json) =>
+    t.moves.some((m: Json) => m.to === "In Progress"),
+  );
+
+  assertEq(started.length, 1, "pia's tickets of the plan ran as one round, not one each");
+  assertSame(
+    piaWakes().slice(piaBefore),
+    ["chat", "chat"],
+    "pia was woken for the two messages only: no round was queued for the other ticket",
+  );
+
+  step(
+    `plan in chat: the human confirmed -> pia filed ${PLAN_MILESTONE} with ${filed.tickets.map((t: Json) => t.key).join(", ")}, one reply, one round`,
+  );
 }
 
 /** The pieces of the monitoring plan the scripted architect writes: one can start now, one waits for the dashboard. */
