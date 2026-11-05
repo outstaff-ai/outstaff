@@ -1,4 +1,4 @@
-import type { ActOp, Logger } from "@outstaff/core";
+import type { ActOp, Logger, TeamConfig } from "@outstaff/core";
 import type { PipelineEvent, PolicyState } from "@outstaff/policy";
 import type { PayloadOf, QueuedAct } from "@outstaff/protocol";
 import type { Clock } from "#/types.js";
@@ -60,6 +60,9 @@ export interface ActDesk {
 
 export interface ActDeskOptions {
   store: Pick<Store, "getSubject" | "upsertSubject">;
+
+  /** The team, whose tracker identities name the agents an act assigns. */
+  team: Pick<TeamConfig, "people" | "humans">;
   traces: TraceStore;
   workState: Pick<WorkState, "refreshTicket">;
   clock: Clock;

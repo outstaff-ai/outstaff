@@ -1706,6 +1706,14 @@ async function main() {
     "the office moved the unblocked ticket to active, as sam, when sam's round started",
   );
 
+  // The assignment that gave it to pia was the echo of the hand-back's act: no round of hers started on it after the
+  // unblock, so nothing took it back from sam (a round's start makes the ticket active, as her).
+  assertSame(
+    unblockedMoves.filter((m: string) => m.startsWith("pia:")),
+    [],
+    "the ticket stayed with sam once pia handed it to him: no round of hers moved it",
+  );
+
   assertEq(
     unblockedTicket.comments.some(
       (c: Json) => c.author === "pia" && c.body.startsWith("Needs a human:"),
@@ -1729,7 +1737,7 @@ async function main() {
   );
 
   step(
-    `unblock: ${answerable} blocked -> pia answered it and gave it back to sam -> active again when sam's round started, sam resumed from her comment and handed it back`,
+    `unblock: ${answerable} blocked -> pia answered it and gave it back to sam, where it stayed (pia woken once) -> active again when sam's round started, sam resumed from her comment and handed it back`,
   );
 
   // ---- 10a. a ticket that asks for the services the team granted: the token is added and never shown

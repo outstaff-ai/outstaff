@@ -93,14 +93,15 @@ export function createTickets(core: WorkstateCore): TicketOps {
       return undefined;
     }
 
+    const names = [member.id, member.username, member.name].filter((n): n is string => !!n);
     if (member.kind === "agent") {
       const handle =
         trackerPeople.get(member.id) ?? (member.username && trackerPeople.get(member.username));
 
-      return { id: handle || member.id, kind: "agent" };
+      return { id: handle || member.id, kind: "agent", names };
     }
 
-    return { id: member.username ?? member.id, kind: "human" };
+    return { id: member.username ?? member.id, kind: "human", names };
   };
 
   const saveTicket = async (rec: TicketRecord) => {

@@ -52,6 +52,7 @@ async function harness(opts: { refresh?: (key: string) => Promise<void> } = {}) 
   const state = { online: true };
   const desk = createActDesk({
     store,
+    team: { people: [] },
     traces,
     clock,
     logger,

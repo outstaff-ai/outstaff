@@ -6,6 +6,7 @@ import type {
   PrVerdict,
   RepoRef,
   TeamConfig,
+  TicketAssignee,
   Tracker,
   Vcs,
   WorkflowEvent,
@@ -28,7 +29,7 @@ export interface TicketRecord {
 
   /** The tracker's priority, when its adapter has one: 1 is the most urgent. */
   priority?: number;
-  assignee?: { id: string; kind: "human" | "agent" };
+  assignee?: TicketAssignee;
   labels: string[];
 
   /** The human waiting on the work: the latest trusted human to assign the ticket or send it back with feedback. */

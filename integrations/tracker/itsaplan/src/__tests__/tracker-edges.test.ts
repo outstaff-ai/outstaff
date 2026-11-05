@@ -218,6 +218,26 @@ describe("events", () => {
     ]);
   });
 
+  it("names the member an assignment left the ticket with, by display name or username, when the project has one", async () => {
+    const at = "2026-01-01T00:00:10Z";
+    const to = (value?: string) => ({ action: "assignee", payload: { to: { value } } });
+    const { tracker } = await trackerOver([
+      route("GET", "/projects/SHOP/analytics/activity", () => ({
+        items: [
+          entry(4, at, to("sam duarte")),
+          entry(3, at, to("sam")),
+          entry(2, at, to("Rio Park")),
+          entry(1, at, to()),
+        ],
+      })),
+    ]);
+
+    const page = await tracker.events(JSON.stringify({ since: "2026-01-01T00:00:00Z" }));
+    expect(page.events.map((e) => (e.data["assignee"] as { id?: string } | undefined)?.id)).toEqual(
+      [undefined, undefined, "u-sam", "u-sam"],
+    );
+  });
+
   it("classifies activity by kind and action", () => {
     const base = { id: 1, issueId: 1, issueSequence: 1, createdAt: "2026-01-01T00:00:00Z" };
     expect(eventType({ ...base, kind: "comment" })).toBe("commented");

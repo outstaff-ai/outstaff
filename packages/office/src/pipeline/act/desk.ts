@@ -24,7 +24,7 @@ const wire = (act: PendingAct): QueuedAct => ({ id: act.id, ops: act.ops });
 export function createActDesk(opts: ActDeskOptions): ActDesk {
   const { clock, logger: log } = opts;
   const queue = createActQueue(opts.store);
-  const echoes = createActEchoes(opts.store, clock);
+  const echoes = createActEchoes(opts.store, clock, opts.team);
   const update = actRecords(opts.traces);
   const now = () => clock.now().toISOString();
 

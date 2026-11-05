@@ -337,6 +337,12 @@ describe("tracker", () => {
       data: { from: "Backlog", to: "Review" },
     });
 
+    // The feed shows the assignee by display name; the event carries the member it names.
+    expect(first.events[2]?.data).toMatchObject({
+      to: "Sam Duarte",
+      assignee: { id: "u-sam", name: "Sam Duarte", kind: "agent" },
+    });
+
     expect(first.events[3]?.data["body"]).toBe("hello");
     expect(first.events[3]?.data).toMatchObject({
       commentId: expect.any(String),
