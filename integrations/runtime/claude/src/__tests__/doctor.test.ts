@@ -140,4 +140,26 @@ describe("claude-agent-sdk doctor: Design canvas", () => {
     const off = { ...canvas, team: { policies: { design: { canvas: false } } } as TeamConfig };
     expect(await checkOf({ ANTHROPIC_API_KEY: "fake-api-key" }, off)).toBeUndefined();
   });
+
+  describe("for a role that reads canvases", () => {
+    const reader = { roleCapabilities: ["design.canvas.read" as const] };
+
+    it("passes with a Claude account token, naming the account", async () => {
+      const check = await checkOf({ CLAUDE_CODE_OAUTH_TOKEN: "fake-oauth" }, reader);
+      expect(check).toMatchObject({ status: "ok", key: "CLAUDE_CODE_OAUTH_TOKEN" });
+      expect(check!.detail).toContain("reads only the canvases of the account it signs in with");
+    });
+
+    it("warns without one", async () => {
+      const check = await checkOf({ ANTHROPIC_API_KEY: "fake-api-key" }, reader);
+      expect(check).toMatchObject({ status: "warn" });
+      expect(check!.detail).toContain("The role reads the Design canvas");
+      expect(check!.fix).toContain("the account the designer's canvases belong to");
+    });
+
+    it("says nothing with the switch off", async () => {
+      const off = { ...reader, team: { policies: { design: { canvas: false } } } as TeamConfig };
+      expect(await checkOf({ ANTHROPIC_API_KEY: "fake-api-key" }, off)).toBeUndefined();
+    });
+  });
 });

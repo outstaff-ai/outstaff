@@ -209,7 +209,7 @@ export const policiesSchema = z
           .default(true)
           .meta(
             d(
-              "Let roles that declare the design.canvas capability use Claude's Artifact tools (the Design canvas). Needs the claude-agent-sdk runtime signed in with a Claude account. Default on; it does nothing for a role without the capability.",
+              "Let roles that declare the design.canvas capability use Claude's Artifact tools (the Design canvas), and roles that declare design.canvas.read read those canvases. Needs the claude-agent-sdk runtime signed in with a Claude account. Default on; it does nothing for a role without either capability.",
             ),
           ),
       })

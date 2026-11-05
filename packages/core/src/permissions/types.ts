@@ -116,6 +116,12 @@ export interface Policy {
   ost?: { allow: string[] };
 
   /**
+   * What the artifact tool may do: "write" (create and change canvases, answer comments) or "read" (read canvases and
+   * their comments only). Every artifact call is allowed when omitted.
+   */
+  artifact?: "read" | "write";
+
+  /**
    * The worktrees of the person's other work items, set per round. A write refused under one of them adds its hint,
    * which names the work it belongs to and how to change it there.
    */
@@ -137,6 +143,15 @@ export interface ToolCall {
 
   /** More files the call reads (an artifact publish names its sources); each must pass the read rules. */
   paths?: string[];
+
+  /** Files or folders the call writes besides `path` (an artifact read saves to a folder); each must pass the write rules. */
+  writes?: string[];
+
+  /**
+   * Whether an artifact call only reads (a canvas, a listing, its comments) or changes something. A call the runtime
+   * does not mark as a read is a write.
+   */
+  access?: "read" | "write";
   command?: string;
   cwd?: string;
 
@@ -210,7 +225,7 @@ export interface BuildPolicyInput {
 
   /**
    * Capabilities the person's role declares and the team has switched on. `design.canvas` adds the artifact tool and
-   * the artifacts folder; no profile has them by itself.
+   * the artifacts folder; `design.canvas.read` adds the artifact tool limited to reads. No profile has them by itself.
    */
   capabilities?: readonly Capability[];
 }

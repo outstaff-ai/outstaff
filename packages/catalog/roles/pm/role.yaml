@@ -7,6 +7,7 @@ needs:
 optional_needs:
   - knowledge.docs
   - tracker.initiatives
+  - design.canvas.read
 modes:
   - name: roadmap
     when: The team needs a roadmap, or a milestone starts, closes or changes.

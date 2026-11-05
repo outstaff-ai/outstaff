@@ -8,6 +8,11 @@ describe("capabilityOn", () => {
     expect(capabilityOn({ design: { canvas: false } }, "design.canvas")).toBe(false);
   });
 
+  it("follows the switch of a parent capability", () => {
+    expect(capabilityOn(undefined, "design.canvas.read")).toBe(true);
+    expect(capabilityOn({ design: { canvas: false } }, "design.canvas.read")).toBe(false);
+  });
+
   it("keeps a capability without a switch on", () => {
     expect(capabilityOn({ design: { canvas: false } }, "runtime.usage")).toBe(true);
     expect(capabilityOn(undefined, "vcs.merge")).toBe(true);

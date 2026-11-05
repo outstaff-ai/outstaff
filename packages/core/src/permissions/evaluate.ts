@@ -54,12 +54,23 @@ function ost(policy: Policy, call: ToolCall): Decision {
   return allow("ost is allowed.", "tools.allow");
 }
 
-/** The tool publishes files from disk, so every source must be readable by the person. */
+/**
+ * Under a read grant only reads pass. The tool publishes files from disk, so every source must be readable by the
+ * person, and a read that saves files must be allowed to write where it saves them.
+ */
 function artifact(policy: Policy, call: ToolCall, cwd: string): Decision {
+  if (policy.artifact === "read" && call.access !== "read") {
+    return deny(
+      "The artifact tool is read-only for this role: it may read canvases, list them and read their comments, nothing else.",
+      "artifact.read-only",
+    );
+  }
+
   const sources = [...(call.path === undefined ? [] : [call.path]), ...(call.paths ?? [])];
-  const refused = sources
-    .map((p) => checkPath(policy, "read", p, cwd))
-    .find((d) => d.effect !== "allow");
+  const refused = [
+    ...sources.map((p) => checkPath(policy, "read", p, cwd)),
+    ...(call.writes ?? []).map((p) => checkPath(policy, "write", p, cwd)),
+  ].find((d) => d.effect !== "allow");
 
   return refused ?? allow("artifact is allowed.", "tools.allow");
 }

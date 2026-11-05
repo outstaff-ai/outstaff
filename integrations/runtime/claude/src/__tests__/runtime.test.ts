@@ -605,6 +605,32 @@ describe("Design canvas", () => {
     expect(on.disallowedTools).toContain("ArtifactData");
   });
 
+  it("turns it on for a role that only reads canvases, and the hook keeps it to reads", async () => {
+    const policy = codePolicy(["design.canvas.read"]);
+    const { query, calls } = fakeQuery(() => [init("s1"), result()]);
+    await collect(
+      createAgentSdkRuntime({ options, query, env: {} }).run(
+        req({ policy, builtinTools: [...policy.tools.allow] }),
+      ),
+    );
+
+    const on = calls[0]!.options;
+    expect(on.env).toMatchObject({ CLAUDE_CODE_ARTIFACT: "1" });
+    expect(on.env).not.toHaveProperty("CLAUDE_CODE_DISABLE_ARTIFACT");
+    expect(on.settings).toMatchObject({ enableArtifact: true });
+    expect(on.tools).toEqual(expect.arrayContaining(["Artifact", "ArtifactComments"]));
+
+    const url = "https://claude.ai/artifact/acme-landing";
+    const hook = hookOf(calls[0]!);
+    expect(await decisionOf(hook, "Artifact", { action: "read", url })).toMatchObject({
+      permissionDecision: "allow",
+    });
+
+    expect(await decisionOf(hook, "Artifact", { file_path: "/tmp/p.html" })).toMatchObject({
+      permissionDecision: "deny",
+    });
+  });
+
   it("keeps it off for every other session, whatever the environment says", async () => {
     const off = await run(["read"], { CLAUDE_CODE_ARTIFACT: "1" });
     expect(off.env).not.toHaveProperty("CLAUDE_CODE_ARTIFACT");

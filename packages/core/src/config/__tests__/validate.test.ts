@@ -504,3 +504,57 @@ describe("validateTeam: design.canvas", () => {
     ]);
   });
 });
+
+describe("validateTeam: design.canvas.read", () => {
+  const reader = (runtime: Capability[]) =>
+    ctx({
+      roles: new Map<string, RoleNeeds>([
+        ["developer", { needs: ["vcs.pullRequests"], optionalNeeds: ["design.canvas.read"] }],
+      ]),
+      adapters: new Map([
+        adapter("runtime", "claude-agent-sdk", runtime),
+        adapter("knowledge", "notion", ["knowledge.docs"]),
+        adapter("vcs", "github", ["vcs.pullRequests"]),
+        adapter("chat", "slack", ["chat.messages"]),
+      ]),
+    });
+
+  const team = (policies?: { design: { canvas: boolean } }) =>
+    config((c) => {
+      c.people = [{ handle: "dev", name: "Dev", role: "developer", model: "sonnet", repos: {} }];
+      delete c.integrations.tracker;
+      if (policies) {
+        c.policies = policies as never;
+      }
+    });
+
+  const capabilityWarnings = (report: ReturnType<typeof validateTeam>) =>
+    report.warnings.filter((w) => w.code.startsWith("capability."));
+
+  it("is quiet when the runtime provides the capability", () => {
+    expect(
+      capabilityWarnings(validateTeam(team(), reader(["runtime.sessions", "design.canvas.read"]))),
+    ).toEqual([]);
+  });
+
+  it("warns when the runtime does not provide it", () => {
+    expect(capabilityWarnings(validateTeam(team(), reader(["runtime.sessions"])))).toEqual([
+      {
+        path: ["people", 0, "role"],
+        code: "capability.optional_missing",
+        message:
+          'Role "developer" can use design.canvas.read, which runtime "claude-agent-sdk" of dev does not provide.',
+        consequence:
+          "developer dev cannot read the Design canvas it builds from: give dev a runtime that provides design.canvas.read.",
+      },
+    ]);
+  });
+
+  it("is quiet when the team switched the canvas off", () => {
+    expect(
+      capabilityWarnings(
+        validateTeam(team({ design: { canvas: false } }), reader(["runtime.sessions"])),
+      ),
+    ).toEqual([]);
+  });
+});

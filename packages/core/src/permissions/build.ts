@@ -1,3 +1,4 @@
+import type { Capability } from "#/types.js";
 import { commandRules } from "./builtin-rules.js";
 import { PROFILE_SPECS } from "./profiles.js";
 import type {
@@ -94,15 +95,15 @@ export function buildPolicy({
   assertLayout(layout);
   const spec = PROFILE_SPECS[profile];
   const git = gitGrants(person, team, layout, spec);
-  const canvas = capabilities.includes("design.canvas");
-  const tools: ToolKind[] = [...spec.tools, ...(canvas ? (["artifact"] as const) : [])];
+  const artifact = artifactGrant(capabilities);
+  const tools: ToolKind[] = [...spec.tools, ...(artifact ? (["artifact"] as const) : [])];
   const writeAllow = [
     `${layout.scratchDir}/**`,
     // Claude Code's session transcripts and tool-result spill files; the rest of ~/.claude is configuration.
     `${layout.home}/.claude/projects/**`,
     "/tmp/**",
     ...git.writeAllow,
-    ...(canvas ? [`${artifactsDir(layout)}/**`] : []),
+    ...(artifact === "write" ? [`${artifactsDir(layout)}/**`] : []),
   ];
 
   const readDeny = [`${layout.secretsDir}/**`, ...SECRET_GLOBS];
@@ -134,7 +135,17 @@ export function buildPolicy({
     ],
     git: { repos: git.repos, defaultBranches: git.defaultBranches },
     ...(spec.verbs ? { ost: { allow: [...spec.verbs] } } : {}),
+    ...(artifact ? { artifact } : {}),
   };
+}
+
+/** What the artifact tool may do: everything with `design.canvas`, reads with `design.canvas.read`, else nothing. */
+function artifactGrant(capabilities: readonly Capability[]): Policy["artifact"] {
+  if (capabilities.includes("design.canvas")) {
+    return "write";
+  }
+
+  return capabilities.includes("design.canvas.read") ? "read" : undefined;
 }
 
 /** The repos, worktrees and secrets folders must lie outside the working directory. */

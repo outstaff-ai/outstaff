@@ -38,7 +38,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     off: false,
     kind: "agent",
     behaviour:
-      "Let a role that declares the design.canvas capability (the stock designer) use Claude's Artifact tools to work on a private Design canvas, with a persistent artifacts folder in its home. Roles without the capability never get them. Needs the claude-agent-sdk runtime signed in with a Claude account; `ost doctor` checks it.",
+      "Let a role that declares the design.canvas capability (the stock designer) use Claude's Artifact tools to work on a private Design canvas, with a persistent artifacts folder in its home, and a role that declares design.canvas.read (the stock developer, architect and PM) read those canvases and their comments, and nothing more. Roles with neither capability never get the tools. Needs the claude-agent-sdk runtime signed in with a Claude account, the one the canvases belong to; `ost doctor` checks it.",
   },
   {
     path: "feedback.follow_up_round",
