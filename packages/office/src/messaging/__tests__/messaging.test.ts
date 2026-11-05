@@ -255,59 +255,6 @@ describe("answering", () => {
   });
 });
 
-describe("answers that arrive while the asker is running", () => {
-  const setup = async () => {
-    const h = await harness();
-    const item = await h.startItem("sam");
-    const q1 = await h.messaging.ask("sam", { to: "mira", question: "One?", workItemId: item.id });
-    const q2 = await h.messaging.ask("sam", { to: "noor", question: "Two?", workItemId: item.id });
-    await h.messaging.answer("mira", q1.id, "Answer one.");
-    await h.messaging.answer("noor", q2.id, "Answer two.");
-    return { h, item, q1, q2 };
-  };
-
-  it("waits, undelivered, while the asker is active", async () => {
-    const { h, item } = await setup();
-    expect((await h.store.getItem(item.id))?.status).toBe("active");
-    expect(await h.store.listUndelivered(item.id)).toHaveLength(2);
-  });
-
-  it("requeues the asker at hand-back with every answer in its journal", async () => {
-    const { h, item } = await setup();
-    h.notified.length = 0;
-    await h.scheduler.finish(item.id, { outcome: "waiting", status: "waiting" });
-    await h.messaging.onHandBack(item.id, "waiting");
-    expect((await h.store.getItem(item.id))?.status).toBe("queued");
-    expect(await h.store.listUndelivered(item.id)).toEqual([]);
-    const text = (await h.store.readJournal(item.id)).map((j) => j.text).join("\n");
-    expect(text).toContain("arrived while you were working");
-    expect(text).toContain("Answer one.");
-    expect(text).toContain("Answer two.");
-    expect(h.notified).toEqual(["sam"]);
-
-    // Delivered once: a second hand-back does nothing.
-    await h.messaging.onHandBack(item.id, "waiting");
-    expect(h.notified).toEqual(["sam"]);
-  });
-
-  it("does nothing while the item is still active, for blocked hand-backs, or without answers", async () => {
-    const { h, item } = await setup();
-    await h.messaging.onHandBack(item.id, "waiting");
-    expect(await h.store.listUndelivered(item.id)).toHaveLength(2);
-    await h.messaging.onHandBack(item.id, "blocked");
-    expect(await h.store.listUndelivered(item.id)).toHaveLength(2);
-    await h.messaging.onHandBack("missing", "waiting");
-  });
-
-  it("starts a follow-up when the asker handed back as done", async () => {
-    const { h, item } = await setup();
-    await h.scheduler.finish(item.id, { outcome: "done", status: "done" });
-    await h.messaging.onHandBack(item.id, "done");
-    const [follow] = await h.store.listItems({ person: "sam", status: "queued" });
-    expect(follow?.parentId).toBe(item.id);
-  });
-});
-
 describe("loop guard", () => {
   it("blocks a resumed asker that keeps cycling through questions", async () => {
     const h = await harness({ maxRuns: 2 });

@@ -75,7 +75,7 @@ export const offerContextSchema = z.strictObject({
     .array(feedbackSchema)
     .optional()
     .describe(
-      "For a review round: the reviews and comments it covers, oldest first. Feedback that arrives while the item is queued is added; what arrives while it runs starts a follow-up round.",
+      "For a review round: the reviews and comments it covers, oldest first. Feedback that arrives while the item is queued is added; what arrives while it runs goes into the one round after its hand-back.",
     ),
   conversation: z
     .array(conversationEntrySchema)

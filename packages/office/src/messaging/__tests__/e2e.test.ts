@@ -11,6 +11,7 @@ import { createProtocolServer } from "#/protocol/server.js";
 import type { ProtocolServer } from "#/protocol/types.js";
 import { harness, storeSource } from "./test-support.js";
 import { createMessaging } from "#/messaging/messaging.js";
+import { createOfficeRounds } from "#/office-rounds.js";
 import { fakeTeam } from "@outstaff/testing.office";
 
 type Harness = Awaited<ReturnType<typeof harness>>;
@@ -179,7 +180,16 @@ describe("agent-to-agent questions through the real server and client", () => {
 describe("an answer that arrives while the asker is still running", () => {
   it("is delivered when the asker hands back as waiting", async () => {
     const h = await harness();
-    const source = storeSource(h.store, h.scheduler, h.team);
+    const rounds = createOfficeRounds({
+      store: h.store,
+      scheduler: h.scheduler,
+      workState: { ticket: () => undefined },
+      team: h.team,
+      logger: { info() {} },
+      notify: (p) => server.notify(p),
+    });
+
+    const source = storeSource(h.store, h.scheduler, h.team, (id) => rounds.followUp(id));
     const messaging = createMessaging({
       store: h.store,
       scheduler: h.scheduler,

@@ -155,7 +155,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
   const started = createStarted({ store, workState, judge, log });
   const handedBack = createHandedBack({ store, workState, judge, log });
   const idle = createIdlePull({ ...pipelineOptions, pipeline });
-  const rounds = createOfficeRounds({ store, scheduler, workState, team, logger: log });
+  const rounds = createOfficeRounds({ store, scheduler, workState, team, logger: log, notify });
 
   // An item the scheduler blocked: the report the blocked agent owes the requester (queued, so the agent posts it as
   // itself). The office posts nothing.
