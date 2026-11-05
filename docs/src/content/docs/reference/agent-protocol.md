@@ -477,6 +477,26 @@ Sent by: office.
 | `humans`                      | list of objects                              | no       | The trusted humans of the team.                                       |
 | `humans[].name`               | string                                       | yes      |                                                                       |
 
+### `resolve_role`
+
+Asks who gets work for a role, routed as `ask` routes a question to a role: the least busy person with it (queued plus active items, ties by team order), never the caller for its own role. A role nobody has is refused.
+
+Sent by: agent. Answered by: `resolve_role_result`, `error`.
+
+| Field  | Type   | Required | Description                                      |
+| ------ | ------ | -------- | ------------------------------------------------ |
+| `role` | string | yes      | The role to give work to, for example developer. |
+
+### `resolve_role_result`
+
+The person the role resolved to.
+
+Sent by: office.
+
+| Field    | Type   | Required | Description                      |
+| -------- | ------ | -------- | -------------------------------- |
+| `handle` | string | yes      | The person the role resolved to. |
+
 ### `work_made`
 
 Tells the office what the caller made in a work item: a ticket it created, or a pull request it opened and the ticket that pull request links to. The office records them on the item, so the item's hand-back also gives those tickets, once in review, to the person who asked.

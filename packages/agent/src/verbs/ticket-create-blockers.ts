@@ -6,9 +6,13 @@ const CLOSED = new Set(["done", "canceled"]);
 export const blockerIssues = (tracker: Tracker, keys: string[] | undefined): Promise<Issue[]> =>
   Promise.all([...new Set(keys ?? [])].map((k) => tracker.getIssue(k)));
 
-/** Whether the new ticket starts blocked: any of its blockers is still open, and it is not a chat session's work. */
-export const startsBlocked = (blockers: Issue[], chat: boolean): boolean =>
-  !chat && blockers.some((b) => !CLOSED.has(b.status.canonical ?? ""));
+/** The keys of the blockers still open (not done or canceled): with any, the new ticket starts blocked, from a chat session or not. */
+export const openBlockerKeys = (blockers: Issue[]): string[] =>
+  blockers.filter((b) => !CLOSED.has(b.status.canonical ?? "")).map((b) => b.key);
+
+/** The open blockers the new ticket waits on: none unless it started blocked (a backlog ticket does not). */
+export const waitingOn = (issue: Issue, blockers: Issue[]): string[] =>
+  issue.status.canonical === "blocked" ? openBlockerKeys(blockers) : [];
 
 /**
  * Links each blocker as blocking the new ticket. The ticket exists already, so a link the tracker refuses is reported

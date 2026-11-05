@@ -7,7 +7,7 @@ export {
 
 export { mirror } from "./mirror.js";
 export { loadByPerson, readRoster } from "./roster.js";
-export { routeQuestion } from "./routing.js";
+export { routeQuestion, routeRole } from "./routing.js";
 export type {
   MessagingOptions,
   MirrorOptions,

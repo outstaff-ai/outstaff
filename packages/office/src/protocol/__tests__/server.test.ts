@@ -572,6 +572,12 @@ describe("protocol server", () => {
       expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
     });
 
+    it("says resolve_role is unsupported without messaging", async () => {
+      const a = await login();
+      a.send("resolve_role", { role: "reviewer" });
+      expect((await a.next("error")).payload).toMatchObject({ code: "unsupported" });
+    });
+
     it("says ticket_prs is unsupported without a ticket desk", async () => {
       const a = await login("ada", tokens.ada);
       a.send("ticket_prs", { headRef: "feat/x", title: "x", body: "" });
@@ -853,6 +859,10 @@ describe("protocol server with messaging", () => {
       async answer(from, id, answer) {
         asked.push({ from, id, answer });
       },
+      async resolveRole(from, role) {
+        asked.push({ from, role });
+        return "noor";
+      },
     };
 
     const server = createProtocolServer({
@@ -878,9 +888,12 @@ describe("protocol server with messaging", () => {
 
     a.send("answer", { questionId: "q9", answer: "Yes" });
     await a.next("ack");
+    a.send("resolve_role", { role: "reviewer" });
+    expect((await a.next("resolve_role_result")).payload).toEqual({ handle: "noor" });
     expect(asked).toEqual([
       { from: "ada", to: "noor", question: "Ok?", workItemId: "w1" },
       { from: "ada", id: "q9", answer: "Yes" },
+      { from: "ada", role: "reviewer" },
     ]);
 
     a.ws.terminate();

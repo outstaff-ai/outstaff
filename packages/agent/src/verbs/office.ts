@@ -1,3 +1,4 @@
+import { PortError } from "@outstaff/core";
 import type { Attached, Filed, TicketUsage } from "@outstaff/protocol";
 import type {
   OfficeWorkItem,
@@ -74,6 +75,7 @@ export function createFakeOffice(
   } = {},
 ): FakeOffice {
   const asked: FakeOffice["asked"] = [];
+  const rolesResolved: string[] = [];
   const answered: FakeOffice["answered"] = [];
   const placed: FakeOffice["placed"] = [];
   const linked: FakeOffice["linked"] = [];
@@ -228,6 +230,16 @@ export function createFakeOffice(
     },
     async team() {
       return { members: opts.team ?? [], humans: opts.humans ?? [] };
+    },
+    rolesResolved,
+    async resolveRole(role) {
+      rolesResolved.push(role);
+      const to = opts.team?.find((m) => m.role === role);
+      if (!to) {
+        throw new PortError("not_found", `no ${role} on this team; ask a human`);
+      }
+
+      return to.handle;
     },
   };
 }

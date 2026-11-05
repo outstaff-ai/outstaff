@@ -2765,6 +2765,19 @@
         {
           "type": "object",
           "properties": {
+            "open_blockers": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "open_blockers"
+          ],
+          "additionalProperties": false,
+          "description": "A ticket that blocks this one is still open, not done or canceled (or, with false, none is)."
+        },
+        {
+          "type": "object",
+          "properties": {
             "actor_in_round": {
               "type": "boolean"
             }

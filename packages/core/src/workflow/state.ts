@@ -15,6 +15,7 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
     handedBack: (t) => data.tickets?.[t]?.handedBack ?? false,
     lastWorker: (t) => data.tickets?.[t]?.lastWorker,
     blockedAgent: (t) => data.tickets?.[t]?.blockedAgent,
+    openBlockers: (t) => data.tickets?.[t]?.openBlockers ?? [],
     inRound: (t, person, at) =>
       (data.tickets?.[t]?.rounds ?? []).some(
         (r) =>

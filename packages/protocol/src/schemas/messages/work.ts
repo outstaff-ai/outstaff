@@ -17,6 +17,16 @@ export const workMessages = [
   message("answer", z.strictObject({ questionId: z.string().min(1), answer: text })),
   message("roster", empty),
   message(
+    "resolve_role",
+    z.strictObject({
+      role: z.string().min(1).max(30).describe("The role to give work to, for example developer."),
+    }),
+  ),
+  message(
+    "resolve_role_result",
+    z.strictObject({ handle: z.string().min(1).describe("The person the role resolved to.") }),
+  ),
+  message(
     "roster_result",
     z.strictObject({
       members: z.array(memberSchema),

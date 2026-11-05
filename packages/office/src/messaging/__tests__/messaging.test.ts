@@ -135,6 +135,48 @@ describe("routing a question", () => {
   });
 });
 
+describe("resolving a role", () => {
+  it("gives the least busy person with the role, with ties in team order", async () => {
+    const h = await harness();
+    expect(await h.messaging.resolveRole("noor", "architect")).toBe("mira");
+    await h.scheduler.enqueue({ person: "mira", kind: "ticket", title: "t", trigger: "human" });
+    expect(await h.messaging.resolveRole("noor", "architect")).toBe("lena");
+    expect(await h.store.listItems({ person: "lena" })).toEqual([]);
+  });
+
+  it("leaves the caller out of its own role", async () => {
+    const h = await harness();
+    await h.startItem("kit");
+    expect(await h.messaging.resolveRole("sam", "developer")).toBe("kit");
+  });
+
+  it("matches a role only, never a handle", async () => {
+    const h = await harness();
+    expect(await rejection(h.messaging.resolveRole("noor", "sam"))).toMatchObject({
+      code: "not_found",
+      message: "no sam on this team; ask a human",
+    });
+  });
+
+  it("refuses a role nobody has, an unknown role and the caller's own when nobody else has it", async () => {
+    const h = await harness();
+    expect(await rejection(h.messaging.resolveRole("sam", "devops"))).toMatchObject({
+      code: "not_found",
+      message: "no devops on this team; ask a human",
+    });
+
+    expect(await rejection(h.messaging.resolveRole("sam", "astronaut"))).toMatchObject({
+      code: "not_found",
+      message: "no astronaut on this team; ask a human",
+    });
+
+    expect(await rejection(h.messaging.resolveRole("noor", "reviewer"))).toMatchObject({
+      code: "not_found",
+      message: "no other reviewer on this team; ask a human",
+    });
+  });
+});
+
 describe("depth limit", () => {
   it("refuses a question beyond the maximum depth", async () => {
     const h = await harness({ maxDepth: 2 });

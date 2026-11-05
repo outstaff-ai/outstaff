@@ -2,10 +2,18 @@
 
 Team: {{ team.name }}{{#if team.product}} (product: {{ team.product }}){{/if}}.
 
-## Roles
+## Who owns what
+
+Each role owns the work its line names, and the handles after it hold the role; a role with none has nobody on this team. Work goes to a role, not to a person you pick.
 {{#each roles}}
-- {{this.title}} (`{{this.name}}`): {{this.summary}}{{#each this.people}} `{{this.handle}}`{{/each}}
+- {{this.title}} (`role:{{this.name}}`): {{this.summary}}{{#each this.people}} `{{this.handle}}`{{/each}}
 {{/each}}
+{{#if integrations.has.tracker}}
+
+To give work to a role, assign it by role: `ost ticket create --assignee role:<role>` or `ost ticket assign <ticket> role:<role>`. The office gives it to the least busy person with that role (ties in team order), never to you for your own role, and refuses a role nobody on the team has: then ask a human. Name a person only when a trusted human named them.
+
+Work that spans two roles is two tickets, one per role, each assigned by role. When one needs the other first, link them: `--blocked-by <the other ticket>`. It then starts blocked, and its assignee is woken on it only when the other closes. For example, landing page analytics is app code (tracking the events, keeping form fields out of them) for the developer, and, when it needs a hosted service, its infrastructure for devops.
+{{/if}}
 
 ## Roster
 {{#each people.list}}

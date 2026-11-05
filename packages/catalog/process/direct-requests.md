@@ -37,7 +37,9 @@ Never say you will do something "later" or "in a later round" unless that work e
 
    A feature, a request too large for one piece of work, is still one ticket: the work of writing its plan section, which then goes to the PM to place on the roadmap. Never file its breakdown from chat.
 
-   When the requester asks for the ticket to go to someone else on the team, add `--assignee <them>`. The ticket is then theirs: it starts `ready`, assigned to them, and the assignment wakes them. Nothing is filed as your work, and you do not work on it. Say in your last message who has it, with the ticket link; it is posted in the thread.
+   When the requester asks for the ticket to go to someone else on the team, add `--assignee <them>`. When the work belongs to another role ("Who owns what" in `references/team.md`), add `--assignee role:<role>`: the office gives it to the least busy person with that role. The ticket is then theirs: it starts `ready`, assigned to them, and the assignment wakes them. Nothing is filed as your work, and you do not work on it. Say in your last message who has it, with the ticket link; it is posted in the thread.
+
+   A request that spans two roles is one ticket per role, each assigned by role, for example the app part to `role:developer` and the infrastructure part to `role:devops`. When one needs the other first, file that one first and pass `--blocked-by <its key>` on the other: it starts blocked, and its assignee is woken on it only when the first one closes. A ticket of your own that starts blocked is not your work yet either: it waits for its blocker, and you are woken on it when that closes.
 
 4. **Planning** ("this needs better planning", "can these be split?", "regroup these tickets", "plan the next milestone"): planning ends in a proposal a trusted human confirms, in chat as anywhere (`process/ticket-lifecycle.md`, "Planning work for others"). Do not file, re-parent or move anything yet. Read what exists (`ost milestone list`, `ost milestone show`, `ost ticket list`), then answer with the proposal in your last message: the milestones (existing or new), which tickets go in which, the tickets to file or change, and ask the requester to confirm. A longer plan goes in a document you link (ask the PM or the owning role to write it, `ost ask`). Their confirmation, a reply in the thread or a comment on the plan document, starts a new session: file the confirmed plan in it, all of it (`ost milestone create`, `ost ticket create --milestone <id>`, `ost milestone add <id> --ticket <key>` for tickets that exist), and your agent acknowledges everything you filed in one reply.
 
@@ -85,7 +87,7 @@ A few chat sessions run at once (two by default; the team sets `policies.chat.pa
 
 ## Later or another role
 
-File for later only if the human says "later", or the work clearly belongs to another role. Say so in your last message, then use `ost ask <role>` or hand it to that role.
+File for later only if the human says "later", or the work clearly belongs to another role. Say so in your last message. Work for another role goes to that role{{#if integrations.has.tracker}}: a ticket assigned by role (`--assignee role:<role>`, above){{/if}}; a question for it goes with `ost ask <role>`.
 
 ## Closing the loop
 

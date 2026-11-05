@@ -108,6 +108,9 @@ export interface WorkflowState {
    */
   blockedAgent(ticket: string): string | undefined;
 
+  /** The tickets that block the ticket and are still open (not done or canceled). */
+  openBlockers(ticket: string): string[];
+
   /** Whether the agent had a round on the ticket under way at that time (ISO-8601). */
   inRound(ticket: string, person: string, at: string): boolean;
 
@@ -209,6 +212,7 @@ export type Condition =
   | { open_subtickets: boolean }
   | { in_milestone: boolean }
   | { blocked_agent: boolean }
+  | { open_blockers: boolean }
   | { actor_in_round: boolean };
 
 export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
@@ -225,6 +229,9 @@ export interface StaticTicket {
 
   /** The agent blocked on the ticket. */
   blockedAgent?: string;
+
+  /** The tickets that block it and are still open. */
+  openBlockers?: string[];
 
   /** The agents' rounds on the ticket. */
   rounds?: StaticRound[];

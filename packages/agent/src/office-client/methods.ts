@@ -107,6 +107,10 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
       return (await call("work_status", { workItemIds }, "work_status_result")).items;
     },
 
+    async resolveRole(role) {
+      return (await call("resolve_role", { role }, "resolve_role_result")).handle;
+    },
+
     async team(): Promise<OfficeTeam> {
       const r = await call("roster", {}, "roster_result");
       return {

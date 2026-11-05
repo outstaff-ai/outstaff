@@ -1,6 +1,6 @@
 name: designer
 title: Designer
-summary: Produces designs and specs, and reviews the built interface against them.
+summary: Owns visual design and canvases; produces designs and specs, and reviews the built interface against them.
 permissions: docs
 needs:
   - knowledge.docs

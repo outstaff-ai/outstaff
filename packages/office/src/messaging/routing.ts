@@ -17,20 +17,34 @@ function leastBusy(people: readonly RoutablePerson[], load: ReadonlyMap<string, 
   return people.reduce((best, p) => (loadOf(p) < loadOf(best) ? p : best));
 }
 
-/**
- * Picks who answers. A handle matches exactly and wins over a role of the same name. A role goes to the least busy
- * person with it (fewest queued and active items, ties by team order). Asking your own role means a peer, so the
- * asker is left out.
- */
-export function routeQuestion(input: {
+interface RouteInput {
   from: string;
   to: string;
   people: readonly RoutablePerson[];
 
   /** Queued plus active items per handle. */
   load: ReadonlyMap<string, number>;
-}): Route {
+}
+
+/**
+ * Picks the person for a role: the least busy person with it (fewest queued and active items, ties by team order).
+ * The caller's own role means a peer, so the caller is left out. A role nobody has is refused: ask a human.
+ */
+export function routeRole(input: RouteInput): Route {
   const { from, to, people, load } = input;
+  const candidates = people.filter((p) => p.role === to && p.handle !== from);
+  if (candidates.length === 0) {
+    return noOne(to, people.find((p) => p.handle === from)?.role === to);
+  }
+
+  return { ok: true, handle: leastBusy(candidates, load).handle };
+}
+
+/**
+ * Picks who answers. A handle matches exactly and wins over a role of the same name; a role goes as `routeRole` says.
+ */
+export function routeQuestion(input: RouteInput): Route {
+  const { from, to, people } = input;
   if (to === from) {
     return { ok: false, code: "invalid", message: "You cannot ask yourself." };
   }
@@ -39,10 +53,5 @@ export function routeQuestion(input: {
     return { ok: true, handle: to };
   }
 
-  const candidates = people.filter((p) => p.role === to && p.handle !== from);
-  if (candidates.length === 0) {
-    return noOne(to, people.find((p) => p.handle === from)?.role === to);
-  }
-
-  return { ok: true, handle: leastBusy(candidates, load).handle };
+  return routeRole(input);
 }

@@ -190,4 +190,19 @@ describe("work state: closing a ticket unblocks the tickets it blocks", () => {
       blockedBy: [{ key: blocker, status: "active" }],
     });
   });
+
+  it("names the blockers still open, for the policies, until they close", async () => {
+    const open = await ticket("Open blocker", "active");
+    const closed = await ticket("Closed blocker", "done");
+    const blocked = await ticket("Blocked", "blocked");
+    await tracker.link(open, blocked, "blocks");
+    await tracker.link(closed, blocked, "blocks");
+    await Promise.all([moved(open), moved(blocked)]);
+    expect(ws.openBlockers(blocked)).toEqual([open]);
+    expect(ws.openBlockers("SHOP-404")).toEqual([]);
+
+    await close(open, "done");
+    expect(ws.openBlockers(blocked)).toEqual([]);
+    expect(unblocked()).toMatchObject([{ ticket: blocked, blocker: open }]);
+  });
 });

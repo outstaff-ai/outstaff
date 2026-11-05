@@ -73,4 +73,55 @@ describe("ticket.create from a chat session", () => {
     await expect(f.tracker.getIssue("SHOP-1")).rejects.toMatchObject({ code: "not_found" });
     expect(f.office.filedFor).toEqual([]);
   });
+
+  it("starts a ticket blocked on an open ticket blocked, files it for nobody now, and says who is woken when", async () => {
+    const f = await chatSession();
+    const plan = await f.tracker.createIssue({
+      title: "Plan the store",
+      body: "",
+      status: "active",
+    });
+
+    const r = await f.create({ assignee: "Noor Haddad", blockedBy: [plan.key] });
+
+    const issue = await f.tracker.getIssue("SHOP-2");
+    expect(issue.status.canonical).toBe("blocked");
+    expect(issue.assignee?.id).toBe(f.noor.id);
+    expect(f.office.linked).toEqual([]);
+    expect(f.office.filedFor).toMatchObject([{ ticket: "SHOP-2", assignee: "Noor Haddad" }]);
+    expect(r.text).toContain(
+      `It starts blocked on ${plan.key}: Noor Haddad is woken on it when the last one closes, not now.`,
+    );
+  });
+
+  it("files the caller's own ticket that starts blocked as no work item: the close of its last blocker wakes them", async () => {
+    const f = await chatSession();
+    const plan = await f.tracker.createIssue({
+      title: "Plan the store",
+      body: "",
+      status: "ready",
+    });
+
+    const r = await f.create({ blockedBy: [plan.key], say: "Will do once the plan is done." });
+
+    const issue = await f.tracker.getIssue("SHOP-2");
+    expect(issue.status.canonical).toBe("blocked");
+    expect(issue.assignee?.id).toBe(f.sam.id);
+    expect(f.office.linked).toEqual([]);
+    expect(f.office.filedFor).toMatchObject([{ ticket: "SHOP-2", assignee: "sam.duarte" }]);
+    expect(r.text).toContain("Filed as your ticket.");
+    expect(r.text).toContain(
+      `It starts blocked on ${plan.key}: you are woken on it when the last one closes`,
+    );
+  });
+
+  it("starts a ticket ready and files it as work when every blocker is closed", async () => {
+    const f = await chatSession();
+    const plan = await f.tracker.createIssue({ title: "Plan the store", body: "", status: "done" });
+    await f.create({ blockedBy: [plan.key] });
+
+    expect((await f.tracker.getIssue("SHOP-2")).status.canonical).toBe("ready");
+    expect(f.office.linked).toMatchObject([{ ticket: "SHOP-2" }]);
+    expect(f.office.filedFor).toEqual([]);
+  });
 });

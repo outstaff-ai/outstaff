@@ -876,6 +876,47 @@ describe("chat", () => {
     expect(text).toBe("Filed SHOP-9 for sam; it is theirs.");
   });
 
+  it("files work that spans two roles as one ticket per role, the second blocked by the first", async () => {
+    const results = [
+      "Created SHOP-9.\nRole architect went to mira.",
+      "Created SHOP-10.\nRole developer went to sam.",
+    ];
+
+    const { seen, text } = await play(
+      chat(
+        talk([
+          false,
+          "New work by role: architect: Plan the analytics store; then developer: Track page views",
+        ]),
+      ),
+      () => results.shift() ?? "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "ticket_create",
+        input: {
+          title: "Plan the analytics store",
+          body: "Plan the analytics store",
+          assignee: "role:architect",
+        },
+      },
+      {
+        type: "tool",
+        tool: "ticket_create",
+        input: {
+          title: "Track page views",
+          body: "Track page views",
+          assignee: "role:developer",
+          blockedBy: ["SHOP-9"],
+        },
+      },
+    ]);
+
+    expect(text).toBe("Filed SHOP-9 for mira and SHOP-10 for sam, which waits on it.");
+  });
+
   it("answers a question in the thread of running work without attaching", async () => {
     const { seen, text } = await play(
       chat({

@@ -33,6 +33,10 @@ export const serviceHandlers: RequestHandlers = {
     await messaging.answer(person, payload.questionId, payload.answer);
     reply("ack", {});
   },
+  async resolve_role({ ctx, person, payload, reply }) {
+    const messaging = required(ctx.opts.messaging, NO_QUESTIONS);
+    reply("resolve_role_result", { handle: await messaging.resolveRole(person, payload.role) });
+  },
   async roster({ ctx, reply }) {
     const { messaging, source } = ctx.opts;
     reply(

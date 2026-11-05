@@ -46,7 +46,7 @@ When you plan work that others will build (a design, a milestone, a re-plan), th
 2. Share the plan for review: link it from the ticket and ask a trusted human to confirm it. List each open decision with its options and your recommendation.
 3. Iterate on it: answer their comments and revise the plan. Comments on the document reach you as in `process/doc-feedback.md`, comments on the ticket as in "Rules" above.
 4. File the tickets for its pieces only once a trusted human has confirmed the plan, or said it needs no confirmation. Until then, keep working: on the plan, on feedback and on other work. Hand back as `process/hand-back.md` says.
-5. Then file the tickets from the confirmed breakdown for the pieces that can start now (below, "A ticket must be executable when it is filed"), each linking the plan, with the dependencies of the breakdown as links (`--blocked-by`), not as text. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
+5. Then file the tickets from the confirmed breakdown for the pieces that can start now (below, "A ticket must be executable when it is filed"), each linking the plan, with the dependencies of the breakdown as links (`--blocked-by`), not as text. Assign each piece by role, not to a person you pick: `--assignee role:<role>` (`references/team.md`, "Who owns what"); a piece that spans two roles is one ticket per role. When the plan changes later, edit or cancel the tickets it affects (`ost ticket edit`, or cancel with a comment that links the change).
 
 Splitting your own ticket into sub-tickets for its pull requests is different: follow "One pull request per ticket" below.
 

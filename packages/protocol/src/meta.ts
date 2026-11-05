@@ -90,6 +90,13 @@ export const MESSAGE_META = {
     replies: ["roster_result", "error"],
   },
   roster_result: { from: "office", summary: "The team.", replies: [] },
+  resolve_role: {
+    from: "agent",
+    summary:
+      "Asks who gets work for a role, routed as `ask` routes a question to a role: the least busy person with it (queued plus active items, ties by team order), never the caller for its own role. A role nobody has is refused.",
+    replies: ["resolve_role_result", "error"],
+  },
+  resolve_role_result: { from: "office", summary: "The person the role resolved to.", replies: [] },
   ...WORK_MESSAGE_META,
   chat_message: {
     from: "agent",
