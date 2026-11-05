@@ -1,5 +1,6 @@
 import type { StaticTicket } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
+import { describeDecision } from "#/pipeline/describe.js";
 import {
   BUILT_IN_POLICIES,
   evaluatePipeline,
@@ -30,12 +31,32 @@ const back = (status: string, data: Record<string, unknown> = {}) =>
 
 const world = (status: StaticTicket["status"], assignee: string | undefined = "sam") => ({
   tickets: { "ACME-1": t(status, assignee, { requester: "ada.admin" }) },
-  prs: [pr(9, { url: "https://github.example/acme-example/shop/pull/9" }), pr(10, { draft: true })],
+  prs: [
+    pr(9, { url: "https://github.example/acme-example/shop/pull/9", head: "a1" }),
+    pr(10, { draft: true }),
+  ],
   links: { 9: "ACME-1", 10: "ACME-1" },
 });
 
 const notices = (e: Parameters<typeof traceOf>[0], w: Parameters<typeof traceOf>[1]) =>
   traceOf(e, w).decisions.filter((d) => d.policy === ID);
+
+/** Ada with a chat identity: her chat threads with the agent tie tickets. */
+const WITH_CHAT = {
+  ...OPTS,
+  humans: [
+    { name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "ada.admin", chat: "U0ADA" } },
+  ],
+};
+
+const judgeChat = (e: Parameters<typeof traceOf>[0], w: Parameters<typeof traceOf>[1]) =>
+  evaluatePipeline(e, stateOf(w), BUILT_IN_POLICIES, WITH_CHAT)
+    .decisions.filter((d) => d.policy === ID)
+    .map(describeDecision);
+
+/** The ticket as a round found it: in review with Ada, after an earlier hand-back. */
+const WITH_ADA = { status: "review", assignee: { id: "ada.admin", kind: "human" } };
+const SEEN = { human: "ada.admin", prs: { "acme-example/shop#9": "a1" } };
 
 describe("notify_human_on_handoff", () => {
   it("tells the requester of a hand-back as done, with the ticket's pull requests open for review and the summary", () => {
@@ -55,6 +76,7 @@ describe("notify_human_on_handoff", () => {
           },
         ],
         text: "Added the greeting.\nNothing else needed.",
+        seen: SEEN,
       },
     ]);
   });
@@ -81,7 +103,7 @@ describe("notify_human_on_handoff", () => {
       "notify ada.admin in chat, as sam (review) of ACME-4 with acme-example/shop#12",
     ]);
 
-    expect(judge(ID, handedBack({ chat: true }), split())).toEqual([
+    expect(judgeChat(handedBack({ chat: ["U0ADA"] }), split())).toEqual([
       "notify ada.admin of nothing more of ACME-1: told in the chat thread the work came from",
       "notify ada.admin of nothing more of ACME-2: told in the chat thread the work came from",
       "notify ada.admin of nothing more of ACME-4: told in the chat thread the work came from",
@@ -108,9 +130,81 @@ describe("notify_human_on_handoff", () => {
     ]);
   });
 
-  it("sends nothing more for work from a chat thread, which gets the result", () => {
-    expect(judge(ID, back("done", { chat: true }), world("active"))).toEqual([
+  it("sends nothing more for a round that posts its own result in a chat thread with the human", () => {
+    expect(judgeChat(back("done", { chat: ["U0ADA"] }), world("active"))).toEqual([
       "notify ada.admin of nothing more of ACME-1: told in the chat thread the work came from",
+    ]);
+
+    // The thread was with someone else, or the human has no chat identity: they are told.
+    const news = ["notify ada.admin in chat, as sam (review) of ACME-1 with acme-example/shop#9"];
+    expect(judgeChat(back("done", { chat: ["U0GRACE"] }), world("active"))).toEqual(news);
+    expect(judge(ID, back("done", { chat: ["U0ADA"] }), world("active"))).toEqual(news);
+  });
+
+  it("tells of a later round on work from chat only what is new: a new head, not the same one", () => {
+    // A rebase round on a ticket filed from chat: its round reports to no thread of its own, so the notice is made, and
+    // the office posts it in the ticket's chat thread (see the notice desk).
+    const rebase = back("done", { kind: "rebase", before: WITH_ADA, notified: SEEN });
+    const pushed = { ...world("review", "ada.admin"), prs: [pr(9, { head: "b2" })] };
+    expect(notices(rebase, pushed)).toMatchObject([
+      {
+        type: "notify",
+        human: "ada.admin",
+        ticket: "ACME-1",
+        seen: { human: "ada.admin", prs: { "acme-example/shop#9": "b2" } },
+      },
+    ]);
+
+    expect(judgeChat(rebase, world("review", "ada.admin"))).toEqual([
+      "drop: nothing new for ada.admin: ACME-1 was in review with ada.admin already, with the pull request heads they were told of",
+    ]);
+  });
+
+  it("tells nothing of a round that left nothing new for the human, decided from the state", () => {
+    const round = (kind: string, data: Record<string, unknown> = {}) =>
+      back("done", { kind, before: WITH_ADA, notified: SEEN, ...data });
+
+    // A merge round on a pull request that is already merged: nothing is open for review, whatever was told before.
+    const merged = {
+      ...world("review", "ada.admin"),
+      prs: [pr(9, { state: "merged", head: "a1" })],
+    };
+
+    const none =
+      "drop: nothing new for ada.admin: ACME-1 was in review with ada.admin already, and no pull request of it is open for review";
+
+    expect(judge(ID, round("merge"), merged)).toEqual([none]);
+    expect(judge(ID, round("merge", { notified: undefined }), merged)).toEqual([none]);
+
+    // A rebase round that pushed nothing: the head the human was told of.
+    expect(judge(ID, round("rebase"), world("review", "ada.admin"))).toEqual([
+      "drop: nothing new for ada.admin: ACME-1 was in review with ada.admin already, with the pull request heads they were told of",
+    ]);
+
+    // A rebase that pushed a new head, a last notice to someone else, or none remembered: the pull request is news.
+    const news = ["notify ada.admin in chat, as sam (review) of ACME-1 with acme-example/shop#9"];
+    const pushed = { ...world("review", "ada.admin"), prs: [pr(9, { head: "b2" })] };
+    expect(judge(ID, round("rebase"), pushed)).toEqual(news);
+    const toGrace = round("rebase", { notified: { ...SEEN, human: "grace.lead" } });
+    expect(judge(ID, toGrace, world("review", "ada.admin"))).toEqual(news);
+    const unknown = round("rebase", { notified: undefined });
+    expect(judge(ID, unknown, world("review", "ada.admin"))).toEqual(news);
+
+    // A round the human's feedback started had the ticket back with the agent: handing it back is news.
+    const feedback = round("review_feedback", {
+      before: { status: "active", assignee: { id: "sam", kind: "agent" } },
+    });
+
+    expect(judge(ID, feedback, world("active"))).toEqual(news);
+  });
+
+  it("tells the human once of a pull request newly opened for review, and remembers its head", () => {
+    const opened = back("done", {
+      before: { status: "ready", assignee: { id: "sam", kind: "agent" } },
+    });
+
+    expect(notices(opened, world("active"))).toMatchObject([
+      { type: "notify", human: "ada.admin", ticket: "ACME-1", seen: SEEN },
     ]);
   });
 

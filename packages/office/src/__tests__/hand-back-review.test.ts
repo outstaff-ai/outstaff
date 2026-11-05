@@ -35,6 +35,7 @@ function workStateOf() {
     repoPrs: () => [],
     subTickets: () => [],
     refreshTicket: async (key: string, by?: unknown) => void refreshed.push([key, by]),
+    refreshPrsOf: async () => {},
   };
 }
 

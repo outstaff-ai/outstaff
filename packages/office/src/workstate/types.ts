@@ -234,6 +234,9 @@ export interface WorkState extends WorkflowState {
    * changed it, when known: if the ticket turns out closed now, the tickets it unblocked name them.
    */
   refreshTicket(key: string, by?: WorkflowEvent["actor"]): Promise<void>;
+
+  /** Re-reads the ticket's open pull requests from the code host, for heads an agent may have pushed since the last poll. */
+  refreshPrsOf(key: string): Promise<void>;
   currentWork(person: string): CurrentWork;
 
   /**

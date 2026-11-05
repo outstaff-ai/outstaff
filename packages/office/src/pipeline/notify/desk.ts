@@ -2,9 +2,17 @@ import { humanOf } from "#/office-requester.js";
 import type { Notify } from "#/pipeline/decisions.types.js";
 import { createNoticeBook, recentSent } from "./book.js";
 import { holdNotice, keysOf } from "./held.js";
-import type { NoticeBook, NoticeDesk, NoticeDeskOptions, PendingNotices } from "./notify.types.js";
+import type {
+  NoticeBook,
+  NoticeDesk,
+  NoticeDeskOptions,
+  NoticeEntry,
+  NoticeThread,
+  PendingNotices,
+} from "./notify.types.js";
 import { groupNotices, renderNotice } from "./render.js";
-import { askedInChat } from "./asked.js";
+import { askedInChat, tiedThread } from "./asked.js";
+import { writeNotified } from "./seen.js";
 import { escalationText } from "./text.js";
 
 /** How long a notice waits for more to join it, when the team sets nothing (`pipeline.notify.debounce_seconds`). */
@@ -20,6 +28,18 @@ export const debounceSeconds = (team: NoticeDeskOptions["team"]) =>
 
 /** A round that runs on and on holds its notices no longer than this. */
 export const MAX_HOLD_MS = 30 * 60 * 1000;
+
+/** A human's held notices by where they go: the direct message to `chat`, or a chat thread, in the order they came. */
+function destinations(entries: readonly NoticeEntry[], chat: string) {
+  const out = new Map<string, [{ to: string } | NoticeThread, NoticeEntry[]]>();
+  for (const e of entries) {
+    const key = e.thread ? `${e.thread.channel}:${e.thread.thread}` : "";
+    const [where, held] = out.get(key) ?? [e.thread ?? { to: chat }, []];
+    out.set(key, [where, [...held, e]]);
+  }
+
+  return [...out.values()];
+}
 
 /**
  * The notices of the pipeline, sent by the agent each is from as one direct message per human. A notice waits for
@@ -81,7 +101,43 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
     return { body: renderNotice(items), keys: groups.flatMap((g) => keysOf(p.human, g)) };
   }
 
-  /** Sends one human's notices, or logs why it cannot; what the human was told, to remember. */
+  /** One message: in the human's direct messages (`to`), or as a reply in a chat thread with them. */
+  async function post(
+    p: PendingNotices,
+    where: { to: string } | NoticeThread,
+    sent: ReadonlySet<string>,
+  ): Promise<string[]> {
+    const m = await message(p, sent);
+    if (!m) {
+      return [];
+    }
+
+    const first = p.entries[0]!.event;
+    const thread = "to" in where ? "" : `:${where.channel}:${where.thread}`;
+    await opts.acts.send(p.as, {
+      id: `notify:${first}:${p.as}:${p.human}${thread}`,
+      ops: [
+        "to" in where
+          ? { op: "chat_dm", to: where.to, body: m.body }
+          : { op: "chat_reply", channel: where.channel, thread: where.thread, body: m.body },
+      ],
+      event: first,
+    });
+
+    log.info(
+      `notify: ${p.as} tells ${p.human} in chat${thread ? ` (thread ${thread.slice(1)})` : ""}`,
+      {
+        events: p.entries.map((e) => e.event),
+      },
+    );
+
+    return m.keys;
+  }
+
+  /**
+   * Sends one human's notices, or logs why it cannot; what the human was told, to remember. Notices about tickets tied
+   * to a chat thread with them go as a reply in that thread, the rest as one direct message.
+   */
   async function send(p: PendingNotices, b: NoticeBook, at: Date): Promise<string[]> {
     const chat = humanOf(team, p.human)?.identities.chat;
     if (!chat) {
@@ -94,20 +150,12 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
     }
 
     const sent = new Set(recentSent(b, at.getTime()).map((s) => s.key));
-    const m = await message(p, sent);
-    if (!m) {
-      return [];
+    const told: string[] = [];
+    for (const [where, entries] of destinations(p.entries, chat)) {
+      told.push(...(await post({ ...p, entries }, where, sent)));
     }
 
-    const first = p.entries[0]!.event;
-    await opts.acts.send(p.as, {
-      id: `notify:${first}:${p.as}:${p.human}`,
-      ops: [{ op: "chat_dm", to: chat, body: m.body }],
-      event: first,
-    });
-
-    log.info(`notify: ${p.as} tells ${p.human} in chat`, { events: p.entries.map((e) => e.event) });
-    return m.keys;
+    return told;
   }
 
   async function flush() {
@@ -154,6 +202,10 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
 
   return {
     async add(given: Notify, eventId: string, at?: string) {
+      if (given.ticket && given.seen) {
+        await writeNotified(opts.store, given.ticket, given.seen);
+      }
+
       const asked = await askedInChat(opts, given, at);
       if (asked) {
         log.info(`notify: ${given.human} asked ${given.as} for it in chat: nothing sent`, {
@@ -162,8 +214,9 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
       }
 
       const notice = asked ? { ...given, told: true } : given;
+      const thread = await tiedThread(opts, notice);
       await book.change(async (b) => ({
-        book: holdNotice(b, notice, eventId, now().toISOString()),
+        book: holdNotice(b, notice, eventId, now().toISOString(), thread),
         out: undefined,
       }));
 

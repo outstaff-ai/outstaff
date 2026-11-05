@@ -1,7 +1,9 @@
 import type { Logger, WorkflowEvent } from "@outstaff/core";
-import { readOrigin } from "./chat/origin.js";
+import type { NoticeSeen } from "@outstaff/policy";
+import { readOrigin, threadsOf } from "./chat/origin.js";
 import { itemEventSubject } from "./office-item-subject.js";
 import { PR_OPEN_SOURCE } from "./office-work-made.js";
+import { readNotified } from "./pipeline/notify/seen.js";
 import { ROUND_START } from "./round-start.js";
 import type { HandBackResult } from "./work-source.types.js";
 import type { Store, WorkItem } from "./store/types.js";
@@ -49,14 +51,16 @@ const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock", "milestone"])
 const statusOf = (item: WorkItem, result: Pick<HandBackResult, "status">) =>
   result.status === "silent" ? "silent" : item.status;
 
-/** For a silent finish: the ticket as the round found it, which it is put back to (`hand_back_silent_restores`). */
+/**
+ * The ticket as the round found it: a silent finish puts it back (`hand_back_silent_restores`), and a round that found
+ * it in review with the human it hands back to gave them nothing new (`notify_human_on_handoff`).
+ */
 async function beforeOf(
   store: Pick<Store, "getSubject">,
   item: WorkItem,
-  result: Pick<HandBackResult, "status">,
   ticket: string | undefined,
 ) {
-  if (result.status !== "silent" || !ticket) {
+  if (!ticket) {
     return undefined;
   }
 
@@ -69,14 +73,14 @@ async function beforeOf(
     : undefined;
 }
 
-/** The hand-back event's data: the item, its status and summary, and for a silent finish the ticket before the round. */
+/** The hand-back event's data: the item, its status and summary, and the ticket before the round. */
 async function dataOf(
   store: Pick<Store, "getSubject">,
   item: WorkItem,
   result: Pick<HandBackResult, "summary" | "status" | "waitingOn">,
   ticket: string | undefined,
 ) {
-  const before = await beforeOf(store, item, result, ticket);
+  const before = await beforeOf(store, item, ticket);
   return {
     workItem: item.id,
     kind: item.kind,
@@ -87,17 +91,31 @@ async function dataOf(
   };
 }
 
-/** Re-reads who last worked on what, and the tickets, as the agent's hand-back is what they are read for. */
+/**
+ * Re-reads who last worked on what, the tickets, and their open pull requests (the heads the round pushed, which a
+ * notice remembers), as the agent's hand-back is what they are read for.
+ */
 const refresh = (workState: WorkState, person: string, tickets: string[]) =>
   Promise.all([
     workState.refreshWorkers(),
     ...tickets.map((key) => workState.refreshTicket(key, { kind: "agent", id: person })),
+    ...tickets.map((key) => workState.refreshPrsOf(key)),
   ]);
 
-/** Work from a chat thread gets its result there (the chat desk's report): `chat` says so. */
-async function fromChat(store: Store, item: WorkItem): Promise<{ chat?: true }> {
+/**
+ * What the human the hand-back goes to hears of the ticket elsewhere: `chat`, the chat members whose threads the item
+ * came from or was attached from, where the chat desk posts its result; `notified`, what the last notice about the
+ * ticket put in front of its human.
+ */
+async function toldOf(
+  store: Store,
+  item: WorkItem,
+  ticket: string | undefined,
+): Promise<{ chat?: string[]; notified?: NoticeSeen }> {
   const origin = await readOrigin(store, item.id);
-  return origin && !origin.filed ? { chat: true } : {};
+  const chat = origin && !origin.filed ? threadsOf(origin).map((t) => t.requester.id) : [];
+  const notified = ticket ? await readNotified(store, ticket) : undefined;
+  return { ...(chat.length > 0 ? { chat } : {}), ...(notified ? { notified } : {}) };
 }
 
 /**
@@ -134,7 +152,7 @@ export function createHandedBack(deps: {
       actor: { kind: "agent", id: item.person },
       data: {
         ...(await dataOf(store, item, result, subject.ticket)),
-        ...(await fromChat(store, item)),
+        ...(await toldOf(store, item, subject.ticket)),
         ...made,
       },
     };

@@ -17,6 +17,15 @@ export interface NoticeEntry {
   ticket?: string | undefined;
   prs: NoticePr[];
   text?: string | undefined;
+
+  /** The chat thread with the human the ticket's work is tied to, which the notice goes to instead of a direct message. */
+  thread?: NoticeThread | undefined;
+}
+
+/** A chat thread a notice is posted in, as a reply. */
+export interface NoticeThread {
+  channel: string;
+  thread: string;
 }
 
 /** A human's notices from one agent, waiting to go as one direct message. */
@@ -59,8 +68,12 @@ export interface NoticeItem {
 
 export interface NoticeDeskOptions {
   team: Pick<TeamConfig, "humans" | "people" | "pipeline" | "office">;
-  store: Pick<Store, "getSubject" | "upsertSubject" | "listItems" | "listRuns">;
-  workState: Pick<WorkState, "inRound" | "ticket">;
+  store: Pick<
+    Store,
+    "getSubject" | "upsertSubject" | "listItems" | "listRuns" | "getItem" | "findItemRefs"
+  >;
+
+  workState: Pick<WorkState, "inRound" | "ticket" | "prsOfTicket" | "prSubject">;
   acts: Pick<ActDesk, "send">;
   clock: Clock;
   logger: Logger;

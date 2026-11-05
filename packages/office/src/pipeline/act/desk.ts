@@ -5,11 +5,13 @@ import { createActEchoes } from "./echoes.js";
 import { createActQueue } from "./pending.js";
 import { actRecords } from "./results.js";
 
-/** The tickets whose state the ops change; a comment, a custom field or a direct message changes none the office follows. */
+/** The tickets whose state the ops change; a comment, a custom field or a chat message changes none the office follows. */
 const changedTickets = (ops: ActOp[]): string[] => [
   ...new Set(
     ops.flatMap((o) =>
-      o.op === "comment" || o.op === "set_field" || o.op === "chat_dm" ? [] : [o.ticket],
+      o.op === "comment" || o.op === "set_field" || o.op === "chat_dm" || o.op === "chat_reply"
+        ? []
+        : [o.ticket],
     ),
   ),
 ];

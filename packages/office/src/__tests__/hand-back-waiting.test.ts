@@ -39,6 +39,7 @@ function workStateOf() {
     subTickets: (key: string) => [...tickets].filter(([, t]) => t.parent === key).map(([k]) => k),
     repoPrs: () => [],
     refreshTicket: async (key: string, by?: unknown) => void refreshed.push([key, by]),
+    refreshPrsOf: async () => {},
   };
 }
 

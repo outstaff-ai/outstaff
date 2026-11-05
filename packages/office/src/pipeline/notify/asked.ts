@@ -1,10 +1,11 @@
 import { readOrigin } from "#/chat/origin.js";
+import { chatThreadsOf } from "#/chat/tie.js";
 import { humanOf } from "#/office-requester.js";
 import { CHAT_KIND } from "#/scheduler/policy.js";
 import { CLOCK_SKEW_MS } from "#/workstate/blocked.js";
 import type { Notify } from "#/pipeline/decisions.types.js";
 import type { Run } from "#/store/runs.types.js";
-import type { NoticeDeskOptions } from "./notify.types.js";
+import type { NoticeDeskOptions, NoticeThread } from "./notify.types.js";
 
 /** Chat sessions older than this cannot have made the change. */
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -53,4 +54,22 @@ export async function askedInChat(
   }
 
   return inChatWith(opts, n.as, chat, Date.parse(at));
+}
+
+/**
+ * The chat thread of the agent with the human the notice's ticket is tied to (work filed or attached from chat, and its
+ * later rounds): the notice goes there as a reply instead of a direct message. None for a notice the human was told.
+ */
+export async function tiedThread(
+  opts: Pick<NoticeDeskOptions, "store" | "team" | "workState">,
+  n: Notify,
+): Promise<NoticeThread | undefined> {
+  const chat = humanOf(opts.team, n.human)?.identities.chat;
+  if (n.told || !n.ticket || !chat) {
+    return undefined;
+  }
+
+  const threads = await chatThreadsOf(opts.store, opts.workState, n.as, n.ticket);
+  const t = threads.find((x) => x.requester.id === chat);
+  return t ? { channel: t.channel, thread: t.thread } : undefined;
 }

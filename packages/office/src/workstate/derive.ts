@@ -37,6 +37,7 @@ export const toWorkflowPr = (p: PrRecord): WorkflowPr => ({
   title: p.title,
   ...(p.url ? { url: p.url } : {}),
   headRef: p.headRef,
+  ...(p.headSha ? { head: p.headSha } : {}),
   baseRef: p.baseRef,
   draft: p.draft,
   state: p.state,

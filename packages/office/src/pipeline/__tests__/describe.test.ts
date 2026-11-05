@@ -474,6 +474,10 @@ describe("a notice in words", () => {
       "send a direct message to U0ADA",
     );
 
+    expect(describeOp({ op: "chat_reply", channel: "D-sam", thread: "1700.1", body: "x" })).toBe(
+      "reply in chat thread D-sam:1700.1",
+    );
+
     const trace: Trace = {
       event: event("agent.handed_back"),
       policies: [],

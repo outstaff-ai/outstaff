@@ -15,6 +15,7 @@ const OP_TEXT: { [K in ActOp["op"]]: (op: Extract<ActOp, { op: K }>) => string }
   link_doc: (op) => `link doc ${op.doc} on ${op.ticket}`,
   set_field: (op) => `set ${op.field} of ${op.ticket} to ${op.value ?? "nothing"}`,
   chat_dm: (op) => `send a direct message to ${op.to}`,
+  chat_reply: (op) => `reply in chat thread ${op.channel}:${op.thread}`,
 };
 
 /** One tracker change, in words. */
