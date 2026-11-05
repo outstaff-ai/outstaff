@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -1750,6 +1750,68 @@ async function main() {
 
   step(
     `unblock: ${answerable} blocked -> pia answered it and gave it back to sam, where it stayed (pia woken once) -> active again when sam's round started, sam resumed from her comment and handed it back`,
+  );
+
+  // ---- 10, no commissioning: only a trusted human starts new work. The PM cannot unblock this ticket and would file a
+  // workaround for it; her unblock round was started by sam's hand-back, not by a human, so `ost ticket create` is
+  // refused. She proposes the workaround on the ticket instead and gives it to the requester; no new ticket exists.
+  const piaBeforePropose = piaWakes().length;
+  const workaround = "Add a CI screenshot job";
+  const ticketsBeforePropose = (await state()).tickets.length;
+  const { key: proposing } = await stub("POST", "/_test/tickets", {
+    title: "Take the review screenshots",
+    description: `blocked: the agent image has no browser libraries\npm would file: ${workaround}`,
+    assignee: "sam",
+  });
+
+  const proposed = await until(`${proposing}: the PM proposed the workaround to the human`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === proposing);
+    const proposal = t.comments.find(
+      (c: Json) => c.author === "pia" && c.body.startsWith(`Proposal for a human: ${workaround}.`),
+    );
+
+    return t.status === "Blocked" && t.assignee === "ada.admin" && proposal
+      ? { proposal }
+      : undefined;
+  });
+
+  assertEq(
+    proposed.proposal.body.includes(
+      "Filing it myself was refused: This round is an unblock, started by a teammate's blocked hand-back, not a trusted human's request, so it does not file a ticket.",
+    ),
+    true,
+    "the PM's ticket create was refused in her unblock round",
+  );
+
+  await until("the agent idle", (s) =>
+    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+      .status === "idle"
+      ? true
+      : undefined,
+  );
+
+  await officePolledTwice(`${proposing} went to the requester`);
+  const afterPropose = await state();
+  assertSame(
+    afterPropose.tickets.filter((x: Json) => x.title === workaround).map((x: Json) => x.key),
+    [],
+    "no ticket was filed for the workaround",
+  );
+
+  assertEq(
+    afterPropose.tickets.length,
+    ticketsBeforePropose + 1,
+    "the blocked ticket is the only new ticket",
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBeforePropose)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once, to unblock it",
+  );
+
+  step(
+    `no commissioning: ${proposing} blocked -> the PM's unblock round tried to file "${workaround}", which was refused -> she proposed it on the ticket and gave it to the requester; no new ticket exists`,
   );
 
   // ---- 10a. a ticket that asks for the services the team granted: the token is added and never shown

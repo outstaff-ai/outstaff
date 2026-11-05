@@ -10,7 +10,7 @@ import {
   type Vcs,
 } from "@outstaff/core";
 import type { Filed, OfficeClient } from "./office.types.js";
-import type { AgentEnv } from "./types.js";
+import type { AgentEnv, Round } from "./types.js";
 
 /** The one formatter outgoing text goes through: ticket keys linked, links on the tracker's or knowledge host guarded. */
 export function ticketLinker(env: AgentEnv): TicketLinker {
@@ -43,6 +43,37 @@ export function requireOffice(env: AgentEnv): OfficeClient {
   }
 
   return env.office;
+}
+
+/** What started the round when another agent did: a teammate's question (`ost ask`), an unblock, an agent's mention. */
+function startedByAgent(round: Round): string | undefined {
+  switch (round.kind) {
+    case "question":
+      return "a teammate's question";
+    case "unblock":
+      return "an unblock, started by a teammate's blocked hand-back";
+    case "asked":
+      return round.trigger === "human" ? undefined : "a teammate's mention";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Only a trusted human starts new work. A round another agent started (a question, an unblock, an agent's mention)
+ * may answer, comment, route existing work and hand back, but files no ticket and opens no pull request; it puts the
+ * proposal to a trusted human instead. Rounds a human started, and work on an assigned ticket, are not limited.
+ */
+export function requireHumanStarted(env: AgentEnv, what: "file a ticket" | "open a pull request") {
+  const from = env.round && startedByAgent(env.round);
+  if (!from) {
+    return;
+  }
+
+  throw new PortError(
+    "forbidden",
+    `This round is ${from}, not a trusted human's request, so it does not ${what}: only a trusted human starts new work, and a teammate's question, mention or approval is not their confirmation. Put the proposal to a trusted human instead: comment it on the ticket (what, why, and your recommendation), or, answering a question, suggest it in your answer for the asker to take to a human; then hand back.`,
+  );
 }
 
 /** What a chat session is told after it filed work. The agent posts the reply and any placement question itself. */

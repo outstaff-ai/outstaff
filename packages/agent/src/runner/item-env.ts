@@ -119,6 +119,7 @@ export function itemEnv(
   let declared: DeclaredHandBack | undefined;
   const handBack = {
     handBack: { kind: offer.workItem.kind, declare: (s: DeclaredHandBack) => (declared = s) },
+    round: { kind: offer.workItem.kind, trigger: offer.workItem.trigger },
   };
 
   const base = opts.env.office;

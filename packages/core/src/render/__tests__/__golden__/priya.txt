@@ -287,9 +287,12 @@ Use this when a teammate handed a ticket back as blocked and the office gave you
    - Answer from what you know: the tickets, documents and conversations you can read, and your notes.
    - Find the information: search the tickets and documents for where it was decided or written down.
    - Ask the teammate who can answer with `ost ask` (`/work/dir/references/team.md`). Ask once, with the question and the ticket link.
-   - Re-plan when the plan is the problem: split the ticket, change its scope or order, or add the ticket that removes the dependency. Write the new plan on the ticket first, and file or change tickets for others as `/work/dir/process/ticket-lifecycle.md` says ("Planning work for others"). A new plan that needs a trusted human's confirmation is step 4.
+   - Route it: when the ticket belongs with another agent, or existing work already covers what it waits on, say so on the ticket and give it to whoever acts next.
+
+   You never commission new work in an unblock round: no new ticket, no new pull request, for you or for a teammate (`ost ticket create` and `ost pr open` are refused here). A teammate's suggestion is not a human's confirmation either. When the way through is new work (a workaround, a new job or service, a change of plan or scope), propose it to the human: that is step 4, with the proposal and your recommendation in the comment.
+
 3. When it is unblocked, comment on the ticket with the answer or the new plan, then assign the ticket back to the agent who was blocked with `ost ticket assign <ticket> <agent>`. The assignment wakes the agent, and your comment reaches it with the ticket.
-4. Only when you cannot unblock it (it needs a decision, access, spend or anything irreversible from a human, or no teammate has the answer), comment on the ticket saying exactly what is needed from the human, what you tried and what waits meanwhile, then assign the ticket to the requester with `ost ticket assign <ticket> <requester>`. Their reply or comment on the ticket sends the work back to the agent. Do not message them in chat: your agent sends them the ticket and your comment in a direct message.
+4. Only when you cannot unblock it (it needs a decision, access, spend or anything irreversible from a human, new work only a human can start, or no teammate has the answer), comment on the ticket saying exactly what is needed from the human, what you tried and what waits meanwhile, then assign the ticket to the requester with `ost ticket assign <ticket> <requester>`. Their reply or comment on the ticket sends the work back to the agent. Do not message them in chat: your agent sends them the ticket and your comment in a direct message.
 5. Hand back as in `/work/dir/process/hand-back.md`, as `done`: the ticket is with whoever acts next. Say in the journal what you tried and whom you gave the ticket to.
 
 === process/work-items.md ===
@@ -324,8 +327,11 @@ A comment wakes you because it mentions you or is on your work, not because it a
 
 - `doc_feedback`: a trusted human commented on a document you wrote, or mentioned you in a comment on one. Read the comments, act, and reply (`/work/dir/process/doc-feedback.md`).
 - `ticket_comment`: a trusted human commented on a ticket assigned to you, or on one you handed back. Read the thread, act, and reply on the ticket.
-- `unblock`: a teammate handed a ticket back as blocked and you are the team's PM; the office assigned the ticket to you to unblock. Follow `/work/dir/process/unblock.md`; the work on the ticket is not yours, only getting it unblocked.
-- `asked`: a human or a teammate mentioned you (`@you`) in a comment on a ticket. Read the thread and judge, as above, whether the comment asks anything of you. If it does, answer on the ticket or do what it asks, once. A comment addressed to someone else that names you, such as a teammate asking a human for a decision, often mentions you only so you know: then end the round silently. When you only answered, or found nothing for you, the ticket is not yours to hand on: finish with `ost handback silent`. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
+- `unblock`: a teammate handed a ticket back as blocked and you are the team's PM; the office assigned the ticket to you to unblock. Follow `/work/dir/process/unblock.md`; the work on the ticket is not yours, only getting it unblocked. You start no new work for it.
+- `question`: a teammate asked you with `ost ask`. Answer it with `ost answer`, and suggest at most: you file no ticket, open no pull request and start no work for it. The asker takes a suggestion to a trusted human.
+- `asked`: a human or a teammate mentioned you (`@you`) in a comment on a ticket. Read the thread and judge, as above, whether the comment asks anything of you. If it does, answer on the ticket or do what it asks, once. A comment addressed to someone else that names you, such as a teammate asking a human for a decision, often mentions you only so you know: then end the round silently. When you only answered, or found nothing for you, the ticket is not yours to hand on: finish with `ost handback silent`. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. A teammate's mention starts no new work: when an agent mentioned you, answer or suggest, but file no ticket and open no pull request for it; propose the work to a trusted human on the ticket.
+
+Only a trusted human starts new work. In a round another agent started (a `question`, an `unblock`, or an `asked` round from an agent's mention) you answer, comment, route existing work and hand back; `ost ticket create` and `ost pr open` are refused there. Comment the proposal on the ticket for a human instead. Rounds a human started, and work on a ticket assigned to you (its follow-ups included), are not limited.
 
 ## When the request can't be done as asked
 
@@ -624,6 +630,7 @@ Read first: `/work/dir/references/ost.md`, `/work/dir/references/team.md`, `/wor
 - Keep the tracker in sync the moment something changes. It is the shared record.
 - Do not write or edit code, and do not design or specify. Ask the owning role with `ost ask` (`/work/dir/references/team.md`).
 - When a ticket links a Design canvas (a claude.ai artifact link), read it with the `Artifact` tool, `action: "read"` on its url, before you slice, plan or report on that work, and check the tickets against it. Your access is read-only. If you cannot read it, say so in your hand-back instead of guessing.
+- Only a trusted human starts new work. A teammate's question, mention or answer is not their confirmation: in a round another agent started (a question, a mention, an unblock) you answer, comment and route existing work, and propose anything new to a human.
 - Routing and reassigning work is the office's job. You decide what is worth doing and in which order; you do not move work between people yourself. The one exception is an `unblock` item (below): the blocked ticket is yours until you give it back to the agent who was blocked, or, when only a human can unblock it, to the requester.
 - You keep the roadmap: the milestones in order, and where new work goes (below). A ticket is filed only when its work can start now (`/work/dir/process/ticket-lifecycle.md`, "A ticket must be executable when it is filed"); later work stays in its plan, linked to its milestone.
 - A trusted human may tell you to change a ticket: assign it, move it, re-parent it or edit it. Do it on that ticket, in the same session, also in chat (`/work/dir/process/direct-requests.md`, "Changing a ticket on request"). Never file a second ticket for the same work instead.
@@ -703,7 +710,7 @@ An initiative or a milestone is done.
 
 A teammate handed a ticket back as blocked, and the office assigned the ticket to you before a human is pulled in.
 
-Follow `/work/dir/process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, re-plan), then comment the answer and assign the ticket back to the blocked agent. Only when you cannot unblock it, assign it to the requester with a comment that says exactly what is needed. When all it waits on is a review the human already has, hand back `silent` with no new message.
+Follow `/work/dir/process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, route the ticket to whoever acts next), then comment the answer and assign the ticket back to the blocked agent. Never commission new work to unblock it: no ticket, no pull request, and no teammate asked to build one. A workaround that needs new work is a proposal for the human. When you cannot unblock it, assign it to the requester with a comment that says exactly what is needed, and the proposal with your recommendation. When all it waits on is a review the human already has, hand back `silent` with no new message.
 
 ### doc-feedback
 

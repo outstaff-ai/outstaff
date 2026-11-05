@@ -42,6 +42,7 @@ function questionBrief(
     "",
     `${from} is working on: ${asker.title} (work item ${asker.id}).${about}`,
     `Answer with: ost answer ${id} "<your answer>". ${from} continues with it.`,
+    "Answer, and suggest at most: a question starts no new work (no ticket, no pull request). A suggestion is for the asker to take to a trusted human.",
   ].join("\n");
 }
 

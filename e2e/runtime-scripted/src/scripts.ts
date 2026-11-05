@@ -1549,9 +1549,63 @@ export async function* mergeChecksFailed(ctx: ItemContext): Script {
 }
 
 /**
+ * A workaround the PM would file as a ticket (`pm would file: <title>`). An unblock round starts no new work, so the
+ * filing is refused; she proposes the work on the ticket instead, saying the filing was refused. Returns the comment.
+ */
+async function* proposeWorkaround(
+  key: string,
+  title: string,
+): AsyncGenerator<Action, string, string> {
+  let refused = "";
+  try {
+    yield { type: "tool", tool: "ticket_create", input: { title, related: key } };
+  } catch (e) {
+    refused = e instanceof Error ? e.message : String(e);
+  }
+
+  const comment = refused
+    ? `Proposal for a human: ${title}. Filing it myself was refused: ${refused.split(":")[0]}.`
+    : `Filed: ${title}.`;
+
+  yield { type: "tool", tool: "ticket_comment", input: { key, body: comment } };
+  return comment;
+}
+
+/** The PM cannot unblock it: the ticket goes to the requester with what is needed, and any workaround as a proposal. */
+async function* toRequester(
+  ctx: ItemContext,
+  key: string,
+  blocked: string,
+  shown: string,
+): AsyncGenerator<Action, string, string> {
+  const requester = need(
+    /assign it to the requester, (\S+?), with a comment/.exec(ctx.journal)?.[1],
+    "the requester",
+  );
+
+  const blocker = /^blocked: (.+)$/m.exec(shown)?.[1] ?? "see the ticket";
+  const workaround = /^pm would file: (.+)$/m.exec(shown)?.[1];
+  if (workaround) {
+    yield* proposeWorkaround(key, workaround);
+  }
+
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `Needs a human: ${blocker}. Nobody on the team can provide it; ${blocked} carries on once it is here.`,
+    },
+  };
+
+  yield { type: "tool", tool: "ticket_assign", input: { key, to: requester } };
+  return `${key} needs a human: ${blocker}. Gave it to ${requester}.`;
+}
+
+/**
  * The PM unblocks a ticket an agent handed back as blocked. A ticket that says `pm knows: <answer>` is answered on the
  * ticket and given back to the blocked agent; any other needs a human, so it goes to the requester the office named,
- * with what is needed.
+ * with what is needed, and with the workaround she would have filed (`pm would file: <title>`) as a proposal.
  */
 export async function* unblock(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
@@ -1568,23 +1622,7 @@ export async function* unblock(ctx: ItemContext): Script {
     return `Unblocked ${key}: ${answer}. Gave it back to ${blocked}.`;
   }
 
-  const requester = need(
-    /assign it to the requester, (\S+?), with a comment/.exec(ctx.journal)?.[1],
-    "the requester",
-  );
-
-  const blocker = /^blocked: (.+)$/m.exec(shown)?.[1] ?? "see the ticket";
-  yield {
-    type: "tool",
-    tool: "ticket_comment",
-    input: {
-      key,
-      body: `Needs a human: ${blocker}. Nobody on the team can provide it; ${blocked} carries on once it is here.`,
-    },
-  };
-
-  yield { type: "tool", tool: "ticket_assign", input: { key, to: requester } };
-  return `${key} needs a human: ${blocker}. Gave it to ${requester}.`;
+  return yield* toRequester(ctx, key, blocked, shown);
 }
 
 export const SCRIPTS: Record<string, (ctx: ItemContext) => Script> = {
