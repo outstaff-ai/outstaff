@@ -15,10 +15,12 @@ async function recordRoundStart(
   ticket: string,
 ) {
   const record = workState.ticket(ticket);
+  const assignee = record?.assignee;
   await store.upsertSubject(ROUND_START, item.id, {
     ticket,
     ...(record?.status ? { status: record.status } : {}),
-    ...(record?.assignee ? { assignee: record.assignee } : {}),
+    // Whom to give the ticket back to, as an act names them.
+    ...(assignee ? { assignee: { id: assignee.id, kind: assignee.kind } } : {}),
   });
 }
 

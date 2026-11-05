@@ -297,7 +297,7 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
     it("links the ticket assignee to the person", async () => {
       const issue = await tracker.createIssue({ title: "A", body: "", assignee: "u-sam" });
       await ws.apply(ticketEvent("ticket.assigned", issue.key), meta());
-      expect(ws.assignee(issue.key)).toEqual({ id: "sam", kind: "agent" });
+      expect(ws.assignee(issue.key)).toMatchObject({ id: "sam", kind: "agent" });
       expect(await store.queryLinks({ from: { type: "ticket", ref: issue.key } })).toEqual([
         expect.objectContaining({ relation: "assigned_to", to: { type: "person", ref: "sam" } }),
       ]);
@@ -720,7 +720,8 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
 
       await ws.apply(ticketEvent("ticket.created", issue.key), meta());
       expect(ws.ticketStatus(issue.key)).toBe("active");
-      expect(ws.assignee(issue.key)).toEqual({ id: "sam", kind: "agent" });
+      // The agent by its handle, and every name the tracker knows its member by.
+      expect(ws.assignee(issue.key)).toEqual({ id: "sam", kind: "agent", names: ["u-sam", "Sam"] });
       expect(ws.hasLabel(issue.key, "needs-human")).toBe(true);
       expect(ws.hasLabel(issue.key, "other")).toBe(false);
       expect(ws.requester(issue.key)).toBe("dana");
@@ -1175,7 +1176,7 @@ describe.each(harnesses)("work state on %s", (_name, makeHarness) => {
       expect(ws.ticketForPr(prRef(p.number))).toBeUndefined();
       await ws.rescan();
       expect(ws.ticketForPr(prRef(p.number))).toBe(issue.key);
-      expect(ws.assignee(issue.key)).toEqual({ id: "sam", kind: "agent" });
+      expect(ws.assignee(issue.key)).toMatchObject({ id: "sam", kind: "agent" });
       expect(seen).toEqual([]);
     });
 

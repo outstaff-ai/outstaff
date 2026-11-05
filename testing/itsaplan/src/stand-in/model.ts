@@ -93,8 +93,19 @@ export function assignIssue(
   actor: string,
   userId: string | null,
 ) {
+  // As the live feed shows it: the assignees' display names.
+  const shown = (id: string | null) => ({
+    value: s.members.find((m) => m.userId === id)?.name,
+  });
+
+  const from = shown(issue.assigneeUserId);
   issue.assigneeUserId = userId;
-  log(s, issue, actor, { kind: "history", action: "assignee", body: null, payload: {} });
+  log(s, issue, actor, {
+    kind: "history",
+    action: "assignee",
+    body: null,
+    payload: { from, to: shown(userId) },
+  });
 }
 
 export function commentIssue(s: ItsaplanStore, issue: StoredIssue, actor: string, body: string) {

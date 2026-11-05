@@ -188,7 +188,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
 
       emit("created", key);
       if (issue.assignee) {
-        emit("assigned", key, { assignee: issue.assignee.id });
+        emit("assigned", key, { assignee: structuredClone(issue.assignee) });
       }
 
       return structuredClone(issue);
@@ -222,7 +222,7 @@ export function createFakeTracker(opts: FakeTrackerOptions = {}): FakeTracker {
         issue.assignee = member(memberId);
       }
 
-      emit("assigned", key, { assignee: memberId });
+      emit("assigned", key, { assignee: issue.assignee ? structuredClone(issue.assignee) : null });
       return touch(issue);
     },
     async comment(key, body) {

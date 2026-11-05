@@ -69,6 +69,16 @@ export interface WorkflowPr {
   ci?: "none" | "pending" | "success" | "failure";
 }
 
+/**
+ * Whom a ticket is assigned to. For agents `id` is the person handle. `names` are the ones the tracker knows the
+ * member by (its id, username and display name): an act may name the member by any of them.
+ */
+export interface TicketAssignee {
+  id: string;
+  kind: "human" | "agent";
+  names?: string[] | undefined;
+}
+
 /** Read-only snapshot of the office's world, taken after the event happened. */
 export interface WorkflowState {
   ticketForPr(pr: PrRef): string | undefined;
@@ -76,8 +86,7 @@ export interface WorkflowState {
   /** Canonical status of the ticket. */
   ticketStatus(ticket: string): CanonicalStatus | undefined;
 
-  /** For agents `id` is the person handle. */
-  assignee(ticket: string): { id: string; kind: "human" | "agent" } | undefined;
+  assignee(ticket: string): TicketAssignee | undefined;
   pullRequest(pr: PrRef): WorkflowPr | undefined;
 
   /** Every pull request linked to the ticket, in any state. */
@@ -203,7 +212,7 @@ export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
 
 export interface StaticTicket {
   status: CanonicalStatus;
-  assignee?: { id: string; kind: "human" | "agent" };
+  assignee?: TicketAssignee;
   lastWorker?: string;
   requester?: string;
   labels?: string[];

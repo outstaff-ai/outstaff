@@ -67,7 +67,11 @@ export interface TrackerEvent {
   actor: Member;
   at: string;
 
-  /** A `commented` event carries `body`, `commentId`, `url` and `mentions`: the `@name`s in the body, as the adapter parsed them. */
+  /**
+   * A `commented` event carries `body`, `commentId`, `url` and `mentions`: the `@name`s in the body, as the adapter
+   * parsed them. An `assigned` event carries `assignee`, the member it left the ticket with (`null` for none), when the
+   * tracker says; `to` may name them as the tracker shows it.
+   */
   data: Record<string, unknown>;
 }
 

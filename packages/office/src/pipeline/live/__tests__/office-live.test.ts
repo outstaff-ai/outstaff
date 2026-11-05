@@ -430,6 +430,51 @@ describe("the office with the event pipeline live", () => {
     expect(answer.decisions).toMatchObject([
       { type: "wake", person: "sam", policy: "assigned_to_assignee" },
     ]);
+
+    // The hand-off stays: pia was woken once in all, and the ticket is sam's.
+    expect((await store.listItems({ person: "pia" })).map((i) => i.kind)).toEqual(["unblock"]);
+    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe(sam.id);
+  });
+
+  it("wakes the PM once when the tracker reports the round's start only after the blocked hand-back", async () => {
+    const { tracker, config, ada, sam, pia } = await start();
+    conn = agent(tracker, config, sam);
+    await conn.whenConnected();
+    // Ada gives sam the ticket, then takes it back before he starts: his round's start takes it again.
+    const issue = await tracker.as(ada).createIssue({
+      title: "Rotate the staging key",
+      body: "",
+      status: "backlog",
+      assignee: sam.id,
+    });
+
+    await office!.parts.intake.pollOnce();
+    await tracker.as(ada).assign(issue.key, ada.id);
+    await office!.parts.intake.pollOnce();
+    const item = (await conn.offers()[Symbol.asyncIterator]().next()).value!.workItem;
+    await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
+    await until(async () => office!.parts.workState.assignee(issue.key)?.id === "sam");
+
+    // Sam is blocked at once. The tracker's feed has not been read since the round started.
+    await conn.handBack(item.id, { summary: "The staging key is missing.", status: "blocked" });
+    await until(async () => office!.parts.workState.assignee(issue.key)?.id === "pia");
+
+    // Now it is: the start's assignment and move, then the hand-back's, each the echo of its own act.
+    await office!.parts.intake.pollOnce();
+    const echoes = (await traces())
+      .filter((t) => t.event.actor.id === "sam" && t.event.type.startsWith("ticket."))
+      .toSorted((a, b) => a.event.id.localeCompare(b.event.id, undefined, { numeric: true }))
+      .map((t) => `${t.event.type} ${String(t.event.data["echo"]).split(":").at(-1)}`);
+
+    expect(echoes).toEqual([
+      "ticket.assigned start_marks_active",
+      "ticket.moved start_marks_active",
+      "ticket.moved hand_back_blocked_to_pm",
+      "ticket.assigned hand_back_blocked_to_pm",
+    ]);
+
+    expect((await store.listItems({ person: "pia" })).map((i) => i.kind)).toEqual(["unblock"]);
+    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe(pia.id);
   });
 
   it("bounds two agents that keep mentioning each other with the loop guard", async () => {

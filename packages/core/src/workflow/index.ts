@@ -22,6 +22,7 @@ export type { Resolved } from "./evaluate.types.js";
 export { createStaticWorkflowState } from "./state.js";
 export type {
   ActorKind,
+  TicketAssignee,
   PrRef,
   PrVerdict,
   WorkflowEvent,

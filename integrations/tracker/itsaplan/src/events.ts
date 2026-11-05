@@ -71,6 +71,21 @@ function change(item: ApiActivityItem) {
   return { ...(from ? { from } : {}), ...(to ? { to } : {}) };
 }
 
+/**
+ * The member an assignment left the ticket with, from the name the feed shows (its display name); nothing when the
+ * feed names no one the project has.
+ */
+function assigneeOf(api: Itsaplan, setup: ApiProject, item: ApiActivityItem) {
+  const shown = item.payload?.to?.value?.toLowerCase();
+  const hit =
+    shown === undefined
+      ? undefined
+      : (setup.assignees.find((a) => a.name.toLowerCase() === shown) ??
+        setup.assignees.find((a) => a.username?.toLowerCase() === shown));
+
+  return hit ? { assignee: api.toMember(hit) } : {};
+}
+
 function toEvent(
   api: Itsaplan,
   setup: ApiProject,
@@ -92,6 +107,7 @@ function toEvent(
       ...(item.body ? { body: item.body } : {}),
       ...(comment ? mentionData(item.body) : {}),
       ...change(item),
+      ...(type === "assigned" ? assigneeOf(api, setup, item) : {}),
     },
   };
 }
