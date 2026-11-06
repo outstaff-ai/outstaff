@@ -1,10 +1,11 @@
-import type { Comment, Logger, TeamConfig } from "@outstaff/core";
+import type { Comment, Logger, MergeRequirements, TeamConfig } from "@outstaff/core";
 import { manualClock } from "#/clock.js";
 import type { Run } from "#/store/runs.types.js";
 import type { ItemRef, Subject, WorkItem } from "#/store/types.js";
 import type { PendingAct } from "#/pipeline/act/act.types.js";
 import type { Notify } from "#/pipeline/decisions.types.js";
 import { createNoticeDesk } from "#/pipeline/notify/desk.js";
+import type { PrRecord } from "#/workstate/types.js";
 
 export const TEAM = {
   humans: [
@@ -55,6 +56,9 @@ export function deskHarness(
     failSend?: number;
     failStore?: number;
     noTracker?: boolean;
+
+    /** The code host's merge rules; a function that throws stands for a host that cannot be read. */
+    rules?: MergeRequirements | (() => never);
   } = {},
 ) {
   const clock = manualClock();
@@ -65,6 +69,8 @@ export function deskHarness(
   const items: WorkItem[] = [];
   const runs = new Map<string, Run[]>();
   const refs: ItemRef[] = [];
+  const prs: PrRecord[] = [];
+  const refreshes: string[] = [];
   let failures = o.failSend ?? 0;
   let storeFailures = o.failStore ?? 0;
   const log: Logger = {
@@ -93,9 +99,21 @@ export function deskHarness(
     workState: {
       inRound: (ticket, person) => rounds.has(`${person}/${ticket}`),
       ticket: (key) => (key === "ACME-1" ? ({ title: "Add a greeting" } as never) : undefined),
-      prsOfTicket: () => [],
+      prsOfTicket: (ticket) => prs.filter((p) => p.ticket === ticket),
       prSubject: (pr) => `${pr.repo.owner}/${pr.repo.name}#${pr.number}`,
+      refreshPrsOf: async (ticket) => {
+        refreshes.push(ticket);
+        if (ticket === "ACME-BROKEN") {
+          throw new Error("host down");
+        }
+      },
     },
+    vcs:
+      o.rules === undefined
+        ? undefined
+        : {
+            mergeRequirements: async () => (typeof o.rules === "function" ? o.rules() : o.rules!),
+          },
     acts: {
       send: async (person, act) => {
         if (failures-- > 0) {
@@ -178,5 +196,53 @@ export function deskHarness(
     }
   };
 
-  return { desk, clock, sent, logged, rounds, bodies, pass, breakStore, item, subjects };
+  /**
+   * The work state's record of a pull request of the ticket (`acme/shop#n`), its head and its checks; the same number
+   * again replaces it, as a rescan would.
+   */
+  const pr = (o: {
+    number?: number;
+    ticket?: string;
+    head?: string;
+    base?: string;
+    state?: PrRecord["state"];
+    checks?: PrRecord["checks"];
+  }) => {
+    const d = {
+      number: 9,
+      ticket: "ACME-1",
+      head: "a1b2c3d4e5",
+      base: "main",
+      state: "open" as const,
+      checks: [],
+      ...o,
+    };
+
+    const at = prs.findIndex((p) => p.ref.number === d.number);
+    const rec = {
+      ref: { repo: { owner: "acme", name: "shop" }, number: d.number },
+      headSha: d.head,
+      baseRef: d.base,
+      state: d.state,
+      ticket: d.ticket,
+      checks: d.checks,
+    } as PrRecord;
+
+    prs.splice(at < 0 ? prs.length : at, at < 0 ? 0 : 1, rec);
+  };
+
+  return {
+    desk,
+    clock,
+    sent,
+    logged,
+    rounds,
+    bodies,
+    pass,
+    breakStore,
+    item,
+    subjects,
+    pr,
+    refreshes,
+  };
 }

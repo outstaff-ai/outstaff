@@ -85,7 +85,10 @@ function controls(s: GithubStore) {
       }
     },
 
-    /** A completed check run on the pull request's head commit, as a CI service would report it. */
+    /**
+     * A check run on the pull request's head commit, as a CI service would report it: completed with `conclusion`, or
+     * still running for `pending`.
+     */
     async setCheck(n: number, name: string, conclusion: string) {
       const pr = pullOf(s, n);
       const sha = pr && (await headSha(s, pr));
@@ -96,8 +99,9 @@ function controls(s: GithubStore) {
       const run = {
         id: ++s.counters.checkId,
         name,
-        status: "completed",
-        conclusion,
+        ...(conclusion === "pending"
+          ? { status: "in_progress", conclusion: null }
+          : { status: "completed", conclusion }),
         html_url: `https://github.acme.example/${full}/runs/${name}`,
         output: { title: `${name} ${conclusion}`, summary: `${name} ${conclusion}` },
       };

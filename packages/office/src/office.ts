@@ -116,6 +116,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     push,
     clock,
     logger: log,
+    vcs: ports.vcs,
     capabilities: configuredAdapters(team, input.registry, "office").found.flatMap(
       (a) => a.def.capabilities,
     ),

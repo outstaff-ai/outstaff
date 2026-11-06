@@ -12,6 +12,7 @@ import type {
 } from "./notify.types.js";
 import { groupNotices, renderNotice } from "./render.js";
 import { askedInChat, tiedThread } from "./asked.js";
+import { createChecksGate } from "./checks.js";
 import { writeNotified } from "./seen.js";
 import { escalationText } from "./text.js";
 
@@ -44,12 +45,14 @@ function destinations(entries: readonly NoticeEntry[], chat: string) {
 /**
  * The notices of the pipeline, sent by the agent each is from as one direct message per human. A notice waits for
  * the debounce window to pass with no new one for the same human and agent, and while the agent's round on its ticket
- * still runs (a pull request opened in a round goes with that round's hand-back), at most `MAX_HOLD_MS`. What the
- * human was told within the last hour is not told again.
+ * still runs (a pull request opened in a round goes with that round's hand-back), at most `MAX_HOLD_MS`. A review
+ * notice then waits for the checks on its pull requests' heads (`createChecksGate`). What the human was told within the
+ * last hour is not told again.
  */
 export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
   const { team, workState, clock, logger: log } = opts;
   const book = createNoticeBook(opts.store);
+  const gate = createChecksGate(opts);
   const debounceMs = debounceSeconds(team) * 1000;
   const timers = new Set<() => void>();
   const now = () => clock.now();
@@ -158,8 +161,32 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
     return told;
   }
 
+  /** Sends what of a due human's notices may go; what it keeps for later, and what the human was told. */
+  async function sendDue(p: PendingNotices, b: NoticeBook, at: Date) {
+    const { go, hold } = await gate.split(p);
+    const held = hold.length > 0 ? [{ ...p, entries: hold }] : [];
+    if (go.length === 0) {
+      return { keep: held, told: [] };
+    }
+
+    try {
+      const told = await send({ ...p, entries: go }, b, at);
+      await gate.sent(p.human, go);
+      return { keep: held, told };
+    } catch (error) {
+      // Kept for the next flush: the act desk takes the same id once.
+      log.warn("notify: could not hand a notice to its agent", {
+        as: p.as,
+        error: String(error),
+      });
+
+      return { keep: [p], told: [] };
+    }
+  }
+
   async function flush() {
     try {
+      await gate.refresh((await book.read()).pending.filter((p) => due(p, now())));
       await book.change(async (b) => {
         const at = now();
         const keep: PendingNotices[] = [];
@@ -170,16 +197,9 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
             continue;
           }
 
-          try {
-            told.push(...(await send(p, b, at)));
-          } catch (error) {
-            // Kept for the next flush: the act desk takes the same id once.
-            keep.push(p);
-            log.warn("notify: could not hand a notice to its agent", {
-              as: p.as,
-              error: String(error),
-            });
-          }
+          const out = await sendDue(p, b, at);
+          keep.push(...out.keep);
+          told.push(...out.told);
         }
 
         const stamp = at.toISOString();
@@ -202,10 +222,6 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
 
   return {
     async add(given: Notify, eventId: string, at?: string) {
-      if (given.ticket && given.seen) {
-        await writeNotified(opts.store, given.ticket, given.seen);
-      }
-
       const asked = await askedInChat(opts, given, at);
       if (asked) {
         log.info(`notify: ${given.human} asked ${given.as} for it in chat: nothing sent`, {
@@ -214,6 +230,11 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
       }
 
       const notice = asked ? { ...given, told: true } : given;
+      // What a notice sent later puts in front of the human is recorded when it goes; this one went already.
+      if (notice.told && notice.ticket && notice.seen) {
+        await writeNotified(opts.store, notice.ticket, notice.seen);
+      }
+
       const thread = await tiedThread(opts, notice);
       await book.change(async (b) => ({
         book: holdNotice(b, notice, eventId, now().toISOString(), thread),

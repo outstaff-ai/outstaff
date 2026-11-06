@@ -185,12 +185,16 @@ describe("the notice desk", () => {
     expect(h.sent).toEqual([]);
   });
 
-  it("remembers what each notice about a ticket put in front of its human, told or not", async () => {
+  it("remembers what each notice about a ticket put in front of its human: once sent, or at once when told", async () => {
     const h = deskHarness();
     const seen = { human: "ada.admin", prs: { "acme/shop#9": "a1" } };
     await h.desk.add(notice({ prs: [PR9], seen }), "e:back");
     await h.desk.add(notice({ ticket: "ACME-2", told: true, seen: { ...seen, prs: {} } }), "e:2");
     await h.desk.add(notice({ ticket: undefined, seen }), "e:no-ticket");
+    expect(h.subjects.get("handoff_notified/ACME-1")).toBeUndefined();
+    expect(h.subjects.get("handoff_notified/ACME-2")?.data).toEqual({ ...seen, prs: {} });
+
+    await h.pass(31_000);
     expect(h.subjects.get("handoff_notified/ACME-1")?.data).toEqual(seen);
     expect(h.subjects.get("handoff_notified/ACME-2")?.data).toEqual({ ...seen, prs: {} });
     expect([...h.subjects.keys()].filter((k) => k.startsWith("handoff_notified/"))).toHaveLength(2);

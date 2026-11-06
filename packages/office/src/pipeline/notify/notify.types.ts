@@ -1,5 +1,5 @@
-import type { Logger, TeamConfig, Tracker } from "@outstaff/core";
-import type { NoticePr } from "@outstaff/policy";
+import type { Logger, TeamConfig, Tracker, Vcs } from "@outstaff/core";
+import type { NoticePr, NoticeSeen } from "@outstaff/policy";
 import type { Clock } from "#/types.js";
 import type { Store } from "#/store/types.js";
 import type { WorkState } from "#/workstate/index.js";
@@ -20,6 +20,15 @@ export interface NoticeEntry {
 
   /** The chat thread with the human the ticket's work is tied to, which the notice goes to instead of a direct message. */
   thread?: NoticeThread | undefined;
+
+  /** What the notice puts in front of the human, recorded for the ticket when it is sent. */
+  seen?: NoticeSeen | undefined;
+}
+
+/** A human's due notices: those that go now, and those that wait for the checks of their pull requests. */
+export interface ChecksSplit {
+  go: NoticeEntry[];
+  hold: NoticeEntry[];
 }
 
 /** A chat thread a notice is posted in, as a reply. */
@@ -73,7 +82,10 @@ export interface NoticeDeskOptions {
     "getSubject" | "upsertSubject" | "listItems" | "listRuns" | "getItem" | "findItemRefs"
   >;
 
-  workState: Pick<WorkState, "inRound" | "ticket" | "prsOfTicket" | "prSubject">;
+  workState: Pick<WorkState, "inRound" | "ticket" | "prsOfTicket" | "prSubject" | "refreshPrsOf">;
+
+  /** The code host's merge rules: which checks a review notice waits for. All of them when unset. */
+  vcs?: Pick<Vcs, "mergeRequirements"> | undefined;
   acts: Pick<ActDesk, "send">;
   clock: Clock;
   logger: Logger;
