@@ -76,6 +76,9 @@ export interface NoticePr {
   ref: string;
   url?: string | undefined;
   title?: string | undefined;
+
+  /** The head commit whose checks passed, which the office sets on a review notice it held until they finished. */
+  head?: string | undefined;
 }
 
 /**

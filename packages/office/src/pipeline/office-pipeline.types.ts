@@ -1,4 +1,4 @@
-import type { Capability, Logger, TeamConfig, Tracker } from "@outstaff/core";
+import type { Capability, Logger, TeamConfig, Tracker, Vcs } from "@outstaff/core";
 import type { ConfiguredPolicy } from "@outstaff/policy";
 import type { QueuedAct } from "@outstaff/protocol";
 import type { Clock } from "#/types.js";
@@ -23,6 +23,9 @@ export interface OfficePipelineOptions {
 
   /** The office's own tracker, read only: the links and comments the notices to humans carry. */
   tracker?: Tracker | undefined;
+
+  /** The office's code host, read only: the merge rules that say which checks a review notice waits for. */
+  vcs?: Pick<Vcs, "mergeRequirements"> | undefined;
 
   /** The team's custom policies, loaded; they run after the built-in ones. */
   policies?: readonly ConfiguredPolicy[] | undefined;

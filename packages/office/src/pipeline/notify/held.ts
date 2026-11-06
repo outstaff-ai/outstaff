@@ -40,6 +40,7 @@ const entryOf = (n: Notify, eventId: string, at: string, thread?: NoticeThread):
   prs: n.prs ?? [],
   ...(n.text ? { text: n.text } : {}),
   ...(thread ? { thread } : {}),
+  ...(n.seen ? { seen: n.seen } : {}),
 });
 
 /**

@@ -56,6 +56,10 @@ export function groupNotices(entries: readonly NoticeEntry[]): NoticeGroup[] {
 
 const link = (label: string, url: string | undefined) => (url ? `[${label}](${url})` : label);
 
+/** A pull request, and the head whose checks passed when the notice waited for them. */
+const prText = (p: NoticePr) =>
+  `${link(p.ref, p.url)}${p.head ? ` (checks passed on ${p.head.slice(0, 7)})` : ""}`;
+
 const NEED = { review: "Ready for your review", blocked: "Blocked, needs you" } as const;
 
 function itemLine(item: NoticeItem): string {
@@ -63,7 +67,7 @@ function itemLine(item: NoticeItem): string {
     ? `${link(item.ticket.key, item.ticket.url)}${item.ticket.title ? ` ${item.ticket.title}` : ""}`
     : "";
 
-  const prs = item.prs.map((p) => link(p.ref, p.url)).join(", ");
+  const prs = item.prs.map(prText).join(", ");
   const what = [ticket, prs ? `pull request ${prs}` : ""].filter(Boolean).join(", ");
   return `${NEED[item.need]}: ${what}`;
 }

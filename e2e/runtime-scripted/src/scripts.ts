@@ -589,7 +589,16 @@ async function* followUpOnTicket(
     return `Opened ${url}. Waiting for the architect.`;
   }
 
+  yield* holdAfterPush(shown);
   return `Opened ${url}`;
+}
+
+/** A ticket that says `hold after pushing: <gate>`: the round waits there once it pushed, before it hands back. */
+async function* holdAfterPush(shown: string): AsyncGenerator<Action, void, string> {
+  const gate = /^hold after pushing: (\S+)$/m.exec(shown)?.[1];
+  if (gate) {
+    yield { type: "gate", name: gate };
+  }
 }
 
 /**
@@ -1562,7 +1571,10 @@ export async function* merge(ctx: ItemContext): Script {
   return "Ran pr merge.";
 }
 
-/** The checks of the pull request fail: look at them and say so on the ticket. */
+/**
+ * The checks of the pull request fail: look at them and say so on the ticket. A ticket that says `on failing checks:
+ * push a fix` gets a fix pushed to the pull request's branch too.
+ */
 export async function* ciFailed(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const number = need(ctx.pr, "the pull request");
@@ -1577,7 +1589,20 @@ export async function* ciFailed(ctx: ItemContext): Script {
     },
   };
 
-  return `Looked at the failing checks of pull request ${number}.`;
+  const ticket = yield { type: "tool", tool: "ticket_show", input: { key } };
+  if (!/^on failing checks: push a fix$/m.test(ticket)) {
+    return `Looked at the failing checks of pull request ${number}.`;
+  }
+
+  const cwd = need(ctx.worktree, "the worktree");
+  const branch = yield* branchOf(ctx, key);
+  yield* onBranch(cwd, branch);
+  const current = yield { type: "read", path: `${cwd}/${FILE}` };
+  yield { type: "write", path: `${cwd}/${FILE}`, text: `${current.replace(/\n$/, "")}\nchecked\n` };
+  yield { type: "shell", command: "git add -A", cwd };
+  yield* commitToPush(ctx, cwd, branch, `${key}: fix the checks`);
+  yield* holdAfterPush(ticket);
+  return `Fixed the failing checks of pull request ${number}.`;
 }
 
 /**
