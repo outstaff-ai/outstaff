@@ -1496,6 +1496,37 @@ async function* changeInWorktree(
   throw new Error(`No refusal named the work of pull request ${number}.`);
 }
 
+/**
+ * "CI still fails on PR <n>": the wake context says whether that pull request is the agent's own. Its own is a fix to
+ * its work, attached at once with the human's word; someone else's is left to them. Undefined for any other message.
+ */
+async function* ciStillFails(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const number = /^CI still fails on PR #?(\d+)/i.exec(latest)?.[1];
+  if (!number) {
+    return undefined;
+  }
+
+  if (!ctx.yours?.includes(Number(number))) {
+    return `PR #${number} is not mine, so I did not touch it.`;
+  }
+
+  yield {
+    type: "tool",
+    tool: "work_attach",
+    input: {
+      target: number,
+      confirmed: true,
+      request: latest,
+      say: "Fixing the failing checks now.",
+    },
+  };
+
+  return `Fixing CI on PR #${number}.`;
+}
+
 /** What the chat message asks of the work: a pull request's status, a reply about work, or a change to file. */
 async function* aboutWork(
   ctx: ItemContext,
@@ -1509,6 +1540,11 @@ async function* aboutWork(
 
   if (ctx.about) {
     return yield* replyAboutWork(ctx, talk, latest);
+  }
+
+  const fix = yield* ciStillFails(ctx, latest);
+  if (fix !== undefined) {
+    return fix;
   }
 
   const elsewhere = yield* changeInWorktree(latest);

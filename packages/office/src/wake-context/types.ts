@@ -12,6 +12,9 @@ export interface ContextReaders {
 
   /** The pull requests of a repository the work state keeps, for a merge's context. */
   prs?: ((repo: RepoRef) => PrRecord[]) | undefined;
+
+  /** Who last worked on a ticket, as the work state knows: a ticket handed back is still that agent's work. */
+  lastWorker?: ((ticket: string) => string | undefined) | undefined;
 }
 
 /** Reads a pull request's review threads, by its key and record; undefined when the code host cannot be read. */

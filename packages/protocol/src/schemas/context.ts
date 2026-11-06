@@ -42,6 +42,12 @@ export const contextTicketSchema = z.strictObject({
   url: z.string().optional().describe("Link to the ticket."),
   status: z.string().optional().describe("Canonical status, for example active or review."),
   assignee: z.string().optional().describe("Name of whom it is assigned to."),
+  yours: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Set when the ticket is the woken agent's work: assigned to it, or it was the last to work on it.",
+    ),
   description: data("The ticket's description, cut to `pipeline.context.body_chars`.").optional(),
   comments: z
     .array(contextNoteSchema)
@@ -73,6 +79,13 @@ export const contextPrSchema = z.strictObject({
   number: z.number().int(),
   title: z.string(),
   url: z.string().optional().describe("Link to the pull request."),
+  author: z.string().describe("Who opened it: the agent's handle, else the code host login."),
+  yours: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Set when the pull request is the woken agent's work: it opened it, or the ticket it implements is the agent's.",
+    ),
   state: z.enum(["open", "closed", "merged"]),
   draft: z.boolean(),
   ci: z.enum(["none", "pending", "success", "failure"]).describe("Combined state of its checks."),

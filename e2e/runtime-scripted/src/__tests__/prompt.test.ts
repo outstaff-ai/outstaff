@@ -453,4 +453,38 @@ describe("latestChatMessage", () => {
 
     expect(latestChatMessage("No chat here.")).toBeUndefined();
   });
+
+  it("reads which pull requests of the wake are the agent's own", () => {
+    const pr = (number: number, yours: boolean) => ({
+      ref: `github.acme.example/acme/shop#${number}`,
+      number,
+      title: `PR ${number}`,
+      author: yours ? "sam" : "ada",
+      ...(yours ? { yours: true as const } : {}),
+      state: "open" as const,
+      draft: false,
+      ci: "failure" as const,
+      failing: ["test"],
+      mergeable: "clean" as const,
+      unresolvedThreads: 0,
+      threads: [],
+      stackedBy: [],
+      why: { role: "mentioned" as const, source: "chat:D1:1" },
+    });
+
+    const base = offer("chat");
+    const prompt = buildWorkPrompt(
+      {
+        ...base,
+        context: {
+          ...base.context,
+          wake: { tickets: [], prs: [pr(3, true), pr(4, false)], docs: [], chats: [] },
+        },
+      },
+      { resumed: false },
+    );
+
+    expect(parsePrompt(prompt)?.yours).toEqual([3]);
+    expect(parsePrompt(buildWorkPrompt(base, { resumed: false }))).not.toHaveProperty("yours");
+  });
 });

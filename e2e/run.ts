@@ -992,16 +992,64 @@ async function main() {
     `attach: a chat request about #${pr1.pr.number} in review -> asked first, then pushed to that pull request, no new ticket`,
   );
 
+  const samIdle = (what: string) =>
+    until(what, (s) =>
+      s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
+        .status === "idle"
+        ? true
+        : undefined,
+    );
+
+  // ---- 3e'. "CI still fails on PR N" about the agent's own pull request, in review: the chat session's context marks
+  // the pull request as its own, so it attaches the request with the human's word and the round fixes it, in one go,
+  // with no question and nothing left for "whoever owns it"
+  await samIdle("the agent idle again after the attached round");
+  const shaCi = added.pr.head.sha;
+  const ciAsked = await stub("POST", "/_test/chat/say", {
+    text: `CI still fails on PR ${pr1.pr.number}`,
+  });
+
+  const ciFixed = await until(
+    "the request attached to the agent's own pull request and pushed, with no question first",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const posts = s.chat.posts.filter((p: Json) => p.thread === ciAsked.id);
+      const ack = posts.find((p: Json) => p.text.startsWith("Fixing the failing checks now."));
+      const done = posts.find((p: Json) => p.text.includes("Addressed"));
+      return pr.head.sha !== shaCi && ack && done ? { pr, posts, ack } : undefined;
+    },
+  );
+
+  assertEq(
+    ciFixed.posts.some((p: Json) => /follow-up\?|not mine/.test(p.text)),
+    false,
+    "the agent asked nothing and did not leave its own pull request to someone else",
+  );
+
+  assertEq(
+    ciFixed.ack.text.includes(`#${pr1.pr.number}`),
+    true,
+    `the reply links the pull request (${ciFixed.ack.text})`,
+  );
+
+  assertEq(
+    ciFixed.pr.conversation.some((c: Json) => c.body.includes("CI still fails on PR")),
+    true,
+    "the round answered the request on the pull request",
+  );
+
+  const ciKept = await state();
+  assertEq(ciKept.tickets.length, ticketsBefore, "no ticket was filed for the fix");
+  assertEq(ciKept.github.pulls.length, pullsBefore, "no pull request was opened for the fix");
+  step(
+    `own work: "CI still fails on PR ${pr1.pr.number}" -> marked as the agent's own, attached and fixed in one go`,
+  );
+
   // ---- 3e. replies in the thread of running work: a review round is held at the gate, and a request about it is
   // attached from a chat thread, which links the thread to the running round. A question in that thread is answered
   // by a chat session beside the round; an instruction is attached to the round and leads to one follow-up round.
-  const sha5 = added.pr.head.sha;
-  await until("the agent idle again after the attached round", (s) =>
-    s.chat.profiles.findLast((p: Json) => p.agent === "sam" && p.userId === "U0ADA00001")?.profile
-      .status === "idle"
-      ? true
-      : undefined,
-  );
+  const sha5 = ciFixed.pr.head.sha;
+  await samIdle("the agent idle again after the round that fixed CI");
 
   const loose = "Keep the greeting short.";
   await stub("POST", "/_test/gates/review/close");

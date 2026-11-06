@@ -46,11 +46,12 @@ export function offerBuilder(
   opts: Omit<WakeContextOptions, "limits"> & {
     team?: Pick<TeamConfig, "pipeline">;
     prs?: ContextReaders["prs"];
+    lastWorker?: ContextReaders["lastWorker"];
   } = {},
 ) {
   const { subjectsOf } = itemRefs(store, ports);
   const wakeOf = wakeContextOf(
-    { store, tracker: ports?.tracker, vcs: ports?.vcs, prs: opts.prs },
+    { store, tracker: ports?.tracker, vcs: ports?.vcs, prs: opts.prs, lastWorker: opts.lastWorker },
     { ...opts, limits: contextLimits(opts.team ?? {}) },
   );
 

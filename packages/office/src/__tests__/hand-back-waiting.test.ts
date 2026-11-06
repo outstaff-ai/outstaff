@@ -40,6 +40,7 @@ function workStateOf() {
     repoPrs: () => [],
     refreshTicket: async (key: string, by?: unknown) => void refreshed.push([key, by]),
     refreshPrsOf: async () => {},
+    lastWorker: () => undefined,
   };
 }
 

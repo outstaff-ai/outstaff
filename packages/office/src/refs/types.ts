@@ -7,3 +7,9 @@ export interface EventSubject {
   doc?: string | undefined;
   chat?: { channel: string; thread?: string | undefined } | undefined;
 }
+
+/** A pull request a text names: its number, and its repository as `<owner>/<repo>` (lower case) when the text says. */
+export interface PrMention {
+  number: number;
+  repo?: string;
+}

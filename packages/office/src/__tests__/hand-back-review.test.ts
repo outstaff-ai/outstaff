@@ -36,6 +36,7 @@ function workStateOf() {
     subTickets: () => [],
     refreshTicket: async (key: string, by?: unknown) => void refreshed.push([key, by]),
     refreshPrsOf: async () => {},
+    lastWorker: () => undefined,
   };
 }
 

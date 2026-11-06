@@ -64,7 +64,7 @@ export function wakeContextOf(readers: ContextReaders, opts: WakeContextOptions)
   const { limits, traces } = opts;
   return async (item: WorkItem, fresh: boolean): Promise<WakeContext | undefined> => {
     try {
-      const graph = await gatherGraph(readers, item.id, limits.items * 2);
+      const graph = await gatherGraph(readers, item.id, limits.items * 2, item.person);
       const merge = await mergeOf(readers, item, limits.items);
       const { context: built, manifest } = withMerge(buildWakeContext(graph, limits), merge);
       if (fresh && traces) {

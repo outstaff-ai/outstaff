@@ -881,6 +881,41 @@ describe("chat", () => {
     expect(text).toContain("greeting.txt");
   });
 
+  it("attaches a failing check on its own pull request at once, with the human's word", async () => {
+    const { seen, text } = await play(
+      chat({ ...talk([false, "CI still fails on PR 3"]), yours: [3] }),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: {
+          target: "3",
+          confirmed: true,
+          request: "CI still fails on PR 3",
+          say: "Fixing the failing checks now.",
+        },
+      },
+    ]);
+
+    expect(text).toBe("Fixing CI on PR #3.");
+  });
+
+  it("leaves a failing check on someone else's pull request to them", async () => {
+    const { seen, text } = await play(
+      chat({ ...talk([false, "CI still fails on PR #4"]), yours: [3] }),
+      () => "",
+    );
+
+    expect(seen).toEqual([]);
+    expect(text).toBe("PR #4 is not mine, so I did not touch it.");
+    expect((await play(chat(talk([false, "CI still fails on PR 3"])), () => "")).text).toBe(
+      "PR #3 is not mine, so I did not touch it.",
+    );
+  });
+
   it("files new work for a teammate as theirs, and says who has it", async () => {
     const { seen, text } = await play(
       chat(talk([false, "New work for sam: Add a status page"])),

@@ -37,7 +37,7 @@ export interface WorkSourceOptions {
    */
   workState?: Pick<
     WorkState,
-    "repoPrs" | "ticket" | "prsOfTicket" | "refreshTicket" | "subTickets"
+    "repoPrs" | "ticket" | "prsOfTicket" | "refreshTicket" | "subTickets" | "lastWorker"
   >;
   roles?: RosterOptions["roles"];
 
