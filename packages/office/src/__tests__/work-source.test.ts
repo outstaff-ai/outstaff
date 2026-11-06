@@ -216,3 +216,47 @@ describe("work source: an item stopped as it would start", () => {
     await store.close();
   });
 });
+
+describe("work source: the status of the item's ticket", () => {
+  let store: Store;
+  let clock: ManualClock;
+
+  beforeEach(async () => {
+    clock = manualClock();
+    store = await openStore("sqlite://:memory:", { now: () => clock.now() });
+  });
+
+  afterEach(async () => {
+    await store.close();
+  });
+
+  it("offers the ticket's status as the work state last saw it, and none when it knows none", async () => {
+    const scheduler = createScheduler({ store, team, clock });
+    const source = schedulerWorkSource({ scheduler, store, team });
+    await store.upsertSubject("ticket", "ACME-1", { key: "ACME-1", status: "backlog" });
+    await store.upsertSubject("ticket", "ACME-2", { key: "ACME-2" });
+    for (const ref of ["ACME-1", "ACME-2"]) {
+      await scheduler.enqueue({
+        person: "sam",
+        kind: "ticket_comment",
+        title: ref,
+        trigger: "human",
+        subject: { type: "ticket", ref },
+      });
+    }
+
+    await scheduler.enqueue({ person: "sam", kind: "chat", title: "Hi", trigger: "human" });
+
+    const offered = [];
+    for (let o = await source.next("sam"); o; o = await source.next("sam")) {
+      offered.push(o.workItem);
+      await source.handBack("sam", o.workItem.id, { summary: "ok", links: [], status: "silent" });
+    }
+
+    expect(Object.fromEntries(offered.map((w) => [w.title, w.ticketStatus]))).toEqual({
+      "ACME-1": "backlog",
+      "ACME-2": undefined,
+      Hi: undefined,
+    });
+  });
+});

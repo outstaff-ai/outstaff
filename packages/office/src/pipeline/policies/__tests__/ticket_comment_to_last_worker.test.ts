@@ -45,7 +45,7 @@ describe("ticket_comment_to_last_worker", () => {
         type: "wake",
         policy: "ticket_comment_to_last_worker",
         instruction:
-          "ada-admin commented on ACME-1, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. ACME-1's status now: review. A done or canceled ticket stays closed unless the comment asks to reopen it.",
+          "ada-admin commented on ACME-1, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. ACME-1's status now: review. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.",
       },
     ]);
 

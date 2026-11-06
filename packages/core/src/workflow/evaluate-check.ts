@@ -260,6 +260,13 @@ const CHECKS: ConditionChecks = {
       detail: `actor ${actor.id} ${inRound ? "was" : "was not"} in a round on the ticket${why}, wanted ${wanted ? "in one" : "not"}`,
     };
   },
+  work_from_chat: (wanted, ctx) => {
+    const fromChat = ctx.event.data["fromChat"] === true;
+    return {
+      ok: fromChat === wanted,
+      detail: `the work ${fromChat ? "came" : "did not come"} from a request in chat, wanted ${wanted ? "from chat" : "not"}`,
+    };
+  },
   review_state: (wanted, ctx) => {
     const st = ctx.event.data["state"];
     return {

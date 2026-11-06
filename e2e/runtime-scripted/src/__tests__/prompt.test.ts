@@ -34,6 +34,21 @@ describe("parsePrompt", () => {
     ).toBeUndefined();
   });
 
+  it("reads that the item's ticket is in backlog, from the line the agent adds for it", () => {
+    const comment = offer("ticket_comment");
+    const onBacklog = {
+      ...comment,
+      workItem: {
+        ...comment.workItem,
+        subject: { type: "ticket", ref: "SHOP-1" },
+        ticketStatus: "backlog",
+      },
+    };
+
+    expect(parsePrompt(buildWorkPrompt(onBacklog, { resumed: false }))?.backlog).toBe(true);
+    expect(parsePrompt(buildWorkPrompt(comment, { resumed: false }))?.backlog).toBeUndefined();
+  });
+
   it("reads the notes the round started with, and a version of them that is not used", () => {
     const prompt = buildWorkPrompt(offer("chat"), {
       resumed: false,

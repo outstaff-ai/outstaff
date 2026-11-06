@@ -45,6 +45,7 @@ interface OfferExtras {
   files?: Record<string, unknown>[];
   kind?: string;
   trigger?: string;
+  ticketStatus?: string;
   feedback?: Record<string, unknown>[];
 
   /** The pull requests of the item; by default one open for review, so a done hand-back has something to review. */
@@ -111,6 +112,7 @@ const offeredItem = (id: string, extra: OfferExtras) => ({
   title: `Fix ${id}`,
   priority: 1,
   trigger: extra.trigger ?? "human",
+  ...(extra.ticketStatus ? { ticketStatus: extra.ticketStatus } : {}),
   ...(extra.origin ? { origin: chatOrigin(extra.files) } : {}),
 });
 
@@ -1014,13 +1016,19 @@ describe("work loop", () => {
   });
 
   it.each([
-    ["unblock", "agent", "forbidden"],
-    ["asked", "agent", "forbidden"],
-    ["asked", "human", "created"],
-    ["ticket", "agent", "created"],
+    ["unblock", "agent", undefined, "forbidden"],
+    ["asked", "agent", undefined, "forbidden"],
+    ["asked", "human", undefined, "created"],
+    ["ticket", "agent", undefined, "created"],
+    ["ticket_comment", "human", "backlog", "forbidden"],
+    ["ticket_comment", "human", "ready", "created"],
+    // Work a chat session attached to a ticket in backlog: a human asked for it in chat.
+    ["ticket", "human", "backlog from chat", "created"],
   ])(
-    "tells the verbs who started a %s round (%s): a new ticket is %s",
-    async (kind, trigger, want) => {
+    "tells the verbs who started a %s round (%s, ticket %s): a new ticket is %s",
+    async (kind, trigger, status, want) => {
+      const fromChat = status?.endsWith(" from chat") ?? false;
+      const ticketStatus = status?.replace(" from chat", "");
       await connect();
       let got = "";
       const runtime: Runtime = {
@@ -1036,7 +1044,13 @@ describe("work loop", () => {
       };
 
       start(runtime);
-      socket.offerWith("w1", { kind, trigger });
+      socket.offerWith("w1", {
+        kind,
+        trigger,
+        ...(ticketStatus ? { ticketStatus } : {}),
+        ...(fromChat ? { origin: true } : {}),
+      });
+
       await until(() => sentOf("handback").length === 1);
       expect(got).toBe(want);
       await loop.stop();

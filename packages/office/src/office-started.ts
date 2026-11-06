@@ -3,6 +3,7 @@ import { itemEventSubject } from "./office-item-subject.js";
 import type { Store, WorkItem } from "./store/types.js";
 import type { WorkState } from "./workstate/index.js";
 import { ROUND_START } from "./round-start.js";
+import { readOrigin } from "./chat/origin.js";
 
 /**
  * Keeps the ticket as the round finds it, before its start moves or assigns it: a round that finishes silently puts
@@ -57,7 +58,12 @@ export function createStarted(deps: {
         type: "agent.started",
         subject,
         actor: { kind: "agent", id: item.person },
-        data: { workItem: item.id, kind: item.kind },
+        // Work a human asked for in chat (a session, or work it filed or attached) starts even on a backlog ticket.
+        data: {
+          workItem: item.id,
+          kind: item.kind,
+          ...((await readOrigin(store, item.id)) ? { fromChat: true } : {}),
+        },
       };
 
       await judge(event, {

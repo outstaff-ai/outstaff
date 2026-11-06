@@ -10,7 +10,7 @@ const code = (s: string) => `\`${s}\``;
  * ticket may have closed since.
  */
 export const STATUS_NOW =
-  "{{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.";
+  "{{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.";
 
 /** One person, or a list tried in order. */
 export const personText = (p: PersonSpec): string =>

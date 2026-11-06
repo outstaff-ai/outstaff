@@ -2787,6 +2787,19 @@
           ],
           "additionalProperties": false,
           "description": "The actor is an agent that had a round of work on the ticket under way when the event happened; an agent's event without a time counts as in one (or, with false, is not)."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "work_from_chat": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "work_from_chat"
+          ],
+          "additionalProperties": false,
+          "description": "The work item behind the event (the round that started or was handed back) came from a trusted human's request in chat: a chat session, or work one filed or attached (or, with false, did not)."
         }
       ]
     }

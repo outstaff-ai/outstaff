@@ -26,8 +26,8 @@ const proposed = (talk: Message[]) => {
 };
 
 /**
- * Files a confirmed plan: the milestone, then each ticket in it, for the PM herself. The agent acknowledges all of it
- * in one reply when the session ends.
+ * Files a confirmed plan: the milestone, then each ticket in it, for the PM herself, ready, as the human confirmed it
+ * for now. The agent acknowledges all of it in one reply when the session ends.
  */
 async function* fileConfirmed(plan: {
   milestone: string;
@@ -44,7 +44,7 @@ async function* fileConfirmed(plan: {
         body: `Part of the ${plan.milestone} plan.`,
         milestone: id,
         assignee: "me",
-        status: "backlog",
+        status: "ready",
       },
     };
   }
@@ -75,8 +75,8 @@ export async function* planInChat(
 }
 
 /**
- * The PM's round on tickets she filed for herself from a confirmed plan: one round for all of them. Filed in the
- * backlog, so nothing pulls them on its own; she hands them to the requester to review.
+ * The PM's round on tickets she filed for herself from a confirmed plan: one round for all of them. Confirmed for now,
+ * they are filed ready, so the office queues them as her work; she hands them to the requester to review.
  */
 export async function* plannedTickets(ctx: ItemContext, key: string): Script {
   const also = [...ctx.journal.matchAll(/also filed (\S+)/g)].map((m) => m[1]!);
@@ -85,4 +85,26 @@ export async function* plannedTickets(ctx: ItemContext, key: string): Script {
   }
 
   return `Planned ${[key, ...also].join(", ")} in their milestone, for your review.`;
+}
+
+/**
+ * A request for later in chat (`file a backlog ticket for <what>`): the ticket is filed in the backlog and nothing
+ * more; the reply says so. Undefined for any other message.
+ */
+export async function* fileForLater(
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const what = /^file a backlog ticket for (.+?)\.?$/i.exec(latest.trim())?.[1];
+  if (!what) {
+    return undefined;
+  }
+
+  const filed = yield {
+    type: "tool",
+    tool: "ticket_create",
+    input: { title: what, body: "Asked in chat, for later.", status: "backlog" },
+  };
+
+  const key = /^Created (\S+?)\./m.exec(filed)?.[1] ?? "the ticket";
+  return `Filed ${key} in the backlog for later: nothing starts it until you move it on.`;
 }

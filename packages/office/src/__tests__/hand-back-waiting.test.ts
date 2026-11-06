@@ -195,6 +195,21 @@ describe("work source: a blocked hand-back that waits on work in flight", () => 
     expect(warned).toEqual([]);
   });
 
+  it("takes a blocked hand-back on a ticket in backlog as silent, after re-reading it: backlog is not blocked", async () => {
+    const backlog = (s: ReturnType<typeof workStateOf>) =>
+      s.tickets.set("ACME-48", { status: "backlog", assignee: agent("sam") });
+
+    for (const status of ["blocked", "silent"] as const) {
+      const { item, warned, handed } = await handBack(status, backlog);
+      expect(item.status).toBe("done");
+      expect(handed[0]).toMatchObject({ status: "silent" });
+      expect(handed[0]).not.toHaveProperty("waitingOn");
+      expect(warned.at(-1)).toBe(
+        "a blocked hand-back on ACME-48, which is in backlog; taking it as silent",
+      );
+    }
+  });
+
   it("lets ticket work finish silently only while it waits on work in flight", async () => {
     expect((await handBack("silent", inFlight)).item.status).toBe("done");
     const { item, warned } = await handBack("silent", parent);

@@ -92,6 +92,12 @@ export const workItemSchema = z.strictObject({
     ),
   parentId: z.string().optional().describe("The item this one was split from, for questions."),
   subject: z.strictObject({ type: z.string(), ref: z.string() }).optional(),
+  ticketStatus: z
+    .string()
+    .optional()
+    .describe(
+      "Canonical status of the ticket the item is about, as the office knew it when it offered the item, for example backlog or ready. A round on a ticket in backlog starts no new work.",
+    ),
   origin: chatOriginSchema
     .optional()
     .describe("Where the request came from, for items started by a chat message."),

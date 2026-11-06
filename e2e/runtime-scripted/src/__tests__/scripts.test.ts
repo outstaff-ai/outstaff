@@ -1340,3 +1340,46 @@ describe("merge", () => {
     );
   });
 });
+
+describe("ticketComment on a ticket in backlog", () => {
+  const comment = {
+    ...ctx,
+    kind: "ticket_comment",
+    backlog: true as const,
+    feedback: [
+      { kind: "ticket_comment" as const, actor: "ada.admin", body: "CSV first.", threads: [] },
+    ],
+  };
+
+  it("tries to start the work, says on the ticket that it was refused, and finishes silently", async () => {
+    const refusal = "This round is on a ticket in backlog, so it does not file a ticket: later";
+    const { seen, text } = await play(
+      ticketComment(comment),
+      () => "",
+      (a) => a.type === "tool" && a.tool === "ticket_create" && refusal,
+    );
+
+    expect(seen.map((a) => (a.type === "tool" ? a.tool : a.type))).toEqual([
+      "ticket_create",
+      "ticket_comment",
+      "handback",
+    ]);
+
+    expect(seen[1]).toMatchObject({
+      input: {
+        key: "SHOP-1",
+        body: "Noted for later: CSV first.\nNot started: starting the work was refused: This round is on a ticket in backlog, so it does not file a ticket.",
+      },
+    });
+
+    expect(seen[2]).toMatchObject({ input: { status: "silent" } });
+    expect(text).toBe("Answered the comment on SHOP-1, which stays in backlog.");
+  });
+
+  it("says it started the work when filing was not refused", async () => {
+    const { seen } = await play(ticketComment(comment), () => "Created SHOP-2.");
+    expect(seen[1]).toMatchObject({
+      input: { body: "Noted for later: CSV first.\nStarted: filed the work." },
+    });
+  });
+});

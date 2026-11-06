@@ -2,7 +2,7 @@ import type { Logger } from "@outstaff/core";
 import type { Filed } from "@outstaff/protocol";
 import type { FiledWhat, Filing } from "./chat.types.js";
 import type { Offer } from "#/office-client/index.js";
-import type { AgentEnv, DeclaredHandBack } from "#/verbs/types.js";
+import type { AgentEnv, DeclaredHandBack, Round } from "#/verbs/types.js";
 import type { Attachment } from "./types.js";
 import { saveTicketFiles } from "./attachments.js";
 import { safeId } from "#/repos/workspaces.js";
@@ -68,6 +68,17 @@ export async function itemFiles(
 }
 
 /**
+ * What the verbs know of the item's round: its kind, who started it, and the status of its ticket. An item from chat
+ * (a chat session, or work one attached or filed) is a trusted human's direct request, so the status of its ticket
+ * does not limit it and is left out.
+ */
+const roundOf = ({ workItem: { kind, trigger, ticketStatus, origin } }: Offer): Round => ({
+  kind,
+  trigger,
+  ...(ticketStatus && !origin ? { ticketStatus } : {}),
+});
+
+/**
  * The verbs' environment for one item. It notes the tickets the agent moves, whether it asked a question that is
  * still open, and whether a chat session filed its request as work.
  */
@@ -129,7 +140,7 @@ export function itemEnv(
       kind: offer.workItem.kind,
       declare: (status: DeclaredHandBack, message?: string) => (declared = { status, message }),
     },
-    round: { kind: offer.workItem.kind, trigger: offer.workItem.trigger },
+    round: roundOf(offer),
   };
 
   const base = opts.env.office;
