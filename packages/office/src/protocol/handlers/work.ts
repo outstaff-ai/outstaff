@@ -3,12 +3,7 @@ import type { RequestHandlers } from "#/protocol/types.js";
 
 /** The work loop: offers taken or declined, progress, and the result handed back. */
 export const workHandlers: RequestHandlers = {
-  ping: ({ reply }) => reply("pong", {}),
-  pong: () => undefined,
-  async heartbeat({ ctx, person, payload, reply }) {
-    await ctx.opts.source.heartbeat(person, payload.workItemId);
-    reply("ack", {});
-  },
+  // `heartbeat`, `ping` and `pong` are answered as they arrive, ahead of the queue (`beats.ts`).
   async accept({ ctx, person, payload, reply }) {
     const { workItemId, ...on } = payload;
     await ctx.opts.source.accept(person, workItemId, on);

@@ -398,6 +398,30 @@ describe("protocol server", () => {
       expect((await a.next("offer")).payload).toMatchObject({ workItem: { id: "w2" } });
     });
 
+    it("answers a heartbeat at once while a slow request of the same agent is still handled", async () => {
+      source.enqueue("ada", "w1");
+      const a = await login();
+      await a.next("offer");
+
+      let release!: () => void;
+      const slow = new Promise<void>((resolve) => (release = resolve));
+      const accept = source.accept.bind(source);
+      source.accept = async (...args) => {
+        await slow;
+        await accept(...args);
+      };
+
+      const accepting = a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
+      const beat = a.send("heartbeat", { workItemId: "w1" });
+      expect(await a.next("ack")).toMatchObject({ replyTo: beat });
+      expect(a.inbox).toEqual([]);
+
+      release();
+      expect(await a.next("ack")).toMatchObject({ replyTo: accepting });
+      await settle();
+      expect(source.calls).toEqual(["heartbeat:ada:w1", "accept:ada:w1"]);
+    });
+
     it("offers the next item after a failure, and requeues a declined one on the next poll", async () => {
       source.enqueue("ada", "w1");
       source.enqueue("ada", "w2");
