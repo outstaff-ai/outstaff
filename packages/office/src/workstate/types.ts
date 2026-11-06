@@ -54,6 +54,9 @@ export interface TicketRecord {
   /** The tickets that block this one, with their status as the tracker last said. */
   blockedBy?: { key: string; status?: CanonicalStatus }[];
 
+  /** When the tracker last changed the ticket, as it says (a comment counts, on trackers that count it). */
+  changedAt?: string;
+
   /** When the tracker answered that the ticket does not exist. It is not refreshed again unless an event names it. */
   goneAt?: string;
   updatedAt: string;

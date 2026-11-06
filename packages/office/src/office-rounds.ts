@@ -5,7 +5,7 @@ import type { WorkItem } from "./store/types.js";
 import { undeliveredFeedback } from "./work-feedback.js";
 
 /** Kinds that only answer something on a ticket, or start from it: finishing one settles nothing. */
-const ANSWERS = new Set(["asked", "doc_feedback", "unblock", "milestone"]);
+const ANSWERS = new Set(["asked", "doc_feedback", "unblock", "milestone", "reconcile"]);
 
 /** The statuses a hand-back leaves an asker in that take the answers that came while it ran; a blocked one keeps them. */
 const TAKES_ANSWERS = new Set<string>(["waiting", "done"]);

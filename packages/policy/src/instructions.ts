@@ -41,6 +41,7 @@ export const INSTRUCTION_VARIABLES = [
   "milestone.id",
   "recovered",
   "why",
+  "stale",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -90,6 +91,21 @@ function recoveredOf(event: EvaluationContext["event"]): string {
 
   const verb = names.length === 1 ? "passes" : "pass";
   return `${names.join(", ")} ${verb} on ${stringOf(event.data["base"])} at ${on.slice(0, 7)}, which includes #${number(event.subject.pr)}'s merge`;
+}
+
+/** The tickets a `board.stale` lists, one line each: `- ACME-1 (blocked, with dana): the facts`. */
+function staleOf(tickets: unknown): string {
+  const list = Array.isArray(tickets)
+    ? (tickets as { ticket?: unknown; status?: unknown; assignee?: unknown; facts?: unknown }[])
+    : [];
+
+  return list
+    .filter((t) => typeof t?.ticket === "string")
+    .map((t) => {
+      const who = typeof t.assignee === "string" ? `, with ${t.assignee}` : "";
+      return `- ${String(t.ticket)} (${stringOf(t.status)}${who}): ${stringOf(t.facts)}`;
+    })
+    .join("\n");
 }
 
 /** Who closed the ticket a `ticket.closed` or `ticket.unblocked` names, from its `closedBy`; `someone` when unknown. */
@@ -160,6 +176,7 @@ export function instructionVariables(
     ...milestoneVariables(ctx),
     recovered: recoveredOf(event),
     why: stringOf(event.data["why"]),
+    stale: staleOf(event.data["tickets"]),
   };
 }
 
