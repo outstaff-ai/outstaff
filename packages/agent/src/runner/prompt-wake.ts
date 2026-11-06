@@ -5,10 +5,12 @@ import type {
   ContextMerge,
   ContextMergeOther,
   ContextPr,
+  ContextRecentPr,
   ContextReview,
   ContextTicket,
   ContextWhy,
   WakeContext,
+  WorkSummary,
 } from "@outstaff/protocol";
 import { quoteBody } from "./prompt-quote.js";
 
@@ -211,6 +213,38 @@ function failedChecksLines(checks: ContextFailedCheck[] | undefined): string[] {
     : [];
 }
 
+/** One of the agent's open work items: what it is, what it is about, and where it stands. */
+function workLine(w: WorkSummary): string {
+  const on = w.pr ?? w.ticketKey;
+  const ticket = w.pr && w.ticketKey ? ` (${w.ticketKey})` : "";
+  return `  - ${w.id}: ${w.kind ?? "work"}${on ? ` on ${on}${ticket}` : ""}, ${w.status}: ${w.title}${link(w.prUrl)}`;
+}
+
+/** For a chat session: the agent's own work, so a request one of its rounds already covers is attached to it. */
+function workLines(work: WorkSummary[] | undefined): string[] {
+  return work?.length
+    ? [
+        "",
+        "Your own work now, the running items first, then your queue in the order it runs, then what waits. When the message is about something one of these already covers (the same failure, the same change), it is that work: attach the request to it with `ost work attach <its ticket or pull request> --confirmed`; never file a ticket for it. A merged pull request whose merge checks failed leaves its ticket open: attach to that ticket.",
+        ...work.map(workLine),
+      ]
+    : [];
+}
+
+const recentPrLine = (p: ContextRecentPr) =>
+  `  - ${p.ref} (${p.draft ? "draft, " : ""}${p.state}${p.ticket ? `, ${p.ticket}` : ""}, ${p.at}): ${p.title}${link(p.url)}`;
+
+/** For a round on a failure: the agent's own pull requests since it, any of which may already fix it. */
+function recentPrLines(prs: ContextRecentPr[] | undefined): string[] {
+  return prs?.length
+    ? [
+        "",
+        'Your pull requests in this repository opened or pushed to since this failure, on any ticket, latest first. Before you fix anything, check whether one of them already fixes it. If one does, do not fix it again: hand back with `ost handback silent --message "<which pull request fixes it>"`.',
+        ...prs.map(recentPrLine),
+      ]
+    : [];
+}
+
 /** What "(yours)" means, when an item of the bundle has it. */
 function yoursLines(wake: WakeContext): string[] {
   const any = [...wake.tickets, ...wake.prs].some((x) => x.yours);
@@ -237,6 +271,8 @@ export function wakeLines(wake: WakeContext | undefined): string[] {
     ...wake.chats.flatMap(chatLines),
     ...mergeLines(wake.merge),
     ...failedChecksLines(wake.failedChecks),
+    ...recentPrLines(wake.recentPrs),
+    ...workLines(wake.work),
     ...(wake.omitted
       ? ["", `${wake.omitted} more linked items were left out to keep this short.`]
       : []),

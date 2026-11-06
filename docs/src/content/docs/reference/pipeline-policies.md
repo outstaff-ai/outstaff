@@ -151,7 +151,7 @@ When:
 Instruction:
 
 ```text
-Pull request #{{pr.number}} ({{pr.title}}) by {{pr.author}} merged, but checks on its merge commit failed: {{checks}}. The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks.
+Pull request #{{pr.number}} ({{pr.title}}) by {{pr.author}} merged, but checks on its merge commit failed: {{checks}}. The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one.
 ```
 
 ### rebase_to_author
@@ -171,7 +171,7 @@ When:
 Instruction:
 
 ```text
-Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why.
+Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one.
 ```
 
 ### ci_failed_to_author
@@ -191,7 +191,7 @@ When:
 Instruction:
 
 ```text
-Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}. The failing checks are in the feedback. Fix them and push.
+Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}. The failing checks are in the feedback. Fix them and push. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one.
 ```
 
 ### merge_ready
