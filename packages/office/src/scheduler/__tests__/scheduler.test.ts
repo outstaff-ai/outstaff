@@ -763,7 +763,7 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       await sched.startRun(a.id);
 
       const queued = await sched.abandon(a.id, "the agent lost it.");
-      expect(queued).toMatchObject({ id: a.id, status: "queued" });
+      expect(queued).toEqual({ item: expect.objectContaining({ id: a.id, status: "queued" }) });
       expect(await store.listRuns(a.id)).toMatchObject([
         { outcome: "abandoned", error: "the agent lost it." },
       ]);
@@ -774,6 +774,24 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
 
       expect(await store.countLoopGuard(a.id, 3_600_000)).toBe(1);
       expect(await sched.abandon(a.id, "again")).toBeNull();
+    });
+
+    it("block an item whose run the agent lost twice in a row, and requeue an offer it never took", async () => {
+      const a = await add("a");
+      for (let i = 0; i < 2; i++) {
+        await sched.offer(a.id);
+        expect((await sched.abandon(a.id, "never taken."))?.blocked).toBeUndefined();
+      }
+
+      await sched.offer(a.id);
+      await sched.startRun(a.id);
+      expect((await sched.abandon(a.id, "lost."))?.blocked).toBeUndefined();
+
+      await sched.offer(a.id);
+      await sched.startRun(a.id);
+      const lost = await sched.abandon(a.id, "lost.");
+      expect(lost?.blocked).toMatchObject({ code: "stale", reason: "Lost again: lost." });
+      expect((await store.getItem(a.id))?.status).toBe("blocked");
     });
 
     it("go back to the queue when nobody accepted them before they went stale", async () => {

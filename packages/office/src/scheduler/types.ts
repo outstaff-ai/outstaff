@@ -108,6 +108,13 @@ export interface FinishInput {
   error?: string;
 }
 
+export interface AbandonResult {
+  item: WorkItem;
+
+  /** Set when the agent lost the item's run a second time in a row (or after a stale one), which blocked it. */
+  blocked?: BlockNotice;
+}
+
 export interface FailResult {
   item: WorkItem;
 
@@ -157,9 +164,10 @@ export interface Scheduler {
   /**
    * The agent is not running an item the office has active: an offer it never took, or a run it lost. The open run,
    * if any, ends as `abandoned` with the reason, and the item goes back to the queue with its session and journal.
-   * Null when the item is not active.
+   * A run lost right after another lost or stale one blocks the item instead, like a second stale run. Null when the
+   * item is not active.
    */
-  abandon(itemId: string, reason: string): Promise<WorkItem | null>;
+  abandon(itemId: string, reason: string): Promise<AbandonResult | null>;
 
   /** Records activity so the item is not considered stale. */
   heartbeat(itemId: string): Promise<void>;

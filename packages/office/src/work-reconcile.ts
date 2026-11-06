@@ -15,7 +15,7 @@ const why = (accepted: boolean) =>
  * and the office does not have active is only logged. Returns the ids the agent carries on with.
  */
 export function reconciler(
-  opts: Pick<WorkSourceOptions, "store" | "scheduler" | "logger">,
+  opts: Pick<WorkSourceOptions, "store" | "scheduler" | "logger" | "onBlocked">,
   acceptedOf: AcceptedOf,
 ) {
   const { store, scheduler, logger } = opts;
@@ -27,7 +27,10 @@ export function reconciler(
       if (running.includes(item.id)) {
         kept.push(item.id);
       } else {
-        await scheduler.abandon(item.id, why(await acceptedOf(item.id)));
+        const abandoned = await scheduler.abandon(item.id, why(await acceptedOf(item.id)));
+        if (abandoned?.blocked) {
+          await opts.onBlocked?.(abandoned.blocked);
+        }
       }
     }
 
