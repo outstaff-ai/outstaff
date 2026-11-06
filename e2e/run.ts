@@ -2696,6 +2696,7 @@ async function main() {
   await canceledWhileQueued();
   await commentThenClose();
   await mergeChecks();
+  await staleBlockResolves();
   await recallHistory();
   await usagePerTicket();
   await handedToHumanWithoutChat();
@@ -4013,6 +4014,112 @@ async function mergeChecks() {
 
   await until(`${key} done`, (s) => ticketOf(s).status === "Done");
   step(`merge checks: fix #${fix.pr.number} merged with the deploy green -> ${key} is done`);
+}
+
+/** The pull request that closes a ticket. */
+const closingPr = (s: Json, key: string) =>
+  s.github.pulls.find((p: Json) => p.body.includes(`Closes ${key}`));
+
+/**
+ * 13d2. a stale block resolves itself: sam's sub-ticket merges, and its deploy fails on the merge commit for a reason
+ * outside the pull request. sam finds nothing to fix and blocks it; the PM cannot unblock it either and gives it to
+ * the human. Its parent's own pull request merged green but stays open behind it. Another pull request fixes the
+ * outside cause and merges with the deploy green; that merge commit contains the first one, so the failed deploy
+ * counts as passed: the sub-ticket closes with a note saying where the deploy passed, and its parent closes after it,
+ * with no human action on either.
+ */
+async function staleBlockResolves() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const inReview = async (key: string) =>
+    until(`${key}: sam's pull request, the ticket in review`, (s) => {
+      const t = ticketOf(s, key);
+      return closingPr(s, key) && t.status === "In Review" && t.assignee !== "sam"
+        ? closingPr(s, key)
+        : undefined;
+    });
+
+  const { key: parent } = await stub("POST", "/_test/tickets", {
+    title: "Publish the welcome page",
+  });
+
+  await stub("POST", `/_test/tickets/${parent}/assign`, { to: "sam" });
+  const parentPr = await inReview(parent);
+  const { key: sub } = await stub("POST", "/_test/tickets", {
+    title: "Deploy the welcome page",
+    description: "outside cause: the deploy runner's key expired",
+  });
+
+  await stub("POST", `/_test/tickets/${sub}/parent`, { parent });
+  await stub("POST", `/_test/pulls/${parentPr.number}/merge`, {});
+  await officePolledTwice(`#${parentPr.number} merged`);
+  await until(`${parent}: its merge passed, and its open sub-ticket keeps it open`, (s) =>
+    ticketOf(s, parent).status === "In Review" ? true : undefined,
+  );
+
+  await stub("POST", `/_test/tickets/${sub}/assign`, { to: "sam" });
+  const first = await inReview(sub);
+  await stub("POST", `/_test/pulls/${first.number}/merge`, {
+    checks: [
+      {
+        name: "deploy",
+        conclusion: "failure",
+        step: "Deploy",
+        log: ["Connecting to the runner", "error: the deploy key has expired"],
+      },
+    ],
+  });
+
+  const human = await until(`${sub}: blocked by sam, given to the human by the PM`, (s) => {
+    const t = ticketOf(s, sub);
+    const blocked = t.comments.some(
+      (c: Json) =>
+        c.author === "sam" && c.body.startsWith(`Blocked: deploy failed after #${first.number}`),
+    );
+
+    return blocked && t.status === "Blocked" && t.assignee !== "sam" && t.assignee !== "pia"
+      ? t
+      : undefined;
+  });
+
+  step(
+    `stale block: #${first.number} merged, its deploy failed from outside it -> sam blocked ${sub}, the PM gave it to ${human.assignee}; ${parent} stays open behind it`,
+  );
+
+  const { key: fix } = await stub("POST", "/_test/tickets", { title: "Renew the deploy key" });
+  await stub("POST", `/_test/tickets/${fix}/assign`, { to: "sam" });
+  const fixPr = await inReview(fix);
+  await stub("POST", `/_test/pulls/${fixPr.number}/merge`, {
+    checks: [{ name: "deploy", conclusion: "success" }],
+  });
+
+  const done = await until(`${sub} and ${parent} done`, (s) => {
+    const [t, p] = [ticketOf(s, sub), ticketOf(s, parent)];
+    return t.status === "Done" && p.status === "Done" ? { t, p, main: s.github.main } : undefined;
+  });
+
+  const note = done.t.comments.find((c: Json) => c.body.startsWith("Moved to done: deploy passes"));
+  assertEq(
+    note?.body,
+    `Moved to done: deploy passes on main at ${String(done.main).slice(0, 7)}, which includes #${first.number}'s merge.`,
+    `${sub} closed with a note saying where the deploy passed`,
+  );
+
+  assertEq(note?.author, "sam", "the note is sam's, who did the work");
+  for (const [key, t] of [
+    [sub, done.t],
+    [parent, done.p],
+  ] as const) {
+    assertEq(
+      t.moves.filter((m: Json) => m.to === "Done").map((m: Json) => m.by),
+      ["sam"],
+      `${key} was closed once, by sam, with no human action`,
+    );
+  }
+
+  step(
+    `stale block: #${fixPr.number} fixed the outside cause and merged with the deploy green -> ${sub} closed with a note, then ${parent}, with no human action`,
+  );
 }
 
 /**

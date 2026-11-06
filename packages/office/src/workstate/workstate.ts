@@ -87,7 +87,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const prOps = createPrs(core, ticketOps);
   const requesters = createRequesters(core, ticketOps);
   const { saveDoc, touchDoc, linkDoc } = createDocs(core);
-  const { followMerges } = createMergeChecks(core);
+  const { followMerges } = createMergeChecks(core, unblockOps);
   const { refreshPr, ticketOfDraft } = prOps;
   const { deliver, handle } = createEvents(core, {
     ...ticketOps,

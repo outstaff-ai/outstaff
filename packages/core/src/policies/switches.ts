@@ -81,6 +81,14 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "When an agent has nothing queued or running (when a ticket is created or assigned to it or moves into ready, after a hand-back, on the scheduler's tick, when it connects), the office starts its next ready ticket: one assigned to it, in the ready status, the highest tracker priority first, then the one that entered ready the longest ago. A ticket in backlog, one assigned to someone else, and one the agent already worked on since it entered ready are never pulled. It counts as automatic work: usage above `usage.pause_automatic_at` stops it, and the loop guard covers each item.",
   },
   {
+    path: "recheck_blocked",
+    default: true,
+    off: false,
+    kind: "agent",
+    behaviour:
+      "When something a blocked ticket may wait on happens, the office wakes the PM on it to check whether the block still holds: a check that failed on the merge commit of its pull request passes on a later commit of the default branch that contains the merge, while its work goes on (with no other work left, the ticket closes on its own); one of several tickets linked as its blockers closes (the last one wakes the blocked agent instead); or the human it is assigned to writes about it on another ticket. The PM unblocks it (back to the agent, or done when its work is done) with a comment saying why, or changes nothing when it still holds. Each ticket and cause wakes the PM at most once in 24 hours.",
+  },
+  {
     path: "notify_handoff",
     default: true,
     off: false,

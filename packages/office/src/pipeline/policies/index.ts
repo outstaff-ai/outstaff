@@ -1,5 +1,6 @@
 import type { Policy } from "@outstaff/policy";
 import { policy as assignedToAssignee } from "./assigned_to_assignee.js";
+import { policy as blockedMaybeResolvedToPm } from "./blocked_maybe_resolved_to_pm.js";
 import { policy as chatToAddressed } from "./chat_to_addressed.js";
 import { policy as ciFailedToAuthor } from "./ci_failed_to_author.js";
 import { policy as closedStopsWork } from "./closed_stops_work.js";
@@ -63,6 +64,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   milestoneDoneToPm,
   unblockedToBlockedAgent,
   unblockedToReady,
+  blockedMaybeResolvedToPm,
   docCommentToAgent,
   docCommentToMentionedAgent,
   linkDocOnTicket,
@@ -78,10 +80,12 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
 
 /**
  * Built-in policies that are on only while a `policies` switch is: the merge wake (`policies.merge.on_approval`), the
- * idle pull (`policies.pull_ready`) and the message to a human that work landed on (`policies.notify_handoff`).
+ * idle pull (`policies.pull_ready`), the message to a human that work landed on (`policies.notify_handoff`) and the
+ * PM's look at a block that may have cleared (`policies.recheck_blocked`).
  */
 export const POLICY_SWITCH_OF: Readonly<Record<string, string>> = {
   merge_ready: "merge.on_approval",
   idle_pulls_next: "pull_ready",
   notify_human_on_handoff: "notify_handoff",
+  blocked_maybe_resolved_to_pm: "recheck_blocked",
 };

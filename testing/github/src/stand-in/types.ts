@@ -149,7 +149,12 @@ export interface StoredReaction {
 /** A check run on a commit; `job` marks one an Actions job backs. */
 export type StoredCheckRun = Pick<RestCheckRun, "name" | "status" | "conclusion"> &
   Required<Pick<RestCheckRun, "id">> &
-  Partial<Pick<RestCheckRun, "html_url" | "output">> & { job?: boolean };
+  Partial<Pick<RestCheckRun, "html_url" | "output">> & {
+    job?: boolean;
+
+    /** The workflow it ran in: its check suite is a workflow run of that name. */
+    workflow?: string;
+  };
 
 /** An Actions job, keyed by its check run's id: its steps and its raw log text. */
 export interface StoredJob {

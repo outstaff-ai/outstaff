@@ -7,6 +7,7 @@ import { githubHostCli } from "./host-cli.js";
 import { createGithubContext } from "./vcs/context.js";
 import { conversationOperations } from "./vcs/conversation.js";
 import { eventOperations } from "./vcs/events.js";
+import { historyOperations } from "./vcs/history.js";
 import { identityOperations } from "./vcs/identity.js";
 import { pullOperations } from "./vcs/pulls.js";
 import { requirementOperations } from "./vcs/requirements.js";
@@ -22,6 +23,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     ...requirementOperations(c),
     ...autoMergeOperations(c),
     ...checkOperations(c),
+    ...historyOperations(c),
     ...checkLinkOperations(c),
     ...reviewOperations(c),
     ...conversationOperations(c),

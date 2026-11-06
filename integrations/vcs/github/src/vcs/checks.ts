@@ -8,6 +8,7 @@ import type {
   RollupContexts,
 } from "#/api.types.js";
 import { repoPath } from "./context.js";
+import { withWorkflows } from "./workflows.js";
 import type { GithubContext } from "./types.js";
 
 /** Reading job logs needs Actions: read; requested when the installation has it, like Workflows. */
@@ -78,7 +79,7 @@ export function checkOperations(
       : await apiToken(repo);
 
   return {
-    async checks(repo, sha) {
+    async checks(repo, sha, opts = {}) {
       const token = await apiToken(repo);
       const runs = await http.paginate<{ check_runs: RestCheckRun[] }, RestCheckRun>(
         `${repoPath(repo)}/commits/${sha}/check-runs`,
@@ -99,15 +100,16 @@ export function checkOperations(
         ...(actionsJobId(r) ? { logId: actionsJobId(r)! } : {}),
       }));
 
+      const named = opts.workflows ? await withWorkflows(c, repo, sha, token, runs, out) : out;
       for (const s of status.data.statuses) {
-        out.push({
+        named.push({
           name: s.context,
           status: commitStatusState(s.state),
           url: s.target_url ?? fallback,
         });
       }
 
-      return out;
+      return named;
     },
 
     async checkLog(repo, logId, opts = {}) {

@@ -29,6 +29,19 @@ export interface StoredPr {
   required: Set<string>;
 }
 
+/** The commits of the branches, by repository key: what `branchHead` and `contains` read. */
+export interface FakeHistory {
+  /** A commit on top of the branch's head, or of `from`, which rewrites the branch. */
+  commit(repo: string, branch: string, from?: string): string;
+
+  /** The merge commit of `head` into the branch. */
+  merge(repo: string, branch: string, head: string): string;
+
+  /** The branch's head; `not_found` for a branch nothing landed on. */
+  head(repo: string, branch: string): string;
+  contains(sha: string, ancestor: string): boolean;
+}
+
 /** The state of one fake vcs and the helpers over it, shared by its seed, reads and writes. */
 export interface FakeVcsState {
   host: string;
@@ -57,6 +70,7 @@ export interface FakeVcsState {
   key: (r: RepoRef) => string;
   withHost: (r: RepoRef) => RepoRef;
   newSha: () => string;
+  history: FakeHistory;
   emit: (
     type: VcsEvent["type"],
     repo: RepoRef,
@@ -84,6 +98,8 @@ export type VcsReads = Pick<
   | "listPullRequests"
   | "getPullRequest"
   | "checks"
+  | "branchHead"
+  | "contains"
   | "checkLog"
   | "checkLink"
   | "reviewThreads"

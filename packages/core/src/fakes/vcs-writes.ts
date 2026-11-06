@@ -170,7 +170,7 @@ export function fakeVcsWrites(st: FakeVcsState): VcsWrites {
       }
 
       s.pr.state = "merged";
-      s.pr.mergeCommitSha = newSha();
+      s.pr.mergeCommitSha = st.history.merge(key(repo), s.pr.base.ref, s.pr.head.sha);
       touch(s);
       emit("pr.merged", repo, number, self);
       return { outcome: "merged" };

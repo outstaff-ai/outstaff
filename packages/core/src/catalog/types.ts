@@ -71,6 +71,7 @@ export type RenderOptions = { file?: string };
  *   policies.tickets.many_prs (true when policies.tickets.prs_per_ticket is many)
  *   policies.design.canvas (true unless policies.design.canvas is switched off)
  *   policies.notify_handoff (true unless policies.notify_handoff is switched off)
+ *   policies.recheck_blocked (true unless policies.recheck_blocked is switched off)
  */
 export type RepoContext = {
   name: string;
@@ -122,6 +123,7 @@ export type CatalogContext = {
     tickets: { many_prs: boolean };
     design: { canvas: boolean };
     notify_handoff: boolean;
+    recheck_blocked: boolean;
   };
 };
 

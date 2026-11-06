@@ -125,8 +125,17 @@ export interface VcsSeed {
 
       /** Gives the check a readable log: its steps in order, `failed` ones included in `checkLog`. */
       log?: { steps: { name: string; failed?: boolean; lines: string[] }[] };
+
+      /** The workflow it ran in, for subjects that group checks in workflows. */
+      workflow?: string;
     },
   ): Promise<void>;
+
+  /**
+   * A new commit on a branch, on top of its head, or of `from`, which rewrites the branch; resolves to it. The kit
+   * skips the cases that need it when unset.
+   */
+  commit?(repo: RepoRef, branch: string, o?: { from?: string }): Promise<string>;
   permission(repo: RepoRef, login: string, level: VcsPermission): Promise<void>;
   forbiddenCall?(): Promise<unknown>;
 }

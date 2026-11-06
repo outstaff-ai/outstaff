@@ -71,7 +71,7 @@ export type {
   NotesPage,
 } from "./knowledge.js";
 
-export type { Check, CheckLog, CheckLogStep } from "./vcs-checks.js";
+export type { Check, CheckLog, CheckLogStep, CheckReadOptions } from "./vcs-checks.js";
 export type { CredentialUse, HostCli } from "./vcs-cli.js";
 export type {
   ConversationEntry,

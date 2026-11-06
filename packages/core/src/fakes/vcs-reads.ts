@@ -41,8 +41,15 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
 
       return pr;
     },
-    async checks(repo, sha) {
-      return structuredClone(checks.get(`${key(repo)}@${sha}`) ?? []);
+    async checks(repo, sha, o = {}) {
+      const list = structuredClone(checks.get(`${key(repo)}@${sha}`) ?? []);
+      return o.workflows ? list : list.map(({ workflow: _workflow, ...c }) => c);
+    },
+    async branchHead(repo, branch) {
+      return st.history.head(key(repo), branch);
+    },
+    async contains(_repo, sha, ancestor) {
+      return st.history.contains(sha, ancestor);
     },
     async checkLog(repo, logId, o = {}): Promise<CheckLog> {
       const steps = logs.get(logId);

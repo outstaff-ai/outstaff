@@ -1,5 +1,7 @@
 import type { Check, PullRequest, WorkflowEvent } from "@outstaff/core";
 import type { MergeCheckOps, RefreshCtx, WorkstateCore } from "./core.types.js";
+import type { BlockNudges } from "./block-nudges.types.js";
+import { createMergeRecovery } from "./merge-recovery.js";
 import { recordSynthetic, WORKSTATE_ACTOR } from "./synthetic.js";
 import type { MergeCheck, MergeChecks, PrRecord } from "./types.js";
 
@@ -30,6 +32,7 @@ const toMergeCheck = (c: Check): MergeCheck => ({
   name: c.name,
   url: c.url,
   ...(c.logId ? { logId: c.logId } : {}),
+  ...(c.workflow ? { workflow: c.workflow } : {}),
 });
 
 /**
@@ -99,6 +102,7 @@ function mergeEventData(rec: PrRecord, checks: MergeChecks, at: string): Record<
     ...(checks.sha ? { sha: checks.sha } : {}),
     base: rec.baseRef,
     ...(checks.state === "failed" ? { failing } : {}),
+    ...(checks.recoveredOn ? { recoveredOn: checks.recoveredOn, recovered: failing } : {}),
     ...(checks.timedOut ? { timedOut: true } : {}),
     ...(rec.url ? { url: rec.url } : {}),
     at,
@@ -106,7 +110,10 @@ function mergeEventData(rec: PrRecord, checks: MergeChecks, at: string): Record<
 }
 
 /** Follows the merges whose checks are not decided yet: from the store, so across restarts too. */
-export function createMergeChecks(core: WorkstateCore): MergeCheckOps {
+export function createMergeChecks(
+  core: WorkstateCore,
+  nudges: Pick<BlockNudges, "nudge">,
+): MergeCheckOps {
   const { store, vcs, clock, logger, prs, prSubject, team } = core;
 
   const waits = (): Waits => {
@@ -134,7 +141,7 @@ export function createMergeChecks(core: WorkstateCore): MergeCheckOps {
   /** The checks on the merge commit, or undefined when they could not be read this time. */
   const read = async (rec: PrRecord, sha: string): Promise<Check[] | undefined> => {
     try {
-      return await vcs.checks(rec.ref.repo, sha);
+      return await vcs.checks(rec.ref.repo, sha, { workflows: true });
     } catch (error) {
       logger.warn("could not read the checks on a merge commit", {
         pr: prSubject(rec.ref),
@@ -154,7 +161,12 @@ export function createMergeChecks(core: WorkstateCore): MergeCheckOps {
     return updated;
   };
 
-  const decide = async (ctx: RefreshCtx, rec: PrRecord, pending: MergeChecks, d: Decision) => {
+  const decide = async (
+    ctx: RefreshCtx,
+    rec: PrRecord,
+    pending: MergeChecks,
+    d: Decision | Partial<MergeChecks>,
+  ) => {
     const { quiet: _quiet, ...rest } = pending;
     const mergeChecks: MergeChecks = { ...rest, ...d };
     await raise(ctx, { ...rec, mergeChecks }, mergeChecks);
@@ -195,6 +207,8 @@ export function createMergeChecks(core: WorkstateCore): MergeCheckOps {
     }
   };
 
+  const recovery = createMergeRecovery(core, { read, decide, save, nudges });
+
   return {
     async followMerges(ctx) {
       for (const rec of prs.values()) {
@@ -202,6 +216,8 @@ export function createMergeChecks(core: WorkstateCore): MergeCheckOps {
           await follow(ctx, rec, rec.mergeChecks);
         }
       }
+
+      await recovery.followRecoveries(ctx);
     },
   };
 }

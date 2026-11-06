@@ -5,15 +5,21 @@ import type { BranchRules } from "./types.js";
 const NOT_PROTECTED = { status: 404, body: { message: "Branch not protected" } };
 
 /** A repository's default branch: its protection summary, its classic protection and the rules of its rulesets. */
-export function branchRoutes(branch: BranchRules, repo: string): Route[] {
+export function branchRoutes(
+  branch: BranchRules,
+  repo: string,
+  headOf: (branch: string) => Promise<string | undefined> = async () => undefined,
+): Route[] {
   return [
     {
       method: "GET",
       path: `${repo}/branches/:branch`,
-      handler: (r): RestBranch => {
+      handler: async (r): Promise<RestBranch> => {
         const { protection } = branch;
+        const sha = await headOf(r.params["branch"]!);
         return {
           name: r.params["branch"]!,
+          ...(sha ? { commit: { sha } } : {}),
           protected: !!protection,
           protection: {
             enabled: !!protection,

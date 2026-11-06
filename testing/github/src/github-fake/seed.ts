@@ -79,7 +79,7 @@ export function createSeed(s: GithubStore, git: MemoryRepo, vcsRef: FakeVcsRef):
     },
     async merge(_repo, number, actor) {
       const pr = need(s, number);
-      await closePull(s, pr, actor, true);
+      await closePull(s, pr, actor, true, await git.merge(pr.base.ref, pr.head.ref, "merge"));
       return domain(s, pr);
     },
     async close(_repo, number, actor) {
