@@ -97,6 +97,47 @@ describe("githubSetupGuide", () => {
     expect(steps[1]!.body).toContain("acme-example/infra");
     expect(steps[2]!.body).toContain("GH_OFFICE_APP_ID");
   });
+
+  it("keeps the App private when the repositories are on one account", () => {
+    const [create] = githubSetupGuide({ team, scope: "office", options: {} });
+    expect(JSON.parse(create!.manifest!).public).toBe(false);
+    expect(create!.body).toContain('"Only on this account"');
+  });
+
+  describe("repositories on more than one account", () => {
+    const spread = {
+      ...team,
+      repos: [...team.repos, { name: "kit", url: "github.com/acme-libs/kit", kind: "library" }],
+    } as unknown as TeamConfig;
+
+    it("makes the office App public and installs it on each account with only its repositories", () => {
+      const [create, install] = githubSetupGuide({ team: spread, scope: "office", options: {} });
+      expect(JSON.parse(create!.manifest!).public).toBe(true);
+      expect(create!.body).toContain('"Any account"');
+      expect(create!.body).toContain("acme-example, acme-libs");
+      expect(install!.body).toContain(
+        "on acme-example, `github.com/acme-example/shop`, `github.com/acme-example/infra`; on acme-libs, `github.com/acme-libs/kit`",
+      );
+    });
+
+    it("installs a writer's App only on the accounts of the repositories they can write", () => {
+      const guide = (repos: Record<string, string>) =>
+        githubSetupGuide({
+          team: spread,
+          scope: "person",
+          options: {},
+          person: { ...sam, repos } as never,
+        });
+
+      const [create, install] = guide({ shop: "write", infra: "read", kit: "write" });
+      expect(JSON.parse(create!.manifest!).public).toBe(true);
+      expect(install!.body).toContain("on acme-libs, `github.com/acme-libs/kit`");
+      expect(install!.body).not.toContain("infra");
+
+      const [narrow] = guide({ shop: "write", kit: "read" });
+      expect(JSON.parse(narrow!.manifest!).public).toBe(false);
+    });
+  });
 });
 
 describe("deriveGithub", () => {

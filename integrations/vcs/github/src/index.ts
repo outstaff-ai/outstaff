@@ -45,7 +45,7 @@ const appSecrets = (prefix: string, who: string, where: string): SecretSpec[] =>
   },
   {
     key: `${prefix}INSTALLATION_ID`,
-    description: `Installation id of ${who} on the team's account`,
+    description: `Installation id of ${who} on one account that owns team repositories (installations on other accounts are looked up)`,
     where: "The number in the installation URL, or let ost setup --derive look it up",
     derivable: true,
   },

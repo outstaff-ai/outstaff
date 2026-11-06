@@ -5,6 +5,7 @@ import {
   clock,
   createStubFetch,
   expectPortError,
+  installationRoute,
   ORIGIN,
   REPO,
   type Route,
@@ -59,10 +60,85 @@ describe("AppAuth.slug", () => {
 });
 
 describe("AppAuth.installationId", () => {
-  it("uses the configured installation without a request", async () => {
-    const { auth, stub } = setup([], { installationId: "99" });
+  const list = (installs: unknown[]): Route => ({
+    method: "GET",
+    path: "/app/installations",
+    handler: () => installs,
+  });
+
+  it("uses the pinned installation for its own account after one lookup, without listing", async () => {
+    const { auth, stub } = setup([installationRoute(99, undefined, "Acme")], {
+      installationId: "99",
+    });
+
     await expect(auth.installationId("acme")).resolves.toBe("99");
-    expect(stub.calls).toHaveLength(0);
+    await expect(auth.installationId("ACME")).resolves.toBe("99");
+    expect(stub.called("GET", "/app/installations/99")).toHaveLength(1);
+    expect(stub.called("GET", "/app/installations")).toHaveLength(0);
+  });
+
+  it("looks up another account's installation instead of using the pinned one", async () => {
+    const { auth, stub } = setup(
+      [
+        installationRoute(99),
+        list([
+          { id: 99, account: { login: "acme" } },
+          { id: 5, account: { login: "acme-libs" } },
+        ]),
+      ],
+      { installationId: "99" },
+    );
+
+    await expect(auth.installationId("acme-libs")).resolves.toBe("5");
+    await expect(auth.installationId("acme-libs")).resolves.toBe("5");
+    await expect(auth.installationId("acme")).resolves.toBe("99");
+    expect(stub.called("GET", "/app/installations")).toHaveLength(1);
+    expect(stub.called("GET", "/app/installations/99")).toHaveLength(1);
+  });
+
+  it("is forbidden for another account the App is not installed on, even with an id pinned", async () => {
+    const { auth } = setup(
+      [installationRoute(99), list([{ id: 99, account: { login: "acme" } }])],
+      {
+        installationId: "99",
+      },
+    );
+
+    const e = await expectPortError(auth.installationId("acme-libs"), "forbidden");
+    expect(e.message).toContain('"acme-libs"');
+  });
+
+  it("treats a pinned installation without an account as no account's", async () => {
+    const { auth } = setup(
+      [
+        { method: "GET", path: "/app/installations/99", handler: () => ({ account: null }) },
+        list([{ id: 3, account: { login: "acme" } }]),
+      ],
+      { installationId: "99" },
+    );
+
+    await expect(auth.installationId("acme")).resolves.toBe("3");
+  });
+
+  it("fails while the pinned installation cannot be read, and reads it again on the next call", async () => {
+    let fail = true;
+    const { auth, stub } = setup(
+      [
+        {
+          method: "GET",
+          path: "/app/installations/99",
+          handler: () =>
+            fail ? { status: 500, body: { message: "down" } } : { account: { login: "acme" } },
+        },
+      ],
+      { installationId: "99" },
+    );
+
+    await expectPortError(auth.installationId("acme"), "unavailable");
+    await Promise.resolve();
+    fail = false;
+    await expect(auth.installationId("acme")).resolves.toBe("99");
+    expect(stub.called("GET", "/app/installations/99")).toHaveLength(2);
   });
 
   it("finds the installation by owner, ignoring case, and remembers it", async () => {
@@ -93,11 +169,19 @@ describe("AppAuth.token", () => {
   const installation = (permissions: unknown): Route => ({
     method: "GET",
     path: "/app/installations/7",
-    handler: () => (permissions === undefined ? {} : { permissions }),
+    handler: () => ({
+      account: { login: "acme" },
+      ...(permissions === undefined ? {} : { permissions }),
+    }),
   });
 
   it("reuses a token until the refresh margin, then requests a new one", async () => {
-    const { auth, stub, clock: c } = setup([token()], { installationId: "7" });
+    const {
+      auth,
+      stub,
+      clock: c,
+    } = setup([token(), installationRoute(7)], { installationId: "7" });
+
     await auth.token(REPO);
     await auth.token(REPO);
     expect(stub.called("POST", "/app/installations/7/access_tokens")).toHaveLength(1);
@@ -108,9 +192,9 @@ describe("AppAuth.token", () => {
   });
 
   it("sends the repositories and permissions it was scoped to", async () => {
-    const { auth, stub } = setup([token()], { installationId: "7" });
+    const { auth, stub } = setup([token(), installationRoute(7)], { installationId: "7" });
     await auth.token(REPO, { repositories: ["app"], permissions: { contents: "read" } });
-    expect(stub.calls[0]!.json).toEqual({
+    expect(stub.called("POST", "/app/installations/7/access_tokens")[0]!.json).toEqual({
       repositories: ["app"],
       permissions: { contents: "read" },
     });
@@ -151,24 +235,32 @@ describe("AppAuth.token", () => {
     expect(stub.called("GET", "/app/installations/7")).toHaveLength(2);
   });
 
-  it("treats an answer without permissions as none", async () => {
-    const { auth, stub } = setup([token(), installation(undefined)], { installationId: "7" });
+  const listed: Route = {
+    method: "GET",
+    path: "/app/installations",
+    handler: () => [{ id: 7, account: { login: "acme" } }],
+  };
+
+  it.each([
+    ["pinned", { installationId: "7" }],
+    ["looked up", {}],
+  ] as const)("treats an answer without permissions as none (%s)", async (_, creds) => {
+    const { auth, stub } = setup([token(), installation(undefined), listed], creds);
     await auth.token(REPO, { optionalPermissions: { actions: "read" } });
     expect(stub.called("POST", "/app/installations/7/access_tokens")[0]!.json).toEqual({});
+    expect(stub.called("GET", "/app/installations/7")).toHaveLength(1);
   });
 
   it("asks without the optional permissions when the installation cannot be read", async () => {
-    const { auth, stub } = setup(
-      [
-        token(),
-        {
-          method: "GET",
-          path: "/app/installations/7",
-          handler: () => ({ status: 500, body: { message: "down" } }),
-        },
-      ],
-      { installationId: "7" },
-    );
+    const { auth, stub } = setup([
+      token(),
+      listed,
+      {
+        method: "GET",
+        path: "/app/installations/7",
+        handler: () => ({ status: 500, body: { message: "down" } }),
+      },
+    ]);
 
     await auth.token(REPO, {
       permissions: { contents: "read" },
@@ -177,6 +269,37 @@ describe("AppAuth.token", () => {
 
     expect(stub.called("POST", "/app/installations/7/access_tokens")[0]!.json.permissions).toEqual({
       contents: "read",
+    });
+  });
+
+  it("mints a second account's token from its own installation while an id is pinned", async () => {
+    const { auth } = setup(
+      [
+        token(),
+        installationRoute(7),
+        {
+          method: "GET",
+          path: "/app/installations",
+          handler: () => [
+            { id: 7, account: { login: "acme" } },
+            { id: 9, account: { login: "acme-libs" } },
+          ],
+        },
+        {
+          method: "POST",
+          path: "/app/installations/9/access_tokens",
+          handler: () => ({
+            status: 201,
+            body: { token: "ghs_libs", expires_at: "2026-01-01T01:00:00Z" },
+          }),
+        },
+      ],
+      { installationId: "7" },
+    );
+
+    await expect(auth.token(REPO)).resolves.toMatchObject({ token: "ghs_x" });
+    await expect(auth.token({ owner: "acme-libs", name: "kit" })).resolves.toMatchObject({
+      token: "ghs_libs",
     });
   });
 });

@@ -49,6 +49,17 @@ export const officeSecrets = {
 
 export const ownSecrets = { GH_APP_ID: "200", GH_APP_PRIVATE_KEY: testKey.privateKey };
 
+/** `GET /app/installations/{id}` for a pinned installation: the account it is on and what it was granted. */
+export const installationRoute = (
+  id: number | string,
+  permissions?: Record<string, string>,
+  login = REPO.owner,
+): Route => ({
+  method: "GET",
+  path: `/app/installations/${id}`,
+  handler: () => ({ id: Number(id), account: { login }, ...(permissions ? { permissions } : {}) }),
+});
+
 /** Routes every adapter call needs: installation lookup and an installation token. */
 export function appRoutes(
   prefix = "ghs",

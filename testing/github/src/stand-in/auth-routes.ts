@@ -19,6 +19,16 @@ export function authRoutes(s: GithubStore, auth: GithubAuth, api: string): Route
       },
     },
     {
+      method: "GET",
+      path: `${api}/app/installations/:id`,
+      handler: (r) => {
+        const app = Number(r.params["id"]) - 1000;
+        return auth.appOf(r) === app
+          ? { id: installationOf(app), account: { login: s.repo.owner } }
+          : UNAUTHORIZED;
+      },
+    },
+    {
       method: "POST",
       path: `${api}/app/installations/:id/access_tokens`,
       handler: (r) => {

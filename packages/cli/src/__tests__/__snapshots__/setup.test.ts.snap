@@ -141,7 +141,7 @@ GH_APP_PRIVATE_KEY=
 # Required.
 GH_APP_PRIVATE_KEY_FILE=
 
-# Installation id of this person's own GitHub App on the team's account.
+# Installation id of this person's own GitHub App on one account that owns team repositories (installations on other accounts are looked up).
 # Where: The number in the installation URL, or let ost setup --derive look it up.
 # Required. Derivable. Leave it empty and run \`ost setup mira --derive\`.
 GH_APP_INSTALLATION_ID=
@@ -171,7 +171,7 @@ GH_OFFICE_APP_PRIVATE_KEY=
 # Required.
 GH_OFFICE_APP_PRIVATE_KEY_FILE=
 
-# Installation id of the team's read-only office GitHub App on the team's account.
+# Installation id of the team's read-only office GitHub App on one account that owns team repositories (installations on other accounts are looked up).
 # Where: The number in the installation URL, or let ost setup --derive look it up.
 # Required. Derivable. Leave it empty and run \`ost setup mira --derive\`.
 GH_OFFICE_APP_INSTALLATION_ID=
@@ -306,7 +306,7 @@ GH_OFFICE_APP_PRIVATE_KEY=
 # Required.
 GH_OFFICE_APP_PRIVATE_KEY_FILE=
 
-# Installation id of the team's read-only office GitHub App on the team's account.
+# Installation id of the team's read-only office GitHub App on one account that owns team repositories (installations on other accounts are looked up).
 # Where: The number in the installation URL, or let ost setup --derive look it up.
 # Required. Derivable. Leave it empty and run \`ost setup office --derive\`.
 GH_OFFICE_APP_INSTALLATION_ID=
@@ -421,7 +421,7 @@ Secret files go in .outstaff/secrets/mira/, one file per key.
 
 2. Install it on exactly the repositories this person can write
 
-   Install App, pick the owning account, "Only select repositories": \`github.com/acme-example/shop\`. Nothing else: the App carries write permissions, and a GitHub App's permissions are per installation, not per repository, so the repository list is the real boundary. Read access comes from the office App, so read-only repositories do not belong on this installation.
+   On the App's page choose Install App, pick the account that owns the repositories, and select "Only select repositories": \`github.com/acme-example/shop\`. Nothing else: the App carries write permissions, and a GitHub App's permissions are per installation, not per repository, so the repository list is the real boundary. Read access comes from the office App, so read-only repositories do not belong on this installation.
 
 3. Generate a private key and copy the keys
 
