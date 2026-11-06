@@ -5,7 +5,7 @@ sidebar:
   order: 25
 ---
 
-**Status:** accepted. Builds on [0019](/decisions/0019-agents-make-their-acts/) and [0022](/decisions/0022-act-echoes-wake-no-one/).
+**Status:** accepted. Builds on [0019](/decisions/0019-agents-make-their-acts/) and [0022](/decisions/0022-act-echoes-wake-no-one/). Its guard of the agent's words (the first two lines of the summary) is replaced by [0026](/decisions/0026-notices-lead-with-the-agents-message/).
 
 ## Context
 

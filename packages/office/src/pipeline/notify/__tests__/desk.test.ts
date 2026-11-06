@@ -19,7 +19,7 @@ describe("the notice desk", () => {
 
     expect(h.bodies()).toEqual([
       [
-        "U0ADA: Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)\nAdded the greeting. @U0BOSS please look.",
+        "U0ADA: Added the greeting. @U0BOSS please look.\nReady for your review: pull request [acme/shop#9](https://github.example/acme/shop/pull/9), for [ACME-1](https://tracker.example/ACME-1) Add a greeting",
       ],
     ]);
 
@@ -57,10 +57,10 @@ describe("the notice desk", () => {
       [
         [
           "U0ADA: Waiting for you:",
-          "- Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)",
-          "  Added the greeting. @U0BOSS please look.",
-          "- Blocked, needs you: [ACME-2](https://tracker.example/ACME-2)",
-          "  Needs the key.",
+          "- Added the greeting. @U0BOSS please look.",
+          "  Ready for your review: pull request [acme/shop#9](https://github.example/acme/shop/pull/9), for [ACME-1](https://tracker.example/ACME-1) Add a greeting",
+          "- Needs the key.",
+          "  Blocked, needs you: [ACME-2](https://tracker.example/ACME-2)",
         ].join("\n"),
       ],
       ["U0MONA: Ready for your review: [ACME-3](https://tracker.example/ACME-3)"],
@@ -79,9 +79,9 @@ describe("the notice desk", () => {
       [
         [
           "U0ADA: Waiting for you:",
-          "- Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)",
-          "  Added the greeting. @U0BOSS please look.",
-          "- Ready for your review: [ACME-2](https://tracker.example/ACME-2), pull request acme/shop#11",
+          "- Added the greeting. @U0BOSS please look.",
+          "  Ready for your review: pull request [acme/shop#9](https://github.example/acme/shop/pull/9), for [ACME-1](https://tracker.example/ACME-1) Add a greeting",
+          "- Ready for your review: pull request acme/shop#11, for [ACME-2](https://tracker.example/ACME-2)",
         ].join("\n"),
       ],
     ]);
@@ -155,7 +155,7 @@ describe("the notice desk", () => {
           op: "chat_reply",
           channel: "D-sam",
           thread: "chat-1",
-          body: "Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)\nAdded the greeting. @U0BOSS please look.",
+          body: "Added the greeting. @U0BOSS please look.\nReady for your review: pull request [acme/shop#9](https://github.example/acme/shop/pull/9), for [ACME-1](https://tracker.example/ACME-1) Add a greeting",
         },
       ],
       [
@@ -222,7 +222,7 @@ describe("the notice desk", () => {
     await h.pass(31_000);
     expect(h.bodies()).toEqual([
       [
-        "U0ADA: Blocked, needs you: [ACME-1](https://tracker.example/ACME-1) Add a greeting\nNeeds a human: the staging key.",
+        "U0ADA: Needs a human: the staging key.\nBlocked, needs you: [ACME-1](https://tracker.example/ACME-1) Add a greeting",
       ],
     ]);
   });

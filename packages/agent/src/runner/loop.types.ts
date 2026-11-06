@@ -115,4 +115,7 @@ export interface ItemEnv {
 
   /** The hand-back the agent stated with `ost handback`, the last one; undefined when it stated none. */
   declared(): DeclaredHandBack | undefined;
+
+  /** The message for the human the agent gave with that hand-back; undefined when it gave none. */
+  message(): string | undefined;
 }

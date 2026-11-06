@@ -29,6 +29,7 @@ const itemOf = (did: Did): ItemEnv => ({
   acknowledge: async () => {},
   produced: () => did.produced ?? [],
   declared: () => did.declared,
+  message: () => undefined,
 });
 
 const runOf = (o: Offer, item: ItemEnv): ItemRun => ({

@@ -23,6 +23,13 @@ const REPORTS: Partial<Record<HandBackStatus, { kind: "result" | "blocked"; fall
   blocked: { kind: "blocked", fallback: "Blocked." },
 };
 
+/** The hand-back's words: the summary with its links, and the agent's message for the human when it gave one. */
+const handedBackWords = (summary: string, message: string | undefined) => ({
+  summary: summary || "Finished without a message.",
+  ...(message ? { message } : {}),
+  links: linksIn(summary),
+});
+
 /** Statuses that end the item: its worktree and scratch directory go. */
 const FINISHED = new Set<HandBackStatus>(["done", "silent"]);
 
@@ -143,8 +150,7 @@ export function createWorker(ctx: WorkerContext) {
     const id = offer.workItem.id;
     await appendJournal(id, await entryFor(run, summary, true));
     await opts.office.handBack(id, {
-      summary: summary || "Finished without a message.",
-      links: linksIn(summary),
+      ...handedBackWords(summary, item.message()),
       status,
       ...(status === "done" ? { toReview } : {}),
       usage: usageReport(run),

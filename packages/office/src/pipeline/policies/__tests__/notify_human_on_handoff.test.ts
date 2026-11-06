@@ -81,6 +81,18 @@ describe("notify_human_on_handoff", () => {
     ]);
   });
 
+  it("leads with the agent's message for the human, and falls back to the summary without one", () => {
+    const words = (data: Record<string, unknown>) =>
+      notices(back("done", data), world("active")).map((d) => (d as { text?: string }).text);
+
+    expect(words({ message: "Added the greeting to the home page." })).toEqual([
+      "Added the greeting to the home page.",
+    ]);
+
+    expect(words({ message: "  " })).toEqual(["Added the greeting.\nNothing else needed."]);
+    expect(words({ message: undefined, summary: " " })).toEqual([undefined]);
+  });
+
   it("lists every ticket the hand-back gives the requester: its sub-tickets in review and the tickets of its pull requests", () => {
     const split = (owner = "sam") => ({
       ...world("active", owner),

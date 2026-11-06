@@ -123,9 +123,12 @@ export function itemEnv(
   const made = producedTracker();
   const vcs = opts.env.vcs ? { vcs: made.vcs(opts.env.vcs) } : {};
   // The hand-back the agent states with `ost handback`; the last one counts.
-  let declared: DeclaredHandBack | undefined;
+  let declared: { status: DeclaredHandBack; message?: string | undefined } | undefined;
   const handBack = {
-    handBack: { kind: offer.workItem.kind, declare: (s: DeclaredHandBack) => (declared = s) },
+    handBack: {
+      kind: offer.workItem.kind,
+      declare: (status: DeclaredHandBack, message?: string) => (declared = { status, message }),
+    },
     round: { kind: offer.workItem.kind, trigger: offer.workItem.trigger },
   };
 
@@ -182,6 +185,7 @@ export function itemEnv(
     filedWork: () => filings.length > 0,
     acknowledge,
     produced: made.produced,
-    declared: () => declared,
+    declared: () => declared?.status,
+    message: () => declared?.message,
   };
 }

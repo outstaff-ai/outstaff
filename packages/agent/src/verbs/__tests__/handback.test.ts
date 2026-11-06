@@ -6,15 +6,23 @@ import type { DeclaredHandBack } from "#/verbs/types.js";
 /** An item of the given kind, and the statuses its agent stated. */
 function item(kind: string | undefined) {
   const said: DeclaredHandBack[] = [];
+  const messages: (string | undefined)[] = [];
   const { env } = fakeEnv();
-  const withItem = kind
-    ? { ...env, handBack: { kind, declare: (s: DeclaredHandBack) => void said.push(s) } }
-    : env;
+  const declare = (s: DeclaredHandBack, message?: string) => {
+    said.push(s);
+    messages.push(message);
+  };
 
-  const run = (status: string) =>
-    runVerb(findVerb("handback")!, withItem, { status }, { workItemId: "w1" });
+  const withItem = kind ? { ...env, handBack: { kind, declare } } : env;
+  const run = (status: string, message?: string) =>
+    runVerb(
+      findVerb("handback")!,
+      withItem,
+      { status, ...(message === undefined ? {} : { message }) },
+      { workItemId: "w1" },
+    );
 
-  return { said, run };
+  return { said, messages, run };
 }
 
 describe("ost handback", () => {
@@ -24,6 +32,15 @@ describe("ost handback", () => {
     await i.run("done");
     expect(i.said).toEqual(["blocked", "done"]);
     expect(JSON.stringify(out)).toContain("handed back as blocked");
+  });
+
+  it("takes the agent's message for the human with the status", async () => {
+    const i = item("assigned");
+    const out = await i.run("done", "  Added the preview step; nothing needed from you.  ");
+    await i.run("done");
+    expect(i.messages).toEqual(["Added the preview step; nothing needed from you.", undefined]);
+    expect(JSON.stringify(out)).toContain("with your message");
+    await expect(i.run("done", " ")).rejects.toThrow(/message/);
   });
 
   it("lets a comment round finish silently", async () => {

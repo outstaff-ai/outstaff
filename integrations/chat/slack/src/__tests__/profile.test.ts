@@ -32,20 +32,23 @@ describe("formatWhen", () => {
 });
 
 describe("homeView", () => {
-  it("clips a name over 150 characters and a section over 3000", () => {
-    const view = homeView({
-      name: "n".repeat(200),
-      role: "developer",
-      status: "idle",
-      hint: "h".repeat(4000),
-    });
-
+  it("clips a name over 150 characters, and splits a section over 3000 into several, keeping all of it", () => {
+    const hint = Array.from({ length: 80 }, (_, i) => `line ${i} ${"h".repeat(60)}`).join("\n");
+    const view = homeView({ name: "n".repeat(200), role: "developer", status: "idle", hint });
     const header = view.blocks[0]!["text"] as { text: string };
     expect(header.text).toHaveLength(150);
     expect(header.text.endsWith("…")).toBe(true);
-    const hint = view.blocks[3]!["text"] as { text: string };
-    expect(hint.text).toHaveLength(3000);
-    expect(hint.text.endsWith("…")).toBe(true);
+    const parts = texts(view).slice(3);
+    expect(parts.length).toBeGreaterThan(1);
+    expect(parts.every((p) => p.length <= 3000)).toBe(true);
+    expect(parts.join("\n")).toBe(hint);
+  });
+
+  it("keeps a view within Slack's 100 blocks", () => {
+    const lines = Array.from({ length: 200 }, (_, i) => `line ${i} ${"x".repeat(60)}`);
+    const sections = Array.from({ length: 40 }, (_, i) => ({ heading: `S${i}`, lines }));
+    const view = homeView({ name: "Sam", role: "dev", status: "idle", sections });
+    expect(view.blocks).toHaveLength(100);
   });
 
   it("shows description and model, and a paused agent as paused", () => {

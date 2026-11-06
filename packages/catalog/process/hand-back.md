@@ -3,7 +3,7 @@
 Hand back each time you stop, whether the work is finished or not.
 
 1. Comment on the ticket or pull request with what you did. Link every pull request, ticket and document you mention. Report the pull request, not a branch name. If you split the ticket, link the sub-tickets and their pull requests too. A round woken by a comment that had nothing for you skips this step and step 4, and hands back `silent` (`process/work-items.md`, "Comments on documents and tickets").
-2. Hand back with the status that says where the work is, with `ost handback <status>` before you end the round:
+2. Hand back with the status that says where the work is, with `ost handback <status>` before you end the round.{{#if policies.notify_handoff}} With `done`, add your message for the human the work goes to: `ost handback done --message "<text>"` (see "The message for the human" below).{{/if}}
    - `done`: only when there is a result to review or the work is finished: a pull request open for review, a document linked to the ticket, the ticket closed, or the ticket moved to review by you with your answer in a comment (see "Questions and investigations" below). A round that leaves none of these is not `done`, whatever the work: you are told so once, and then it is handed back as `blocked`.
    - `blocked`: you wait on a decision or an answer from a human, or on anything outside your control. Waiting on a human's review of a pull request that is open for them, or on a sub-ticket someone else holds, is not blocked: that is `silent`. Say in the comment what you need and from whom. A push or pull request refused for a missing permission (for example "refusing to allow a GitHub App to create or update workflow ... without `workflows` permission") is `blocked`, never `done`: say in the comment the exact permission a human must grant, and where (for example "Workflows: Read and write, on this agent's GitHub App"), and keep the commit on its branch so nothing is lost.
    - `waiting`: only for an answer you already asked of another agent with `ost ask`. You do not say it; asking is enough.
@@ -12,7 +12,7 @@ Hand back each time you stop, whether the work is finished or not.
    The office moves the ticket from that status for you, and gives it on: `done` to review and to the person who asked; `blocked` to blocked and to the team's PM, who tries to unblock it before a human is asked (to the person who asked when the team has no PM, or you are the PM); `waiting` changes nothing; `silent` leaves the ticket as it was before the round. A ticket you gave to someone else during the work stays with them: the hand-back does not move or reassign it. Do not make that move or assignment yourself. A `done` hand-back on a ticket that is blocked is treated as blocked, so never hand back as `done` while the ticket is blocked.
 
 3. Append the journal entry (see `process/work-items.md`).
-4. Write your hand-back summary as one final message to the person who asked, using `templates/hand-back.md`. Do not post it in chat yourself: in a chat thread your agent posts it there{{#if policies.notify_handoff}}, and when the hand-back gives the work to a human, your agent sends them its first lines in a direct message with the ticket and pull request links{{/if}}.
+4. Write your hand-back summary as one final message to the person who asked, using `templates/hand-back.md`. Do not post it in chat yourself: in a chat thread your agent posts it there{{#if policies.notify_handoff}}, and when the hand-back gives the work to a human, your agent sends them your `--message` in chat (your final message when you gave none), with the ticket and pull request links after it{{/if}}.
 
 ## Questions and investigations
 
@@ -23,6 +23,17 @@ A ticket that asks a question, or asks you to find something out, ends in one of
 - **An answer that needs a human's review:** comment the answer on the ticket, move the ticket to review yourself (`ost ticket move <key> review`) and hand back as `done`.
 
 An answer you only wrote in your final message, with the ticket left as it was, is none of these: there is nothing to review.
+{{#if policies.notify_handoff}}
+
+## The message for the human
+
+The human reads it first, before any link, to know what happened since they last looked.
+
+- Say what changed and what you need from them: a review, a decision, or nothing. For example: "Addressed the review on acme/app#70: own preview step and top-level env; answered the question about caching without a change."
+- Leave out how you worked. "I handed the item back as done", "I pushed and checked formatting" or "I ran the tests" tell them nothing.
+- Keep it short, a line or two. It is sent whole, never cut.
+- The ticket and pull request are linked after it; link anything else you mention.
+{{/if}}
 
 ## The final message
 
