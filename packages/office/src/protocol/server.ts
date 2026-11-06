@@ -16,6 +16,7 @@ import { answerAtOnce } from "./beats.js";
 import { ProtocolError } from "./errors.js";
 import { handleHello } from "./hello.js";
 import { handleRequest } from "./requests.js";
+import type { Offer } from "./source.types.js";
 import type { Connection, HelloContext, ProtocolServer, ProtocolServerOptions } from "./types.js";
 
 const MAX_FRAME = 1024 * 1024;
@@ -65,6 +66,12 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     }, ms);
   }
 
+  function offerOn(c: Connection, person: string, offer: Offer) {
+    c.offered.add(offer.workItem.id);
+    send(c, "offer", offer);
+    log.info("offered a work item", { person, item: offer.workItem.id });
+  }
+
   function deliver(person: string) {
     const run = async () => {
       const c = conns.get(person);
@@ -75,15 +82,13 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       const outstanding = await source.outstanding(person);
       for (const { offer, accepted } of outstanding) {
         if (!accepted && !c.offered.has(offer.workItem.id)) {
-          c.offered.add(offer.workItem.id);
-          send(c, "offer", offer);
+          offerOn(c, person, offer);
         }
       }
 
       // The work item and the chat sessions run in lanes of their own: offer until nothing more can start.
       for (let offer = await source.next(person); offer; offer = await source.next(person)) {
-        c.offered.add(offer.workItem.id);
-        send(c, "offer", offer);
+        offerOn(c, person, offer);
       }
     };
 

@@ -55,7 +55,7 @@ describe("which runtime and model ran an item", () => {
     expect(runs[0]).toMatchObject({ runtime: "claude", model: "opus" });
   });
 
-  it("leaves a run that was never accepted without a runtime", async () => {
+  it("starts no run for an offer that was never accepted", async () => {
     const scheduler = createScheduler({ store, team, clock: manualClock() });
     const source = schedulerWorkSource({ scheduler, store, team });
     const queued = await scheduler.enqueue({
@@ -66,9 +66,6 @@ describe("which runtime and model ran an item", () => {
     });
 
     await source.next("sam");
-    expect((await findItem(store, queued.id))!.item.runs[0]).toMatchObject({
-      runtime: null,
-      model: null,
-    });
+    expect((await findItem(store, queued.id))!.item.runs).toEqual([]);
   });
 });

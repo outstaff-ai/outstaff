@@ -742,6 +742,50 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
     });
   });
 
+  describe("offers", () => {
+    it("start no run until the agent accepts, and one run however often it accepts", async () => {
+      const a = await add("a");
+      const offered = await sched.offer(a.id);
+      expect(offered).toMatchObject({ started: true, item: { id: a.id, status: "active" } });
+      expect(await store.listRuns(a.id)).toEqual([]);
+
+      const run = await sched.startRun(a.id);
+      expect(run).toMatchObject({ workItemId: a.id, finishedAt: null });
+      expect((await sched.startRun(a.id))?.id).toBe(run?.id);
+
+      const b = await add("b");
+      expect(await sched.startRun(b.id)).toBeNull();
+    });
+
+    it("go back to the queue when the agent no longer has them, counted by the loop guard", async () => {
+      const a = await add("a", "agent");
+      await sched.offer(a.id);
+      await sched.startRun(a.id);
+
+      const queued = await sched.abandon(a.id, "the agent lost it.");
+      expect(queued).toMatchObject({ id: a.id, status: "queued" });
+      expect(await store.listRuns(a.id)).toMatchObject([
+        { outcome: "abandoned", error: "the agent lost it." },
+      ]);
+
+      expect((await store.readJournal(a.id)).map((j) => j.text)).toContain(
+        "Requeued: the agent lost it.",
+      );
+
+      expect(await store.countLoopGuard(a.id, 3_600_000)).toBe(1);
+      expect(await sched.abandon(a.id, "again")).toBeNull();
+    });
+
+    it("go back to the queue when nobody accepted them before they went stale", async () => {
+      const a = await add("a");
+      await sched.offer(a.id);
+      clock.advance(11 * 60_000);
+      expect((await sched.tick()).retried.map((i) => i.id)).toEqual([a.id]);
+      expect(await store.listRuns(a.id)).toEqual([]);
+      expect((await store.getItem(a.id))?.status).toBe("queued");
+    });
+  });
+
   describe("stale runs", () => {
     it("retries once, then blocks with a reason", async () => {
       const a = await add("a");
@@ -763,6 +807,22 @@ describe.each(harnesses)("scheduler on %s", (_name, makeHarness) => {
       expect(second.blocked).toHaveLength(1);
       expect(second.blocked[0]).toMatchObject({ code: "stale", item: { status: "blocked" } });
       expect(second.blocked[0]?.reason).toMatch(/Stale again/);
+    });
+
+    it("go stale after the team's minutes, five by default", async () => {
+      for (const [scheduler, minutes] of [
+        [{}, 5],
+        [{ stale_run_after_minutes: 3 }, 3],
+      ] as const) {
+        sched.stop();
+        sched = createScheduler({ store, team: { ...team, scheduler }, clock });
+        const a = await add(`a${minutes}`);
+        await sched.markActive(a.id);
+        clock.advance((minutes - 1) * 60_000);
+        expect((await sched.tick()).retried).toEqual([]);
+        clock.advance(2 * 60_000);
+        expect((await sched.tick()).retried.map((i) => i.id)).toEqual([a.id]);
+      }
     });
 
     it("offers a stale item again with its session", async () => {

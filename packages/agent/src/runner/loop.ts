@@ -1,5 +1,5 @@
 import { policyOn, silentLogger } from "@outstaff/core";
-import type { Offer } from "#/office-client/index.js";
+import { Unanswered, type Offer } from "#/office-client/index.js";
 import { acknowledgeFeedback } from "./reactions.js";
 import { createSessionManager } from "./sessions.js";
 import type { WorkLoopOptions, WorkLoop } from "./loop.types.js";
@@ -20,21 +20,11 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
   const inFlight = new Set<Promise<void>>();
   let workLane: Promise<void> = Promise.resolve();
 
-  /** Items the office still lists as ours after a restart have no offer to resume from; it queues them again. */
-  async function releaseResumed() {
-    for (const id of opts.office.resume()) {
-      try {
-        await opts.office.decline(id, "The agent restarted while working on this item.");
-      } catch (e) {
-        log.warn("could not release an item left over from before a restart", {
-          workItemId: id,
-          error: reason(e),
-        });
-      }
-    }
-  }
-
-  /** Takes the offer; an offer the office would not give us is dropped. */
+  /**
+   * Takes the offer; an offer the office would not give us is dropped. An accept the office did not answer may still
+   * have reached it, so the offer is given back: on the same connection the office handles it after the accept. After
+   * a reconnect the office has already requeued it, and offers it again.
+   */
   async function accepted(id: string): Promise<boolean> {
     try {
       await opts.office.accept(id, {
@@ -45,6 +35,11 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
       return true;
     } catch (e) {
       log.warn("could not accept an offer", { workItemId: id, error: reason(e) });
+      if (e instanceof Unanswered) {
+        await opts.office
+          .decline(id, "The office did not answer the accept in time.")
+          .catch(() => {});
+      }
 
       return false;
     }
@@ -98,7 +93,6 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
   return {
     async run() {
-      await releaseResumed();
       for await (const offer of until(opts.office.offers(), ended)) {
         if (closed()) {
           // Not accepted, so the office offers it again later.

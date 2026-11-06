@@ -1,6 +1,6 @@
 import type { WorkItem } from "#/store/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
-import { INTERRUPTED } from "./constants.js";
+import { ABANDONED, INTERRUPTED } from "./constants.js";
 import { backoffMs, orderQueue } from "./policy.js";
 import type { BlockNotice, FailResult, FinishInput, RetryRequest } from "./types.js";
 
@@ -136,5 +136,27 @@ export async function retryItem(
     { item: itemId, person: item.person, by: request.by, signal: request.signal },
   );
 
+  return queued;
+}
+
+export async function abandonItem(
+  deps: SchedulerDeps,
+  itemId: string,
+  reason: string,
+): Promise<WorkItem | null> {
+  const { store, log } = deps;
+  const item = await store.getItem(itemId);
+  if (item?.status !== "active") {
+    return null;
+  }
+
+  const run = await deps.checks.openRun(itemId);
+  if (run) {
+    await store.finishRun(run.id, { outcome: ABANDONED, error: reason });
+  }
+
+  const queued = await store.updateItem(itemId, { status: "queued" });
+  await store.appendJournal(itemId, "scheduler", `Requeued: ${reason}`);
+  log.warn("work item requeued", { item: itemId, person: item.person, reason });
   return queued;
 }

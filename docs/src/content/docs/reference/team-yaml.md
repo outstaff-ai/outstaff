@@ -926,6 +926,22 @@ Ports (for example chat) whose adapter's live checks the office does not run, fo
 - Optional
 - Allowed values: `chat`, `vcs`, `runtime`, `tracker`, `knowledge`, `avatars`
 
+## scheduler
+
+How the office runs the work queue.
+
+- Type: `object`
+- Optional
+
+### scheduler.stale_run_after_minutes
+
+Minutes an active work item may go without a heartbeat from its agent before the office ends its run as stale and queues it again: a run the agent lost, or an offer nobody accepted. A running agent beats every 15 seconds. The second stale run in a row blocks the item. Default 5.
+
+- Type: `integer`
+- Optional
+- Minimum 1
+- Maximum 1440
+
 ## tools
 
 Tools every agent of the team installs at start, with the commands they may run.

@@ -80,9 +80,6 @@ export interface OfficeConnection extends OfficeClient {
    */
   offers(): AsyncIterable<Offer>;
 
-  /** Ids of accepted, unfinished items the office listed when the connection was last established. */
-  resume(): string[];
-
   /** The team config of the last `welcome`; undefined until the first one. */
   teamConfig(): Team | undefined;
 
@@ -162,17 +159,32 @@ export type RequestFn = <T extends MessageType>(
   type: T,
   payload: PayloadOf<T>,
   timeoutMs?: number,
+  wait?: boolean,
 ) => Promise<Message>;
+
+/** How a request is sent when the connection is not up, or drops before the answer. */
+export interface CallOptions {
+  /** Sent once more on the next connection when the first went unanswered; for messages that are safe to repeat. */
+  again?: boolean;
+
+  /** Fails at once when the client is not connected, instead of waiting for the next connection. */
+  now?: boolean;
+}
 
 /** Sends one request and resolves to the payload of the expected answer; an `error` answer rejects. */
 export type CallFn = <T extends MessageType, R extends MessageType>(
   type: T,
   payload: PayloadOf<T>,
   expect: R,
+  how?: CallOptions,
 ) => Promise<PayloadOf<R>>;
 
 /** Sends one request the office answers with `ack`. */
-export type AckFn = <T extends MessageType>(type: T, payload: PayloadOf<T>) => Promise<void>;
+export type AckFn = <T extends MessageType>(
+  type: T,
+  payload: PayloadOf<T>,
+  how?: CallOptions,
+) => Promise<void>;
 
 export interface RequestsOptions {
   clock: ClientClock;
@@ -215,7 +227,6 @@ export type OfficeMethods = Omit<
   | "rejection"
   | "whenConnected"
   | "offers"
-  | "resume"
   | "onReports"
   | "onActs"
   | "teamConfig"

@@ -948,6 +948,19 @@
       },
       "additionalProperties": false
     },
+    "scheduler": {
+      "description": "How the office runs the work queue.",
+      "type": "object",
+      "properties": {
+        "stale_run_after_minutes": {
+          "description": "Minutes an active work item may go without a heartbeat from its agent before the office ends its run as stale and queues it again: a run the agent lost, or an offer nobody accepted. A running agent beats every 15 seconds. The second stale run in a row blocks the item. Default 5.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440
+        }
+      },
+      "additionalProperties": false
+    },
     "tools": {
       "description": "Tools every agent of the team installs at start, with the commands they may run.",
       "type": "object",
