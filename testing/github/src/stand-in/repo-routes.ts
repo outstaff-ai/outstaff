@@ -85,7 +85,14 @@ export function moreRoutes(s: GithubStore, api: string, more: StandInRepo[]): Ro
     return [
       { method: "GET", path: base, handler: () => ({ default_branch: "main" }) },
       ...branchRoutes({ rules: [] }, base),
-      { method: "GET", path: `${base}/pulls`, handler: () => [] },
+      {
+        method: "GET",
+        path: `${base}/pulls`,
+        handler: () =>
+          s.pullsDenied.has(m.name)
+            ? { status: 403, body: { message: "Resource not accessible by integration" } }
+            : [],
+      },
       ...emptyListRoutes(base),
       {
         method: "GET",

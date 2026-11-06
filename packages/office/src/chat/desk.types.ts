@@ -1,4 +1,4 @@
-import type { TeamConfig, Tracker } from "@outstaff/core";
+import type { Logger, TeamConfig, Tracker } from "@outstaff/core";
 import type { Filed, Link } from "@outstaff/protocol";
 import type { ChatDesk } from "#/protocol/source.types.js";
 import type { Scheduler } from "#/scheduler/types.js";
@@ -40,6 +40,7 @@ export interface ChatDeskOptions {
   push?: (person: string) => void;
 
   clock?: Clock;
+  logger?: Logger;
 }
 
 /** What the office's chat handling does besides taking messages in: the filing and attach verbs, and the reports. */

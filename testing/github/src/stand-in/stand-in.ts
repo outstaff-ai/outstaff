@@ -37,6 +37,7 @@ function createStore(opts: StandInOptions): GithubStore {
     events: [],
     queueDelayMs: opts.queueDelayMs,
     logUrl: opts.logUrl,
+    pullsDenied: new Set(),
   };
 }
 

@@ -59,16 +59,32 @@ const filedReply = {
   work: [],
 };
 
-// The chat sessions of these tests are the items called c*.
-const chatItems = (id: string | undefined) =>
-  id?.startsWith("c") ? [{ id, title: "Chat", status: "active", kind: "chat", current: true }] : [];
+// The chat sessions of these tests are the items called c*; the others are rounds on SHOP-1, the offers' ticket.
+const listedItems = (id: string | undefined) => {
+  if (!id) {
+    return [];
+  }
+
+  return id.startsWith("c")
+    ? [{ id, title: "Chat", status: "active", kind: "chat", current: true }]
+    : [
+        {
+          id,
+          title: `Fix ${id}`,
+          status: "active",
+          kind: "ticket",
+          ticketKey: "SHOP-1",
+          current: true,
+        },
+      ];
+};
 
 /** What the office answers each request with; anything else is acknowledged. */
 const officeReplies: Partial<{
   [T in Message["type"]]: (m: Extract<Message, { type: T }>) => Reply;
 }> = {
   ask: (m) => ["ask_result", { id: "q1", to: m.payload.to, status: "pending" }],
-  work_list: (m) => ["work_list_result", { items: chatItems(m.payload.workItemId) }],
+  work_list: (m) => ["work_list_result", { items: listedItems(m.payload.workItemId) }],
   work_link: () => ["work_link_result", filedReply],
   work_queue: () => ["work_queue_result", filedReply],
   work_attach: () => [

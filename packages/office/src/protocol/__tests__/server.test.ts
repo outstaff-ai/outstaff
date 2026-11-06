@@ -1,3 +1,4 @@
+import { silentLogger } from "@outstaff/core";
 import { PROTOCOL_VERSION, type Message } from "@outstaff/protocol";
 import { WebSocket } from "ws";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -87,6 +88,7 @@ describe("protocol server", () => {
   let source: FakeSource;
   let server: ProtocolServer;
   let agents: Agent[];
+  let logged: unknown[][];
 
   const connect = async () => {
     const a = await Agent.connect(server.port());
@@ -111,11 +113,13 @@ describe("protocol server", () => {
     ]);
 
     agents = [];
+    logged = [];
     server = createProtocolServer({
       source,
       team: fakeTeam(),
       auth: createAgentAuth(tokens),
       clock,
+      logger: { ...silentLogger, error: (message, fields) => void logged.push([message, fields]) },
       port: 0,
       host: "127.0.0.1",
       heartbeatMs: 1000,
@@ -557,6 +561,18 @@ describe("protocol server", () => {
       const err = await a.next("error");
       expect(err.payload).toMatchObject({ code: "failed" });
       expect(JSON.stringify(err)).not.toContain("hunter2");
+      // The office logs what the agent is not told, with where it came from.
+      expect(logged).toEqual([
+        [
+          "agent request failed",
+          expect.objectContaining({
+            person: "ada",
+            type: "accept",
+            error: "Error: database password is hunter2",
+            stack: expect.stringContaining("server.test.ts") as string,
+          }),
+        ],
+      ]);
 
       source.failNext(new ProtocolError("invalid", "Cannot do that."));
       a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });

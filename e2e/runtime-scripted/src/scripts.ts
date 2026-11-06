@@ -610,6 +610,24 @@ async function* askHuman(
   return `Waiting on an answer: ${question} Nothing changed yet.`;
 }
 
+/**
+ * A round a reply in chat continued with only a check to make ("can you check if you have access now?"): the answer
+ * goes on the ticket, and the ticket goes to review with it. Returns the message to stop with, or undefined to go on.
+ */
+async function* checkFromChat(
+  ctx: ItemContext,
+  key: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  if (!ctx.feedback.some((f) => f.kind === "chat" && /\bcan you check\b/i.test(f.body))) {
+    return undefined;
+  }
+
+  const answer = "Checked: I have access now.";
+  yield { type: "tool", tool: "ticket_comment", input: { key, body: answer } };
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "review" } };
+  return answer;
+}
+
 /** What the agent answers when the runner refuses a done hand-back with nothing to review. */
 export const nothingToReview = (last: string) =>
   `Blocked: ${last || "nothing to review yet"} I need the answer from a human before I go on.`;
@@ -621,14 +639,18 @@ async function* postUsage(key: string, of: string): AsyncGenerator<Action, strin
   return `Posted the usage of ${of} on ${key}.`;
 }
 
-/** A blocked ticket, or one that only asks for usage: the message to stop with, else undefined. */
+/** A blocked ticket, one that only asks for usage, or a check asked in chat: the message to stop with, else undefined. */
 async function* stopsEarly(
   ctx: ItemContext,
   key: string,
   shown: string,
 ): AsyncGenerator<Action, string | undefined, string> {
   const usageOf = /^usage: (\S+)$/m.exec(shown)?.[1];
-  return usageOf ? yield* postUsage(key, usageOf) : yield* blockIfStuck(key, shown, ctx.unblocked);
+  if (usageOf) {
+    return yield* postUsage(key, usageOf);
+  }
+
+  return (yield* blockIfStuck(key, shown, ctx.unblocked)) ?? (yield* checkFromChat(ctx, key));
 }
 
 /** A ticket that says `hold: <gate>` keeps its round running until the driver opens that gate. */
@@ -1182,7 +1204,7 @@ async function* replyAboutWork(
   const said =
     [...ctx.journal.matchAll(/replied in chat \(thread \S+\):\n([^\n]*)/g)].at(-1)?.[1] ?? latest;
 
-  if (target && /^(also|please|split)\b/i.test(said)) {
+  if (target && /^(?:also|please|split)\b|\bcan you check\b/i.test(said)) {
     yield {
       type: "tool",
       tool: "work_attach",
@@ -1310,9 +1332,11 @@ async function* fileRequest(
   ctx: ItemContext,
   latest: string,
 ): AsyncGenerator<Action, string | undefined, string> {
-  const filed = /^new work: (.+)$/i.exec(latest)?.[1];
+  // The first line is the title; lines after it, when there are any, are the ticket's description.
+  const [, filed, more] = /^new work: ([^\n]+)(?:\n([\s\S]+))?$/i.exec(latest) ?? [];
   if (filed) {
-    yield { type: "tool", tool: "ticket_create", input: { title: filed, body: filed } };
+    const description = more ? `${filed}\n${more}` : filed;
+    yield { type: "tool", tool: "ticket_create", input: { title: filed, body: description } };
     return "Filed.";
   }
 

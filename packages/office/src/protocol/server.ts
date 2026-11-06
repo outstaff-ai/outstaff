@@ -167,13 +167,26 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
 
       await handleRequest(ctx, c, c.person, m);
     } catch (err) {
-      if (err instanceof ProtocolError) {
-        sendError(c, err.code, err.message, m.id);
-      } else {
-        log.error("agent request failed", { person: c.person, type: m.type, error: String(err) });
-        sendError(c, "failed", "The office could not handle the request.", m.id);
-      }
+      refuse(c, m, err);
     }
+  }
+
+  /** A `ProtocolError` goes back as it is; anything else the agent hears only failed, and the log keeps what and where. */
+  function refuse(c: Connection, m: Message, err: unknown) {
+    if (err instanceof ProtocolError) {
+      sendError(c, err.code, err.message, m.id);
+      return;
+    }
+
+    log.error("agent request failed", {
+      person: c.person,
+      type: m.type,
+      id: m.id,
+      error: String(err),
+      ...(err instanceof Error && err.stack ? { stack: err.stack } : {}),
+    });
+
+    sendError(c, "failed", "The office could not handle the request.", m.id);
   }
 
   function onConnection(ws: WebSocket) {
