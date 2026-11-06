@@ -15,6 +15,5 @@ Closes #
 ## Checklist
 
 - [ ] Docs updated under `docs/` (or not needed for this change)
-- [ ] Title and commit subject are conventional commits (`type(scope): summary`); they drive the release notes
-- [ ] The PR is one commit (amended, pushed with `--force-with-lease`)
+- [ ] The title is a conventional commit (`type(scope): summary`); it becomes the squash commit and drives the release notes
 - [ ] First pull request here? Sign the [CLA](https://github.com/outstaff-ai/outstaff/blob/main/CLA.md) by commenting the phrase from CONTRIBUTING.md (bots are exempt)
