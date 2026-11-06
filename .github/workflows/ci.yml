@@ -53,21 +53,6 @@ jobs:
         if: always()
       - run: pnpm build
 
-  single-commit:
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-    runs-on: ubuntu-latest
-    timeout-minutes: 2
-    steps:
-      - name: Exactly one commit
-        env:
-          COMMITS: ${{ github.event.pull_request.commits }}
-        run: |
-          if [ "$GITHUB_EVENT_NAME" = "merge_group" ]; then echo "Checked on the pull request."; exit 0; fi
-          if [ "$COMMITS" != "1" ]; then
-            echo "::error::This pull request has $COMMITS commits. PRs land as exactly one commit (merged with a merge commit): squash them, then push with --force-with-lease."
-            exit 1
-          fi
-
   conventional:
     if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     runs-on: ubuntu-latest
@@ -76,24 +61,13 @@ jobs:
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
-      - name: PR title and commit subjects are conventional commits
+      - name: PR title is a conventional commit
         env:
           TITLE: ${{ github.event.pull_request.title }}
-          BASE: ${{ github.event.pull_request.base.sha }}
-          HEAD: ${{ github.event.pull_request.head.sha }}
         run: |
           if [ "$GITHUB_EVENT_NAME" = "merge_group" ]; then echo "Checked on the pull request."; exit 0; fi
           pattern='^(feat|fix|perf|docs|style|refactor|test|build|ci|chore|revert)(\([a-z0-9./-]+\))?!?: .+'
-          bad=0
           if ! printf '%s' "$TITLE" | grep -Eq "$pattern"; then
-            echo "::error::PR title must be a conventional commit, e.g. 'feat(core): add the loader'. Got: $TITLE"
-            bad=1
+            echo "::error::PR title must be a conventional commit, e.g. 'feat(core): add the loader'. It becomes the squash commit's subject. Got: $TITLE"
+            exit 1
           fi
-          for subject in $(git log --format='%s' "$BASE..$HEAD" | tr ' ' '\001'); do
-            subject=$(printf '%s' "$subject" | tr '\001' ' ')
-            if ! printf '%s' "$subject" | grep -Eq "$pattern"; then
-              echo "::error::Commit subject must be a conventional commit. Got: $subject"
-              bad=1
-            fi
-          done
-          exit $bad
