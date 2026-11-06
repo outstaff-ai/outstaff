@@ -214,10 +214,14 @@ async function fail(e: unknown) {
   }
 
   process.stderr.write(`\nFAIL: ${headline}\n`);
-  const now = await state().then(
-    (s) => JSON.stringify(s, null, 2),
-    () => undefined,
-  );
+  // The stub may be what failed: its state is worth a few seconds, never the teardown.
+  const now = await Promise.race([
+    state().then(
+      (s) => JSON.stringify(s, null, 2),
+      () => undefined,
+    ),
+    sleep(10_000).then(() => undefined),
+  ]);
 
   keepEvidence({ text, ...(now ? { state: now } : {}) });
   teardown(1, true);
