@@ -54,7 +54,7 @@ Architecture documentation is missing, wrong or out of date.
 
 Core or critical work is assigned to you.
 
-- Follow the developer skill. Because the work is critical, note the risks and how to roll back in the pull request.
+- Follow the developer skill, including its use of your code host's CLI for CI runs. Because the work is critical, note the risks and how to roll back in the pull request.
 
 ### doc-feedback
 

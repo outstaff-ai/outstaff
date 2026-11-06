@@ -70,7 +70,7 @@ Installation tokens are cached and reused until five minutes before they expire.
 | App                | Repository permissions                                                                                                                                                       |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | office (read-only) | Contents: read, Pull requests: read, Checks: read, Commit statuses: read, Issues: read, Metadata: read (collaborator permissions may need Administration: read on some orgs) |
-| person (own)       | Contents: write, Pull requests: write, Issues: write, Checks: read, Metadata: read                                                                                           |
+| person (own)       | Contents: write, Pull requests: write, Issues: write, Checks: read, Commit statuses: read, Actions: read (read and write for a role with `vcs.ciRuns`), Metadata: read       |
 
 ### Secrets
 

@@ -14,6 +14,13 @@ import { signAppJwt } from "./jwt.js";
 export const needsWorkflows = (ctx: Pick<SetupContext, "roleCapabilities">): boolean =>
   ctx.roleCapabilities?.includes("vcs.workflows") ?? false;
 
+/**
+ * Whether the person's role re-runs, cancels and dispatches CI runs with the code host's CLI (the `vcs.ciRuns`
+ * capability), so its App needs Actions: write. Never Checks: write: that would let it report a check as passing.
+ */
+export const needsCiRuns = (ctx: Pick<SetupContext, "roleCapabilities">): boolean =>
+  ctx.roleCapabilities?.includes("vcs.ciRuns") ?? false;
+
 type Team = SetupContext["team"];
 
 /** Repositories a person has any grant on, by the grant rules of `team.people[].repos`. */

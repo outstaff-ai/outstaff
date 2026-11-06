@@ -30,6 +30,9 @@ export interface AppExpectation {
    */
   wantActions?: boolean;
 
+  /** The person's role re-runs, cancels and dispatches CI runs (`vcs.ciRuns`), so the App needs Actions: write. */
+  wantActionsWrite?: boolean;
+
   /** The person's role changes CI workflow files, so the App needs the Workflows permission. */
   wantWorkflows?: boolean;
 

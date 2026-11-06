@@ -1,5 +1,5 @@
 import { parseRepoUrl, type SetupContext, type SetupStep } from "@outstaff/core";
-import { grantedRepos, needsWorkflows, writableRepos } from "./setup.js";
+import { grantedRepos, needsCiRuns, needsWorkflows, writableRepos } from "./setup.js";
 
 type Team = SetupContext["team"];
 type Person = NonNullable<SetupContext["person"]>;
@@ -24,6 +24,9 @@ const WRITE = {
   pull_requests: "write",
   issues: "write",
 } as const;
+
+/** Re-running, cancelling and dispatching workflow runs with gh; for roles with `vcs.ciRuns`. Never Checks: write. */
+const CI_RUNS = { actions: "write" } as const;
 
 /** Needed to push changes under `.github/workflows/`; GitHub rejects such a push from an App without it. */
 const WORKFLOWS = { workflows: "write" } as const;
@@ -50,6 +53,12 @@ function manifest(name: string, permissions: Record<string, string>, isPublic: b
     2,
   );
 }
+
+/** What the person's own App gets, in words; Actions is read and write for a role that re-runs CI. */
+const writerSummary = (ciRuns: boolean) =>
+  ciRuns
+    ? "metadata, checks and commit statuses read-only (checks stay read-only, so the App can never report a check as passing); Actions read and write, to read the logs of failed CI jobs and because this person's role re-runs, cancels and dispatches workflow runs with gh; contents, pull requests and issues read and write (pull requests are commented on through the issues API)."
+    : "metadata, checks, commit statuses and Actions (to read the logs of failed CI jobs) read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API).";
 
 const WORKFLOWS_NOTE =
   " Workflows read and write too: this person's role changes CI, and GitHub refuses a push that touches `.github/workflows/` from an App without it. Mind the risk: a workflow can read the repository's Actions secrets when it runs, so grant Workflows only to roles that need it and review such pull requests with care.";
@@ -116,13 +125,14 @@ function writerAppSteps(
   writable: ReturnType<typeof writableRepos>,
 ): SetupStep[] {
   const workflows = needsWorkflows(ctx);
+  const ciRuns = needsCiRuns(ctx);
   const urls = writable.map((g) => g.repo.url);
   return [
     createStep(
       `Create ${person.name}'s GitHub App`,
       slugOf(ctx.team, person.handle),
-      workflows ? { ...WRITE, ...WORKFLOWS } : WRITE,
-      `metadata, checks, commit statuses and Actions (to read the logs of failed CI jobs) read-only; contents, pull requests and issues read and write (pull requests are commented on through the issues API).${workflows ? WORKFLOWS_NOTE : ""}`,
+      { ...WRITE, ...(ciRuns ? CI_RUNS : {}), ...(workflows ? WORKFLOWS : {}) },
+      `${writerSummary(ciRuns)}${workflows ? WORKFLOWS_NOTE : ""}`,
       accountsOf(urls),
     ),
     {

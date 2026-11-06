@@ -2,7 +2,7 @@ import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
 import { checkApp } from "./doctor/app.js";
 import { bad, ok, repoName } from "./doctor/findings.js";
 import type { AppExpectation } from "./doctor/types.js";
-import { grantedRepos, needsWorkflows, writableRepos } from "./setup.js";
+import { grantedRepos, needsCiRuns, needsWorkflows, writableRepos } from "./setup.js";
 
 type Person = NonNullable<DeriveContext["person"]>;
 
@@ -24,6 +24,7 @@ function personApps(
       readOnly: false,
       wantWrite: writable.length > 0,
       wantActions: writable.length > 0,
+      wantActionsWrite: writable.length > 0 && needsCiRuns(ctx),
       wantWorkflows: writable.length > 0 && needsWorkflows(ctx),
       ...(person.identities?.vcs ? { login: person.identities.vcs } : {}),
     },

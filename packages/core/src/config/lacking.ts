@@ -15,6 +15,7 @@ export const LACKING: Record<Capability, string> = {
   "vcs.pullRequests": "open or update pull requests",
   "vcs.reviewThreads": "reply to review threads",
   "vcs.workflows": "push changes to CI workflow files",
+  "vcs.ciRuns": "re-run, cancel and dispatch CI runs",
   "vcs.webhooks": "react to repository changes instantly",
   "vcs.reactions": "react to pull request comments",
   "vcs.merge": "merge pull requests",

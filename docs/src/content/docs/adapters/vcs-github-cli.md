@@ -14,7 +14,7 @@ The `github` vcs adapter declares `gh` as the code host's CLI. A GitLab adapter 
 3. It asks the adapter for a short-lived token for that one repository, the same way [git's credential helper](/architecture/agent/#repositories-and-credentials) does: the person's own App for a write grant, the read-only office App for a read grant, and read for the `readonly` profile whatever the grant. The token asks GitHub for no permissions, so it carries what the App is granted there, and no more.
 4. It runs the real `gh` with the token in that process's environment only (`GH_TOKEN`, or `GH_ENTERPRISE_TOKEN` and `GH_HOST` on GitHub Enterprise Server, plus `GH_REPO`). Every call gets a fresh token; nothing is written to disk or left in the agent's environment.
 
-The App's permissions are the hard limit: a `gh` command the App may not do fails at GitHub, whatever the rules below allow. Re-running, cancelling and dispatching workflow runs need **Actions: read and write** on the App. Without it those commands fail with a 403, and reading runs still works.
+The App's permissions are the hard limit: a `gh` command the App may not do fails at GitHub, whatever the rules below allow. Re-running, cancelling and dispatching workflow runs need **Actions: read and write** on the App. `ost setup` asks for it for roles with the `vcs.ciRuns` capability (the stock developer, architect and devops), and `ost doctor` fails when such a person's App lacks it. Other roles keep Actions read-only: those commands fail at GitHub with a 403, and reading runs still works. No role gets Checks: write.
 
 ## Install it
 
