@@ -162,14 +162,17 @@ describe("a wake's view of the agent's own work", () => {
 
   describe("in a round on a failure", () => {
     it("lists the agent's pull requests in the repository since the merge whose checks failed, latest first", async () => {
+      const unlinked = pr(88, {
+        title: "Draft",
+        draft: true,
+        state: "merged",
+        updatedAt: "2026-10-01T16:53:00.000Z",
+      });
+
+      delete unlinked.url;
       records.push(
         pr(87, { title: "Set the deploy region", ticket: "ACME-108" }),
-        pr(88, {
-          title: "Draft",
-          draft: true,
-          state: "merged",
-          updatedAt: "2026-10-01T16:53:00.000Z",
-        }),
+        unlinked,
         pr(70, { title: "Before the merge", updatedAt: "2026-10-01T16:00:00.000Z" }),
         pr(71, { title: "Closed", state: "closed" }),
         pr(72, { title: "Gone", goneAt: "2026-10-01T16:55:00.000Z" }),
@@ -193,7 +196,6 @@ describe("a wake's view of the agent's own work", () => {
           ref: key(88),
           number: 88,
           title: "Draft",
-          url: "https://git.acme.example/acme/app/pull/88",
           state: "merged",
           draft: true,
           at: "2026-10-01T16:53:00.000Z",
