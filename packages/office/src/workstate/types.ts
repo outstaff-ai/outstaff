@@ -130,6 +130,9 @@ export interface PrRecord {
   headRef: string;
   headSha: string;
   baseRef: string;
+
+  /** The base commit the code host compares the pull request against, when it reports one. */
+  baseSha?: string;
   draft: boolean;
   state: "open" | "closed" | "merged";
   mergeable: "clean" | "conflicting" | "unknown";

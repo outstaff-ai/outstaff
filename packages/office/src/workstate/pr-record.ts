@@ -65,6 +65,7 @@ export function toPrRecord(
     headRef: pr.head.ref,
     headSha: pr.head.sha,
     baseRef: pr.base.ref,
+    ...(pr.base.sha ? { baseSha: pr.base.sha } : {}),
     draft: pr.draft,
     state: pr.state,
     // A finished pull request has no mergeability worth reporting.

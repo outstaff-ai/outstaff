@@ -45,6 +45,11 @@ describe("toPullRequest", () => {
     });
   });
 
+  it("carries the base commit when GitHub reports one", () => {
+    const based = pull({ base: { ref: "main", sha: "def" } });
+    expect(toPullRequest(REPO, based, "u", () => false).base).toEqual({ ref: "main", sha: "def" });
+  });
+
   it("attributes a deleted user to ghost and an empty body to the empty string", () => {
     const out = toPullRequest(REPO, pull({ user: null, body: null }), "u", () => false);
     expect(out.author).toEqual({ login: "ghost", kind: "human" });
