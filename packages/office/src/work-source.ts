@@ -68,7 +68,9 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
 
   const offerOf = offerBuilder(store, opts.ports, {
     team: opts.team,
-    ...(opts.workState ? { prs: opts.workState.repoPrs } : {}),
+    ...(opts.workState
+      ? { prs: opts.workState.repoPrs, lastWorker: opts.workState.lastWorker }
+      : {}),
     ...(opts.traces ? { traces: opts.traces } : {}),
     ...(opts.logger ? { logger: opts.logger } : {}),
   });

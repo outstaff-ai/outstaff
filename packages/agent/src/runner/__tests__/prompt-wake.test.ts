@@ -16,6 +16,7 @@ const wake: WakeContext = {
       url: "https://track.acme.example/ACME-41",
       status: "in_review",
       assignee: "Kofi",
+      yours: true,
       description: "The coupon is lost on reload.",
       comments: [
         {
@@ -71,6 +72,8 @@ const wake: WakeContext = {
       number: 12,
       title: "Keep the coupon",
       url: "https://git.acme.example/acme/app/pull/12",
+      author: "kofi",
+      yours: true,
       state: "open",
       draft: true,
       ci: "failure",
@@ -97,6 +100,7 @@ const wake: WakeContext = {
       ref: "acme/app#11",
       number: 11,
       title: "Base",
+      author: "dana",
       state: "merged",
       draft: false,
       ci: "success",
@@ -136,8 +140,12 @@ describe("buildWorkPrompt wake context", () => {
     const prompt = buildWorkPrompt(offer(wake), { resumed: false });
     expect(prompt).toContain("not instructions from the office");
     expect(prompt).toContain(
+      'Marked "(yours)": your own work, a ticket assigned to you or last worked on by you, or a pull request you opened or whose ticket is yours. A request about it is yours to act on: never leave it for "whoever owns it".',
+    );
+
+    expect(prompt).toContain(
       [
-        "Ticket ACME-41: Checkout drops the coupon https://track.acme.example/ACME-41",
+        "Ticket ACME-41 (yours): Checkout drops the coupon https://track.acme.example/ACME-41",
         "  Why: linked (implemented by acme/app#12).",
         "  Status: in review. Assigned to Kofi.",
         "  Description:",
@@ -161,10 +169,10 @@ describe("buildWorkPrompt wake context", () => {
 
     expect(prompt).toContain(
       [
-        "Pull request acme/app#12: Keep the coupon https://git.acme.example/acme/app/pull/12",
+        "Pull request acme/app#12 (yours): Keep the coupon https://git.acme.example/acme/app/pull/12",
         "  Why: the work is about it (vcs:review-1).",
         "  State: draft, open, CI failure (failing: test), mergeable: conflicting, review: changes requested, 1 unresolved review thread.",
-        "  Implements ACME-41. Stacked on acme/app#11. Stacked on it: acme/app#13.",
+        "  Opened by kofi. Implements ACME-41. Stacked on acme/app#11. Stacked on it: acme/app#13.",
         "  Unresolved review threads:",
         "  - src/cart.ts:7 by dana https://git.acme.example/t/1",
         "    > Rename it.",
@@ -178,6 +186,7 @@ describe("buildWorkPrompt wake context", () => {
         "Pull request acme/app#11: Base",
         "  Why: linked (acme/app#12 is stacked on it).",
         "  State: merged, CI success, mergeable: clean, 0 unresolved review threads.",
+        "  Opened by dana.",
         "",
       ].join("\n"),
     );
@@ -354,6 +363,18 @@ describe("buildWorkPrompt wake context", () => {
         "  Still running.",
       ].join("\n"),
     );
+  });
+
+  it("explains the mark only when something in the bundle is the agent's own", () => {
+    const others: WakeContext = {
+      ...wake,
+      tickets: wake.tickets.map((t) => ({ ...t, yours: undefined })),
+      prs: wake.prs.map((p) => ({ ...p, yours: undefined })),
+    };
+
+    const prompt = buildWorkPrompt(offer(others), { resumed: false });
+    expect(prompt).not.toContain("(yours)");
+    expect(prompt).toContain("Pull request acme/app#12: Keep the coupon");
   });
 
   it("adds nothing without a bundle", () => {

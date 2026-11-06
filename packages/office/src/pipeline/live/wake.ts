@@ -84,7 +84,7 @@ async function join(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 
   const m = messageOf(event.data);
   if (m) {
-    await joinChatSession(opts.store, item.id, m);
+    await joinChatSession(opts.store, item.id, m, opts.workState);
   }
 
   if (item.kind !== wake.kind) {
@@ -108,7 +108,7 @@ async function init(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 
   const m = messageOf(event.data);
   if (m && wake.subject.type === "chat") {
-    await openChatSession(opts.store, item, m);
+    await openChatSession(opts.store, item, m, opts.workState);
   }
 
   await linkEvent(opts, item.id, event.id);

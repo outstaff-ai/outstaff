@@ -1,5 +1,5 @@
 import type { ChatOrigin, Link } from "@outstaff/protocol";
-import type { PrRecord, TicketRecord } from "#/workstate/index.js";
+import type { PrRecord, TicketRecord, WorkState } from "#/workstate/index.js";
 
 export interface ChatOriginRecord extends ChatOrigin {
   /**
@@ -68,3 +68,6 @@ export interface OwnWork {
   ticket?: TicketRecord;
   pr?: PrRecord;
 }
+
+/** How the work state finds the pull requests a chat message names. */
+export type PrLookup = Pick<WorkState, "pullRequests" | "prSubject">;

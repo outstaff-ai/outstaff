@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { appendChatLog } from "#/chat/log.js";
 import { readOrigin } from "#/chat/origin.js";
+import type { PrLookup } from "#/chat/types.js";
+import type { PrRecord } from "#/workstate/index.js";
 import { chatTitle, joinChatSession, messageOf, openChatSession } from "#/chat/session.js";
 import { openStore, type Store } from "#/store/index.js";
 
@@ -134,6 +137,24 @@ describe("chat sessions the pipeline queues", () => {
     expect((await store!.getSubject("chat_thread", "D-1:1600.1"))?.data).toEqual({
       itemId: next.id,
     });
+
+    // A later reply still belongs to that work, through the session that answered first.
+    const third = await store!.enqueue({
+      person: "kofi",
+      kind: "chat",
+      title: "t",
+      trigger: "human",
+    });
+
+    await openChatSession(store!, third, { ...m, messageId: "1700.5", thread: "1600.1" });
+    expect((await readOrigin(store!, third.id))?.about).toMatchObject({
+      id: work.id,
+      state: "finished",
+    });
+
+    expect(
+      (await store!.listItemRefs(third.id)).filter((r) => r.type === "pr").map((r) => r.ref),
+    ).toEqual(["acme/app#4"]);
   });
 
   it("goes on with the conversation of the session that answered in the thread before, but not someone else's", async () => {
@@ -160,5 +181,75 @@ describe("chat sessions the pipeline queues", () => {
 
     await openChatSession(store!, other, { ...m, messageId: "1700.4", thread: "1700.1" });
     expect((await store!.getItem(other.id))?.sessionId ?? null).toBeNull();
+  });
+
+  describe("the pull requests and tickets it names", () => {
+    const repo = (name: string) => ({ host: "git.acme.example", owner: "acme", name });
+    const pr = (name: string, number: number) =>
+      ({
+        ref: { repo: repo(name), number },
+        url: `https://git.acme.example/acme/${name}/pull/${number}`,
+      }) as PrRecord;
+
+    const prs: PrLookup = {
+      pullRequests: (n) =>
+        n === 57 ? [pr("app", 57), pr("web", 57)] : n === 3 ? [pr("app", 3)] : [],
+      prSubject: (ref) => `acme/${ref.repo.name}#${ref.number}`,
+    };
+
+    const named = async (id: string) =>
+      (await store!.listItemRefs(id))
+        .filter((r) => r.role === "mentioned")
+        .map((r) => [r.type, r.ref, r.source, r.url ?? null])
+        .toSorted((a, b) => String(a[1]).localeCompare(String(b[1])));
+
+    it("adds a pull request by its link in its repository only, and a bare number in each repository that has it", async () => {
+      const i = await item();
+      await openChatSession(
+        store!,
+        i,
+        {
+          ...m,
+          text: "CI still fails on https://git.acme.example/acme/web/pull/57, see PR 3 and #99",
+        },
+        prs,
+      );
+
+      expect(await named(i.id)).toEqual([
+        ["pr", "acme/app#3", "chat:D-1:1700.1", "https://git.acme.example/acme/app/pull/3"],
+        ["pr", "acme/web#57", "chat:D-1:1700.1", "https://git.acme.example/acme/web/pull/57"],
+      ]);
+
+      await joinChatSession(store!, i.id, { ...m, messageId: "1700.2", text: "and #57" }, prs);
+      expect((await named(i.id)).map((r) => r[1])).toEqual([
+        "acme/app#3",
+        "acme/app#57",
+        "acme/web#57",
+      ]);
+    });
+
+    it("adds what the latest earlier messages of the thread name, each from its own message", async () => {
+      const i = await item();
+      const say = (messageId: string, text: string) =>
+        appendChatLog(store!, "D-1:1600.1", { messageId, author: { id: "U-SAM" }, at: "t", text });
+
+      await say("1600.1", "ACME-41 is the coupon bug");
+      for (let n = 2; n <= 7; n++) {
+        await say(`1600.${n}`, n === 3 ? "its fix is PR 3" : "noted");
+      }
+
+      await say("1700.1", "CI still fails on it");
+      await openChatSession(
+        store!,
+        i,
+        { ...m, text: "CI still fails on it", thread: "1600.1" },
+        prs,
+      );
+
+      // The ticket's message is six messages back: only the five latest are read.
+      expect(await named(i.id)).toEqual([
+        ["pr", "acme/app#3", "chat:D-1:1600.3", "https://git.acme.example/acme/app/pull/3"],
+      ]);
+    });
   });
 });

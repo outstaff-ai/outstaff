@@ -227,8 +227,11 @@ describe(
       });
 
       const prompt = buildWorkPrompt(offer, { resumed: false });
-      expect(prompt).toContain(`Ticket ${issue.key}: Checkout drops the coupon ${issue.url}`);
-      expect(prompt).toContain(`Pull request ${key}: ${pr.title} ${pr.url}`);
+      expect(prompt).toContain(
+        `Ticket ${issue.key} (yours): Checkout drops the coupon ${issue.url}`,
+      );
+
+      expect(prompt).toContain(`Pull request ${key} (yours): ${pr.title} ${pr.url}`);
       expect(prompt).toContain("Chat thread 1700.1 in channel D-SAM");
       expect(prompt).toContain(
         "    > Kofi, the checkout drops the coupon on reload. Please fix it.",

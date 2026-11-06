@@ -81,6 +81,13 @@ function reviewsOf(t: GraphTicket, limits: ContextLimits) {
   return { fields, counts: { shown: shown.length, left } };
 }
 
+/** A ticket's status and assignee, and whether it is the woken agent's work. */
+const whoAndWhere = (t: GraphTicket): Pick<ContextTicket, "status" | "assignee" | "yours"> => ({
+  ...(t.status ? { status: t.status } : {}),
+  ...(t.assignee ? { assignee: t.assignee } : {}),
+  ...(t.yours ? { yours: true } : {}),
+});
+
 function ticketValue(t: GraphTicket, node: ContextNode, limits: ContextLimits) {
   const { shown, left } = latest(t.comments, limits.comments);
   const reviews = reviewsOf(t, limits);
@@ -89,8 +96,7 @@ function ticketValue(t: GraphTicket, node: ContextNode, limits: ContextLimits) {
     key: t.key,
     title: t.title,
     ...(url ? { url } : {}),
-    ...(t.status ? { status: t.status } : {}),
-    ...(t.assignee ? { assignee: t.assignee } : {}),
+    ...whoAndWhere(t),
     ...(t.description?.trim() ? { description: cut(t.description, limits.bodyChars) } : {}),
     comments: shown.map((c) => ({ ...c, body: cut(c.body, limits.bodyChars) })),
     ...(more(left) ? { moreComments: left } : {}),
@@ -125,6 +131,8 @@ const pr: Filler = (graph, node, limits) => {
     number: p.number,
     title: p.title,
     ...(url ? { url } : {}),
+    author: p.author,
+    ...(p.yours ? { yours: true as const } : {}),
     state: p.state,
     draft: p.draft,
     ci: p.ci,

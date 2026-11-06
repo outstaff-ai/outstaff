@@ -7,6 +7,7 @@ import type {
   GraphTicket,
 } from "#/pipeline/context/index.js";
 import { readChatLog } from "#/chat/log.js";
+import { ownsPr, ownsTicket } from "#/chat/own-work.js";
 import { isOpen } from "#/workstate/open.js";
 import type { DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
 import type { ContextReaders, ThreadsRead } from "./types.js";
@@ -40,8 +41,29 @@ function ticketFields(key: string, rec: TicketRecord | undefined, issue: Issue |
   return { key, title: rec!.title, url: rec!.url, status: rec!.status };
 }
 
-/** A ticket as the work state knows it, with its description, assignee and comments when the tracker can be read. */
-export async function readTicket(r: ContextReaders, key: string): Promise<GraphTicket | undefined> {
+/** Whether the ticket is the woken person's work, by the rule `ost work attach` takes it by; no one's without a person. */
+const ticketOwned = (r: ContextReaders, rec: TicketRecord | undefined, person?: string) =>
+  person !== undefined && rec !== undefined && ownsTicket(person, rec, r.lastWorker?.(rec.key));
+
+/** Whether the pull request is the woken person's work: they opened it, or its ticket is theirs. */
+async function prOwned(r: ContextReaders, rec: PrRecord, person?: string): Promise<boolean> {
+  if (person === undefined) {
+    return false;
+  }
+
+  const ticket = rec.ticket ? await record<TicketRecord>(r, "ticket", rec.ticket) : undefined;
+  return ownsPr(person, rec, ticketOwned(r, ticket, person));
+}
+
+/**
+ * A ticket as the work state knows it, with its description, assignee and comments when the tracker can be read, and
+ * whether it is the woken person's work.
+ */
+export async function readTicket(
+  r: ContextReaders,
+  key: string,
+  person?: string,
+): Promise<GraphTicket | undefined> {
   const rec = await record<TicketRecord>(r, "ticket", key);
   const tracker = r.tracker;
   const issue = await attempt(tracker && (() => tracker.getIssue(key)));
@@ -52,6 +74,7 @@ export async function readTicket(r: ContextReaders, key: string): Promise<GraphT
   const comments = (await attempt(tracker && (() => tracker.listComments(key)))) ?? [];
   return {
     ...ticketFields(key, rec, issue),
+    ...(ticketOwned(r, rec, person) ? { yours: true } : {}),
     comments: comments
       .map((c): GraphNote => ({ author: c.author.name, at: c.at, url: c.url, body: c.body }))
       .toSorted((a, b) => a.at.localeCompare(b.at)),
@@ -85,11 +108,15 @@ async function threadsOf(
     }));
 }
 
-/** A pull request as the work state knows it, with its unresolved review threads when the code host can be read. */
+/**
+ * A pull request as the work state knows it, with its unresolved review threads when the code host can be read, who
+ * opened it and whether it is the woken person's work.
+ */
 export async function readPr(
   r: ContextReaders,
   key: string,
   read: ThreadsRead,
+  person?: string,
 ): Promise<GraphPr | undefined> {
   const rec = await record<PrRecord>(r, "pr", key);
   if (!rec) {
@@ -102,6 +129,8 @@ export async function readPr(
     number: rec.ref.number,
     title: rec.title,
     url: rec.url,
+    author: rec.author.person ?? rec.author.login,
+    ...((await prOwned(r, rec, person)) ? { yours: true } : {}),
     state: rec.state,
     draft: rec.draft,
     ci: rec.ci,

@@ -1,15 +1,13 @@
 import { ProtocolError } from "#/protocol/errors.js";
 import type { PrRecord, TicketRecord, WorkState } from "#/workstate/index.js";
+import { ownsPr, ownsTicket } from "./own-work.js";
 import type { OwnWork } from "./types.js";
 
 type State = Pick<WorkState, "pullRequests" | "ticket" | "prSubject" | "lastWorker">;
 
-const assignedTo = (person: string, t?: TicketRecord) =>
-  t?.assignee?.kind === "agent" && t.assignee.id === person;
-
 /** Work the agent can attach to: assigned to it, or it was the last to work on it (a hand-back reassigns to the requester). */
 const ownTicket = (state: State, person: string, t?: TicketRecord) =>
-  assignedTo(person, t) || (t !== undefined && state.lastWorker(t.key) === person);
+  ownsTicket(person, t, t && state.lastWorker(t.key));
 
 /** The existing work a verb argument names (a ticket key or a pull request), if it is the person's own. */
 export function resolveOwnWork(state: State, person: string, text: string): OwnWork {
@@ -19,8 +17,7 @@ export function resolveOwnWork(state: State, person: string, text: string): OwnW
   };
 
   const mine = (pr: PrRecord) =>
-    pr.author.person === person ||
-    ownTicket(state, person, pr.ticket ? state.ticket(pr.ticket) : undefined);
+    ownsPr(person, pr, ownTicket(state, person, pr.ticket ? state.ticket(pr.ticket) : undefined));
 
   if (/^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(t)) {
     const ticket = state.ticket(t) ?? state.ticket(t.toUpperCase());

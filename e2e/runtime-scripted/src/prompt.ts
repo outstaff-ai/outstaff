@@ -38,6 +38,9 @@ export interface ItemContext {
   /** The answer a PM's `Unblocked: <answer>` comment gives, among the ticket comments the wake carries. */
   unblocked?: string;
 
+  /** The numbers of the pull requests the wake context marks as the agent's own ("(yours)"). */
+  yours?: number[];
+
   /** For a merge: what the office handed over to decide with. */
   merge?: MergeView;
 
@@ -248,6 +251,16 @@ function parseUnblocked(prompt: string): Pick<ItemContext, "unblocked"> {
   return answer ? { unblocked: answer } : {};
 }
 
+// The wake context names each pull request as "Pull request <ref>: <title>", with " (yours)" after the ref when it is
+// the agent's own work.
+function parseYours(prompt: string): Pick<ItemContext, "yours"> {
+  const yours = [...prompt.matchAll(/^Pull request \S*#(\d+) \(yours\):/gm)].map((m) =>
+    Number(m[1]),
+  );
+
+  return yours.length ? { yours } : {};
+}
+
 // "For the merge decision, ..." then the pull request ("Mergeable: <state>.") and each other open pull request as
 // "  - <ref> by <author>: <title>" over "    <relation>. <Draft|Ready>, <approved|not approved>, ...".
 function parseMerge(prompt: string): Pick<ItemContext, "merge"> {
@@ -342,6 +355,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseConversation(prompt),
     ...parseAbout(prompt),
     ...parseUnblocked(prompt),
+    ...parseYours(prompt),
     ...parseMerge(prompt),
     ...parseFailedChecks(prompt),
     ...parseNotes(prompt),

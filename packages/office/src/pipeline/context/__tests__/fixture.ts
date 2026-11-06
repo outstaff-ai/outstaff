@@ -36,6 +36,7 @@ export const pr12 = (over: Partial<GraphPr> = {}): GraphPr => ({
   number: 12,
   title: "Keep the coupon on reload",
   url: "https://git.acme.example/acme/app/pull/12",
+  author: "kofi",
   state: "open",
   draft: false,
   ci: "failure",

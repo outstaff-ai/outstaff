@@ -33,6 +33,9 @@ export interface GraphTicket {
   /** The key of the ticket it is a subtask of, when the tracker says. */
   parent?: string | undefined;
 
+  /** The woken agent's work: assigned to it, or it was the last to work on it. */
+  yours?: boolean | undefined;
+
   /** For the ticket being worked on: review comments on its and its parent's pull requests, in no order. */
   reviews?: GraphReview[] | undefined;
 }
@@ -63,6 +66,12 @@ export interface GraphPr {
   number: number;
   title: string;
   url?: string | undefined;
+
+  /** Who opened it: the agent's handle, else the code host login. */
+  author: string;
+
+  /** The woken agent's work: it opened it, or the ticket it implements is the agent's. */
+  yours?: boolean | undefined;
   state: "open" | "closed" | "merged";
   draft: boolean;
   ci: CiState;
