@@ -15,6 +15,12 @@ export const sessionMessages = [
       token: z.string().min(1).max(500).describe("The person's agent token."),
       protocolVersion: z.number().int().describe("PROTOCOL_VERSION the agent speaks."),
       agentVersion: z.string().max(100).describe("Version of the agent software."),
+      running: z
+        .array(itemId)
+        .max(50)
+        .describe(
+          "Ids of the accepted items this agent is still running, empty after a start. The office requeues every other item it has active for the person: an offer the agent never took, or a run it no longer has.",
+        ),
     }),
   ),
   message(
@@ -29,7 +35,9 @@ export const sessionMessages = [
         ),
       resume: z
         .array(z.string())
-        .describe("Ids of accepted, unfinished items the agent should carry on with."),
+        .describe(
+          "Ids of the items named in `hello.running` that the office still has active: the agent carries on with these. A running item missing here was ended by the office while the agent was away.",
+        ),
       reports: z
         .array(queuedReportSchema)
         .optional()

@@ -10,12 +10,12 @@ export interface UsageSource {
 
 export interface SchedulerOptions {
   store: Store;
-  team: Pick<TeamConfig, "policies">;
+  team: Pick<TeamConfig, "policies"> & Partial<Pick<TeamConfig, "scheduler">>;
   clock: Clock;
   logger?: Logger;
   usage?: UsageSource;
 
-  /** Minutes without a heartbeat before an active item is stale. Default 10. */
+  /** Minutes without a heartbeat before an active item is stale; overrides `scheduler.stale_run_after_minutes` (default 5). */
   staleAfterMinutes?: number;
 
   /** Interval of the background tick started by `start()`. Default 60 seconds. */
@@ -68,16 +68,20 @@ export interface EnqueueInput extends Omit<NewWorkItem, "position"> {
   coalesce?: Coalesce;
 }
 
-export type StartResult =
-  | { started: true; item: WorkItem; run: Run }
-  | {
-      started: false;
-      reason: "not_queued" | "busy" | "backoff" | RunBlock["code"] | "loop_guard" | "stopped";
-      detail: string;
+/** Why an item could not be offered or started. */
+export interface NotStarted {
+  started: false;
+  reason: "not_queued" | "busy" | "backoff" | RunBlock["code"] | "loop_guard" | "stopped";
+  detail: string;
 
-      /** Set when the attempt blocked the item (loop guard). */
-      blocked?: BlockNotice;
-    };
+  /** Set when the attempt blocked the item (loop guard). */
+  blocked?: BlockNotice;
+}
+
+/** An item offered to its agent: active, with no run until the agent accepts. */
+export type OfferResult = { started: true; item: WorkItem } | NotStarted;
+
+export type StartResult = { started: true; item: WorkItem; run: Run } | NotStarted;
 
 export interface BlockNotice {
   item: WorkItem;
@@ -102,6 +106,13 @@ export interface FinishInput {
   /** What the item becomes. Default "done". */
   status?: "done" | "waiting" | "queued" | "canceled";
   error?: string;
+}
+
+export interface AbandonResult {
+  item: WorkItem;
+
+  /** Set when the agent lost the item's run a second time in a row (or after a stale one), which blocked it. */
+  blocked?: BlockNotice;
 }
 
 export interface FailResult {
@@ -138,8 +149,25 @@ export interface Scheduler {
    */
   next(person: string): Promise<WorkItem | null>;
 
-  /** Starts a run of a queued item (re-checks every policy). */
+  /**
+   * Offers a queued item to its agent (re-checks every policy): the item is active and holds the person's lane, and
+   * the loop guard counts it, but no run starts until the agent accepts (`startRun`).
+   */
+  offer(itemId: string): Promise<OfferResult>;
+
+  /** The agent accepted an offered item: starts its run, or returns the one already open. Null when it is not active. */
+  startRun(itemId: string): Promise<Run | null>;
+
+  /** Starts a queued item at once: `offer` and `startRun` together. */
   markActive(itemId: string): Promise<StartResult>;
+
+  /**
+   * The agent is not running an item the office has active: an offer it never took, or a run it lost. The open run,
+   * if any, ends as `abandoned` with the reason, and the item goes back to the queue with its session and journal.
+   * A run lost right after another lost or stale one blocks the item instead, like a second stale run. Null when the
+   * item is not active.
+   */
+  abandon(itemId: string, reason: string): Promise<AbandonResult | null>;
 
   /** Records activity so the item is not considered stale. */
   heartbeat(itemId: string): Promise<void>;

@@ -31,6 +31,12 @@ export interface WorkSource {
   /** Items handed to the person and not finished yet, with whether the agent accepted them. */
   outstanding(person: string): Promise<{ offer: Offer; accepted: boolean }[]>;
 
+  /**
+   * Reconciles the items the office has active for the person with the ones the agent says it runs (`hello.running`):
+   * any other active item goes back to the queue. Returns the ids the agent carries on with (`welcome.resume`).
+   */
+  reconcile(person: string, running: string[]): Promise<string[]>;
+
   /** Takes the next queued item for the person, or nothing when they are busy or the queue is empty. */
   next(person: string): Promise<Offer | undefined>;
 

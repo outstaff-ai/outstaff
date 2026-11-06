@@ -107,7 +107,7 @@ describe("the agent work loop against the real protocol server", () => {
     await running;
   });
 
-  it("puts an accepted item back in the queue untouched after a restart", async () => {
+  it("requeues an accepted item after a restart, and runs it again once", async () => {
     const team = { people: [{ handle: "sam", repos: {} }], repos: [] } as unknown as TeamConfig;
     source.enqueue("sam", "w3", "Half done");
     await source.next("sam");
@@ -149,8 +149,11 @@ describe("the agent work loop against the real protocol server", () => {
 
     conn.start();
     await conn.whenConnected();
+    expect(source.calls).toEqual(["requeue:sam:w3"]);
     const running = loop.run();
-    await until(() => source.calls.includes("decline:sam:w3"));
+    // Offered again on the new connection, and run once.
+    await until(() => source.stateOf("w3") === "done");
+    expect(source.calls.filter((c) => c.startsWith("accept:"))).toEqual(["accept:sam:w3"]);
     expect(source.calls.some((c) => c.startsWith("fail:"))).toBe(false);
     await loop.stop();
     await conn.stop();

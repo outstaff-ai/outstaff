@@ -2697,6 +2697,7 @@ async function main() {
   await byRole();
   await unblockDependents();
   await canceledWhileQueued();
+  await droppedAfterOffer();
   await commentThenClose();
   await mergeChecks();
   await deployStillFails();
@@ -3870,6 +3871,82 @@ async function canceledWhileQueued() {
 
   step(
     `canceled while queued: ${dup} assigned to sam while he worked on ${busy} -> the human canceled it -> its queued round was canceled and never ran`,
+  );
+}
+
+/**
+ * 13b'. the agent's connection drops right after an offer. The office offers sam a ticket while sam is frozen, and
+ * drops the silent connection; once sam runs again, its accept goes to the dead connection and is lost. When sam
+ * reconnects, the office requeues the offer it never took and offers it again: the round runs once.
+ */
+async function droppedAfterOffer() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const queued = () =>
+    logs("office").match(/queued work item \S+ for sam \(assigned\)/g)?.length ?? 0;
+
+  const queuedBefore = queued();
+  dcOrFail("Could not pause the agent", "pause", "sam");
+  let key: string;
+  let id: string;
+  const offers = () =>
+    logs("office").match(new RegExp(`"offered a work item","person":"sam","item":"${id}"`, "g"))
+      ?.length ?? 0;
+
+  try {
+    ({ key } = await stub("POST", "/_test/tickets", {
+      title: "Check the staging banner",
+      description: "which repo: unclear",
+    }));
+
+    await stub("POST", `/_test/tickets/${key}/assign`, { to: "sam" });
+    await until(`a round on ${key} queued for sam`, () =>
+      queued() > queuedBefore ? true : undefined,
+    );
+
+    id = lastItemOf("sam", "assigned")!;
+    await until(
+      `the round on ${key} offered to the frozen agent`,
+      () => offers() === 1 || undefined,
+    );
+
+    await until(
+      "the office dropped the silent connection",
+      () => /"agent connection timed out","person":"sam"/.test(logs("office")) || undefined,
+      90_000,
+    );
+  } finally {
+    dcOrFail("Could not unpause the agent", "unpause", "sam");
+  }
+
+  await until(
+    `sam lost the accept of ${key} with the connection`,
+    () =>
+      new RegExp(`could not accept an offer \\{"workItemId":"${id}"`).test(logs("sam")) ||
+      undefined,
+  );
+
+  await until(
+    `${key} requeued and offered again`,
+    () =>
+      (new RegExp(`"work item requeued","item":"${id}".*without having taken this offer`).test(
+        logs("office"),
+      ) &&
+        offers() === 2) ||
+      undefined,
+  );
+
+  const asked = (s: Json) =>
+    s.tickets
+      .find((t: Json) => t.key === key)
+      .comments.filter((c: Json) => c.body.includes("Which repository is")).length;
+
+  await until(`sam's round on ${key} done`, (s) => (asked(s) === 1 && idle(s)) || undefined);
+  await officePolledTwice(`${key} handed back`);
+  assertEq(asked(await state()), 1, `sam asked about ${key} once: the round ran once`);
+  assertEq(offers(), 2, `${key} was offered twice: once to the dropped connection, once after`);
+  step(
+    `dropped after an offer: sam's connection dropped right after the office offered ${key} -> the office requeued the offer nobody took, offered it again, and the round ran once`,
   );
 }
 

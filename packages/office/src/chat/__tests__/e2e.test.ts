@@ -198,10 +198,12 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     conn.onActs((list) => void acts.make(list));
   });
 
+  // The connection goes first: a request the clock jump left unanswered waits for a reconnect the frozen clock never
+  // makes, and only a stopped connection gives it up.
   afterEach(async () => {
+    await conn.stop();
     await loop?.stop();
     await relay.stop();
-    await conn.stop();
     await running;
     await office.stop();
   });
@@ -560,9 +562,9 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       expect(officeChat.posts).toEqual([]);
       expect(agentChat.posts).toEqual([]);
 
+      await conn.stop();
       await loop?.stop();
       await relay.stop();
-      await conn.stop();
       const back = createOfficeConnection({
         url: `ws://127.0.0.1:${office.agentPort()}/agent`,
         person: "sam",
@@ -639,16 +641,17 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
         },
       });
 
-      // A failed item waits out its backoff on the clock; the third failure blocks it.
+      // A failed item waits out its backoff on the clock; the third failure blocks it. Steps shorter than a heartbeat
+      // keep the connection up between them.
       await until(() => {
-        clock.advance(60_000);
+        clock.advance(10_000);
         return agentChat.posts.some((p) => p.text.includes("I am blocked."));
       });
 
       const post = agentChat.posts.find((p) => p.text.includes("I am blocked."))!;
       expect(post.channel).toBe(DM);
-      // The jumps of the manual clock also starve the heartbeat, so the item may block as stale or as failed.
-      expect(post.text).toMatch(/Stale again|failed 3 times/);
+      // The jumps of the manual clock can still starve the heartbeat, so the item may block as stale, lost or failed.
+      expect(post.text).toMatch(/Stale again|Lost again|failed 3 times/);
       expect(post.text).toContain(tracker.links.issue(issue.key));
       expect(officeChat.posts).toEqual([]);
     });

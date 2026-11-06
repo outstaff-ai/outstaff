@@ -140,6 +140,21 @@ export const teamConfigSchema = z
       })
       .optional()
       .meta(d("Office settings: event intake and the doctor checks.")),
+    scheduler: z
+      .strictObject({
+        stale_run_after_minutes: z
+          .int()
+          .min(1)
+          .max(1440)
+          .optional()
+          .meta(
+            d(
+              "Minutes an active work item may go without a heartbeat from its agent before the office ends its run as stale and queues it again: a run the agent lost, or an offer nobody accepted. A running agent beats every 15 seconds. The second stale run in a row blocks the item. Default 5.",
+            ),
+          ),
+      })
+      .optional()
+      .meta(d("How the office runs the work queue.")),
     tools: toolsSchema
       .optional()
       .meta(d("Tools every agent of the team installs at start, with the commands they may run.")),

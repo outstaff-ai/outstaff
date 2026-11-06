@@ -16,7 +16,8 @@ async function retryStale(deps: SchedulerDeps, item: WorkItem, openRun: string |
   }
 
   const requeued = await store.updateItem(item.id, { status: "queued" });
-  await store.appendJournal(item.id, "scheduler", "Run went stale; retrying once.");
+  const what = openRun ? "Run went stale" : "Offer was not accepted in time";
+  await store.appendJournal(item.id, "scheduler", `${what}; retrying once.`);
   log.warn("stale run requeued", { item: item.id });
   return requeued;
 }

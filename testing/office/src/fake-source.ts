@@ -75,6 +75,23 @@ export function createFakeSource(members: Member[] = []): FakeSource {
         .filter((i) => i.person === person && (i.state === "offered" || i.state === "accepted"))
         .map((i) => ({ offer: i.offer, accepted: i.state === "accepted" }));
     },
+    async reconcile(person, running) {
+      const kept: string[] = [];
+      for (const [id, i] of items) {
+        if (i.person !== person || (i.state !== "offered" && i.state !== "accepted")) {
+          continue;
+        }
+
+        if (running.includes(id)) {
+          kept.push(id);
+        } else {
+          record("requeue", person, id);
+          i.state = "queued";
+        }
+      }
+
+      return kept;
+    },
     async next(person) {
       const busy = [...items.values()].some(
         (i) => i.person === person && (i.state === "offered" || i.state === "accepted"),

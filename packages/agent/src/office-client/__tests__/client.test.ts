@@ -52,13 +52,35 @@ describe("office connection", () => {
         token: "t",
         protocolVersion: PROTOCOL_VERSION,
         agentVersion: "1.2.3",
+        running: [],
       },
     });
 
-    current().welcome({ resume: ["w7"] });
+    current().welcome();
     await conn.whenConnected();
     expect(conn.state()).toBe("connected");
-    expect(conn.resume()).toEqual(["w7"]);
+  });
+
+  it("names its running items in the hello after a reconnect, and stops beating for one the office dropped", async () => {
+    await connectUp({ heartbeatMs: 1000 });
+    for (const id of ["w1", "w2"]) {
+      const accept = conn.accept(id, { runtime: "claude", model: "opus" });
+      current().reply(current().last(), "ack");
+      await accept;
+    }
+
+    current().drop();
+    clock.advance(1000);
+    current().open();
+    expect(current().sentOf("hello")[0]?.payload).toMatchObject({ running: ["w1", "w2"] });
+    current().welcome({ heartbeatMs: 1000, resume: ["w2"] });
+    await conn.whenConnected();
+    clock.advance(1000);
+    expect(
+      current()
+        .sentOf("heartbeat")
+        .map((m) => m.payload),
+    ).toEqual([{ workItemId: "w2" }]);
   });
 
   it("hands the reports queued for the agent to the handler, also when they came before it was set", async () => {
@@ -229,7 +251,7 @@ describe("office connection", () => {
     expect(sockets).toHaveLength(1);
   });
 
-  it("sends heartbeats with the active item and reconnects when the office goes quiet", async () => {
+  it("sends heartbeats with the active item and reconnects when the office misses two in a row", async () => {
     await connectUp({ heartbeatMs: 1000 });
     const accept = conn.accept("w1", { runtime: "claude", model: "opus" });
     current().reply(current().last(), "ack");
@@ -244,11 +266,38 @@ describe("office connection", () => {
     clock.advance(1000);
     expect(current().sentOf("heartbeat")).toHaveLength(2);
     const first = current();
+    // The first miss sends another beat at once.
+    clock.advance(1000);
+    await flush();
+    clock.advance(0);
+    expect(first.terminated).toBe(false);
+    expect(current().sentOf("heartbeat")).toHaveLength(3);
     clock.advance(1000);
     await flush();
     expect(first.terminated).toBe(true);
     clock.advance(1000);
     expect(sockets).toHaveLength(2);
+  });
+
+  it("keeps the connection when the office answers a missed heartbeat's retry", async () => {
+    await connectUp({ heartbeatMs: 1000 });
+    clock.advance(1000);
+    clock.advance(1000);
+    await flush();
+    clock.advance(0);
+    const retry = current().sentOf("heartbeat")[1];
+    expect(retry).toBeDefined();
+    current().reply(retry!, "ack");
+    await flush();
+
+    // Back to the normal rhythm: the next miss is a first one again.
+    clock.advance(1000);
+    clock.advance(1000);
+    await flush();
+    clock.advance(0);
+    expect(current().terminated).toBe(false);
+    expect(current().sentOf("heartbeat")).toHaveLength(4);
+    expect(sockets).toHaveLength(1);
   });
 
   it("streams offers and drops a repeat of one nobody has taken", async () => {
@@ -445,6 +494,48 @@ describe("office connection", () => {
       expect(current().last().type).toBe("roster");
       current().reply(current().last(), "roster_result", { members: [] });
       expect(await later).toEqual({ members: [], humans: [] });
+    });
+
+    it("sends a hand-back, a failure and an act's answer once more on the next connection when the first was lost", async () => {
+      await connectUp();
+      const handBack = conn.handBack("w1", { summary: "Done", status: "done" });
+      const fail = conn.fail("w2", "broke");
+      const act = conn.actResult({ id: "a1", ok: true, results: [] });
+      const roster = conn.team();
+      current().drop();
+      await expect(roster).rejects.toMatchObject({ code: "unavailable" });
+
+      clock.advance(1000);
+      current().open();
+      current().welcome();
+      await flush();
+      const again = current().sent.filter((m) => m.type !== "hello");
+      expect(again.map((m) => m.type)).toEqual(["handback", "fail", "act_result"]);
+      for (const m of again) {
+        current().reply(m, "ack");
+      }
+
+      await Promise.all([handBack, fail, act]);
+
+      // Only once: a second loss gives up.
+      const twice = conn.handBack("w3", { summary: "Done", status: "done" });
+      current().drop();
+      clock.advance(1000);
+      current().open();
+      current().welcome();
+      await flush();
+      current().drop();
+      await expect(twice).rejects.toMatchObject({ code: "unavailable" });
+    });
+
+    it("takes or gives back an offer only while connected", async () => {
+      await connectUp();
+      current().drop();
+      await expect(conn.accept("w1", { runtime: "claude", model: "opus" })).rejects.toThrow(
+        /Not connected/,
+      );
+
+      await expect(conn.decline("w1", "busy")).rejects.toThrow(/Not connected/);
     });
 
     it("times out when nobody answers or the office is unreachable", async () => {

@@ -12,9 +12,11 @@ import {
 } from "@outstaff/protocol";
 import { WebSocketServer, type WebSocket } from "ws";
 import { CLOSE_AUTH } from "./constants.js";
+import { answerAtOnce } from "./beats.js";
 import { ProtocolError } from "./errors.js";
 import { handleHello } from "./hello.js";
 import { handleRequest } from "./requests.js";
+import type { Offer } from "./source.types.js";
 import type { Connection, HelloContext, ProtocolServer, ProtocolServerOptions } from "./types.js";
 
 const MAX_FRAME = 1024 * 1024;
@@ -64,6 +66,12 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     }, ms);
   }
 
+  function offerOn(c: Connection, person: string, offer: Offer) {
+    c.offered.add(offer.workItem.id);
+    send(c, "offer", offer);
+    log.info("offered a work item", { person, item: offer.workItem.id });
+  }
+
   function deliver(person: string) {
     const run = async () => {
       const c = conns.get(person);
@@ -74,15 +82,13 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       const outstanding = await source.outstanding(person);
       for (const { offer, accepted } of outstanding) {
         if (!accepted && !c.offered.has(offer.workItem.id)) {
-          c.offered.add(offer.workItem.id);
-          send(c, "offer", offer);
+          offerOn(c, person, offer);
         }
       }
 
       // The work item and the chat sessions run in lanes of their own: offer until nothing more can start.
       for (let offer = await source.next(person); offer; offer = await source.next(person)) {
-        c.offered.add(offer.workItem.id);
-        send(c, "offer", offer);
+        offerOn(c, person, offer);
       }
     };
 
@@ -139,14 +145,7 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     armIdle,
   };
 
-  async function onFrame(c: Connection, raw: string) {
-    const decoded = decode(raw);
-    if (!decoded.ok) {
-      sendError(c, decoded.code, decoded.message, decoded.id);
-      return;
-    }
-
-    const m = decoded.message;
+  async function onFrame(c: Connection, m: Message) {
     if (c.person === undefined) {
       if (m.type !== "hello") {
         sendError(c, "unauthenticated", "Send hello first.", m.id);
@@ -156,6 +155,11 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
 
       c.cancelTimer?.();
       await handleHello(ctx, c, m);
+      return;
+    }
+
+    // A heartbeat that came while the hello was handled waited in the queue.
+    if (answerAtOnce(ctx, c, m)) {
       return;
     }
 
@@ -204,9 +208,18 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
     }, helloTimeoutMs);
 
     ws.on("message", (data: Buffer) => {
-      // Messages of one connection are handled in order.
+      const decoded = decode(data.toString("utf8"));
+      if (decoded.ok && answerAtOnce(ctx, c, decoded.message)) {
+        return;
+      }
+
+      // Requests of one connection are handled in order.
       c.queue = c.queue
-        .then(() => onFrame(c, data.toString("utf8")))
+        .then(() =>
+          decoded.ok
+            ? onFrame(c, decoded.message)
+            : sendError(c, decoded.code, decoded.message, decoded.id),
+        )
         .catch((err: unknown) => log.error("frame handling failed", { error: String(err) }));
     });
 
