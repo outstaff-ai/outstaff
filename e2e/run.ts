@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2682,6 +2682,7 @@ async function main() {
   await byRole();
   await unblockDependents();
   await canceledWhileQueued();
+  await commentThenClose();
   await mergeChecks();
   await recallHistory();
   await usagePerTicket();
@@ -3696,6 +3697,54 @@ async function canceledWhileQueued() {
 
   step(
     `canceled while queued: ${dup} assigned to sam while he worked on ${busy} -> the human canceled it -> its queued round was canceled and never ran`,
+  );
+}
+
+/**
+ * 13c'. a human approves a plan with a comment that mentions the agent and closes the ticket right after, so the
+ * office reads both at once and finds the ticket closed when it judges the comment. The comment was written on an open
+ * ticket: the mention wakes sam once, who answers on the ticket and leaves it closed.
+ */
+async function commentThenClose() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const { key } = await stub("POST", "/_test/tickets", {
+    title: "Plan the import cleanup",
+    description: "The plan is in the comments.",
+    status: "In Review",
+  });
+
+  await officePolledTwice(`${key} seen open`);
+  const samBefore = wakesOf("sam").length;
+  const body = "All good on my side. @sam please amend the existing pull requests.";
+  await stub("POST", `/_test/tickets/${key}/comment`, { body });
+  await stub("POST", `/_test/tickets/${key}/move`, { to: "Done" });
+  await until(`${key}: sam answered the mention`, (s) =>
+    s.tickets
+      .find((x: Json) => x.key === key)
+      .comments.some((c: Json) => c.author === "sam" && c.body === `Noted: ${body}`)
+      ? true
+      : undefined,
+  );
+
+  await until("sam idle after answering", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice(`sam's answer on ${key}`);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore)),
+    JSON.stringify(["asked"]),
+    "the mention woke sam once, to answer it",
+  );
+
+  const closed = (await state()).tickets.find((x: Json) => x.key === key);
+  assertEq(closed.status, "Done", `${key} stayed done`);
+  assertEq(
+    closed.moves.some((m: Json) => m.by === "sam"),
+    false,
+    `sam left ${key} closed`,
+  );
+
+  step(
+    `comment then close: the human commented @sam on ${key} and closed it at once -> sam was woken once and answered; ${key} stayed done`,
   );
 }
 

@@ -477,6 +477,84 @@ describe("the office with the event pipeline live", () => {
     expect((await tracker.getIssue(issue.key)).assignee?.id).toBe(pia.id);
   });
 
+  /** The trace of the ticket's `n`th comment, once it is judged. */
+  const commentTrace = async (key: string, n = 1) => {
+    const comments = async () =>
+      (await traces())
+        .filter((t) => t.event.type === "ticket.commented" && t.event.subject.ticket === key)
+        .toSorted((a, b) => a.event.at.localeCompare(b.event.at));
+
+    await until(async () => (await comments()).length >= n);
+    return (await comments())[n - 1]!;
+  };
+
+  const decided = (trace: Trace) =>
+    trace.decisions.map((d) => (d.type === "wake" ? `wake ${d.person} (${d.kind})` : d.type));
+
+  it("judges a comment read with the ticket's close as written on the open ticket, and wakes its agent", async () => {
+    const { tracker, ada, sam } = await start();
+    const issue = await tracker.as(ada).createIssue({
+      title: "Plan the import",
+      body: "",
+      status: "backlog",
+      assignee: sam.id,
+    });
+
+    await tracker.as(ada).transition(issue.key, "active");
+    await office!.parts.intake.pollOnce();
+
+    // The human approves in a comment and closes the ticket seconds later; one poll reads both, and the office reads
+    // the ticket closed when it judges the comment.
+    clock.advance(1_000);
+    await tracker.as(ada).comment(issue.key, "All good on my side, go ahead with the cleanup.");
+    clock.advance(7_000);
+    await tracker.as(ada).transition(issue.key, "done");
+    await office!.parts.intake.pollOnce();
+
+    const trace = await commentTrace(issue.key);
+    expect(decided(trace)).toEqual(["wake sam (ticket_comment)"]);
+    expect(trace.policies.find((p) => p.policy === "ticket_comment_to_agent")?.reason).toBe(
+      "all conditions hold",
+    );
+
+    expect(trace.decisions[0]).toMatchObject({
+      instruction: expect.stringContaining(`${issue.key}'s status now: done.`),
+    });
+
+    // The close was judged too, before the comment: there was no work on the ticket to stop yet.
+    expect((await traces()).some((t) => t.event.type === "ticket.closed")).toBe(true);
+    expect(
+      (await store.listItems({ person: "sam" })).map((i) => [i.kind, i.status]),
+    ).toContainEqual(["ticket_comment", "queued"]);
+  });
+
+  it("wakes the agent a human mentions on a ticket closed long before; a comment there without one wakes no one", async () => {
+    const { tracker, ada } = await start();
+    const issue = await tracker
+      .as(ada)
+      .createIssue({ title: "Old work", body: "", status: "review" });
+
+    await office!.parts.intake.pollOnce();
+    await tracker.as(ada).transition(issue.key, "done");
+    await office!.parts.intake.pollOnce();
+
+    clock.advance(3_600_000);
+    await tracker.as(ada).comment(issue.key, "Thanks, all fine.");
+    await office!.parts.intake.pollOnce();
+    expect(decided(await commentTrace(issue.key))).toEqual(["drop"]);
+
+    clock.advance(60_000);
+    await tracker.as(ada).comment(issue.key, "@pia can you check the follow-ups of this?");
+    await office!.parts.intake.pollOnce();
+    const trace = await commentTrace(issue.key, 2);
+    expect(decided(trace)).toEqual(["wake pia (asked)"]);
+    expect(trace.decisions[0]).toMatchObject({
+      instruction: expect.stringContaining(
+        `${issue.key}'s status now: done. A done or canceled ticket stays closed unless the comment asks to reopen it.`,
+      ),
+    });
+  });
+
   it("bounds two agents that keep mentioning each other with the loop guard", async () => {
     const { tracker, ada, sam, pia } = await start();
     const issue = await tracker.as(ada).createIssue({

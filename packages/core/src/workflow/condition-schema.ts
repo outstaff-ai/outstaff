@@ -17,7 +17,11 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
     z.strictObject({ not: conditionSchema }).meta(d("The condition must not hold.")),
     z
       .strictObject({ ticket_status: z.array(status).min(1) })
-      .meta(d("The linked ticket is in one of these canonical statuses.")),
+      .meta(
+        d(
+          "The linked ticket is in one of these canonical statuses; for a ticket.commented event on a ticket closed after the comment was written, the status it had then.",
+        ),
+      ),
     z
       .strictObject({ parent_status: z.array(status).min(1) })
       .meta(

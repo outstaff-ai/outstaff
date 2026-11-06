@@ -2386,7 +2386,7 @@
             "ticket_status"
           ],
           "additionalProperties": false,
-          "description": "The linked ticket is in one of these canonical statuses."
+          "description": "The linked ticket is in one of these canonical statuses; for a ticket.commented event on a ticket closed after the comment was written, the status it had then."
         },
         {
           "type": "object",

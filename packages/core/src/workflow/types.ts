@@ -89,6 +89,12 @@ export interface WorkflowState {
   /** Canonical status of the ticket. */
   ticketStatus(ticket: string): CanonicalStatus | undefined;
 
+  /**
+   * The status the ticket had at that time (ISO-8601), as far as the state knows: the status before its latest change
+   * for a time before that change, else its status now.
+   */
+  ticketStatusAt(ticket: string, at: string): CanonicalStatus | undefined;
+
   assignee(ticket: string): TicketAssignee | undefined;
   pullRequest(pr: PrRef): WorkflowPr | undefined;
 
@@ -144,8 +150,9 @@ export interface WorkflowState {
 }
 
 /**
- * What a condition reads of an event: its subject, actor and data. The type is not read, so the office's event
- * pipeline can check conditions on event types of its own (`agent.idle`, the merge-derived events).
+ * What a condition reads of an event: its subject, actor and data. Only a comment's type is read (a ticket that closed
+ * after the comment was written is judged open for it), so the office's event pipeline can check conditions on event
+ * types of its own (`agent.idle`, the merge-derived events).
  */
 export interface ConditionEvent {
   type: string;
@@ -219,6 +226,10 @@ export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
 
 export interface StaticTicket {
   status: CanonicalStatus;
+
+  /** When it entered its status, and the status it had before (ISO-8601). */
+  statusSince?: string;
+  previousStatus?: CanonicalStatus;
   assignee?: TicketAssignee;
   lastWorker?: string;
   requester?: string;

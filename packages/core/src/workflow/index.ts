@@ -20,6 +20,7 @@ export {
 export { openSubTickets } from "./evaluate-check.js";
 export type { Resolved } from "./evaluate.types.js";
 export { createStaticWorkflowState } from "./state.js";
+export { statusAt } from "./status-at.js";
 export type {
   ActorKind,
   TicketAssignee,

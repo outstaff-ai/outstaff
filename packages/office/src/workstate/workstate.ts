@@ -1,14 +1,14 @@
 import { parseRepoUrl, repoKey, vcsAgentLogins, type PrRef, type RepoRef } from "@outstaff/core";
 import type { Cancel } from "#/types.js";
 import type { RefreshCtx, WorkstateCore } from "./core.types.js";
-import { currentWork, docOpen, stackedOn, toWorkflowPr } from "./derive.js";
+import { currentWork, docOpen, personForRole, stackedOn, toWorkflowPr } from "./derive.js";
 import { blockedAgent, inRound, openBlockers } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
 import { createMergeChecks } from "./merge-checks.js";
 import { isOpen, visible } from "./open.js";
 import { createPrs } from "./prs.js";
-import { readyTickets } from "./ready.js";
+import { readyTickets, ticketStatusAt } from "./ready.js";
 import { createRequesters } from "./requesters.js";
 import { createRescan } from "./rescan.js";
 import { createTickets } from "./tickets.js";
@@ -234,6 +234,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     ticketForPr: (pr) => prs.get(prSubject(pr))?.ticket,
     ticketStatus: (t) => tickets.get(t)?.status,
+    ticketStatusAt: (t, at) => ticketStatusAt(core, t, at),
     assignee: (t) => tickets.get(t)?.assignee,
     pullRequest(pr) {
       const rec = prs.get(prSubject(pr));
@@ -286,10 +287,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     stackedOn: (repo, branch) => stackedOn(core, repo, branch),
 
-    personForRole(role) {
-      const matches = team.people.filter((p) => p.role === role || p.extends?.includes(role));
-      return matches.length === 1 ? matches[0]!.handle : undefined;
-    },
+    personForRole: (role) => personForRole(core, role),
 
     currentWork: (person) => currentWork(core, person),
     readyTickets: (person) => readyTickets(core, person),

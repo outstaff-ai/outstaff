@@ -83,6 +83,37 @@ describe("ready tickets in the work state", () => {
     });
   });
 
+  it("dates a change a comment's read finds by the tracker's update, and keeps the status before it", async () => {
+    const t = await ready("one");
+    await ws.apply(event("ticket.created", t.key, { at: "2030-01-01T08:00:00.000Z" }), meta);
+
+    // The comment is written, then the ticket closed; the office reads the ticket for the comment after both.
+    clock.advance(MINUTE);
+    const written = clock.now().toISOString();
+    clock.advance(7_000);
+    await tracker.transition(t.key, "done");
+    await ws.apply(event("ticket.commented", t.key, { at: written }), meta);
+    expect(ws.ticket(t.key)).toMatchObject({
+      status: "done",
+      statusSince: "2030-01-01T08:01:07.000Z",
+      previousStatus: "ready",
+    });
+
+    expect(ws.ticketStatusAt(t.key, written)).toBe("ready");
+    expect(ws.ticketStatusAt(t.key, "2030-01-01T08:01:07.000Z")).toBe("done");
+
+    // The move that closed it, read after, dates nothing earlier and keeps the status before.
+    await ws.apply(
+      event("ticket.moved", t.key, { to: "done", at: "2030-01-01T08:01:06.000Z" }),
+      meta,
+    );
+
+    expect(ws.ticket(t.key)).toMatchObject({
+      statusSince: "2030-01-01T08:01:07.000Z",
+      previousStatus: "ready",
+    });
+  });
+
   it("lists the ready tickets assigned to the agent, never backlog or someone else's", async () => {
     const ada = await tracker.seed.member({ name: "Ada Admin" });
     const first = await ready("first");

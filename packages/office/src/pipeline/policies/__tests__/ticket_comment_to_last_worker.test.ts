@@ -45,7 +45,7 @@ describe("ticket_comment_to_last_worker", () => {
         type: "wake",
         policy: "ticket_comment_to_last_worker",
         instruction:
-          "ada-admin commented on ACME-1, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work.",
+          "ada-admin commented on ACME-1, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. ACME-1's status now: review. A done or canceled ticket stays closed unless the comment asks to reopen it.",
       },
     ]);
 
@@ -79,6 +79,28 @@ describe("ticket_comment_to_last_worker", () => {
 
     expect(judged(comment(), handedBack("review", "ada.admin", "someone-else"))).toEqual([
       "drop: no one to wake: someone-else (last_worker) is not an agent on the team",
+    ]);
+  });
+
+  it("a comment written while the agent still had the ticket, judged after its hand-back, wakes that agent", () => {
+    const world: World = {
+      tickets: {
+        "ACME-1": t("review", "ada.admin", {
+          lastWorker: "sam",
+          statusSince: "2026-10-05T09:00:05.000Z",
+          previousStatus: "active",
+        }),
+      },
+    };
+
+    const comment = event("ticket.commented", {
+      subject: { ticket: "ACME-1" },
+      actor: ADA,
+      data: { body: "Use the cached rates too.", at: "2026-10-05T09:00:00.000Z" },
+    });
+
+    expect(judge("ticket_comment_to_last_worker", comment, world)).toEqual([
+      "wake sam (ticket_comment) on ticket ACME-1",
     ]);
   });
 });
