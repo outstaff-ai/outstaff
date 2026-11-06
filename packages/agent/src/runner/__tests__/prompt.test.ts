@@ -588,3 +588,57 @@ describe("buildWorkPrompt document paths", () => {
     }
   });
 });
+
+describe("buildWorkPrompt backlog", () => {
+  const on = (
+    kind: string,
+    ticketStatus: string | undefined,
+    subject = { type: "ticket", ref: "ACME-9" },
+  ): Offer => {
+    const o = offer();
+    return {
+      ...o,
+      workItem: { ...o.workItem, kind, subject, ...(ticketStatus ? { ticketStatus } : {}) },
+    };
+  };
+
+  it("tells a round on a ticket in backlog to answer, not start the work, and not to hand back blocked", () => {
+    for (const kind of ["ticket_comment", "asked"]) {
+      const prompt = buildWorkPrompt(on(kind, "backlog"), { resumed: false });
+      expect(prompt).toContain("The ticket ACME-9 is in backlog: work planned for later");
+      expect(prompt).toContain("file no ticket and open no pull request");
+      expect(prompt).toContain("Backlog is not a blocker: hand back silent");
+    }
+
+    const onPr = on("ci_failed", "backlog", { type: "pr", ref: "acme/app#3" });
+    expect(buildWorkPrompt(onPr, { resumed: false })).toContain("Its ticket is in backlog");
+  });
+
+  it("says nothing of backlog for a human's chat request or a ticket that is not in backlog", () => {
+    for (const o of [
+      on("chat", "backlog"),
+      on("ticket_comment", "ready"),
+      on("assigned", undefined),
+    ]) {
+      expect(buildWorkPrompt(o, { resumed: false })).not.toContain("in backlog");
+    }
+  });
+
+  it("says nothing of backlog for work a chat session attached or filed: a human asked for it", () => {
+    const attached = on("assigned", "backlog");
+    const origin = {
+      channel: "D1",
+      thread: "t1",
+      requester: { id: "U1", name: "Ada" },
+      direct: true,
+      participant: true,
+    };
+
+    const prompt = buildWorkPrompt(
+      { ...attached, workItem: { ...attached.workItem, origin } },
+      { resumed: false },
+    );
+
+    expect(prompt).not.toContain("in backlog");
+  });
+});

@@ -51,7 +51,7 @@ How to read it:
 | - | - | - |
 | 21 | `ticket.assigned` ACME-150 by ada.admin | wake sam (assigned): _ACME-150 is assigned to you. Work on it the way the repository asks._ |
 | 22 | `ticket.assigned` ACME-151 by sam | (drop: no policy matched) |
-| 23 | `ticket.created` ACME-152 by ada.admin | wake noor (assigned): _ACME-152 is assigned to you. Work on it the way the repository asks._ |
+| 23 | `ticket.created` ACME-152 by ada.admin | (drop: no policy matched) |
 | 24 | `ticket.assigned` ACME-153 by ada.admin | (drop: no policy matched) |
 | 25 | `ticket.moved` ACME-150 by ada.admin | wake sam (assigned): _ada.admin moved ACME-150 to active. Pick the work up._ |
 | 26 | `ticket.moved` ACME-154 by ada.admin | assign ACME-154 to agent sam (for sam)<br>wake sam (assigned): _ada.admin moved ACME-154 to active and it is assigned to you again. Pick the work up._ |
@@ -61,9 +61,9 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 28 | `ticket.commented` ACME-150 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it. ACME-150's status now: active. A done or canceled ticket stays closed unless the comment asks to reopen it._ |
-| 29 | `ticket.commented` ACME-150 by ada.admin | wake mira (asked): _ada.admin mentioned you in a comment on ACME-150. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. ACME-150's status now: active. A done or canceled ticket stays closed unless the comment asks to reopen it._ |
-| 30 | `ticket.commented` ACME-154 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-154, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. ACME-154's status now: review. A done or canceled ticket stays closed unless the comment asks to reopen it._ |
+| 28 | `ticket.commented` ACME-150 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-150. Read the comment and act on it. ACME-150's status now: active. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work._ |
+| 29 | `ticket.commented` ACME-150 by ada.admin | wake mira (asked): _ada.admin mentioned you in a comment on ACME-150. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. ACME-150's status now: active. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work._ |
+| 30 | `ticket.commented` ACME-154 by ada.admin | wake sam (ticket_comment): _ada.admin commented on ACME-154, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. ACME-154's status now: review. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work._ |
 | 31 | `ticket.commented` ACME-150 by sam | (drop: no policy matched) |
 | 32 | `ticket.commented` ACME-123 by ada.admin | (drop: no policy matched) |
 
@@ -118,6 +118,6 @@ How to read it:
 
 ## Coalescing
 
-The pipeline's 26 wakes become 24 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 25 wakes become 23 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

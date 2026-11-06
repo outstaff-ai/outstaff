@@ -61,6 +61,9 @@ export interface ItemContext {
 
   /** For the PM's wake after the last open ticket of a milestone closed: the milestone's id and title. */
   milestone?: { id: string; title: string };
+
+  /** The prompt says the item's ticket is in backlog: planned for later, so the round answers, never starts it. */
+  backlog?: true;
 }
 
 /** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
@@ -361,5 +364,6 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseNotes(prompt),
     ...parseOpenSubtickets(prompt),
     ...parseConversations(prompt),
+    ...(/ is in backlog: work planned for later/.test(prompt) ? { backlog: true as const } : {}),
   };
 }

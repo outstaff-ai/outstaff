@@ -50,8 +50,11 @@ export interface HandBackTarget {
   declare(status: DeclaredHandBack, message?: string): void;
 }
 
-/** The work item a run is on: what kind of work it is and who started it (for a mention, who mentioned). */
-export type Round = Pick<OfferedWorkItem, "kind" | "trigger">;
+/**
+ * The work item a run is on: what kind of work it is, who started it (for a mention, who mentioned), and the status of
+ * its ticket when it was offered.
+ */
+export type Round = Pick<OfferedWorkItem, "kind" | "trigger" | "ticketStatus">;
 
 /** Everything a verb touches: who is acting, the team, and the ports built from its config. */
 export interface AgentEnv {
@@ -69,7 +72,10 @@ export interface AgentEnv {
   /** The work item a run is on, for `ost handback`: its kind, and where the status the agent states goes. */
   handBack?: HandBackTarget;
 
-  /** The work item a run is on; the verbs that start new work refuse in a round another agent started. */
+  /**
+   * The work item a run is on; the verbs that start new work refuse in a round another agent started, and in a round
+   * on a ticket in backlog that is not a human's chat request.
+   */
   round?: Round;
 
   /**

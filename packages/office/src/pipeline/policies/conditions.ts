@@ -7,6 +7,9 @@ export const UNFINISHED: CanonicalStatus[] = ["backlog", "ready", "active", "rev
 export const HUMAN: PipelineCondition = { actor_kind: "human" };
 export const NOT_CLOSED: PipelineCondition = { not: { ticket_status: ["done", "canceled"] } };
 
+/** Not a ticket in a backlog status: planned for later, so nothing starts it until a human moves it on. */
+export const NOT_BACKLOG: PipelineCondition = { not: { ticket_status: ["backlog"] } };
+
 /**
  * A human's comment, or one on an open ticket. A human's mention is an explicit request, so it wakes the agent on a
  * closed ticket too; an agent's does not, so agents do not wake each other on finished work.

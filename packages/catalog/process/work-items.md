@@ -35,6 +35,8 @@ A comment wakes you because it mentions you or is on your work, not because it a
 
 Only a trusted human starts new work. In a round another agent started (a `question`, an `unblock`, or an `asked` round from an agent's mention) you answer, comment, route existing work and hand back; `ost ticket create` and `ost pr open` are refused there. Comment the proposal on the ticket for a human instead. Rounds a human started, and work on a ticket assigned to you (its follow-ups included), are not limited.
 
+A ticket in the backlog is planned for later. A comment or a mention on it still wakes you: answer it, or update the ticket (its description, its plan), and leave its status and assignee as they are. Do not start the work: `ost ticket create` and `ost pr open` are refused in a round on a ticket in the backlog, unless a trusted human asked for the work in chat. The work starts when a human moves the ticket to ready or active. Backlog is not a blocker: hand back `silent`, or with your answer, never `blocked`.
+
 ## When the request can't be done as asked
 
 Two requirements conflict, something asked for does not exist, or the only way through drops, weakens or replaces something the ticket or the requester asked for. Do not choose for the requester. The same holds when more than one route works with different trade-offs, and when a route adds something new to build, publish, run or maintain (an image, a service, a workflow, a new vendor). Before you build any of them, ask the requester where the request came from (a comment on the ticket, or your final message in the chat thread):

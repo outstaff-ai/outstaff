@@ -252,7 +252,7 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### assigned_to_assignee
 
-A ticket assigned to an agent, by anyone but that agent, wakes the agent. A ticket that is blocked because a ticket that blocks it is still open wakes no one: `unblocked_to_ready` wakes the agent when its last blocker closes.
+A ticket assigned to an agent, by anyone but that agent, wakes the agent. A ticket in backlog wakes no one either: it is planned for later, and its work starts when a human moves it to ready (the idle pull, `idle_pulls_next`) or to active (`moved_active_to_assignee`). A ticket that is blocked because a ticket that blocks it is still open wakes no one: `unblocked_to_ready` wakes the agent when its last blocker closes.
 
 Listens to `ticket.assigned`, `ticket.created`. Decides: wake `assignee` (kind `assigned`).
 
@@ -266,6 +266,8 @@ When:
     - `actor_is: assignee`
   - not:
     - `ticket_status: done, canceled`
+  - not:
+    - `ticket_status: backlog`
   - any of:
     - not:
       - `ticket_status: blocked`
@@ -296,7 +298,7 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} commented on {{ticket}}. Read the comment and act on it. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.
+{{actor.id}} commented on {{ticket}}. Read the comment and act on it. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.
 ```
 
 ### ticket_comment_to_mentioned_agent
@@ -319,7 +321,7 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.
+{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.
 ```
 
 ### ticket_comment_to_blocked_agent
@@ -369,7 +371,7 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.
+{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.
 ```
 
 ### moved_active_to_assignee
@@ -597,7 +599,7 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### start_marks_active
 
-A round of work starting on a ticket assigns the ticket to the agent and moves it to active, for the agent.
+A round of work starting on a ticket assigns the ticket to the agent and moves it to active, for the agent. A round on a ticket in backlog (a comment or a mention on it) leaves its status and assignee alone: backlog is work for later, and only a human starts it, by moving the ticket on or by asking for the work in chat (a round from a chat request does start it).
 
 Listens to `agent.started`. Decides: act for `actor`: assign it to the agent acted for, move the ticket to `active`.
 
@@ -607,6 +609,10 @@ When:
   - `work_kind: assigned, review_feedback, ticket_comment, rebase, ci_failed, merge_checks_failed`
   - not:
     - `ticket_status: done, canceled`
+  - any of:
+    - not:
+      - `ticket_status: backlog`
+    - `work_from_chat: true`
 
 Note posted with the change: none, since the ticket shows the change. A team can add one with `pipeline.policies.start_marks_active.instruction`.
 

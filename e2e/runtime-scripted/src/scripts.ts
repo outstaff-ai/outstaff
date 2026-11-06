@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
 import { answerTeammate, decideTopic, decideWithPm } from "./decide.js";
-import { planInChat, plannedTickets } from "./plan.js";
+import { fileForLater, planInChat, plannedTickets } from "./plan.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
@@ -986,6 +986,10 @@ const passedOn = ([, to, cc, question]: RegExpExecArray) =>
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const feedback = need(ctx.feedback[0], "the comment");
+  if (ctx.backlog) {
+    return yield* answerOnBacklog(key, feedback.body);
+  }
+
   const decide = /^decide: (.+)$/m.exec(feedback.body)?.[1];
   if (decide) {
     return yield* askForDecision(key, decide);
@@ -1011,6 +1015,32 @@ export async function* ticketComment(ctx: ItemContext): Script {
     : { type: "tool", tool: "ticket_move", input: { key, to: "review" } };
 
   return ask ? `Asked ${ask[1]} on ${key}.` : `Answered the comment on ${key}.`;
+}
+
+/**
+ * A comment on a ticket in backlog: the agent tries to start the work by filing it, which is refused, answers the
+ * comment on the ticket, saying so, and finishes silently, leaving the ticket in backlog with its assignee.
+ */
+async function* answerOnBacklog(key: string, body: string): AsyncGenerator<Action, string, string> {
+  let refused = "";
+  try {
+    yield { type: "tool", tool: "ticket_create", input: { title: `Start ${key}`, related: key } };
+  } catch (e) {
+    refused = e instanceof Error ? e.message : String(e);
+  }
+
+  const started = refused
+    ? `Not started: starting the work was refused: ${refused.split(":")[0]}.`
+    : `Started: filed the work.`;
+
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: { key, body: `Noted for later: ${body}\n${started}` },
+  };
+
+  yield { type: "tool", tool: "handback", input: { status: "silent" } };
+  return `Answered the comment on ${key}, which stays in backlog.`;
 }
 
 /**
@@ -1577,6 +1607,7 @@ export async function* chat(ctx: ItemContext): Script {
   return (
     (yield* notes(ctx, latest)) ??
     (yield* planInChat(talk, latest)) ??
+    (yield* fileForLater(latest)) ??
     (yield* aboutWork(ctx, talk, latest))
   );
 }

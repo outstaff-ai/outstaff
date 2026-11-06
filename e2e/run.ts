@@ -2704,6 +2704,7 @@ async function main() {
   await lateInputOneRound();
   await continueFromReview();
   await planInChat();
+  await planForLater();
 
   // ---- 14. every change in the tracker and the knowledge base was made by an agent (sam, or pia, the PM) or a human, as
   // themselves: the office's account only reads (decision 0019)
@@ -2809,6 +2810,109 @@ async function planInChat() {
 
   step(
     `plan in chat: the human confirmed -> pia filed ${PLAN_MILESTONE} with ${filed.tickets.map((t: Json) => t.key).join(", ")}, one reply, one round`,
+  );
+}
+
+/**
+ * 13h. "plan this for later": a human files a ticket in the backlog, assigned to sam. Nobody starts it: filing it wakes
+ * no one and it stays in the backlog. A human's comment on it wakes sam once, who answers on the ticket; the round's
+ * try to start the work (filing it) is refused, the ticket stays in the backlog with sam, the PM is not woken, and
+ * nothing is filed or opened. Asked in chat for a backlog ticket, sam files it there with one reply, and no round runs.
+ */
+async function planForLater() {
+  await agentIdle();
+  await officePolledTwice("the last round handed back");
+  const samBefore = wakesOf("sam").length;
+  const piaBefore = piaWakes().length;
+  const before = await state();
+  const { key } = await stub("POST", "/_test/tickets", {
+    title: "Export the invoices",
+    description: "For later: export a month of invoices.",
+    status: "Backlog",
+    assignee: "sam",
+  });
+
+  const ticketOf = (s: Json) => s.tickets.find((t: Json) => t.key === key);
+  const where = (t: Json) => [t.status, t.assignee].join(" ");
+  await officePolledTwice(`${key} filed in the backlog`);
+  assertSame(wakesOf("sam").slice(samBefore), [], "filing a backlog ticket for sam woke no one");
+  assertEq(
+    where(ticketOf(await state())),
+    "Backlog sam",
+    "the ticket waits in the backlog with sam",
+  );
+
+  step(
+    `plan for later: ${key} filed in the backlog for sam -> nobody woken, it stays in the backlog`,
+  );
+
+  await stub("POST", `/_test/tickets/${key}/comment`, { body: "CSV first; PDF can wait." });
+  const answer = await until(`sam's answer on ${key}`, (s) =>
+    ticketOf(s).comments.find((c: Json) => c.author === "sam"),
+  );
+
+  await agentIdle();
+  await officePolledTwice(`sam's round on ${key} handed back`);
+  const after = await state();
+  const t = ticketOf(after);
+  assertEq(where(t), "Backlog sam", "the comment round left the ticket in the backlog with sam");
+  assertSame(t.moves, [], "nobody moved the ticket");
+  assertSays(
+    answer.body,
+    "Noted for later: CSV first; PDF can wait.\nNot started: starting the work was refused: This round is on a ticket in backlog, so it does not file a ticket.",
+    "sam answered the comment, and the try to start the work was refused",
+  );
+
+  assertSame(
+    wakesOf("sam").slice(samBefore),
+    ["ticket_comment"],
+    "sam was woken once, for the comment",
+  );
+
+  assertSame(piaWakes().slice(piaBefore), [], "the PM was not woken: backlog is not blocked");
+  assertEq(
+    after.tickets.length,
+    before.tickets.length + 1,
+    "nothing was filed besides the backlog ticket",
+  );
+
+  assertEq(after.github.pulls.length, before.github.pulls.length, "no pull request was opened");
+  step(
+    `plan for later: a human's comment on ${key} -> sam answered once, filing the work refused; still in the backlog with sam, no ticket, no pull request, no PM`,
+  );
+
+  // The chat variant: asked in chat for a backlog ticket, sam files it there and does nothing more.
+  await agentIdle();
+  await officePolledTwice("the comment round handed back");
+  const samChat = wakesOf("sam").length;
+  const asked = await stub("POST", "/_test/chat/say", {
+    text: "File a backlog ticket for the invoice archive.",
+  });
+
+  const replies = (s: Json) =>
+    s.chat.posts.filter((p: Json) => p.agent === "sam" && p.thread === asked.id);
+
+  const reply = await until("sam's reply in the thread", (s) =>
+    replies(s).find((p: Json) => p.text.includes("in the backlog for later")),
+  );
+
+  await agentIdle();
+  await officePolledTwice("sam's chat session ended");
+  const chatted = await state();
+  const archive = chatted.tickets.find((x: Json) => x.title === "the invoice archive");
+  assertEq(where(archive), "Backlog sam", "the ticket asked for later is in the backlog with sam");
+  assertSame(archive.moves, [], "nobody moved the ticket asked for later");
+  assertSays(reply.text, archive.key, "the reply names the ticket");
+  assertEq(replies(chatted).length, 1, "one acknowledgement in the thread");
+  assertSame(
+    wakesOf("sam").slice(samChat),
+    ["chat"],
+    "only the chat session ran: no work item for the ticket asked for later",
+  );
+
+  assertEq(chatted.tickets.length, after.tickets.length + 1, "one ticket filed from chat");
+  step(
+    `plan for later: "file a backlog ticket" in chat -> ${archive.key} in the backlog with sam, one reply, no round`,
   );
 }
 

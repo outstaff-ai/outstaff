@@ -60,20 +60,34 @@ function startedByAgent(round: Round): string | undefined {
 }
 
 /**
+ * A round on a ticket in backlog, other than a chat session: the ticket is planned for later, not started. Work a chat
+ * session attached or filed comes without the ticket's status, as a human asked for it.
+ */
+const onBacklog = (round: Round) => round.ticketStatus === "backlog" && round.kind !== "chat";
+
+/**
  * Only a trusted human starts new work. A round another agent started (a question, an unblock, an agent's mention)
  * may answer, comment, route existing work and hand back, but files no ticket and opens no pull request; it puts the
- * proposal to a trusted human instead. Rounds a human started, and work on an assigned ticket, are not limited.
+ * proposal to a trusted human instead. So does a round on a ticket in backlog (a comment or a mention on it): the work
+ * starts when a human moves the ticket on, or asks for it in chat. Other rounds a human started, and work on an
+ * assigned ticket, are not limited.
  */
 export function requireHumanStarted(env: AgentEnv, what: "file a ticket" | "open a pull request") {
-  const from = env.round && startedByAgent(env.round);
-  if (!from) {
-    return;
+  const round = env.round;
+  const from = round && startedByAgent(round);
+  if (from) {
+    throw new PortError(
+      "forbidden",
+      `This round is ${from}, not a trusted human's request, so it does not ${what}: only a trusted human starts new work, and a teammate's question, mention or approval is not their confirmation. Put the proposal to a trusted human instead: comment it on the ticket (what, why, and your recommendation), or, answering a question, suggest it in your answer for the asker to take to a human; then hand back.`,
+    );
   }
 
-  throw new PortError(
-    "forbidden",
-    `This round is ${from}, not a trusted human's request, so it does not ${what}: only a trusted human starts new work, and a teammate's question, mention or approval is not their confirmation. Put the proposal to a trusted human instead: comment it on the ticket (what, why, and your recommendation), or, answering a question, suggest it in your answer for the asker to take to a human; then hand back.`,
-  );
+  if (round && onBacklog(round)) {
+    throw new PortError(
+      "forbidden",
+      `This round is on a ticket in backlog, so it does not ${what}: backlog is work planned for later, and it starts only when a trusted human moves the ticket to ready or active, or asks for the work in chat. Answer the comment or update the ticket instead (its description, its plan, a proposal), then hand back. Backlog is not a blocker: hand back silent, or with the answer, never blocked.`,
+    );
+  }
 }
 
 /** What a chat session is told after it filed work. The agent posts the reply and any placement question itself. */

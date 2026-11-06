@@ -64,7 +64,7 @@ describe("planning in chat", () => {
           body: `Part of the ${PLAN_MILESTONE} plan.`,
           milestone: "12",
           assignee: "me",
-          status: "backlog",
+          status: "ready",
         },
       })),
     ]);
@@ -86,5 +86,39 @@ describe("planning in chat", () => {
       { tool: "ticket_move", input: { key: "SHOP-50", to: "review" } },
       { tool: "ticket_move", input: { key: "SHOP-51", to: "review" } },
     ]);
+  });
+});
+
+describe("a request for later in chat", () => {
+  const later = {
+    from: "ada",
+    agent: false,
+    text: "File a backlog ticket for the invoice export.",
+  };
+
+  it("files it in the backlog and nothing more, and says so", async () => {
+    const r = await play(chat({ ...base, conversation: [later] }), {
+      ticket_create: "Created SHOP-7.\nFiled in the backlog for later.",
+    });
+
+    expect(r.tools).toEqual([
+      {
+        tool: "ticket_create",
+        input: {
+          title: "the invoice export",
+          body: "Asked in chat, for later.",
+          status: "backlog",
+        },
+      },
+    ]);
+
+    expect(r.text).toBe(
+      "Filed SHOP-7 in the backlog for later: nothing starts it until you move it on.",
+    );
+  });
+
+  it("names no key the filing did not give", async () => {
+    const r = await play(chat({ ...base, conversation: [later] }), {});
+    expect(r.text).toContain("Filed the ticket in the backlog");
   });
 });

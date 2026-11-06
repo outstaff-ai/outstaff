@@ -203,11 +203,20 @@ function filedForLine(assignee: string, forOther: boolean, waitsOn: string[]): s
   return `${whose}. ${wakes} Your chat work is not tied to it; do not work on it. Tell the requester who has it${waitsOn.length ? " and what it waits on" : ""}, then finish with a short note.`;
 }
 
+/** What a chat session is told after filing a ticket in the backlog: work for later, which nothing starts now. */
+const laterLine = (assignee: string) =>
+  `Filed in the backlog for later, assigned to ${assignee}: nothing starts it now, and no work item is made for it. Do not work on it, link blockers to it or move it; a human starts it by moving it to ready or active, or by asking for it in chat. Tell the requester it is in the backlog, then finish with a short note.`;
+
+/** Whether a chat ticket is the caller's work now: theirs, waiting on nothing, and not filed for later. */
+const isWorkNow = (forOther: boolean, waitsOn: string[], later: boolean) =>
+  !forOther && waitsOn.length === 0 && !later;
+
 /**
  * Tells the office about a chat ticket. The caller's own ticket, ready to work, is filed as its work, with the agent's
- * line for the reply. One for someone else, or one that starts blocked on open tickets (`waitsOn`), is only recorded
- * against the request: the assignment wakes its assignee, or, for a blocked one, the close of its last blocker
- * (`unblocked_to_ready`). Returns the line that says which, and the filing for the verb's data.
+ * line for the reply. One for someone else, one that starts blocked on open tickets (`waitsOn`), or one filed in the
+ * backlog (`later`), is only recorded against the request: the assignment wakes its assignee, for a blocked one the
+ * close of its last blocker (`unblocked_to_ready`), and for one in the backlog a human moving it on. Returns the line
+ * that says which, and the filing for the verb's data.
  */
 export async function fileInOffice(
   env: AgentEnv,
@@ -217,7 +226,8 @@ export async function fileInOffice(
     request,
     say,
     waitsOn,
-  }: { key: string; request: string; say?: string | undefined; waitsOn: string[] },
+    later,
+  }: { key: string; request: string; say?: string | undefined; waitsOn: string[]; later: boolean },
   to: Assignee,
 ): Promise<{ line?: string; data: { filed?: Filed; filedFor?: string } }> {
   if (!chat) {
@@ -226,14 +236,15 @@ export async function fileInOffice(
 
   const office = requireOffice(env);
   const forOther = to.forOther && !!to.member;
-  if (!forOther && waitsOn.length === 0) {
+  if (isWorkNow(forOther, waitsOn, later)) {
     const filed = await office.linkTicket(chat.id, key, request, say);
     return { line: filedLine(filed), data: { filed } };
   }
 
   const assignee = to.member ? (to.member.username ?? to.member.name) : env.person;
   await office.fileFor(chat.id, { ticket: key, request, assignee });
-  return { line: filedForLine(assignee, forOther, waitsOn), data: { filedFor: assignee } };
+  const line = later ? laterLine(assignee) : filedForLine(assignee, forOther, waitsOn);
+  return { line, data: { filedFor: assignee } };
 }
 
 /**

@@ -55,7 +55,8 @@ function team(): TeamConfig {
       runtime: { adapter: "fake" },
       tracker: { adapter: "fake" },
     },
-    // These scenarios are about what a wake carries; coalescing has its own.
+    // These scenarios are about what a wake carries; coalescing and the idle pull have their own.
+    policies: { pull_ready: false },
     pipeline: { wake: { coalesce_seconds: 0 }, notify: { debounce_seconds: 1 } },
   });
 
@@ -157,11 +158,10 @@ describe("the office with the event pipeline live", () => {
     conn = agent(tracker, config, sam);
     await conn.whenConnected();
 
-    // In backlog: a ready ticket created for sam would be pulled at once, before Ada's assignment is judged.
     const issue = await tracker.as(ada).createIssue({
       title: "Search",
       body: "",
-      status: "backlog",
+      status: "ready",
       assignee: sam.id,
     });
 
@@ -236,7 +236,7 @@ describe("the office with the event pipeline live", () => {
     const issue = await tracker.as(ada).createIssue({
       title: "Checkout",
       body: "",
-      status: "backlog",
+      status: "ready",
       assignee: sam.id,
     });
 
@@ -309,7 +309,7 @@ describe("the office with the event pipeline live", () => {
     const issue = await tracker.as(ada).createIssue({
       title: "Greeting",
       body: "",
-      status: "backlog",
+      status: "ready",
       assignee: sam.id,
     });
 
@@ -376,7 +376,7 @@ describe("the office with the event pipeline live", () => {
     const issue = await tracker.as(ada).createIssue({
       title: "Rotate the staging key",
       body: "",
-      status: "backlog",
+      status: "ready",
       assignee: sam.id,
     });
 
@@ -445,7 +445,7 @@ describe("the office with the event pipeline live", () => {
     const issue = await tracker.as(ada).createIssue({
       title: "Rotate the staging key",
       body: "",
-      status: "backlog",
+      status: "ready",
       assignee: sam.id,
     });
 
@@ -561,7 +561,7 @@ describe("the office with the event pipeline live", () => {
     const issue = await tracker.as(ada).createIssue({
       title: "Fold into the device work",
       body: "",
-      status: "backlog",
+      status: "ready",
     });
 
     await office!.parts.intake.pollOnce();

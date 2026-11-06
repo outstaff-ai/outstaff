@@ -367,6 +367,21 @@ describe("conditions", () => {
 
     expect(ok({ actor_in_round: false }, noTicket())).toBe(true);
   });
+
+  it("work_from_chat: the round's work item came from a request in chat", () => {
+    const started = (data: Record<string, unknown>) =>
+      ev("agent.started", { data: { workItem: "w-1", kind: "assigned", ...data } });
+
+    expect(ok({ work_from_chat: true }, started({ fromChat: true }))).toBe(true);
+    expect(ok({ work_from_chat: true }, started({}))).toBe(false);
+    expect(holds({ work_from_chat: false }, started({})).detail).toBe(
+      "the work did not come from a request in chat, wanted not",
+    );
+
+    expect(holds({ work_from_chat: true }, started({ fromChat: true })).detail).toBe(
+      "the work came from a request in chat, wanted from chat",
+    );
+  });
 });
 
 describe("people", () => {

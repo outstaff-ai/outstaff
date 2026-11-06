@@ -1,6 +1,7 @@
 import { SILENT_KINDS } from "@outstaff/core";
 import { officeToReview } from "./hand-back-review.js";
 import { officeWaitingOn } from "./hand-back-waiting.js";
+import { itemTicket } from "./item-ticket.js";
 import type { WorkItem } from "./store/types.js";
 import type { HandBackResult, WorkSourceOptions } from "./work-source.types.js";
 
@@ -63,6 +64,49 @@ async function checkedWaiting(
   return result;
 }
 
+/**
+ * A ticket in backlog is planned for later, not started, so nothing on it is blocked: a `blocked` hand-back on it (a
+ * round answering a comment on it, say) is taken as `silent`, and no PM or human is pulled in. The ticket is read
+ * again first, as a human may have moved it on during the round.
+ */
+async function checkedBacklog(
+  opts: WorkSourceOptions & { workState: NonNullable<WorkSourceOptions["workState"]> },
+  item: WorkItem,
+  result: HandBackResult,
+): Promise<HandBackResult> {
+  const { workState, store } = opts;
+  const ticket = await itemTicket(store, item);
+  if (!ticket) {
+    return result;
+  }
+
+  await workState.refreshTicket(ticket, { kind: "agent", id: item.person }).catch(() => undefined);
+  if (workState.ticket(ticket)?.status !== "backlog") {
+    return result;
+  }
+
+  opts.logger?.warn(`a blocked hand-back on ${ticket}, which is in backlog; taking it as silent`, {
+    item: item.id,
+    person: item.person,
+  });
+
+  return { ...result, status: "silent" };
+}
+
+/** The status as the office takes it, before the backlog check. */
+function checkedStatus(
+  opts: WorkSourceOptions & { workState: NonNullable<WorkSourceOptions["workState"]> },
+  item: WorkItem,
+  result: HandBackResult,
+): Promise<HandBackResult> | HandBackResult {
+  if (result.status === "done" && !result.toReview) {
+    return checkedDone(opts, item, result);
+  }
+
+  const ticketSilent = result.status === "silent" && !SILENT_KINDS.includes(item.kind);
+  return result.status === "blocked" || ticketSilent ? checkedWaiting(opts, item, result) : result;
+}
+
 /** The hand-back as the office takes it, checked against its own view of the item's ticket. */
 export async function checkedResult(
   opts: WorkSourceOptions,
@@ -74,12 +118,6 @@ export async function checkedResult(
     return result;
   }
 
-  if (result.status === "done" && !result.toReview) {
-    return checkedDone({ ...opts, workState }, item, result);
-  }
-
-  const ticketSilent = result.status === "silent" && !SILENT_KINDS.includes(item.kind);
-  return result.status === "blocked" || ticketSilent
-    ? checkedWaiting({ ...opts, workState }, item, result)
-    : result;
+  const taken = await checkedStatus({ ...opts, workState }, item, result);
+  return taken.status === "blocked" ? checkedBacklog({ ...opts, workState }, item, taken) : taken;
 }

@@ -22,6 +22,19 @@ function headerLines(item: OfferedWorkItem): string[] {
   ];
 }
 
+/** A round on a ticket in backlog, but not a human's request in chat: answer, never start the work. */
+function backlogLines(item: OfferedWorkItem): string[] {
+  if (item.ticketStatus !== "backlog" || item.kind === "chat" || item.origin) {
+    return [];
+  }
+
+  const ticket = item.subject?.type === "ticket" ? `The ticket ${item.subject.ref}` : "Its ticket";
+  return [
+    "",
+    `${ticket} is in backlog: work planned for later, not started. Answer the comment or question, or update the ticket (its description, its plan), and leave its status and assignee as they are. Do not start the work: file no ticket and open no pull request (both are refused in this round). The work starts when a trusted human moves the ticket to ready or active. Backlog is not a blocker: hand back silent, or with your answer, never blocked.`,
+  ];
+}
+
 function subjectLine(s: OfferContext["subjects"][number]): string {
   const title = s.title ? ` ${s.title}` : "";
   const url = s.url ? ` (${s.url})` : "";
@@ -96,6 +109,7 @@ export function buildWorkPrompt(offer: Offer, opts: WorkPromptOptions): string {
 
   return [
     ...headerLines(item),
+    ...backlogLines(item),
     ...subjectLines(context.subjects, opts.ticketFiles),
     ...linkLines(context.links),
     ...feedbackLines(context.feedback ?? []),

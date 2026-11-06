@@ -32,7 +32,7 @@ describe("ticket_comment_to_mentioned_agent", () => {
         person: "mira",
         kind: "asked",
         instruction:
-          "sam mentioned you in a comment on ACME-1. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. ACME-1's status now: active. A done or canceled ticket stays closed unless the comment asks to reopen it.",
+          "sam mentioned you in a comment on ACME-1. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. ACME-1's status now: active. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.",
       },
     ]);
 
@@ -74,7 +74,7 @@ describe("ticket_comment_to_mentioned_agent", () => {
     expect(wakes(late, closed)).toEqual([`${ID}: wake mira (asked)`]);
     expect(traceOf(late, closed).decisions[0]).toMatchObject({
       instruction: expect.stringContaining(
-        "ACME-1's status now: done. A done or canceled ticket stays closed unless the comment asks to reopen it.",
+        "ACME-1's status now: done. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.",
       ),
     });
 

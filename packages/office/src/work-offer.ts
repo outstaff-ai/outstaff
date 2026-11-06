@@ -5,10 +5,12 @@ import { publicOrigin, readOrigin } from "./chat/origin.js";
 import { previousConversation } from "./conversation-context.js";
 import { deliverFeedback, readFeedback } from "./work-feedback.js";
 import { itemRefs } from "./item-refs.js";
+import { itemTicket } from "./item-ticket.js";
 import type { Offer } from "./protocol/index.js";
 import { INTERRUPTED } from "./scheduler/index.js";
 import { contextLimits } from "./pipeline/context/index.js";
 import type { Store, WorkItem } from "./store/types.js";
+import type { TicketRecord } from "./workstate/index.js";
 import {
   wakeContextOf,
   type ContextReaders,
@@ -23,7 +25,18 @@ const unique = (refs: Ref[]) =>
 const linksOf = (subjects: Ref[]) =>
   subjects.flatMap((s) => (s.url ? [{ url: s.url, title: s.title ?? s.ref }] : []));
 
-function offeredItem(item: WorkItem, origin: ChatOriginRecord | undefined): Offer["workItem"] {
+/** The canonical status of the ticket the item is about, as the work state last saw it. */
+async function ticketStatusOf(store: Store, item: WorkItem): Promise<string | undefined> {
+  const key = await itemTicket(store, item);
+  const rec = key ? (await store.getSubject("ticket", key))?.data : undefined;
+  return (rec as TicketRecord | undefined)?.status;
+}
+
+function offeredItem(
+  item: WorkItem,
+  origin: ChatOriginRecord | undefined,
+  ticketStatus: string | undefined,
+): Offer["workItem"] {
   return {
     id: item.id,
     kind: item.kind,
@@ -32,6 +45,7 @@ function offeredItem(item: WorkItem, origin: ChatOriginRecord | undefined): Offe
     trigger: item.trigger,
     ...(item.parentId ? { parentId: item.parentId } : {}),
     ...(item.subject ? { subject: item.subject } : {}),
+    ...(ticketStatus ? { ticketStatus } : {}),
     ...(origin ? { origin: publicOrigin(origin) } : {}),
   };
 }
@@ -87,10 +101,11 @@ export function offerBuilder(
     const interrupted = await interruptedBefore(item.id);
     const journal = await journalOf(item, about);
     const wake = await wakeOf(item, fresh);
+    const ticketStatus = await ticketStatusOf(store, item);
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       ...(interrupted ? { interrupted } : {}),
-      workItem: offeredItem(item, origin),
+      workItem: offeredItem(item, origin, ticketStatus),
       context: {
         journal,
         subjects,

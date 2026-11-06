@@ -158,5 +158,12 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
           "The actor is an agent that had a round of work on the ticket under way when the event happened; an agent's event without a time counts as in one (or, with false, is not).",
         ),
       ),
+    z
+      .strictObject({ work_from_chat: z.boolean() })
+      .meta(
+        d(
+          "The work item behind the event (the round that started or was handed back) came from a trusted human's request in chat: a chat session, or work one filed or attached (or, with false, did not).",
+        ),
+      ),
   ]),
 );

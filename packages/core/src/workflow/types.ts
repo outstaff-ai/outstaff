@@ -220,7 +220,8 @@ export type Condition =
   | { in_milestone: boolean }
   | { blocked_agent: boolean }
   | { open_blockers: boolean }
-  | { actor_in_round: boolean };
+  | { actor_in_round: boolean }
+  | { work_from_chat: boolean };
 
 export type HandBackStatus = (typeof HAND_BACK_STATUSES)[number];
 

@@ -124,4 +124,22 @@ describe("ticket.create from a chat session", () => {
     expect(f.office.linked).toMatchObject([{ ticket: "SHOP-2" }]);
     expect(f.office.filedFor).toEqual([]);
   });
+
+  it("files a ticket for later in the backlog as no work item: it waits there, and the session is told to leave it", async () => {
+    for (const assignee of [undefined, "Noor Haddad"]) {
+      const f = await chatSession();
+      const r = await f.create({ status: "backlog", ...(assignee ? { assignee } : {}) });
+
+      const issue = await f.tracker.getIssue("SHOP-1");
+      expect(issue.status.canonical).toBe("backlog");
+      expect(f.office.linked).toEqual([]);
+      expect(f.office.filedFor).toMatchObject([
+        { ticket: "SHOP-1", assignee: assignee ?? "sam.duarte" },
+      ]);
+
+      expect(r.text).toContain("Filed in the backlog for later");
+      expect(r.text).toContain("Do not work on it, link blockers to it or move it");
+      expect(r.text).not.toContain("Filed as work item");
+    }
+  });
 });
