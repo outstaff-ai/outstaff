@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseTeamConfig } from "#/config/parse.js";
 import { buildTeamJsonSchema } from "#/config/json-schema.js";
-import { agent, automation, ev, human, pr, ref, world } from "./fixtures.js";
+import { agent, automation, ev, human, pr, ref, ticket, world } from "./fixtures.js";
 import { createStaticWorkflowState } from "#/workflow/state.js";
 import {
   checkCondition,
@@ -65,6 +65,72 @@ describe("conditions", () => {
       holds({ ticket_status: ["review"] }, ev("ticket.moved", { subject: { ticket: "X-9" } }))
         .detail,
     ).toContain("unknown");
+  });
+
+  it("judge a comment by the status its ticket had when it was written, and any other event by the status now", () => {
+    const closed = createStaticWorkflowState({
+      tickets: {
+        "ACME-1": ticket("done", { statusSince: "2030-01-01T10:00:07Z", previousStatus: "review" }),
+        "ACME-2": ticket("done"),
+        "ACME-3": ticket("review", {
+          statusSince: "2030-01-01T10:00:07Z",
+          previousStatus: "active",
+        }),
+        "ACME-4": ticket("canceled", {
+          statusSince: "2030-01-01T10:00:07Z",
+          previousStatus: "done",
+        }),
+      },
+    });
+
+    const at = (type: WorkflowEvent["type"], when: string, key = "ACME-1") =>
+      ev(type, { subject: { ticket: key }, data: { at: when } });
+
+    const before = holds(
+      { ticket_status: ["review"] },
+      at("ticket.commented", "2030-01-01T10:00:00Z"),
+      closed,
+    );
+
+    expect(before).toEqual({
+      ok: true,
+      detail: "ticket status review when commented on (done now) in [review]",
+    });
+
+    expect(
+      ok({ ticket_status: ["done"] }, at("ticket.commented", "2030-01-01T10:00:07Z"), closed),
+    ).toBe(true);
+
+    expect(
+      ok({ ticket_status: ["done"] }, at("ticket.assigned", "2030-01-01T10:00:00Z"), closed),
+    ).toBe(true);
+
+    expect(ok({ ticket_status: ["done"] }, ev("ticket.commented", tk), closed)).toBe(true);
+
+    // Only a close is looked behind: any other move, or one from closed to closed, is judged as it is now.
+    for (const [key, now] of [
+      ["ACME-3", "review"],
+      ["ACME-4", "canceled"],
+    ] as const) {
+      expect(
+        holds(
+          { ticket_status: [now] },
+          at("ticket.commented", "2030-01-01T10:00:00Z", key),
+          closed,
+        ),
+      ).toEqual({ ok: true, detail: `ticket status ${now} in [${now}]` });
+    }
+
+    // Without the status before, or a time it can place, the status now is all there is.
+    expect(
+      ok(
+        { ticket_status: ["done"] },
+        at("ticket.commented", "2030-01-01T10:00:00Z", "ACME-2"),
+        closed,
+      ),
+    ).toBe(true);
+
+    expect(ok({ ticket_status: ["done"] }, at("ticket.commented", "soon"), closed)).toBe(true);
   });
 
   it("match a move by its canonical status and name the tracker's", () => {

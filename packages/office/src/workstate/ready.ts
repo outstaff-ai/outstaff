@@ -1,4 +1,4 @@
-import type { CanonicalStatus, Issue } from "@outstaff/core";
+import { statusAt, type CanonicalStatus, type Issue } from "@outstaff/core";
 import type { Pickup, WorkstateCore } from "./core.types.js";
 import type { ReadyTicket, TicketRecord } from "./types.js";
 
@@ -11,27 +11,38 @@ const OPEN = new Set(["queued", "active", "waiting", "blocked"]);
 
 export const pickupKey = (person: string, ticket: string): string => `${person}\n${ticket}`;
 
+/** The status the ticket left at a change: the one it had, if the work state knew it. */
+const left = (prev: TicketRecord | undefined): Pick<TicketRecord, "previousStatus"> =>
+  prev?.status ? { previousStatus: prev.status } : {};
+
+/** The status it had before, kept while it stays in its status. */
+const kept = (prev: TicketRecord | undefined): Pick<TicketRecord, "previousStatus"> =>
+  prev?.previousStatus ? { previousStatus: prev.previousStatus } : {};
+
 /**
- * When the ticket entered `status`: kept while the status stays, else `at`, when the change happened. A move restarts
- * it even when the status looks unchanged (the ticket left and came back between two reads), but never back in time.
+ * When the ticket entered `status`, and the status it had before: kept while the status stays, else `at`, when the
+ * change happened. A move restarts it even when the status looks unchanged (the ticket left and came back between two
+ * reads), but never back in time.
  */
 export function statusSince(
   prev: TicketRecord | undefined,
   status: CanonicalStatus | undefined,
   at: string,
   moved = false,
-): Pick<TicketRecord, "statusSince"> {
+): Pick<TicketRecord, "statusSince" | "previousStatus"> {
   if (!status) {
     return {};
   }
 
-  const kept = prev?.status === status ? prev.statusSince : undefined;
-  if (!kept) {
-    return { statusSince: at };
-  }
-
-  return { statusSince: moved && Date.parse(at) > Date.parse(kept) ? at : kept };
+  const since = prev?.status === status ? prev.statusSince : undefined;
+  return since && !(moved && Date.parse(at) > Date.parse(since))
+    ? { statusSince: since, ...kept(prev) }
+    : { statusSince: at, ...left(prev) };
 }
+
+/** The status the ticket had at a time (ISO-8601), as far as the work state saw. */
+export const ticketStatusAt = (core: Pick<WorkstateCore, "tickets">, key: string, at: string) =>
+  statusAt(core.tickets.get(key), at);
 
 /** The fields a ticket takes from the tracker beyond its status: its priority, when the adapter has one. */
 export const priorityOf = (issue: Issue): Pick<TicketRecord, "priority"> =>

@@ -6,6 +6,12 @@ import type { CiState, CurrentWork, DocRecord, PrRecord } from "./types.js";
 
 export const TERMINAL = new Set(["done", "canceled"]);
 
+/** Handle of the agent playing a catalog role, if exactly one is configured. */
+export function personForRole(core: Pick<WorkstateCore, "team">, role: string): string | undefined {
+  const matches = core.team.people.filter((p) => p.role === role || p.extends?.includes(role));
+  return matches.length === 1 ? matches[0]!.handle : undefined;
+}
+
 export const isTerminal = (status: string | undefined): boolean =>
   status !== undefined && TERMINAL.has(status);
 

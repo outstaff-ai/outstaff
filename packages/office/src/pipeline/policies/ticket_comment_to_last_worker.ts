@@ -1,6 +1,6 @@
 import { definePolicy } from "@outstaff/policy";
 import { BLOCKED_ON_AGENT, HUMAN } from "./conditions.js";
-import { wakes } from "./spec.js";
+import { STATUS_NOW, wakes } from "./spec.js";
 
 export const policy = definePolicy({
   id: "ticket_comment_to_last_worker",
@@ -16,7 +16,6 @@ export const policy = definePolicy({
       { not: BLOCKED_ON_AGENT },
     ],
   },
-  instruction:
-    "{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work.",
+  instruction: `{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. ${STATUS_NOW}`,
   ...wakes({ person: "last_worker", kind: "ticket_comment" }),
 });

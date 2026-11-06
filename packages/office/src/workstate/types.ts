@@ -24,8 +24,9 @@ export interface TicketRecord {
   url?: string;
   status?: CanonicalStatus;
 
-  /** When the ticket entered its current status (ISO-8601), from the tracker's event or its last update. */
+  /** When it entered its status (ISO-8601), from the tracker's move or last update, and the status it had before. */
   statusSince?: string;
+  previousStatus?: CanonicalStatus;
 
   /** The tracker's priority, when its adapter has one: 1 is the most urgent. */
   priority?: number;

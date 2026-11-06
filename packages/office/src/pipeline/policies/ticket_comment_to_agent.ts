@@ -1,6 +1,6 @@
 import { definePolicy } from "@outstaff/policy";
 import { HUMAN, NOT_CLOSED } from "./conditions.js";
-import { wakes } from "./spec.js";
+import { STATUS_NOW, wakes } from "./spec.js";
 
 export const policy = definePolicy({
   id: "ticket_comment_to_agent",
@@ -10,6 +10,6 @@ export const policy = definePolicy({
   when: {
     all: [HUMAN, NOT_CLOSED, { not: { agent_mentioned: true } }, { assignee_kind: "agent" }],
   },
-  instruction: "{{actor.id}} commented on {{ticket}}. Read the comment and act on it.",
+  instruction: `{{actor.id}} commented on {{ticket}}. Read the comment and act on it. ${STATUS_NOW}`,
   ...wakes({ person: "assignee", kind: "ticket_comment" }),
 });

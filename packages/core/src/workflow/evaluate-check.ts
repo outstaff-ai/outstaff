@@ -2,6 +2,7 @@ import { isApprover } from "#/policies/approvers.js";
 import type { ApproverCandidate } from "#/policies/types.js";
 import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
 import type { Check, ConditionChecks, ConditionKey, Ctx } from "./evaluate.types.js";
+import { roundOf, statusOf } from "./event-time.js";
 import type { Condition, ConditionEvent, WorkflowPr } from "./types.js";
 
 /** The agents a comment names, first mention first: the handles the office put in `data.mentions`. */
@@ -69,11 +70,11 @@ const CHECKS: ConditionChecks = {
     };
   },
   ticket_status: (wanted, ctx) => {
-    const s = ctx.ticket ? ctx.state.ticketStatus(ctx.ticket) : undefined;
+    const [s, then] = ctx.ticket ? statusOf(ctx, ctx.ticket) : [undefined, ""];
     const shown = s ?? (ctx.ticket ? "unknown" : "none (no linked ticket)");
     return {
       ok: s !== undefined && wanted.includes(s),
-      detail: `ticket status ${shown} in ${list(wanted)}`,
+      detail: `ticket status ${shown}${then} in ${list(wanted)}`,
     };
   },
   parent_status: (wanted, ctx) => {
@@ -267,23 +268,6 @@ const CHECKS: ConditionChecks = {
     };
   },
 };
-
-/**
- * Whether the event's agent had a round on the ticket under way when the event happened, and why when it is not read
- * from the rounds. An agent's event without a time is taken as in a round: a missed wake can be recovered, a loop of
- * agents waking each other cannot.
- */
-function roundOf(ctx: Ctx): [boolean, string] {
-  const { actor, data } = ctx.event;
-  const at = data["at"];
-  if (actor.kind !== "agent" || ctx.ticket === undefined) {
-    return [false, ""];
-  }
-
-  return typeof at === "string" && at !== ""
-    ? [ctx.state.inRound(ctx.ticket, actor.id, at), ""]
-    : [true, " (the event has no time, so it is taken as in one)"];
-}
 
 /** Condition names in the order they are tried. */
 const CONDITION_KEYS = Object.keys(CHECKS) as ConditionKey[];

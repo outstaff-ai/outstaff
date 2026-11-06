@@ -8,6 +8,12 @@ export const HUMAN: PipelineCondition = { actor_kind: "human" };
 export const NOT_CLOSED: PipelineCondition = { not: { ticket_status: ["done", "canceled"] } };
 
 /**
+ * A human's comment, or one on an open ticket. A human's mention is an explicit request, so it wakes the agent on a
+ * closed ticket too; an agent's does not, so agents do not wake each other on finished work.
+ */
+export const BY_HUMAN_OR_OPEN: PipelineCondition = { any: [HUMAN, NOT_CLOSED] };
+
+/**
  * Not a ticket in the blocked status because a ticket that blocks it is still open, which waits for that ticket, not
  * for work. When it fails, the trace names the open blockers.
  */

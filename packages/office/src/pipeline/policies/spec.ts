@@ -5,6 +5,13 @@ export const TICKET_AGENT: PersonSpec = ["author", "assignee", "last_worker"];
 
 const code = (s: string) => `\`${s}\``;
 
+/**
+ * The ticket's status now, for a comment's wake: the comment is judged by the status when it was written, and the
+ * ticket may have closed since.
+ */
+export const STATUS_NOW =
+  "{{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.";
+
 /** One person, or a list tried in order. */
 export const personText = (p: PersonSpec): string =>
   typeof p === "string" ? code(p) : p.map(code).join(", else ");

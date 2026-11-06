@@ -296,12 +296,12 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} commented on {{ticket}}. Read the comment and act on it.
+{{actor.id}} commented on {{ticket}}. Read the comment and act on it. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.
 ```
 
 ### ticket_comment_to_mentioned_agent
 
-A comment on a ticket, by a human or another agent, wakes the agent it mentions first, to answer or act on it; the ticket stays with its assignee. An agent's comment that mentions no other agent wakes no one.
+A comment on a ticket, by a human or another agent, wakes the agent it mentions first, to answer or act on it; the ticket stays with its assignee. A human's mention wakes it on a closed ticket too; an agent's comment on a closed ticket, or one that mentions no other agent, wakes no one.
 
 Listens to `ticket.commented`. Decides: wake `mentioned` (kind `asked`).
 
@@ -310,14 +310,16 @@ When:
 - all of:
   - not:
     - `actor_kind: automation`
-  - not:
-    - `ticket_status: done, canceled`
+  - any of:
+    - `actor_kind: human`
+    - not:
+      - `ticket_status: done, canceled`
   - `agent_mentioned: true`
 
 Instruction:
 
 ```text
-{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over.
+{{actor.id}} mentioned you in a comment on {{ticket}}. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. A teammate's mention starts no new work: when an agent mentioned you, file no ticket and open no pull request for it (both are refused); propose the work to a trusted human on the ticket instead. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.
 ```
 
 ### ticket_comment_to_blocked_agent
@@ -367,7 +369,7 @@ When:
 Instruction:
 
 ```text
-{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work.
+{{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it.
 ```
 
 ### moved_active_to_assignee

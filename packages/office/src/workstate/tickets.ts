@@ -73,6 +73,14 @@ const eventAt = (event?: WorkflowEvent): string | undefined => {
   return typeof at === "string" && at !== "" ? at : undefined;
 };
 
+/**
+ * When a status the read finds was entered: the time of the move that set it, or of the event the ticket is first seen
+ * with, else the tracker's last update of the ticket. Any other event only made the office read the ticket, and the
+ * change it finds may have come after it: a comment written just before the ticket was closed.
+ */
+const changedAt = (issue: Issue, prev?: TicketRecord, event?: WorkflowEvent): string =>
+  (event?.type === "ticket.moved" || !prev?.status ? eventAt(event) : undefined) ?? issue.updatedAt;
+
 /** Ticket records: read from the tracker, saved, and forgotten when the tracker no longer has them. */
 export function createTickets(core: WorkstateCore): TicketOps {
   const {
@@ -126,12 +134,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
       title: issue.title,
       url: issue.url,
       ...(status ? { status } : {}),
-      ...statusSince(
-        prev,
-        status,
-        eventAt(event) ?? issue.updatedAt,
-        event?.type === "ticket.moved",
-      ),
+      ...statusSince(prev, status, changedAt(issue, prev, event), event?.type === "ticket.moved"),
       ...priorityOf(issue),
       ...(assignee ? { assignee } : {}),
       labels: [...issue.labels],

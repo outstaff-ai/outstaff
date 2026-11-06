@@ -1,4 +1,5 @@
 import type { RepoRef } from "#/ports/types.js";
+import { statusAt } from "./status-at.js";
 import type { PrRef, StaticWorkflowData, WorkflowState } from "./types.js";
 
 const k = (r: PrRef) => `${r.repo.owner}/${r.repo.name}#${r.number}`;
@@ -9,6 +10,7 @@ export function createStaticWorkflowState(data: StaticWorkflowData): WorkflowSta
   return {
     ticketForPr: (pr) => data.links?.[pr.number],
     ticketStatus: (t) => data.tickets?.[t]?.status,
+    ticketStatusAt: (t, at) => statusAt(data.tickets?.[t], at),
     assignee: (t) => data.tickets?.[t]?.assignee,
     pullRequest: (pr) => prs.find((p) => k(p.ref) === k(pr)),
     pullRequestsOf: (t) => prs.filter((p) => data.links?.[p.ref.number] === t),
