@@ -9,6 +9,6 @@ export const policy = definePolicy({
   on: ["pr.conflicted", "pr.behind_base", "pr.base_merged"],
   when: AGENT_PR_OPEN,
   instruction:
-    "Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one.",
+    "Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one.",
   ...wakes({ person: "author", kind: "rebase" }),
 });

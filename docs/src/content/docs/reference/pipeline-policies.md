@@ -171,7 +171,7 @@ When:
 Instruction:
 
 ```text
-Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one.
+Your pull request #{{pr.number}} ({{pr.title}}) {{pr.problem}}{{cause}}. Bring it up to date with `{{pr.base}}` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one.
 ```
 
 ### ci_failed_to_author
