@@ -1654,12 +1654,16 @@ export async function* mergeChecksFailed(ctx: ItemContext): Script {
   const url = need(check.url, "the failed check's link");
   const more = yield { type: "tool", tool: "ci_log", input: { url, lines: 50 } };
   const cause = /^ {2}(error: .*)$/m.exec(more)?.[1] ?? "see the log";
+  // The code host's CLI, through the wrapper's per-call token: re-run the failed run; a merge with it is refused.
+  const run = need(/\/actions\/runs\/(\d+)\//.exec(url)?.[1], "the check's workflow run");
+  yield { type: "shell", command: `gh run rerun ${run}`, cwd };
+  yield* mustBeDenied(`gh pr merge ${number} --merge`, cwd);
   yield {
     type: "tool",
     tool: "ticket_comment",
     input: {
       key,
-      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}`,
+      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}. gh run rerun ${run}: requested.`,
     },
   };
 

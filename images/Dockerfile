@@ -156,9 +156,9 @@ FROM agent AS agent-e2e
 # Its CMD, the e2e bin, carries the scripted runtime too; `ost-agent --runtimes` here still lists the agent's own.
 LABEL work.outstaff.runtimes="claude-agent-sdk scripted"
 COPY --from=builder-e2e /out/e2e /opt/outstaff-e2e
-# The developer toolset's pnpm, installed now because the test downloads nothing at start. The agent still writes
-# the global mise config at start, which is what makes the shim work in the worktree.
-RUN mise install pnpm@12.9.1
+# The developer toolset's pnpm and the team's gh, installed now because the test downloads nothing at start. The agent
+# still writes the global mise config at start, which is what makes the shims work in the worktree.
+RUN mise install pnpm@12.9.1 gh@2.103.3
 CMD ["node", "/opt/outstaff-e2e/dist/bin.js"]
 
 # Stand-ins for GitHub (API and git remote) and the tracker, served by the shared vendor stand-ins (testing/*).

@@ -9,7 +9,7 @@ import { loadCatalogs, loadToolsets } from "./catalogs.js";
 import { startChat } from "./startup-chat.js";
 import { loadStartupContext, officeConnection } from "./startup-context.js";
 import { createRuntime, runtimeAdapter, writeWorkdirFiles } from "./startup-runtime.js";
-import { buildPolicies, renderWorkdir } from "./startup-steps.js";
+import { buildPolicies, installHostCli, renderWorkdir } from "./startup-steps.js";
 import {
   agentWorkspaces,
   cloneRepositories,
@@ -57,6 +57,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   // Person beats team beats toolset. Installing a tool allows nothing; its `allow` becomes policy rules below.
   const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });
   const toolStatuses = await installTools(ctx, env, tools);
+  installHostCli(opts, env);
   const runtimeDef = runtimeAdapter(ctx);
   const capabilities = roleCapabilities(ctx, roles, rendered.extends, runtimeDef);
   const addDirs = prepareDirs(layout, capabilities);

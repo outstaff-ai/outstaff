@@ -1,5 +1,6 @@
 import type { RestCheckRun } from "@outstaff/integration.vcs.github";
 import type { Route } from "@outstaff/testing.http";
+import { RUN_ID } from "./actions-routes.js";
 import { branchRoutes } from "./branch-routes.js";
 import { emptyListRoutes } from "./list-routes.js";
 import { NOT_FOUND, WEB, etag } from "./model.js";
@@ -10,7 +11,7 @@ export const LOG_ORIGIN = "https://logs.github.test";
 
 /** The link of an Actions job, as GitHub gives it to the job's check run. */
 export const jobUrl = (s: GithubStore, id: number) =>
-  `${WEB}/${s.repo.owner}/${s.repo.name}/actions/runs/9/job/${id}`;
+  `${WEB}/${s.repo.owner}/${s.repo.name}/actions/runs/${RUN_ID}/job/${id}`;
 
 const checkRun = (s: GithubStore, c: StoredCheckRun): RestCheckRun => ({
   id: c.id,

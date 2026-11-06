@@ -3,12 +3,14 @@ import { commandRules } from "./builtin-rules.js";
 import { PROFILE_SPECS } from "./profiles.js";
 import type {
   BuildPolicyInput,
+  CommandRule,
   GitMode,
   Layout,
   PermissionPerson,
   PermissionTeam,
   Policy,
   ProfileSpec,
+  RulePack,
   ToolKind,
 } from "./types.js";
 
@@ -131,12 +133,28 @@ export function buildPolicy({
     },
     commands: [
       ...commandRules(),
-      ...packs.filter((p) => !p.profiles || p.profiles.includes(packsOf)).flatMap((p) => p.rules),
+      ...packRules(packs.filter((p) => !p.profiles || p.profiles.includes(packsOf))),
     ],
     git: { repos: git.repos, defaultBranches: git.defaultBranches },
     ...(spec.verbs ? { ost: { allow: [...spec.verbs] } } : {}),
     ...(artifact ? { artifact } : {}),
   };
+}
+
+/**
+ * The rules of the packs, less a tool's broad allow for a program an adapter's allow rules narrow, so declaring the
+ * adapter's CLI under `tools` installs it without widening what the adapter allows of it.
+ */
+function packRules(packs: RulePack[]): CommandRule[] {
+  const narrowed = new Set(
+    packs
+      .filter((p) => p.source === "adapter")
+      .flatMap((p) => p.rules)
+      .filter((r) => r.effect === "allow")
+      .map((r) => r.program),
+  );
+
+  return packs.flatMap((p) => p.rules).filter((r) => !(r.broad && narrowed.has(r.program)));
 }
 
 /** What the artifact tool may do: everything with `design.canvas`, reads with `design.canvas.read`, else nothing. */

@@ -17,6 +17,33 @@ export interface CredentialHelperOptions {
   profile: Profile;
 }
 
+/** Runs a program with inherited standard streams and resolves to its exit code. */
+export type ExecProgram = (
+  file: string,
+  args: string[],
+  opts: { cwd: string; env: NodeJS.ProcessEnv },
+) => Promise<number>;
+
+export interface HostCliRunnerOptions extends CredentialHelperOptions {
+  /** The environment the command inherits, before its token is added. */
+  env: NodeJS.ProcessEnv;
+
+  /** The origin URL of the repository at a directory, or undefined outside one. */
+  origin: (cwd: string) => string | undefined;
+
+  /** The path of the real program, past the wrapper; undefined when it is not installed. */
+  which: (command: string) => string | undefined;
+  exec: ExecProgram;
+
+  /** Where the runner says why it did not run the command. */
+  err: (text: string) => void;
+}
+
+export interface HostCliRunner {
+  /** Runs the code host's CLI with `args` in `cwd`, with a fresh token, and resolves to its exit code. */
+  run(args: string[], cwd: string): Promise<number>;
+}
+
 export interface CredentialHelper {
   /** Output for git on stdout. Empty when the request is not for a repo the person has a grant on. */
   run(operation: CredentialOperation, input: string): Promise<string>;

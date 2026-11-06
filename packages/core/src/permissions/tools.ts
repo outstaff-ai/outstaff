@@ -58,6 +58,7 @@ const allRule = (name: string): CommandRule => ({
   program: name,
   effect: "allow",
   reason: `${name} is declared in tools.`,
+  broad: true,
 });
 
 /** The rule of one `allow` or `deny` entry: a subcommand (one or more words), or a structured rule. */

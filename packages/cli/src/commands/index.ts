@@ -7,6 +7,7 @@ import { explainEvent } from "./explain.js";
 import { gitCredential } from "./git-credential.js";
 import { fire } from "./fire.js";
 import { hire } from "./hire.js";
+import { hostCli } from "./host-cli.js";
 import { init } from "./init.js";
 import { policies } from "./policies.js";
 import { render } from "./render.js";
@@ -36,5 +37,6 @@ export const commands: CommandDef[] = [
   policies,
   explainEvent,
   gitCredential,
+  hostCli,
   ...verbCommands,
 ];

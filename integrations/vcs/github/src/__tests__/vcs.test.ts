@@ -212,6 +212,29 @@ describe("credentials", () => {
     expect(stub.called("POST", "/app/installations/8/access_tokens")).toHaveLength(1);
   });
 
+  it("mints a CLI token with what the App is granted, on the one repository, without an author", async () => {
+    const { vcs, stub } = build(routes(), agent);
+    expect(await vcs.credentials("sam", REPO, "write", "cli")).toEqual({
+      token: "ghs_sam",
+      expiresAt: "2026-01-01T01:00:00Z",
+    });
+
+    expect(stub.called("POST", "/app/installations/8/access_tokens")[0]!.json).toEqual({
+      repositories: ["app"],
+    });
+
+    expect(stub.calls.filter((c) => c.path.startsWith("/users/"))).toHaveLength(0);
+    expect(await vcs.credentials("noor", REPO, "read", "cli")).toMatchObject({
+      token: "ghs_office",
+    });
+
+    expect(stub.called("POST", "/app/installations/7/access_tokens")[0]!.json).toEqual({
+      repositories: ["app"],
+    });
+
+    await expectPortError(vcs.credentials("noor", REPO, "write", "cli"), "forbidden");
+  });
+
   it("adds the workflows permission to the write token only when the installation has it", async () => {
     const granted = (permissions: Record<string, string>): Route =>
       ({ method: "GET", path: "/app/installations/8", handler: () => ({ permissions }) }) as Route;

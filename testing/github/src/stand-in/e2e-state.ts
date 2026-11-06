@@ -37,12 +37,13 @@ async function pullState(s: GithubStore, p: StoredPull) {
   };
 }
 
-/** What the end-to-end driver checks: main, the branches, the reactions and every pull request. */
+/** What the end-to-end driver checks: main, the branches, the reactions, the re-runs and every pull request. */
 export async function e2eState(s: GithubStore) {
   return {
     main: await s.backend.sha("main"),
     branches: await s.backend.branches(),
     reactions: s.reactions,
+    reruns: s.reruns,
     pulls: await Promise.all([...s.prs.values()].map((p) => pullState(s, p))),
   };
 }

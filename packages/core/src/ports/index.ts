@@ -72,6 +72,7 @@ export type {
 } from "./knowledge.js";
 
 export type { Check, CheckLog, CheckLogStep } from "./vcs-checks.js";
+export type { CredentialUse, HostCli } from "./vcs-cli.js";
 export type {
   ConversationEntry,
   PullRequestReview,
@@ -81,16 +82,13 @@ export type {
   PullRequestUpdate,
   Review,
   ReviewComment,
-  ReactionTarget,
-  Reaction,
   ReviewInlineComment,
   ReviewVerdict,
-  UnreadRepo,
   Vcs,
-  VcsEvent,
-  VcsEventPage,
   VcsPermission,
 } from "./vcs.js";
+
+export type { Reaction, ReactionTarget, UnreadRepo, VcsEvent, VcsEventPage } from "./vcs-events.js";
 
 export type { ReviewThread, ReviewThreadComment } from "./vcs-threads.js";
 

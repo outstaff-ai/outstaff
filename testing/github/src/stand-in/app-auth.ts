@@ -3,7 +3,7 @@ import type { StandInRequest } from "@outstaff/testing.http";
 import type { AppAuth, AppAuthOptions, TokenHolder } from "./e2e.types.js";
 
 const bearerOf = (req: StandInRequest) =>
-  (req.headers.get("authorization") ?? "").replace(/^[Bb]earer /, "");
+  (req.headers.get("authorization") ?? "").replace(/^(?:[Bb]earer|token) /, "");
 
 /** The claims of a JWT signed with the key; undefined when it is not one. */
 function claimsOf(token: string, key: KeyObject): { iss?: unknown } | undefined {
@@ -23,7 +23,7 @@ function claimsOf(token: string, key: KeyObject): { iss?: unknown } | undefined 
 
 /**
  * GitHub's App scheme: JWTs signed with the Apps' key and checked against its public half, and installation tokens
- * `ghs_<slug>_<n>` that may write when they were asked for `contents: write`.
+ * `ghs_<slug>_<n>` that may write when they were asked for `contents: write`, or for no permissions at all.
  */
 export function appAuth(opts: AppAuthOptions): AppAuth {
   const key = createPublicKey(opts.publicKey);
@@ -40,7 +40,9 @@ export function appAuth(opts: AppAuthOptions): AppAuth {
     issue(app, req) {
       const slug = opts.apps[String(app)]!;
       const token = `ghs_${slug}_${++issued}`;
-      tokens.set(token, { slug, write: req.json?.permissions?.contents === "write" });
+      // A token asked for no permissions carries all the App's, as GitHub's does; the stand-in's Apps can all write.
+      const permissions = req.json?.permissions;
+      tokens.set(token, { slug, write: !permissions || permissions.contents === "write" });
       return {
         status: 201,
         body: { token, expires_at: new Date(Date.now() + 3_600_000).toISOString() },

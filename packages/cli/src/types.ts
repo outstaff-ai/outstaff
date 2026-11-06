@@ -1,4 +1,4 @@
-import type { AgentEnv, MiseRunner, OfficeClient } from "@outstaff/agent";
+import type { AgentEnv, ExecProgram, MiseRunner, OfficeClient } from "@outstaff/agent";
 import type * as OfficeModule from "@outstaff/office";
 import type {
   AdapterRegistry,
@@ -60,6 +60,12 @@ export type Context = {
 
   /** Loads `@outstaff/office` for `ost explain`; defaults to importing it (tests only). */
   loadOffice?: () => Promise<typeof OfficeModule>;
+
+  /** Runs the code host's CLI for `ost host-cli`, with inherited standard streams; tests only. */
+  exec?: ExecProgram;
+
+  /** Finds the real code host CLI past the wrapper for `ost host-cli`; tests only. */
+  which?: (command: string) => string | undefined;
 
   /** Returns the origin URL of the repository in `cwd`, or undefined. */
   gitOrigin: (cwd: string) => string | undefined;
