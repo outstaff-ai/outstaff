@@ -66,6 +66,14 @@ export const policiesSchema = z
           "Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.",
         ),
       ),
+    recheck_blocked: z
+      .boolean()
+      .default(true)
+      .meta(
+        d(
+          "Wake the PM on a blocked ticket when something it may wait on happened: a check that failed on the merge commit of its pull request passes on a later commit of the default branch while its work goes on, one of several tickets linked as its blockers closes, or the human it is assigned to writes about it on another ticket. The PM checks whether the block still holds, and unblocks or closes the ticket with a comment when it does not. At most once per ticket and cause in 24 hours. Default on.",
+        ),
+      ),
     retry: z
       .strictObject({
         base_minutes: z

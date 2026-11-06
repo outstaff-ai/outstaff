@@ -70,6 +70,15 @@ describe("configurePipeline", () => {
     expect(byId(off.policies, "idle_pulls_next").enabled).toBe(false);
   });
 
+  it("follows policies.recheck_blocked for the PM's look at a block that may have cleared", () => {
+    expect(byId(configurePipeline(team()).policies, "blocked_maybe_resolved_to_pm").enabled).toBe(
+      true,
+    );
+
+    const off = configurePipeline(team({ policies: { recheck_blocked: false } }));
+    expect(byId(off.policies, "blocked_maybe_resolved_to_pm").enabled).toBe(false);
+  });
+
   it("turns policies on and off, narrows them and replaces wake instructions", () => {
     const { policies, issues } = configurePipeline(
       team({

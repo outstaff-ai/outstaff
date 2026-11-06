@@ -133,6 +133,7 @@ describe("parseTeamConfig", () => {
       tickets: { prs_per_ticket: "one" },
       notify_handoff: true,
       pull_ready: true,
+      recheck_blocked: true,
       merge: { on_approval: false, approvers: ["humans"] },
       merge_checks: { wait_for_start_minutes: 5, timeout_minutes: 120, settle_minutes: 2 },
       retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },

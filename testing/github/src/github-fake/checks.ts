@@ -31,6 +31,7 @@ export function seedCheck(s: GithubStore, sha: string, c: SeedCheck) {
     status: c.status === "pending" ? "in_progress" : "completed",
     conclusion: CONCLUSION[c.status] ?? null,
     ...(c.log ? { job: true } : {}),
+    ...(c.workflow ? { workflow: c.workflow } : {}),
   };
 
   if (c.log) {

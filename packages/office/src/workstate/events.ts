@@ -11,6 +11,7 @@ import type {
   UnblockOps,
   WorkstateCore,
 } from "./core.types.js";
+import type { BlockNudges } from "./block-nudges.types.js";
 import { openPrs } from "./derive.js";
 import { isOpen } from "./open.js";
 
@@ -40,7 +41,13 @@ function verdictOf(event: WorkflowEvent, review: string | undefined): PrVerdict 
 /** Applies events to the records, and delivers the synthetic events that raises. */
 export function createEvents(
   core: WorkstateCore,
-  ops: TicketOps & UnblockOps & PrOps & RequesterOps & DocOps & MergeCheckOps,
+  ops: TicketOps &
+    UnblockOps &
+    PrOps &
+    RequesterOps &
+    DocOps &
+    MergeCheckOps &
+    Pick<BlockNudges, "onComment">,
 ) {
   const { store, logger, handlers, prSubject } = core;
   const {
@@ -51,6 +58,7 @@ export function createEvents(
     recordCommentRequester,
     touchDoc,
     followMerges,
+    onComment,
   } = ops;
 
   const deliver = async (list: Fresh[]) => {
@@ -124,6 +132,7 @@ export function createEvents(
     await refreshAndUnblock(ctx, ticket, { event });
     if (event.type === "ticket.commented") {
       await recordCommentRequester(ticket, event);
+      await onComment(ctx, event);
     }
   };
 

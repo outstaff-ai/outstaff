@@ -1639,6 +1639,14 @@ Let an agent with nothing queued or running start its next ready ticket: assigne
 - Optional
 - Default: `true`
 
+### policies.recheck_blocked
+
+Wake the PM on a blocked ticket when something it may wait on happened: a check that failed on the merge commit of its pull request passes on a later commit of the default branch while its work goes on, one of several tickets linked as its blockers closes, or the human it is assigned to writes about it on another ticket. The PM checks whether the block still holds, and unblocks or closes the ticket with a comment when it does not. At most once per ticket and cause in 24 hours. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
 ### policies.retry
 
 How a failing work item is retried: exponential backoff, then blocked.

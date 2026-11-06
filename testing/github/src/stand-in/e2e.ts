@@ -46,6 +46,7 @@ function jobCheck(s: GithubStore, sha: string, c: DriverCheck) {
     status: "completed",
     conclusion: c.conclusion,
     job: true,
+    workflow: c.workflow ?? "CI",
     html_url: `https://github.acme.example/${s.repo.owner}/${s.repo.name}/actions/runs/${RUN_ID}/job/${id}`,
   };
 

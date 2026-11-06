@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { OFFICE, judge, onPr, prWorld, HUMAN_AUTHOR, pr, t, type World } from "./support.js";
+import {
+  OFFICE,
+  judge,
+  onPr,
+  prWorld,
+  HUMAN_AUTHOR,
+  pr,
+  t,
+  traceOf,
+  type World,
+} from "./support.js";
 
 const merged = onPr("pr.merge_checks_passed", {}, OFFICE);
 
@@ -11,6 +21,56 @@ const humans = (ticket: ReturnType<typeof t>, more: Partial<World> = {}): World 
 });
 
 describe("merged_closes_ticket", () => {
+  it("closes a blocked ticket held by a human once its failed checks pass later, saying where", () => {
+    const later = onPr(
+      "pr.merge_checks_passed",
+      {
+        sha: "f00",
+        base: "main",
+        recoveredOn: "abc1234def",
+        recovered: [{ name: "deploy", url: "https://ci.acme.example/deploy" }, { url: "x" }],
+      },
+      OFFICE,
+    );
+
+    const world = {
+      ...prWorld({ state: "merged" }),
+      tickets: { "ACME-9": t("blocked", "ada-admin") },
+    };
+
+    expect(judge("merged_closes_ticket", later, world)).toEqual([
+      "act for sam: move ACME-9 to done, assign ACME-9 to agent sam",
+    ]);
+
+    expect(traceOf(later, world).decisions[0]).toMatchObject({
+      note: "Moved to done: deploy passes on main at abc1234, which includes #9's merge.",
+    });
+
+    const two = onPr(
+      "pr.merge_checks_passed",
+      {
+        base: "main",
+        recoveredOn: "abc1234def",
+        recovered: [{ name: "deploy" }, { name: "smoke" }],
+      },
+      OFFICE,
+    );
+
+    expect(traceOf(two, world).decisions[0]).toMatchObject({
+      note: "Moved to done: deploy, smoke pass on main at abc1234, which includes #9's merge.",
+    });
+
+    const odd = onPr(
+      "pr.merge_checks_passed",
+      { base: "main", recoveredOn: "abc1234def", recovered: "x" },
+      OFFICE,
+    );
+
+    expect(traceOf(odd, world).decisions[0]).toMatchObject({
+      note: "Moved to done:  pass on main at abc1234, which includes #9's merge.",
+    });
+  });
+
   it("as the author, unless the merge was into another branch or another pull request is open", () => {
     expect(judge("merged_closes_ticket", merged, prWorld({ state: "merged" }))).toEqual([
       "act for sam: move ACME-9 to done",
