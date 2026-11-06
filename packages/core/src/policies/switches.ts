@@ -84,7 +84,7 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
     path: "recheck_blocked",
     default: true,
     off: false,
-    kind: "agent",
+    kind: "office",
     behaviour:
       "When something a blocked ticket may wait on happens, the office wakes the PM on it to check whether the block still holds: a check that failed on the merge commit of its pull request passes on a later commit of the default branch that contains the merge, while its work goes on (with no other work left, the ticket closes on its own); one of several tickets linked as its blockers closes (the last one wakes the blocked agent instead); or the human it is assigned to writes about it on another ticket. The PM unblocks it (back to the agent, or done when its work is done) with a comment saying why, or changes nothing when it still holds. Each ticket and cause wakes the PM at most once in 24 hours.",
   },

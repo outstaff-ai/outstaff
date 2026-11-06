@@ -167,6 +167,24 @@ describe("work state: a failed merge that passes later on the default branch", (
     expect(recovered()).toEqual([]);
   });
 
+  it("leaves a failed merge to a later merge of the same ticket, whose own checks decide it", async () => {
+    const { key } = await failedMerge();
+    clock.advance(1_000);
+    const fix = await vcs.seed.pullRequest(REPO, {
+      author: { login: SAM, kind: "agent" },
+      title: "Fix the deploy",
+      body: `Closes ${key}`,
+    });
+
+    await apply("pr.opened", fix.number);
+    const sha = (await vcs.seed.merge(REPO, fix.number, "dana")).mergeCommitSha!;
+    await vcs.seed.check(REPO, sha, { name: "deploy", status: "success", workflow: "Deploy" });
+    await apply("pr.merged", fix.number);
+    await ws.followMerges();
+    expect(recovered()).toEqual([expect.objectContaining({ number: fix.number })]);
+    expect(recovered()[0]).not.toHaveProperty("recoveredOn");
+  });
+
   it("stops following once the ticket is closed", async () => {
     await failedMerge("done");
     const later = await vcs.seed.commit!(REPO, "main");

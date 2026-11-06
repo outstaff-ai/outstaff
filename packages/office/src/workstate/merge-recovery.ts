@@ -32,13 +32,33 @@ export function recoveredBy(failing: readonly MergeCheck[], checks: readonly Che
 const unrecovered = (m: MergeChecks | undefined): m is MergeChecks =>
   m?.state === "failed" && !!m.sha && !m.recoveredOn;
 
-/** A failed merge into the default branch whose ticket is still open: a later commit may make up for it. */
+/** Another pull request of the ticket merged into the same branch after this one: its own checks decide the ticket. */
+const mergedSince = (core: WorkstateCore, rec: PrRecord, since: string) =>
+  [...core.prs.values()].some(
+    (p) =>
+      p !== rec &&
+      p.ticket === rec.ticket &&
+      p.baseRef === rec.baseRef &&
+      p.mergeChecks !== undefined &&
+      Date.parse(p.mergeChecks.since) > Date.parse(since),
+  );
+
+/**
+ * A failed merge into the default branch whose ticket is still open, and that no later merge of the ticket replaced: a
+ * later commit may make up for it.
+ */
 function followed(
   core: WorkstateCore,
   rec: PrRecord,
 ): rec is PrRecord & { mergeChecks: MergeChecks } {
   const ticket = rec.ticket ? core.tickets.get(rec.ticket) : undefined;
-  return unrecovered(rec.mergeChecks) && !rec.goneAt && !!rec.ticket && !isTerminal(ticket?.status);
+  return (
+    unrecovered(rec.mergeChecks) &&
+    !rec.goneAt &&
+    !!rec.ticket &&
+    !isTerminal(ticket?.status) &&
+    !mergedSince(core, rec, rec.mergeChecks.since)
+  );
 }
 
 /**
