@@ -3,6 +3,11 @@ import type { GithubHttp } from "./http.js";
 import type { AppCredentials, InstallationToken, TokenScope } from "./types.js";
 import { signAppJwt } from "./jwt.js";
 
+interface InstallationDetails {
+  account?: { login: string } | null;
+  permissions?: Record<string, string>;
+}
+
 /** How long a read of an installation's granted permissions is reused. */
 const PERMISSIONS_TTL_MS = 10 * 60_000;
 
@@ -15,6 +20,7 @@ export class AppAuth {
   private readonly tokens = new Map<string, InstallationToken>();
   private readonly granted = new Map<string, { at: number; permissions: Record<string, string> }>();
   private slugPromise: Promise<string> | undefined;
+  private pinnedPromise: Promise<string> | undefined;
 
   constructor(
     private readonly http: GithubHttp,
@@ -39,12 +45,33 @@ export class AppAuth {
     return this.slugPromise;
   }
 
+  /**
+   * The lower-case account the pinned installation is on (`GET /app/installations/{id}`), read once. The answer also
+   * seeds the granted permissions, so the common single-account path makes no second request for them.
+   */
+  private pinnedAccount(id: string): Promise<string> {
+    this.pinnedPromise ??= this.http
+      .request<InstallationDetails>("GET", `/app/installations/${id}`, { token: this.jwt() })
+      .then((r) => {
+        this.granted.set(id, { at: this.now().getTime(), permissions: r.data.permissions ?? {} });
+        return r.data.account?.login.toLowerCase() ?? "";
+      });
+
+    this.pinnedPromise.catch(() => (this.pinnedPromise = undefined));
+    return this.pinnedPromise;
+  }
+
+  /**
+   * The installation for `owner`. A pinned installation serves only the account it is on; another owner's
+   * installation (repositories can span accounts) is looked up and remembered.
+   */
   async installationId(owner: string): Promise<string> {
-    if (this.creds.installationId) {
-      return this.creds.installationId;
+    const key = owner.toLowerCase();
+    const pinned = this.creds.installationId;
+    if (pinned && (await this.pinnedAccount(pinned)) === key) {
+      return pinned;
     }
 
-    const key = owner.toLowerCase();
     const known = this.installations.get(key);
     if (known) {
       return known;
@@ -75,11 +102,9 @@ export class AppAuth {
     }
 
     try {
-      const res = await this.http.request<{ permissions?: Record<string, string> }>(
-        "GET",
-        `/app/installations/${id}`,
-        { token: this.jwt() },
-      );
+      const res = await this.http.request<InstallationDetails>("GET", `/app/installations/${id}`, {
+        token: this.jwt(),
+      });
 
       const permissions = res.data.permissions ?? {};
       this.granted.set(id, { at: this.now().getTime(), permissions });

@@ -5,6 +5,7 @@ export {
   build,
   clock,
   expectPortError,
+  installationRoute,
   officeSecrets,
   ownSecrets,
   secretMap,

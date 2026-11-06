@@ -10,6 +10,7 @@ import {
   build,
   clock,
   expectPortError,
+  installationRoute,
   officeSecrets,
   ORIGIN,
   ownSecrets,
@@ -66,7 +67,11 @@ describe("app authentication", () => {
     const file = join(dir, "app.pem");
     writeFileSync(file, testKey.privateKey);
     const { vcs, stub } = build(
-      [...appRoutes(), { method: "GET", path: "/repos/acme/app/pulls/1", handler: () => pull() }],
+      [
+        ...appRoutes(),
+        installationRoute(7),
+        { method: "GET", path: "/repos/acme/app/pulls/1", handler: () => pull() },
+      ],
       {
         GH_OFFICE_APP_ID: "100",
         GH_OFFICE_APP_PRIVATE_KEY_FILE: file,
@@ -163,6 +168,7 @@ describe("credentials", () => {
       handler: (r) => ({ id: r.params["login"] === "acme-sam[bot]" ? 4242 : 0 }),
     },
     ...extra,
+    installationRoute(8),
   ];
 
   const appId = (r: { headers: Headers }) =>
@@ -832,6 +838,7 @@ describe("review threads", () => {
       const auth: string[] = [];
       const routes: Route[] = [
         ...appRoutes(),
+        installationRoute(8),
         {
           method: "POST",
           path: "/app/installations/8/access_tokens",

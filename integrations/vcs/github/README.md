@@ -74,6 +74,8 @@ Installation tokens are cached and reused until five minutes before they expire.
 
 `secrets("person", { team, person })` lists the set that person needs (see above), `secrets("person")` both sets, `secrets("office")` only the office set.
 
+An `*_INSTALLATION_ID` is the App's installation on one account that owns team repositories. Repositories can belong to several accounts: make the App public and install it on each account with only the repositories it needs there. The pinned id is used only for its own account (learned once from `GET /app/installations/{id}`); the installation on any other account is looked up with `GET /app/installations` and remembered. Without a pinned id, every account is looked up.
+
 | Key                                                            | Scope          | Meaning                                               | Derivable                                                    |
 | -------------------------------------------------------------- | -------------- | ----------------------------------------------------- | ------------------------------------------------------------ |
 | `GH_APP_ID`                                                    | person         | numeric id of the person's own App                    | no                                                           |

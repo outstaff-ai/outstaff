@@ -5,7 +5,8 @@ import { call } from "./api.js";
 import { bad, ok } from "./findings.js";
 import { permissionChecks } from "./permissions.js";
 import { repositoryChecks } from "./repositories.js";
-import type { AppExpectation, Installation } from "./types.js";
+import { reposByOwner, resolveAccounts } from "./accounts.js";
+import type { AccountInstallation, AppExpectation, Installation } from "./types.js";
 import { workflowRepos, workflowsCheck } from "./workflows.js";
 
 /** Signs the App's JWT from its stored id and key; findings instead when the key is unusable, none when either is unset. */
@@ -96,12 +97,46 @@ function identityCheck(want: AppExpectation, slug: string): DoctorCheck[] {
   return [ok(`${label}: identity`, `identities.vcs matches ${login}.`)];
 }
 
-/** The account the installation is on, when that is not the owner of the team repositories. */
-function foreignAccount(owners: Set<string>, inst: Installation): string | undefined {
-  const account = inst.account?.login.toLowerCase();
-  return account && owners.size > 0 && !owners.has(account) ? account : undefined;
+/** Permissions, workflows and repository coverage of the App's installation on one account. */
+async function accountChecks(
+  ctx: DeriveContext,
+  jwt: string,
+  inst: AccountInstallation,
+  slug: string,
+): Promise<DoctorCheck[]> {
+  const { want, id, data } = inst;
+  const granted = data.permissions ?? {};
+  const repos = await workflowRepos(ctx, jwt, id, want);
+  const { checks, writes } = permissionChecks({ ...want, workflowRepos: repos }, granted);
+  return [
+    ...checks,
+    ...workflowsCheck(want, slug, granted, repos),
+    ...(await repositoryChecks(ctx, jwt, id, want, data.repository_selection, writes)),
+  ];
 }
 
+/** Whether the pinned installation is on an account that owns repositories of `want`, naming the account. */
+function pinnedCheck(want: AppExpectation, account: string): DoctorCheck {
+  const { prefix, label } = want;
+  const owners = [...reposByOwner(want).keys()];
+  if (owners.length > 0 && !owners.includes(account)) {
+    return bad(
+      "fail",
+      `${label}: installation`,
+      `${prefix}INSTALLATION_ID belongs to "${account}" but the repositories are owned by ${owners.join(", ")}.`,
+      "Pin the installation on an account that owns the repositories (clear it and run `ost setup --derive`); the App's installations on the other accounts are looked up.",
+      `${prefix}INSTALLATION_ID`,
+    );
+  }
+
+  return ok(
+    `${label}: installation`,
+    `${prefix}INSTALLATION_ID is an installation of the App on ${account || "an unknown account"}.`,
+    `${prefix}INSTALLATION_ID`,
+  );
+}
+
+/** The pinned installation, then the App's installation on every account that owns repositories of `want`. */
 async function installationChecks(
   ctx: DeriveContext,
   jwt: string,
@@ -123,38 +158,21 @@ async function installationChecks(
         "fail",
         `${label}: installation`,
         `${prefix}INSTALLATION_ID is "${installationId}" but GitHub answered ${inst.status} for that installation of ${slug}.`,
-        "Install the App on the team's account, then run `ost setup --derive` or copy the number from the installation URL.",
+        "Install the App on the account that owns the repositories, then run `ost setup --derive` or copy the number from the installation URL.",
         `${prefix}INSTALLATION_ID`,
       ),
     ];
   }
 
-  const owners = new Set(want.repos.map((r) => r.split("/")[0]!));
-  const account = foreignAccount(owners, inst.data);
-  if (account) {
-    return [
-      bad(
-        "fail",
-        `${label}: installation`,
-        `${prefix}INSTALLATION_ID belongs to "${account}" but the repositories are owned by ${[...owners].join(", ")}.`,
-        "Use the installation on the account that owns the team repositories.",
-        `${prefix}INSTALLATION_ID`,
-      ),
-    ];
+  const account = inst.data.account?.login.toLowerCase() ?? "";
+  const pinned = { account, id: installationId, data: inst.data, want };
+  const { accounts, findings } = await resolveAccounts(ctx, jwt, want, slug, pinned);
+  const out = [pinnedCheck(want, account), ...findings];
+  for (const one of accounts) {
+    out.push(...(await accountChecks(ctx, jwt, one, slug)));
   }
 
-  const granted = inst.data.permissions ?? {};
-  const repos = await workflowRepos(ctx, jwt, installationId, want);
-  const withWorkflows = { ...want, workflowRepos: repos };
-
-  const { checks, writes } = permissionChecks(withWorkflows, granted);
-  const selection = inst.data.repository_selection;
-  return [
-    ok(`${label}: installation`, `${prefix}INSTALLATION_ID is an installation of the App.`),
-    ...checks,
-    ...workflowsCheck(want, slug, granted, repos),
-    ...(await repositoryChecks(ctx, jwt, installationId, want, selection, writes)),
-  ];
+  return out;
 }
 
 export async function checkApp(

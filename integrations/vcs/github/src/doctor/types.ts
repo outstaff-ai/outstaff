@@ -1,4 +1,7 @@
+import type { DoctorCheck } from "@outstaff/core";
+
 export interface Installation {
+  id?: number;
   account?: { login: string } | null;
   repository_selection?: "all" | "selected";
   permissions?: Record<string, string>;
@@ -38,4 +41,21 @@ export interface AppExpectation {
 
   /** The bot login the team file names for this App. */
   login?: string;
+}
+
+/** The App's installation on one account that owns repositories of the expectation, narrowed to those. */
+export interface AccountInstallation {
+  /** Lower-case login of the account. */
+  account: string;
+  id: string;
+  data: Installation;
+
+  /** The expectation for this account alone: its repositories, and a label naming it when there are several. */
+  want: AppExpectation;
+}
+
+/** The installations the doctor checks, and the findings from finding them. */
+export interface Resolved {
+  accounts: AccountInstallation[];
+  findings: DoctorCheck[];
 }

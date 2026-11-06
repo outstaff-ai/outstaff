@@ -3,6 +3,7 @@ import {
   appRoutes,
   build,
   expectPortError,
+  installationRoute,
   officeSecrets,
   ownSecrets,
   REPO,
@@ -53,6 +54,7 @@ function setup(person: string, over: { pull?: Record<string, unknown>; threads?:
 
   const routes: Route[] = [
     ...appRoutes(),
+    installationRoute(8),
     {
       method: "POST",
       path: "/app/installations/8/access_tokens",
@@ -266,6 +268,7 @@ describe("opening and updating pull requests", () => {
     const { vcs } = build(
       [
         ...appRoutes(),
+        installationRoute(8),
         {
           method: "POST",
           path: "/app/installations/8/access_tokens",

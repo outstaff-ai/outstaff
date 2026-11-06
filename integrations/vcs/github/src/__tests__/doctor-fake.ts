@@ -40,25 +40,61 @@ interface Fake {
 
   /** Repositories (`owner/name`) that have a `.github/workflows/` directory. */
   workflows?: string[];
+
+  /** The App's installations on other accounts, as `GET /app/installations` lists them; a status fails the list. */
+  others?: Other[] | { status: number };
+}
+
+interface Other {
+  id: number;
+
+  /** Null for an installation GitHub lists without an account. */
+  account: string | null;
+  selection?: string;
+  permissions?: object;
+  repos?: string[];
 }
 
 export const json = (status: number, body: unknown): Response =>
   new Response(JSON.stringify(body), { status });
 
-/** The App id is in the JWT's iss claim; installation tokens carry the id. */
-function appIdOf(init?: RequestInit): string {
+/** The App id is in the JWT's iss claim; installation tokens (`tok-<app>-<installation>`) carry both ids. */
+function idsOf(init?: RequestInit): { iss: string; installation?: number } {
   const auth = String((init!.headers as Record<string, string>)["authorization"]);
   const jwt = auth.replace("Bearer ", "");
-  return jwt.startsWith("tok-")
-    ? jwt.slice(4)
-    : JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()).iss;
+  if (jwt.startsWith("tok-")) {
+    const [, iss, installation] = jwt.split("-");
+    return { iss: iss!, installation: Number(installation) };
+  }
+
+  return { iss: JSON.parse(Buffer.from(jwt.split(".")[1]!, "base64url").toString()).iss };
+}
+
+const othersOf = (a: Fake): Other[] => (Array.isArray(a.others) ? a.others : []);
+
+const otherReply = (o: Other) => ({
+  id: o.id,
+  account: o.account === null ? null : { login: o.account },
+  repository_selection: o.selection ?? "selected",
+  permissions: o.permissions ?? OFFICE,
+});
+
+function listReply(a: Fake): Response {
+  return Array.isArray(a.others) || !a.others
+    ? json(200, othersOf(a).map(otherReply))
+    : json(a.others.status, {});
 }
 
 function appReply(a: Fake, iss: string): Response {
   return a.app?.status ? json(a.app.status, {}) : json(200, { slug: a.app?.slug ?? `acme-${iss}` });
 }
 
-function installationReply(a: Fake): Response {
+function installationReply(a: Fake, path: string): Response {
+  const other = othersOf(a).find((o) => path.endsWith(`/${o.id}`));
+  if (other) {
+    return json(200, otherReply(other));
+  }
+
   const i = a.installation ?? {};
   return i.status
     ? json(i.status, {})
@@ -76,15 +112,27 @@ function workflowsReply(a: Fake, path: string): Response {
   return (a.workflows ?? []).includes(repo) ? json(200, []) : json(404, {});
 }
 
-const ROUTES: [(path: string) => boolean, (a: Fake, iss: string, path: string) => Response][] = [
-  [(path) => path === "/app", appReply],
-  [(path) => /^\/app\/installations\/\d+$/.test(path), installationReply],
-  [(path) => path.endsWith("/access_tokens"), (_a, iss) => json(201, { token: `tok-${iss}` })],
+/** The repositories of the installation the token was minted for. */
+function reposReply(a: Fake, installation?: number): Response {
+  const repos = othersOf(a).find((o) => o.id === installation)?.repos ?? a.repos ?? [];
+  return json(200, { repositories: repos.map((full_name) => ({ full_name })) });
+}
+
+type Ids = ReturnType<typeof idsOf>;
+
+const ROUTES: [(path: string) => boolean, (a: Fake, ids: Ids, path: string) => Response][] = [
+  [(path) => path === "/app", (a, ids) => appReply(a, ids.iss)],
+  [(path) => path === "/app/installations", (a) => listReply(a)],
   [
-    (path) => path === "/installation/repositories",
-    (a) => json(200, { repositories: (a.repos ?? []).map((full_name) => ({ full_name })) }),
+    (path) => /^\/app\/installations\/\d+$/.test(path),
+    (a, _ids, path) => installationReply(a, path),
   ],
-  [(path) => WORKFLOWS.test(path), (a, _iss, path) => workflowsReply(a, path)],
+  [
+    (path) => path.endsWith("/access_tokens"),
+    (_a, ids, path) => json(201, { token: `tok-${ids.iss}-${path.split("/")[3]}` }),
+  ],
+  [(path) => path === "/installation/repositories", (a, ids) => reposReply(a, ids.installation)],
+  [(path) => WORKFLOWS.test(path), (a, _ids, path) => workflowsReply(a, path)],
 ];
 
 /** A fake GitHub for the doctor tests: the App, installation and contents endpoints, answered per App id. */
@@ -93,9 +141,9 @@ export function fake(apps: Record<string, Fake>) {
   const impl = (async (url: string | URL, init?: RequestInit) => {
     const path = new URL(String(url)).pathname;
     calls.push(`${init?.method ?? "GET"} ${path}`);
-    const iss = appIdOf(init);
+    const ids = idsOf(init);
     const reply = ROUTES.find(([matches]) => matches(path))?.[1];
-    return reply ? reply(apps[iss] ?? {}, iss, path) : json(404, {});
+    return reply ? reply(apps[ids.iss] ?? {}, ids, path) : json(404, {});
   }) as typeof fetch;
 
   return { impl, calls };

@@ -8,6 +8,7 @@ import {
   build,
   clock,
   expectPortError,
+  installationRoute,
   officeSecrets,
   ownSecrets,
   REPO,
@@ -70,6 +71,7 @@ const agentRoutes = (extra: Route[] = [], ownToken?: Route["handler"]): Route[] 
       (() => ({ status: 201, body: { token: "ghs_own", expires_at: "2026-01-01T01:00:00Z" } })),
   },
   ...extra,
+  installationRoute(8),
 ];
 
 describe("default clock for the mergeable backoff", () => {
