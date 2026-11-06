@@ -4115,8 +4115,8 @@ async function staleBlockResolves() {
     [parent, done.p],
   ] as const) {
     assertEq(
-      t.moves.filter((m: Json) => m.to === "Done").map((m: Json) => m.by),
-      ["sam"],
+      JSON.stringify(t.moves.filter((m: Json) => m.to === "Done").map((m: Json) => m.by)),
+      JSON.stringify(["sam"]),
       `${key} was closed once, by sam, with no human action`,
     );
   }
