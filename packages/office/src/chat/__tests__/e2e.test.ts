@@ -198,10 +198,12 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     conn.onActs((list) => void acts.make(list));
   });
 
+  // The connection goes first: a request the clock jump left unanswered waits for a reconnect the frozen clock never
+  // makes, and only a stopped connection gives it up.
   afterEach(async () => {
+    await conn.stop();
     await loop?.stop();
     await relay.stop();
-    await conn.stop();
     await running;
     await office.stop();
   });
@@ -556,9 +558,9 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       expect(officeChat.posts).toEqual([]);
       expect(agentChat.posts).toEqual([]);
 
+      await conn.stop();
       await loop?.stop();
       await relay.stop();
-      await conn.stop();
       const back = createOfficeConnection({
         url: `ws://127.0.0.1:${office.agentPort()}/agent`,
         person: "sam",
