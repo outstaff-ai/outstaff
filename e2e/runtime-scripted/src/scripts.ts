@@ -1566,6 +1566,37 @@ async function* ciStillFails(
   return `Fixing CI on PR #${number}.`;
 }
 
+/**
+ * "Why does the deploy still fail?": a round of the agent's own already fixes the failed checks of a merge (the wake
+ * context lists it), so the request is attached to that round's ticket, which stays open, and no ticket is filed.
+ * Undefined for any other message, or when no such round is listed.
+ */
+async function* deployStillFails(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const round = /^why does the deploy still fail/i.test(latest)
+    ? ctx.work?.find((w) => w.kind === "merge_checks_failed" && w.ticket)
+    : undefined;
+
+  if (!round) {
+    return undefined;
+  }
+
+  yield {
+    type: "tool",
+    tool: "work_attach",
+    input: {
+      target: round.ticket,
+      confirmed: true,
+      request: latest,
+      say: "My round on the failed deploy is already queued; it fixes it.",
+    },
+  };
+
+  return `Attached to ${round.ticket}: the ${round.kind} round ${round.id} is ${round.status}.`;
+}
+
 /** What the chat message asks of the work: a pull request's status, a reply about work, or a change to file. */
 async function* aboutWork(
   ctx: ItemContext,
@@ -1579,6 +1610,11 @@ async function* aboutWork(
 
   if (ctx.about) {
     return yield* replyAboutWork(ctx, talk, latest);
+  }
+
+  const queued = yield* deployStillFails(ctx, latest);
+  if (queued !== undefined) {
+    return queued;
   }
 
   const fix = yield* ciStillFails(ctx, latest);
