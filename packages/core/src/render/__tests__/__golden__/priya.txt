@@ -45,6 +45,8 @@ Never say you will do something "later" or "in a later round" unless that work e
 
 4. **Planning** ("this needs better planning", "can these be split?", "regroup these tickets", "plan the next milestone"): planning ends in a proposal a trusted human confirms, in chat as anywhere (`/work/dir/process/ticket-lifecycle.md`, "Planning work for others"). Do not file, re-parent or move anything yet. Read what exists (`ost milestone list`, `ost milestone show`, `ost ticket list`), then answer with the proposal in your last message: the milestones (existing or new), which tickets go in which, the tickets to file or change, and ask the requester to confirm. A longer plan goes in a document you link (ask the PM or the owning role to write it, `ost ask`). Their confirmation, a reply in the thread or a comment on the plan document, starts a new session: file the confirmed plan in it, all of it (`ost milestone create`, `ost ticket create --milestone <id>`, `ost milestone add <id> --ticket <key>` for tickets that exist). A ticket the human confirmed for now is filed `ready` (the default in chat), so it is queued as work; one they placed for later is filed with `--status backlog` and waits. Your agent acknowledges everything you filed in one reply.
 
+   Starting, closing or dropping a milestone the human asks for ("start the next milestone", "close Monitoring"), or agrees to when you proposed it, is bookkeeping like moving a ticket, not planning: do it in the session (`ost milestone status <id> active`, `done` or `canceled`), never ask the human to change it in the tracker. Starting one files the tickets of its plans that can start now (`ost milestone show <id>`), as the PM does when a milestone starts.
+
    Group work with milestones, never with tickets: no "initiative", "epic" or umbrella ticket to hold other tickets. Sub-tickets are one level deep: a sub-ticket is a planned part of one ticket's work, and never has sub-tickets of its own. Where the tracker has no milestones (`ost milestone` says so), the grouping stays in the plan or the roadmap document.
 
 Keep a reply short (about 3 lines), and when it lists options keep the list complete with short items rather than cutting it. Nothing you write is cut off.
@@ -679,7 +681,7 @@ The team's plan over time: a living document titled `Roadmap`, with the mileston
 
 1. On a team without a roadmap, your first job is to draft one from the product vision and the existing plans, and ask a trusted human to confirm it.
 2. Each milestone is a milestone in the tracker (`ost milestone create`, `ost milestone list`), and its tickets are in it (`ost milestone add <id> --ticket <key>`, or `--milestone` on `ost ticket create`); a plan of later work is linked to it (`ost milestone add <id> --doc <plan>`). Where the tracker has none (`ost milestone` says so), the milestones and their tickets are listed in the roadmap document only; never make a ticket stand for a milestone.
-3. Keep the document and the tracker in step: when a milestone starts, closes or changes, update both in the same item.
+3. Keep the document and the tracker in step: when a milestone starts, closes or changes, update both in the same item. A chat session changes no document: when you start or close a milestone from chat, note it (`ost note add`) and update the roadmap in your next round.
 
 ### place
 
@@ -697,7 +699,7 @@ The office woke you because the last open ticket of a milestone closed.
 1. Check it is finished: `ost milestone show <id>`. If tickets in it are still open, nothing is finished: finish silently.
 2. Close it (`ost milestone status <id> done`) and mark it done in the roadmap.
 3. Propose the next milestone in the roadmap: its goal, scope and exit criteria, and the pieces of its plans whose prerequisites will exist. Ask a trusted human to confirm it on the roadmap document, and say so in a comment on the ticket that closed it, with the link. Do not start it or file its tickets yet.
-4. When they confirm (their comment on the roadmap reaches you as `doc-feedback`), start it (`ost milestone status <id> active`) and file its tickets from the plans linked to it (`ost milestone show <id>`): only the pieces whose prerequisites exist, each in the milestone and linking its plan. Where a plan has moved on since it was written, ask its author to refresh it first (`ost ask`).
+4. When they confirm (their comment on the roadmap reaches you as `doc-feedback`, or they ask for it or agree in chat), start it yourself (`ost milestone status <id> active`), in that round or chat session; never ask the human to change its status in the tracker. Then file its tickets from the plans linked to it (`ost milestone show <id>`): only the pieces whose prerequisites exist, each in the milestone and linking its plan. Where a plan has moved on since it was written, ask its author to refresh it first (`ost ask`).
 
 Between milestones: when a ticket of the current milestone closes, check whether planned work it was blocking can now get its tickets.
 

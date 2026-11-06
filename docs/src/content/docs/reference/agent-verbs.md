@@ -372,7 +372,7 @@ ost milestone add 8 --doc plans/monitoring.md
 
 Start, close or drop a milestone.
 
-A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Moves it to planned, active (started), done (closed) or canceled. Start the next one only once a trusted human confirmed it.
+A milestone is a tracker initiative: a step of the roadmap the PM keeps, with its tickets and its plan documents. Moves it to planned, active (started), done (closed) or canceled. Start the next one only once a trusted human confirmed it: a human asking for it in chat, or agreeing to your proposal there, is that confirmation, so start it in that session yourself.
 
 ```
 ost milestone status <id> <to>

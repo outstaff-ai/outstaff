@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
 import { answerTeammate, decideTopic, decideWithPm } from "./decide.js";
-import { fileForLater, planInChat, plannedTickets } from "./plan.js";
+import { fileForLater, planInChat, plannedTickets, startNextMilestone } from "./plan.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
@@ -1643,6 +1643,7 @@ export async function* chat(ctx: ItemContext): Script {
   return (
     (yield* notes(ctx, latest)) ??
     (yield* planInChat(talk, latest)) ??
+    (yield* startNextMilestone(latest)) ??
     (yield* fileForLater(latest)) ??
     (yield* aboutWork(ctx, talk, latest))
   );
