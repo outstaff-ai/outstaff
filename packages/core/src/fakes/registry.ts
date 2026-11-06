@@ -49,6 +49,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
           "vcs.pullRequests",
           "vcs.reviewThreads",
           "vcs.workflows",
+          "vcs.ciRuns",
           "vcs.reactions",
           "vcs.merge",
         ],

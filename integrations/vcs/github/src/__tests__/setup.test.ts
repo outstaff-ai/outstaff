@@ -65,6 +65,39 @@ describe("githubSetupGuide", () => {
     expect(developer.body).not.toContain("Workflows");
   });
 
+  it("asks for Actions: write when the role re-runs CI, and never for Checks: write", () => {
+    const guide = (roleCapabilities: string[]) =>
+      githubSetupGuide({
+        team,
+        scope: "person",
+        options: {},
+        person: sam as never,
+        roleCapabilities: roleCapabilities as never,
+      })[0]!;
+
+    const roles = {
+      developer: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.ciRuns"],
+      architect: ["vcs.pullRequests", "vcs.ciRuns"],
+      devops: ["vcs.pullRequests", "vcs.workflows", "vcs.ciRuns"],
+      reviewer: ["vcs.pullRequests"],
+    };
+
+    for (const [role, caps] of Object.entries(roles)) {
+      const step = guide(caps);
+      const permissions = JSON.parse(step.manifest!).default_permissions;
+      expect({ role, checks: permissions.checks }).toEqual({ role, checks: "read" });
+      expect({ role, actions: permissions.actions }).toEqual({
+        role,
+        actions: role === "reviewer" ? "read" : "write",
+      });
+
+      expect({ role, says: step.body.includes("re-runs, cancels and dispatches") }).toEqual({
+        role,
+        says: role !== "reviewer",
+      });
+    }
+  });
+
   it("keeps a reader's App read-only", () => {
     const [create] = githubSetupGuide({
       team,

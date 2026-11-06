@@ -77,6 +77,16 @@ A trusted human commented on a document you wrote, or mentioned you on one.
 
 Follow `process/doc-feedback.md`: read the comments, act on them, reply, and resolve a thread when you have addressed it and the last word is yours.
 
+## Your code host's CLI
+
+Your code host's CLI (`gh` on GitHub) is on your PATH. Each call gets a short-lived token of your own for one team repository: the one `-R` names, else the repository you run it in. Use it for what no `ost` verb does:
+
+- read a workflow run, its logs and artefacts (`gh run view`, `gh run list`, `gh run download`);
+- re-run a run that failed for a reason unrelated to the change, once (`gh run rerun <run> --failed`), cancel one, or dispatch a workflow (`gh workflow run`), for example a deploy workflow a trusted human approved;
+- generate the repository's Actions lockfile (`gh actions-lock`), and read-only API queries (`gh api`, GET only).
+
+Pull request work stays on `ost pr`, and a merge goes only through `ost pr merge` (`process/merge.md`); the policy refuses `gh pr merge` and anything the list above does not name. Your App's permissions are the limit: a refusal from the host is the answer, so say so and ask a human rather than trying another way. A re-run is not a fix: when a check fails again, find the cause.
+
 ## Checks before you push
 
 Run only the checks your change affects: validate, lint and plan for the files you touched.

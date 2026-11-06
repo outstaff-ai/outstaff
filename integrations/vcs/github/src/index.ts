@@ -115,6 +115,7 @@ export const githubVcs = defineAdapter({
     "vcs.pullRequests",
     "vcs.reviewThreads",
     "vcs.workflows",
+    "vcs.ciRuns",
     "vcs.reactions",
     "vcs.merge",
   ],

@@ -19,18 +19,36 @@ interface Missing {
 
   /** The App reads the logs of failed CI jobs, which needs Actions: read (write also covers it). */
   actions: boolean;
+
+  /** The role re-runs CI runs with gh, which needs Actions: write. */
+  actionsWrite: boolean;
   workflows: boolean;
 }
 
+/** Whether the App lacks `name` at `level` while `wanted`: read is any grant, write only write. */
+const lacks = (
+  granted: Record<string, string>,
+  wanted: boolean | undefined,
+  name: string,
+  level: "read" | "write",
+): boolean =>
+  wanted === true &&
+  (level === "read" ? (granted[name] ?? "none") === "none" : granted[name] !== "write");
+
 function missingPermissions(want: AppExpectation, granted: Record<string, string>): Missing {
   const level = (p: string) => granted[p] ?? "none";
-  const actions = want.wantActions === true && level("actions") === "none";
-  const workflows = want.wantWorkflows === true && level("workflows") !== "write";
+  const actions = lacks(granted, want.wantActions, "actions", "read");
+  const actionsWrite = lacks(granted, want.wantActionsWrite, "actions", "write");
+  const workflows = lacks(granted, want.wantWorkflows, "workflows", "write");
   const write = want.wantWrite ? WRITE_PERMISSIONS.filter((p) => level(p) !== "write") : [];
   return {
-    read: [...READ_PERMISSIONS.filter((p) => level(p) === "none"), ...(actions ? ["actions"] : [])],
-    write: [...write, ...(workflows ? ["workflows"] : [])],
+    read: [
+      ...READ_PERMISSIONS.filter((p) => level(p) === "none"),
+      ...(actions && !actionsWrite ? ["actions"] : []),
+    ],
+    write: [...write, ...(actionsWrite ? ["actions"] : []), ...(workflows ? ["workflows"] : [])],
     actions,
+    actionsWrite,
     workflows,
   };
 }
@@ -48,7 +66,11 @@ function lacksDetail(want: AppExpectation, missing: Missing): string {
 
   const notes: [boolean, string][] = [
     [want.wantWrite, " (this person has a write grant)"],
-    [missing.actions, actionsNote(want)],
+    [missing.actions && !missing.actionsWrite, actionsNote(want)],
+    [
+      missing.actionsWrite,
+      ". Without Actions: write, gh cannot re-run, cancel or dispatch workflow runs (this person's role re-runs CI)",
+    ],
     [
       missing.workflows,
       ". Without Workflows, GitHub refuses to push a change under .github/workflows/ (this person's role changes CI)",

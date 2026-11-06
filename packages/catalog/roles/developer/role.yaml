@@ -6,6 +6,7 @@ needs:
   - vcs.pullRequests
   - vcs.reviewThreads
 optional_needs:
+  - vcs.ciRuns
   - design.canvas.read
 modes:
   - name: implement

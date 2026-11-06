@@ -5,6 +5,7 @@ permissions: code
 needs:
   - vcs.pullRequests
 optional_needs:
+  - vcs.ciRuns
   - knowledge.docs
   - design.canvas.read
 extends:

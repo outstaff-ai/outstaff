@@ -362,8 +362,9 @@ describe("ost doctor with the shipped adapters", () => {
       repository_selection: "selected",
       permissions: {
         metadata: "read",
-        // A writer reads its CI logs; the office reads those of checks that fail after a merge.
-        actions: "read",
+        // A writer whose role re-runs CI (the architect) re-runs with gh; the office reads the logs of checks that
+        // fail after a merge.
+        actions: write ? "write" : "read",
         contents: write ? "write" : "read",
         pull_requests: write ? "write" : "read",
         issues: write ? "write" : "read",

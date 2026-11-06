@@ -146,6 +146,43 @@ describe("doctorGithub", () => {
     expect(by(dev, "GitHub App: permissions")[0]!.detail).not.toContain("workflows");
   });
 
+  it("fails when the role re-runs CI and the App lacks Actions: write", async () => {
+    const ciCtx = (f: typeof fetch) => ({
+      ...ctx(f),
+      roleCapabilities: ["vcs.pullRequests", "vcs.ciRuns"] as never,
+    });
+
+    const readOnly = await doctorGithub(secrets(), ciCtx(fake(good).impl));
+    const found = by(readOnly, "GitHub App: permissions")[0]!;
+    expect(found).toMatchObject({ status: "fail" });
+    expect(found.detail).toContain("actions:write");
+    expect(found.detail).toContain("re-run, cancel or dispatch");
+    expect(found.detail).not.toContain("actions:read");
+
+    const { actions: _a, ...noActions } = WRITE;
+    const none = fake({
+      ...good,
+      "11": { ...good["11"]!, installation: { permissions: noActions } },
+    });
+
+    const lacks = by(
+      await doctorGithub(secrets(), ciCtx(none.impl)),
+      "GitHub App: permissions",
+    )[0]!;
+
+    expect(lacks.detail).toContain("actions:write");
+    expect(lacks.detail).not.toContain("ost pr checks");
+
+    const withIt = fake({
+      ...good,
+      "11": { ...good["11"]!, installation: { permissions: { ...WRITE, actions: "write" } } },
+    });
+
+    expect(
+      (await doctorGithub(secrets(), ciCtx(withIt.impl))).filter((c) => c.status !== "ok"),
+    ).toEqual([]);
+  });
+
   it("fails and names actions:read when a writer's App cannot read CI logs", async () => {
     const { actions: _a, ...noActions } = WRITE;
     const lacking = fake({
