@@ -71,6 +71,11 @@ export function createWorkLoop(opts: WorkLoopOptions): WorkLoop {
 
   async function handle(offer: Offer) {
     const id = offer.workItem.id;
+    // Offered again while it is still being taken or run (after a reconnect): it runs once.
+    if (running.has(id)) {
+      return;
+    }
+
     const abort = new AbortController();
     running.set(id, abort);
     if (!(await accepted(id))) {

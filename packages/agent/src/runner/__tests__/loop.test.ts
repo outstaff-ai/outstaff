@@ -1388,6 +1388,22 @@ describe("work loop", () => {
       await running;
       expect(sentOf("handback")).toHaveLength(2);
     });
+
+    it("runs a chat session offered again while it runs once", async () => {
+      await connect();
+      const { runtime, requests, release } = blockingRuntime();
+      start(runtime, { chatSession: sessionFor() });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("progress").length === 1);
+      socket.offerWith("c1", { origin: true });
+      await tick();
+      release();
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("accept")).toHaveLength(1);
+      expect(requests.filter((r) => r.prompt !== JOURNAL_PROMPT)).toHaveLength(1);
+      await loop.stop();
+      await conn.stop();
+    });
   });
 
   describe("chat requests", () => {

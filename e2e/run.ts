@@ -3865,7 +3865,8 @@ async function droppedAfterOffer() {
   await until(
     `sam lost the accept of ${key} with the connection`,
     () =>
-      new RegExp(`"could not accept an offer","workItemId":"${id}"`).test(logs("sam")) || undefined,
+      new RegExp(`could not accept an offer \\{"workItemId":"${id}"`).test(logs("sam")) ||
+      undefined,
   );
 
   await until(

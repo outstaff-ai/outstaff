@@ -158,6 +158,11 @@ export function createProtocolServer(opts: ProtocolServerOptions): ProtocolServe
       return;
     }
 
+    // A heartbeat that came while the hello was handled waited in the queue.
+    if (answerAtOnce(ctx, c, m)) {
+      return;
+    }
+
     armIdle(c, heartbeatMs * 3);
     try {
       if (m.type === "hello") {

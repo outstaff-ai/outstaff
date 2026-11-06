@@ -105,7 +105,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   function keepResumed(resume: string[]) {
     for (const id of activeItems) {
       if (!resume.includes(id)) {
-        log.warn("the office no longer has a running item active", { workItemId: id });
+        log.info("the office no longer has a running item active", { workItemId: id });
         activeItems.delete(id);
       }
     }
