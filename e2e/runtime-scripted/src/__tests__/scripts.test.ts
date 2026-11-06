@@ -736,6 +736,8 @@ describe("mergedFeedback", () => {
       "git switch -c 'feat/SHOP-2-follow-up-on-1' origin/main",
     ]);
 
+    // The commit names the follow-up's ticket, so a rebase of the pull request finds its branch.
+    expect(steps).toContain("git commit -m 'SHOP-2: follow up on #1'");
     expect(steps.at(-2)).toBe("pr_open");
     expect(seen.find((a) => a.type === "tool" && a.tool === "ticket_create")).toMatchObject({
       input: { related: "SHOP-1" },
