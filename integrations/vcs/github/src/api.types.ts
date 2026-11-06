@@ -15,7 +15,7 @@ export interface RestPull {
   body: string | null;
   user: { login: string } | null;
   head: { ref: string; sha: string };
-  base: { ref: string };
+  base: { ref: string; sha?: string };
   state: "open" | "closed";
   merged?: boolean;
   merged_at?: string | null;

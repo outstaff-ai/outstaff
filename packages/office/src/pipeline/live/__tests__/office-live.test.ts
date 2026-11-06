@@ -39,7 +39,7 @@ function team(): TeamConfig {
         name: "Sam",
         role: "developer",
         model: "sonnet",
-        identities: { tracker: "u-sam" },
+        identities: { tracker: "u-sam", vcs: "acme-sam[bot]" },
       },
       {
         handle: "pia",
@@ -520,5 +520,47 @@ describe("the office with the event pipeline live", () => {
     expect(turns.at(-1)).toBe("pia: loop_guard");
     const blocked = (await store.listItems({ person: "pia" })).find((w) => w.status === "blocked")!;
     expect((await store.readJournal(blocked.id)).at(-1)?.text).toMatch(/Blocked: Loop guard/);
+  });
+
+  it("bounds a pull request whose every new head fails with the loop guard", async () => {
+    const { vcs } = await start();
+    const repo = { host: "git.acme.example", owner: "acme-example", name: "shop" };
+    const pr = await vcs.seed.pullRequest(repo, {
+      author: { login: "acme-sam[bot]", kind: "agent" },
+      title: "Add search",
+    });
+
+    await office!.parts.intake.pollOnce();
+    const scheduler = office!.parts.scheduler;
+    const turns: string[] = [];
+    for (let i = 0; i < 20; i++) {
+      // Each push fails before a rescan sees its checks pending: every head is a failure of its own.
+      const pushed = await vcs.seed.push(repo, pr.number, "acme-sam[bot]");
+      await vcs.seed.check(repo, pushed.head.sha, { name: "build", status: "failure" });
+      await office!.parts.workState.rescan();
+      const queued = async () =>
+        (await store.listItems({ person: "sam" })).find((w) => w.status === "queued");
+
+      await until(async () => (await queued()) !== undefined);
+      const item = await queued();
+      if (!item) {
+        turns.push("not woken");
+        break;
+      }
+
+      const started = await scheduler.markActive(item.id);
+      if (!started.started) {
+        turns.push(started.reason);
+        break;
+      }
+
+      turns.push(item.kind);
+      await scheduler.finish(item.id, { outcome: "ok" });
+      clock.advance(60_000);
+    }
+
+    // One ci_failed round per failing head, on one pull request: the team's default limit of 12 in the hour holds.
+    expect(turns.filter((t) => t === "ci_failed")).toHaveLength(12);
+    expect(turns.at(-1)).toBe("loop_guard");
   });
 });

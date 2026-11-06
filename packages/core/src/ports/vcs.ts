@@ -13,7 +13,9 @@ export interface PullRequest {
   url: string;
   author: { login: string; kind: "human" | "agent" | "bot" };
   head: { ref: string; sha: string };
-  base: { ref: string };
+
+  /** `sha` is the base commit the host compares the pull request against, when it reports one. */
+  base: { ref: string; sha?: string };
   state: "open" | "closed" | "merged";
   draft: boolean;
   mergeable: "clean" | "conflicting" | "unknown";

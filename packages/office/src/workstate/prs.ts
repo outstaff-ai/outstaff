@@ -16,13 +16,29 @@ import { ciFailure, keptLive, readLive, toPrRecord } from "./pr-record.js";
 import { recordSynthetic, WORKSTATE_ACTOR } from "./synthetic.js";
 import type { PrRecord } from "./types.js";
 
-/** Whether a field of the record took the value just now: it has it, and the previous record did not. */
-const turned = <K extends "mergeable" | "ci">(
+/** Whether the head commit, or with `base` the base commit too, is not the one the previous record had. */
+const moved = (rec: PrRecord, prev: PrRecord | undefined, base = false) =>
+  prev !== undefined &&
+  (prev.headSha !== rec.headSha || (base && (prev.baseSha ?? "") !== (rec.baseSha ?? "")));
+
+/**
+ * Whether the record reached the value on a commit the previous record did not have it on: it has it, and the
+ * previous record did not, or had it on another head (with `base`, another base commit too). A new head whose checks
+ * fail before a rescan saw them pending still counts.
+ */
+const reached = <K extends "mergeable" | "ci">(
   rec: PrRecord,
   prev: PrRecord | undefined,
   field: K,
   value: PrRecord[K],
-) => rec[field] === value && prev?.[field] !== value;
+  base = false,
+) => rec[field] === value && (prev?.[field] !== value || moved(rec, prev, base));
+
+/** The base a conflict is against: the branch, and its commit when the code host reports one. */
+const baseOf = (rec: PrRecord) => ({
+  base: rec.baseRef,
+  ...(rec.baseSha ? { baseSha: rec.baseSha } : {}),
+});
 
 /** Pull request records: read from the code host, linked to tickets and stacks, and the events they raise. */
 export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
@@ -159,22 +175,31 @@ export function createPrs(core: WorkstateCore, ticketOps: TicketOps): PrOps {
     }
   };
 
-  /** The events a change of an open pull request raises: it started to conflict, or its CI started to fail or turned green. */
+  /**
+   * The events a change of an open pull request raises, each once per head commit: it conflicts (again on a new head
+   * or base commit), or the CI of its head failed or passed.
+   */
   const raiseEvents = async (
     ctx: RefreshCtx,
     rec: PrRecord,
     prev: PrRecord | undefined,
     links: PrLive["links"],
   ) => {
-    if (turned(rec, prev, "mergeable", "conflicting")) {
-      await synthetic(ctx, "pr.conflicted", rec, { base: rec.baseRef });
+    if (reached(rec, prev, "mergeable", "conflicting", true)) {
+      await synthetic(
+        ctx,
+        "pr.conflicted",
+        rec,
+        baseOf(rec),
+        `${rec.headSha}:${rec.baseSha ?? ""}`,
+      );
     }
 
-    if (turned(rec, prev, "ci", "failure")) {
+    if (reached(rec, prev, "ci", "failure")) {
       await synthetic(ctx, "pr.ci_failed", rec, ciFailure(rec.checks, links));
     }
 
-    if (turned(rec, prev, "ci", "success")) {
+    if (reached(rec, prev, "ci", "success")) {
       await synthetic(ctx, "pr.ci_passed", rec, { passing: rec.checks.map((c) => c.name) });
     }
 

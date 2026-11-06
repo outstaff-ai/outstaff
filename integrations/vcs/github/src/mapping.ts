@@ -36,6 +36,10 @@ export function mergeability(
 const mergeCommit = (pr: RestPull, merged: boolean) =>
   merged && pr.merge_commit_sha ? { mergeCommitSha: pr.merge_commit_sha } : {};
 
+/** The base branch, with the commit GitHub compares against when it says. */
+const baseOf = ({ ref, sha }: RestPull["base"]): PullRequest["base"] =>
+  sha ? { ref, sha } : { ref };
+
 export function toPullRequest(
   repo: RepoRef,
   pr: RestPull,
@@ -52,7 +56,7 @@ export function toPullRequest(
     url,
     author: { login, kind: authorKind(login, isAgentLogin) },
     head: { ref: pr.head.ref, sha: pr.head.sha },
-    base: { ref: pr.base.ref },
+    base: baseOf(pr.base),
     state: merged ? "merged" : pr.state,
     draft: pr.draft === true,
     mergeable: mergeability(pr),

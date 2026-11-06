@@ -51,6 +51,7 @@ const CLOSED = { mergeable: null, mergeable_state: "unknown" };
 /** A pull request as REST serves it; reading an open one is a read of its mergeability. */
 export async function rest(s: GithubStore, pr: StoredPull): Promise<RestPull> {
   const sha = await headSha(s, pr);
+  const baseSha = await s.backend.sha(pr.base.ref);
   const merge =
     pr.state === "open" ? MERGEABLE[await s.backend.mergeable(pr.base.ref, pr.head.ref)] : CLOSED;
 
@@ -61,7 +62,7 @@ export async function rest(s: GithubStore, pr: StoredPull): Promise<RestPull> {
     body: pr.body,
     user: { login: pr.login },
     head: { ref: pr.head.ref, sha },
-    base: { ref: pr.base.ref },
+    base: { ref: pr.base.ref, ...(baseSha ? { sha: baseSha } : {}) },
     state: pr.state,
     merged: pr.merged,
     merged_at: pr.merged ? pr.updatedAt : null,
