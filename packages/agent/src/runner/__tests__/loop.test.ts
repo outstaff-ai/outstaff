@@ -429,6 +429,37 @@ describe("work loop", () => {
     await loop.stop();
   });
 
+  it("hands back the message for the human the agent gave with ost handback, the last one stated", async () => {
+    await connect();
+    const runtime: Runtime = {
+      async *run(req) {
+        const handBack = req.tools.find((t) => t.name === "handback")!;
+        await handBack.handler(
+          { status: "done", message: "An earlier word." },
+          { workItemId: "w1" },
+        );
+
+        await handBack.handler(
+          { status: "blocked", message: "Need the staging key from you to finish the deploy." },
+          { workItemId: "w1" },
+        );
+
+        yield { type: "finished", ok: true, text: "I handed the item back as blocked." };
+      },
+    };
+
+    start(runtime);
+    socket.offerWith("w1");
+    await until(() => sentOf("handback").length === 1);
+    expect(sentOf("handback")[0]?.payload).toMatchObject({
+      status: "blocked",
+      summary: "I handed the item back as blocked.",
+      message: "Need the staging key from you to finish the deploy.",
+    });
+
+    await loop.stop();
+  });
+
   it("accepts an offer, runs it and hands back with the summary and links", async () => {
     await connect();
     const runtime = createFakeRuntime();

@@ -121,6 +121,11 @@ export const sessionMessages = [
     z.strictObject({
       workItemId: itemId,
       summary: text.describe("What was done, decisions and open points."),
+      message: text
+        .optional()
+        .describe(
+          "The agent's short message for the human the hand-back goes to: what changed since they last looked and what it needs from them. A notice to the human leads with it; without it, with the summary.",
+        ),
       links: z.array(linkSchema).describe("Pull requests, documents and tickets touched."),
       status: z
         .enum(["done", "waiting", "blocked", "silent", "interrupted"])

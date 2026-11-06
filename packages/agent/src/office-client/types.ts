@@ -124,6 +124,9 @@ export interface OfficeConnection extends OfficeClient {
     workItemId: string,
     result: {
       summary: string;
+
+      /** The agent's message for the human the hand-back goes to. */
+      message?: string | undefined;
       links?: Link[];
       status: "done" | "waiting" | "blocked" | "silent" | "interrupted";
 

@@ -8,6 +8,9 @@ import type { WorkState } from "./workstate/index.js";
 
 export interface HandBackResult {
   summary: string;
+
+  /** The agent's message for the human the hand-back goes to, which a notice to them leads with. */
+  message?: string | undefined;
   links: Link[];
   status: "done" | "waiting" | "blocked" | "silent" | "interrupted";
 

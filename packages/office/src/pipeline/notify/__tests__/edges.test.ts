@@ -73,8 +73,8 @@ describe("the notice desk at its edges", () => {
         [
           "U0ADA: Waiting for you:",
           "- Blocked, needs you: ACME-1 Add a greeting",
-          "- Ready for your review: ACME-2",
-          "  Done.",
+          "- Done.",
+          "  Ready for your review: ACME-2",
         ].join("\n"),
       ],
     ]);
@@ -95,7 +95,7 @@ describe("the notice desk at its edges", () => {
 
     await h.desk.add(notice({ as: "mira", need: "blocked" }), "e:1");
     await h.pass(31_000);
-    expect(h.bodies()[0]![0]).toContain("\nNeeds a key.");
+    expect(h.bodies()[0]![0]).toMatch(/^U0ADA: Needs a key\.\n/);
   });
 });
 

@@ -1,24 +1,18 @@
 import type { NoticePr } from "@outstaff/policy";
 import type { NoticeEntry, NoticeGroup, NoticeItem } from "./notify.types.js";
 
-const MAX_LINES = 2;
-const MAX_CHARS = 300;
-
 /**
- * The agent's words, safe to post: its first lines, and no mention that would notify anyone. Chat adapters keep a
- * `<@member>` mention as one, so the text the agent handed back gives up its brackets.
+ * The agent's words, safe to post: all of them, and no mention that would notify anyone. Chat adapters keep a
+ * `<@member>` mention as one, so the text the agent handed back gives up its brackets. The chat adapter splits a
+ * message over its platform's limit; the agent is asked to keep it short.
  */
 export function guardText(text: string): string {
-  const lines = text
+  return text
     .trim()
     .split("\n")
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .slice(0, MAX_LINES)
+    .map((l) => l.trimEnd())
     .join("\n")
     .replaceAll(/<([@!#][^>]*)>/g, "$1");
-
-  return lines.length > MAX_CHARS ? `${lines.slice(0, MAX_CHARS - 1)}…` : lines;
 }
 
 /** The pull requests of several notices, each once, in the order they came. */
@@ -62,29 +56,37 @@ const prText = (p: NoticePr) =>
 
 const NEED = { review: "Ready for your review", blocked: "Blocked, needs you" } as const;
 
+/**
+ * What is needed, and the links: the pull requests first, since the human acts on them, with the ticket they are for
+ * after them; the ticket alone when there is none (a blocked ticket).
+ */
 function itemLine(item: NoticeItem): string {
   const ticket = item.ticket
     ? `${link(item.ticket.key, item.ticket.url)}${item.ticket.title ? ` ${item.ticket.title}` : ""}`
     : "";
 
   const prs = item.prs.map(prText).join(", ");
-  const what = [ticket, prs ? `pull request ${prs}` : ""].filter(Boolean).join(", ");
+  const what = prs
+    ? `pull request${item.prs.length > 1 ? "s" : ""} ${prs}${ticket ? `, for ${ticket}` : ""}`
+    : ticket;
+
   return `${NEED[item.need]}: ${what}`;
 }
 
-/** The direct message: one item as a line and its text; several as a list. */
+/** An item's lines: the agent's words first, when it gave any, then what is needed with the links. */
+function itemLines(item: NoticeItem): string[] {
+  const said = item.text ? guardText(item.text) : "";
+  return [...(said ? said.split("\n") : []), itemLine(item)];
+}
+
+/** An item as an entry of a list: its first line bulleted, the others indented under it. */
+const listed = (lines: string[]) => lines.map((l, i) => (i === 0 ? `- ${l}` : l ? `  ${l}` : l));
+
+/** The direct message: one item as the agent's words and a line with its links; several as a list. */
 export function renderNotice(items: readonly NoticeItem[]): string {
-  const text = (item: NoticeItem) => (item.text ? guardText(item.text) : "");
   if (items.length === 1) {
-    const only = items[0]!;
-    return [itemLine(only), text(only)].filter(Boolean).join("\n");
+    return itemLines(items[0]!).join("\n");
   }
 
-  return [
-    "Waiting for you:",
-    ...items.flatMap((item) => {
-      const said = text(item);
-      return [`- ${itemLine(item)}`, ...(said ? said.split("\n").map((l) => `  ${l}`) : [])];
-    }),
-  ].join("\n");
+  return ["Waiting for you:", ...items.flatMap((item) => listed(itemLines(item)))].join("\n");
 }

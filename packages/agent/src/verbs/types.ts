@@ -45,7 +45,9 @@ export type DeclaredHandBack = "done" | "blocked" | "silent";
 
 export interface HandBackTarget {
   kind: string;
-  declare(status: DeclaredHandBack): void;
+
+  /** `message` is the agent's words for the human the hand-back goes to, when it gave any. */
+  declare(status: DeclaredHandBack, message?: string): void;
 }
 
 /** The work item a run is on: what kind of work it is and who started it (for a mention, who mentioned). */

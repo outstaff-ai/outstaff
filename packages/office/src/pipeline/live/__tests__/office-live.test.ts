@@ -320,7 +320,8 @@ describe("the office with the event pipeline live", () => {
     await conn.accept(item.id, { runtime: "claude", model: "sonnet" });
     await until(async () => office!.parts.workState.ticketStatus(issue.key) === "active");
     await conn.handBack(item.id, {
-      summary: "Added the greeting.",
+      summary: "I added the greeting and handed the item back as done.",
+      message: "Added the greeting to the home page.",
       status: "done",
       toReview: ["opened pull request acme/app#1"],
     });
@@ -333,7 +334,7 @@ describe("the office with the event pipeline live", () => {
     expect(chat.posts.map((p) => [p.channel, p.text])).toEqual([
       [
         await chat.openDirect("U-ada"),
-        `Ready for your review: [${issue.key}](${tracker.links.issue(issue.key)}) Greeting\nAdded the greeting.`,
+        `Added the greeting to the home page.\nReady for your review: [${issue.key}](${tracker.links.issue(issue.key)}) Greeting`,
       ],
     ]);
   });

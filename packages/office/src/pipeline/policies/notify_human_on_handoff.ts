@@ -81,10 +81,12 @@ function handedTo(ctx: PolicyContext, ticket: string): string | undefined {
   return assignee?.kind === "human" ? assignee.id : undefined;
 }
 
-/** The hand-back's summary, as the message's words: none when it is empty. */
-function summaryOf(ctx: PolicyContext): { text?: string } {
-  const summary = ctx.event.data["summary"];
-  return typeof summary === "string" && summary.trim() ? { text: summary } : {};
+const said = (value: unknown) => (typeof value === "string" && value.trim() ? value : undefined);
+
+/** The words the notice leads with: the agent's message for the human, else its summary; none when both are empty. */
+function wordsOf(ctx: PolicyContext): { text?: string } {
+  const text = said(ctx.event.data["message"]) ?? said(ctx.event.data["summary"]);
+  return text ? { text } : {};
 }
 
 /**
@@ -121,7 +123,7 @@ function handBack(ctx: PolicyContext): Proposal[] {
           need: "review",
           ticket,
           prs: reviewPrs(ctx, ticket),
-          ...summaryOf(ctx),
+          ...wordsOf(ctx),
           ...(told ? { told } : {}),
           seen,
           reason: `${ctx.event.actor.id} handed ${ticket} back to ${human} for review${where}`,
@@ -209,7 +211,7 @@ function opened(ctx: PolicyContext): Proposal[] {
 export const policy = definePolicy({
   id: "notify_human_on_handoff",
   summary:
-    "When work lands on a human, the agent tells them in chat, with the ticket and pull request links and what is needed: a hand-back as done that gives the ticket to them, listing every ticket it gives them (the item's sub-tickets in review and the tickets of the pull requests it opened too), a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. It is a direct message, or a reply in the chat thread of the agent with that human the ticket's work is tied to (work filed or attached from chat, and its later rounds). Nothing more is sent for a round that posts its own result in a chat thread with that human, nor for a round that put nothing new in front of them: it found the ticket in review with them and left no pull request open for review with a head they were not told of, such as a merge round on a merged pull request or a rebase that pushed nothing. The office batches one agent's messages to one human.",
+    "When work lands on a human, the agent tells them in chat: its own message from the hand-back first (its summary when it gave none), then what is needed, with the pull request links and the ticket they are for: a hand-back as done that gives the ticket to them, listing every ticket it gives them (the item's sub-tickets in review and the tickets of the pull requests it opened too), a ticket in review or blocked that an agent gives to them (a PM that cannot unblock it, for example), or an agent's pull request opened for review, for the requester of its ticket. It is a direct message, or a reply in the chat thread of the agent with that human the ticket's work is tied to (work filed or attached from chat, and its later rounds). Nothing more is sent for a round that posts its own result in a chat thread with that human, nor for a round that put nothing new in front of them: it found the ticket in review with them and left no pull request open for review with a head they were not told of, such as a merge round on a merged pull request or a rebase that pushed nothing. The office batches one agent's messages to one human.",
   on: ["agent.handed_back", "ticket.assigned", "pr.opened"],
   when: {
     any: [

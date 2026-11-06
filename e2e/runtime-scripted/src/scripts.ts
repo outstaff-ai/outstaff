@@ -590,8 +590,17 @@ async function* followUpOnTicket(
   }
 
   yield* holdAfterPush(shown);
+  yield { type: "tool", tool: "handback", input: { status: "done", message: addedFor(key) } };
   return `Opened ${url}`;
 }
+
+/** The message for the human of a ticket's first pull request, which their notice leads with. */
+export const addedFor = (key: string) =>
+  `Added the greeting ${key} asked for. Nothing else is needed from you.`;
+
+/** The message for the human of a fix for failing checks. */
+const fixedChecksOf = (number: number | string) =>
+  `Fixed the failing checks of pull request ${number}; the greeting is unchanged.`;
 
 /** A ticket that says `hold after pushing: <gate>`: the round waits there once it pushed, before it hands back. */
 async function* holdAfterPush(shown: string): AsyncGenerator<Action, void, string> {
@@ -1638,6 +1647,12 @@ export async function* ciFailed(ctx: ItemContext): Script {
   yield { type: "shell", command: "git add -A", cwd };
   yield* commitToPush(ctx, cwd, branch, `${key}: fix the checks`);
   yield* holdAfterPush(ticket);
+  yield {
+    type: "tool",
+    tool: "handback",
+    input: { status: "done", message: fixedChecksOf(number) },
+  };
+
   return `Fixed the failing checks of pull request ${number}.`;
 }
 

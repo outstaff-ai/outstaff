@@ -9,8 +9,8 @@ const HAND_BACK = notice({
 
 const RULES = { branch: "main", requiredChecks: ["ci"], requiredApprovals: 1, upToDate: false };
 const ci = (status: "pending" | "success" | "failure") => [{ name: "ci", status }];
-const LINE =
-  "U0ADA: Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)";
+const line = (head: string) =>
+  `Ready for your review: pull request [acme/shop#9](https://github.example/acme/shop/pull/9) (checks passed on ${head}), for [ACME-1](https://tracker.example/ACME-1) Add a greeting`;
 
 describe("a review notice held for the pull request's checks", () => {
   it("waits while the checks run, then goes once they pass, naming the head", async () => {
@@ -28,7 +28,7 @@ describe("a review notice held for the pull request's checks", () => {
     h.pr({ checks: ci("success") });
     await h.desk.flush();
     await h.desk.flush();
-    expect(h.bodies()).toEqual([[`${LINE} (checks passed on a1b2c3d)\nFixed the build.`]]);
+    expect(h.bodies()).toEqual([[`U0ADA: Fixed the build.\n${line("a1b2c3d")}`]]);
     expect(h.subjects.get("handoff_notified/ACME-1")?.data).toEqual({
       human: "ada.admin",
       prs: { "acme/shop#9": "a1b2c3d4e5" },
@@ -63,7 +63,7 @@ describe("a review notice held for the pull request's checks", () => {
 
     h.pr({ head: "f00dfeed99", checks: ci("success") });
     await h.desk.flush();
-    expect(h.bodies()).toEqual([[`${LINE} (checks passed on f00dfee)\nFixed the build.`]]);
+    expect(h.bodies()).toEqual([[`U0ADA: Fixed the build.\n${line("f00dfee")}`]]);
     expect(h.subjects.get("handoff_notified/ACME-1")?.data).toEqual({
       human: "ada.admin",
       prs: { "acme/shop#9": "f00dfeed99" },
@@ -123,7 +123,7 @@ describe("a review notice held for the pull request's checks", () => {
     await h.pass(31_000);
     expect(h.bodies()).toEqual([
       [
-        "U0ADA: Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9) (checks passed on a1b2c3d), acme/shop#12",
+        "U0ADA: Ready for your review: pull requests [acme/shop#9](https://github.example/acme/shop/pull/9) (checks passed on a1b2c3d), acme/shop#12, for [ACME-1](https://tracker.example/ACME-1) Add a greeting",
       ],
     ]);
 
@@ -143,9 +143,9 @@ describe("a review notice held for the pull request's checks", () => {
       [
         [
           "U0ADA: Waiting for you:",
-          "- Ready for your review: [ACME-1](https://tracker.example/ACME-1) Add a greeting, pull request [acme/shop#9](https://github.example/acme/shop/pull/9)",
-          "  Fixed the build.",
-          "- Ready for your review: [ACME-2](https://tracker.example/ACME-2), pull request acme/shop#12",
+          "- Fixed the build.",
+          "  Ready for your review: pull request [acme/shop#9](https://github.example/acme/shop/pull/9), for [ACME-1](https://tracker.example/ACME-1) Add a greeting",
+          "- Ready for your review: pull request acme/shop#12, for [ACME-2](https://tracker.example/ACME-2)",
         ].join("\n"),
       ],
     ]);
@@ -158,7 +158,7 @@ describe("a review notice held for the pull request's checks", () => {
     await h.desk.add(notice({ ticket: "ACME-2", need: "blocked", text: "Needs the key." }), "e:2");
     await h.pass(31_000);
     expect(h.bodies()).toEqual([
-      ["U0ADA: Blocked, needs you: [ACME-2](https://tracker.example/ACME-2)\nNeeds the key."],
+      ["U0ADA: Needs the key.\nBlocked, needs you: [ACME-2](https://tracker.example/ACME-2)"],
     ]);
 
     h.pr({ state: "merged", checks: ci("pending") });

@@ -633,9 +633,14 @@ async function main() {
     first,
     "sam",
     (text) =>
-      text.startsWith(`Ready for your review: [${first}](`) &&
-      text.includes(`acme/shop#${pr1.pr.number}`),
-    "the pull request opened in the round and the hand-back as done",
+      text.startsWith(
+        `Added the greeting ${first} asked for. Nothing else is needed from you.\n`,
+      ) &&
+      // The pull request first, the ticket it is for after it.
+      new RegExp(
+        `\\nReady for your review: pull request \\[?acme/shop#${pr1.pr.number}\\b.*, for \\[${first}\\]\\(`,
+      ).test(text),
+    "the pull request opened in the round and the hand-back as done, led by the agent's message",
   );
 
   step(
@@ -1535,8 +1540,8 @@ async function main() {
     stuck,
     "pia",
     (text) =>
-      text.startsWith(`Blocked, needs you: [${stuck}](`) &&
-      text.includes("Needs a human: the staging credentials are missing."),
+      text.startsWith("Needs a human: the staging credentials are missing.") &&
+      text.includes(`\nBlocked, needs you: [${stuck}](`),
     "the blocked ticket the PM gave to the human",
   );
 
@@ -2467,7 +2472,10 @@ async function main() {
       (p: Json) =>
         p.agent === "sam" &&
         p.thread === request.id &&
-        p.text.startsWith(`Ready for your review: [${made.t.key}](`),
+        // The review round gave no message for the human: its summary leads, the links after it.
+        p.text.startsWith(`Addressed `) &&
+        p.text.includes(`\nReady for your review: pull request `) &&
+        p.text.includes(`, for [${made.t.key}](`),
     );
 
   const notice12 = await until(
@@ -4346,8 +4354,11 @@ async function heldForChecks() {
     key,
     "sam",
     (text) =>
-      text.startsWith(`Ready for your review: [${key}](`) &&
-      text.includes(`(checks passed on ${short})`),
+      text.startsWith(
+        `Fixed the failing checks of pull request ${first.number}; the greeting is unchanged.\n`,
+      ) &&
+      text.includes(`\nReady for your review: pull request `) &&
+      text.includes(`(checks passed on ${short}), for [${key}](`),
     "after the green run of the fix",
   );
 

@@ -1,6 +1,6 @@
 import type { AgentProfile } from "@outstaff/core";
 import type { SlackHomeView } from "./api.js";
-import { escapeSlack, toMrkdwn } from "./mrkdwn.js";
+import { escapeSlack, splitMrkdwn, toMrkdwn } from "./mrkdwn.js";
 
 const STATUS = {
   working: ":large_green_circle: *Working*",
@@ -8,14 +8,21 @@ const STATUS = {
   paused: ":double_vertical_bar: *Paused*",
 } as const;
 
-// Slack caps a header at 150 characters, a section at 3000 and a view at 100 blocks.
+// Slack caps a header at 150 characters, a section's text at 3000 and a view at 100 blocks.
+const HEADER_MAX = 150;
+const SECTION_MAX = 3000;
+const VIEW_MAX_BLOCKS = 100;
+
+/** A header holds one line of plain text: a longer name is cut. */
 const clip = (text: string, max: number) =>
   text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
-const section = (text: string) => ({
-  type: "section",
-  text: { type: "mrkdwn", text: clip(text, 3000) },
-});
+/** Text as section blocks: longer text is split at line breaks into several sections, never cut. */
+const sections = (text: string) =>
+  splitMrkdwn(text, SECTION_MAX).map((part) => ({
+    type: "section",
+    text: { type: "mrkdwn", text: part },
+  }));
 
 /** A time in the viewer's timezone, with the zone named; UTC when the zone is unknown or not valid. */
 export function formatWhen(iso: string, tz?: string): string {
@@ -88,11 +95,13 @@ function statusLines(profile: AgentProfile, tz: string | undefined): string[] {
 
 /** How to talk to the agent and its extra sections, each after a divider. */
 function extraBlocks(profile: AgentProfile): Record<string, unknown>[] {
-  const blocks: Record<string, unknown>[] = profile.hint ? [section(toMrkdwn(profile.hint))] : [];
+  const blocks: Record<string, unknown>[] = profile.hint ? sections(toMrkdwn(profile.hint)) : [];
   for (const s of (profile.sections ?? []).slice(0, 40)) {
     blocks.push(
       { type: "divider" },
-      section(`*${escapeSlack(s.heading)}*\n${s.lines.map(toMrkdwn).join("\n") || "_Nothing._"}`),
+      ...sections(
+        `*${escapeSlack(s.heading)}*\n${s.lines.map(toMrkdwn).join("\n") || "_Nothing._"}`,
+      ),
     );
   }
 
@@ -107,10 +116,10 @@ export function homeView(profile: AgentProfile, tz?: string): SlackHomeView {
   return {
     type: "home",
     blocks: [
-      { type: "header", text: { type: "plain_text", text: clip(profile.name, 150) } },
-      section(aboutLines(profile).join("\n")),
-      section(statusLines(profile, tz).join("\n")),
+      { type: "header", text: { type: "plain_text", text: clip(profile.name, HEADER_MAX) } },
+      ...sections(aboutLines(profile).join("\n")),
+      ...sections(statusLines(profile, tz).join("\n")),
       ...extraBlocks(profile),
-    ],
+    ].slice(0, VIEW_MAX_BLOCKS),
   };
 }

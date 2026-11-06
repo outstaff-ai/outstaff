@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  addedFor,
   assigned,
   branchFor,
   chat,
@@ -331,9 +332,16 @@ describe("assigned", () => {
       "git commit -F - <<'EOF'\nSHOP-1: Add a greeting\nEOF",
       "git push origin 'feat/SHOP-1-add-a-greeting'",
       "pr_open",
+      "handback",
     ]);
 
-    expect(seen.at(-1)).toMatchObject({ input: { body: "Closes SHOP-1\n" } });
+    expect(seen.at(-2)).toMatchObject({ input: { body: "Closes SHOP-1\n" } });
+    expect(seen.at(-1)).toEqual({
+      type: "tool",
+      tool: "handback",
+      input: { status: "done", message: addedFor("SHOP-1") },
+    });
+
     expect(text).toContain("https://github.acme.example/acme/shop/pull/1");
   });
 
