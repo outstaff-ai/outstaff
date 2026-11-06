@@ -1771,6 +1771,31 @@ Minutes the checks on a merge commit must stay finished, with none failed and no
 - Minimum 0
 - Maximum 1440
 
+### policies.reconcile
+
+The periodic board sweep: the office checks each open ticket against the facts it has (pull requests merged, blockers closed, no work running) and wakes the PM only when one disagrees, with the facts for each.
+
+- Type: `object`
+- Optional
+- Default: `{"every":"2h","stale_hours":48}`
+
+#### policies.reconcile.every
+
+How often the office sweeps the open tickets in active, review and blocked for ones whose status or assignee no longer matches what it knows, and wakes the PM with the list when it finds any: minutes (`30m`) or hours (`2h`), fractions allowed, or `off`. Default 2h.
+
+- Type: `string`
+- Optional
+- Default: `2h`
+
+#### policies.reconcile.stale_hours
+
+Hours a blocked ticket assigned to a human may go without a change in the tracker before the sweep lists it. Default 48.
+
+- Type: `number`
+- Optional
+- Default: `48`
+- Maximum 8760
+
 ### policies.messages
 
 How agents write chat messages.

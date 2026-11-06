@@ -187,6 +187,33 @@ export const policiesSchema = z
           "The checks that run on a pull request's merge commit in the default branch, such as a deploy. A ticket closes only once they pass; when one fails, the author is woken with its log.",
         ),
       ),
+    reconcile: z
+      .strictObject({
+        every: z
+          .union([z.literal("off"), z.string().regex(/^\d+(\.\d+)?[mh]$/)])
+          .default("2h")
+          .meta(
+            d(
+              "How often the office sweeps the open tickets in active, review and blocked for ones whose status or assignee no longer matches what it knows, and wakes the PM with the list when it finds any: minutes (`30m`) or hours (`2h`), fractions allowed, or `off`. Default 2h.",
+            ),
+          ),
+        stale_hours: z
+          .number()
+          .positive()
+          .max(8760)
+          .default(48)
+          .meta(
+            d(
+              "Hours a blocked ticket assigned to a human may go without a change in the tracker before the sweep lists it. Default 48.",
+            ),
+          ),
+      })
+      .default({ every: "2h", stale_hours: 48 })
+      .meta(
+        d(
+          "The periodic board sweep: the office checks each open ticket against the facts it has (pull requests merged, blockers closed, no work running) and wakes the PM only when one disagrees, with the facts for each.",
+        ),
+      ),
     messages: z
       .strictObject({
         max_lines: z

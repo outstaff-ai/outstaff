@@ -1844,6 +1844,38 @@
           },
           "additionalProperties": false
         },
+        "reconcile": {
+          "default": {
+            "every": "2h",
+            "stale_hours": 48
+          },
+          "description": "The periodic board sweep: the office checks each open ticket against the facts it has (pull requests merged, blockers closed, no work running) and wakes the PM only when one disagrees, with the facts for each.",
+          "type": "object",
+          "properties": {
+            "every": {
+              "default": "2h",
+              "description": "How often the office sweeps the open tickets in active, review and blocked for ones whose status or assignee no longer matches what it knows, and wakes the PM with the list when it finds any: minutes (`30m`) or hours (`2h`), fractions allowed, or `off`. Default 2h.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "off"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d+)?[mh]$"
+                }
+              ]
+            },
+            "stale_hours": {
+              "default": 48,
+              "description": "Hours a blocked ticket assigned to a human may go without a change in the tracker before the sweep lists it. Default 48.",
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 8760
+            }
+          },
+          "additionalProperties": false
+        },
         "messages": {
           "default": {
             "max_lines": 3,

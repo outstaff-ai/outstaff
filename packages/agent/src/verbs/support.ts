@@ -52,6 +52,8 @@ function startedByAgent(round: Round): string | undefined {
       return "a teammate's question";
     case "unblock":
       return "an unblock, started by a teammate's blocked hand-back";
+    case "reconcile":
+      return "the office's sweep of the board";
     case "asked":
       return round.trigger === "human" ? undefined : "a teammate's mention";
     default:

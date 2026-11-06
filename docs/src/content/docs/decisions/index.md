@@ -36,3 +36,4 @@ Each record explains one decision: the context, what was decided, and what follo
 | [0025](/decisions/0025-agents-tell-humans-work-landed/)       | Agents tell a human in chat when work lands on them                            |
 | [0026](/decisions/0026-notices-lead-with-the-agents-message/) | A notice leads with the agent's message for the human, sent whole              |
 | [0027](/decisions/0027-stale-blocks-resolve-themselves/)      | A failed merge check that passes later counts, and the PM rechecks blocks      |
+| [0028](/decisions/0028-periodic-board-sweep/)                 | The office sweeps the board and wakes the PM with what is out of step          |

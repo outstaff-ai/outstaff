@@ -24,6 +24,7 @@ import { policy as notifyHumanOnHandoff } from "./notify_human_on_handoff.js";
 import { policy as openedToReview } from "./opened_to_review.js";
 import { policy as rebaseToAuthor } from "./rebase_to_author.js";
 import { policy as reviewToAuthor } from "./review_to_author.js";
+import { policy as staleBoardToPm } from "./stale_board_to_pm.js";
 import { policy as startMarksActive } from "./start_marks_active.js";
 import { policy as subticketClosedToAgent } from "./subticket_closed_to_agent.js";
 import { policy as subticketsClosedCloseParent } from "./subtickets_closed_close_parent.js";
@@ -65,6 +66,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   unblockedToBlockedAgent,
   unblockedToReady,
   blockedMaybeResolvedToPm,
+  staleBoardToPm,
   docCommentToAgent,
   docCommentToMentionedAgent,
   linkDocOnTicket,

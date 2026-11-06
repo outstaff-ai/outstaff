@@ -22,6 +22,7 @@ export const PIPELINE_EVENT_TYPES = [
   "ticket.created",
   "ticket.unblocked",
   "ticket.block_maybe_resolved",
+  "board.stale",
   "ticket.closed",
   "doc.commented",
   "doc.linked",

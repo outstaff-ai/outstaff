@@ -6,7 +6,7 @@ import type { ReadyTicket, TicketRecord } from "./types.js";
  * Items that do not count as working on a ticket: answering a question on it, trying to unblock it, the PM's round on
  * the milestone it finished.
  */
-const NOT_WORK = new Set(["asked", "unblock", "milestone"]);
+const NOT_WORK = new Set(["asked", "unblock", "milestone", "reconcile"]);
 const OPEN = new Set(["queued", "active", "waiting", "blocked"]);
 
 export const pickupKey = (person: string, ticket: string): string => `${person}\n${ticket}`;
