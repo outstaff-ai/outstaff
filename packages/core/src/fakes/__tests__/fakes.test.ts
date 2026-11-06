@@ -7,6 +7,7 @@ import {
   createFakeChat,
   createFakeRuntime,
   createFakeTracker,
+  createFakeVcs,
 } from "#/fakes/index.js";
 
 describe("fake runtime", () => {
@@ -91,5 +92,34 @@ describe("fake adapter registry", () => {
         expect(CAPABILITIES).toContain(cap);
       }
     }
+  });
+});
+
+describe("fake vcs events", () => {
+  const app = { host: "git.acme.example", owner: "acme", name: "app" };
+  const libs = { host: "git.acme.example", owner: "acme", name: "libs" };
+  const opened = (page: { events: { repo: { name: string }; number: number }[] }) =>
+    page.events.map((e) => `${e.repo.name}#${e.number}`);
+
+  it("keeps the place of a repository a poll leaves out", async () => {
+    const vcs = createFakeVcs();
+    await vcs.seed.pullRequest(app, { title: "a1" });
+    await vcs.seed.pullRequest(libs, { title: "l1" });
+    const first = await vcs.events([app]);
+    expect(opened(first)).toEqual(["app#1"]);
+
+    await vcs.seed.pullRequest(app, { title: "a2" });
+    const second = await vcs.events([app, libs], first.cursor);
+    expect(opened(second)).toEqual(["libs#1", "app#2"]);
+
+    // Everyone is caught up: the cursor is a plain count again.
+    expect(second.cursor).toBe("3");
+    expect((await vcs.events([app, libs], second.cursor)).events).toEqual([]);
+  });
+
+  it("rejects a cursor it did not make", async () => {
+    await expect(createFakeVcs().events([app], "{nope")).rejects.toMatchObject({
+      code: "invalid",
+    });
   });
 });

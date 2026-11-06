@@ -77,7 +77,18 @@ export function createIntake(opts: IntakeOptions): Intake {
     drain: () => drain(),
   });
 
-  const sources = pollSources({ store, ports, team, docs: opts.docs, repos, logger, ingest });
+  const sources = pollSources({
+    store,
+    ports,
+    team,
+    docs: opts.docs,
+    repos,
+    logger,
+    ingest,
+    clock,
+    backoff,
+  });
+
   const poller = createPoller({ clock, logger, backoff, intervalMs, stalePollMs, isRunning });
 
   let server: WebhookServer | undefined;

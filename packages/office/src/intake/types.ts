@@ -212,6 +212,8 @@ export interface SourcesOptions {
   repos: RepoRef[];
   logger: Logger;
   ingest: Ingest;
+  clock: Clock;
+  backoff: BackoffOptions;
 }
 
 export interface PollSource {
@@ -220,6 +222,27 @@ export interface PollSource {
 
   /** No webhook exists for it, so it is polled in webhook mode too. */
   always?: true;
+}
+
+export interface RepoBackoffOptions {
+  clock: Clock;
+  logger: Logger;
+  backoff: BackoffOptions;
+
+  /** What reads the repositories, for the log: `intake: vcs poll`, `workstate rescan`. */
+  what: string;
+}
+
+/** Which repositories to read now, given the ones that could not be read lately. */
+export interface RepoBackoff {
+  /** The repositories whose backoff, if any, has run out. */
+  due(repos: RepoRef[]): RepoRef[];
+
+  /** Counts a failed read of the repository and logs it with the delay before the next one. */
+  failed(repo: RepoRef, error: unknown): void;
+
+  /** The repositories were read: their backoff is over. */
+  read(repos: RepoRef[]): void;
 }
 
 export interface PollerOptions {

@@ -1,4 +1,5 @@
-import type { TeamConfig } from "@outstaff/core";
+import type { RepoRef, TeamConfig } from "@outstaff/core";
+import { cannotRead, createRepoBackoff, DEFAULT_BACKOFF } from "#/intake/index.js";
 import type { Ref, WorkItem } from "#/store/index.js";
 import type { PrRecord, TicketRecord } from "./types.js";
 import type { PrOps, RefreshCtx, TicketOps, UnblockOps, WorkstateCore } from "./core.types.js";
@@ -105,19 +106,49 @@ export function createRescan(core: WorkstateCore, ops: TicketOps & UnblockOps & 
     await forget(docs, docNode, (d) => !docOpen(core, d) && old(d.touchedAt));
   };
 
+  const unreadable = createRepoBackoff({
+    clock,
+    logger,
+    backoff: DEFAULT_BACKOFF,
+    what: "workstate rescan",
+  });
+
+  /** The open pull requests of the repository; undefined when it cannot be read, which backs it off on its own. */
+  const listOpen = async (repo: RepoRef) => {
+    try {
+      const listed = await vcs.listPullRequests(repo, { state: "open" });
+      unreadable.read([repo]);
+      return listed;
+    } catch (error) {
+      if (!cannotRead(error)) {
+        throw error;
+      }
+
+      unreadable.failed(repo, error);
+      return undefined;
+    }
+  };
+
   const rescanPrs = async (ctx: RefreshCtx) => {
     const seen = new Set<string>();
-    for (const repo of repos) {
-      for (const listed of await vcs.listPullRequests(repo, { state: "open" })) {
+    const read: RepoRef[] = [];
+    for (const repo of unreadable.due(repos)) {
+      const open = await listOpen(repo);
+      read.push(...(open ? [repo] : []));
+      for (const listed of open ?? []) {
         const ref = { repo: listed.repo, number: listed.number };
         seen.add(prSubject(ref));
         await refreshPr(ctx, ref, { baseline: !prs.has(prSubject(ref)) });
       }
     }
 
-    // Stored as open, no longer listed: merged or closed while nobody was watching.
+    // Stored as open, no longer listed: merged or closed while nobody was watching. A repository that was not
+    // read this time says nothing about its pull requests.
+    const wasRead = (repo: RepoRef) => read.some((r) => core.sameRepo(r, repo));
     for (const rec of openPrs(core).filter((p) => !seen.has(prSubject(p.ref)))) {
-      await refreshPr(ctx, rec.ref);
+      if (wasRead(rec.ref.repo)) {
+        await refreshPr(ctx, rec.ref);
+      }
     }
   };
 

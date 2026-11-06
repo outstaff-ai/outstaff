@@ -85,8 +85,10 @@ export type {
   Reaction,
   ReviewInlineComment,
   ReviewVerdict,
+  UnreadRepo,
   Vcs,
   VcsEvent,
+  VcsEventPage,
   VcsPermission,
 } from "./vcs.js";
 

@@ -1,5 +1,6 @@
 import { PortError, parseRepoUrl } from "#/ports/index.js";
 import type { CheckLog, ReviewThread } from "#/ports/index.js";
+import { repoEvents } from "./repo-events.js";
 import type { FakeVcsState, VcsReads } from "./vcs.types.js";
 
 /** What a fake vcs answers: credentials, pull requests, checks, threads, the conversation and events. */
@@ -138,9 +139,7 @@ export function fakeVcsReads(st: FakeVcsState): VcsReads {
       return perms.get(`${key(repo)}:${login}`) ?? "none";
     },
     async events(repos, cursor) {
-      const wanted = new Set(repos.map(key));
-      const page = log.since(cursor);
-      return { events: page.events.filter((e) => wanted.has(key(e.repo))), cursor: page.cursor };
+      return repoEvents(log, key, repos, cursor);
     },
   };
 }

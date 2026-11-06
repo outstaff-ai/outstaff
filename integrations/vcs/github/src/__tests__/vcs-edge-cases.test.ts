@@ -681,6 +681,67 @@ describe("events edge cases", () => {
     expect(page.events).toEqual([]);
   });
 
+  describe("a repository that cannot be read", () => {
+    const LIBS = { owner: "acme", name: "libs" };
+    const libsEntry = { since: "2026-01-01T00:00:00Z", direct: { since: "2026-01-01T00:00:00Z" } };
+    const cursor = JSON.stringify({ ...JSON.parse(SINCE), "acme/libs": libsEntry });
+    const libsFeed = (status: number): Route => ({
+      method: "GET",
+      path: "/repos/acme/libs/events",
+      handler: () => ({ status, body: { message: status === 404 ? "Not Found" : "Server Error" } }),
+    });
+
+    it.each([
+      [404, "not_found"],
+      [403, "forbidden"],
+    ])("is reported on its own (%i) while the others are read", async (status, code) => {
+      const { vcs } = build([
+        ...appRoutes(),
+        ...listRoutes(),
+        libsFeed(status),
+        feed([ev("1", "2026-01-01T00:00:05Z")]),
+      ]);
+
+      const page = await vcs.events([LIBS, REPO], cursor);
+      expect(page.events.map((e) => e.externalId)).toEqual(["comment:1"]);
+      expect(page.unread).toEqual([{ repo: LIBS, error: expect.objectContaining({ code }) }]);
+      expect(String(page.unread?.[0]?.error)).toContain("/repos/acme/libs/events");
+
+      // It keeps its place, so it reads on from there once it can be read.
+      expect(JSON.parse(page.cursor)["acme/libs"]).toEqual(libsEntry);
+    });
+
+    it("has no entry made for it when it never had one", async () => {
+      const { vcs } = build([...appRoutes(), ...listRoutes(), libsFeed(404), feed([])]);
+      const page = await vcs.events([LIBS, REPO], SINCE);
+      expect(Object.keys(JSON.parse(page.cursor))).toEqual(["acme/app"]);
+      expect(page.unread).toHaveLength(1);
+    });
+
+    it("leaves unread out of a page where every repository was read", async () => {
+      const { vcs } = build([...appRoutes(), ...listRoutes(), feed([])]);
+      expect(await vcs.events([REPO], SINCE)).not.toHaveProperty("unread");
+    });
+
+    it("fails the poll when no repository could be read, as with refused credentials", async () => {
+      const refused: Route = {
+        method: "POST",
+        path: "/app/installations/7/access_tokens",
+        handler: () => ({ status: 401, body: { message: "Bad credentials" } }),
+      };
+
+      const { vcs } = build([...appRoutes().filter((r) => r.method === "GET"), refused]);
+      const error = await expectPortError(vcs.events([LIBS, REPO], cursor), "forbidden");
+      expect(error.message).toContain("Bad credentials");
+    });
+
+    it("still fails the poll when the host itself fails", async () => {
+      const { vcs } = build([...appRoutes(), ...listRoutes(), libsFeed(500), feed([])]);
+      const error = await expectPortError(vcs.events([LIBS, REPO], cursor), "unavailable");
+      expect(error.message).toContain("/repos/acme/libs/events");
+    });
+  });
+
   it("keeps the stored etag when the feed sends none", async () => {
     const cursor = JSON.stringify({
       "acme/app": {
