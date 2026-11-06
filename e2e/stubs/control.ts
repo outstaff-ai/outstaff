@@ -72,6 +72,23 @@ function githubControls({ github }: World): Route[] {
     },
     {
       method: "POST",
+      path: "/_test/pulls/:n/close",
+      handler: async (r) => {
+        await github.close(pull(r), r.json?.actor ?? "ada-admin");
+        return ok();
+      },
+    },
+    {
+      // The App loses (`deny: true`) or gets back the listing of a further repository's pull requests.
+      method: "POST",
+      path: "/_test/repos/:name/pulls",
+      handler: (r) => {
+        github.denyPulls(r.params["name"]!, r.json.deny === true);
+        return ok();
+      },
+    },
+    {
+      method: "POST",
       path: "/_test/pulls/:n/merge",
       handler: async (r) => {
         await github.merge(pull(r), "grace-lead", r.json?.checks ?? []);

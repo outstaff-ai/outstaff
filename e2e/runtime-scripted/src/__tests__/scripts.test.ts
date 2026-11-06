@@ -164,6 +164,28 @@ describe("assigned, on a ticket that says to hold", () => {
   });
 });
 
+describe("assigned, continued from chat to check something", () => {
+  it("answers the check on the ticket and moves it to review, opening nothing", async () => {
+    const asked = "Closed your PR and handled the access. Can you check if you have access now?";
+    const { seen, text } = await play(
+      assigned({ ...ctx, feedback: [{ kind: "chat", actor: "Ada", body: asked, threads: [] }] }),
+      (a) => (isTool(a, "ticket_show") ? "SHOP-1 Check access\nStatus: In Progress (active)" : ""),
+    );
+
+    expect(seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Checked: I have access now." },
+      },
+      { type: "tool", tool: "ticket_move", input: { key: "SHOP-1", to: "review" } },
+    ]);
+
+    expect(text).toBe("Checked: I have access now.");
+  });
+});
+
 describe("assigned, on a ticket that asks for usage", () => {
   it("posts what ost usage prints for the ticket it names, and does nothing else", async () => {
     const { seen, text } = await play(assigned(ctx), (a) =>
@@ -948,6 +970,40 @@ describe("chat", () => {
         type: "tool",
         tool: "work_attach",
         input: { target: "SHOP-1", confirmed: true, request: "Also keep it on one line." },
+      },
+    ]);
+  });
+
+  it("continues finished work when the reply asks for a check, confirmed", async () => {
+    const asked = "Closed your PR and handled the access. Can you check if you have access now?";
+    const { seen } = await play(
+      chat({
+        ...talk([false, asked]),
+        about: { itemId: "w9", title: "assigned", state: "finished" as const },
+      }),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: { target: "SHOP-1", confirmed: true, request: asked },
+      },
+    ]);
+  });
+
+  it("files new work with the lines after the first as the ticket's description", async () => {
+    const { seen } = await play(
+      chat(talk([false, "New work: Check access\nhold: access"])),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "ticket_create",
+        input: { title: "Check access", body: "Check access\nhold: access" },
       },
     ]);
   });

@@ -93,7 +93,7 @@ ost ticket comment ACME-12 "Pull request is up for review."
 
 Move a ticket to another status.
 
-Moves a ticket to a canonical status (backlog, ready, active, review, blocked, done, canceled). The tracker's own status names are mapped by the team's workflow settings.
+Moves a ticket to a canonical status (backlog, ready, active, review, blocked, done, canceled). The tracker's own status names are mapped by the team's workflow settings. Only a round on the ticket (or on its parent) moves it to active, since that move starts no work: to continue a ticket from chat, attach the request with ost work attach.
 
 ```
 ost ticket move <key> <to>

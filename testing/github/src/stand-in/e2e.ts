@@ -3,7 +3,7 @@ import { REVIEW_STATE, addComment, submitReview } from "./conversation.js";
 import { e2eState } from "./e2e-state.js";
 import type { DriverCheck, DriverComment, GithubE2eOptions } from "./e2e.types.js";
 import { gitServer } from "./git-serve.js";
-import { headSha, mergePull, pullOf } from "./model.js";
+import { closePull, headSha, mergePull, pullOf } from "./model.js";
 import { createGithubStandIn } from "./stand-in.js";
 import type { GithubStore, StoredPull } from "./types.js";
 
@@ -109,6 +109,20 @@ function controls(s: GithubStore) {
      * A human merges. `checks` are the CI's on the merge commit, there as soon as the merge is: each an Actions job
      * with a log the office can read.
      */
+    /** A human closes the pull request without merging it. */
+    async close(n: number, actor: string) {
+      await closePull(s, needPull(s, n), actor, false);
+    },
+
+    /** The App may not list the pull requests of a further repository (`more`), until allowed again. */
+    denyPulls(name: string, deny: boolean) {
+      if (deny) {
+        s.pullsDenied.add(name);
+      } else {
+        s.pullsDenied.delete(name);
+      }
+    },
+
     async merge(n: number, actor: string, checks: DriverCheck[] = []) {
       const pr = pullOf(s, n);
       if (!pr || pr.state !== "open") {

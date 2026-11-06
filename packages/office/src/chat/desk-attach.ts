@@ -1,3 +1,4 @@
+import { silentLogger } from "@outstaff/core";
 import type { Attached, Feedback } from "@outstaff/protocol";
 import { summarizeItem } from "#/item-summary.js";
 import { ProtocolError } from "#/protocol/errors.js";
@@ -30,6 +31,7 @@ export function createAttach(
 ): ChatRequests["attachWork"] {
   const { store, scheduler } = opts;
   const clock = opts.clock;
+  const log = opts.logger ?? silentLogger;
 
   const TERMINAL = new Set(["done", "canceled"]);
 
@@ -49,8 +51,16 @@ export function createAttach(
     // A ticket is the work of its open pull request, when it has one.
     let { ticket, pr } = target;
     if (!pr && ticket) {
-      // A pull request opened a moment ago may not be in the work state yet.
-      await opts.workState.catchUp();
+      // A pull request opened a moment ago may not be in the work state yet. Looking is best effort: a repository the
+      // office cannot list (no access yet) must not fail the request, which then goes to the ticket as it stands.
+      await opts.workState.catchUp().catch((error: unknown) => {
+        log.warn("could not look for new pull requests", {
+          person,
+          ticket: ticket!.key,
+          error: String(error),
+        });
+      });
+
       const open = opts.workState.currentWork(person).prs.find((p) => p.ticket === ticket!.key);
       pr =
         open &&

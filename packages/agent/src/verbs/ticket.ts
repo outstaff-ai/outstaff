@@ -1,4 +1,4 @@
-import { CANONICAL_STATUSES, PortError } from "@outstaff/core";
+import { PortError } from "@outstaff/core";
 import { z } from "zod";
 import { basename } from "node:path";
 import { MAX_ATTACHMENT_BYTES, humanSize } from "#/runner/attachments.js";
@@ -13,6 +13,7 @@ import { ticketCreate } from "./ticket-create.js";
 import { ticketEdit } from "./ticket-edit.js";
 import { ticketLink } from "./ticket-link.js";
 import { ticketList } from "./ticket-list.js";
+import { ticketMove } from "./ticket-move.js";
 import { ticketParent } from "./ticket-parent.js";
 
 export const ticketShow = defineVerb({
@@ -84,35 +85,6 @@ export const ticketComment = defineVerb({
       comment.url,
       url,
     ]);
-  },
-});
-
-export const ticketMove = defineVerb({
-  name: "ticket.move",
-  summary: "Move a ticket to another status.",
-  description:
-    "Moves a ticket to a canonical status (backlog, ready, active, review, blocked, done, canceled). The tracker's own status names are mapped by the team's workflow settings.",
-  input: z.strictObject({
-    key,
-    to: z
-      .enum(CANONICAL_STATUSES as [string, ...string[]])
-      .describe("Canonical status to move to."),
-  }),
-  args: ["key", "to"],
-  examples: ["ost ticket move ACME-12 review"],
-  async run(env, input) {
-    const tracker = requireTracker(env);
-    const issue = await tracker.transition(
-      input.key,
-      input.to as (typeof CANONICAL_STATUSES)[number],
-    );
-
-    const url = tracker.links.issue(issue.key);
-    return result(
-      [`Moved ${issue.key} to ${issue.status.name}.`, ...summary(issue, url)],
-      { issue },
-      [url],
-    );
   },
 });
 

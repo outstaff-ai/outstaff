@@ -202,6 +202,9 @@ export interface GithubStore {
   /** How long the merge queue takes to merge an enqueued pull request; never, when unset. */
   queueDelayMs: number | undefined;
   logUrl: string | undefined;
+
+  /** The further repositories (`more`) whose pull requests the App may not list, as a missing installation answers. */
+  pullsDenied: Set<string>;
 }
 
 export interface StandInOptions {

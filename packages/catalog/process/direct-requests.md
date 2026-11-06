@@ -81,6 +81,10 @@ A reply in the thread of work you handed back (done or canceled) starts a chat s
 
 A merged or closed pull request, or a done ticket with no open pull request, is never reopened: file a follow-up ticket, linking it. A ticket marked done while one of its pull requests is still open (for example after a merge into another pull request's branch) is not finished: attach to that pull request. The round works on the pull request; the ticket stays done.
 
+## When `ost work attach` fails
+
+A refusal says why and what to do instead, for example ask the requester first or file a follow-up: do that. An error that gives no reason ("The office could not handle the request.") is the office's own: run the same attach once more. If it fails again, say in your last message that you could not continue the work, with the ticket linked and the error, so the requester can act; nothing is queued. Leave the ticket where it is. Do not move it to `active` yourself: that starts no work, so it would sit in progress with nothing working on it, and `ost ticket move` refuses it outside a round on the ticket.
+
 ## Limits
 
 A few chat sessions run at once (two by default; the team sets `policies.chat.parallel_sessions`). A message beyond that waits for a free session. Chat is answered even when your usage is above the pause limit for automatic work.

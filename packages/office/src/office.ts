@@ -217,6 +217,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     notify,
     push: (person) => server?.reports(person),
     clock,
+    logger: log,
     ...tracker,
     // The requester of the item's ticket, else the first human (as the pipeline's own fallback does).
     requesterChat: requesterChat({ store, workState, team }),

@@ -19,6 +19,7 @@ import {
   silentLogger,
   type PortName,
   type Runtime,
+  type RuntimeTool,
   type TeamConfig,
 } from "@outstaff/core";
 import {
@@ -680,5 +681,89 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       expect(officeChat.posts).toEqual([]);
       expect((await tracker.getIssue(issue.key)).status.canonical).toBe("blocked");
     });
+  });
+
+  it("continues work in review from a reply in its thread, though a repository cannot be listed", async () => {
+    await seedDraftPr();
+    const sent = await dana("please add a search page to the shop");
+    const attached: string[] = [];
+    let chats = 0;
+    let rounds = 0;
+    let statusInRound: string | undefined;
+    let summary = "Up for review.";
+    type Req = Parameters<Runtime["run"]>[0];
+    const chatSession = async (req: Req, tool: (name: string) => RuntimeTool) => {
+      const ctx = { workItemId: req.workItemId! };
+      if (++chats === 1) {
+        await tool("ticket_create").handler({ title: "Add a search page", body: "In chat." }, ctx);
+        return;
+      }
+
+      const done = await tool("work_attach").handler({ target: "ACME-1", confirmed: true }, ctx);
+      attached.push(JSON.stringify(done));
+    };
+
+    const round = async (req: Req, tool: (name: string) => RuntimeTool) => {
+      const ctx = { workItemId: req.workItemId! };
+      if (++rounds === 1) {
+        await tool("pr_update").handler({ repo: "app", number: 1, ready: true }, ctx);
+        return;
+      }
+
+      // The round finds its ticket active again, and hands the answer back for review.
+      statusInRound = (await tracker.getIssue("ACME-1")).status.canonical;
+      await tool("ticket_move").handler({ key: "ACME-1", to: "review" }, ctx);
+      summary = "Access works now.";
+    };
+
+    startLoop({
+      async *run(req) {
+        runtime.requests.push(req);
+        yield { type: "started", sessionId: `session-${req.workItemId}` };
+        const tool = (name: string) => req.tools.find((t) => t.name === name)!;
+        // A session without tools only writes the line of a report.
+        if (req.tools.length > 0) {
+          const chat = (await store.getItem(req.workItemId!))?.kind === "chat";
+          await (chat ? chatSession(req, tool) : round(req, tool));
+        }
+
+        yield { type: "finished", ok: true, text: summary };
+      },
+    });
+
+    await until(() => agentChat.posts.length === 2);
+    await until(async () => (await tracker.getIssue("ACME-1")).status.canonical === "review");
+
+    // The human closes the pull request and grants an access the office cannot list pull requests without yet.
+    await vcs.seed.close({ owner: "acme", name: "app" }, 1, "dana");
+    await office.parts.intake.pollOnce();
+    vcs.listPullRequests = () =>
+      Promise.reject(new Error("Resource not accessible by integration"));
+
+    await dana(
+      "Closed your PR and handled the access. Can you check if you have access now?",
+      sent.id,
+    );
+
+    // The reply's session attaches it to the ticket: a round runs on it, and its result goes to the thread.
+    await until(() => rounds === 2 && attached.length === 1);
+    expect(attached[0]).toContain("Added the request to ACME-1.");
+    await until(() => agentChat.posts.some((p) => p.text.includes("Access works now.")));
+    expect(agentChat.posts.find((p) => p.text.includes("Access works now."))).toMatchObject({
+      channel: DM,
+      thread: sent.id,
+    });
+
+    expect(statusInRound).toBe("active");
+    await until(async () => (await tracker.getIssue("ACME-1")).status.canonical === "review");
+    const work = (await store.listItems({ person: "sam" })).filter((i) => i.kind === "assigned");
+    expect(work.map((i) => [i.status, i.subject?.ref])).toEqual([
+      ["done", "ACME-1"],
+      ["done", "ACME-1"],
+    ]);
+
+    expect(await readFeedback(store, work[1]!.id)).toMatchObject([
+      { kind: "chat", body: expect.stringContaining("Can you check if you have access") as string },
+    ]);
   });
 });

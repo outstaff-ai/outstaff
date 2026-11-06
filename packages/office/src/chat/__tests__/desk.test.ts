@@ -1,4 +1,4 @@
-import { parseTeamConfig, type TeamConfig } from "@outstaff/core";
+import { parseTeamConfig, silentLogger, type TeamConfig } from "@outstaff/core";
 import { createFakeTracker } from "@outstaff/core/fakes";
 import { beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
@@ -890,6 +890,44 @@ describe("chat requests", () => {
         kind: "review_feedback",
         subject: { type: "pr", ref: "acme/app#11" },
       });
+    });
+
+    it("still attaches to a ticket in review when the office cannot look for new pull requests, and logs why", async () => {
+      ticket("ACME-13", { status: "review", assignee: { id: "u-1", kind: "human" } });
+      workers["ACME-13"] = "sam";
+      const warned: unknown[][] = [];
+      const logger = { ...silentLogger, warn: (...args: unknown[]) => void warned.push(args) };
+      desk = createChatDesk({
+        clock,
+        store,
+        scheduler,
+        team: teamConfig(),
+        workState: {
+          ...knownWork(),
+          catchUp: () => Promise.reject(new Error("Resource not accessible by integration")),
+        },
+        tracker,
+        linksOf: async () => [],
+        notify: (p) => notified.push(p),
+        logger,
+      });
+
+      const { attached } = await attach("ACME-13", true);
+      expect(await store.getItem(attached.item.id)).toMatchObject({
+        kind: "assigned",
+        status: "queued",
+        subject: { type: "ticket", ref: "ACME-13" },
+      });
+
+      expect(warned).toEqual([
+        [
+          "could not look for new pull requests",
+          expect.objectContaining({
+            ticket: "ACME-13",
+            error: "Error: Resource not accessible by integration",
+          }),
+        ],
+      ]);
     });
 
     it("treats a ticket in review without a pull request like a pull request in review", async () => {
