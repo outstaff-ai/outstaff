@@ -478,6 +478,9 @@ const wakesOf = (person: string) =>
     ),
   ].map((m) => m[1]);
 
+/** How many `merge_checks_failed` rounds the office queued for sam, or folded into an open one. */
+const fixRounds = () => wakesOf("sam").filter((k) => k === "merge_checks_failed").length;
+
 const piaWakes = () => wakesOf("pia");
 
 /** The id of the last work item the office queued for a person of that kind, from its log. */
@@ -2696,6 +2699,7 @@ async function main() {
   await canceledWhileQueued();
   await commentThenClose();
   await mergeChecks();
+  await deployStillFails();
   await staleBlockResolves();
   await recallHistory();
   await usagePerTicket();
@@ -4120,6 +4124,95 @@ async function staleBlockResolves() {
   step(
     `stale block: #${fixPr.number} fixed the outside cause and merged with the deploy green -> ${sub} closed with a note, then ${parent}, with no human action`,
   );
+}
+
+/**
+ * 13d'. a question in chat about a failure a queued round already fixes: sam is busy with a round held at a gate when
+ * the deploy after his merge fails, so the `merge_checks_failed` round waits in his queue. The human asks in chat why
+ * the deploy still fails. The chat session sees that round in its context and attaches the question to its ticket,
+ * which stays open; it files no ticket. The round then runs once: exactly one fix is opened.
+ */
+async function deployStillFails() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const { key } = await stub("POST", "/_test/tickets", { title: "Deploy the banner" });
+  await stub("POST", `/_test/tickets/${key}/assign`, { to: "sam" });
+  const ticketOf = (s: Json) => s.tickets.find((x: Json) => x.key === key);
+  const fixesOf = (s: Json) => s.github.pulls.filter((p: Json) => p.body.includes(`Closes ${key}`));
+  const [first] = await until(`a pull request for ${key}, the ticket in review`, (s) => {
+    const t = ticketOf(s);
+    return fixesOf(s).length === 1 && t.status === "In Review" && t.assignee !== "sam" && idle(s)
+      ? fixesOf(s)
+      : undefined;
+  });
+
+  await officePolledTwice(`${key} handed back`);
+  await stub("POST", "/_test/gates/closed/close");
+  const { key: busy } = await stub("POST", "/_test/tickets", {
+    title: "Check the banner font",
+    description: "which repo: unclear\nhold: closed",
+  });
+
+  await stub("POST", `/_test/tickets/${busy}/assign`, { to: "sam" });
+  await until(`sam's round on ${busy} held at the gate`, (s) => s.chat.gates.closed?.arrived);
+
+  const roundsBefore = fixRounds();
+  await stub("POST", `/_test/pulls/${first.number}/merge`, {
+    checks: [
+      {
+        name: "deploy",
+        conclusion: "failure",
+        step: "Apply the configuration",
+        log: ["Loading the configuration", "error: region is not set"],
+      },
+    ],
+  });
+
+  await until(`a merge_checks_failed round queued for sam on #${first.number}`, () =>
+    fixRounds() > roundsBefore ? true : undefined,
+  );
+
+  const ticketsBefore = (await state()).tickets.length;
+  const reply = await askSam("Why does the deploy still fail?", "sam's answer about the deploy");
+  assertSays(reply, "already queued", "the chat session attached to the queued round");
+  assertSays(reply, key, "the reply links the ticket of the failed merge");
+
+  await stub("POST", "/_test/gates/closed/open");
+  const fix = await until(`one fix for ${key}, and sam idle`, (s) => {
+    const fixes = fixesOf(s).filter((p: Json) => p.number !== first.number);
+    return fixes.length > 0 && idle(s) ? fixes : undefined;
+  });
+
+  await officePolledTwice(`the fix for ${key} handed back`);
+  const after = await state();
+  assertEq(
+    fixesOf(after).filter((p: Json) => p.number !== first.number).length,
+    1,
+    `exactly one fix pull request for ${key}`,
+  );
+
+  assertEq(after.tickets.length, ticketsBefore, "the chat session filed no ticket");
+  assertEq(
+    fixRounds(),
+    roundsBefore + 1,
+    "one merge_checks_failed round, and the attach queued no other",
+  );
+
+  assertEq(
+    ticketOf(after).moves.some((m: Json) => m.to === "Done"),
+    false,
+    `${key} stayed open after its merge's deploy failed`,
+  );
+
+  step(
+    `deploy still fails: #${first.number} merged, its deploy failed while sam was busy -> the human asked in chat, the session attached to the queued round on ${key}, filed nothing -> one fix #${fix[0].number}`,
+  );
+
+  await stub("POST", `/_test/pulls/${fix[0].number}/merge`, {
+    checks: [{ name: "deploy", conclusion: "success" }],
+  });
+
+  await until(`${key} done`, (s) => ticketOf(s).status === "Done");
 }
 
 /**

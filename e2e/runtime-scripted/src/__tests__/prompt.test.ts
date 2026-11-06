@@ -502,4 +502,55 @@ describe("latestChatMessage", () => {
     expect(parsePrompt(prompt)?.yours).toEqual([3]);
     expect(parsePrompt(buildWorkPrompt(base, { resumed: false }))).not.toHaveProperty("yours");
   });
+
+  it("reads the agent's own work a chat wake lists, with each item's kind and ticket", () => {
+    const base = offer("chat");
+    const prompt = buildWorkPrompt(
+      {
+        ...base,
+        context: {
+          ...base.context,
+          wake: {
+            tickets: [],
+            prs: [],
+            docs: [],
+            chats: [],
+            work: [
+              {
+                id: "w1",
+                title: "Add it",
+                status: "active",
+                kind: "assigned",
+                ticketKey: "SHOP-4",
+              },
+              {
+                id: "w2",
+                title: "merge checks failed",
+                status: "queued",
+                kind: "merge_checks_failed",
+                ticketKey: "SHOP-3",
+                pr: "github.acme.example/acme/shop#3",
+              },
+              { id: "w3", title: "A request", status: "queued" },
+            ],
+          },
+        },
+      },
+      { resumed: false },
+    );
+
+    expect(parsePrompt(prompt)?.work).toEqual([
+      { id: "w1", kind: "assigned", on: "SHOP-4", ticket: "SHOP-4", status: "active" },
+      {
+        id: "w2",
+        kind: "merge_checks_failed",
+        on: "github.acme.example/acme/shop#3",
+        ticket: "SHOP-3",
+        status: "queued",
+      },
+      { id: "w3", kind: "work", status: "queued" },
+    ]);
+
+    expect(parsePrompt(buildWorkPrompt(base, { resumed: false }))).not.toHaveProperty("work");
+  });
 });

@@ -365,6 +365,86 @@ describe("buildWorkPrompt wake context", () => {
     );
   });
 
+  it("lists the agent's own pull requests since a failure, with what to do when one fixes it", () => {
+    const prompt = buildWorkPrompt(
+      offer({
+        tickets: [],
+        prs: [],
+        docs: [],
+        chats: [],
+        recentPrs: [
+          {
+            ref: "acme/app#87",
+            number: 87,
+            title: "Set the deploy region",
+            url: "https://git.acme.example/acme/app/pull/87",
+            state: "open",
+            draft: false,
+            ticket: "ACME-108",
+            at: "2026-10-01T16:54:00.000Z",
+          },
+          {
+            ref: "acme/app#85",
+            number: 85,
+            title: "Draft the banner",
+            state: "merged",
+            draft: true,
+            at: "2026-10-01T16:53:00.000Z",
+          },
+        ],
+      }),
+      { resumed: false },
+    );
+
+    expect(prompt).toContain(
+      [
+        'Your pull requests in this repository opened or pushed to since this failure, on any ticket, latest first. Before you fix anything, check whether one of them already fixes it. If one does, do not fix it again: hand back with `ost handback silent --message "<which pull request fixes it>"`.',
+        "  - acme/app#87 (open, ACME-108, 2026-10-01T16:54:00.000Z): Set the deploy region https://git.acme.example/acme/app/pull/87",
+        "  - acme/app#85 (draft, merged, 2026-10-01T16:53:00.000Z): Draft the banner",
+      ].join("\n"),
+    );
+  });
+
+  it("lists a chat session's own running and queued work, with when to attach to it", () => {
+    const prompt = buildWorkPrompt(
+      offer({
+        tickets: [],
+        prs: [],
+        docs: [],
+        chats: [],
+        work: [
+          {
+            id: "w1",
+            title: "Add the banner",
+            status: "active",
+            kind: "assigned",
+            ticketKey: "ACME-106",
+          },
+          {
+            id: "w2",
+            title: "merge checks failed: PR #86",
+            status: "queued",
+            kind: "merge_checks_failed",
+            ticketKey: "ACME-107",
+            pr: "acme/app#86",
+            prUrl: "https://git.acme.example/acme/app/pull/86",
+          },
+          { id: "w3", title: "Tidy the notes", status: "queued" },
+        ],
+      }),
+      { resumed: false },
+    );
+
+    expect(prompt).toContain(
+      [
+        "Your own work now, the running items first, then your queue in the order it runs, then what waits. When the message is about something one of these already covers (the same failure, the same change), it is that work: attach the request to it with `ost work attach <its ticket or pull request> --confirmed`; never file a ticket for it. A merged pull request whose merge checks failed leaves its ticket open: attach to that ticket.",
+        "  - w1: assigned on ACME-106, active: Add the banner",
+        "  - w2: merge_checks_failed on acme/app#86 (ACME-107), queued: merge checks failed: PR #86 https://git.acme.example/acme/app/pull/86",
+        "  - w3: work, queued: Tidy the notes",
+      ].join("\n"),
+    );
+  });
+
   it("explains the mark only when something in the bundle is the agent's own", () => {
     const others: WakeContext = {
       ...wake,

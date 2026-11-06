@@ -2,9 +2,8 @@ import { silentLogger } from "@outstaff/core";
 import type { Attached, Feedback } from "@outstaff/protocol";
 import { summarizeItem } from "#/item-summary.js";
 import { ProtocolError } from "#/protocol/errors.js";
-import { CHAT_KIND } from "#/scheduler/policy.js";
-import type { WorkItem } from "#/store/types.js";
 import { addFeedback } from "#/work-feedback.js";
+import { liveWorkOn } from "./attach-live.js";
 import { attachSessionDocs } from "./desk-attach-docs.js";
 import type { ChatDeskOptions, ChatRequests, DeskFiling } from "./desk.types.js";
 import { resolveOwnWork } from "./desk-resolve.js";
@@ -17,9 +16,6 @@ import {
 } from "./origin.js";
 import { chatRefsOf } from "./refs.js";
 import type { ChatOriginRecord } from "./types.js";
-
-/** Work that is still open, the order an attached request prefers it in. */
-const LIVE: WorkItem["status"][] = ["active", "queued", "waiting", "blocked"];
 
 /**
  * `ost work attach`: makes a chat session's request part of existing work of the person, as a round on its pull
@@ -111,16 +107,7 @@ export function createAttach(
     };
 
     const note = `${who} asked in chat (thread ${origin.thread}); added to ${what}${key && !pr ? "" : key ? ` for ${key}` : ""}:\n${message}`;
-    const live = (await store.listItems({ person }))
-      .filter(
-        (i) =>
-          LIVE.includes(i.status) &&
-          i.kind !== CHAT_KIND &&
-          i.id !== session.id &&
-          ((i.subject?.type === "pr" && i.subject.ref === subject.ref) ||
-            (key !== undefined && i.subject?.type === "ticket" && i.subject.ref === key)),
-      )
-      .toSorted((a, b) => LIVE.indexOf(a.status) - LIVE.indexOf(b.status));
+    const live = await liveWorkOn(store, person, subject, key);
 
     const attachedOrigin: ChatOriginRecord = {
       channel: origin.channel,

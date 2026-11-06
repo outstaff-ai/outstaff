@@ -38,6 +38,9 @@ export interface ItemContext {
   /** The answer a PM's `Unblocked: <answer>` comment gives, among the ticket comments the wake carries. */
   unblocked?: string;
 
+  /** For a chat session: the agent's own open work items the wake context lists, with their kind and ticket. */
+  work?: { id: string; kind: string; on?: string; ticket?: string; status: string }[];
+
   /** The numbers of the pull requests the wake context marks as the agent's own ("(yours)"). */
   yours?: number[];
 
@@ -264,6 +267,25 @@ function parseYours(prompt: string): Pick<ItemContext, "yours"> {
   return yours.length ? { yours } : {};
 }
 
+// "Your own work now, ..." then one item per line: "  - <id>: <kind> on <pr or ticket> (<ticket>), <status>: <title>".
+function parseWork(prompt: string): Pick<ItemContext, "work"> {
+  const block = /^Your own work now,[^\n]*\n((?: {2}- [^\n]*(?:\n|$))+)/m.exec(prompt)?.[1];
+  const work = [
+    ...(block ?? "").matchAll(/^ {2}- (\S+): (\S+)(?: on (\S+?)(?: \((\S+)\))?)?, (\w+): /gm),
+  ].map((m) => {
+    const ticket = m[4] ?? (m[3] && !m[3].includes("#") ? m[3] : undefined);
+    return {
+      id: m[1]!,
+      kind: m[2]!,
+      ...(m[3] ? { on: m[3] } : {}),
+      ...(ticket ? { ticket } : {}),
+      status: m[5]!,
+    };
+  });
+
+  return work.length ? { work } : {};
+}
+
 // "For the merge decision, ..." then the pull request ("Mergeable: <state>.") and each other open pull request as
 // "  - <ref> by <author>: <title>" over "    <relation>. <Draft|Ready>, <approved|not approved>, ...".
 function parseMerge(prompt: string): Pick<ItemContext, "merge"> {
@@ -359,6 +381,7 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseAbout(prompt),
     ...parseUnblocked(prompt),
     ...parseYours(prompt),
+    ...parseWork(prompt),
     ...parseMerge(prompt),
     ...parseFailedChecks(prompt),
     ...parseNotes(prompt),

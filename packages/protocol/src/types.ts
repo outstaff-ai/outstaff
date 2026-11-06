@@ -23,6 +23,7 @@ import type {
   contextMergeSelfSchema,
   contextNoteSchema,
   contextPrSchema,
+  contextRecentPrSchema,
   contextReviewSchema,
   contextTicketSchema,
   contextWhySchema,
@@ -73,6 +74,7 @@ export type ContextNote = z.infer<typeof contextNoteSchema>;
 export type ContextTicket = z.infer<typeof contextTicketSchema>;
 export type ContextReview = z.infer<typeof contextReviewSchema>;
 export type ContextPr = z.infer<typeof contextPrSchema>;
+export type ContextRecentPr = z.infer<typeof contextRecentPrSchema>;
 export type ContextDoc = z.infer<typeof contextDocSchema>;
 export type ContextChat = z.infer<typeof contextChatSchema>;
 export type WorkSummary = z.infer<typeof workSummarySchema>;

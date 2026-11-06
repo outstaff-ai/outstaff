@@ -984,6 +984,29 @@ describe("chat requests", () => {
       expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([]);
     });
 
+    it("joins the round fixing the failed merge checks of a ticket's merged pull request, and queues nothing more", async () => {
+      ticket("ACME-17", { status: "review" });
+      const merged = pull(17, { ticket: "ACME-17", state: "merged", draft: false });
+      await store.upsertSubject("pr", "#17", merged);
+      const fixing = await scheduler.enqueue({
+        person: "sam",
+        kind: "merge_checks_failed",
+        title: "merge checks failed: PR #17",
+        trigger: "automation",
+        subject: { type: "pr", ref: "#17" },
+      });
+
+      const { attached } = await attach("ACME-17", true, "why does the deploy still fail?");
+      expect(attached.item.id).toBe(fixing.id);
+      expect(await readFeedback(store, fixing.id)).toMatchObject([
+        { kind: "chat", body: "why does the deploy still fail?" },
+      ]);
+
+      expect((await store.listItems({ person: "sam", status: "queued" })).map((i) => i.id)).toEqual(
+        [fixing.id],
+      );
+    });
+
     it("attaches a request about an open pull request to its ticket even when the ticket was closed early", async () => {
       ticket("ACME-14", { status: "done" });
       pull(49, { ticket: "ACME-14", draft: false });
