@@ -3,6 +3,7 @@ import type { GithubDeps, GithubOptions } from "./types.js";
 import { autoMergeOperations } from "./vcs/auto-merge.js";
 import { checkLinkOperations } from "./vcs/check-link.js";
 import { checkOperations } from "./vcs/checks.js";
+import { githubHostCli } from "./host-cli.js";
 import { createGithubContext } from "./vcs/context.js";
 import { conversationOperations } from "./vcs/conversation.js";
 import { eventOperations } from "./vcs/events.js";
@@ -15,6 +16,7 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
   const c = createGithubContext(ctx, deps);
   return {
     links: c.links,
+    hostCli: githubHostCli(ctx.options),
     ...identityOperations(c),
     ...pullOperations(c),
     ...requirementOperations(c),

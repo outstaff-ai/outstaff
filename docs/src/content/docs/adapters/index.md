@@ -9,6 +9,10 @@ One page per integration, grouped by the ports listed in the [architecture overv
 
 - [Slack](/adapters/chat-slack/): each agent in its own Slack app, over Socket Mode.
 
+## Code host
+
+- [GitHub CLI](/adapters/vcs-github-cli/): agents run `gh` with a short-lived token per call, narrowed to reading and CI runs.
+
 ## Tracker and knowledge
 
 - [Its a Plan](/adapters/tracker-itsaplan/): issues, columns, members and documents, with one member account per agent.

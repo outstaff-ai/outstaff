@@ -1,3 +1,4 @@
+import { RUN_ID } from "./actions-routes.js";
 import { appAuth } from "./app-auth.js";
 import { REVIEW_STATE, addComment, submitReview } from "./conversation.js";
 import { e2eState } from "./e2e-state.js";
@@ -45,7 +46,7 @@ function jobCheck(s: GithubStore, sha: string, c: DriverCheck) {
     status: "completed",
     conclusion: c.conclusion,
     job: true,
-    html_url: `https://github.acme.example/${s.repo.owner}/${s.repo.name}/actions/runs/9/job/${id}`,
+    html_url: `https://github.acme.example/${s.repo.owner}/${s.repo.name}/actions/runs/${RUN_ID}/job/${id}`,
   };
 
   s.jobs.set(id, {

@@ -68,6 +68,12 @@ export interface CommandRule {
    * tool declaration or a team rule that allows the program lifts it.
    */
   fallback?: boolean;
+
+  /**
+   * An allow rule that only declares the program (a `tools` entry without `allow`). It allows any arguments, but not
+   * past an adapter's allow rules for the program: installing the code host's CLI as a tool keeps the adapter's narrowing.
+   */
+  broad?: boolean;
 }
 
 /**

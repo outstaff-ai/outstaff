@@ -1,4 +1,5 @@
 import { createRouter } from "@outstaff/testing.http";
+import { actionsRoutes } from "./actions-routes.js";
 import { authRoutes } from "./auth-routes.js";
 import { branchRoutes } from "./branch-routes.js";
 import { commentRoutes } from "./comment-routes.js";
@@ -27,6 +28,7 @@ function createStore(opts: StandInOptions): GithubStore {
     prs: new Map(),
     checks: new Map(),
     jobs: new Map(),
+    reruns: [],
     threads: new Map(),
     reviews: new Map(),
     issueComments: new Map(),
@@ -59,6 +61,7 @@ export function createGithubStandIn(opts: StandInOptions) {
     ...commentRoutes(store, auth, repo),
     ...reactionRoutes(store, auth, repo),
     ...repoRoutes(store, repo),
+    ...actionsRoutes(store, auth, repo),
     ...branchRoutes(store.branch, repo),
     ...moreRoutes(store, api, opts.more ?? []),
     graphqlRoute(store, auth, opts.graphqlPath ?? "/graphql"),

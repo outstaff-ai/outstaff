@@ -19,7 +19,9 @@ import {
   type Policy,
 } from "@outstaff/core";
 import type { StartupOptions } from "./startup.types.js";
+import { installHostCliWrapper } from "#/repos/index.js";
 import { installTools, type ToolStatus } from "#/tools/index.js";
+import type { AgentEnv } from "#/verbs/types.js";
 import { StartupError } from "./startup-error.js";
 
 /** The runtime starts its children with the process environment, so the shims go on this process's PATH. */
@@ -89,6 +91,17 @@ export async function installDeclaredTools(
 
   (opts.tools?.addToPath ?? addToPath)(installed.shimsDir);
   return toolStatuses;
+}
+
+/**
+ * Puts the wrapper of the code host's CLI first on this process's PATH, ahead of the tools' shims, so the agent's
+ * `gh` (or the host's equivalent) runs with a token of its own per call. Nothing without a code host CLI.
+ */
+export function installHostCli(opts: StartupOptions, env: Pick<AgentEnv, "vcs">): void {
+  const cli = env.vcs?.hostCli;
+  if (cli) {
+    (opts.tools?.addToPath ?? addToPath)(installHostCliWrapper(opts.home, cli.command));
+  }
 }
 
 /** The person's permission policy, and the one chat sessions run under. */

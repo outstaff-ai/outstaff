@@ -186,6 +186,22 @@ describe("rule packs", () => {
     expect(run("code", [pack], "forge pr merge 1").effect).toBe("allow");
   });
 
+  it("keeps an adapter's narrowing when a tool declares its program without allow", () => {
+    const tool = toolsToPacks([{ name: "forge", version: "1.0.0", origin: "team" }]);
+    expect(run("code", [forge("adapter"), ...tool], "forge pr merge 1")).toMatchObject({
+      effect: "deny",
+      rule: "commands.narrowed",
+    });
+
+    expect(run("code", [forge("adapter"), ...tool], "forge pr view 1").rule).toBe("forge.view");
+    // Narrowing from a toolset or the team is still widened by a tool that allows everything.
+    expect(run("code", [forge("toolset"), ...tool], "forge pr merge 1").rule).toBe(
+      "tools.forge.all",
+    );
+
+    expect(run("code", tool, "forge pr merge 1").rule).toBe("tools.forge.all");
+  });
+
   it.each(["adapter", "toolset", "team"] as const)("deny wins in a %s pack", (source) => {
     const packs = [forge(source)];
     expect(run("code", packs, "forge api repos/x").effect).toBe("allow");

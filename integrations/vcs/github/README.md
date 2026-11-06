@@ -61,6 +61,8 @@ A person with no grants has no GitHub identity: their agent starts without the `
 - `react(repo, target, "eyes")`: with the own App's write token, `POST /repos/{o}/{r}/issues/comments/{id}/reactions` for a `conversation_comment` and `.../pulls/comments/{id}/reactions` for an `inline_comment`. Needs a write grant like the other write methods; GitHub answers an existing reaction of the same user with 200, so repeating it adds nothing. Pull requests: write covers inline comments and Issues: write covers conversation comments.
 - `resolveThread(repo, id, asLogin?)`: `asLogin` defaults to this container's own bot login (`<slug>[bot]`); refuses unless the last comment is `asLogin`'s, then requires `asLogin` to be this container's own bot login (`forbidden` otherwise, and in a container without an own App), and resolves with the own App's token.
 
+- `credentials(person, repo, access, "cli")`: the same Apps and the same grant checks, but the token asks for no permissions, so it carries what the App is granted on that one repository, and has no author. For one run of `gh` (see The gh CLI below).
+
 Installation tokens are cached and reused until five minutes before they expire. Tokens are never broader than the request. The JWT (RS256) is signed with `node:crypto`; there is no `jsonwebtoken` or `openssl` dependency.
 
 ### App permissions
@@ -87,15 +89,25 @@ An `*_INSTALLATION_ID` is the App's installation on one account that owns team r
 | `GH_OFFICE_APP_INSTALLATION_ID`                                | person, office | installation of the office App                        | yes                                                          |
 | `GH_OFFICE_APP_SLUG`                                           | person, office | office App slug                                       | yes                                                          |
 
+## The gh CLI
+
+The adapter declares GitHub's CLI as the code host's CLI (`Vcs.hostCli`): the command `gh`, the mise tool `gh` at a pinned version as the suggested `tools` entry, and the environment one run gets its token from. That is `GH_TOKEN` for github.com and `*.ghe.com`, and `GH_ENTERPRISE_TOKEN` plus `GH_HOST` for GitHub Enterprise Server, each with `GH_REPO` set to the repository the token is for and prompts and update checks off. The agent puts a wrapper named `gh` first on its PATH; each call runs `ost host-cli`, which asks this adapter for `credentials(person, repo, access, "cli")` and passes the token to that one `gh` process.
+
+A `cli` token asks GitHub for no permissions, so it carries what the App is granted, on the one repository: the own App's for a write grant, the read-only office App's for a read grant. The App's permissions are the hard limit. See [the gh CLI](https://docs.outstaff.work/adapters/vcs-github-cli/) for what agents may run.
+
 ## Command permissions
 
-The adapter contributes a rule pack for the `gh` CLI (`githubVcs.permissions()`, collected by `AdapterRegistry.rulePacks()` and merged by core's `buildPolicy({ packs })`). Core itself knows nothing about `gh`.
+The adapter contributes a rule pack for the `gh` CLI (`githubVcs.permissions()`, collected by `AdapterRegistry.rulePacks()` and merged by core's `buildPolicy({ packs })`). Core itself knows nothing about `gh`. Its allow rules narrow `gh` to what they list; its deny rules win over any other rule, and a `tools` entry for `gh` without `allow` installs it without widening the list.
 
-| Command          | Decision                                               |
-| ---------------- | ------------------------------------------------------ |
-| any `gh` command | denied (rule `gh.denied`); agents use `ost pr` instead |
-
-Agents hold no GitHub token: git gets short-lived tokens from the `ost git-credential` helper, and `GH_TOKEN` and `GITHUB_TOKEN` are scrubbed. The `gh` CLI does not use git credential helpers for API calls, so it could not authenticate anyway; the rule keeps agents from reaching for it.
+| Command                                                                            | Decision                                                                      |
+| ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `gh run view\|list\|watch\|rerun\|cancel\|download`, `gh workflow run\|view\|list` | allowed; re-running, cancelling and dispatching need the App's Actions: write |
+| `gh pr view\|checks\|diff\|list`, `gh actions-lock`, `gh api` (GET)                | allowed                                                                       |
+| `gh pr merge`                                                                      | denied (`gh.pr-merge`); merging goes through `ost pr merge`                   |
+| `gh pr review --approve`                                                           | denied (`gh.pr-approve`)                                                      |
+| `gh repo delete`, `gh repo edit`, `gh secret`                                      | denied (`gh.repo-delete`, `gh.repo-edit`, `gh.secret`)                        |
+| `gh api` with a method other than GET, with fields and no `-X`, or `graphql`       | denied (`gh.api-method`, `gh.api-fields`, `gh.api-graphql`)                   |
+| anything else                                                                      | refused (`commands.narrowed`); pull request work goes through `ost pr`        |
 
 ## What it implements
 

@@ -446,6 +446,28 @@ git config credential.helper '!ost git-credential'
 printf 'protocol=https\nhost=github.com\npath=acme-example/shop.git\n' | ost git-credential get
 ```
 
+## ost host-cli
+
+Runs the code host's CLI (gh for GitHub) with a short-lived token for one repository.
+
+The credential wrapper agents run the code host's CLI through: the agent puts a wrapper named like the CLI first on its PATH, which calls this. It finds the team repository the call acts on (`-R`, else the repository of the working directory), checks the person's grant on it, gets a short-lived token for it from the vcs adapter and runs the real CLI with the token in that one process's environment. Nothing is stored. The permission policy decides which of the CLI's commands an agent may run; the App's permissions are the limit.
+
+```
+ost host-cli [args...]
+```
+
+Exit codes:
+
+- the CLI's own exit code when it ran
+- 1: no team repository, no grant, the CLI is not installed, or the token could not be issued
+
+Examples:
+
+```sh
+ost host-cli -- run rerun 1234
+ost host-cli -- pr checks 7 -R acme/shop
+```
+
 ## ost ticket show
 
 Show a ticket with its description and comments.

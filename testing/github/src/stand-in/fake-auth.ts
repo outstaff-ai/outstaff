@@ -8,7 +8,7 @@ export const OFFICE_APP = 100;
 const personOf = (app: number) => (app === OWN_APP ? "sam" : undefined);
 
 const bearerOf = (req: StandInRequest) =>
-  (req.headers.get("authorization") ?? "").replace(/^[Bb]earer /, "");
+  (req.headers.get("authorization") ?? "").replace(/^(?:[Bb]earer|token) /, "");
 
 /** The `iss` of a JWT, unverified. */
 const issuerOf = (req: StandInRequest): number =>

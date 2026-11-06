@@ -110,7 +110,7 @@ Keep Playwright's default launch options. Chromium's own sandbox cannot run in t
 
 ## Narrowing a tool
 
-Without `allow`, or with `allow: all`, the tool runs with any arguments. `allow` narrows it:
+Without `allow`, or with `allow: all`, the tool runs with any arguments, except a code host's CLI (such as [`gh`](/adapters/vcs-github-cli/)), which keeps the narrowing its vcs adapter gives it. `allow` narrows it:
 
 - A list of words, such as `[get, describe, logs]`, allows those first subcommands only: `kubectl get pods` runs, `kubectl delete pod x` is denied. An entry of several words names a nested subcommand: `auth can-i` allows `kubectl auth can-i list pods`, not `kubectl auth reconcile`.
 

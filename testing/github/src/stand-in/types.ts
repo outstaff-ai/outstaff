@@ -157,6 +157,15 @@ export interface StoredJob {
   log: string;
 }
 
+/** A re-run of a workflow run someone asked for, and whether only its failed jobs. */
+export interface StoredRerun {
+  runId: number;
+
+  /** The login behind the token, with `[bot]`. */
+  actor: string;
+  failedOnly: boolean;
+}
+
 /** The id counters; each is bumped before use. */
 export interface StandInCounters {
   eventId: number;
@@ -190,6 +199,7 @@ export interface GithubStore {
   prs: Map<number, StoredPull>;
   checks: Map<string, StoredCheckRun[]>;
   jobs: Map<number, StoredJob>;
+  reruns: StoredRerun[];
   threads: Map<string, StoredThread>;
   reviews: Map<number, StoredReview>;
   issueComments: Map<number, StoredIssueComment>;

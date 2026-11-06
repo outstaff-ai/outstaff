@@ -6,6 +6,8 @@ export {
   repoForRequest,
 } from "./credential-helper.js";
 
+export { createHostCliRunner, repoFlag, teamRepoFor } from "./host-cli.js";
+export { hostCliBinDir, installHostCliWrapper, whichPast } from "./host-cli-wrapper.js";
 export { CREDENTIAL_HELPER, prePushHook, syncRepositories } from "./clone.js";
 export { runGit } from "./git.js";
 export { createWorkspaces, headBranchOf, repoForItem, safeId } from "./workspaces.js";
@@ -14,6 +16,9 @@ export type {
   CredentialHelper,
   CredentialHelperOptions,
   CredentialOperation,
+  ExecProgram,
+  HostCliRunner,
+  HostCliRunnerOptions,
   RepoHead,
   RunGit,
   SyncRepositoriesOptions,

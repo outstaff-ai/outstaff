@@ -44,12 +44,12 @@ const runner = createAgentRunner({
   stockCatalogDir: dirname(fileURLToPath(import.meta.resolve("@outstaff/catalog/package.json"))),
   agentVersion: "e2e",
   log,
-  // The developer toolset installs pnpm, yarn, python and go with mise at start, and the test must not
-  // download anything. The image (agent-e2e) carries pnpm, so mise really answers for it, and the global config
-  // the agent wrote must make its shim work; installing and the other tools are reported as done.
+  // The developer toolset installs pnpm, yarn, python and go with mise at start, and the team declares gh; the test
+  // must not download anything. The image (agent-e2e) carries pnpm and gh, so mise really answers for them, and the
+  // global config the agent wrote must make their shims work; installing and the other tools are reported as done.
   tools: {
     mise: (args, opts) =>
-      args[1]?.startsWith("pnpm") ? runMise(args, opts) : declared(args, opts),
+      /^(pnpm|gh)\b/.test(args[1] ?? "") ? runMise(args, opts) : declared(args, opts),
   },
 });
 
