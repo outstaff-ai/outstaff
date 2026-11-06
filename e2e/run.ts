@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again, and work asked for in chat while one round runs with nothing queued is placed next and acknowledged as running after that round, with no question, and runs once it ends. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2703,6 +2703,7 @@ async function main() {
   await roadmap();
   await lateInputOneRound();
   await continueFromReview();
+  await filedBehindRunning();
   await planInChat();
   await planForLater();
 
@@ -3126,6 +3127,58 @@ async function roadmap() {
   );
 
   step(`roadmap: a human confirmed Monitoring -> pia started it and filed ${filed[0].key} only`);
+}
+
+const RUNNING = "Tidy the changelog";
+
+const BEHIND = "Sort the changelog entries";
+
+/**
+ * 13i. work filed in chat while sam runs one item and nothing is queued: it is placed next, so the acknowledgement
+ * says it runs after the running work, with no list and nothing to answer, and it runs once that round ends.
+ */
+async function filedBehindRunning() {
+  await agentIdle();
+  await stub("POST", "/_test/gates/running/close");
+  await stub("POST", "/_test/chat/say", { text: `New work: ${RUNNING}\nhold: running` });
+  await until(`sam's round on ${RUNNING} held at the gate`, (s) =>
+    s.chat.gates.running?.arrived ? true : undefined,
+  );
+
+  const running = (await state()).tickets.find((t: Json) => t.title === RUNNING);
+  const request = await stub("POST", "/_test/chat/say", { text: `New work: ${BEHIND}` });
+  const ack = await until("the acknowledgement of the work filed behind the running round", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === request.id && p.text.includes("On it")),
+  );
+
+  assertEq(ack.text.includes("Tell me if"), false, "nothing queued: no list, no offer to move it");
+  assertEq(
+    ack.text.includes("It runs after") &&
+      ack.text.includes(running.key) &&
+      ack.text.includes("which is running now"),
+    true,
+    `the acknowledgement says it runs after ${running.key}`,
+  );
+
+  await stub("POST", "/_test/gates/running/open");
+  const behind = await until(`${BEHIND} worked and in review, with no placement answer`, (s) => {
+    const t = s.tickets.find((x: Json) => x.title === BEHIND);
+    const pr = t ? s.github.pulls.find((p: Json) => p.body.includes(`Closes ${t.key}`)) : undefined;
+    return t && pr && t.status === "In Review" ? t : undefined;
+  });
+
+  await agentIdle();
+  assertEq(
+    (await state()).chat.posts.some(
+      (p: Json) => p.thread === request.id && p.text.includes("Tell me if"),
+    ),
+    false,
+    "nothing was offered or asked in the thread",
+  );
+
+  step(
+    `filed behind running work: ${behind.key} asked for while ${running.key} ran with nothing queued -> placed next with no question, it ran after ${running.key}`,
+  );
 }
 
 const DECISION = "the cache size";

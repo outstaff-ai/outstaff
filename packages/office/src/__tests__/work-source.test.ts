@@ -107,7 +107,6 @@ describe("work source: a chat session beside running work", () => {
       channel: "D1",
       thread: "t1",
       requester: { id: "U1" },
-      awaitingPlacement: false,
       claimed: [],
       about: { id: work.id, title: work.title, state: "running" },
     });

@@ -67,7 +67,8 @@ export interface ChatRelay {
 
   /**
    * First reply in the thread, once the chat session ends having filed requests as work: one reply for all of them,
-   * saying what tracks each, and when the person is busy the work in the order it runs and the question where it goes.
+   * saying what tracks each, and when the person is busy where the work went: next, after the running work, with the
+   * queued work it is ahead of and the offer to move it.
    * Posted once per session round.
    */
   acknowledge(offer: Offer, filings: Filing[]): Promise<void>;

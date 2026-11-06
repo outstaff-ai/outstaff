@@ -135,7 +135,6 @@ function originOf(
     requester: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
     direct: m.direct,
     participant: m.participant,
-    awaitingPlacement: false,
     claimed: [],
     text: m.text,
     ...(m.files?.length ? { files: m.files } : {}),

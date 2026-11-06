@@ -52,7 +52,6 @@ describe("chat sessions the pipeline queues", () => {
       requester: { id: "U-SAM" },
       direct: true,
       participant: true,
-      awaitingPlacement: false,
       claimed: [],
       text: m.text,
       files,

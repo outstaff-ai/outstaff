@@ -8,6 +8,7 @@ import { openStore } from "#/store/index.js";
 import type { Store, WorkItem } from "#/store/types.js";
 import { createChatDesk } from "#/chat/desk.js";
 import type { ChatRequests } from "#/chat/desk.types.js";
+import { placeQueued } from "#/chat/placement.js";
 import { openChatSession } from "#/chat/session.js";
 import { readOrigin, threadsOf, withThread } from "#/chat/origin.js";
 import type { DocLink, DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
@@ -399,7 +400,7 @@ describe("chat requests", () => {
   describe("filing work", () => {
     it("creates a work item for the ticket in the session's thread, once", async () => {
       const { session, filed, item } = await fileWork("Add a search page", "ACME-5");
-      expect(filed).toMatchObject({ url: tracker.links.issue("ACME-5"), waiting: false, work: [] });
+      expect(filed).toMatchObject({ url: tracker.links.issue("ACME-5"), work: [] });
 
       const created = (await store.getItem(item.id))!;
       expect(created).toMatchObject({
@@ -413,7 +414,6 @@ describe("chat requests", () => {
       expect(await readOrigin(store, created.id)).toMatchObject({
         thread: "m1",
         requester: DANA,
-        awaitingPlacement: false,
       });
 
       expect(await readOrigin(store, session.id)).toMatchObject({ filed: created.id });
@@ -459,8 +459,8 @@ describe("chat requests", () => {
         requests: ["add a search page", "fix the footer", "tidy the header"],
       });
 
-      // The first filing does not make the person busy for the second: nothing is asked.
-      expect(second.waiting).toBe(false);
+      // The first filing does not make the person busy for the second: there is nothing to say about its place.
+      expect(second.work).toEqual([]);
       await expect(
         desk.linkTicket("sam", first.session.id, "ACME-8", "Fix the footer"),
       ).rejects.toMatchObject({ code: "invalid" });
@@ -564,22 +564,42 @@ describe("chat requests", () => {
       });
     });
 
-    it("lists the busy person's work and waits last, for the placement question", async () => {
-      await busyWith("Running thing", "Queued thing");
+    it("places the work next, ahead of the queued work, and lists that work for the offer to move it", async () => {
+      await busyWith("Running thing", "Queued thing", "Queued later");
       const { filed, item } = await fileWork();
-      expect(filed.waiting).toBe(true);
       expect(filed.work.map((w) => [w.title, w.status])).toEqual([
         ["Running thing", "active"],
         ["Queued thing", "queued"],
+        ["Queued later", "queued"],
       ]);
 
-      expect(await queueOrder()).toEqual(["Queued thing", "Fix the footer"]);
-      expect(await readOrigin(store, item.id)).toMatchObject({ awaitingPlacement: true });
+      expect(await queueOrder()).toEqual(["Fix the footer", "Queued thing", "Queued later"]);
+      expect((await store.readJournal(item.id)).map((j) => j.text).at(-1)).toContain(
+        "this runs next: after the work running now, ahead of the work already queued",
+      );
+
+      // The requester answers "after 2": the chat session that answer wakes moves it as any move.
+      await placeQueued({ store, scheduler }, item.id, { after: filed.work[2]!.id });
+      expect(await queueOrder()).toEqual(["Queued thing", "Queued later", "Fix the footer"]);
+    });
+
+    it("places the work right after the running work when nothing is queued", async () => {
+      await busyWith("Running thing");
+      const { filed } = await fileWork();
+      expect(filed.work.map((w) => [w.title, w.status])).toEqual([["Running thing", "active"]]);
+      expect(await queueOrder()).toEqual(["Fix the footer"]);
+    });
+
+    it("keeps work the same session filed earlier ahead of the next filing", async () => {
+      await busyWith("Running thing", "Queued thing");
+      const first = await fileWork("Fix the footer");
+      await desk.queueWork("sam", first.session.id, { title: "Tidy the header", body: "Asked." });
+      expect(await queueOrder()).toEqual(["Fix the footer", "Tidy the header", "Queued thing"]);
     });
 
     it("starts once the session ends for an idle person, and asks nothing", async () => {
       const { item, filed, session } = await fileWork();
-      expect(filed).toMatchObject({ waiting: false, work: [] });
+      expect(filed).toMatchObject({ work: [] });
       expect(await scheduler.next("sam")).toBeNull();
       await scheduler.finish(session.id, { outcome: "answered" });
       expect((await scheduler.next("sam"))?.id).toBe(item.id);
@@ -646,7 +666,6 @@ describe("chat requests", () => {
       const { s, attached } = await attach("ACME-11");
       expect(attached).toMatchObject({
         item: { id: running!.id },
-        waiting: false,
         work: [],
         attached: { ticket: { ref: "ACME-11" }, pr: { ref: "#11" } },
       });
@@ -662,7 +681,6 @@ describe("chat requests", () => {
       expect(await readOrigin(store, running!.id)).toMatchObject({
         thread: "m1",
         requester: DANA,
-        awaitingPlacement: false,
       });
 
       expect(await readOrigin(store, s.id)).toMatchObject({ filed: running!.id });
@@ -726,7 +744,6 @@ describe("chat requests", () => {
         channel: "D0",
         thread: "t0",
         requester: { id: "U0OTHER001" },
-        awaitingPlacement: false,
         claimed: [],
       });
 
@@ -773,10 +790,7 @@ describe("chat requests", () => {
         { actor: "Dana", kind: "chat", body: "for the search PR, also support filters" },
       ]);
 
-      expect(await readOrigin(store, item.id)).toMatchObject({
-        awaitingPlacement: false,
-        thread: "m1",
-      });
+      expect(await readOrigin(store, item.id)).toMatchObject({ thread: "m1" });
 
       expect(attached.attached.pr).toMatchObject({
         ref: "#11",

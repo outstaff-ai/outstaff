@@ -56,7 +56,6 @@ type Reply = [type: string, payload?: unknown];
 
 const filedReply = {
   item: { id: "w9", title: "Filed", status: "queued" },
-  waiting: false,
   work: [],
 };
 
