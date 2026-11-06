@@ -5,6 +5,17 @@ import type { AdapterPort, ConfigIssue, TeamConfig } from "./types.js";
 
 export const ADAPTER_PORTS = ["chat", "vcs", "runtime", "tracker", "knowledge", "avatars"] as const;
 
+/**
+ * The ports the office itself uses. Runtime and avatars belong to the agents and the CLI, so the office neither ships
+ * their adapters nor checks them.
+ */
+export const OFFICE_PORTS = [
+  "vcs",
+  "tracker",
+  "chat",
+  "knowledge",
+] as const satisfies readonly (typeof ADAPTER_PORTS)[number][];
+
 const registry = new Map<string, z.ZodType>();
 const key = (port: AdapterPort, adapter: string) => `${port}:${adapter}`;
 

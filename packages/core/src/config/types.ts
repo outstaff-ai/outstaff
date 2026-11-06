@@ -1,6 +1,6 @@
 import type { z } from "zod";
 import type { Capability } from "#/types.js";
-import type { ADAPTER_PORTS } from "./adapters.js";
+import type { ADAPTER_PORTS, OFFICE_PORTS } from "./adapters.js";
 import type { CONFIG_CODES } from "./codes.js";
 import type { networkSchema } from "./network.js";
 import type { teamConfigSchema } from "./schema.js";
@@ -10,6 +10,9 @@ export type TeamConfig = z.output<typeof teamConfigSchema>;
 export type TeamConfigInput = z.input<typeof teamConfigSchema>;
 
 export type AdapterPort = (typeof ADAPTER_PORTS)[number];
+
+/** A port the office itself uses. */
+export type OfficePort = (typeof OFFICE_PORTS)[number];
 
 export type ConfigCode = (typeof CONFIG_CODES)[keyof typeof CONFIG_CODES];
 

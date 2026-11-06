@@ -5,7 +5,7 @@ import {
   type Chat,
   type Knowledge,
   type Logger,
-  type PortName,
+  type OfficePort,
   type SecretSource,
   type TeamConfig,
   type Tracker,
@@ -22,7 +22,8 @@ interface Input {
   logger: Logger;
 }
 
-async function create(port: PortName, input: Input) {
+/** One of the office's own ports (`OFFICE_PORTS`), which are the ones its doctor checks. */
+async function create(port: OfficePort, input: Input) {
   const ref = (input.team.integrations as Record<string, { adapter: string } | undefined>)[port];
   if (!ref) {
     return undefined;
@@ -91,7 +92,7 @@ async function knowledgePort(input: Input): Promise<Knowledge | undefined> {
  * it, and chat only when `office.channel` names the team channel agent questions are mirrored to. The knowledge base is
  * read for comments on documents; a knowledge adapter this image lacks, or one that fails to start, costs that
  * feedback and nothing else.
- * Runtime and avatars belong to the agents, not the office.
+ * Runtime and avatars belong to the agents and the CLI, not the office (`OFFICE_PORTS`).
  */
 export async function createOfficePorts(input: Input): Promise<OfficePorts> {
   const vcs = (await create("vcs", input)) as Vcs | undefined;
