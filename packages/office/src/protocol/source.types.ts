@@ -120,8 +120,8 @@ export interface ChatDesk {
   posted(person: string, workItemId: string, id: string): Promise<void>;
 
   /**
-   * Files the ticket a chat session created as work: a work item for the ticket, in the session's thread. It starts
-   * when the person is idle and otherwise waits last until the requester says where it goes.
+   * Files the ticket a chat session created as work: a work item for the ticket, in the session's thread, placed next:
+   * it starts when the person is idle, and otherwise runs after the running work, ahead of the queued work.
    */
   linkTicket(person: string, workItemId: string, ticket: string, request: string): Promise<Filed>;
 

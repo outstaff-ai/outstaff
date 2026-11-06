@@ -8,9 +8,6 @@ export interface ChatOriginRecord extends ChatOrigin {
    */
   also?: ChatOrigin[];
 
-  /** The request waits last until the requester says where it goes. */
-  awaitingPlacement: boolean;
-
   /** The message that started the session, for the office's own use (it is not offered to the agent). */
   text?: string;
 

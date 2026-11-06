@@ -35,7 +35,6 @@ async function setup(opts: { answered?: boolean; chat?: boolean } = {}) {
     requester: { id: "U1" },
     direct: true,
     participant: true,
-    awaitingPlacement: false,
     claimed: ["result:1"],
   });
 

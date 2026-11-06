@@ -77,7 +77,6 @@ describe("the office's rounds after a hand-back", () => {
         requester: { id: "U1" },
         direct: true,
         participant: true,
-        awaitingPlacement: true,
         claimed: ["result:1"],
         also: [
           { channel: "D1", thread: "m2", requester: { id: "U1" }, direct: true, participant: true },
@@ -93,11 +92,7 @@ describe("the office's rounds after a hand-back", () => {
       expect(next).toMatchObject({ kind: "assigned", parentId: first.id, subject: first.subject });
       expect((await readFeedback(store, next.id)).map((f) => f.body)).toEqual(["late"]);
       expect((await store.listItemRefs(next.id)).map((r) => r.ref)).toEqual(["ACME-1"]);
-      expect(await readOrigin(store, next.id)).toEqual({
-        ...origin,
-        awaitingPlacement: false,
-        claimed: [],
-      });
+      expect(await readOrigin(store, next.id)).toEqual({ ...origin, claimed: [] });
 
       expect(await store.listItems({ person: "sam", status: "queued" })).toHaveLength(1);
       expect(logged).toHaveLength(1);

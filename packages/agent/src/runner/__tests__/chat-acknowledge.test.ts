@@ -6,7 +6,6 @@ import { linksToList, reportBody } from "#/runner/chat-report.js";
 const filed = (over: Partial<Filed> = {}) =>
   ({
     item: { id: "w9", title: "Filed", status: "queued" },
-    waiting: false,
     work: [],
     ...over,
   }) as Filed;

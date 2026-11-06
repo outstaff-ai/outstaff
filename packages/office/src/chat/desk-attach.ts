@@ -128,7 +128,6 @@ export function createAttach(
       requester: origin.requester,
       direct: origin.direct,
       participant: origin.participant,
-      awaitingPlacement: false,
       claimed: [],
     };
 
@@ -213,7 +212,6 @@ export function createAttach(
     const ticketUrl = key ? (ticket?.url ?? opts.tracker?.links.issue(key)) : undefined;
     return {
       item: await summarizeItem(store, (await store.getItem(item.id)) ?? item),
-      waiting: false,
       work: [],
       attached: {
         ...(key

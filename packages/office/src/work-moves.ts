@@ -1,6 +1,5 @@
 import type { WorkSummary } from "@outstaff/protocol";
 import { placeQueued } from "./chat/placement.js";
-import { readOrigin } from "./chat/origin.js";
 import { ProtocolError } from "./protocol/errors.js";
 import type { WorkSource } from "./protocol/source.types.js";
 import type { Placement } from "./scheduler/types.js";
@@ -40,14 +39,6 @@ export function workMoves(
   /** The item as it is now, for the answer. */
   const summaryNow = async (item: WorkItem) =>
     summaryOf((await store.getItem(item.id)) ?? item, item.id);
-
-  /** A placed item is no longer waiting for its requester to say where it goes. */
-  const placed = async (id: string) => {
-    const origin = await readOrigin(store, id);
-    if (origin?.awaitingPlacement) {
-      await store.upsertSubject("chat_origin", id, { ...origin, awaitingPlacement: false });
-    }
-  };
 
   const requeue = async (person: string, item: WorkItem) => {
     if (!REQUEUABLE.has(item.status)) {
@@ -107,7 +98,6 @@ export function workMoves(
         throw invalid(error);
       });
 
-      await placed(id);
       await store.appendJournal(
         id,
         person,

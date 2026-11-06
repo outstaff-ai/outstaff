@@ -77,8 +77,11 @@ const prLabel = (g: WorkGroup) =>
 const prHeadText = (g: WorkGroup) =>
   g.prNumber === undefined ? g.title : `${prLabel(g)}${g.prTitle ? ` ${g.prTitle}` : ""}`;
 
-/** The linked title a group's line starts with. */
-function headOf(g: WorkGroup, ticketUrl: (key: string) => string | undefined): string {
+/** The linked title a group's line starts with: `[ACME-1 Title](ticket link)`. */
+export function formatWorkGroupHead(
+  g: WorkGroup,
+  ticketUrl: (key: string) => string | undefined,
+): string {
   if (g.ticketKey) {
     return link(
       withKey(g.ticketKey, g.ticketTitle ?? primaryTitle(g)),
@@ -110,6 +113,6 @@ export function formatWorkGroups(
 ): string[] {
   return groups.map((g, n) => {
     const states = [...new Set(g.items.flatMap((i) => itemState(g, i)))];
-    return `${n + 1}. ${headOf(g, ticketUrl)}${states.length ? ` (${states.join("; ")})` : ""}`;
+    return `${n + 1}. ${formatWorkGroupHead(g, ticketUrl)}${states.length ? ` (${states.join("; ")})` : ""}`;
   });
 }

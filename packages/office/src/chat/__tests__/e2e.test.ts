@@ -403,7 +403,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
     await until(async () => (await store.getItem(main.id))!.status === "blocked");
   });
 
-  it("asks where work goes when the agent is busy, and the agent moves it with the verb", async () => {
+  it("places work next when the agent is busy, offers to move it, and the agent moves it with the verb", async () => {
     const main = await office.parts.scheduler.enqueue({
       person: "sam",
       kind: "ticket",
@@ -443,32 +443,36 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
 
     const sent = await dana("fix the footer");
     await until(() => agentChat.posts.length === 1);
-    const asked = agentChat.posts[0]!;
-    expect(asked.thread).toBe(sent.id);
-    expect(asked.text).toContain("On it. Tracked in");
-    expect(asked.text).toContain("busy");
-    expect(asked.text).toContain(
-      `1. [ACME-77 Checkout bug](${tracker.links.issue("ACME-77")}) (running)`,
+    const told = agentChat.posts[0]!;
+    expect(told.thread).toBe(sent.id);
+    expect(told.text).toContain("On it. Tracked in");
+    expect(told.text).toContain(
+      `Queued next, after [ACME-77 Checkout bug](${tracker.links.issue("ACME-77")}) (running). Ahead of:`,
     );
 
-    expect(asked.text).toContain(`2. [ACME-78 Search page](${tracker.links.issue("ACME-78")})`);
-    expect(asked.text).toContain("Where does this go");
+    expect(told.text).toContain(`1. [ACME-78 Search page](${tracker.links.issue("ACME-78")})`);
+    expect(told.text).toContain("Tell me if it should go after one of these instead.");
 
     const titles = async () =>
       (await store.listItems({ person: "sam", status: "queued" }))
         .toSorted((a, b) => a.priority - b.priority || a.position - b.position)
         .map((i) => i.title);
 
-    // The filed work waits last until the requester says; their answer reaches a chat session, which moves it.
-    expect(await titles()).toEqual(["Search page", expect.stringContaining("ACME-")]);
-    const filed = (await store.listItems({ person: "sam", status: "queued" })).find(
-      (i) => i.kind === "assigned",
-    )!;
+    // The filed work is next at once; an answer like "after 1" reaches a chat session, which moves it.
+    expect(await titles()).toEqual([expect.stringContaining("ACME-"), "Search page"]);
+    const queued = await store.listItems({ person: "sam", status: "queued" });
+    const filed = queued.find((i) => i.kind === "assigned")!;
+    const search = queued.find((i) => i.title === "Search page")!;
 
+    await runVerb(findVerb("work.move")!, env, {
+      id: filed.id,
+      position: "after",
+      relativeTo: search.id,
+    });
+
+    expect(await titles()).toEqual(["Search page", expect.stringContaining("ACME-")]);
     await runVerb(findVerb("work.move")!, env, { id: filed.id, position: "next" });
     expect((await titles())[0]).toContain("ACME-");
-    await runVerb(findVerb("work.move")!, env, { id: filed.id, position: "last" });
-    expect((await titles()).at(-1)).toContain("ACME-");
     await expect(
       runVerb(findVerb("work.move")!, env, { id: filed.id, position: "after" }),
     ).rejects.toMatchObject({ code: "invalid" });

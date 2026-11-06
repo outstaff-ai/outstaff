@@ -38,7 +38,6 @@ async function carryOrigin(store: Store, from: WorkItem, to: WorkItem): Promise<
     requester: origin.requester,
     direct: origin.direct,
     participant: origin.participant,
-    awaitingPlacement: false,
     claimed: [],
     ...(origin.also ? { also: origin.also } : {}),
   } satisfies ChatOriginRecord);
