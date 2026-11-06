@@ -9,6 +9,7 @@ export { parseTeamConfig } from "./config/parse.js";
 export { buildTeamJsonSchema } from "./config/json-schema.js";
 export {
   ADAPTER_PORTS,
+  OFFICE_PORTS,
   registerAdapterOptions,
   validateAdapterOptions,
   clearAdapterOptions,
@@ -27,6 +28,7 @@ export { USAGE_FIELDS, usageSettings, wantedTrackerFields } from "./config/usage
 export type {
   AdapterInfo,
   AdapterPort,
+  OfficePort,
   ConfigCode,
   ConfigFs,
   ConfigIssue,

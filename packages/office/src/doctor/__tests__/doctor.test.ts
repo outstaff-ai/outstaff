@@ -139,6 +139,26 @@ describe("the office's doctor", () => {
     );
   });
 
+  it("leaves out the ports the office does not use, and warns about an adapter of its own it lacks", async () => {
+    const t = team();
+    t.integrations = {
+      ...t.integrations,
+      runtime: { adapter: "claude" },
+      avatars: { adapter: "dicebear" },
+      tracker: { adapter: "missing" },
+    } as TeamConfig["integrations"];
+
+    make(t);
+    await doctor.run();
+    const checks = (await doctor.health()).checks;
+    expect(checks.filter((c) => c.status !== "ok").map((c) => [c.name, c.detail])).toEqual([
+      [
+        "tracker/missing not checked",
+        "tracker/missing is not shipped in this build, so its secrets and setup are not checked.",
+      ],
+    ]);
+  });
+
   it("joins a run in progress, keeps agents' reports and numbers repeated names", async () => {
     make(team({ daily_at: "05:30" }));
     let release!: () => void;

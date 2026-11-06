@@ -1,3 +1,4 @@
+import { OFFICE_PORTS } from "#/config/adapters.js";
 import { integrationsFor } from "#/config/runtime-of.js";
 import type { TeamConfig } from "#/config/types.js";
 import type { DeriveContext, DoctorCheck } from "#/ports/adapter.js";
@@ -6,9 +7,14 @@ import type { PortName } from "#/ports/adapter.js";
 import { fail } from "./check.js";
 import type { ConfiguredAdapter, DoctorScope, ScopeChecksInput, ScopedCheck } from "./types.js";
 
+const officePorts: ReadonlySet<string> = new Set(OFFICE_PORTS);
+
+/** Whether a scope uses a port: the office only its own ports, a person every one. */
+const usesPort = (scope: DoctorScope, port: string) => scope === "person" || officePorts.has(port);
+
 /**
- * The adapters the team file configures for a scope (the office has no runtime; a person runs on their own runtime,
- * else the team's), and the ones not in `registry`.
+ * The adapters the team file configures for a scope (the office only those of `OFFICE_PORTS`; a person runs on their
+ * own runtime, else the team's), and the ones not in `registry`.
  */
 export function configuredAdapters(
   team: TeamConfig,
@@ -19,7 +25,7 @@ export function configuredAdapters(
   const found: ConfiguredAdapter[] = [];
   const unknown: string[] = [];
   for (const [port, ref] of Object.entries(integrationsFor(team, person))) {
-    if (!ref || (scope === "office" && port === "runtime")) {
+    if (!ref || !usesPort(scope, port)) {
       continue;
     }
 

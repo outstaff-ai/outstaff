@@ -18,6 +18,7 @@ const team = {
     knowledge: { adapter: "fake" },
     chat: { adapter: "missing" },
     runtime: { adapter: "fake" },
+    avatars: { adapter: "dicebear" },
   },
 } as unknown as TeamConfig;
 
@@ -34,10 +35,16 @@ const withDoctor = (port: "tracker" | "knowledge", doctor: () => Promise<DoctorC
   });
 
 describe("the shared doctor checks", () => {
-  it("skips the runtime for the office and names adapters this build does not ship", () => {
+  it("skips the runtime and avatars for the office and names adapters this build does not ship", () => {
     const { found, unknown } = configuredAdapters(team, fake, "office");
     expect(found.map((f) => f.def.port)).toEqual(["tracker", "knowledge"]);
     expect(unknown).toEqual(["chat/missing"]);
+  });
+
+  it("checks every port for a person, and names an avatars adapter this build does not ship", () => {
+    const { found, unknown } = configuredAdapters(team, fake, "person", team.people[0]);
+    expect(found.map((f) => f.def.port)).toEqual(["tracker", "knowledge", "runtime"]);
+    expect(unknown).toEqual(["chat/missing", "avatars/dicebear"]);
   });
 
   describe("a person's own runtime", () => {
