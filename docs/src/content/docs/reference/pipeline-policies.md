@@ -39,6 +39,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`), unless the blocker is a sub-ticket of the same parent and the parent is with that agent (`parentAgent`): then only move it; with no agent assigned, act for `closer`: move the ticket to `ready` |
 | [`blocked_maybe_resolved_to_pm`](#blocked_maybe_resolved_to_pm) | `ticket.block_maybe_resolved` | wake `role:pm` (kind `unblock`), when the team has a PM |
+| [`stale_board_to_pm`](#stale_board_to_pm) | `board.stale` | wake `role:pm` (kind `reconcile`), on the first ticket listed, with the list; nothing for a sweep that found none |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`doc_comment_to_mentioned_agent`](#doc_comment_to_mentioned_agent) | `doc.commented` | wake `mentioned` (kind `doc_feedback`) |
 | [`link_doc_on_ticket`](#link_doc_on_ticket) | `doc.linked` | act for `doc_author`, else `actor`: link the document on the ticket, when the knowledge base can link documents on tickets (`knowledge.issueLinks`) |
@@ -572,6 +573,22 @@ Instruction:
 {{ticket}} is blocked, and something it may wait on happened: {{why}}. Check whether the block still holds. If it does not, unblock it: assign it back to the agent who works on it with a comment saying what changed, or, when its work is done, move it to done with a comment saying why. If it still holds, do nothing: change nothing, comment nothing, and hand back silent.
 ```
 
+### stale_board_to_pm
+
+The office's periodic board sweep (`policies.reconcile.every`) found open tickets whose status or assignee no longer matches what it knows (a ticket in review whose pull requests all merged, a blocked ticket whose blockers all closed, an active ticket nobody works on, a parent whose sub-tickets all closed): the PM is woken once with the list and the facts for each, to put each right; a sweep that found none is traced and wakes no one. A ticket is listed again for the same reason only after a day.
+
+Listens to `board.stale`. Decides: wake `role:pm` (kind `reconcile`), on the first ticket listed, with the list; nothing for a sweep that found none.
+
+When: always.
+
+Instruction:
+
+```text
+The office's board sweep found tickets whose status or assignee no longer matches what it knows:
+{{stale}}
+For each, check the ticket (`ost ticket show <key>`). If it is out of step, put its status and assignee right and say why on it in one line. If it is actually fine, leave it alone and say nothing. Start no new work.
+```
+
 ### doc_comment_to_agent
 
 A human's comment on a document wakes the agent it mentions, else the agent who wrote it.
@@ -775,6 +792,7 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `ticket.created`
 - `ticket.unblocked`
 - `ticket.block_maybe_resolved`
+- `board.stale`
 - `ticket.closed`
 - `doc.commented`
 - `doc.linked`
@@ -822,3 +840,4 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `milestone.id`
 - `recovered`
 - `why`
+- `stale`

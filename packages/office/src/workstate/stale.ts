@@ -45,26 +45,35 @@ function inReview({ core }: Look, t: TicketRecord): Finding {
 const recovered = (core: WorkstateCore, key: string) =>
   live(core, key).find((p) => p.mergeChecks?.recoveredOn);
 
+/** Every linked blocker is closed. */
+function blockersClosed(t: TicketRecord): Finding {
+  const blockers = t.blockedBy ?? [];
+  if (blockers.length === 0 || !blockers.every((b) => isTerminal(b.status))) {
+    return undefined;
+  }
+
+  const list = blockers.map((b) => `${b.key} ${b.status}`).join(", ");
+  return { reason: "blockers_closed", facts: `every ticket blocking it is closed: ${list}` };
+}
+
+/** With a human, with no change in the tracker for the stale time. */
+function idleWithHuman(look: Look, t: TicketRecord): Finding {
+  const since = Date.parse(t.changedAt ?? t.statusSince ?? t.updatedAt);
+  if (t.assignee?.kind !== "human" || look.now - since < look.staleMs) {
+    return undefined;
+  }
+
+  return {
+    reason: "idle_with_human",
+    facts: `it has been with ${t.assignee.id} with no change for ${hours(look.now - since)} hours`,
+  };
+}
+
 /** Blocked: every blocker is closed; a check that failed after its merge passes now; or it sat with a human. */
 function blocked(look: Look, t: TicketRecord): Finding {
-  const blockers = t.blockedBy ?? [];
-  if (blockers.length > 0 && blockers.every((b) => isTerminal(b.status))) {
-    const list = blockers.map((b) => `${b.key} ${b.status}`).join(", ");
-    return { reason: "blockers_closed", facts: `every ticket blocking it is closed: ${list}` };
-  }
-
   const pr = recovered(look.core, t.key);
-  if (pr) {
-    return { reason: "check_passed", facts: recoveryLine(pr) };
-  }
-
-  const since = Date.parse(t.changedAt ?? t.statusSince ?? t.updatedAt);
-  return t.assignee?.kind === "human" && look.now - since >= look.staleMs
-    ? {
-        reason: "idle_with_human",
-        facts: `it has been with ${t.assignee.id} with no change for ${hours(look.now - since)} hours`,
-      }
-    : undefined;
+  const passed: Finding = pr ? { reason: "check_passed", facts: recoveryLine(pr) } : undefined;
+  return blockersClosed(t) ?? passed ?? idleWithHuman(look, t);
 }
 
 /** Whether an agent has work open on the ticket (or its parent or a sub-ticket), or finished some within the hour. */
@@ -79,7 +88,12 @@ function worked({ core, now }: Look, person: string, keys: string[]): boolean {
 function active(look: Look, t: TicketRecord): Finding {
   const agent = t.assignee?.kind === "agent" ? t.assignee.id : undefined;
   const since = Date.parse(t.statusSince ?? t.updatedAt);
-  const keys = [t.key, ...(t.parent ? [t.parent] : []), ...subTickets(look.core, t.key).map((s) => s.key)];
+  const keys = [
+    t.key,
+    ...(t.parent ? [t.parent] : []),
+    ...subTickets(look.core, t.key).map((s) => s.key),
+  ];
+
   if (!agent || look.now - since < HOUR || worked(look, agent, keys)) {
     return undefined;
   }
@@ -94,12 +108,19 @@ function active(look: Look, t: TicketRecord): Finding {
 function parent({ core }: Look, t: TicketRecord): Finding {
   const subs = subTickets(core, t.key);
   const settled = (s: TicketRecord) => isTerminal(s.status) || s.status === "review";
-  if (subs.length === 0 || !subs.every(settled) || (t.status !== "active" && t.status !== "blocked")) {
+  if (
+    subs.length === 0 ||
+    !subs.every(settled) ||
+    (t.status !== "active" && t.status !== "blocked")
+  ) {
     return undefined;
   }
 
   const list = subs.map((s) => `${s.key} ${s.status}`).join(", ");
-  return { reason: "subtickets_settled", facts: `its sub-tickets are all closed or in review: ${list}` };
+  return {
+    reason: "subtickets_settled",
+    facts: `its sub-tickets are all closed or in review: ${list}`,
+  };
 }
 
 const BY_STATUS: Partial<Record<string, (look: Look, t: TicketRecord) => Finding>> = {

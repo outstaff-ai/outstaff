@@ -19,7 +19,8 @@ export function everyMs(every: string): number | undefined {
 /**
  * The periodic board sweep, run with the merge follow-up on the office's poll: every `policies.reconcile.every` (the
  * first one that long after the office first ran it), it lists the open tickets out of step with the facts and raises
- * `board.stale` with them when there are any. A ticket is listed again for the same reason only after a day.
+ * `board.stale` with them, an empty list included, so each sweep is traced. A ticket is listed again for the same
+ * reason only after a day.
  */
 export function createSweep(core: WorkstateCore) {
   const { store, clock, logger, team } = core;
@@ -62,13 +63,10 @@ export function createSweep(core: WorkstateCore) {
 
       const found = await fresh(findStale(core, now, staleMs), now);
       logger.info(`workstate: the board sweep found ${found.length} ticket(s) out of step`);
-      if (found.length === 0) {
-        return;
-      }
-
+      // Raised when it finds nothing too, so every sweep is traced; the policy wakes no one then.
       const event: WorkflowEvent = {
         type: "board.stale",
-        subject: { ticket: found[0]!.ticket },
+        subject: found[0] ? { ticket: found[0].ticket } : {},
         actor: { ...WORKSTATE_ACTOR },
         data: { tickets: found, at: now.toISOString() },
       };
