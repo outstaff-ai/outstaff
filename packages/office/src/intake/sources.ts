@@ -1,3 +1,5 @@
+import { repoKey } from "@outstaff/core";
+import { createRepoBackoff } from "./repo-backoff.js";
 import type { IntakeMeta, PollSource, SourcesOptions, WebhookParser } from "./types.js";
 
 const CURSOR_KEY = "events";
@@ -5,9 +7,47 @@ const CURSOR_KEY = "events";
 /** How many documents one poll of the knowledge base reads the comments of. */
 export const DOC_POLL_LIMIT = 25;
 
+/**
+ * The code host's events. A repository that cannot be read is left out until its own backoff runs out, so the
+ * others are still read on every poll.
+ */
+function vcsSource(
+  opts: SourcesOptions,
+  setBaseline: (source: "vcs", cursor: string) => Promise<void>,
+): PollSource {
+  const { store, ports, repos, ingest } = opts;
+  const unreadable = createRepoBackoff({ ...opts, what: "intake: vcs poll" });
+  return {
+    name: "vcs",
+    async poll() {
+      const cursor = await store.getCursor("vcs", CURSOR_KEY);
+      const due = unreadable.due(repos);
+      const page = await ports.vcs.events(due, cursor);
+      const unread = page.unread ?? [];
+      const failed = new Set(unread.map((u) => repoKey(u.repo)));
+      for (const u of unread) {
+        unreadable.failed(u.repo, u.error);
+      }
+
+      unreadable.read(due.filter((r) => !failed.has(repoKey(r))));
+      if (cursor === undefined) {
+        await setBaseline("vcs", page.cursor);
+        return;
+      }
+
+      ingest.logUnmapped("vcs", page);
+      for (const event of page.events) {
+        await ingest.vcs(event);
+      }
+
+      await store.setCursor("vcs", CURSOR_KEY, page.cursor);
+    },
+  };
+}
+
 /** The sources intake polls: the code host, and the tracker and knowledge base when the team has them. */
 export function pollSources(opts: SourcesOptions): PollSource[] {
-  const { store, ports, team, repos, logger, ingest } = opts;
+  const { store, ports, team, logger, ingest } = opts;
 
   // With no stored cursor the source returns its recent history; that is not news, so only remember where "now" is.
   const setBaseline = async (source: IntakeMeta["source"], cursor: string) => {
@@ -15,26 +55,7 @@ export function pollSources(opts: SourcesOptions): PollSource[] {
     logger.info(`intake: baseline set for ${source}`);
   };
 
-  const sources: PollSource[] = [
-    {
-      name: "vcs",
-      async poll() {
-        const cursor = await store.getCursor("vcs", CURSOR_KEY);
-        const page = await ports.vcs.events(repos, cursor);
-        if (cursor === undefined) {
-          await setBaseline("vcs", page.cursor);
-          return;
-        }
-
-        ingest.logUnmapped("vcs", page);
-        for (const event of page.events) {
-          await ingest.vcs(event);
-        }
-
-        await store.setCursor("vcs", CURSOR_KEY, page.cursor);
-      },
-    },
-  ];
+  const sources: PollSource[] = [vcsSource(opts, setBaseline)];
 
   const { tracker } = ports;
   if (tracker && team.integrations.tracker) {

@@ -86,6 +86,7 @@ A failed poll never stops the loop.
 - `rate_limited` waits for the adapter's `retryAfterMs` (capped at 5 minutes), or backs off exponentially when none is given.
 - `unavailable` and any other error back off exponentially from 1 second up to 5 minutes.
 - A success returns to the normal interval.
+- A repository the code host will not show (`not_found` or `forbidden`, for example one the office App's installation does not cover yet) does not fail the vcs poll. The adapter reports it apart and it keeps its place in the cursor; intake leaves it out of the next polls while it backs off on its own, with the same delays, and logs each failed attempt once at warn (`intake: vcs poll of acme/libs failed (not_found), retrying in 4s`). The other repositories are read on every poll. A poll that can read none of them fails as a whole, since that points at the App's credentials or the host. `ost doctor` names the installation that is missing a repository.
 
 ### Normalized events
 
@@ -305,7 +306,7 @@ Their ids are stable (`pr.conflicted:<repo>#<n>:<head sha>`, source `workstate`)
 
 **When a ticket entered its status.** Each ticket records `statusSince`, when it entered its current status: the time of the tracker event that moved or created it, else the tracker's last update of the ticket when a rescan finds the change. It stays while the status stays; a move event restarts it even when the status reads the same (the ticket left and came back between two reads), but never back in time. Ordering uses these timestamps, never ids. A ticket also keeps the tracker's `priority` when the adapter reports one (`Issue.priority`, 1 the most urgent). `readyTickets(person)` lists the ready tickets an agent could start next, for the idle pull.
 
-**Polling.** CI results and mergeability arrive without events, so `start()` rescans open pull requests every `refreshIntervalMs` (default 60 seconds) and `rescan()` does it on demand. A rescan also finds pull requests that were merged or closed while the office was down, and the tickets assigned to the team's people. Finished tickets and closed pull requests are forgotten after 14 days.
+**Polling.** CI results and mergeability arrive without events, so `start()` rescans open pull requests every `refreshIntervalMs` (default 60 seconds) and `rescan()` does it on demand. A rescan also finds pull requests that were merged or closed while the office was down, and the tickets assigned to the team's people. A repository it cannot list (`not_found` or `forbidden`) is skipped and backs off on its own, like a repository intake cannot read, and its pull requests keep the state last read; the rest of the rescan goes on. Finished tickets and closed pull requests are forgotten after 14 days.
 
 **Only the team's repositories.** The work state tracks pull requests only in the repositories `repos:` lists. On start it drops the pull requests (and their links) of a repository the team no longer lists, logged once at info, and it ignores events for pull requests elsewhere. A pull request the code host answers as not found or forbidden is marked gone (`goneAt`), logged once, taken out of the open set and its stack, and not read again until an event names it or the host lists it again; a gone one is forgotten after 14 days like a closed one.
 

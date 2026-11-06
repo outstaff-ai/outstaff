@@ -1,3 +1,4 @@
+import type { PortError } from "./errors.js";
 import type { EventPage } from "./events.js";
 import type { Links } from "./links.js";
 import type { MergeMethod, MergeOptions, MergeRequirements, MergeResult } from "./vcs-merge.js";
@@ -130,6 +131,17 @@ export interface VcsEvent {
   actor: string;
   at: string;
   data: Record<string, unknown>;
+}
+
+/** A repository an events poll could not read (`not_found` or `forbidden`); the others were read. */
+export interface UnreadRepo {
+  repo: RepoRef;
+  error: PortError;
+}
+
+export interface VcsEventPage extends EventPage<VcsEvent> {
+  /** The repositories that could not be read this poll; each keeps its place in the cursor. */
+  unread?: UnreadRepo[];
 }
 
 /** What a reaction goes on: a comment of the pull request conversation or an inline comment of a review. */
@@ -265,7 +277,15 @@ export interface Vcs {
 
   /** For the trust model. */
   permission(repo: RepoRef, login: string): Promise<VcsPermission>;
-  events(repos: RepoRef[], cursor?: string): Promise<EventPage<VcsEvent>>;
+
+  /**
+   * The new events of `repos` since `cursor`. A repository that cannot be read (`not_found`, `forbidden`) does not
+   * fail the poll: it is reported in `unread` and the others are read. An unread repository, and one left out of
+   * `repos`, keeps its place in the cursor, so a later poll that includes it reads on from there. A failure of the
+   * host itself (`rate_limited`, `unavailable`, ...) still throws, and so does a poll that could read none of
+   * `repos`: refused credentials look like every repository refusing.
+   */
+  events(repos: RepoRef[], cursor?: string): Promise<VcsEventPage>;
 
   /**
    * Webhook mode: verify the delivery (signature) and turn it into events; return `[]` for deliveries to ignore.

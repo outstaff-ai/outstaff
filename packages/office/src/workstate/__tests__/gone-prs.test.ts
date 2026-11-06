@@ -212,6 +212,49 @@ describe("pull requests the office can no longer read", () => {
     expect(await tracked()).toEqual([]);
   });
 
+  it("skips a repository it cannot list, backing it off on its own, and keeps its pull requests", async () => {
+    await build([APP_REPO, INFRA_REPO]);
+    const infra = await seed(INFRA);
+    const app = await seed(REPO);
+    await ws.rescan();
+    const list = vcs.listPullRequests.bind(vcs);
+    vcs.listPullRequests = async (repo, f) => {
+      if (repo.name === "infra") {
+        throw new PortError("not_found", "GET /repos/acme/infra/pulls: 404 Not Found");
+      }
+
+      return list(repo, f);
+    };
+
+    fetched = [];
+    await ws.rescan(); // fails, retry in 1s
+    await ws.rescan(); // skipped
+    clock.advance(1000);
+    await ws.rescan(); // fails, retry in 2s
+    expect(reads(`app#${app.number}`)).toBe(3);
+    expect(fetched.filter((f) => f.startsWith("infra#"))).toEqual([]);
+    expect(ws.repoPrs(INFRA).map((p) => p.ref.number)).toEqual([infra.number]);
+    expect(ws.repoPrs(INFRA)[0]?.goneAt).toBeUndefined();
+    expect(messages("warn")).toEqual([
+      "workstate rescan of acme/infra failed (not_found), retrying in 1s",
+      "workstate rescan of acme/infra failed (not_found), retrying in 2s",
+    ]);
+
+    vcs.listPullRequests = list;
+    clock.advance(2000);
+    await ws.rescan();
+    expect(reads(`infra#${infra.number}`)).toBe(1);
+    expect(messages("info")).toContain("workstate rescan of acme/infra succeeded again");
+  });
+
+  it("still fails the rescan when the host itself fails", async () => {
+    vcs.listPullRequests = async () => {
+      throw new PortError("unavailable", "down");
+    };
+
+    await expect(ws.rescan()).rejects.toMatchObject({ code: "unavailable" });
+  });
+
   it("only warns, without a record, for a pull request it never held", async () => {
     gone.set("app#99", "not_found");
     await ws.apply(comment(99), { source: "vcs", externalId: "e", trusted: true });
