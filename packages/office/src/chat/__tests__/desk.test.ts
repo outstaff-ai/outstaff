@@ -286,7 +286,7 @@ describe("chat requests", () => {
     });
 
     describe("a blocked item", () => {
-      const blockedItem = async (over: TeamConfig, ticket = true) => {
+      const blockedItem = async (over: TeamConfig, ticket = true, message?: string) => {
         desk = makeDesk(over);
         const item = await scheduler.enqueue({
           person: "sam",
@@ -300,7 +300,12 @@ describe("chat requests", () => {
         await scheduler.block(item.id, "Need the staging key.");
         const blocked = (await store.getItem(item.id))!;
 
-        await desk.handedBack(blocked, { summary: "Need the staging key.", links: [] });
+        await desk.handedBack(blocked, {
+          summary: "Need the staging key.",
+          ...(message ? { message } : {}),
+          links: [],
+        });
+
         return blocked;
       };
 
@@ -345,6 +350,11 @@ describe("chat requests", () => {
             links: [{ url: tracker.links.issue("ACME-3"), title: "ACME-3" }],
           },
         ]);
+      });
+
+      it("is queued with the agent's message for the human first, when it gave one", async () => {
+        await blockedItem(teamConfig(false), true, "ACME-3 needs the staging key from you.");
+        expect((await desk.queued("sam"))[0]?.text).toBe("ACME-3 needs the staging key from you.");
       });
 
       it("is dropped when nobody can be told: no requester chat identity", async () => {

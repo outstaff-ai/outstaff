@@ -93,6 +93,8 @@ An `*_INSTALLATION_ID` is the App's installation on one account that owns team r
 
 The adapter declares GitHub's CLI as the code host's CLI (`Vcs.hostCli`): the command `gh`, the mise tool `gh` at a pinned version as the suggested `tools` entry, and the environment one run gets its token from. That is `GH_TOKEN` for github.com and `*.ghe.com`, and `GH_ENTERPRISE_TOKEN` plus `GH_HOST` for GitHub Enterprise Server, each with `GH_REPO` set to the repository the token is for and prompts and update checks off. The agent puts a wrapper named `gh` first on its PATH; each call runs `ost host-cli`, which asks this adapter for `credentials(person, repo, access, "cli")` and passes the token to that one `gh` process.
 
+The CLI declaration also says how gh takes extensions (`hostCli.extensions`): a `gh-<command>` repository, installed with `gh extension install --pin` into gh's data directory. The agent installs the extensions `tools.gh.extensions` declares at start.
+
 A `cli` token asks GitHub for no permissions, so it carries what the App is granted, on the one repository: the own App's for a write grant, the read-only office App's for a read grant. The App's permissions are the hard limit. See [the gh CLI](https://docs.outstaff.work/adapters/vcs-github-cli/) for what agents may run.
 
 ## Command permissions
@@ -102,7 +104,9 @@ The adapter contributes a rule pack for the `gh` CLI (`githubVcs.permissions()`,
 | Command                                                                            | Decision                                                                      |
 | ---------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
 | `gh run view\|list\|watch\|rerun\|cancel\|download`, `gh workflow run\|view\|list` | allowed; re-running, cancelling and dispatching need the App's Actions: write |
-| `gh pr view\|checks\|diff\|list`, `gh actions-lock`, `gh api` (GET)                | allowed                                                                       |
+| `gh pr view\|checks\|diff\|list`, `gh api` (GET)                                   | allowed                                                                       |
+| a declared extension's command, such as `gh actions-lock`                          | allowed (core allows each installed one)                                      |
+| `gh extension install\|upgrade\|remove` (and `gh ext`, `gh extensions`)            | denied (`gh.extension-install`, ...); extensions are declared in `tools`      |
 | `gh pr merge`                                                                      | denied (`gh.pr-merge`); merging goes through `ost pr merge`                   |
 | `gh pr review --approve`                                                           | denied (`gh.pr-approve`)                                                      |
 | `gh repo delete`, `gh repo edit`, `gh secret`                                      | denied (`gh.repo-delete`, `gh.repo-edit`, `gh.secret`)                        |

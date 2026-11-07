@@ -72,7 +72,7 @@ export type {
 } from "./knowledge.js";
 
 export type { Check, CheckLog, CheckLogStep, CheckReadOptions } from "./vcs-checks.js";
-export type { CredentialUse, HostCli } from "./vcs-cli.js";
+export type { CredentialUse, HostCli, HostCliExtensions } from "./vcs-cli.js";
 export type {
   ConversationEntry,
   PullRequestReview,

@@ -625,6 +625,20 @@ Options mise passes to the tool's backend, such as url, bin_path and checksum fo
 - Type: `map`
 - Optional
 
+#### people[].tools.<key>.extensions
+
+Extensions of the code host's CLI to install at agent start, each pinned to an exact release tag or full commit id: ["github/gh-actions-lock@v1.2.0"]. Only the tool the vcs adapter names as its CLI (gh for GitHub) takes them. A declared extension's command is allowed; an `allow` entry that starts with it narrows it.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+#### people[].tools.<key>.extensions[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
+
 #### people[].tools.<key>.valued_options
 
 Options of the tool that take their value as the next word, such as -c or --context. Their values are never taken for a subcommand, so a rule finds `delete` in `acmectl -c prod delete`. `--option=value` is one word and needs no entry.
@@ -977,6 +991,20 @@ Options mise passes to the tool's backend, such as url, bin_path and checksum fo
 
 - Type: `map`
 - Optional
+
+#### tools.<key>.extensions
+
+Extensions of the code host's CLI to install at agent start, each pinned to an exact release tag or full commit id: ["github/gh-actions-lock@v1.2.0"]. Only the tool the vcs adapter names as its CLI (gh for GitHub) takes them. A declared extension's command is allowed; an `allow` entry that starts with it narrows it.
+
+- Type: `list of string`
+- Optional
+- Minimum items 1
+
+#### tools.<key>.extensions[]
+
+- Type: `string`
+- Optional
+- Minimum length 1
 
 #### tools.<key>.valued_options
 

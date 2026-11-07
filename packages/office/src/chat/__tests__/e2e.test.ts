@@ -40,6 +40,9 @@ import { openStore, type Store } from "#/store/index.js";
 const DANA = "U0DANA0001";
 const DM = "D-U0DANA0001";
 
+/** The office's reasons for blocking an item that keeps failing; the item may block as stale, lost or failed. */
+const BLOCKED_BY_OFFICE = /Stale again|Lost again|failed 3 times/;
+
 function team(): TeamConfig {
   const result = parseTeamConfig({
     version: 1,
@@ -646,13 +649,13 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       // keep the connection up between them.
       await until(() => {
         clock.advance(10_000);
-        return agentChat.posts.some((p) => p.text.includes("I am blocked."));
+        return agentChat.posts.some((p) => BLOCKED_BY_OFFICE.test(p.text));
       });
 
-      const post = agentChat.posts.find((p) => p.text.includes("I am blocked."))!;
+      const post = agentChat.posts.find((p) => BLOCKED_BY_OFFICE.test(p.text))!;
       expect(post.channel).toBe(DM);
       // The jumps of the manual clock can still starve the heartbeat, so the item may block as stale, lost or failed.
-      expect(post.text).toMatch(/Stale again|Lost again|failed 3 times/);
+      expect(post.text).not.toContain("I am blocked.");
       expect(post.text).toContain(tracker.links.issue(issue.key));
       expect(officeChat.posts).toEqual([]);
     });
@@ -684,7 +687,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
       await until(() => agentChat.posts.length === 1);
       const [post] = agentChat.posts;
       expect(post).toMatchObject({ channel: DM });
-      expect(post!.text).toContain("I am blocked. Need the staging key from ops.");
+      expect(post!.text).toMatch(/^Need the staging key from ops\./);
       expect(post!.text).toContain(tracker.links.issue(issue.key));
       expect(officeChat.posts).toEqual([]);
       expect((await tracker.getIssue(issue.key)).status.canonical).toBe("blocked");

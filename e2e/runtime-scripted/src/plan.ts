@@ -75,6 +75,29 @@ export async function* planInChat(
 }
 
 /**
+ * A human asks in chat to start the next milestone: that is its confirmation, so the session starts the first planned
+ * one in the roadmap's order itself and says so, instead of asking the human to set it in the tracker. Undefined for
+ * any other message.
+ */
+export async function* startNextMilestone(
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  if (!/^start the next milestone\b/i.test(latest.trim())) {
+    return undefined;
+  }
+
+  const listed = yield { type: "tool", tool: "milestone_list", input: { status: ["planned"] } };
+  const next = /^- (\S+) \[planned\] (.+?):/m.exec(listed);
+  if (!next) {
+    return "There is no planned milestone to start.";
+  }
+
+  const [, id, title] = next;
+  yield { type: "tool", tool: "milestone_status", input: { id, to: "active" } };
+  return `Started ${title} (${id}).`;
+}
+
+/**
  * The PM's round on tickets she filed for herself from a confirmed plan: one round for all of them. Confirmed for now,
  * they are filed ready, so the office queues them as her work; she hands them to the requester to review.
  */

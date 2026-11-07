@@ -3,16 +3,23 @@ import { MAX_CHAT_FILES, type Link } from "@outstaff/protocol";
 import type { ChatMessageRequest, ChatReportKind } from "#/verbs/office.types.js";
 import { clip } from "./chat-text.js";
 
-/** How the agent words each kind of report. */
+/** How the agent words each kind of report: its own words, but for a failure, which is the runtime speaking. */
 const REPORT_BODIES: Record<Exclude<ChatReportKind, "ack">, (text: string) => string> = {
   result: (text) => text.trim(),
-  blocked: (text) => `I am blocked. ${text.trim()}`,
+  blocked: (text) => text.trim(),
   failed: (text) =>
     `I hit an error and could not finish this. I will try again. ${clip(text, 1).slice(0, 300)}`,
 };
 
 export const reportBody = (kind: Exclude<ChatReportKind, "ack">, text: string) =>
   REPORT_BODIES[kind](text);
+
+/** What a blocked report says: the agent's message for the human, else its summary, else that the ticket is blocked. */
+export const blockedText = (words: {
+  message?: string | undefined;
+  summary: string;
+  ticket?: string | undefined;
+}) => words.message?.trim() || words.summary.trim() || `${words.ticket ?? "This work"} is blocked.`;
 
 /** The links to list under a report: each once, and none the body already shows. */
 export const linksToList = (links: Link[], body: string) =>

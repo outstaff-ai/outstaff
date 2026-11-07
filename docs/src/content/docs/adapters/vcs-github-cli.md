@@ -3,7 +3,7 @@ title: GitHub CLI (vcs)
 description: How agents run gh with a short-lived token per call, and which gh commands they may run.
 ---
 
-Agents can run GitHub's own CLI, `gh`, for work that has no `ost` verb: re-running a flaky workflow run, reading a run's logs and artefacts, dispatching a workflow, generating an Actions lockfile (`gh actions-lock`) or a read-only query of the REST API. The boundary is the person's GitHub App and its permissions, and the network, not a verb per task.
+Agents can run GitHub's own CLI, `gh`, for work that has no `ost` verb: re-running a flaky workflow run, reading a run's logs and artefacts, dispatching a workflow, generating an Actions lockfile with a declared extension (`gh actions-lock`) or a read-only query of the REST API. The boundary is the person's GitHub App and its permissions, and the network, not a verb per task.
 
 ## How gh gets a token
 
@@ -29,18 +29,34 @@ Leave out `allow`: the adapter's rules below narrow `gh`, and a `tools` entry wi
 
 ## What agents may run
 
-| Command                                                                                  | Decision                                                                                       |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `gh run view`, `list`, `watch`, `download`                                               | allowed                                                                                        |
-| `gh run rerun`, `gh run cancel`, `gh workflow run`                                       | allowed; the App needs Actions: write                                                          |
-| `gh workflow view`, `gh workflow list`                                                   | allowed                                                                                        |
-| `gh pr view`, `checks`, `diff`, `list`                                                   | allowed                                                                                        |
-| `gh actions-lock`                                                                        | allowed                                                                                        |
-| `gh api` with GET (the default, or `-X GET` with fields as query parameters)             | allowed                                                                                        |
-| `gh pr merge`                                                                            | denied: merging goes through [`ost pr merge`](/reference/agent-verbs/), which checks the rules |
-| `gh pr review --approve`                                                                 | denied                                                                                         |
-| `gh repo delete`, `gh repo edit`, `gh secret`                                            | denied                                                                                         |
-| `gh api` with another method, with fields (`-f`, `-F`, `--input`) and no `-X`, `graphql` | denied: `gh api` is read-only                                                                  |
-| anything else, for example `gh pr create` or `gh release create`                         | refused: pull request work goes through `ost pr`                                               |
+| Command                                                                                   | Decision                                                                                       |
+| ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `gh run view`, `list`, `watch`, `download`                                                | allowed                                                                                        |
+| `gh run rerun`, `gh run cancel`, `gh workflow run`                                        | allowed; the App needs Actions: write                                                          |
+| `gh workflow view`, `gh workflow list`                                                    | allowed                                                                                        |
+| `gh pr view`, `checks`, `diff`, `list`                                                    | allowed                                                                                        |
+| a [declared extension](#extensions)'s command, such as `gh actions-lock`                  | allowed                                                                                        |
+| `gh extension install`, `upgrade`, `remove` (also as `gh ext` and `gh extensions`)        | denied: extensions are declared in `team.yaml`                                                 |
+| `gh api` with GET (the default, or `-X GET` with fields as query parameters)              | allowed                                                                                        |
+| `gh pr merge`                                                                             | denied: merging goes through [`ost pr merge`](/reference/agent-verbs/), which checks the rules |
+| `gh pr review --approve`                                                                  | denied                                                                                         |
+| `gh repo delete`, `gh repo edit`, `gh secret`                                             | denied                                                                                         |
+| `gh api` with another method, with fields (`-f`, `-F`, `--input`) and no `-X`, `graphql`  | denied: `gh api` is read-only                                                                  |
+| anything else, for example `gh pr create`, `gh release create` or an undeclared extension | refused: pull request work goes through `ost pr`                                               |
 
 Denied commands stay denied whatever a team rule or a tool declaration allows. A team that wants agents to run more of `gh` adds allow rules under [`policies.commands`](/guides/permissions/#narrowing); the App's permissions still decide what GitHub accepts.
+
+## Extensions
+
+`gh` extensions, such as `gh actions-lock` from `github/gh-actions-lock`, are declared on the `gh` tool entry, each pinned to a release tag or a full commit id:
+
+```yaml
+tools:
+  gh:
+    version: 2.103.3
+    extensions: [github/gh-actions-lock@v1.2.0]
+```
+
+The adapter declares how `gh` takes them: an extension is a repository named `gh-<command>`, installed with `gh extension install <owner>/<repository> --pin <ref>` into gh's data directory (`$XDG_DATA_HOME/gh/extensions`, else `~/.local/share/gh/extensions`). At start the agent installs each one there through the same per-call token as any `gh` run, minted for the extension's repository when the team lists it and the person has a grant on it, else for the first team repository the person has a grant on. The token carries what the person's App may read, so a public extension or one in a repository the App can read installs; the repository must be on the team's code host. The home volume keeps it across restarts; a changed ref installs it again, and an extension that is no longer declared is removed.
+
+Agents run a declared extension's command and nothing else of it: `gh extension install`, `upgrade` and `remove` are denied whatever a team rule allows, and an extension that is not declared is refused like any other unlisted command. `allow` entries on the `gh` tool that start with the extension's command (`allow: ["actions-lock check"]`) narrow it. An extension that fails to install, for example a tag with no release, is reported by `ost doctor` with gh's error; the agent starts without it. See [Tools](/guides/tools/#extensions-of-the-code-hosts-cli).

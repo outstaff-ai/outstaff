@@ -49,6 +49,9 @@ export interface GithubE2eOptions extends AppAuthOptions {
   /** Further repositories of the same owner, served over git only (clone, fetch, push). */
   more?: BareRepo[];
 
+  /** Repositories of gh script extensions, served over git and the API routes `gh extension install` reads. */
+  extensions?: BareRepo[];
+
   /** Login to permission level, for `collaborators/:login/permission`. */
   permissions: Record<string, string>;
 
