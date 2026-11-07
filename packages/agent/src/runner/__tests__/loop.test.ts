@@ -1391,6 +1391,7 @@ describe("work loop", () => {
       expect(chatRun.tools.map((t) => t.name)).toContain("work_queue");
       expect(chatRun.tools.map((t) => t.name)).not.toContain("pr_open");
       expect(chatRun.tools.map((t) => t.name)).toContain("work_move");
+      expect(chatRun.tools.map((t) => t.name)).toContain("ask");
       expect(workRun.tools.map((t) => t.name)).toContain("pr_open");
 
       releaseWork?.();
@@ -1580,7 +1581,7 @@ describe("work loop", () => {
       await conn.stop();
     });
 
-    it("tells the requester nothing while the item waits for a teammate's answer", async () => {
+    it("tells the requester nothing while work from chat waits for a teammate's answer", async () => {
       await connect();
       const { chat, reports } = relay();
       const runtime: Runtime = {
@@ -1595,10 +1596,46 @@ describe("work loop", () => {
       };
 
       start(runtime, { chat });
-      socket.offerWith("c1", { origin: true });
+      // Work a chat session filed: a chat session itself does not wait (below).
+      socket.offerWith("c1", { origin: true, kind: "ticket" });
       await until(() => sentOf("handback").length === 1);
       expect(sentOf("handback")[0]?.payload).toMatchObject({ status: "waiting" });
       expect(reports).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("hands back a chat session that asked a teammate as done, and tells the requester", async () => {
+      await connect();
+      const runtime: Runtime = {
+        async *run(req) {
+          yield { type: "started", sessionId: "s" };
+          if (req.prompt === JOURNAL_PROMPT) {
+            yield { type: "finished", ok: true, text: "" };
+            return;
+          }
+
+          const ask = req.tools.find((t) => t.name === "ask")!;
+          await ask.handler(
+            { to: "mira", question: "Summary: checkout is green." },
+            { workItemId: "c1" },
+          );
+
+          yield { type: "finished", ok: true, text: "Asked Mira; I'll pass on her answer." };
+        },
+      };
+
+      const { chat, reports } = relay();
+      start(runtime, { chat });
+      socket.offerWith("c1", { origin: true });
+      await until(() => reports.length === 1);
+      expect(sentOf("ask")[0]?.payload).toMatchObject({ to: "mira", workItemId: "c1" });
+      expect(sentOf("handback")[0]?.payload).toMatchObject({ workItemId: "c1", status: "done" });
+      expect(reports[0]).toMatchObject({
+        kind: "result",
+        text: "Asked Mira; I'll pass on her answer.",
+      });
+
       await loop.stop();
       await conn.stop();
     });

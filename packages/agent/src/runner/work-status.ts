@@ -1,6 +1,7 @@
 import type { Tracker } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
 import { anyBlocked } from "./blocked.js";
+import { CHAT_KIND } from "./work-setup.js";
 import type { WorkerContext } from "./loop.types.js";
 import type { HandBackStatus, ItemRun } from "./work.types.js";
 
@@ -32,7 +33,8 @@ const untouchedBlocked = (
 const ON_BLOCKED_WORK = new Set(["unblock", "reconcile"]);
 
 /**
- * What a finished run is handed back as. An open question makes it wait. A ticket the agent left blocked, or a ticket
+ * What a finished run is handed back as. An open question makes it wait, except in a chat session: its reply goes to
+ * the requester now, and the answer comes back in a follow-up chat round in the same thread. A ticket the agent left blocked, or a ticket
  * that is blocked in the tracker at the end of a run that moved nothing, was not got past: a blocked hand-back,
  * whatever the final message says. A round to unblock a teammate's ticket counts only the agent's own move.
  */
@@ -44,7 +46,7 @@ export async function handBackStatus(
     return "blocked";
   }
 
-  if (item.asked()) {
+  if (item.asked() && offer.workItem.kind !== CHAT_KIND) {
     return "waiting";
   }
 

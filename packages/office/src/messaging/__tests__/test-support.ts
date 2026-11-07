@@ -166,10 +166,14 @@ export async function harness(
   });
 
   /** A running item of the person, like the one an agent asks from. */
-  const startItem = async (person: string, subject?: { type: string; ref: string }) => {
+  const startItem = async (
+    person: string,
+    subject?: { type: string; ref: string },
+    kind = "ticket",
+  ) => {
     const item = await scheduler.enqueue({
       person,
-      kind: "ticket",
+      kind,
       title: `Work of ${person}`,
       trigger: "human",
       ...(subject ? { subject } : {}),

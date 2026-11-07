@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
-import { answerTeammate, decideTopic, decideWithPm } from "./decide.js";
+import { answerTeammate, decideTopic, decideWithPm, teammateInChat } from "./decide.js";
 import { fileForLater, planInChat, plannedTickets, startNextMilestone } from "./plan.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
@@ -1629,17 +1629,26 @@ async function* aboutWork(
   return done ?? (yield* attachToPr(talk, latest));
 }
 
+/** A chat message about the agent's notes or for a teammate, or the round with a teammate's answer. */
+async function* notesOrTeammate(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  return (yield* notes(ctx, latest)) ?? (yield* teammateInChat(ctx, latest));
+}
+
 /**
  * A chat message in a chat session, beside a running round. A question about the work is answered from the office's
  * view of it; a request to change a ticket is made on that ticket; a request about an open pull request is attached
  * to it, after asking when the pull request is in review. A trusted human's
- * word about the agent's notes is noted or answered from them. Nothing is ever filed as a new ticket.
+ * word about the agent's notes is noted or answered from them, and a ping is passed on to a teammate, whose answer
+ * the next round passes on in the thread. Nothing is ever filed as a new ticket.
  */
 export async function* chat(ctx: ItemContext): Script {
   const talk = ctx.conversation ?? [];
   const latest = talk.findLast((m) => !m.agent)?.text ?? "";
   return (
-    (yield* notes(ctx, latest)) ??
+    (yield* notesOrTeammate(ctx, latest)) ??
     (yield* planInChat(talk, latest)) ??
     (yield* startNextMilestone(latest)) ??
     (yield* fileForLater(latest)) ??

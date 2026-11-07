@@ -2,13 +2,14 @@ import type { Profile, ProfileSpec, ToolKind } from "./types.js";
 
 /**
  * The verbs a chat session may call: look at the team, the work, tickets, milestones, documents and pull requests,
- * comment, file work, place queued work where the requester says, change a ticket (assign, move, re-parent, link, edit),
- * file a confirmed plan's milestones and start, close or drop a milestone on a trusted human's request, and keep the
- * agent's own notes. Nothing that changes a pull request, a document or code.
+ * ask a teammate, comment, file work, place queued work where the requester says, change a ticket (assign, move,
+ * re-parent, link, edit), file a confirmed plan's milestones and start, close or drop a milestone on a trusted human's
+ * request, and keep the agent's own notes. Nothing that changes a pull request, a document or code.
  */
 export const CHAT_VERBS = [
   "me",
   "team",
+  "ask",
   "work",
   "work.queue",
   "work.attach",

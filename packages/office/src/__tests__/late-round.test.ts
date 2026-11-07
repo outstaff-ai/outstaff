@@ -14,8 +14,8 @@ import {
  * sam's item asks mira and noor and is offered its feedback; while it runs, a human writes in chat and the answers
  * come. The hand-back's rounds then run as the office runs them.
  */
-async function setup(opts: { answered?: boolean; chat?: boolean } = {}) {
-  const { answered = true, chat = true } = opts;
+async function setup(opts: { answered?: boolean; chat?: boolean; kind?: string } = {}) {
+  const { answered = true, chat = true, kind = "ticket" } = opts;
   const h = await harness();
   const logged: string[] = [];
   const rounds = createOfficeRounds({
@@ -27,7 +27,7 @@ async function setup(opts: { answered?: boolean; chat?: boolean } = {}) {
     notify: (p) => h.notified.push(p),
   });
 
-  const item = await h.startItem("sam", { type: "ticket", ref: "ACME-1" });
+  const item = await h.startItem("sam", { type: "ticket", ref: "ACME-1" }, kind);
   await h.store.updateItem(item.id, { sessionId: "sess-1" });
   await h.store.upsertSubject("chat_origin", item.id, {
     channel: "D1",
@@ -132,6 +132,19 @@ describe("one round for what reached an item while it ran", () => {
 
     expect(await text(next!)).toContain("Answer one.");
     expect(await readOrigin(h.store, next!.id)).toBeUndefined();
+  });
+
+  it("gives a chat session's answer follow-up its thread, so the answer reaches the requester", async () => {
+    const { h, item, handBack, queued } = await setup({ chat: false, kind: "chat" });
+    await handBack("done");
+    const [next, ...more] = await queued();
+    expect(more).toEqual([]);
+    expect(next).toMatchObject({ parentId: item.id, kind: "chat", sessionId: "sess-1" });
+    expect(await readOrigin(h.store, next!.id)).toMatchObject({
+      channel: "D1",
+      thread: "m1",
+      claimed: [],
+    });
   });
 
   it("still gives late feedback alone one follow-up", async () => {

@@ -1,4 +1,5 @@
 import {
+  NO_OFFICE,
   VERBS,
   agentLayout,
   cliPath,
@@ -35,6 +36,15 @@ export const groupSummaries: Record<string, string> = {
 export const defaultRegistry = () => new AdapterRegistry().register(githubVcs);
 
 export class Failure extends Error {}
+
+/**
+ * The shell's `ost` in an agent container (`OUTSTAFF_OFFICE_URL` is set) has no office connection of its own; the
+ * session's `ost` tool has the agent's. Elsewhere the plain message is right.
+ */
+export const IN_AGENT_NO_OFFICE = `${NO_OFFICE}: the shell's ost cannot reach the office. Inside an agent session, call the verb with the ost tool of your session (for example ask, work or roster) instead of running ost in the shell.`;
+
+const messageOf = (ctx: Context, e: PortError) =>
+  e.message === NO_OFFICE && ctx.env["OUTSTAFF_OFFICE_URL"] ? IN_AGENT_NO_OFFICE : e.message;
 
 export async function buildEnv(ctx: Context, options: GlobalOptions): Promise<AgentEnv> {
   if (ctx.agentEnv) {
@@ -164,7 +174,7 @@ function command(verb: Verb): CommandDef {
         return 0;
       } catch (e) {
         if (e instanceof PortError) {
-          return fail(e.code, e.message);
+          return fail(e.code, messageOf(ctx, e));
         }
 
         if (e instanceof Failure) {
