@@ -13,6 +13,7 @@ import type {
 import { groupNotices, renderNotice } from "./render.js";
 import { askedInChat, tiedThread } from "./asked.js";
 import { createChecksGate } from "./checks.js";
+import { createSupersede } from "./superseded.js";
 import { writeNotified } from "./seen.js";
 import { escalationText } from "./text.js";
 
@@ -46,13 +47,15 @@ function destinations(entries: readonly NoticeEntry[], chat: string) {
  * The notices of the pipeline, sent by the agent each is from as one direct message per human. A notice waits for
  * the debounce window to pass with no new one for the same human and agent, and while the agent's round on its ticket
  * still runs (a pull request opened in a round goes with that round's hand-back), at most `MAX_HOLD_MS`. A review
- * notice then waits for the checks on its pull requests' heads (`createChecksGate`). What the human was told within the
- * last hour is not told again.
+ * notice then waits for the checks on its pull requests' heads (`createChecksGate`), and a notice that more work of
+ * the agent on its ticket or pull request, queued or running, makes stale is dropped (`createSupersede`). What the
+ * human was told within the last hour is not told again.
  */
 export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
   const { team, workState, clock, logger: log } = opts;
   const book = createNoticeBook(opts.store);
   const gate = createChecksGate(opts);
+  const supersede = createSupersede(opts);
   const debounceMs = debounceSeconds(team) * 1000;
   const timers = new Set<() => void>();
   const now = () => clock.now();
@@ -163,8 +166,10 @@ export function createNoticeDesk(opts: NoticeDeskOptions): NoticeDesk {
 
   /** Sends what of a due human's notices may go; what it keeps for later, and what the human was told. */
   async function sendDue(p: PendingNotices, b: NoticeBook, at: Date) {
-    const { go, hold } = await gate.split(p);
-    const held = hold.length > 0 ? [{ ...p, entries: hold }] : [];
+    const split = await gate.split(p);
+    const held = split.hold.length > 0 ? [{ ...p, entries: split.hold }] : [];
+    // Judged each time a notice is due, so work queued while it waited for its checks supersedes it too.
+    const go = await supersede(p, split.go);
     if (go.length === 0) {
       return { keep: held, told: [] };
     }
