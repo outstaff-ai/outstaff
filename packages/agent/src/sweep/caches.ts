@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { silentLogger } from "@outstaff/core";
 import { WARN_AT, volumeUsage } from "#/doctor/disk.js";
@@ -6,7 +7,8 @@ import { lastLine, runProgram } from "#/tools/mise.js";
 import { removeOlderThan } from "./old-files.js";
 import type { CachePruner, CachePrunerOptions, PrunedCache } from "./types.js";
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 
 /** npm cache entries not written for this long go when the home is short of space. */
 const NPM_UNUSED_DAYS = 30;
@@ -15,8 +17,10 @@ const NPM_UNUSED_DAYS = 30;
 const STEP_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
- * Prunes the tool and package caches of the agent's home, by what each costs to rebuild. Every sweep clears mise's
- * cache (download archives of tools already installed, which installed tools never read again). Only while the home
+ * Prunes the tool and package caches of the agent's home, by what each costs to rebuild. Every sweep removes mise's
+ * download archives (`downloads-cas` in its cache folder) not written in the last hour: installed tools never read
+ * them again, and an install running now keeps its own. The rest of mise's cache stays, because a shim resolves
+ * through it, and rebuilding it needs the network an agent may not have. Only while the home
  * volume is over the doctor's warning share: `pnpm store prune` (packages no project on disk links to), and npm cache
  * entries not written for 30 days, then `npm cache verify` to drop the content nothing refers to. A tool that is not
  * installed is skipped quietly.
@@ -66,9 +70,21 @@ export function createCachePruner(opts: CachePrunerOptions): CachePruner {
     );
   };
 
+  /** mise's download archives; none when mise never downloaded anything. */
+  async function miseDownloads(): Promise<PrunedCache | undefined> {
+    const path = join(dirs.miseCache, "downloads-cas");
+    if (!existsSync(path)) {
+      return undefined;
+    }
+
+    const was = await size(path);
+    await removeOlderThan(path, now() - HOUR_MS);
+    return { cache: "mise", freed: Math.max(0, was - (await size(path))) };
+  }
+
   return {
     async prune() {
-      const steps = [await step("mise", dirs.miseCache, "mise", ["cache", "clear"])];
+      const steps = [await miseDownloads()];
       if (await overWarning()) {
         steps.push(
           await step("pnpm", dirs.pnpmStore, "pnpm", ["store", "prune"]),
