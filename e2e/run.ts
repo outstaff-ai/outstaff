@@ -400,9 +400,9 @@ office:
   # Slack has dummy tokens and no stand-in, so the office's doctor does not call it.
   doctor: { skip: [chat] }
 # The code host's CLI, installed in the agent-e2e image already (the test downloads nothing at start). The adapter's
-# rules narrow it; the wrapper gives each call its token.
+# rules narrow it; the wrapper gives each call its token. Its pinned extension comes from the stand-in at start.
 tools:
-  gh: { version: 2.103.3 }
+  gh: { version: 2.103.3, extensions: [acme/gh-hello@v1.0.0] }
 # Each event wakes the agent at once: the run waits for every step, and a batch of comments arrives as one review.
 pipeline:
   wake: { coalesce_seconds: 0 }
@@ -4185,6 +4185,15 @@ async function mergeChecks() {
     "gh run rerun ran with the wrapper's token",
   );
 
+  // The team's pinned gh extension was installed at start and ran through the wrapper, for the clone's repository.
+  assertEq(
+    fix.note.body.includes(
+      "gh hello: hello from acme/gh-hello v1.0.0 (github.acme.example/acme/shop).",
+    ),
+    true,
+    "the declared gh extension ran",
+  );
+
   assertEq(
     JSON.stringify((await state()).github.reruns),
     JSON.stringify([{ runId: 9, actor: "acme-sam[bot]", failedOnly: false }]),
@@ -4192,7 +4201,7 @@ async function mergeChecks() {
   );
 
   step(
-    `merge checks: #${first.number} merged, its deploy failed -> sam woken with the log, re-ran it with gh (gh pr merge refused), ${key} open, fix #${fix.pr.number} opened on the same ticket`,
+    `merge checks: #${first.number} merged, its deploy failed -> sam woken with the log, re-ran it with gh and ran its pinned extension (gh pr merge and gh extension install refused), ${key} open, fix #${fix.pr.number} opened on the same ticket`,
   );
 
   await stub("POST", `/_test/pulls/${fix.pr.number}/merge`, {

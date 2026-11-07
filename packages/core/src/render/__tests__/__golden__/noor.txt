@@ -784,7 +784,9 @@ Your code host's CLI (`gh` on GitHub) is on your PATH. Each call gets a short-li
 
 - read a workflow run, its logs and artefacts (`gh run view`, `gh run list`, `gh run download`);
 - re-run a run that failed for a reason unrelated to the change, once (`gh run rerun <run> --failed`), cancel one, or dispatch a workflow (`gh workflow run`);
-- generate the repository's Actions lockfile (`gh actions-lock`), and read-only API queries (`gh api`, GET only).
+- run the extensions the team declared for it (`ost me` lists them), such as `gh actions-lock` for the repository's Actions lockfile, and read-only API queries (`gh api`, GET only).
+
+You cannot install, upgrade or remove an extension: to get one, ask a human to declare it, pinned, under `tools` in team.yaml.
 
 Pull request work stays on `ost pr`, and a merge goes only through `ost pr merge` (`/work/dir/process/merge.md`); the policy refuses `gh pr merge` and anything the list above does not name. Your App's permissions are the limit: a refusal from the host is the answer, so say so and ask a human rather than trying another way. A re-run is not a fix: when a check fails again, find the cause.
 

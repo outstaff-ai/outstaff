@@ -1745,12 +1745,15 @@ export async function* mergeChecksFailed(ctx: ItemContext): Script {
   const run = need(/\/actions\/runs\/(\d+)\//.exec(url)?.[1], "the check's workflow run");
   yield { type: "shell", command: `gh run rerun ${run}`, cwd };
   yield* mustBeDenied(`gh pr merge ${number} --merge`, cwd);
+  // The team's pinned extension, installed at start: its command runs; installing another is refused.
+  const hello = String(yield { type: "shell", command: "gh hello", cwd }).trim();
+  yield* mustBeDenied("gh extension install acme/gh-hello --pin v1.0.0", cwd);
   yield {
     type: "tool",
     tool: "ticket_comment",
     input: {
       key,
-      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}. gh run rerun ${run}: requested.`,
+      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}. gh run rerun ${run}: requested. gh hello: ${hello}.`,
     },
   };
 
