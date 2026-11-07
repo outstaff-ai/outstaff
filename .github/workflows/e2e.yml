@@ -73,3 +73,13 @@ jobs:
         env:
           E2E_PREBUILT: "1"
           E2E_TIMEOUT_MS: "1200000"
+          E2E_ARTIFACTS: ${{ runner.temp }}/e2e-artifacts
+      # Each service's full log, and on a failure its details and the stub's state: the job log keeps only tails.
+      - name: Keep the logs
+        if: always()
+        uses: actions/upload-artifact@v7.0.2
+        with:
+          name: e2e-logs-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/e2e-artifacts
+          retention-days: 7
+          if-no-files-found: warn
