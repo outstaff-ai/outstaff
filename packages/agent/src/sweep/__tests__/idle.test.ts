@@ -34,8 +34,8 @@ const IDLE: Record<string, { state: WorkState["state"]; setup: Setup }> = {
       sh(w, "add", ".");
       sh(w, "commit", "-q", "-m", "ignore");
       sh(w, "push", "-q");
-      mkdirSync(join(w, "node_modules/left-pad"), { recursive: true });
-      writeFileSync(join(w, "node_modules/left-pad/index.js"), "module.exports = 1;\n");
+      mkdirSync(join(w, "node_modules/acme-dep"), { recursive: true });
+      writeFileSync(join(w, "node_modules/acme-dep/index.js"), "module.exports = 1;\n");
     },
   },
   "ACME-31": {
