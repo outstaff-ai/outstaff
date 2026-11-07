@@ -108,6 +108,7 @@ function setup(person: string) {
     tools: {
       mise: withGlobalConfig(async () => ({ code: 0, stdout: "", stderr: "" })),
       addToPath: () => {},
+      run: async () => ({ code: 127, stdout: "", stderr: "not installed" }),
     },
   };
 

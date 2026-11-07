@@ -35,6 +35,9 @@ export interface StartupChecksInput extends NetworkProbes {
 
   /** Reads the usage of the volume a path is on. Defaults to statfs. */
   volume?: ((path: string) => Promise<VolumeUsage>) | undefined;
+
+  /** The largest folders of the home, for the fix line of a volume over the warning share. None without it. */
+  homeBreakdown?: (() => Promise<string | undefined>) | undefined;
 }
 
 /** Sends the checks to the office. */

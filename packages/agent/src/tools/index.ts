@@ -2,7 +2,7 @@ export { globalConfigFile, installTools, renderGlobalMiseToml, renderMiseToml } 
 export { verifyTools } from "./verify.js";
 export { extensionsStateFile, installExtensions, usableExtensions } from "./extensions.js";
 
-export { runMise } from "./mise.js";
+export { dataDirOf, runMise, runProgram } from "./mise.js";
 export type {
   ExtensionStatus,
   InstallExtensionsOptions,
@@ -10,6 +10,7 @@ export type {
   InstallToolsResult,
   MiseResult,
   MiseRunner,
+  ProgramRunner,
   RunExtensionInstall,
   ToolStatus,
 } from "./types.js";

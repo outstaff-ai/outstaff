@@ -20,6 +20,7 @@ export type {
   ExecProgram,
   HostCliRunner,
   HostCliRunnerOptions,
+  IdleRelease,
   RepoHead,
   Repositories,
   RunGit,

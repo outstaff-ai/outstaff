@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process";
 import { join } from "node:path";
 import type { EffectiveTool } from "@outstaff/core";
-import type { MiseResult, MiseRunner } from "./types.js";
+import type { MiseResult, MiseRunner, ProgramRunner } from "./types.js";
 
 /** The mise key of a tool: its explicit source, else its name (mise's registry). */
 export const miseKey = (t: EffectiveTool) => t.source ?? t.name;
@@ -21,18 +21,22 @@ export const lastLine = (r: { stderr: string; stdout: string }) => {
   return (failed.length ? failed : lines).slice(0, 2).join(" ") || "no output";
 };
 
-/** The real `mise` binary on PATH, with a generous timeout because the first install downloads toolchains. */
-export const runMise: MiseRunner = (args, opts) =>
+/**
+ * Runs a program on PATH (mise, or a tool whose shim mise put there) and resolves to its exit code and output. A
+ * missing program is a result with code 127, not a throw. The default timeout is generous because mise's first install
+ * downloads toolchains.
+ */
+export const runProgram: ProgramRunner = (file, args, opts) =>
   new Promise<MiseResult>((resolve) => {
     execFile(
-      "mise",
+      file,
       args,
       {
         cwd: opts.cwd,
         env: opts.env,
         encoding: "utf8",
         maxBuffer: 16 * 1024 * 1024,
-        timeout: 30 * 60 * 1000,
+        timeout: opts.timeoutMs ?? 30 * 60 * 1000,
       },
       (error, stdout, stderr) => {
         if (!error) {
@@ -42,7 +46,7 @@ export const runMise: MiseRunner = (args, opts) =>
 
         const e = error as NodeJS.ErrnoException & { code?: string | number };
         if (e.code === "ENOENT") {
-          resolve({ code: 127, stdout, stderr: "mise is not installed in this image." });
+          resolve({ code: 127, stdout, stderr: `${file} is not installed in this image.` });
           return;
         }
 
@@ -54,3 +58,6 @@ export const runMise: MiseRunner = (args, opts) =>
       },
     );
   });
+
+/** The real `mise` binary on PATH. */
+export const runMise: MiseRunner = (args, opts) => runProgram("mise", args, opts);

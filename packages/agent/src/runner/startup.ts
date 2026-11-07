@@ -20,6 +20,7 @@ import {
   usageReporter,
   workLoop,
   workSweeper,
+  agentHomeSpace,
 } from "./startup-work.js";
 
 const DEFAULT_SECRETS_DIR = "/run/secrets/outstaff";
@@ -122,6 +123,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     loop,
     usage,
     sweeper: workSweeper(ctx, connection, workspaces),
+    homeSpace: agentHomeSpace(ctx, layout, connection, workspaces),
     env,
     runtime,
     rendered,

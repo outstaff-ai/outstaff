@@ -940,6 +940,31 @@ Ports (for example chat) whose adapter's live checks the office does not run, fo
 - Optional
 - Allowed values: `chat`, `vcs`, `runtime`, `tracker`, `knowledge`, `avatars`
 
+## agent
+
+Settings of every agent's own container.
+
+- Type: `object`
+- Optional
+
+### agent.sweep
+
+The agent's daily sweep of its home: the worktrees and scratch folders of finished and idle items, and its tool and package caches.
+
+- Type: `object`
+- Optional
+- Default: `{"idle_days":7}`
+
+#### agent.sweep.idle_days
+
+Days a blocked or waiting work item may go without a change before its agent removes the item's worktree and scratch folder, but only when nothing in the worktree can be lost: no uncommitted or untracked changes and every commit pushed to the branch's upstream (or, with no branch, none beyond the default branch). A later round makes the worktree again from the branch. 0 turns this off; finished items are swept either way. Default 7.
+
+- Type: `integer`
+- Optional
+- Default: `7`
+- Minimum 0
+- Maximum 365
+
 ## scheduler
 
 How the office runs the work queue.
