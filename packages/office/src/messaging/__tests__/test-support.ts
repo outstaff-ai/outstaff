@@ -89,6 +89,10 @@ export function storeSource(
       const active = await store.listItems({ person, status: "active" });
       return Promise.all(active.map(async (i) => ({ offer: await offerOf(i), accepted: true })));
     },
+    // Every active item counts as the agent's: these tests do not reconnect.
+    async reconcile(person) {
+      return (await store.listItems({ person, status: "active" })).map((i) => i.id);
+    },
     async next(person) {
       const item = await scheduler.next(person);
       if (!item) {

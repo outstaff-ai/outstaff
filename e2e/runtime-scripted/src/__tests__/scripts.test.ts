@@ -736,6 +736,8 @@ describe("mergedFeedback", () => {
       "git switch -c 'feat/SHOP-2-follow-up-on-1' origin/main",
     ]);
 
+    // The commit names the follow-up's ticket, so a rebase of the pull request finds its branch.
+    expect(steps).toContain("git commit -m 'SHOP-2: follow up on #1'");
     expect(steps.at(-2)).toBe("pr_open");
     expect(seen.find((a) => a.type === "tool" && a.tool === "ticket_create")).toMatchObject({
       input: { related: "SHOP-1" },
@@ -909,6 +911,39 @@ describe("chat", () => {
     ]);
 
     expect(text).toBe("Fixing CI on PR #3.");
+  });
+
+  it("attaches a question about a failed deploy to the round already queued for it, and files nothing", async () => {
+    const work = [
+      { id: "w1", kind: "assigned", on: "SHOP-4", ticket: "SHOP-4", status: "active" },
+      {
+        id: "w2",
+        kind: "merge_checks_failed",
+        on: "acme/shop#3",
+        ticket: "SHOP-3",
+        status: "queued",
+      },
+    ];
+
+    const { seen, text } = await play(
+      chat({ ...talk([false, "Why does the deploy still fail?"]), work }),
+      () => "",
+    );
+
+    expect(seen).toEqual([
+      {
+        type: "tool",
+        tool: "work_attach",
+        input: {
+          target: "SHOP-3",
+          confirmed: true,
+          request: "Why does the deploy still fail?",
+          say: "My round on the failed deploy is already queued; it fixes it.",
+        },
+      },
+    ]);
+
+    expect(text).toBe("Attached to SHOP-3: the merge_checks_failed round w2 is queued.");
   });
 
   it("leaves a failing check on someone else's pull request to them", async () => {

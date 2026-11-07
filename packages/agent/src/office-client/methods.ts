@@ -13,34 +13,45 @@ import type { AckFn, CallFn, OfficeMethods } from "./types.js";
 const compact = <T extends object>(o: T): T =>
   Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
 
+/** Messages safe to repeat that end an item or answer an act: sent once more on the next connection if unanswered. */
+const AGAIN = { again: true };
+
+/**
+ * An offer is taken or given back only on the connection it came on: after a reconnect the office has requeued it
+ * and offers it again.
+ */
+const NOW = { now: true };
+
 /** The office's API over a connection's requests; `activeItems` are the items kept alive by a heartbeat. */
 export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>): OfficeMethods {
   return {
     async accept(workItemId, on) {
-      await ack("accept", { workItemId, ...on });
+      await ack("accept", { workItemId, ...on }, NOW);
       activeItems.add(workItemId);
     },
 
-    decline: (workItemId, reason) => ack("decline", { workItemId, reason }),
+    decline: (workItemId, reason) => ack("decline", { workItemId, reason }, NOW),
     progress: (workItemId, text) => ack("progress", { workItemId, text }),
     session: (workItemId, sessionId, model) =>
       ack("session", { workItemId, sessionId, ...(model ? { model } : {}) }),
     journal: (workItemId, text) => ack("journal", { workItemId, text }),
+    // Either way the agent no longer runs the item: one the office never heard end is requeued on the next hello.
     async handBack(workItemId, result) {
       const { usage, ...rest } = result;
-      await ack("handback", {
+      const payload = {
         workItemId,
         ...rest,
         links: result.links ?? [],
         ...(usage?.length ? { usage } : {}),
-      });
+      };
 
-      activeItems.delete(workItemId);
+      await ack("handback", payload, AGAIN).finally(() => activeItems.delete(workItemId));
     },
 
     async fail(workItemId, reason, usage) {
-      await ack("fail", { workItemId, reason, ...(usage?.length ? { usage } : {}) });
-      activeItems.delete(workItemId);
+      await ack("fail", { workItemId, reason, ...(usage?.length ? { usage } : {}) }, AGAIN).finally(
+        () => activeItems.delete(workItemId),
+      );
     },
 
     usage: (windows) => ack("usage", { windows }),
@@ -63,7 +74,7 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
 
     chatMessage: (m): Promise<ChatMessageResult> => call("chat_message", m, "chat_message_result"),
     reportPosted: (workItemId, id) => ack("report_posted", { workItemId, id }),
-    actResult: (result) => ack("act_result", result),
+    actResult: (result) => ack("act_result", result, AGAIN),
     chatReport: (workItemId, kind): Promise<ChatReportResult> =>
       call("chat_report", { workItemId, kind }, "chat_report_result"),
     linkTicket: (workItemId, ticket, request) =>

@@ -19,17 +19,17 @@ How to read it:
 | 3 | `pr.merged` acme-example/shop#43 by ada-admin | (drop: no policy matched) |
 | 4 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merge): _#41 (Search API) is approved and may be ready to merge. Decide whether to merge it now, wait, or coordinate first; follow the repository's instructions on merging._ |
 | 5 | `pr.merged` acme-example/shop#41 by sam | (drop: no policy matched) |
-| 6 | derived `pr.base_merged` acme-example/shop#42 after #41 | wake sam (rebase): _Your pull request #42 (Search page) is stacked on a branch that was just merged after #41 (Search API) merged. Bring it up to date with `sam/acme-123` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
-| 7 | `pr.merge_checks_failed` acme-example/shop#41 | wake sam (merge_checks_failed): _Pull request #41 (Search API) by sam merged, but checks on its merge commit failed: deploy (https://github.com/run/41). The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks._ |
+| 6 | derived `pr.base_merged` acme-example/shop#42 after #41 | wake sam (rebase): _Your pull request #42 (Search page) is stacked on a branch that was just merged after #41 (Search API) merged. Bring it up to date with `sam/acme-123` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one._ |
+| 7 | `pr.merge_checks_failed` acme-example/shop#41 | wake sam (merge_checks_failed): _Pull request #41 (Search API) by sam merged, but checks on its merge commit failed: deploy (https://github.com/run/41). The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one._ |
 
 ## Another agent's merge changes the base under unrelated pull requests
 
 | # | Event | Decisions |
 | - | - | - |
 | 8 | `pr.merged` acme-example/shop#50 by ada-admin | (drop: no policy matched) |
-| 9 | derived `pr.conflicted` acme-example/shop#51 after #50 | wake sam (rebase): _Your pull request #51 (Checkout form) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
-| 10 | derived `pr.conflicted` acme-example/shop#52 after #50 | wake kofi (rebase): _Your pull request #52 (CI cache) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
-| 11 | derived `pr.behind_base` acme-example/shop#53 after #50 | wake mira (rebase): _Your pull request #53 (Order events) is behind its base branch, and the repository requires it to be up to date after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why._ |
+| 9 | derived `pr.conflicted` acme-example/shop#51 after #50 | wake sam (rebase): _Your pull request #51 (Checkout form) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one._ |
+| 10 | derived `pr.conflicted` acme-example/shop#52 after #50 | wake kofi (rebase): _Your pull request #52 (CI cache) conflicts with its base branch after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one._ |
+| 11 | derived `pr.behind_base` acme-example/shop#53 after #50 | wake mira (rebase): _Your pull request #53 (Order events) is behind its base branch, and the repository requires it to be up to date after #50 (Cart totals) merged. Bring it up to date with `main` the way the repository asks, and push. Then keep the pull request description current; if the approach changed, comment with what changed and why. If the context lists a pull request of yours since then that already does this, do not do it again: hand back silent, saying which one._ |
 | 12 | derived `pr.conflicted` acme-example/shop#54 after #50 | (drop: no policy matched) |
 | 13 | `pr.merge_checks_passed` acme-example/shop#50 | move ACME-130 to done (for noor)<br>assign ACME-130 to agent noor (for noor) |
 
@@ -101,7 +101,7 @@ How to read it:
 
 | # | Event | Decisions |
 | - | - | - |
-| 43 | `pr.ci_failed` acme-example/shop#61 | wake sam (ci_failed): _Your pull request #61 (Saved searches) has failing checks. The failing checks are in the feedback. Fix them and push._ |
+| 43 | `pr.ci_failed` acme-example/shop#61 | wake sam (ci_failed): _Your pull request #61 (Saved searches) has failing checks. The failing checks are in the feedback. Fix them and push. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one._ |
 | 44 | `pr.ci_failed` acme-example/shop#54 | (drop: no policy matched) |
 
 ## Other pull request events

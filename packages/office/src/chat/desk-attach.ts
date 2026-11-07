@@ -2,9 +2,8 @@ import { silentLogger } from "@outstaff/core";
 import type { Attached, Feedback } from "@outstaff/protocol";
 import { summarizeItem } from "#/item-summary.js";
 import { ProtocolError } from "#/protocol/errors.js";
-import { CHAT_KIND } from "#/scheduler/policy.js";
-import type { WorkItem } from "#/store/types.js";
 import { addFeedback } from "#/work-feedback.js";
+import { liveWorkOn } from "./attach-live.js";
 import { attachSessionDocs } from "./desk-attach-docs.js";
 import type { ChatDeskOptions, ChatRequests, DeskFiling } from "./desk.types.js";
 import { resolveOwnWork } from "./desk-resolve.js";
@@ -17,9 +16,6 @@ import {
 } from "./origin.js";
 import { chatRefsOf } from "./refs.js";
 import type { ChatOriginRecord } from "./types.js";
-
-/** Work that is still open, the order an attached request prefers it in. */
-const LIVE: WorkItem["status"][] = ["active", "queued", "waiting", "blocked"];
 
 /**
  * `ost work attach`: makes a chat session's request part of existing work of the person, as a round on its pull
@@ -48,8 +44,29 @@ export function createAttach(
 
     const target = resolveOwnWork(opts.workState, person, request.target);
 
-    // A ticket is the work of its open pull request, when it has one.
+    // The human may have closed or merged the pull request a moment ago, before the office's next poll: the ticket's
+    // pull requests are read from the code host again, so the request goes to the work as it stands now.
     let { ticket, pr } = target;
+    const known = ticket?.key ?? pr?.ticket;
+    if (known) {
+      await opts.workState.refreshPrsOf(known).catch((error: unknown) => {
+        log.warn("could not read the pull requests again", {
+          person,
+          ticket: known,
+          error: String(error),
+        });
+      });
+    }
+
+    if (pr) {
+      const subject = opts.workState.prSubject(pr.ref);
+      pr =
+        opts.workState
+          .pullRequests(pr.ref.number)
+          .find((p) => opts.workState.prSubject(p.ref) === subject) ?? pr;
+    }
+
+    // A ticket is the work of its open pull request, when it has one.
     if (!pr && ticket) {
       // A pull request opened a moment ago may not be in the work state yet. Looking is best effort: a repository the
       // office cannot list (no access yet) must not fail the request, which then goes to the ticket as it stands.
@@ -111,16 +128,7 @@ export function createAttach(
     };
 
     const note = `${who} asked in chat (thread ${origin.thread}); added to ${what}${key && !pr ? "" : key ? ` for ${key}` : ""}:\n${message}`;
-    const live = (await store.listItems({ person }))
-      .filter(
-        (i) =>
-          LIVE.includes(i.status) &&
-          i.kind !== CHAT_KIND &&
-          i.id !== session.id &&
-          ((i.subject?.type === "pr" && i.subject.ref === subject.ref) ||
-            (key !== undefined && i.subject?.type === "ticket" && i.subject.ref === key)),
-      )
-      .toSorted((a, b) => LIVE.indexOf(a.status) - LIVE.indexOf(b.status));
+    const live = await liveWorkOn(store, person, subject, key);
 
     const attachedOrigin: ChatOriginRecord = {
       channel: origin.channel,
@@ -128,7 +136,6 @@ export function createAttach(
       requester: origin.requester,
       direct: origin.direct,
       participant: origin.participant,
-      awaitingPlacement: false,
       claimed: [],
     };
 
@@ -213,7 +220,6 @@ export function createAttach(
     const ticketUrl = key ? (ticket?.url ?? opts.tracker?.links.issue(key)) : undefined;
     return {
       item: await summarizeItem(store, (await store.getItem(item.id)) ?? item),
-      waiting: false,
       work: [],
       attached: {
         ...(key

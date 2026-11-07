@@ -145,7 +145,6 @@ export function createFakeOffice(
       attached.push({ workItemId, ...request });
       return {
         item: { id: "work-attached", title: request.target, status: "queued" },
-        waiting: false,
         work: [],
         attached: {
           pr: {
@@ -171,7 +170,6 @@ export function createFakeOffice(
       return {
         url: `https://tracker.acme.example/issue/${ticket}`,
         item: { id: `work-${ticket}`, title: ticket, status: "queued" },
-        waiting: false,
         work: [],
         ...opts.filed,
       };
@@ -183,7 +181,6 @@ export function createFakeOffice(
       queued.push({ workItemId, ...request });
       return {
         item: { id: `work-${queued.length}`, title: request.title, status: "queued" },
-        waiting: false,
         work: [],
         ...opts.filed,
       };

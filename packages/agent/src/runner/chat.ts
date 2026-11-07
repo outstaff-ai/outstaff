@@ -12,7 +12,7 @@ import { acknowledgements } from "./chat-acknowledge.js";
 import { fromTrustedHuman, linksToList, officeMessage, reportBody } from "./chat-report.js";
 import type { ChatRelayOptions, ChatRelay, ReportDestination, ReportTarget } from "./chat.types.js";
 import { chatContext } from "./chat-context.js";
-import { placementQuestion } from "./chat-replies.js";
+import { placementNote } from "./chat-replies.js";
 import { linkLine, splitReply, tag } from "./chat-text.js";
 import { reason } from "./reason.js";
 
@@ -195,16 +195,16 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
         return;
       }
 
-      // The first filing found the person busy; the others joined it, so the question is asked once.
-      const waiting = filings.find((f) => f.filed.waiting)?.filed;
+      // The first filing found the person busy; the others joined it, so where the work went is said once.
+      const work = filings.find((f) => f.filed.work.length > 0)?.filed.work;
+      const where = work ? placementNote(work, ticketUrl) : undefined;
       await post(
         origin.channel,
         origin.thread,
         linked(
-          [
-            `${tag(origin)}${acknowledgements(filings, ticketUrl)}`,
-            ...(waiting ? [placementQuestion(describe, waiting.work)] : []),
-          ].join("\n"),
+          [`${tag(origin)}${acknowledgements(filings, ticketUrl)}`, ...(where ? [where] : [])].join(
+            "\n",
+          ),
         ),
       );
     },

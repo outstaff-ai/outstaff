@@ -1,7 +1,7 @@
 import type { Links } from "./links.js";
 import type { MergeMethod, MergeOptions, MergeRequirements, MergeResult } from "./vcs-merge.js";
 import type { RepoRef } from "./types.js";
-import type { Check, CheckLog } from "./vcs-checks.js";
+import type { Check, CheckLog, CheckReadOptions } from "./vcs-checks.js";
 import type { CredentialUse, HostCli } from "./vcs-cli.js";
 import type { ReviewThread } from "./vcs-threads.js";
 import type { Reaction, ReactionTarget, VcsEvent, VcsEventPage } from "./vcs-events.js";
@@ -143,7 +143,16 @@ export interface Vcs {
     number: number,
     opts?: { waitForMergeable?: boolean },
   ): Promise<PullRequest>;
-  checks(repo: RepoRef, sha: string): Promise<Check[]>;
+  checks(repo: RepoRef, sha: string, opts?: CheckReadOptions): Promise<Check[]>;
+
+  /**
+   * The commit a branch points at now (read grant, the office's identity); `not_found` for an unknown branch.
+   * Adapters leave it out together with `contains`, and then nothing follows a branch's later commits.
+   */
+  branchHead?(repo: RepoRef, branch: string): Promise<string>;
+
+  /** Whether `ancestor` is in the history of `sha`, or is `sha` (read grant, the office's identity). */
+  contains?(repo: RepoRef, sha: string, ancestor: string): Promise<boolean>;
 
   /**
    * The failed steps of a check and the last `tail` lines (default 200) of each, for a check with a `logId`.

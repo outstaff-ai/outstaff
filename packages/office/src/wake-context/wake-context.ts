@@ -11,7 +11,9 @@ import type { Store, WorkItem } from "#/store/types.js";
 import { failedChecksOf } from "./failed-checks.js";
 import { gatherGraph } from "./gather.js";
 import { mergeContextOf } from "./merge.js";
+import { recentPrsOf } from "./recent-prs.js";
 import type { ContextReaders, WakeContextOptions } from "./types.js";
+import { workListOf } from "./work-list.js";
 
 /** The events that may have woken the item, latest first: those the pipeline queued it for, then its references'. */
 async function eventsOf(store: Store, itemId: string): Promise<string[]> {
@@ -25,7 +27,9 @@ async function eventsOf(store: Store, itemId: string): Promise<string[]> {
 const isEmpty = (c: WakeContext) =>
   c.tickets.length + c.prs.length + c.docs.length + c.chats.length === 0 &&
   !c.merge &&
-  !c.failedChecks?.length;
+  !c.failedChecks?.length &&
+  !c.work?.length &&
+  !c.recentPrs?.length;
 
 /** A merge item's context of the merge, when the office knows its pull request. */
 async function mergeOf(readers: ContextReaders, item: WorkItem, limit: number) {
@@ -55,6 +59,22 @@ function withMerge(
     : built;
 }
 
+/** What the bundle adds of the person's own work: failed checks and later fixes for a failure, the work for a chat. */
+async function ownWorkOf(
+  readers: ContextReaders,
+  item: WorkItem,
+  max: number,
+): Promise<Pick<WakeContext, "failedChecks" | "work" | "recentPrs">> {
+  const failedChecks = await failedChecksOf(readers, item);
+  const work = await workListOf(readers, item, max);
+  const recentPrs = await recentPrsOf(readers, item, max);
+  return {
+    ...(failedChecks?.length ? { failedChecks } : {}),
+    ...(work?.length ? { work } : {}),
+    ...(recentPrs?.length ? { recentPrs } : {}),
+  };
+}
+
 /**
  * The context bundle each wake of an item carries: what the office knows around it, built by the context builder (and
  * for a merge, what the merge is decided with) and, for a new offer, recorded in the trace of the event that woke it.
@@ -71,8 +91,7 @@ export function wakeContextOf(readers: ContextReaders, opts: WakeContextOptions)
         await recordContext(traces, await eventsOf(readers.store, item.id), manifest);
       }
 
-      const failedChecks = await failedChecksOf(readers, item);
-      const context = failedChecks?.length ? { ...built, failedChecks } : built;
+      const context = { ...built, ...(await ownWorkOf(readers, item, limits.items)) };
       return isEmpty(context) ? undefined : context;
     } catch (error) {
       opts.logger?.warn("could not build the context of a wake", {

@@ -56,7 +56,6 @@ type Reply = [type: string, payload?: unknown];
 
 const filedReply = {
   item: { id: "w9", title: "Filed", status: "queued" },
-  waiting: false,
   work: [],
 };
 
@@ -135,10 +134,13 @@ const offerContext = (extra: OfferExtras) => ({
 class OfficeSocket extends FakeSocket {
   failJournal = false;
 
+  /** Requests of these types are left unanswered, as by a busy office or a dropped connection. */
+  readonly hold = new Set<string>();
+
   override send(data: string) {
     super.send(data);
     const m = this.last();
-    if (m.type === "hello") {
+    if (m.type === "hello" || this.hold.has(m.type)) {
       return;
     }
 
@@ -1385,6 +1387,22 @@ describe("work loop", () => {
       await running;
       expect(sentOf("handback")).toHaveLength(2);
     });
+
+    it("runs a chat session offered again while it runs once", async () => {
+      await connect();
+      const { runtime, requests, release } = blockingRuntime();
+      start(runtime, { chatSession: sessionFor() });
+      socket.offerWith("c1", { origin: true });
+      await until(() => sentOf("progress").length === 1);
+      socket.offerWith("c1", { origin: true });
+      await tick();
+      release();
+      await until(() => sentOf("handback").length === 1);
+      expect(sentOf("accept")).toHaveLength(1);
+      expect(requests.filter((r) => r.prompt !== JOURNAL_PROMPT)).toHaveLength(1);
+      await loop.stop();
+      await conn.stop();
+    });
   });
 
   describe("chat requests", () => {
@@ -1618,12 +1636,88 @@ describe("work loop", () => {
     });
   });
 
-  it("declines items left from before a restart so the office offers them again", async () => {
-    await connect(["w9"]);
-    start(createFakeRuntime());
+  describe("a reconnect", () => {
+    /** Drops the connection and opens the next one, which the office welcomes keeping `resume`. */
+    async function reconnect(resume: string[]) {
+      const old = socket;
+      old.drop();
+      socket = new OfficeSocket();
+      clock.advance(1000);
+      socket.open();
+      socket.welcome({ resume });
+      await conn.whenConnected();
+      return old;
+    }
+
+    it("keeps the running item going and hands it back on the new connection", async () => {
+      await connect();
+      const { runtime, requests, release } = blockingRuntime();
+      start(runtime);
+      socket.offerWith("w1");
+      await until(() => sentOf("progress").length === 1);
+
+      const old = await reconnect(["w1"]);
+      expect(sentOf("hello")[0]?.payload).toMatchObject({ running: ["w1"] });
+      release();
+      await until(() => sentOf("handback").length === 1);
+      expect([...old.sentOf("fail"), ...sentOf("fail")]).toEqual([]);
+      expect(requests.filter((r) => r.prompt !== JOURNAL_PROMPT)).toHaveLength(1);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("sends a hand-back lost with the connection again, and does not fail the item", async () => {
+      await connect();
+      const { runtime, release } = blockingRuntime();
+      start(runtime);
+      socket.offerWith("w1");
+      await until(() => sentOf("progress").length === 1);
+
+      socket.hold.add("handback");
+      release();
+      await until(() => sentOf("handback").length === 1);
+      const old = await reconnect(["w1"]);
+      await until(() => sentOf("handback").length === 1);
+      await tick();
+      expect([...old.sentOf("fail"), ...sentOf("fail")]).toEqual([]);
+      await loop.stop();
+      await conn.stop();
+    });
+
+    it("drops an offer whose accept was lost, and takes it when the office offers it again", async () => {
+      await connect();
+      const { runtime, requests, release } = blockingRuntime();
+      start(runtime);
+      socket.hold.add("accept");
+      socket.offerWith("w1");
+      await until(() => sentOf("accept").length === 1);
+
+      await reconnect([]);
+      expect(sentOf("hello")[0]?.payload).toMatchObject({ running: [] });
+      await tick();
+      expect(requests).toEqual([]);
+
+      socket.offerWith("w1");
+      await until(() => sentOf("progress").length === 1);
+      release();
+      await until(() => sentOf("handback").length === 1);
+      expect(requests.filter((r) => r.prompt !== JOURNAL_PROMPT)).toHaveLength(1);
+      await loop.stop();
+      await conn.stop();
+    });
+  });
+
+  it("gives an offer back when the office does not answer its accept in time", async () => {
+    await connect();
+    const runtime = createFakeRuntime();
+    start(runtime);
+    socket.hold.add("accept");
+    socket.offerWith("w1");
+    await until(() => sentOf("accept").length === 1);
+    clock.advance(30_000);
     await until(() => sentOf("decline").length === 1);
-    expect(sentOf("decline")[0]?.payload).toMatchObject({ workItemId: "w9" });
-    expect(sentOf("fail")).toHaveLength(0);
+    expect(sentOf("decline")[0]?.payload).toMatchObject({ workItemId: "w1" });
+    expect(runtime.requests).toEqual([]);
     await loop.stop();
     await conn.stop();
   });

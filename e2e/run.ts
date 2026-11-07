@@ -7,7 +7,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and a CI fix that hands back while a round the human asked for in chat on the same pull request waits in the queue tells nothing, so the human hears once, after that round, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and a CI fix that hands back while a round the human asked for in chat on the same pull request waits in the queue tells nothing, so the human hears once, after that round, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again, and work asked for in chat while one round runs with nothing queued is placed next and acknowledged as running after that round, with no question, and runs once it ends. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -15,12 +15,14 @@
 // E2E_PREBUILT=1   use the images that are already tagged (outstaff/{office,agent-e2e,e2e-stubs}:local)
 // E2E_KEEP=1       leave the stack and its files up after the run, for a look around
 // E2E_TIMEOUT_MS   bound of the whole run (default 600000)
+// E2E_ARTIFACTS    a folder for each service's full log and, on a failure, its details and the stub's state
 import { execFileSync, spawnSync } from "node:child_process";
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { wakesIn } from "./src/office-log.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -155,18 +157,90 @@ const logs = (service: string) => dc("logs", "--no-color", "--no-log-prefix", se
 
 let composeEnv: NodeJS.ProcessEnv = process.env;
 
-function fail(e: unknown): never {
-  process.stderr.write(`\nFAIL: ${e instanceof Error ? e.message : String(e)}\n`);
+/** Where the full logs and the failure go for CI to keep (E2E_ARTIFACTS), whatever the outcome. */
+const artifacts = process.env["E2E_ARTIFACTS"];
+
+/** Lines of a failure's details (a timeout's last read) that go to stderr; the artifacts keep all of them. */
+const DETAIL_LINES = 150;
+
+/** Writes each service's full log, and the failure with the stub's state if there is one, to E2E_ARTIFACTS. */
+function keepEvidence(failure?: { text: string; state?: string }) {
+  if (!artifacts) {
+    return;
+  }
+
+  try {
+    mkdirSync(artifacts, { recursive: true });
+    for (const service of dc("config", "--services").stdout.split("\n").filter(Boolean)) {
+      writeFileSync(join(artifacts, `${service}.log`), logs(service));
+    }
+
+    writeFileSync(join(artifacts, "ps.txt"), dc("ps", "-a").stdout);
+    if (failure) {
+      writeFileSync(join(artifacts, "failure.txt"), `${failure.text}\n`);
+      if (failure.state) {
+        writeFileSync(join(artifacts, "state.json"), failure.state);
+      }
+    }
+  } catch (e) {
+    process.stderr.write(`could not keep the evidence in ${artifacts}: ${String(e)}\n`);
+  }
+}
+
+/**
+ * Reports a failure: what failed, the tail of each service's log, then a capped part of the details (a timeout's last
+ * read can be longer than a job log keeps). The full logs, the details and the stub's state go to E2E_ARTIFACTS.
+ */
+async function fail(e: unknown) {
+  if (failing || ending) {
+    return;
+  }
+
+  failing = true;
+  const text = e instanceof Error ? e.message : String(e);
+  const [headline, ...details] = text.split("\n");
+  process.stderr.write(`\nFAIL: ${headline}\n`);
   for (const service of ["stubs", "office", "sam", "pia"]) {
     process.stderr.write(
       `\n---------------- ${service} log (tail)\n${logs(service).split("\n").slice(-120).join("\n")}\n`,
     );
   }
 
-  return teardown(1);
+  if (details.length) {
+    const kept = artifacts ? `; all of it in ${join(artifacts, "failure.txt")}` : "";
+    process.stderr.write(
+      `\n---------------- details (${Math.min(details.length, DETAIL_LINES)} of ${details.length} lines${kept})\n${details.slice(0, DETAIL_LINES).join("\n")}\n`,
+    );
+  }
+
+  process.stderr.write(`\nFAIL: ${headline}\n`);
+  // The stub may be what failed: its state is worth a few seconds, never the teardown.
+  const now = await Promise.race([
+    state().then(
+      (s) => JSON.stringify(s, null, 2),
+      () => undefined,
+    ),
+    sleep(10_000).then(() => undefined),
+  ]);
+
+  keepEvidence({ text, ...(now ? { state: now } : {}) });
+  teardown(1, true);
 }
 
-function teardown(code: number): never {
+let failing = false;
+let ending = false;
+
+/** Takes the stack down (unless E2E_KEEP=1) and exits once stdout and stderr have drained into the job log. */
+function teardown(code: number, kept = false) {
+  if (ending) {
+    return;
+  }
+
+  ending = true;
+  if (!kept) {
+    keepEvidence();
+  }
+
   if (process.env["E2E_KEEP"] === "1") {
     log(`left running: project ${project}, files in ${work}, stub at http://127.0.0.1:${port}`);
   } else {
@@ -174,7 +248,8 @@ function teardown(code: number): never {
     rmSync(work, { recursive: true, force: true });
   }
 
-  process.exit(code);
+  process.exitCode = code;
+  process.stdout.write("", () => process.stderr.write("", () => process.exit(code)));
 }
 
 // A killed run takes down its own compose project (and only that one) instead of leaving the stack behind.
@@ -467,16 +542,11 @@ function dcOrFail(what: string, ...args: string[]) {
   }
 }
 
-/** The kind of each wake the office queued, or folded into an open item, for a person, in order: from its log. */
-const wakesOf = (person: string) =>
-  [
-    ...logs("office").matchAll(
-      new RegExp(
-        `pipeline: (?:queued|folded the wake into) work item \\S+ for ${person} \\((\\w+)\\)`,
-        "g",
-      ),
-    ),
-  ].map((m) => m[1]);
+/** The kind of each round the office queued for a person, in order: one per work item, a folded wake not again. */
+const wakesOf = (person: string) => wakesIn(logs("office"), person);
+
+/** How many `merge_checks_failed` rounds the office queued for sam, or folded into an open one. */
+const fixRounds = () => wakesOf("sam").filter((k) => k === "merge_checks_failed").length;
 
 const piaWakes = () => wakesOf("pia");
 
@@ -2694,8 +2764,11 @@ async function main() {
   await byRole();
   await unblockDependents();
   await canceledWhileQueued();
+  await droppedAfterOffer();
   await commentThenClose();
   await mergeChecks();
+  await deployStillFails();
+  await staleBlockResolves();
   await recallHistory();
   await usagePerTicket();
   await handedToHumanWithoutChat();
@@ -2704,6 +2777,7 @@ async function main() {
   await roadmap();
   await lateInputOneRound();
   await continueFromReview();
+  await filedBehindRunning();
   await planInChat();
   await planForLater();
 
@@ -3127,6 +3201,58 @@ async function roadmap() {
   );
 
   step(`roadmap: a human confirmed Monitoring -> pia started it and filed ${filed[0].key} only`);
+}
+
+const RUNNING = "Tidy the changelog";
+
+const BEHIND = "Sort the changelog entries";
+
+/**
+ * 13i. work filed in chat while sam runs one item and nothing is queued: it is placed next, so the acknowledgement
+ * says it runs after the running work, with no list and nothing to answer, and it runs once that round ends.
+ */
+async function filedBehindRunning() {
+  await agentIdle();
+  await stub("POST", "/_test/gates/running/close");
+  await stub("POST", "/_test/chat/say", { text: `New work: ${RUNNING}\nhold: running` });
+  await until(`sam's round on ${RUNNING} held at the gate`, (s) =>
+    s.chat.gates.running?.arrived ? true : undefined,
+  );
+
+  const running = (await state()).tickets.find((t: Json) => t.title === RUNNING);
+  const request = await stub("POST", "/_test/chat/say", { text: `New work: ${BEHIND}` });
+  const ack = await until("the acknowledgement of the work filed behind the running round", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === request.id && p.text.includes("On it")),
+  );
+
+  assertEq(ack.text.includes("Tell me if"), false, "nothing queued: no list, no offer to move it");
+  assertEq(
+    ack.text.includes("It runs after") &&
+      ack.text.includes(running.key) &&
+      ack.text.includes("which is running now"),
+    true,
+    `the acknowledgement says it runs after ${running.key}`,
+  );
+
+  await stub("POST", "/_test/gates/running/open");
+  const behind = await until(`${BEHIND} worked and in review, with no placement answer`, (s) => {
+    const t = s.tickets.find((x: Json) => x.title === BEHIND);
+    const pr = t ? s.github.pulls.find((p: Json) => p.body.includes(`Closes ${t.key}`)) : undefined;
+    return t && pr && t.status === "In Review" ? t : undefined;
+  });
+
+  await agentIdle();
+  assertEq(
+    (await state()).chat.posts.some(
+      (p: Json) => p.thread === request.id && p.text.includes("Tell me if"),
+    ),
+    false,
+    "nothing was offered or asked in the thread",
+  );
+
+  step(
+    `filed behind running work: ${behind.key} asked for while ${running.key} ran with nothing queued -> placed next with no question, it ran after ${running.key}`,
+  );
 }
 
 const DECISION = "the cache size";
@@ -3818,6 +3944,82 @@ async function canceledWhileQueued() {
 }
 
 /**
+ * 13b'. the agent's connection drops right after an offer. The office offers sam a ticket while sam is frozen, and
+ * drops the silent connection; once sam runs again, its accept goes to the dead connection and is lost. When sam
+ * reconnects, the office requeues the offer it never took and offers it again: the round runs once.
+ */
+async function droppedAfterOffer() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const queued = () =>
+    logs("office").match(/queued work item \S+ for sam \(assigned\)/g)?.length ?? 0;
+
+  const queuedBefore = queued();
+  dcOrFail("Could not pause the agent", "pause", "sam");
+  let key: string;
+  let id: string;
+  const offers = () =>
+    logs("office").match(new RegExp(`"offered a work item","person":"sam","item":"${id}"`, "g"))
+      ?.length ?? 0;
+
+  try {
+    ({ key } = await stub("POST", "/_test/tickets", {
+      title: "Check the staging banner",
+      description: "which repo: unclear",
+    }));
+
+    await stub("POST", `/_test/tickets/${key}/assign`, { to: "sam" });
+    await until(`a round on ${key} queued for sam`, () =>
+      queued() > queuedBefore ? true : undefined,
+    );
+
+    id = lastItemOf("sam", "assigned")!;
+    await until(
+      `the round on ${key} offered to the frozen agent`,
+      () => offers() === 1 || undefined,
+    );
+
+    await until(
+      "the office dropped the silent connection",
+      () => /"agent connection timed out","person":"sam"/.test(logs("office")) || undefined,
+      90_000,
+    );
+  } finally {
+    dcOrFail("Could not unpause the agent", "unpause", "sam");
+  }
+
+  await until(
+    `sam lost the accept of ${key} with the connection`,
+    () =>
+      new RegExp(`could not accept an offer \\{"workItemId":"${id}"`).test(logs("sam")) ||
+      undefined,
+  );
+
+  await until(
+    `${key} requeued and offered again`,
+    () =>
+      (new RegExp(`"work item requeued","item":"${id}".*without having taken this offer`).test(
+        logs("office"),
+      ) &&
+        offers() === 2) ||
+      undefined,
+  );
+
+  const asked = (s: Json) =>
+    s.tickets
+      .find((t: Json) => t.key === key)
+      .comments.filter((c: Json) => c.body.includes("Which repository is")).length;
+
+  await until(`sam's round on ${key} done`, (s) => (asked(s) === 1 && idle(s)) || undefined);
+  await officePolledTwice(`${key} handed back`);
+  assertEq(asked(await state()), 1, `sam asked about ${key} once: the round ran once`);
+  assertEq(offers(), 2, `${key} was offered twice: once to the dropped connection, once after`);
+  step(
+    `dropped after an offer: sam's connection dropped right after the office offered ${key} -> the office requeued the offer nobody took, offered it again, and the round ran once`,
+  );
+}
+
+/**
  * 13c'. a human approves a plan with a comment that mentions the agent and closes the ticket right after, so the
  * office reads both at once and finds the ticket closed when it judges the comment. The comment was written on an open
  * ticket: the mention wakes sam once, who answers on the ticket and leaves it closed.
@@ -3961,6 +4163,201 @@ async function mergeChecks() {
 
   await until(`${key} done`, (s) => ticketOf(s).status === "Done");
   step(`merge checks: fix #${fix.pr.number} merged with the deploy green -> ${key} is done`);
+}
+
+/** The pull request that closes a ticket. */
+const closingPr = (s: Json, key: string) =>
+  s.github.pulls.find((p: Json) => p.body.includes(`Closes ${key}`));
+
+/**
+ * 13d2. a stale block resolves itself: sam's sub-ticket merges, and its deploy fails on the merge commit for a reason
+ * outside the pull request. sam finds nothing to fix and blocks it; the PM cannot unblock it either and gives it to
+ * the human. Its parent's own pull request merged green but stays open behind it. Another pull request fixes the
+ * outside cause and merges with the deploy green; that merge commit contains the first one, so the failed deploy
+ * counts as passed: the sub-ticket closes with a note saying where the deploy passed, and its parent closes after it,
+ * with no human action on either.
+ */
+async function staleBlockResolves() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const inReview = async (key: string) =>
+    until(`${key}: sam's pull request, the ticket in review`, (s) => {
+      const t = ticketOf(s, key);
+      return closingPr(s, key) && t.status === "In Review" && t.assignee !== "sam"
+        ? closingPr(s, key)
+        : undefined;
+    });
+
+  const { key: parent } = await stub("POST", "/_test/tickets", {
+    title: "Publish the welcome page",
+  });
+
+  await stub("POST", `/_test/tickets/${parent}/assign`, { to: "sam" });
+  const parentPr = await inReview(parent);
+  const { key: sub } = await stub("POST", "/_test/tickets", {
+    title: "Deploy the welcome page",
+    description: "outside cause: the deploy runner's key expired",
+  });
+
+  await stub("POST", `/_test/tickets/${sub}/parent`, { parent });
+  await stub("POST", `/_test/pulls/${parentPr.number}/merge`, {});
+  await officePolledTwice(`#${parentPr.number} merged`);
+  await until(`${parent}: its merge passed, and its open sub-ticket keeps it open`, (s) =>
+    ticketOf(s, parent).status === "In Review" ? true : undefined,
+  );
+
+  await stub("POST", `/_test/tickets/${sub}/assign`, { to: "sam" });
+  const first = await inReview(sub);
+  await stub("POST", `/_test/pulls/${first.number}/merge`, {
+    checks: [
+      {
+        name: "deploy",
+        conclusion: "failure",
+        step: "Deploy",
+        log: ["Connecting to the runner", "error: the deploy key has expired"],
+      },
+    ],
+  });
+
+  const human = await until(`${sub}: blocked by sam, given to the human by the PM`, (s) => {
+    const t = ticketOf(s, sub);
+    const blocked = t.comments.some(
+      (c: Json) =>
+        c.author === "sam" && c.body.startsWith(`Blocked: deploy failed after #${first.number}`),
+    );
+
+    return blocked && t.status === "Blocked" && t.assignee !== "sam" && t.assignee !== "pia"
+      ? t
+      : undefined;
+  });
+
+  step(
+    `stale block: #${first.number} merged, its deploy failed from outside it -> sam blocked ${sub}, the PM gave it to ${human.assignee}; ${parent} stays open behind it`,
+  );
+
+  const { key: fix } = await stub("POST", "/_test/tickets", { title: "Renew the deploy key" });
+  await stub("POST", `/_test/tickets/${fix}/assign`, { to: "sam" });
+  const fixPr = await inReview(fix);
+  await stub("POST", `/_test/pulls/${fixPr.number}/merge`, {
+    checks: [{ name: "deploy", conclusion: "success" }],
+  });
+
+  const done = await until(`${sub} and ${parent} done`, (s) => {
+    const [t, p] = [ticketOf(s, sub), ticketOf(s, parent)];
+    return t.status === "Done" && p.status === "Done" ? { t, p, main: s.github.main } : undefined;
+  });
+
+  const note = done.t.comments.find((c: Json) => c.body.startsWith("Moved to done: deploy passes"));
+  assertEq(
+    note?.body,
+    `Moved to done: deploy passes on main at ${String(done.main).slice(0, 7)}, which includes #${first.number}'s merge.`,
+    `${sub} closed with a note saying where the deploy passed`,
+  );
+
+  assertEq(note?.author, "sam", "the note is sam's, who did the work");
+  for (const [key, t] of [
+    [sub, done.t],
+    [parent, done.p],
+  ] as const) {
+    assertEq(
+      JSON.stringify(t.moves.filter((m: Json) => m.to === "Done").map((m: Json) => m.by)),
+      JSON.stringify(["sam"]),
+      `${key} was closed once, by sam, with no human action`,
+    );
+  }
+
+  step(
+    `stale block: #${fixPr.number} fixed the outside cause and merged with the deploy green -> ${sub} closed with a note, then ${parent}, with no human action`,
+  );
+}
+
+/**
+ * 13d'. a question in chat about a failure a queued round already fixes: sam is busy with a round held at a gate when
+ * the deploy after his merge fails, so the `merge_checks_failed` round waits in his queue. The human asks in chat why
+ * the deploy still fails. The chat session sees that round in its context and attaches the question to its ticket,
+ * which stays open; it files no ticket. The round then runs once: exactly one fix is opened.
+ */
+async function deployStillFails() {
+  await until("the agent idle", (s) => (idle(s) ? true : undefined));
+  await officePolledTwice("the last round handed back");
+  const { key } = await stub("POST", "/_test/tickets", { title: "Deploy the banner" });
+  await stub("POST", `/_test/tickets/${key}/assign`, { to: "sam" });
+  const ticketOf = (s: Json) => s.tickets.find((x: Json) => x.key === key);
+  const fixesOf = (s: Json) => s.github.pulls.filter((p: Json) => p.body.includes(`Closes ${key}`));
+  const [first] = await until(`a pull request for ${key}, the ticket in review`, (s) => {
+    const t = ticketOf(s);
+    return fixesOf(s).length === 1 && t.status === "In Review" && t.assignee !== "sam" && idle(s)
+      ? fixesOf(s)
+      : undefined;
+  });
+
+  await officePolledTwice(`${key} handed back`);
+  await stub("POST", "/_test/gates/closed/close");
+  const { key: busy } = await stub("POST", "/_test/tickets", {
+    title: "Check the banner font",
+    description: "which repo: unclear\nhold: closed",
+  });
+
+  await stub("POST", `/_test/tickets/${busy}/assign`, { to: "sam" });
+  await until(`sam's round on ${busy} held at the gate`, (s) => s.chat.gates.closed?.arrived);
+
+  const roundsBefore = fixRounds();
+  await stub("POST", `/_test/pulls/${first.number}/merge`, {
+    checks: [
+      {
+        name: "deploy",
+        conclusion: "failure",
+        step: "Apply the configuration",
+        log: ["Loading the configuration", "error: region is not set"],
+      },
+    ],
+  });
+
+  await until(`a merge_checks_failed round queued for sam on #${first.number}`, () =>
+    fixRounds() > roundsBefore ? true : undefined,
+  );
+
+  const ticketsBefore = (await state()).tickets.length;
+  const reply = await askSam("Why does the deploy still fail?", "sam's answer about the deploy");
+  assertSays(reply, "already queued", "the chat session attached to the queued round");
+  assertSays(reply, key, "the reply links the ticket of the failed merge");
+
+  await stub("POST", "/_test/gates/closed/open");
+  const fix = await until(`one fix for ${key}, and sam idle`, (s) => {
+    const fixes = fixesOf(s).filter((p: Json) => p.number !== first.number);
+    return fixes.length > 0 && idle(s) ? fixes : undefined;
+  });
+
+  await officePolledTwice(`the fix for ${key} handed back`);
+  const after = await state();
+  assertEq(
+    fixesOf(after).filter((p: Json) => p.number !== first.number).length,
+    1,
+    `exactly one fix pull request for ${key}`,
+  );
+
+  assertEq(after.tickets.length, ticketsBefore, "the chat session filed no ticket");
+  assertEq(
+    fixRounds(),
+    roundsBefore + 1,
+    "one merge_checks_failed round, and the attach queued no other",
+  );
+
+  assertEq(
+    ticketOf(after).moves.some((m: Json) => m.to === "Done"),
+    false,
+    `${key} stayed open after its merge's deploy failed`,
+  );
+
+  step(
+    `deploy still fails: #${first.number} merged, its deploy failed while sam was busy -> the human asked in chat, the session attached to the queued round on ${key}, filed nothing -> one fix #${fix[0].number}`,
+  );
+
+  await stub("POST", `/_test/pulls/${fix[0].number}/merge`, {
+    checks: [{ name: "deploy", conclusion: "success" }],
+  });
+
+  await until(`${key} done`, (s) => ticketOf(s).status === "Done");
 }
 
 /**
@@ -4681,7 +5078,7 @@ function assertIncludes(list: string[], item: string, what: string) {
 }
 
 const bound = setTimeout(() => {
-  fail(new Error(`The run took longer than ${(deadline - started) / 1000}s.`));
+  void fail(new Error(`The run took longer than ${(deadline - started) / 1000}s.`));
 }, deadline - started);
 
 try {
@@ -4695,5 +5092,5 @@ try {
   teardown(0);
 } catch (e) {
   clearTimeout(bound);
-  fail(e);
+  await fail(e);
 }

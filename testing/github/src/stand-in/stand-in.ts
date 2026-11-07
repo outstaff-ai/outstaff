@@ -62,7 +62,7 @@ export function createGithubStandIn(opts: StandInOptions) {
     ...reactionRoutes(store, auth, repo),
     ...repoRoutes(store, repo),
     ...actionsRoutes(store, auth, repo),
-    ...branchRoutes(store.branch, repo),
+    ...branchRoutes(store.branch, repo, (b) => store.backend.sha(b)),
     ...moreRoutes(store, api, opts.more ?? []),
     graphqlRoute(store, auth, opts.graphqlPath ?? "/graphql"),
   ];

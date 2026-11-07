@@ -225,6 +225,8 @@ describe("stale verdict", () => {
     expect(trailingStale([])).toBe(0);
     expect(trailingStale([null])).toBe(0);
     expect(trailingStale(["stale", null])).toBe(1);
+    expect(trailingStale(["stale", "abandoned"])).toBe(2);
+    expect(trailingStale(["abandoned", "ok", "abandoned"])).toBe(1);
     expect(trailingStale(["stale", "ok", null])).toBe(0);
     expect(trailingStale(["ok", "stale", "stale"])).toBe(2);
     expect(trailingStale(["stale", "ok"])).toBe(0);

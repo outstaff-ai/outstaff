@@ -87,7 +87,9 @@ describe("the office's usage tracking", () => {
       subject: { type: "ticket", ref: ticket },
     });
 
-    return (await s.source.next("sam"))!.workItem.id;
+    const id = (await s.source.next("sam"))!.workItem.id;
+    await s.source.accept("sam", id, { runtime: "claude", model: "sonnet" });
+    return id;
   };
 
   it("records a handed-back round's usage and has the agent write the ticket's fields", async () => {

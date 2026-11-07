@@ -1,6 +1,9 @@
 import type { WorkflowEvent } from "@outstaff/core";
 import type { Closing, RefreshCtx, TicketOps, UnblockOps, WorkstateCore } from "./core.types.js";
+import { createBlockNudges } from "./block-nudges.js";
+import type { BlockNudges } from "./block-nudges.types.js";
 import { isTerminal } from "./derive.js";
+import { openBlockers } from "./blocked.js";
 import { recordSynthetic, WORKSTATE_ACTOR } from "./synthetic.js";
 import type { TicketRecord } from "./types.js";
 
@@ -39,7 +42,8 @@ const closedAt = (rec: TicketRecord) => rec.statusSince ?? rec.updatedAt;
  * ticket it blocks is read again: each one in the blocked status that nothing else blocks any more gets one
  * `ticket.unblocked`, naming the ticket that closed. Each is raised once per closing.
  */
-export function createUnblock(core: WorkstateCore, ticketOps: TicketOps): UnblockOps {
+export function createUnblock(core: WorkstateCore, ticketOps: TicketOps): UnblockOps & BlockNudges {
+  const nudges = createBlockNudges(core);
   const { store, clock, tickets, logger } = core;
   const { refreshTicket } = ticketOps;
 
@@ -104,11 +108,18 @@ export function createUnblock(core: WorkstateCore, ticketOps: TicketOps): Unbloc
       const rec = tickets.get(key);
       if (nothingBlocks(rec)) {
         await raise(ctx, rec, blocker, c);
+      } else if (rec && c.event?.data["untrusted"] !== true) {
+        await nudges.nudge(ctx, key, {
+          kind: "blocker",
+          ref: blocker.key,
+          why: `its blocker ${blocker.key} closed; ${openBlockers(rec).join(", ")} still block it`,
+        });
       }
     }
   };
 
   return {
+    ...nudges,
     async refreshAndUnblock(ctx, key, closing = {}) {
       const prev = tickets.get(key);
       await refreshTicket(key, closing.event);

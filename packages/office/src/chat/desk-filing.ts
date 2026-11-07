@@ -96,7 +96,6 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
 
     return {
       item: await summarizeItem(store, (await store.getItem(group.id)) ?? group),
-      waiting: false,
       work: [],
     };
   }
@@ -112,16 +111,19 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
     return group ? join(session, origin, group, spec) : create(person, { session, origin }, spec);
   }
 
-  /** A new work item for the filing, first in the queue when the person is idle, else last until the requester says. */
+  /**
+   * A new work item for the filing, placed next: right after the running work, ahead of everything already queued,
+   * without waiting for the requester. The agent tells them where it went, with the queued work it is ahead of, and
+   * their answer moves it like any move (`work_place`). Work this session filed earlier stays ahead of it.
+   */
   async function create(
     person: string,
     { session, origin }: DeskSession,
     spec: FileSpec,
   ): Promise<Filed> {
     const all = await open(person, session.id);
-    // Work this session filed earlier is queue order, not a reason to ask the requester where this one goes.
+    const own = all.filter((i) => i.parentId === session.id && i.status === "queued");
     const others = all.filter((i) => i.parentId !== session.id);
-    const busy = others.length > 0;
     const created = await scheduler.enqueue({
       person,
       kind: spec.kind,
@@ -129,7 +131,7 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
       trigger: "human",
       subject: spec.subject,
       parentId: session.id,
-      placement: all.length > 0 ? "last" : "next",
+      placement: own.length > 0 ? { after: own.at(-1)!.id } : "next",
       source: spec.source,
       refs: await chatRefsOf(store, session.id, "trigger", spec.source),
     });
@@ -140,7 +142,6 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
       requester: origin.requester,
       direct: origin.direct,
       participant: origin.participant,
-      awaitingPlacement: busy,
       claimed: [],
     } satisfies ChatOriginRecord);
 
@@ -162,10 +163,10 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
       [
         `${origin.requester.name ?? origin.requester.id} asked in chat (thread ${origin.thread}); the chat session filed it.`,
         spec.note,
-        ...(busy
+        ...(others.length > 0
           ? [
               "",
-              "You were busy, so this waits at the end of the queue until the requester says where it goes.",
+              "You were busy, so this runs next: after the work running now, ahead of the work already queued. The requester was told and may move it.",
             ]
           : []),
       ].join("\n"),
@@ -174,8 +175,7 @@ export function createFiling(opts: ChatDeskOptions): DeskFiling {
     opts.notify(person);
     return {
       item: await summarizeItem(store, (await store.getItem(created.id)) ?? created),
-      waiting: busy,
-      work: busy ? await summaries(others.filter((i) => i.kind !== CHAT_KIND)) : [],
+      work: await summaries(others),
     };
   }
 

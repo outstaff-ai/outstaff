@@ -8,6 +8,6 @@ export const policy = definePolicy({
   on: ["pr.merge_checks_failed"],
   when: { all: [{ pr_merged: true }, { not: { ticket_status: ["canceled"] } }] },
   instruction:
-    "Pull request #{{pr.number}} ({{pr.title}}) by {{pr.author}} merged, but checks on its merge commit failed: {{checks}}. The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks.",
+    "Pull request #{{pr.number}} ({{pr.title}}) by {{pr.author}} merged, but checks on its merge commit failed: {{checks}}. The end of the failed step's log is in the context; `ost ci log <check link>` reads more. Fix it the way the repository asks, for example with a follow-up pull request on the same ticket. The ticket stays open until a merge for it passes its checks. If the context lists a pull request of yours since the failure that already fixes it, do not fix it again: hand back silent, saying which one.",
   ...wakes({ person: TICKET_AGENT, kind: "merge_checks_failed" }),
 });

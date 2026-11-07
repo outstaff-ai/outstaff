@@ -32,14 +32,11 @@ export const workStateSchema = z.strictObject({
 export const filedSchema = z.strictObject({
   url: z.string().optional().describe("Link to the ticket."),
   item: workSummarySchema.describe("The work item that carries the filed work."),
-  waiting: z
-    .boolean()
-    .describe(
-      "True when the person is busy: the item waits at the end until the requester says where it goes. False when it starts now.",
-    ),
   work: z
     .array(workSummarySchema)
-    .describe("The person's other open items in the order they run, for the placement question."),
+    .describe(
+      "The person's other open items in the order they ran before this one, which is placed next: the running work it follows, and the queued work it is ahead of, which the requester may move it after. Empty when the person is idle or the work joined existing work.",
+    ),
 });
 
 /** A report the agent was not online to post, handed to it when it connects. */

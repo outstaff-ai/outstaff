@@ -52,6 +52,8 @@ function startedByAgent(round: Round): string | undefined {
       return "a teammate's question";
     case "unblock":
       return "an unblock, started by a teammate's blocked hand-back";
+    case "reconcile":
+      return "the office's sweep of the board";
     case "asked":
       return round.trigger === "human" ? undefined : "a teammate's mention";
     default:
@@ -90,10 +92,10 @@ export function requireHumanStarted(env: AgentEnv, what: "file a ticket" | "open
   }
 }
 
-/** What a chat session is told after it filed work. The agent posts the reply and any placement question itself. */
+/** What a chat session is told after it filed work. The agent posts the reply, and where the work went, itself. */
 export const filedLine = (f: Filed) =>
-  f.waiting
-    ? `Filed as work item ${f.item.id}. You are busy, so it waits last; your agent asks the requester where it goes. Finish with a short note.`
+  f.work.length > 0
+    ? `Filed as work item ${f.item.id}. You are busy, so it runs next, after the work running now; your agent tells the requester, who may move it. Finish with a short note.`
     : `Filed as work item ${f.item.id}. It starts now. Finish with a short note.`;
 
 const sameRepo = (a: RepoRef, b: RepoRef) =>

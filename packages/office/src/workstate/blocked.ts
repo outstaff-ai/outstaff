@@ -4,7 +4,7 @@ import { isTerminal } from "./derive.js";
 import type { TicketRecord } from "./types.js";
 
 /** Answering a question on a ticket, trying to unblock it, or the PM's round on its milestone, is not working on it. */
-const NOT_WORK = new Set(["asked", "unblock", "milestone"]);
+const NOT_WORK = new Set(["asked", "unblock", "milestone", "reconcile"]);
 
 /** Whether an item of this kind works on its ticket. */
 export const worksOnTicket = (kind: string) => !NOT_WORK.has(kind);

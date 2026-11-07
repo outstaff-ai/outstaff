@@ -142,6 +142,7 @@ export function createTickets(core: WorkstateCore): TicketOps {
       ...parentOf(issue, prev),
       ...initiativeOf(issue, prev),
       ...keptRequester(prev),
+      changedAt: issue.updatedAt,
       updatedAt: clock.now().toISOString(),
     };
   };

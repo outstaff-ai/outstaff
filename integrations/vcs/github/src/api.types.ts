@@ -41,6 +41,20 @@ export interface RestCheckRun {
   conclusion: string | null;
   html_url?: string | null;
   details_url?: string | null;
+
+  /** The check suite the run belongs to: an Actions workflow run has one of its own. */
+  check_suite?: { id: number } | null;
+}
+
+/** One run of `GET /repos/{owner}/{repo}/actions/runs`: its workflow's name and its check suite. */
+export interface RestWorkflowRun {
+  name?: string | null;
+  check_suite_id?: number | null;
+}
+
+/** `GET /repos/{owner}/{repo}/compare/{base}...{head}`: where `head` stands against `base`. */
+export interface RestCompare {
+  status: "identical" | "ahead" | "behind" | "diverged";
 }
 
 export interface RestEvent {
@@ -195,6 +209,9 @@ export interface RestRequiredStatusChecks {
 /** `GET /repos/{owner}/{repo}/branches/{branch}`: readable with Contents: read, so only a summary of protection. */
 export interface RestBranch {
   name: string;
+
+  /** The commit the branch points at. */
+  commit?: { sha: string };
   protected: boolean;
   protection?: { enabled?: boolean; required_status_checks?: RestRequiredStatusChecks };
 }

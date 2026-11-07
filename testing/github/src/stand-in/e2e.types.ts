@@ -64,6 +64,9 @@ export interface DriverCheck {
   /** The step the job ran; its output is `log`. */
   step?: string;
   log?: string[];
+
+  /** The workflow the job ran in; `CI` when not given. */
+  workflow?: string;
 }
 
 /** An inline comment of a review the test driver submits as a person. */

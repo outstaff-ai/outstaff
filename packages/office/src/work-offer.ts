@@ -82,9 +82,9 @@ export function offerBuilder(
   const feedbackOf = (id: string, fresh: boolean) =>
     fresh ? deliverFeedback(store, id) : readFeedback(store, id);
 
-  // This run is the latest; the one before it is what the agent continues.
+  // The last run that ended is what the agent continues: an offer has no run yet, an accepted item its open one.
   const interruptedBefore = async (id: string) =>
-    (await store.listRuns(id)).at(-2)?.outcome === INTERRUPTED;
+    (await store.listRuns(id)).findLast((r) => r.finishedAt !== null)?.outcome === INTERRUPTED;
 
   const journalOf = async (item: WorkItem, about: WorkItem | undefined) =>
     [

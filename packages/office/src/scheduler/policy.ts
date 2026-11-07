@@ -200,13 +200,17 @@ export function staleVerdict(input: {
   return input.trailingStaleRuns > 0 ? "block" : "retry";
 }
 
-/** Number of consecutive stale runs at the end of an item's run history (oldest first). */
+/** Runs that ended with no word from the agent: it went silent, or reconnected without the run. */
+const UNHEARD = new Set(["stale", "abandoned"]);
+
+/** Number of consecutive stale or abandoned runs at the end of an item's run history (oldest first). */
 export function trailingStale(outcomes: readonly (string | null)[]): number {
   let n = 0;
   for (let i = outcomes.length - 1; i >= 0; i--) {
-    if (outcomes[i] !== "stale") {
+    const outcome = outcomes[i];
+    if (!outcome || !UNHEARD.has(outcome)) {
       // The currently open run has no outcome yet and does not break the streak.
-      if (outcomes[i] === null && i === outcomes.length - 1) {
+      if (outcome === null && i === outcomes.length - 1) {
         continue;
       }
 

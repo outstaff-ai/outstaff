@@ -107,7 +107,6 @@ describe("work source: a chat session beside running work", () => {
       channel: "D1",
       thread: "t1",
       requester: { id: "U1" },
-      awaitingPlacement: false,
       claimed: [],
       about: { id: work.id, title: work.title, state: "running" },
     });
@@ -167,6 +166,7 @@ describe("work source: a run cut short by a shutdown", () => {
     const first = await source.next("ann");
     expect(first?.workItem.id).toBe(a.id);
     expect(first?.interrupted).toBeUndefined();
+    await source.accept("ann", a.id, { runtime: "claude", model: "sonnet" });
     await source.setSession("ann", a.id, "s-1");
     await source.handBack("ann", a.id, { summary: "stopped", links: [], status: "interrupted" });
 

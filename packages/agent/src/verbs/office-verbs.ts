@@ -136,7 +136,7 @@ export const workQueue = defineVerb({
   name: "work.queue",
   summary: "File a chat request as work when there is no tracker.",
   description:
-    "Files the request of a chat session as a work item of yours. Use it for a message that is work on a team without a tracker (with a tracker, create a ticket). The requester is told, and when you are busy they are asked where it goes. A chat session files one request. A question is answered directly: file nothing.",
+    "Files the request of a chat session as a work item of yours. Use it for a message that is work on a team without a tracker (with a tracker, create a ticket). The requester is told, and when you are busy it runs next, after your running work: they are told where it went and may move it. A chat session files one request. A question is answered directly: file nothing.",
   input: z.strictObject({
     title: z.string().min(1).max(300).describe("Short title of the work."),
     body: z.string().max(20_000).default("").describe("What is asked and why, Markdown."),

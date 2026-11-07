@@ -29,6 +29,8 @@ export interface OfficeOptions {
 
   /** How often the work state rescans open pull requests. */
   refreshIntervalMs?: number;
+
+  /** Overrides the team's `scheduler.stale_run_after_minutes`. */
   staleAfterMinutes?: number;
 
   /** Minutes after which a usage report counts as unknown. Default 30. */

@@ -4,14 +4,25 @@ import type { Cancel } from "#/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
 import { createChecks, personScope, TEAM_SCOPE } from "./checks.js";
 import { enqueueItem, releaseHold } from "./enqueue.js";
-import { blockById, failItem, finishItem, interruptItem, retryItem } from "./outcomes.js";
-import { DEFAULT_RETRY, isLoopGuarded, orderQueue } from "./policy.js";
+import {
+  abandonItem,
+  blockById,
+  failItem,
+  finishItem,
+  interruptItem,
+  retryItem,
+} from "./outcomes.js";
+import { DEFAULT_RETRY, orderQueue } from "./policy.js";
+import { offerItem, startItemRun } from "./start.js";
 import type { UsageWindow } from "./policy.types.js";
 import { runTick } from "./tick.js";
-import type { PauseState, Scheduler, SchedulerOptions, StartResult } from "./types.js";
+import type { PauseState, Scheduler, SchedulerOptions } from "./types.js";
 
 /** Chat sessions run beside the active work item, up to `policies.chat.parallel_sessions`. */
 const DEFAULT_CHAT_SESSIONS = 2;
+
+// Mirrors `scheduler.stale_run_after_minutes`.
+const DEFAULT_STALE_AFTER_MINUTES = 5;
 
 // Mirrors the team.yaml defaults for a team that sets no `policies`.
 const DEFAULT_MAX_RUNS_PER_HOUR = 12;
@@ -26,17 +37,16 @@ function limitsOf(team: SchedulerOptions["team"]) {
   };
 }
 
-/** Why a queued item is not offered yet: the backoff after a failure, or the hold that lets close wakes fold in. */
-const heldUntil = (item: WorkItem) =>
-  item.failures > 0
-    ? `Held back after a failed run until ${item.notBefore}.`
-    : `Held until ${item.notBefore}, so wakes that come close together run as one.`;
-
 export function createScheduler(opts: SchedulerOptions): Scheduler {
   const { store, team, clock } = opts;
   const log = opts.logger ?? silentLogger;
 
-  const staleMs = (opts.staleAfterMinutes ?? 10) * 60_000;
+  const staleAfter =
+    opts.staleAfterMinutes ??
+    team.scheduler?.stale_run_after_minutes ??
+    DEFAULT_STALE_AFTER_MINUTES;
+
+  const staleMs = staleAfter * 60_000;
   const tickIntervalMs = opts.tickIntervalMs ?? 60_000;
   const { maxRuns, chatSessions, retry } = limitsOf(team);
 
@@ -66,7 +76,6 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     pauseBlock,
     usageBlock,
     guardTripped,
-    blockItem,
     queuedOf,
     applyMove,
     stop,
@@ -90,42 +99,11 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
     holds.add(cancel);
   };
 
-  /** Why the item cannot start now: it is not queued, its person has no room, or it backs off after a failure. */
-  const notReady = async (item: WorkItem): Promise<StartResult | undefined> => {
-    if (item.status !== "queued") {
-      return { started: false, reason: "not_queued", detail: `Item is ${item.status}.` };
-    }
-
-    if (!(await hasRoom(item))) {
-      return { started: false, reason: "busy", detail: await checks.busyDetail(item) };
-    }
-
-    return backingOff(item)
-      ? { started: false, reason: "backoff", detail: heldUntil(item) }
-      : undefined;
-  };
-
   /** Whether a queued item waits for now: a failure backoff, too little usage left, or the loop guard. */
   const waits = async (item: WorkItem, windows: UsageWindow[]) =>
     backingOff(item) ||
     (await usageBlock(item.person, item, windows)) !== null ||
     (await guardTripped(item)) !== null;
-
-  /** Why the item is held back: a pause, too little usage left, or the loop guard, which blocks it. */
-  const heldBack = async (item: WorkItem): Promise<StartResult | undefined> => {
-    const held = (await pauseBlock(item.person)) ?? (await usageBlock(item.person, item));
-    if (held) {
-      return { started: false, reason: held.code, detail: held.reason };
-    }
-
-    const tripped = await guardTripped(item);
-    if (!tripped) {
-      return undefined;
-    }
-
-    const blocked = await blockItem(item, tripped, "loop_guard");
-    return { started: false, reason: "loop_guard", detail: tripped, blocked };
-  };
 
   const scheduler: Scheduler = {
     enqueue(input) {
@@ -156,35 +134,23 @@ export function createScheduler(opts: SchedulerOptions): Scheduler {
       return null;
     },
 
+    offer(itemId) {
+      return exclusive(() => offerItem(deps, itemId));
+    },
+
+    startRun(itemId) {
+      return exclusive(() => startItemRun(deps, itemId));
+    },
+
     markActive(itemId) {
-      return exclusive(async (): Promise<StartResult> => {
-        const item = await store.getItem(itemId);
-        if (!item) {
-          throw new Error(`unknown work item: ${itemId}`);
-        }
-
-        const refused = (await notReady(item)) ?? (await heldBack(item));
-        if (refused) {
-          return refused;
-        }
-
-        const stopped = await stop(item);
-        if (stopped) {
-          return { started: false, reason: "stopped", detail: stopped };
-        }
-
-        const active = await store.activateItem(itemId);
-        if (!active) {
-          return { started: false, reason: "not_queued", detail: "Item is no longer queued." };
-        }
-
-        if (isLoopGuarded(active.trigger)) {
-          await store.recordLoopGuard(active.id);
-        }
-
-        const run = await store.startRun(active.id);
-        return { started: true, item: active, run };
+      return exclusive(async () => {
+        const offered = await offerItem(deps, itemId);
+        return offered.started ? { ...offered, run: await store.startRun(itemId) } : offered;
       });
+    },
+
+    abandon(itemId, reason) {
+      return exclusive(() => abandonItem(deps, itemId, reason));
     },
 
     async heartbeat(itemId) {

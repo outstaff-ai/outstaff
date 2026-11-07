@@ -1,4 +1,5 @@
 export { createOfficeConnection, systemClientClock } from "./client.js";
+export { Unanswered } from "./errors.js";
 export type {
   ClientClock,
   ClientSocket,

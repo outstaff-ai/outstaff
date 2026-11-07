@@ -8,6 +8,7 @@ import { openStore } from "#/store/index.js";
 import type { Store, WorkItem } from "#/store/types.js";
 import { createChatDesk } from "#/chat/desk.js";
 import type { ChatRequests } from "#/chat/desk.types.js";
+import { placeQueued } from "#/chat/placement.js";
 import { openChatSession } from "#/chat/session.js";
 import { readOrigin, threadsOf, withThread } from "#/chat/origin.js";
 import type { DocLink, DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
@@ -59,6 +60,8 @@ describe("chat requests", () => {
   let makeDesk: (over?: TeamConfig) => ChatRequests;
   let tickets: TicketRecord[];
   let pulls: PrRecord[];
+  // Pull requests the human closed on the code host that the work state has not read yet.
+  let closedOnHost: Set<number>;
   let workers: Record<string, string>;
   let docs: DocLink[];
 
@@ -85,6 +88,11 @@ describe("chat requests", () => {
     ticket: (key: string) => tickets.find((t) => t.key === key),
     lastWorker: (key: string) => workers[key],
     catchUp: async () => {},
+    refreshPrsOf: async (key: string) => {
+      for (const p of pulls.filter((x) => x.ticket === key && closedOnHost.has(x.ref.number))) {
+        p.state = "closed";
+      }
+    },
     prSubject: (ref: { number: number }) => `acme/app#${ref.number}`,
     doc: (id: string) => docs.findLast((d) => d.id === id) as DocRecord | undefined,
     linkDoc: async (d: DocLink) => void docs.push(d),
@@ -150,6 +158,7 @@ describe("chat requests", () => {
   beforeEach(async () => {
     tickets = [];
     pulls = [];
+    closedOnHost = new Set();
     workers = {};
     docs = [];
     n = 0;
@@ -399,7 +408,7 @@ describe("chat requests", () => {
   describe("filing work", () => {
     it("creates a work item for the ticket in the session's thread, once", async () => {
       const { session, filed, item } = await fileWork("Add a search page", "ACME-5");
-      expect(filed).toMatchObject({ url: tracker.links.issue("ACME-5"), waiting: false, work: [] });
+      expect(filed).toMatchObject({ url: tracker.links.issue("ACME-5"), work: [] });
 
       const created = (await store.getItem(item.id))!;
       expect(created).toMatchObject({
@@ -413,7 +422,6 @@ describe("chat requests", () => {
       expect(await readOrigin(store, created.id)).toMatchObject({
         thread: "m1",
         requester: DANA,
-        awaitingPlacement: false,
       });
 
       expect(await readOrigin(store, session.id)).toMatchObject({ filed: created.id });
@@ -459,8 +467,8 @@ describe("chat requests", () => {
         requests: ["add a search page", "fix the footer", "tidy the header"],
       });
 
-      // The first filing does not make the person busy for the second: nothing is asked.
-      expect(second.waiting).toBe(false);
+      // The first filing does not make the person busy for the second: there is nothing to say about its place.
+      expect(second.work).toEqual([]);
       await expect(
         desk.linkTicket("sam", first.session.id, "ACME-8", "Fix the footer"),
       ).rejects.toMatchObject({ code: "invalid" });
@@ -564,22 +572,42 @@ describe("chat requests", () => {
       });
     });
 
-    it("lists the busy person's work and waits last, for the placement question", async () => {
-      await busyWith("Running thing", "Queued thing");
+    it("places the work next, ahead of the queued work, and lists that work for the offer to move it", async () => {
+      await busyWith("Running thing", "Queued thing", "Queued later");
       const { filed, item } = await fileWork();
-      expect(filed.waiting).toBe(true);
       expect(filed.work.map((w) => [w.title, w.status])).toEqual([
         ["Running thing", "active"],
         ["Queued thing", "queued"],
+        ["Queued later", "queued"],
       ]);
 
-      expect(await queueOrder()).toEqual(["Queued thing", "Fix the footer"]);
-      expect(await readOrigin(store, item.id)).toMatchObject({ awaitingPlacement: true });
+      expect(await queueOrder()).toEqual(["Fix the footer", "Queued thing", "Queued later"]);
+      expect((await store.readJournal(item.id)).map((j) => j.text).at(-1)).toContain(
+        "this runs next: after the work running now, ahead of the work already queued",
+      );
+
+      // The requester answers "after 2": the chat session that answer wakes moves it as any move.
+      await placeQueued({ store, scheduler }, item.id, { after: filed.work[2]!.id });
+      expect(await queueOrder()).toEqual(["Queued thing", "Queued later", "Fix the footer"]);
+    });
+
+    it("places the work right after the running work when nothing is queued", async () => {
+      await busyWith("Running thing");
+      const { filed } = await fileWork();
+      expect(filed.work.map((w) => [w.title, w.status])).toEqual([["Running thing", "active"]]);
+      expect(await queueOrder()).toEqual(["Fix the footer"]);
+    });
+
+    it("keeps work the same session filed earlier ahead of the next filing", async () => {
+      await busyWith("Running thing", "Queued thing");
+      const first = await fileWork("Fix the footer");
+      await desk.queueWork("sam", first.session.id, { title: "Tidy the header", body: "Asked." });
+      expect(await queueOrder()).toEqual(["Fix the footer", "Tidy the header", "Queued thing"]);
     });
 
     it("starts once the session ends for an idle person, and asks nothing", async () => {
       const { item, filed, session } = await fileWork();
-      expect(filed).toMatchObject({ waiting: false, work: [] });
+      expect(filed).toMatchObject({ work: [] });
       expect(await scheduler.next("sam")).toBeNull();
       await scheduler.finish(session.id, { outcome: "answered" });
       expect((await scheduler.next("sam"))?.id).toBe(item.id);
@@ -646,7 +674,6 @@ describe("chat requests", () => {
       const { s, attached } = await attach("ACME-11");
       expect(attached).toMatchObject({
         item: { id: running!.id },
-        waiting: false,
         work: [],
         attached: { ticket: { ref: "ACME-11" }, pr: { ref: "#11" } },
       });
@@ -662,7 +689,6 @@ describe("chat requests", () => {
       expect(await readOrigin(store, running!.id)).toMatchObject({
         thread: "m1",
         requester: DANA,
-        awaitingPlacement: false,
       });
 
       expect(await readOrigin(store, s.id)).toMatchObject({ filed: running!.id });
@@ -726,7 +752,6 @@ describe("chat requests", () => {
         channel: "D0",
         thread: "t0",
         requester: { id: "U0OTHER001" },
-        awaitingPlacement: false,
         claimed: [],
       });
 
@@ -773,10 +798,7 @@ describe("chat requests", () => {
         { actor: "Dana", kind: "chat", body: "for the search PR, also support filters" },
       ]);
 
-      expect(await readOrigin(store, item.id)).toMatchObject({
-        awaitingPlacement: false,
-        thread: "m1",
-      });
+      expect(await readOrigin(store, item.id)).toMatchObject({ thread: "m1" });
 
       expect(attached.attached.pr).toMatchObject({
         ref: "#11",
@@ -930,6 +952,60 @@ describe("chat requests", () => {
       ]);
     });
 
+    it("reads the ticket's pull requests again first: one the human just closed is not the work any more", async () => {
+      // The human closed #14 and replied in the thread before the office's next poll saw the close.
+      ticket("ACME-14", { status: "review", assignee: { id: "u-1", kind: "human" } });
+      workers["ACME-14"] = "sam";
+      pull(14, { ticket: "ACME-14", draft: false });
+      closedOnHost.add(14);
+
+      const { attached } = await attach("ACME-14", true);
+      expect(await store.getItem(attached.item.id)).toMatchObject({
+        kind: "assigned",
+        subject: { type: "ticket", ref: "ACME-14" },
+      });
+
+      expect(attached.attached).not.toHaveProperty("pr");
+    });
+
+    it("refuses a pull request named by number that the human just closed", async () => {
+      ticket("ACME-15");
+      pull(15, { ticket: "ACME-15", draft: false });
+      closedOnHost.add(15);
+      const s = await session();
+      await expect(
+        desk.attachWork("sam", s.id, { target: "15", confirmed: true }),
+      ).rejects.toMatchObject({ message: expect.stringContaining("PR #15 is closed") as string });
+    });
+
+    it("still attaches when the pull requests cannot be read again, and logs why", async () => {
+      ticket("ACME-17");
+      const warned: unknown[][] = [];
+      desk = createChatDesk({
+        clock,
+        store,
+        scheduler,
+        team: teamConfig(),
+        workState: {
+          ...knownWork(),
+          refreshPrsOf: () => Promise.reject(new Error("GitHub is down")),
+        },
+        tracker,
+        linksOf: async () => [],
+        notify: (p) => notified.push(p),
+        logger: { ...silentLogger, warn: (...args: unknown[]) => void warned.push(args) },
+      });
+
+      const { attached } = await attach("ACME-17");
+      expect(await store.getItem(attached.item.id)).toMatchObject({ kind: "assigned" });
+      expect(warned).toEqual([
+        [
+          "could not read the pull requests again",
+          expect.objectContaining({ ticket: "ACME-17", error: "Error: GitHub is down" }),
+        ],
+      ]);
+    });
+
     it("treats a ticket in review without a pull request like a pull request in review", async () => {
       ticket("ACME-13", { status: "review" });
       const s = await session();
@@ -968,6 +1044,29 @@ describe("chat requests", () => {
       }
 
       expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([]);
+    });
+
+    it("joins the round fixing the failed merge checks of a ticket's merged pull request, and queues nothing more", async () => {
+      ticket("ACME-17", { status: "review" });
+      const merged = pull(17, { ticket: "ACME-17", state: "merged", draft: false });
+      await store.upsertSubject("pr", "#17", merged);
+      const fixing = await scheduler.enqueue({
+        person: "sam",
+        kind: "merge_checks_failed",
+        title: "merge checks failed: PR #17",
+        trigger: "automation",
+        subject: { type: "pr", ref: "#17" },
+      });
+
+      const { attached } = await attach("ACME-17", true, "why does the deploy still fail?");
+      expect(attached.item.id).toBe(fixing.id);
+      expect(await readFeedback(store, fixing.id)).toMatchObject([
+        { kind: "chat", body: "why does the deploy still fail?" },
+      ]);
+
+      expect((await store.listItems({ person: "sam", status: "queued" })).map((i) => i.id)).toEqual(
+        [fixing.id],
+      );
     });
 
     it("attaches a request about an open pull request to its ticket even when the ticket was closed early", async () => {
