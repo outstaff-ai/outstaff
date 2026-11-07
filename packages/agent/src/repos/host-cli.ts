@@ -82,8 +82,8 @@ export function createHostCliRunner(opts: HostCliRunnerOptions): HostCliRunner {
   };
 
   /** The team repository the call is for, and the person's grant on it. */
-  function resolve(command: string, args: string[], cwd: string) {
-    const text = repoFlag(args) ?? opts.origin(cwd);
+  function resolve(command: string, args: string[], cwd: string, named: string | undefined) {
+    const text = named ?? repoFlag(args) ?? opts.origin(cwd);
     const target = text === undefined ? undefined : targetOf(text);
     const repo = target && teamRepoFor(opts.team, target);
     if (!repo) {
@@ -99,7 +99,7 @@ export function createHostCliRunner(opts: HostCliRunnerOptions): HostCliRunner {
   }
 
   return {
-    async run(args, cwd) {
+    async run(args, cwd, repo) {
       const cli = opts.vcs.hostCli;
       if (!cli) {
         return fail("The team's code host has no CLI for agents.");
@@ -111,7 +111,7 @@ export function createHostCliRunner(opts: HostCliRunnerOptions): HostCliRunner {
       }
 
       try {
-        const { ref, access } = resolve(cli.command, args, cwd);
+        const { ref, access } = resolve(cli.command, args, cwd, repo);
         const issued = await opts.vcs.credentials(opts.person, ref, access, "cli");
         return await opts.exec(binary, args, {
           cwd,

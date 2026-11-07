@@ -79,6 +79,13 @@ describe("host CLI runner", () => {
     expect(credentials).toHaveBeenCalledTimes(2);
   });
 
+  it("acts on the repository it is given, without passing it to the CLI", async () => {
+    const { r, credentials, runs } = await runner();
+    await r.run(["extension", "install", "acme/gh-hello"], "/home/outstaff", "acme-example/shop");
+    expect(credentials).toHaveBeenLastCalledWith("sam", ref("shop"), "write", "cli");
+    expect(runs[0]!.args).toEqual(["extension", "install", "acme/gh-hello"]);
+  });
+
   it("acts on the -R repository, at the access the grant and the role give", async () => {
     const { r, credentials, runs } = await runner({ profile: "readonly" });
     await r.run(["pr", "view", "3", "-R", "acme-example/shop"], "/w/other");

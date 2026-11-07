@@ -1,4 +1,5 @@
-import type { HostCli } from "@outstaff/core";
+import { join } from "node:path";
+import type { HostCli, HostCliExtensions } from "@outstaff/core";
 import type { GithubOptions } from "./types.js";
 
 /** The gh release the adapter suggests installing (`tools`), from mise's registry. */
@@ -26,6 +27,23 @@ function tokenEnv(host: string, token: string): Record<string, string> {
     : { GH_ENTERPRISE_TOKEN: token, GH_HOST: host };
 }
 
+/**
+ * gh's extensions: repositories named `gh-<command>`, installed with `gh extension install --pin` into gh's data
+ * directory (`$XDG_DATA_HOME/gh`, else `~/.local/share/gh`), one directory per repository.
+ */
+export const GH_EXTENSIONS: HostCliExtensions = {
+  command: (name) => /^gh-(.+)$/.exec(name)?.[1],
+  install: (ext) => ["extension", "install", `${ext.owner}/${ext.name}`, "--pin", ext.ref],
+  dir: (ext, env) =>
+    join(
+      env["XDG_DATA_HOME"]
+        ? join(env["XDG_DATA_HOME"], "gh")
+        : join(env["HOME"] ?? "", ".local", "share", "gh"),
+      "extensions",
+      ext.name,
+    ),
+};
+
 /** `gh`, the GitHub CLI, for the host the adapter's `webUrl` names. */
 export function githubHostCli(options: Pick<GithubOptions, "webUrl">): HostCli {
   const host = new URL(options.webUrl).hostname.toLowerCase();
@@ -38,5 +56,6 @@ export function githubHostCli(options: Pick<GithubOptions, "webUrl">): HostCli {
         host === "github.com" ? `${repo.owner}/${repo.name}` : `${host}/${repo.owner}/${repo.name}`,
     }),
     tool: { version: GH_VERSION },
+    extensions: GH_EXTENSIONS,
   };
 }

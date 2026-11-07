@@ -1,8 +1,10 @@
+import { createRouter } from "@outstaff/testing.http";
 import { RUN_ID } from "./actions-routes.js";
 import { appAuth } from "./app-auth.js";
 import { REVIEW_STATE, addComment, submitReview } from "./conversation.js";
 import { e2eState } from "./e2e-state.js";
 import type { DriverCheck, DriverComment, GithubE2eOptions } from "./e2e.types.js";
+import { extensionRoutes } from "./extension-routes.js";
 import { gitServer } from "./git-serve.js";
 import { closePull, headSha, mergePull, pullOf } from "./model.js";
 import { createGithubStandIn } from "./stand-in.js";
@@ -151,7 +153,7 @@ function controls(s: GithubStore) {
  */
 export function createGithubE2e(opts: GithubE2eOptions) {
   const auth = appAuth(opts);
-  const { store, routes, dispatch } = createGithubStandIn({
+  const { store, routes } = createGithubStandIn({
     repo: { owner: opts.repo.owner, name: opts.repo.name },
     backend: opts.repo,
     now: realClock(),
@@ -173,10 +175,12 @@ export function createGithubE2e(opts: GithubE2eOptions) {
     ],
   });
 
-  const git = gitServer(store, auth, [opts.repo, ...(opts.more ?? [])]);
+  const extensions = opts.extensions ?? [];
+  const git = gitServer(store, auth, [opts.repo, ...(opts.more ?? []), ...extensions]);
+  const all = [...extensionRoutes("/api/v3", extensions), ...routes];
   return {
-    routes,
-    dispatch,
+    routes: all,
+    dispatch: createRouter(all),
     isGitPath: git.isGitPath,
     serveGit: git.serveGit,
     ...controls(store),

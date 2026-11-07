@@ -28,6 +28,35 @@ export function toolStatusChecks(tools: ToolStatus[]): DoctorCheck[] {
   }));
 }
 
+/**
+ * How the declared extensions of the tools fared at start: one failing check per extension that did not install,
+ * with the CLI's reason, or one ok check for all of them. An extension that failed does not stop the agent.
+ */
+export function extensionChecks(tools: ToolStatus[]): DoctorCheck[] {
+  const all = tools.flatMap((t) => t.extensions ?? []);
+  if (all.length === 0) {
+    return [];
+  }
+
+  const failed = all.filter((x) => x.state === "unavailable");
+  if (failed.length === 0) {
+    return [
+      {
+        name: "Tool extensions install",
+        status: "ok",
+        detail: `${all.map((x) => `${x.tool} ${x.extension}`).join(", ")} installed.`,
+      },
+    ];
+  }
+
+  return failed.map((x) => ({
+    name: `Extension ${x.extension} of ${x.tool} installs`,
+    status: "fail",
+    detail: x.error ?? `${x.extension} did not install.`,
+    fix: `Check the extension under tools.${x.tool}.extensions in team.yaml (its repository and pinned release tag or commit), that the person's App can read that repository and that the agent can reach it; then restart the agent.`,
+  }));
+}
+
 /** Whether an executable file is at this path. */
 function isExecutable(file: string): boolean {
   try {

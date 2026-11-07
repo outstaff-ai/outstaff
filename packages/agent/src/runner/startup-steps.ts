@@ -1,6 +1,7 @@
 import { delimiter } from "node:path";
 import {
   buildPolicy,
+  extensionsToPack,
   formatCatalogIssue,
   renderPerson,
   teamCommandsToPack,
@@ -20,7 +21,12 @@ import {
 } from "@outstaff/core";
 import type { StartupOptions } from "./startup.types.js";
 import { installHostCliWrapper } from "#/repos/index.js";
-import { installTools, type ToolStatus } from "#/tools/index.js";
+import {
+  installTools,
+  usableExtensions,
+  type ExtensionStatus,
+  type ToolStatus,
+} from "#/tools/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import { StartupError } from "./startup-error.js";
 
@@ -114,6 +120,7 @@ export function buildPolicies(
     layout,
     toolsets,
     tools,
+    extensions = [],
     capabilities,
   }: {
     rendered: RenderedWorkdir;
@@ -122,6 +129,9 @@ export function buildPolicies(
     layout: Layout;
     toolsets: Toolset[];
     tools: EffectiveTool[];
+
+    /** How the tools' declared extensions installed; each usable one's command is allowed. */
+    extensions?: ExtensionStatus[];
     capabilities: Capability[];
   },
 ): { policy: Policy; chatPolicy: Policy } {
@@ -131,6 +141,10 @@ export function buildPolicies(
   }
 
   packs.push(...toolsToPacks(tools));
+  const extensionPack = extensionsToPack(usableExtensions(extensions), tools);
+  if (extensionPack) {
+    packs.push(extensionPack);
+  }
 
   const teamPack = teamCommandsToPack(team.policies?.commands);
   if (teamPack) {

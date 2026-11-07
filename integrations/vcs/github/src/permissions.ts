@@ -43,15 +43,27 @@ const ALLOWED: [string[], string][] = [
   [["pr", "checks"], "Reads a pull request's checks."],
   [["pr", "diff"], "Reads a pull request's diff."],
   [["pr", "list"], "Lists pull requests."],
-  [["actions-lock"], "Writes the repository's Actions lockfile."],
   [["api"], "Reads the REST API (GET only)."],
 ];
 
 const METHOD = ["-X", "--method"];
 const FIELDS = ["-f", "--raw-field", "-F", "--field", "--input"];
 
+const EXTENSIONS =
+  "Extensions are declared under tools.gh.extensions in team.yaml, pinned, and installed at agent start; agents do not install, upgrade or remove them.";
+
+/** `gh extension` and its aliases, with the subcommands that change what is installed. */
+const EXTENSION_CHANGES = ["extension", "extensions", "ext"].flatMap((word) =>
+  ["install", "upgrade", "remove"].map((sub) => ({
+    id: `gh.${word}-${sub}`,
+    subcommand: [word, sub],
+    reason: EXTENSIONS,
+  })),
+);
+
 /** What an agent never runs of gh, whatever else allows it. */
 const DENIED: { id: string; subcommand: string[]; args?: ArgPredicate[]; reason: string }[] = [
+  ...EXTENSION_CHANGES,
   {
     id: "gh.pr-merge",
     subcommand: ["pr", "merge"],
