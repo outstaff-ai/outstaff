@@ -141,7 +141,7 @@ async function addDoc(env: Parameters<typeof requireTracker>[0], doc: string, id
 export const milestoneStatus = defineVerb({
   name: "milestone.status",
   summary: "Start, close or drop a milestone.",
-  description: `${ROADMAP} Moves it to planned, active (started), done (closed) or canceled. Start the next one only once a trusted human confirmed it.`,
+  description: `${ROADMAP} Moves it to planned, active (started), done (closed) or canceled. Start the next one only once a trusted human confirmed it: a human asking for it in chat, or agreeing to your proposal there, is that confirmation, so start it in that session yourself.`,
   input: z.strictObject({ id: milestoneId, to: z.enum(STATUSES).describe("Its new status.") }),
   args: ["id", "to"],
   examples: ["ost milestone status 7 done", "ost milestone status 8 active"],
