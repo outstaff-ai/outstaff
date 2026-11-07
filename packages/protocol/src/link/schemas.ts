@@ -204,58 +204,63 @@ export const responseSchema = z.union([
   }),
 ]);
 
+/** The result schema of each request method, by its `method`. */
 export const RESULT_SCHEMAS = results;
 
 function message<T extends string, P extends z.ZodType>(type: T, payload: P) {
   return z.strictObject({ type: z.literal(type), payload });
 }
 
+const payloads = {
+  welcome: z.strictObject({
+    version: z.number().int().describe("LINK_VERSION the service speaks."),
+    office: z
+      .strictObject({ id: z.string().min(1), name: z.string().optional() })
+      .describe("How the service knows this office."),
+  }),
+  hello: z.strictObject({
+    office: z
+      .strictObject({
+        team: z.string().describe("The team's name from its team file."),
+        version: z.string().describe("The office's version."),
+      })
+      .describe("Which office this is."),
+  }),
+  request: requestSchema,
+  response: responseSchema,
+  people: results.people,
+  trace: z.strictObject({
+    recordedAt: time.describe(
+      "When the office recorded it. A trace is sent again when an act's result is added.",
+    ),
+    trace: traceSchema,
+  }),
+  item: z.strictObject({
+    id: z.string(),
+    person: z.string(),
+    kind: z.string(),
+    title: z.string(),
+    subject: itemSubjectSchema,
+    status: itemSchema.shape.status,
+    updatedAt: time,
+  }),
+  health: results.health,
+  ping: z.strictObject({}),
+  pong: z.strictObject({}),
+};
+
+/** The payload schema of each link message, by its `type`. */
+export const PAYLOAD_SCHEMAS = payloads;
+
 export const linkMessageSchema = z.discriminatedUnion("type", [
-  message(
-    "welcome",
-    z.strictObject({
-      version: z.number().int().describe("LINK_VERSION the service speaks."),
-      office: z
-        .strictObject({ id: z.string().min(1), name: z.string().optional() })
-        .describe("How the service knows this office."),
-    }),
-  ),
-  message(
-    "hello",
-    z.strictObject({
-      office: z
-        .strictObject({
-          team: z.string().describe("The team's name from its team file."),
-          version: z.string().describe("The office's version."),
-        })
-        .describe("Which office this is."),
-    }),
-  ),
-  message("request", requestSchema),
-  message("response", responseSchema),
-  message("people", results.people),
-  message(
-    "trace",
-    z.strictObject({
-      recordedAt: time.describe(
-        "When the office recorded it. A trace is sent again when an act's result is added.",
-      ),
-      trace: traceSchema,
-    }),
-  ),
-  message(
-    "item",
-    z.strictObject({
-      id: z.string(),
-      person: z.string(),
-      kind: z.string(),
-      title: z.string(),
-      subject: itemSubjectSchema,
-      status: itemSchema.shape.status,
-      updatedAt: time,
-    }),
-  ),
-  message("health", results.health),
-  message("ping", z.strictObject({})),
-  message("pong", z.strictObject({})),
+  message("welcome", payloads.welcome),
+  message("hello", payloads.hello),
+  message("request", payloads.request),
+  message("response", payloads.response),
+  message("people", payloads.people),
+  message("trace", payloads.trace),
+  message("item", payloads.item),
+  message("health", payloads.health),
+  message("ping", payloads.ping),
+  message("pong", payloads.pong),
 ]);

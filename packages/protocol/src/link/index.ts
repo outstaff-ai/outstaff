@@ -15,8 +15,10 @@ export {
   LINK_VERSION,
   LINK_ERROR_CODES,
   linkMessageSchema,
+  PAYLOAD_SCHEMAS,
   requestSchema,
   responseSchema,
+  RESULT_SCHEMAS,
 } from "./schemas.js";
 
 export type * from "./types.js";
