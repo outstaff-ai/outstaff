@@ -73,6 +73,9 @@ export function officeMethods(call: CallFn, ack: AckFn, activeItems: Set<string>
     },
 
     chatMessage: (m): Promise<ChatMessageResult> => call("chat_message", m, "chat_message_result"),
+    async chatCursors() {
+      return (await call("chat_cursors", {}, "chat_cursors_result")).cursors;
+    },
     reportPosted: (workItemId, id) => ack("report_posted", { workItemId, id }),
     actResult: (result) => ack("act_result", result, AGAIN),
     chatReport: (workItemId, kind): Promise<ChatReportResult> =>

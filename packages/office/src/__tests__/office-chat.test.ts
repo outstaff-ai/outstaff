@@ -61,6 +61,7 @@ function team(): TeamConfig {
 
 const dm = (messageId: string, text: string) => ({
   messageId,
+  at: "2026-01-01T00:00:00.000Z",
   channel: DM,
   text,
   author: { id: SAM_CHAT, name: "Sam" },
@@ -304,5 +305,31 @@ describe("wakes coalesce, except chat", { timeout: 30_000 }, () => {
         .map((d) => d.folded!.length)
         .toSorted(),
     ).toEqual([2, 3, 4]);
+  });
+});
+
+describe("where Kofi's conversations left off", { timeout: 30_000 }, () => {
+  const h = harness();
+
+  it("keeps the latest message time per conversation, also for a message taken in again", async () => {
+    expect(await h.kofi.chatCursors()).toEqual([]);
+    await h.kofi.chatMessage({ ...dm("1700.1", "hi"), at: "2026-01-01T00:00:01.000Z" });
+    await h.kofi.chatMessage({
+      ...dm("1700.2", "in a thread"),
+      thread: "1700.1",
+      at: "2026-01-01T00:00:02.000Z",
+    });
+
+    // Delivered twice, the second time late: the office recognizes it and the cursor stays.
+    expect(
+      await h.kofi.chatMessage({ ...dm("1700.1", "hi"), at: "2026-01-01T00:00:01.000Z" }),
+    ).toEqual({
+      repeated: true,
+    });
+
+    expect(await h.kofi.chatCursors()).toEqual([
+      { channel: DM, thread: "1700.1", at: "2026-01-01T00:00:02.000Z" },
+      { channel: DM, at: "2026-01-01T00:00:01.000Z" },
+    ]);
   });
 });

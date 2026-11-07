@@ -11,7 +11,7 @@ integrations:
     adapter: slack
 ```
 
-There are no options. Capabilities: `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`.
+There are no options. Capabilities: `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`, `chat.catchUp`.
 
 ## Set up an app
 
@@ -120,6 +120,12 @@ The adapter drops everything but direct messages and mentions from trusted peopl
 - If `humans` is omitted, a sender is trusted when they are a full workspace member. Guests (restricted or single-channel) and deactivated accounts are not.
 
 See [trust model](/decisions/0004-trust-model/) for why trust is decided in the adapter.
+
+## Messages written while the agent was offline
+
+Socket Mode delivers events only while the agent is connected; what is written while its container stops, restarts or crashes is never delivered. So when the agent connects, it [catches up](/architecture/agent/#chat) from the conversations history and replies APIs (`conversations.history` and `conversations.replies`): each direct message with a listed human (`humans[].identities.chat`), and each conversation the office took a message in from, after the last message it took in there, with the threads that got replies meanwhile. Direct messages need only `im:history`, which the manifest has. Mentions in a channel are caught up on only with `channels:history` (`groups:history` for a private channel); without it the channel is logged and skipped.
+
+The agent's presence does not show that it is away. Slack decides a Socket Mode app's presence from the app's settings (`always_online` in the manifest), and `users.setPresence` does not change it for such an app, so the agent cannot set itself away while it is down.
 
 ## What agents see
 

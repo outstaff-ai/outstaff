@@ -3,6 +3,7 @@ import type { Attached, Filed, TicketUsage } from "@outstaff/protocol";
 import type {
   OfficeWorkItem,
   OfficeTeamMember,
+  ChatCursorEntry,
   ChatMessageRequest,
   ChatMessageResult,
   ChatReportKind,
@@ -197,6 +198,22 @@ export function createFakeOffice(
       const repeated = seen.has(m.messageId);
       seen.add(m.messageId);
       return { repeated };
+    },
+    // Like the office: the latest message time of each conversation it took a message in from.
+    async chatCursors() {
+      const latest = new Map<string, ChatCursorEntry>();
+      for (const m of chatMessages) {
+        const key = `${m.channel}:${m.thread ?? ""}`;
+        if ((latest.get(key)?.at ?? "") < m.at) {
+          latest.set(key, {
+            channel: m.channel,
+            ...(m.thread ? { thread: m.thread } : {}),
+            at: m.at,
+          });
+        }
+      }
+
+      return [...latest.values()].toSorted((a, b) => (a.at < b.at ? 1 : -1));
     },
     async reportPosted(workItemId, id) {
       reportsPosted.push({ workItemId, id });

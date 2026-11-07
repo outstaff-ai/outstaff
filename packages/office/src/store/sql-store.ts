@@ -1,4 +1,5 @@
 import type { Store } from "./types.js";
+import { chatCursorQueries } from "./sql/chat-cursors.js";
 import { doctorQueries } from "./sql/doctor.js";
 import { conversationQueries } from "./sql/conversations.js";
 import { eventQueries } from "./sql/events.js";
@@ -29,6 +30,7 @@ export function createSqlStore(internals: StoreInternals): Store {
     ...momentQueries(internals),
     ...recallQueries(internals),
     ...usageQueries(internals),
+    ...chatCursorQueries(internals),
 
     async close() {
       await db.destroy();

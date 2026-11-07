@@ -3,6 +3,7 @@ import { chatConversation, chatEvent, chatEventId, withFiles } from "#/chat/even
 
 const m = {
   messageId: "1700.1",
+  at: "2026-01-01T00:00:00.000Z",
   channel: "C-1",
   text: "Can you look at ACME-41?",
   author: { id: "U-SAM", name: "Sam" },

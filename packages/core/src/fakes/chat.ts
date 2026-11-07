@@ -2,6 +2,7 @@ import type { InboundMessage } from "#/contracts/seeds.js";
 import { PortError, splitAtLines } from "#/ports/index.js";
 import type { ChatFile, ChatMessage, AgentProfile } from "#/ports/index.js";
 import type { FakeChat, FakeChatOptions } from "./types.js";
+import { missedIn } from "./chat-missed.js";
 import { steppingClock } from "./util.js";
 
 export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
@@ -125,6 +126,9 @@ export function createFakeChat(opts: FakeChatOptions = {}): FakeChat {
       );
 
       return structuredClone(inChannel.slice(-o.limit));
+    },
+    async missedSince(o) {
+      return missedIn(messages, o);
     },
     async download(file) {
       const data = files.get(file.id);

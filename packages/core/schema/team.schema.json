@@ -1958,7 +1958,8 @@
         "chat": {
           "default": {
             "parallel_sessions": 2,
-            "profile": true
+            "profile": true,
+            "catch_up_hours": 24
           },
           "description": "How agents take chat messages, and what they show in chat.",
           "type": "object",
@@ -1974,6 +1975,13 @@
               "default": true,
               "description": "Publish the agent's profile in chat: role, status, and current work grouped by ticket or pull request. Needs a chat adapter with chat.agentProfile. Default on.",
               "type": "boolean"
+            },
+            "catch_up_hours": {
+              "default": 24,
+              "description": "How far back an agent picks up the chat messages written to it while it was offline, when its chat connects: each is taken as if it had just arrived, oldest first, up to 10 per conversation. Anything older, or beyond the 10, is not picked up, and the agent says so once in that conversation. 0 turns catching up off. Needs a chat adapter with chat.catchUp. Default 24.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 168
             }
           },
           "additionalProperties": false

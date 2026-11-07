@@ -1,4 +1,11 @@
-import { defineAdapter, type Chat, type ChatFile, type ChatMessage } from "@outstaff/core";
+import {
+  defineAdapter,
+  type Chat,
+  type ChatFile,
+  type ChatMessage,
+  type ChatMissed,
+  type ChatMissedOptions,
+} from "@outstaff/core";
 import { z } from "zod";
 
 const POLL_MS = 500;
@@ -14,6 +21,38 @@ interface Inbound {
   text: string;
   at: string;
   files?: ChatFile[];
+}
+
+const messageOf = (m: Inbound): ChatMessage => ({
+  id: m.id,
+  channel: m.channel,
+  ...(m.thread ? { thread: m.thread } : {}),
+  author: { id: m.authorId, name: m.authorName, trusted: m.trusted, bot: false },
+  text: m.text,
+  at: m.at,
+  ...(m.files ? { files: m.files } : {}),
+});
+
+const keyOf = (c: { channel: string; thread?: string | undefined }) =>
+  `${c.channel}:${c.thread ?? ""}`;
+
+/** The messages after each conversation's cursor, else since the window: the latest `limit`, and how many are not. */
+function missedIn(messages: ChatMessage[], opts: ChatMissedOptions): ChatMissed[] {
+  const cursors = new Map(opts.cursors.map((c) => [keyOf(c), c.at]));
+  const groups = new Map<string, ChatMessage[]>();
+  for (const m of messages.filter((x) => x.at > (cursors.get(keyOf(x)) ?? opts.since))) {
+    groups.set(keyOf(m), [...(groups.get(keyOf(m)) ?? []), m]);
+  }
+
+  return [...groups.values()].map((all) => {
+    const kept = all.filter((m) => m.at >= opts.since).slice(-opts.limit);
+    return {
+      channel: all[0]!.channel,
+      ...(all[0]!.thread ? { thread: all[0]!.thread } : {}),
+      messages: kept,
+      skipped: all.length - kept.length,
+    };
+  });
 }
 
 /**
@@ -40,29 +79,26 @@ export function createStubChat(baseUrl: string, agent: string): Chat {
     return (await res.json()) as T;
   };
 
+  const inbox = async (from: number) =>
+    (await call<{ messages: Inbound[] }>(`/chat/inbox?after=${from}&agent=${agent}`)).messages;
+
   return {
     async start(onMessage) {
+      // Like Socket Mode, only what is written from now on is delivered; what came before is caught up on. Without
+      // the stub's answer every message is delivered again, and the office recognizes the ones it has.
+      const head = await inbox(0).catch((): Inbound[] => []);
+      after = Math.max(after, ...head.map((m) => m.seq));
       timer = setInterval(() => {
         if (busy) {
           return;
         }
 
         busy = true;
-        void call<{ messages: Inbound[] }>(`/chat/inbox?after=${after}&agent=${agent}`)
-          .then(async ({ messages }) => {
+        void inbox(after)
+          .then(async (messages) => {
             for (const m of messages) {
               after = Math.max(after, m.seq);
-              const message: ChatMessage = {
-                id: m.id,
-                channel: m.channel,
-                ...(m.thread ? { thread: m.thread } : {}),
-                author: { id: m.authorId, name: m.authorName, trusted: m.trusted, bot: false },
-                text: m.text,
-                at: m.at,
-                ...(m.files ? { files: m.files } : {}),
-              };
-
-              await onMessage(message);
+              await onMessage(messageOf(m));
             }
           })
           .catch(() => {})
@@ -106,6 +142,11 @@ export function createStubChat(baseUrl: string, agent: string): Chat {
       return new Uint8Array(await res.arrayBuffer());
     },
 
+    // The stub workspace is the human's direct messages with the agent: each conversation after its cursor.
+    async missedSince(opts) {
+      return missedIn((await inbox(0)).filter((m) => m.trusted).map(messageOf), opts);
+    },
+
     openDirect: async (userId) => `D-${agent}-${userId}`,
 
     async setAgentProfile(userId, profile) {
@@ -122,7 +163,13 @@ export function createStubChat(baseUrl: string, agent: string): Chat {
 export const stubChat = defineAdapter({
   port: "chat",
   name: "slack",
-  capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
+  capabilities: [
+    "chat.messages",
+    "chat.history",
+    "chat.agentProfile",
+    "chat.files",
+    "chat.catchUp",
+  ],
   options: z.strictObject({}),
   secrets: () => [],
   unavailableFor: () =>

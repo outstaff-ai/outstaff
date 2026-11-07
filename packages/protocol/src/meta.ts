@@ -110,6 +110,17 @@ export const MESSAGE_META = {
       "The office took the message in; the agent answers nothing until the work it starts does.",
     replies: [],
   },
+  chat_cursors: {
+    from: "agent",
+    summary:
+      "Asks where the caller's chat conversations left off: for each, when the last message the office took in was written. The agent catches up from there when its chat connects, so messages written while it was offline are not lost.",
+    replies: ["chat_cursors_result", "error"],
+  },
+  chat_cursors_result: {
+    from: "office",
+    summary: "The caller's conversations and their last message times.",
+    replies: [],
+  },
   chat_report: {
     from: "agent",
     summary:

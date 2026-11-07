@@ -42,6 +42,7 @@ describe("protocol", () => {
   it("carries the metadata of a chat message's files, and a message that only shares files", () => {
     const base = {
       messageId: "m1",
+      at: "2026-01-01T00:00:00.000Z",
       channel: "D1",
       text: "",
       author: { id: "U1" },

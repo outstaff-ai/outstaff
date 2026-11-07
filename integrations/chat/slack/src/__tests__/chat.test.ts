@@ -23,6 +23,7 @@ describe("adapter definition", () => {
       "chat.history",
       "chat.agentProfile",
       "chat.files",
+      "chat.catchUp",
     ]);
 
     const secrets = slackChat.secrets("person");

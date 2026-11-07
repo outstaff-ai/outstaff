@@ -1,4 +1,5 @@
 import type { Run, RunRuntime } from "./runs.types.js";
+import type { ChatCursorStore } from "./chat-cursors.types.js";
 import type { DoctorStore } from "./doctor.types.js";
 import type { ItemRefStore, NewItemRef } from "./refs.types.js";
 import type { RecallStore } from "./recall.types.js";
@@ -183,7 +184,7 @@ export interface TraceWindow {
   before?: string | undefined;
 }
 
-export interface Store extends DoctorStore, ItemRefStore, RecallStore, UsageStore {
+export interface Store extends ChatCursorStore, DoctorStore, ItemRefStore, RecallStore, UsageStore {
   readonly dialect: "postgres" | "sqlite";
 
   getCursor(source: string, key: string): Promise<string | undefined>;

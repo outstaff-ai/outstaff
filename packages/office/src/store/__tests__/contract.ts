@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe } from "vitest";
+import { chatCursorCases } from "./contract/chat-cursors.js";
 import { doctorCases } from "./contract/doctor.js";
 import { eventCases } from "./contract/events.js";
 import { orderingCases } from "./contract/ordering.js";
@@ -45,6 +46,7 @@ export function storeContract(name: string, makeHarness: () => StoreHarness): vo
     pauseCases(ctx);
     traceCases(ctx);
     doctorCases(ctx);
+    chatCursorCases(ctx);
     refCases(ctx);
     recallCases(ctx);
     usageCases(ctx);

@@ -14,6 +14,7 @@ afterEach(async () => {
 
 const m = {
   messageId: "1700.1",
+  at: "2026-01-01T00:00:00.000Z",
   channel: "D-1",
   text: "Can you look at ACME-41?",
   author: { id: "U-SAM" },

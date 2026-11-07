@@ -45,6 +45,24 @@ export function createFakeSlack(): FakeSlack {
     return list;
   };
 
+  const historyCalls: FakeSlack["historyCalls"] = [];
+  const repliesCalls: FakeSlack["repliesCalls"] = [];
+  const refused = new Set<string>();
+  const refuse = (channel: string) => {
+    if (refused.has(channel)) {
+      throw slackError("missing_scope");
+    }
+  };
+
+  const after = (m: SlackMessage, oldest: string | undefined) =>
+    !oldest || Number(m.ts) > Number(oldest);
+
+  /** A thread's parent, as history lists it: with its own ts as the thread and its latest reply. */
+  const withLatestReply = (channel: string, m: SlackMessage): SlackMessage => {
+    const replies = inChannel(channel).filter((r) => r.thread_ts === m.ts && r.ts !== m.ts);
+    return replies.length ? { ...m, thread_ts: m.ts!, latest_reply: replies.at(-1)!.ts! } : m;
+  };
+
   const byTs = (channel: string, ts: string) => inChannel(channel).find((m) => m.ts === ts);
   const page = (messages: SlackMessage[], limit = 100, cursor?: string) => {
     const start = cursor ? Number(cursor) : 0;
@@ -98,12 +116,24 @@ export function createFakeSlack(): FakeSlack {
       },
     },
     conversations: {
-      async history({ channel, limit, cursor }) {
-        const top = inChannel(channel).filter((m) => !m.thread_ts || m.thread_ts === m.ts);
+      async history({ channel, limit, cursor, oldest }) {
+        historyCalls.push({ channel, ...(oldest ? { oldest } : {}) });
+        refuse(channel);
+        const top = inChannel(channel)
+          .filter((m) => !m.thread_ts || m.thread_ts === m.ts)
+          .filter((m) => after(m, oldest))
+          .map((m) => withLatestReply(channel, m));
+
         return page(top.toReversed(), limit, cursor);
       },
-      async replies({ channel, ts, limit, cursor }) {
-        const thread = inChannel(channel).filter((m) => m.ts === ts || m.thread_ts === ts);
+      async replies({ channel, ts, limit, cursor, oldest }) {
+        repliesCalls.push({ channel, ts, ...(oldest ? { oldest } : {}) });
+        refuse(channel);
+        // Like Slack, the parent comes first whatever `oldest` says.
+        const thread = inChannel(channel).filter(
+          (m) => m.ts === ts || (m.thread_ts === ts && after(m, oldest)),
+        );
+
         return page(thread, limit, cursor);
       },
       async open({ users: user }) {
@@ -223,6 +253,14 @@ export function createFakeSlack(): FakeSlack {
     usersInfoCalls,
     users,
     emit,
+    historyCalls,
+    repliesCalls,
+    refused,
+    write(channel, row) {
+      const ts = nextTs();
+      inChannel(channel).push({ ts, ...row });
+      return ts;
+    },
     async directMessage(user, text, extra = {}) {
       await emit({
         type: "message",

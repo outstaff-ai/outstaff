@@ -36,6 +36,7 @@ export function officeMessage(m: ChatMessage, participant: boolean): ChatMessage
     ...(m.thread ? { thread: m.thread } : {}),
     text: m.text,
     author: { id: m.author.id, ...(m.author.name ? { name: m.author.name } : {}) },
+    at: m.at,
     direct: m.direct ?? false,
     participant,
     ...(m.files?.length ? { files: m.files.slice(0, MAX_CHAT_FILES) } : {}),

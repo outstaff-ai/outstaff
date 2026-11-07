@@ -13,7 +13,7 @@ An adapter is a package that implements one port for one product (for example a 
 | `tracker`   | issues, comments, assignment, status moves, events                            | `tracker.issues`, `tracker.assign`, `tracker.webhooks`, `tracker.attachments`, `tracker.development`                 |
 | `knowledge` | documents, search, comments, links on tickets, agents' notes                  | `knowledge.docs`, `knowledge.issueLinks`, `knowledge.notes`                                                          |
 | `vcs`       | pull requests, checks, review threads, repo credentials, permissions, events  | `vcs.pullRequests`, `vcs.reviewThreads`, `vcs.workflows`, `vcs.ciRuns`, `vcs.reactions`, `vcs.merge`, `vcs.webhooks` |
-| `chat`      | inbound messages (trust-filtered), posting, reactions, history, agent profile | `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`                                                   |
+| `chat`      | inbound messages (trust-filtered), posting, reactions, history, agent profile | `chat.messages`, `chat.history`, `chat.agentProfile`, `chat.files`, `chat.catchUp`                                   |
 | `runtime`   | runs an LLM session under a permission `Policy` and streams events            | `runtime.sessions`, `runtime.usage`                                                                                  |
 | `avatars`   | deterministic avatar images                                                   | `avatars.generate`                                                                                                   |
 

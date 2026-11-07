@@ -94,6 +94,7 @@ describe("a chat wake says which of the work it names is the agent's", () => {
     const m = {
       messageId: "1700.1",
       channel: "D-1",
+      at: "2026-01-01T00:00:00.000Z",
       text,
       author: { id: "U-ADA" },
       direct: true,

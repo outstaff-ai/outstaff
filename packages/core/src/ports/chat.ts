@@ -24,6 +24,41 @@ export interface ChatMessage {
   files?: ChatFile[];
 }
 
+/** Where catching up starts in one conversation: after the last message the office took in there. */
+export interface ChatCursor {
+  channel: string;
+
+  /** The thread; absent for the top level of the channel or direct message. */
+  thread?: string | undefined;
+
+  /** When that message was written (ISO-8601). */
+  at: string;
+}
+
+export interface ChatMissedOptions {
+  /** The conversations the office took messages in from, each with where it left off. */
+  cursors: ChatCursor[];
+
+  /** Nothing written before this is returned (ISO-8601), however far back a conversation's cursor is. */
+  since: string;
+
+  /** The most messages returned per conversation: the latest ones. */
+  limit: number;
+}
+
+/** One conversation's messages written to the agent while it was not listening. */
+export interface ChatMissed {
+  channel: string;
+  thread?: string;
+  direct?: boolean;
+
+  /** What `start` would have delivered, oldest first: trusted humans' requests after the cursor, at most `limit`. */
+  messages: ChatMessage[];
+
+  /** Requests after the cursor that are not returned: written before `since`, or older than the latest `limit`. */
+  skipped: number;
+}
+
 export interface AgentProfile {
   name: string;
   role: string;
@@ -68,6 +103,14 @@ export interface Chat {
    * Refuses a file that did not come from this chat (`invalid`).
    */
   download?(file: ChatFile): Promise<Uint8Array>;
+
+  /**
+   * Capability `chat.catchUp`. The requests written to the agent while it was not listening: after each cursor in
+   * its conversation, and since `since` in the direct messages with the team's humans that have none. The same
+   * filter as `start` applies (trusted humans, direct messages and mentions). A conversation the adapter cannot read
+   * is left out, never thrown for.
+   */
+  missedSince?(opts: ChatMissedOptions): Promise<ChatMissed[]>;
 
   /** Channel id of a direct message with the user. */
   openDirect(userId: string): Promise<string>;

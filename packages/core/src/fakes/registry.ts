@@ -62,7 +62,13 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
       defineAdapter({
         port: "chat",
         name: "fake",
-        capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
+        capabilities: [
+          "chat.messages",
+          "chat.history",
+          "chat.agentProfile",
+          "chat.files",
+          "chat.catchUp",
+        ],
         options,
         secrets: none,
         create: (ctx) => createFakeChat({ now: ctx.now }),

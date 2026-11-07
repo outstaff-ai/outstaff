@@ -838,6 +838,7 @@ Sent by: agent. Answered by: `chat_message_result`, `error`.
 | `author`           | object          | yes      |                                                                                                                                           |
 | `author.id`        | string          | yes      |                                                                                                                                           |
 | `author.name`      | string          | no       |                                                                                                                                           |
+| `at`               | string          | yes      | When the author wrote it, as the chat has it (ISO-8601). The office keeps the latest per conversation, where the agent catches up from.   |
 | `direct`           | boolean         | yes      | The message is in a direct message with the author.                                                                                       |
 | `participant`      | boolean         | yes      | The author started the thread or replied in it.                                                                                           |
 | `files`            | list of objects | no       | Files shared in the message: metadata only, no bytes. Data from the author.                                                               |
@@ -856,6 +857,27 @@ Sent by: office.
 | Field      | Type    | Required | Description                                        |
 | ---------- | ------- | -------- | -------------------------------------------------- |
 | `repeated` | boolean | yes      | True when the office already took this message in. |
+
+### `chat_cursors`
+
+Asks where the caller's chat conversations left off: for each, when the last message the office took in was written. The agent catches up from there when its chat connects, so messages written while it was offline are not lost.
+
+Sent by: agent. Answered by: `chat_cursors_result`, `error`.
+
+No payload fields.
+
+### `chat_cursors_result`
+
+The caller's conversations and their last message times.
+
+Sent by: office.
+
+| Field               | Type            | Required | Description                                                                  |
+| ------------------- | --------------- | -------- | ---------------------------------------------------------------------------- |
+| `cursors`           | list of objects | yes      | The caller's conversations, latest first, each with its last message's time. |
+| `cursors[].channel` | string          | yes      |                                                                              |
+| `cursors[].thread`  | string          | no       | The thread; absent for the top level of the channel or direct message.       |
+| `cursors[].at`      | string          | yes      | When the last message the office took in was written (ISO-8601).             |
 
 ### `chat_report`
 
