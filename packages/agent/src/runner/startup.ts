@@ -63,7 +63,8 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   const addDirs = prepareDirs(layout, capabilities);
   // Notes kept in memory/ before go to the notes store on the first start that has none.
   await migrateMemory({ ...env, layout });
-  const repos = await cloneRepositories(ctx, env, rendered, layout);
+  const repositories = await cloneRepositories(ctx, env, rendered, layout);
+  const repos = repositories.ready;
   writeWorkdirFiles(runtimeDef, rendered, layout.workDir);
   const runtime = await createRuntime(ctx, runtimeDef);
   const { policy, chatPolicy } = buildPolicies(opts, {
@@ -87,7 +88,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
 
   const usage = usageReporter(ctx, connection, runtime);
   const started = startChat(connection, { env, team, me, role, model, person, log });
-  const workspaces = agentWorkspaces(ctx, layout, repos);
+  const workspaces = agentWorkspaces(ctx, layout, repositories);
   const loop = workLoop(ctx, {
     ...started,
     connection,

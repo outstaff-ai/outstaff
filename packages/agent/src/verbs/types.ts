@@ -17,7 +17,7 @@ import type { OfficeClient } from "./office.types.js";
 import type { z } from "zod";
 import type { Attachment } from "#/runner/types.js";
 import type { ToolStatus } from "#/tools/types.js";
-import type { Workspaces } from "#/repos/types.js";
+import type { Repositories, Workspaces } from "#/repos/types.js";
 
 /** What every verb returns; `text` already contains every URL in `links`. */
 export interface VerbResult {
@@ -91,6 +91,9 @@ export interface AgentEnv {
 
   /** The tools declared for this person and whether each installed; set at startup. */
   tools?: ToolStatus[];
+
+  /** The person's repositories, the prepared ones and the ones that could not be; set at startup. */
+  repositories?: Pick<Repositories, "ready" | "unprepared">;
 
   /**
    * The files shared in the chat message this chat session answers, downloaded to its scratch directory. Filing

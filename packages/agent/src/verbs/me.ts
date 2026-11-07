@@ -1,6 +1,7 @@
 import { PortError } from "@outstaff/core";
 import { z } from "zod";
 import { defineVerb, result } from "./define.js";
+import type { UnpreparedRepo } from "#/repos/types.js";
 import type { ToolStatus } from "#/tools/types.js";
 import type { AgentEnv, NetworkAccess } from "./types.js";
 
@@ -18,6 +19,15 @@ const networkLine = (http: NetworkAccess["http"]): string =>
 /** The HTTP services granted to this person. */
 const grantedHttp = (env: AgentEnv): NetworkAccess["http"] => env.network?.http ?? [];
 
+/** A grant, as "shop: write", with why when the repository could not be prepared. */
+function grantLine(name: string, grant: string, unprepared: UnpreparedRepo[]): string {
+  const error = unprepared.find((u) => u.name === name)?.error;
+  return `${name}: ${grant}${error ? ` (not ready: ${error})` : ""}`;
+}
+
+/** The person's repositories that could not be prepared. */
+const unpreparedOf = (env: AgentEnv): UnpreparedRepo[] => env.repositories?.unprepared() ?? [];
+
 /** Which of the team's integrations this process has connected. */
 function connectedPorts(env: AgentEnv): Record<string, boolean> {
   return {
@@ -32,7 +42,7 @@ export const me = defineVerb({
   name: "me",
   summary: "Show who you are on this team.",
   description:
-    "Shows your handle, role, repository grants and which integrations this team has connected.",
+    "Shows your handle, role, repository grants (and any repository that could not be prepared, with why) and which integrations this team has connected.",
   input: z.strictObject({}),
   args: [],
   examples: ["ost me"],
@@ -42,7 +52,8 @@ export const me = defineVerb({
       throw new PortError("not_found", `${env.person} is not a person of this team.`);
     }
 
-    const grants = Object.entries(person.repos).map(([k, v]) => `${k}: ${v}`);
+    const unprepared = unpreparedOf(env);
+    const grants = Object.entries(person.repos).map(([k, v]) => grantLine(k, v, unprepared));
     const connected = connectedPorts(env);
     const tools = env.tools ?? [];
     const http = grantedHttp(env);
@@ -65,6 +76,7 @@ export const me = defineVerb({
         team: env.team.team.name,
         email: email ?? null,
         repos: person.repos,
+        unprepared: unprepared.map((u) => ({ name: u.name, error: u.error })),
         tools,
         network: { http: http.map((g) => g.name) },
         connected,

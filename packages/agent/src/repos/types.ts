@@ -65,6 +65,34 @@ export interface ClonedRepo {
   trackerLabels: string[];
 }
 
+/** A repository the person has a grant on that could not be prepared (cloned or fetched), with why. */
+export interface UnpreparedRepo {
+  /** The repo's short name in team.yaml. */
+  name: string;
+  dir: string;
+  ref: Required<RepoRef>;
+  access: GitMode;
+  kind: string;
+
+  /** Why the last attempt failed. */
+  error: string;
+}
+
+/** The person's repositories: the ones prepared, and the ones that could not be, which are tried again on demand. */
+export interface Repositories {
+  /** The prepared clones. One list for the agent's life: a repository prepared on a retry is added to it. */
+  ready: ClonedRepo[];
+
+  /** The repositories with a grant that could not be prepared, each with the error of its last attempt. */
+  unprepared(): UnpreparedRepo[];
+
+  /**
+   * Prepares the unprepared repository `name` again and adds it to {@link ready}; resolves to it, or to the clone
+   * when it is ready already. Rejects with the cause when it still fails, and records it.
+   */
+  retry(name: string): Promise<ClonedRepo>;
+}
+
 export interface SyncRepositoriesOptions {
   team: TeamConfig;
   person: string;
@@ -147,18 +175,23 @@ export type AddedWorktree =
   | { repo: string; heldBy: string };
 
 export interface Workspaces {
-  /** Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when no repo fits. */
+  /**
+   * Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when
+   * no repo fits. An unprepared repository the item may need is tried again first, at most once a minute.
+   */
   prepare(offer: Offer): Promise<Workspace | undefined>;
 
   /**
    * Fetches every base clone, at most once a minute each, and moves it to the fetched default branch, for a session
-   * that reads the clones. A clone that cannot be fetched is logged and reported where it is.
+   * that reads the clones. A clone that cannot be fetched is logged and reported where it is. Unprepared repositories
+   * are tried again first, at most once a minute each.
    */
   refresh(): Promise<RepoHead[]>;
 
   /**
    * Adds a worktree of another repository to the item, at `<worktreesDir>/<repo>/<item>`, so later rounds find it as
-   * one of {@link Workspace.others}. Refuses a repository the person cannot write (`forbidden`).
+   * one of {@link Workspace.others}. A repository that could not be prepared is tried again first. Refuses a
+   * repository the person cannot write (`forbidden`), and one that still cannot be prepared (`unavailable`).
    */
   add(workItemId: string, repo: string, branch?: string): Promise<AddedWorktree>;
 
@@ -174,7 +207,12 @@ export interface Workspaces {
 
 export interface WorkspacesOptions {
   layout: Pick<Layout, "worktreesDir" | "scratchDir">;
+
+  /** The prepared clones; the list may grow while the workspaces are in use. */
   repos: ClonedRepo[];
+
+  /** The repositories that could not be prepared and how to try one again; none without it. */
+  unprepared?: Pick<Repositories, "unprepared" | "retry">;
   git?: RunGit;
   log?: Logger;
 

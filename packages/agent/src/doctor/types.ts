@@ -1,4 +1,5 @@
 import type { DoctorCheck, TeamConfig } from "@outstaff/core";
+import type { Repositories } from "#/repos/index.js";
 import type { ToolStatus } from "#/tools/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 
@@ -25,6 +26,9 @@ export interface StartupChecksInput extends NetworkProbes {
 
   /** The ports the agent started with; the acts the office sends are made with its tracker port. */
   ports?: Pick<AgentEnv, "tracker" | "unavailable"> | undefined;
+
+  /** The person's repositories, and the ones that could not be prepared at start. */
+  repositories?: Pick<Repositories, "ready" | "unprepared"> | undefined;
 
   /** Whether an executable file is at a path. Defaults to the file system. */
   executable?: ((file: string) => boolean) | undefined;

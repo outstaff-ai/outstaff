@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { actsCheck } from "#/doctor/acts.js";
 import { diskCheck, volumeUsage } from "#/doctor/disk.js";
 import { reportAgentChecks, reportStartupChecks, startupChecks } from "#/doctor/startup.js";
+import { repoChecks } from "#/doctor/repos.js";
 import { toolPathChecks, toolStatusChecks } from "#/doctor/tools.js";
 
 const GIB = 1024 ** 3;
@@ -176,6 +177,33 @@ describe("the agent's startup checks", () => {
     expect(actsCheck(withTracker, {})[0]?.detail).toContain("(no reason given)");
   });
 
+  it("reports each repository that could not be prepared, with the error, or that all were", () => {
+    const shop = { name: "shop" } as never;
+    expect(repoChecks(undefined)).toEqual([]);
+    expect(repoChecks({ ready: [], unprepared: () => [] })).toEqual([]);
+    expect(repoChecks({ ready: [shop], unprepared: () => [] })).toEqual([
+      { name: "Repositories prepare", status: "ok", detail: "shop cloned and fetched." },
+    ]);
+
+    const libs = {
+      name: "libs",
+      dir: "/home/agent/repos/libs",
+      ref: { host: "github.com", owner: "acme", name: "libs" },
+      access: "write" as const,
+      kind: "library",
+      error: "git fetch failed: could not read Username",
+    };
+
+    expect(repoChecks({ ready: [shop], unprepared: () => [libs] })).toEqual([
+      {
+        name: "Repository libs prepares",
+        status: "fail",
+        detail: "libs could not be prepared: git fetch failed: could not read Username",
+        fix: expect.stringContaining("Check libs's url in team.yaml") as string,
+      },
+    ]);
+  });
+
   it("reports a prepared agent's checks over its connection", async () => {
     const sent: unknown[] = [];
     await reportAgentChecks(
@@ -184,7 +212,11 @@ describe("the agent's startup checks", () => {
         person: "sam",
         tools: [{ name: "jq", version: "1.7.1", state: "installed" }],
         connection: { doctorReport: async (checks: unknown) => void sent.push(checks) } as never,
-        env: { person: "sam", team },
+        env: {
+          person: "sam",
+          team,
+          repositories: { ready: [{ name: "shop" } as never], unprepared: () => [] },
+        },
       },
       {},
       tmpdir(),
@@ -194,6 +226,7 @@ describe("the agent's startup checks", () => {
       expect.arrayContaining([
         expect.objectContaining({ name: "Tools install", status: "ok" }),
         expect.objectContaining({ name: "Tool jq on PATH", status: "fail" }),
+        expect.objectContaining({ name: "Repositories prepare", status: "ok" }),
       ]),
     ]);
   });

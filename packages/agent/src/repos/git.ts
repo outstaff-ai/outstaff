@@ -1,6 +1,10 @@
 import { execFile } from "node:child_process";
 import type { RunGit } from "./types.js";
 
+/** The git command of the arguments, past the `-c` options: `fetch` in `-c a=b fetch origin`. */
+const commandOf = (args: string[]) =>
+  args.find((a, i) => !a.startsWith("-") && args[i - 1] !== "-c") ?? "";
+
 export const runGit: RunGit = (args, opts = {}) =>
   new Promise((resolve, reject) => {
     execFile(
@@ -16,7 +20,7 @@ export const runGit: RunGit = (args, opts = {}) =>
       (error, stdout, stderr) => {
         if (error) {
           reject(
-            new Error(`git ${args[0] ?? ""} failed: ${stderr.trim() || error.message}`, {
+            new Error(`git ${commandOf(args)} failed: ${stderr.trim() || error.message}`, {
               cause: error,
             }),
           );

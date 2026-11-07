@@ -1042,7 +1042,7 @@ ost usage ACME-123
 
 Show who you are on this team.
 
-Shows your handle, role, repository grants and which integrations this team has connected.
+Shows your handle, role, repository grants (and any repository that could not be prepared, with why) and which integrations this team has connected.
 
 ```
 ost me
@@ -1243,7 +1243,7 @@ ost handback silent
 
 Add a worktree of another repository to this work item.
 
-For work that spans repositories: adds a worktree of another repository you have a write grant on to the current work item, at <worktrees>/<repo>/<item>. It is this item's from now on: edit, commit, push and open the pull request there like in the item's first worktree, in this round and later ones, and it is removed with the item. Without --branch it starts detached at the fetched default branch: create the branch with git switch -c before your first commit. With --branch it checks out that branch, from the remote when it exists, else a new one from the default branch. Refused for a repository you can only read or have no grant on, and for a branch another work item's worktree has checked out: that change belongs to that work, and the refusal names it.
+For work that spans repositories: adds a worktree of another repository you have a write grant on to the current work item, at <worktrees>/<repo>/<item>. It is this item's from now on: edit, commit, push and open the pull request there like in the item's first worktree, in this round and later ones, and it is removed with the item. Without --branch it starts detached at the fetched default branch: create the branch with git switch -c before your first commit. With --branch it checks out that branch, from the remote when it exists, else a new one from the default branch. A repository that could not be cloned or fetched at start is tried again first; when it still fails, the refusal says why. Refused for a repository you can only read or have no grant on, and for a branch another work item's worktree has checked out: that change belongs to that work, and the refusal names it.
 
 ```
 ost worktree add <repo> [--branch <branch>]
