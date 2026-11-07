@@ -52,12 +52,14 @@ An error means the config cannot be used. `ost validate` exits with 1.
 | `schema.too_big` | A value, list or string is above its maximum. |
 | `schema.too_small` | A value, list or string is below its minimum. |
 | `schema.unknown_key` | A key is not part of the schema. |
-| `tools.duplicate` | A tool lists a verb twice, or two tools share a source. |
+| `tools.duplicate` | A tool lists a verb or an extension twice, or two tools share a source. |
 | `tools.http_checksum` | A tool with an http: source has no checksum, or a platform without one, so the download is not pinned. |
+| `tools.invalid_extension` | A tool extension is not <owner>/<repository>@<release tag or commit>. |
 | `tools.invalid_version` | A tool version is a range, prefix or alias instead of an exact version. |
 | `tools.options_without_source` | A tool sets options but no source to pass them to. |
 | `tools.reserved_option` | A tool option is version, which the tool's version field sets. |
 | `tools.rule_program` | A structured rule of a tool names a different program than the tool. |
+| `tools.unpinned_extension` | A tool extension names a branch or alias instead of an exact release tag or a full commit id. |
 | `workflow.duplicate_status_name` | Two canonical statuses map to the same tracker status name. |
 
 ## Warnings

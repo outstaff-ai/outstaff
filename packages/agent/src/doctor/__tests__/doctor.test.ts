@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { actsCheck } from "#/doctor/acts.js";
 import { diskCheck, volumeUsage } from "#/doctor/disk.js";
 import { reportAgentChecks, reportStartupChecks, startupChecks } from "#/doctor/startup.js";
-import { toolPathChecks, toolStatusChecks } from "#/doctor/tools.js";
+import { extensionChecks, toolPathChecks, toolStatusChecks } from "#/doctor/tools.js";
 
 const GIB = 1024 ** 3;
 const volume = (used: number) => async () => ({ used: used * GIB, total: 100 * GIB });
@@ -47,6 +47,39 @@ describe("the agent's startup checks", () => {
         detail: "yq@4 did not install.",
       }),
     ]);
+  });
+
+  it("reports each declared extension that did not install, with the error, or that all did", () => {
+    const gh = { name: "gh", version: "2.103.3", state: "cached" as const };
+    const lock = {
+      tool: "gh",
+      extension: "github/gh-actions-lock@v1.2.0",
+      command: "actions-lock",
+      state: "installed" as const,
+    };
+
+    expect(extensionChecks([gh])).toEqual([]);
+    expect(extensionChecks([{ ...gh, extensions: [lock] }])).toEqual([
+      {
+        name: "Tool extensions install",
+        status: "ok",
+        detail: "gh github/gh-actions-lock@v1.2.0 installed.",
+      },
+    ]);
+
+    const failed = { ...lock, state: "unavailable" as const, error: "no release v1.2.0" };
+    expect(extensionChecks([{ ...gh, extensions: [failed, lock] }])).toEqual([
+      expect.objectContaining({
+        name: "Extension github/gh-actions-lock@v1.2.0 of gh installs",
+        status: "fail",
+        detail: "no release v1.2.0",
+      }),
+    ]);
+
+    const { error: _, ...silent } = failed;
+    expect(extensionChecks([{ ...gh, extensions: [silent] }])[0]).toMatchObject({
+      detail: "github/gh-actions-lock@v1.2.0 did not install.",
+    });
   });
 
   it("reports each declared tool that is not on the PATH, or that all are", () => {

@@ -120,6 +120,23 @@ A command outside the list is refused with what the tool allows, for example `ku
 
 Declaring a tool also lifts the built-in default denies for infrastructure writes (`kubectl apply`, `terraform apply`, `helm upgrade` and the like): they run when the declaration allows them, with `all` or a list that names them.
 
+## Extensions of the code host's CLI
+
+The code host's CLI can take extensions, for example `gh actions-lock` from the `github/gh-actions-lock` repository. Declare them on the CLI's tool entry, each pinned to an exact release tag or a full 40-character commit id:
+
+```yaml
+tools:
+  gh:
+    version: 2.103.3
+    extensions: [github/gh-actions-lock@v1.2.0]
+```
+
+- `ost validate` refuses an entry that is not `<owner>/<repository>@<ref>` (`tools.invalid_extension`) or that names a branch, an alias or a short commit id (`tools.unpinned_extension`).
+- Only the tool the [vcs adapter](/adapters/vcs-github-cli/#extensions) names as its CLI takes extensions. The adapter says how the CLI installs them and where it keeps them; the agent never names `gh` itself.
+- The agent allows each declared extension's command (`gh actions-lock ...`). To narrow it, list its subcommands under `allow` like any other (`allow: ["actions-lock check"]`); an `allow` entry that starts with the extension's command replaces the blanket allow. A command of an extension that is not declared stays refused, and agents can never install, upgrade or remove extensions themselves.
+
+At start, after the tools, the agent installs each declared extension with the CLI, pinned, into the CLI's data directory on the home volume, so it survives restarts. An extension already installed at the declared ref is kept; one at another ref, or missing, is installed again; one no longer declared is removed. The install runs with a short-lived token of the person's own, minted for that one call the way [`gh` gets its token](/adapters/vcs-github-cli/#how-gh-gets-a-token); no token is stored. An extension that fails to install does not stop the agent: the error is in the startup log, `ost me` marks it unavailable and [`ost doctor`](/guides/doctor/) fails with the CLI's reason.
+
 ## Denying commands
 
 `deny` refuses commands of a tool, in the same forms as `allow`: a list of subcommands, or structured rules with a `reason`. Deny always wins, over `allow` and over `all`, so a tool can run whole except for a few commands:
@@ -205,6 +222,8 @@ Installing a version does not make it the active one, so the agent also writes t
 Last, the agent asks mise, from the home directory, which version of each tool is active and whether it is installed.
 
 Installing costs time on the first start: allow for it in the startup probe or grace period ([container contract](/reference/container-contract/#resources)). Keep the mise data and cache directories on the home volume so a replaced container does not install again.
+
+Then it installs the declared [extensions of the code host's CLI](#extensions-of-the-code-hosts-cli).
 
 If a tool cannot be installed, or is installed but does not resolve, the agent does not start. The error names the tool and version and is written to the startup log, so the problem shows at start and not at the first command. Fix the declaration or the egress and restart. Nothing is recorded for a failed install, so the next start tries again. `ost doctor <handle>` runs the same check: inside the agent container a tool that does not resolve is a failure; elsewhere it is a warning, or a note that mise is not installed there.
 

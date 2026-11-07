@@ -1,7 +1,7 @@
 import type { Filed } from "@outstaff/protocol";
 import { describe, expect, it } from "vitest";
 import { acknowledgement, acknowledgements } from "#/runner/chat-acknowledge.js";
-import { linksToList, reportBody } from "#/runner/chat-report.js";
+import { blockedText, linksToList, reportBody } from "#/runner/chat-report.js";
 
 const filed = (over: Partial<Filed> = {}) =>
   ({
@@ -89,10 +89,29 @@ describe("acknowledgement", () => {
 describe("reports", () => {
   it("words each kind of report", () => {
     expect(reportBody("result", " Done. ")).toBe("Done.");
-    expect(reportBody("blocked", "Need a key.")).toBe("I am blocked. Need a key.");
+    expect(reportBody("blocked", " ACME-1 needs the staging key from you. ")).toBe(
+      "ACME-1 needs the staging key from you.",
+    );
+
     expect(reportBody("failed", "boom\nmore")).toBe(
       "I hit an error and could not finish this. I will try again. boom",
     );
+  });
+
+  it("says a blocked report in the agent's message first, else its summary, else that the ticket is blocked", () => {
+    const message =
+      "ACME-1 needs one of these from you: the staging key, or a go-ahead to mock it.";
+
+    expect(blockedText({ message, summary: "Stopped at the deploy step.", ticket: "ACME-1" })).toBe(
+      message,
+    );
+
+    expect(blockedText({ summary: " Stopped at the deploy step. ", ticket: "ACME-1" })).toBe(
+      "Stopped at the deploy step.",
+    );
+
+    expect(blockedText({ message: " ", summary: "", ticket: "ACME-1" })).toBe("ACME-1 is blocked.");
+    expect(blockedText({ summary: "" })).toBe("This work is blocked.");
   });
 
   it("lists each link once, and none the body already shows", () => {

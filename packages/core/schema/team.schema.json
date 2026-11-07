@@ -350,6 +350,15 @@
                     ]
                   }
                 },
+                "extensions": {
+                  "description": "Extensions of the code host's CLI to install at agent start, each pinned to an exact release tag or full commit id: [\"github/gh-actions-lock@v1.2.0\"]. Only the tool the vcs adapter names as its CLI (gh for GitHub) takes them. A declared extension's command is allowed; an `allow` entry that starts with it narrows it.",
+                  "minItems": 1,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
                 "valued_options": {
                   "description": "Options of the tool that take their value as the next word, such as -c or --context. Their values are never taken for a subcommand, so a rule finds `delete` in `acmectl -c prod delete`. `--option=value` is one word and needs no entry.",
                   "minItems": 1,
@@ -1017,6 +1026,15 @@
                   }
                 }
               ]
+            }
+          },
+          "extensions": {
+            "description": "Extensions of the code host's CLI to install at agent start, each pinned to an exact release tag or full commit id: [\"github/gh-actions-lock@v1.2.0\"]. Only the tool the vcs adapter names as its CLI (gh for GitHub) takes them. A declared extension's command is allowed; an `allow` entry that starts with it narrows it.",
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
             }
           },
           "valued_options": {
