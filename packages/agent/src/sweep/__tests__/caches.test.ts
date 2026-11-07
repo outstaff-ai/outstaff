@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
-import type { HomeFolder } from "#/home/index.js";
+import { measureFolders, type HomeFolder } from "#/home/index.js";
 import type { MiseResult, ProgramRunner } from "#/tools/index.js";
 import { createCachePruner } from "#/sweep/caches.js";
 import { removeOlderThan } from "#/sweep/old-files.js";
@@ -11,20 +11,41 @@ import { capturingLog } from "./marcus.js";
 const MIB = 1024 ** 2;
 const NOW = Date.parse("2030-01-01T00:00:00.000Z");
 
-/** Marcus's home, with the volume `share` full and the tools in `installed` on PATH. */
-function pruner(share: number, installed = ["mise", "pnpm", "npm"]) {
+const ago = (ms: number) => (NOW - ms) / 1000;
+
+/** Files of one MiB each, written `ms` before now. */
+function written(dir: string, ms: number, ...names: string[]) {
+  mkdirSync(dir, { recursive: true });
+  for (const name of names) {
+    writeFileSync(join(dir, name), "x".repeat(MIB));
+    utimesSync(join(dir, name), ago(ms), ago(ms));
+  }
+
+  return names.map((n) => join(dir, n));
+}
+
+/**
+ * Marcus's home, with the volume `share` full, the tools in `installed` on PATH and, with `mise`, two download
+ * archives of mise: one written two hours ago, one a minute ago.
+ */
+function pruner(share: number, installed = ["pnpm", "npm"], mise = true) {
   const home = mkdtempSync(join(tmpdir(), "ost-caches-"));
   const calls: string[] = [];
+  const downloads = join(home, ".cache/mise/downloads-cas");
+  const [oldArchive, newArchive] = mise
+    ? [
+        ...written(downloads, 2 * 60 * 60 * 1000, "old.tar.gz"),
+        ...written(downloads, 60_000, "new.tar.gz"),
+      ]
+    : [];
 
   // Each prune halves what its folder holds.
   const folderOf: Record<string, string> = {
-    mise: join(home, ".cache/mise"),
     pnpm: join(home, ".local/share/pnpm"),
     npm: join(home, ".npm"),
   };
 
   const sizes: Record<string, number> = {
-    [folderOf["mise"]!]: 500 * MIB,
     [folderOf["pnpm"]!]: 600 * MIB,
     [folderOf["npm"]!]: 400 * MIB,
   };
@@ -44,7 +65,9 @@ function pruner(share: number, installed = ["mise", "pnpm", "npm"]) {
   });
 
   const measure = async (folders: HomeFolder[]) =>
-    folders.map((f) => ({ ...f, bytes: sizes[f.path] ?? 0, capped: false }));
+    folders[0]!.path === downloads
+      ? measureFolders(folders)
+      : folders.map((f) => ({ ...f, bytes: sizes[f.path] ?? 0, capped: false }));
 
   const log = capturingLog();
   const caches = createCachePruner({
@@ -57,53 +80,54 @@ function pruner(share: number, installed = ["mise", "pnpm", "npm"]) {
     volume: async () => ({ used: share * 100, total: 100 }),
   });
 
-  return { home, calls, run, log, caches };
+  return { home, calls, run, log, caches, oldArchive, newArchive };
 }
 
 const commands = (calls: string[]) => calls.filter((c) => !c.endsWith("--version"));
 
 describe("cache pruning", () => {
-  it("clears mise's cache on every sweep, and leaves pnpm and npm while there is room", async () => {
+  it("removes mise's older download archives on every sweep, and leaves pnpm and npm while there is room", async () => {
     const t = pruner(0.5);
-
-    expect(await t.caches.prune()).toEqual([{ cache: "mise", freed: 250 * MIB }]);
-    expect(commands(t.calls)).toEqual(["mise cache clear"]);
-    expect(t.log.info).toHaveBeenCalledWith("pruned the caches: 250 MiB reclaimed (mise 250 MiB)");
-  });
-
-  it("also prunes the pnpm store and old npm entries over the doctor's warning share", async () => {
-    const t = pruner(0.8);
-    const index = join(t.home, ".npm/_cacache/index-v5/ab/cd");
-    mkdirSync(index, { recursive: true });
-    const old = join(index, "old");
-    const recent = join(index, "recent");
-    writeFileSync(old, "{}\n");
-    writeFileSync(recent, "{}\n");
-    const days = (n: number) => (NOW - n * 24 * 60 * 60 * 1000) / 1000;
-    utimesSync(old, days(31), days(31));
-    utimesSync(recent, days(29), days(29));
 
     const pruned = await t.caches.prune();
 
-    expect(commands(t.calls)).toEqual(["mise cache clear", "pnpm store prune", "npm cache verify"]);
-    expect(pruned.map((p) => p.cache)).toEqual(["mise", "pnpm", "npm"]);
-    expect(existsSync(old)).toBe(false);
-    expect(existsSync(recent)).toBe(true);
+    expect(pruned).toEqual([{ cache: "mise", freed: expect.any(Number) }]);
+    expect(pruned[0]!.freed).toBeGreaterThanOrEqual(MIB);
+    expect(existsSync(t.oldArchive!)).toBe(false);
+    expect(existsSync(t.newArchive!)).toBe(true);
+    expect(commands(t.calls)).toEqual([]);
+    expect(t.log.info).toHaveBeenCalledWith(
+      expect.stringMatching(/^pruned the caches: \d+ MiB reclaimed \(mise \d+ MiB\)$/),
+    );
+  });
+
+  it("also prunes the pnpm store and old npm entries over the doctor's warning share", async () => {
+    const t = pruner(0.8, ["pnpm", "npm"], false);
+    const index = join(t.home, ".npm/_cacache/index-v5/ab/cd");
+    const [old] = written(index, 31 * 24 * 60 * 60 * 1000, "old");
+    const [recent] = written(index, 29 * 24 * 60 * 60 * 1000, "recent");
+
+    const pruned = await t.caches.prune();
+
+    expect(commands(t.calls)).toEqual(["pnpm store prune", "npm cache verify"]);
+    expect(pruned.map((p) => p.cache)).toEqual(["pnpm", "npm"]);
+    expect(existsSync(old!)).toBe(false);
+    expect(existsSync(recent!)).toBe(true);
     expect(t.log.info).toHaveBeenCalledOnce();
     expect(t.log.info).toHaveBeenCalledWith(
-      "pruned the caches: 750 MiB reclaimed (mise 250 MiB, pnpm 300 MiB, npm 200 MiB)",
+      "pruned the caches: 500 MiB reclaimed (pnpm 300 MiB, npm 200 MiB)",
     );
   });
 
   it("skips a tool that is not installed, quietly", async () => {
-    const t = pruner(0.9, ["pnpm"]);
+    const t = pruner(0.9, ["pnpm"], false);
 
     expect((await t.caches.prune()).map((p) => p.cache)).toEqual(["pnpm"]);
     expect(t.log.warn).not.toHaveBeenCalled();
   });
 
   it("logs nothing when no tool is installed", async () => {
-    const t = pruner(0.9, []);
+    const t = pruner(0.9, [], false);
 
     expect(await t.caches.prune()).toEqual([]);
     expect(t.log.info).not.toHaveBeenCalled();
