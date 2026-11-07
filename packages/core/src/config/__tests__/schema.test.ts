@@ -139,7 +139,7 @@ describe("parseTeamConfig", () => {
       reconcile: { every: "2h", stale_hours: 48 },
       retry: { base_minutes: 1, cap_minutes: 30, max_failures: 3 },
       messages: { max_lines: 3, always_link: true, omit: ["ci", "mergeability", "hashes"] },
-      chat: { parallel_sessions: 2, profile: true },
+      chat: { parallel_sessions: 2, profile: true, catch_up_hours: 24 },
       design: { canvas: true },
     });
   });

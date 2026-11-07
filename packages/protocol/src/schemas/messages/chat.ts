@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { MAX_CHAT_FILES } from "#/constants.js";
 import { chatFileSchema } from "#/schemas/common.js";
-import { itemId, message, reportWhere } from "#/schemas/fields.js";
+import { empty, itemId, message, reportWhere } from "#/schemas/fields.js";
 import { queuedReportSchema } from "#/schemas/work.js";
 
 export const chatMessages = [
@@ -24,6 +24,13 @@ export const chatMessages = [
         id: z.string().min(1).max(200),
         name: z.string().max(200).optional(),
       }),
+      at: z
+        .string()
+        .min(1)
+        .max(40)
+        .describe(
+          "When the author wrote it, as the chat has it (ISO-8601). The office keeps the latest per conversation, where the agent catches up from.",
+        ),
       direct: z.boolean().describe("The message is in a direct message with the author."),
       participant: z.boolean().describe("The author started the thread or replied in it."),
       files: z
@@ -37,6 +44,28 @@ export const chatMessages = [
     "chat_message_result",
     z.strictObject({
       repeated: z.boolean().describe("True when the office already took this message in."),
+    }),
+  ),
+  message("chat_cursors", empty),
+  message(
+    "chat_cursors_result",
+    z.strictObject({
+      cursors: z
+        .array(
+          z.strictObject({
+            channel: z.string().min(1).max(200),
+            thread: z
+              .string()
+              .min(1)
+              .max(200)
+              .optional()
+              .describe("The thread; absent for the top level of the channel or direct message."),
+            at: z
+              .string()
+              .describe("When the last message the office took in was written (ISO-8601)."),
+          }),
+        )
+        .describe("The caller's conversations, latest first, each with its last message's time."),
     }),
   ),
   message(

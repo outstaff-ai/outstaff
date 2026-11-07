@@ -126,6 +126,7 @@ describe("chat relay", () => {
         channel: "D-U0DANA0001",
         text: "add a search page",
         author: { id: "U0DANA0001", name: "Dana" },
+        at: sent.at,
         direct: true,
         participant: true,
       },

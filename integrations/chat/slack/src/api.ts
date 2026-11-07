@@ -20,6 +20,9 @@ export interface SlackMessage {
   subtype?: string;
   text?: string;
   files?: SlackFile[];
+
+  /** On a thread's parent: the timestamp of its latest reply. */
+  latest_reply?: string;
 }
 
 export interface SlackUser {
@@ -56,12 +59,19 @@ export interface SlackWeb {
   };
   reactions: { add(args: { channel: string; timestamp: string; name: string }): Promise<unknown> };
   conversations: {
-    history(args: { channel: string; limit?: number; cursor?: string }): Promise<SlackPage>;
+    /** `oldest`: only messages after this Slack timestamp. */
+    history(args: {
+      channel: string;
+      limit?: number;
+      cursor?: string;
+      oldest?: string;
+    }): Promise<SlackPage>;
     replies(args: {
       channel: string;
       ts: string;
       limit?: number;
       cursor?: string;
+      oldest?: string;
     }): Promise<SlackPage>;
     open(args: { users: string }): Promise<{ channel?: { id?: string } }>;
   };

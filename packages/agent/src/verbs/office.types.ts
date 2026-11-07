@@ -36,6 +36,8 @@ export type ChatMessageResult = PayloadOf<"chat_message_result">;
 
 export type ChatReportKind = PayloadOf<"chat_report">["kind"];
 
+export type ChatCursorEntry = PayloadOf<"chat_cursors_result">["cursors"][number];
+
 export type ChatReportResult = PayloadOf<"chat_report_result">;
 
 export type TicketPrsRequest = PayloadOf<"ticket_prs">;
@@ -84,6 +86,9 @@ export interface OfficeClient {
 
   /** A trusted human's chat message: the office decides what becomes of it. */
   chatMessage(m: ChatMessageRequest): Promise<ChatMessageResult>;
+
+  /** Where the caller's chat conversations left off, latest first: where catching up starts. */
+  chatCursors(): Promise<ChatCursorEntry[]>;
 
   /** Asks to tell the requester of a chat item how it ended; false in `post` when that was done already. */
   chatReport(workItemId: string, kind: ChatReportKind): Promise<ChatReportResult>;

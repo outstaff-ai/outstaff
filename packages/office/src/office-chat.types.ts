@@ -4,6 +4,6 @@ import type { Clock } from "./types.js";
 
 export interface ChatEntryOptions {
   intake: Pick<Intake, "receive">;
-  store: Pick<Store, "getSubject" | "upsertSubject">;
+  store: Pick<Store, "getSubject" | "upsertSubject" | "advanceChatCursor" | "listChatCursors">;
   clock: Clock;
 }

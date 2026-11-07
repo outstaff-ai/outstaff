@@ -151,6 +151,7 @@ describe(
     async function chatToTicketToPr() {
       await kofi.chatMessage({
         messageId: "1700.1",
+        at: "2026-01-01T00:00:00.000Z",
         channel: DM,
         text: "Kofi, the checkout drops the coupon on reload. Please fix it.",
         author: { id: SAM_CHAT, name: "Sam" },
@@ -306,6 +307,7 @@ describe(
       const { issue, key, pr } = await chatToTicketToPr();
       await kofi.chatMessage({
         messageId: "1800.1",
+        at: "2026-01-01T00:00:00.000Z",
         channel: DM,
         text: `Is ${issue.key} shipped yet?`,
         author: { id: SAM_CHAT, name: "Sam" },

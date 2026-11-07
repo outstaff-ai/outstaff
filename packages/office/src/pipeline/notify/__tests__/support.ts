@@ -169,13 +169,30 @@ export function deskHarness(
     with?: string;
     parentId?: string;
     on?: { ticket: string; role?: ItemRef["role"] };
+    status?: WorkItem["status"];
+    subject?: WorkItem["subject"];
+    trigger?: WorkItem["trigger"];
   }) => {
-    items.push({
-      id: o.id,
-      kind: o.kind,
-      person: o.person ?? "sam",
-      parentId: o.parentId ?? null,
-      updatedAt: o.updatedAt ?? clock.now().toISOString(),
+    // The same id again stands for the item as it is now.
+    const at = items.findIndex((i) => i.id === o.id);
+    const { id, kind, person, parentId, updatedAt, status, subject, trigger } = o;
+    const given = Object.entries({
+      id,
+      kind,
+      person,
+      parentId,
+      updatedAt,
+      status,
+      subject,
+      trigger,
+    });
+
+    items.splice(at < 0 ? items.length : at, at < 0 ? 0 : 1, {
+      person: "sam",
+      parentId: null,
+      subject: null,
+      updatedAt: clock.now().toISOString(),
+      ...Object.fromEntries(given.filter(([, v]) => v !== undefined)),
     } as WorkItem);
 
     refs.push(...refsOf(o.id, o.on));

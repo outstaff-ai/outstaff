@@ -337,6 +337,7 @@ describe("chat requests through the real office and agent", { timeout: 30_000 },
 
     const dup = await conn.chatMessage({
       messageId: sent.id,
+      at: "2026-01-01T00:00:00.000Z",
       channel: DM,
       text: "please add a search page",
       author: { id: DANA },

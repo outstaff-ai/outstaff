@@ -115,6 +115,7 @@ describe("chat requests", () => {
   const say = (text: string, thread?: string, messageId = `m${++n}`) =>
     message({
       messageId,
+      at: "2026-01-01T00:00:00.000Z",
       channel: "D1",
       text,
       author: DANA,
@@ -230,6 +231,7 @@ describe("chat requests", () => {
     it("keeps whether the requester needs a mention for the agent to decide", async () => {
       const r = await message({
         messageId: "x1",
+        at: "2026-01-01T00:00:00.000Z",
         text: "please add a search page",
         author: DANA,
         channel: "C1",

@@ -1653,7 +1653,7 @@ How many pull requests a ticket may have. one: ost pr open refuses a second one 
 
 ### policies.notify_handoff
 
-Have an agent tell a human in a direct message in chat when work lands on them: a ticket it hands back to them for review, a blocked ticket given to them (a PM that cannot unblock it, for example), or a pull request it opens for their review. The message leads with the agent's own words for the human from its hand-back, whole, then says what is needed and links the pull requests and the ticket they are for. One agent's messages to one human are batched (pipeline.notify.debounce_seconds), and a review notice waits for the checks on its pull requests' heads to pass (only the required ones, when the repository requires any): nothing is sent when they fail. A ticket whose work is tied to a chat thread of the agent with that human is told as a reply in that thread instead, and nothing is sent for a round that put nothing new in front of them. A human with no identities.chat is sent nothing, and the office logs it. Default on.
+Have an agent tell a human in a direct message in chat when work lands on them: a ticket it hands back to them for review, a blocked ticket given to them (a PM that cannot unblock it, for example), or a pull request it opens for their review. The message leads with the agent's own words for the human from its hand-back, whole, then says what is needed and links the pull requests and the ticket they are for. One agent's messages to one human are batched (pipeline.notify.debounce_seconds), and a review notice waits for the checks on its pull requests' heads to pass (only the required ones, when the repository requires any): nothing is sent when they fail. Nothing is sent while more work of the agent on the same ticket or pull request is queued or running: the round that finishes last tells the human. A ticket whose work is tied to a chat thread of the agent with that human is told as a reply in that thread instead, and nothing is sent for a round that put nothing new in front of them. A human with no identities.chat is sent nothing, and the office logs it. Default on.
 
 - Type: `boolean`
 - Optional
@@ -1887,7 +1887,7 @@ How agents take chat messages, and what they show in chat.
 
 - Type: `object`
 - Optional
-- Default: `{"parallel_sessions":2,"profile":true}`
+- Default: `{"parallel_sessions":2,"profile":true,"catch_up_hours":24}`
 
 #### policies.chat.parallel_sessions
 
@@ -1906,6 +1906,16 @@ Publish the agent's profile in chat: role, status, and current work grouped by t
 - Type: `boolean`
 - Optional
 - Default: `true`
+
+#### policies.chat.catch_up_hours
+
+How far back an agent picks up the chat messages written to it while it was offline, when its chat connects: each is taken as if it had just arrived, oldest first, up to 10 per conversation. Anything older, or beyond the 10, is not picked up, and the agent says so once in that conversation. 0 turns catching up off. Needs a chat adapter with chat.catchUp. Default 24.
+
+- Type: `integer`
+- Optional
+- Default: `24`
+- Minimum 0
+- Maximum 168
 
 ### policies.commands
 

@@ -6,7 +6,12 @@ import type { Sender } from "./types.js";
 /** Message subtypes that are a person's own content; edits, deletes, joins and bot messages are not requests. */
 const CONTENT_SUBTYPES = new Set(["file_share", "thread_broadcast"]);
 
-const isoOf = (ts: string) => new Date(Number(ts) * 1000).toISOString();
+/** A Slack timestamp (seconds and microseconds) as ISO-8601, to the millisecond. */
+export const isoOf = (ts: string) => new Date(Number(ts) * 1000).toISOString();
+
+/** Whether a message subtype is a person's own content: no subtype, a file share or a reply also sent to the channel. */
+export const isContentSubtype = (subtype: string | undefined) =>
+  !subtype || CONTENT_SUBTYPES.has(subtype);
 
 /** Whether the event is someone opening the agent's Home tab. */
 export function isHomeOpened(e: SlackEvent): boolean {
@@ -15,7 +20,7 @@ export function isHomeOpened(e: SlackEvent): boolean {
 
 /** Whether a message event is a person's own content in a direct message. A message with files arrives as `file_share`. */
 function isDirectContent(e: SlackEvent): boolean {
-  return e.channel_type === "im" && (!e.subtype || CONTENT_SUBTYPES.has(e.subtype));
+  return e.channel_type === "im" && isContentSubtype(e.subtype);
 }
 
 /** Whether the event names a person, a channel and a message, and does not come from a bot. */

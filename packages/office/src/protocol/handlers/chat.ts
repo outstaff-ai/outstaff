@@ -15,6 +15,9 @@ export const chatHandlers: RequestHandlers = {
   async chat_message({ ctx, person, payload, reply }) {
     reply("chat_message_result", await desk(ctx.opts).message(person, payload));
   },
+  async chat_cursors({ ctx, person, reply }) {
+    reply("chat_cursors_result", await desk(ctx.opts).cursors(person));
+  },
   async chat_report({ ctx, person, payload, reply }) {
     const result = await desk(ctx.opts).report(person, payload.workItemId, payload.kind);
     reply("chat_report_result", result);

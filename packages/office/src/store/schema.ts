@@ -172,6 +172,14 @@ export interface RecallMomentsTable {
   url: string | null;
 }
 
+export interface ChatCursorsTable {
+  person: string;
+  channel: string;
+  thread: string;
+  at: string;
+  updated_at: string;
+}
+
 export interface Database {
   cursors: CursorsTable;
   events: EventsTable;
@@ -189,6 +197,7 @@ export interface Database {
   doctor_checks: DoctorChecksTable;
   work_item_refs: WorkItemRefsTable;
   recall_moments: RecallMomentsTable;
+  chat_cursors: ChatCursorsTable;
 }
 
 export type Db = Kysely<Database>;

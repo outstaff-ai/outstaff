@@ -1,4 +1,4 @@
-import type { Chat, Logger, TeamConfig, Tracker } from "@outstaff/core";
+import type { Chat, ChatMessage, Logger, TeamConfig, Tracker } from "@outstaff/core";
 import type {
   Attached,
   ChatOrigin,
@@ -14,7 +14,7 @@ import type { Attachment, ProfilePublisher } from "./types.js";
 /** What the relay uses of the office connection. */
 export type ChatOffice = Pick<
   OfficeClient,
-  "chatMessage" | "chatReport" | "reportPosted" | "currentWork" | "work"
+  "chatMessage" | "chatCursors" | "chatReport" | "reportPosted" | "currentWork" | "work"
 >;
 
 /** What a chat session filed, for the first reply: a new ticket, a request, or the existing work it joined. */
@@ -102,6 +102,21 @@ export interface ChatContextDeps {
 
   /** The numbered list of the agent's work: one line per piece of work. */
   describe(work: WorkSummary[]): string[];
+}
+
+/** What catching up on chat needs from the relay. */
+export interface CatchUpDeps {
+  chat: Pick<Chat, "missedSince">;
+  office: Pick<ChatOffice, "chatCursors">;
+
+  /** How far back to pick up messages; 0 turns catching up off. */
+  hours: number;
+  log: Logger;
+  now: () => Date;
+
+  /** Takes a message in the way a live one is. */
+  take(m: ChatMessage): Promise<void>;
+  post(channel: string, thread: string | undefined, text: string): Promise<void>;
 }
 
 /** The threads a report belongs to, and the requester to message directly when there are none. */
