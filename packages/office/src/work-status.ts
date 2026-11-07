@@ -10,7 +10,11 @@ export function workStatus(store: Pick<Store, "getItem">): Pick<WorkSource, "sta
       return { workItemId, state: "unknown" };
     }
 
-    return { workItemId, state: item.person === person ? item.status : "not_yours" };
+    if (item.person !== person) {
+      return { workItemId, state: "not_yours" };
+    }
+
+    return { workItemId, state: item.status, updatedAt: item.updatedAt };
   };
 
   return {

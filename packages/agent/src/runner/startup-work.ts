@@ -19,7 +19,13 @@ import {
   type Workspaces,
 } from "#/repos/index.js";
 import { createNotesReader } from "#/notes/index.js";
-import { createSweeper, type Sweeper } from "#/sweep/index.js";
+import { createHomeSpace, type HomeSpace } from "#/home/index.js";
+import {
+  DEFAULT_IDLE_DAYS,
+  createCachePruner,
+  createSweeper,
+  type Sweeper,
+} from "#/sweep/index.js";
 import type { ToolStatus } from "#/tools/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import { createWorkLoop } from "./loop.js";
@@ -176,9 +182,15 @@ export function agentWorkspaces(
   });
 }
 
-/** Sweeps the workspaces of items that are finished, canceled or no longer the person's. Not started yet. */
+/** The environment the cache tools run in: the agent's own, with the home they keep their caches under. */
+const toolEnv = (opts: StartupContext["opts"]) => ({ ...opts.env, HOME: opts.home });
+
+/**
+ * Sweeps the workspaces of items that are finished, canceled or no longer the person's, and of idle ones whose work
+ * is all pushed, then prunes the caches. Not started yet.
+ */
 export function workSweeper(
-  { opts, log }: StartupContext,
+  { opts, team, log }: StartupContext,
   connection: OfficeConnection,
   workspaces: Workspaces,
 ): Sweeper {
@@ -187,7 +199,30 @@ export function workSweeper(
     workspaces,
     clock: opts.clock ?? systemClientClock,
     log,
+    idleDays: team.agent?.sweep.idle_days ?? DEFAULT_IDLE_DAYS,
+    caches: createCachePruner({
+      home: opts.home,
+      env: toolEnv(opts),
+      log,
+      ...(opts.tools?.run ? { run: opts.tools.run } : {}),
+    }),
     ...(opts.sweepEveryMs === undefined ? {} : { everyMs: opts.sweepEveryMs }),
+  });
+}
+
+/** What fills the agent's home, for the doctor's fix line. */
+export function agentHomeSpace(
+  { opts }: StartupContext,
+  layout: Layout,
+  connection: OfficeConnection,
+  workspaces: Workspaces,
+): HomeSpace {
+  return createHomeSpace({
+    home: opts.home,
+    env: toolEnv(opts),
+    worktreesDir: layout.worktreesDir,
+    held: () => workspaces.held(),
+    workStatus: (ids) => connection.workStatus(ids),
   });
 }
 

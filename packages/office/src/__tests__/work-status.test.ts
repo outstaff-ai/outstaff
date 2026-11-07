@@ -31,9 +31,23 @@ describe("work status", () => {
     const { status } = workStatus(store);
 
     expect(await status("marcus", [done.id, queued.id, canceled.id])).toEqual([
-      { workItemId: done.id, state: "done" },
-      { workItemId: queued.id, state: "queued" },
-      { workItemId: canceled.id, state: "canceled" },
+      { workItemId: done.id, state: "done", updatedAt: expect.any(String) },
+      { workItemId: queued.id, state: "queued", updatedAt: expect.any(String) },
+      { workItemId: canceled.id, state: "canceled", updatedAt: expect.any(String) },
+    ]);
+  });
+
+  it("gives when each of the person's own items last changed", async () => {
+    const blocked = await item("marcus", "blocked");
+    clock.advance(60_000);
+    await store.updateItem(blocked.id, { status: "blocked" });
+    const changed = new Date(clock.now()).toISOString();
+    clock.advance(60_000);
+
+    const { status } = workStatus(store);
+
+    expect(await status("marcus", [blocked.id])).toEqual([
+      { workItemId: blocked.id, state: "blocked", updatedAt: changed },
     ]);
   });
 

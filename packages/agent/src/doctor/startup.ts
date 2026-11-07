@@ -19,7 +19,7 @@ export async function startupChecks(input: StartupChecksInput): Promise<DoctorCh
     ...(input.ports ? actsCheck(input.team, input.ports) : []),
     ...repoChecks(input.repositories),
     ...(await networkChecks(input, input.team, input.person, true)),
-    await diskCheck(input.home, input.volume),
+    await diskCheck(input.home, input.volume, input.homeBreakdown),
   ];
 }
 
@@ -45,7 +45,8 @@ export async function reportStartupChecks(
 
 /** A started agent's report: its checks, sent once it is connected. Never throws. */
 export function reportAgentChecks(
-  agent: Pick<PreparedAgent, "team" | "person" | "tools" | "connection" | "env">,
+  agent: Pick<PreparedAgent, "team" | "person" | "tools" | "connection" | "env"> &
+    Partial<Pick<PreparedAgent, "homeSpace">>,
   env: NodeJS.ProcessEnv,
   home: string,
   log?: Logger,
@@ -60,6 +61,7 @@ export function reportAgentChecks(
       tools: agent.tools,
       ports: agent.env,
       repositories: agent.env.repositories,
+      homeBreakdown: agent.homeSpace?.breakdown,
     },
     (checks) => agent.connection.doctorReport(checks),
     log,

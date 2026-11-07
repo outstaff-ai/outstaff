@@ -1,102 +1,10 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Logger } from "@outstaff/core";
 import type { WorkState } from "@outstaff/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { createManualClock } from "#/office-client/__tests__/testing.js";
-import type { Offer } from "#/office-client/index.js";
-import { createWorkspaces } from "#/repos/workspaces.js";
-import type { ClonedRepo } from "#/repos/index.js";
 import { createSweeper } from "#/sweep/sweeper.js";
-
-const sh = (cwd: string, ...args: string[]) =>
-  execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-
-const DAY = 24 * 60 * 60 * 1000;
-
-const offer = (id: string): Offer =>
-  ({
-    workItem: { id, kind: "ticket", title: `Work on ${id}`, priority: 1, trigger: "human" },
-    context: { journal: [], subjects: [], links: [] },
-  }) as Offer;
-
-/** Marcus's clone of one repository, with an origin to fetch from. */
-function marcus() {
-  const dir = mkdtempSync(join(tmpdir(), "ost-sweep-"));
-  const origin = join(dir, "origin");
-  mkdirSync(origin);
-  sh(origin, "init", "-q", "-b", "main");
-  sh(origin, "config", "user.name", "Seed");
-  sh(origin, "config", "user.email", "seed@acme.example");
-  writeFileSync(join(origin, "README.md"), "# shop\n");
-  sh(origin, "add", ".");
-  sh(origin, "commit", "-q", "-m", "init");
-
-  const clone = join(dir, "home/repos/shop");
-  sh(dir, "clone", "-q", origin, clone);
-  sh(clone, "config", "user.name", "Marcus");
-  sh(clone, "config", "user.email", "marcus@acme.example");
-
-  const layout = {
-    worktreesDir: join(dir, "home/worktrees"),
-    scratchDir: join(dir, "home/scratch"),
-  };
-
-  const repo: ClonedRepo = {
-    name: "shop",
-    dir: clone,
-    ref: { host: "github.com", owner: "acme-example", name: "shop" },
-    defaultBranch: "main",
-    access: "write",
-    kind: "primary",
-    instructions: [],
-    trackerLabels: [],
-  };
-
-  const workspaces = createWorkspaces({ layout, repos: [repo] });
-
-  return { clone, layout, workspaces };
-}
-
-/** The office as Marcus's agent sees it: the state of each item, and the journal it can write to. */
-function fakeOffice(states: Record<string, WorkState["state"]>) {
-  const asked: string[][] = [];
-  const journal: { id: string; text: string }[] = [];
-  const office = {
-    workStatus: vi.fn<(ids: string[]) => Promise<WorkState[]>>(async (ids) => {
-      asked.push(ids);
-
-      return ids.map((workItemId) => ({ workItemId, state: states[workItemId] ?? "unknown" }));
-    }),
-    journal: vi.fn<(id: string, text: string) => Promise<void>>(async (id, text) => {
-      journal.push({ id, text });
-    }),
-  };
-
-  return { office, asked, journal, states };
-}
-
-function capturingLog() {
-  const log = {
-    debug: vi.fn<Logger["debug"]>(),
-    info: vi.fn<Logger["info"]>(),
-    warn: vi.fn<Logger["warn"]>(),
-    error: vi.fn<Logger["error"]>(),
-  } satisfies Logger;
-
-  return log;
-}
-
-const worktreesOf = (clone: string) =>
-  sh(clone, "worktree", "list", "--porcelain")
-    .split("\n")
-    .filter((l) => l.startsWith("worktree "))
-    .map((l) => l.slice("worktree ".length))
-    .filter((p) => p.includes("/worktrees/"))
-    .map((p) => p.split("/").at(-1))
-    .toSorted();
+import { DAY, capturingLog, fakeOffice, marcus, offer, sh, worktreesOf } from "./marcus.js";
 
 const ITEMS = ["ACME-12", "ACME-15", "ACME-18", "ACME-20", "ACME-22"];
 const STATES: Record<string, WorkState["state"]> = {
@@ -292,5 +200,32 @@ describe("sweeper", () => {
     await again;
     expect(fake.asked).toHaveLength(2);
     sweeper.stop();
+  });
+
+  it("prunes the caches after every sweep, also when the office cannot be reached", async () => {
+    const m = marcus();
+    await m.workspaces.prepare(offer("ACME-12"));
+    const fake = fakeOffice({ "ACME-12": "done" });
+    const prune = vi.fn(async () => []);
+    const log = capturingLog();
+    const sweeper = createSweeper({
+      office: fake.office,
+      workspaces: m.workspaces,
+      clock: createManualClock(),
+      log,
+      caches: { prune },
+    });
+
+    expect(await sweeper.sweep()).toEqual(["ACME-12"]);
+    expect(prune).toHaveBeenCalledTimes(1);
+
+    await m.workspaces.prepare(offer("ACME-15"));
+    fake.office.workStatus.mockRejectedValueOnce(new Error("Not connected to the office."));
+    await expect(sweeper.sweep()).rejects.toThrow("Not connected");
+    expect(prune).toHaveBeenCalledTimes(2);
+
+    prune.mockRejectedValueOnce(new Error("disk gone"));
+    await sweeper.sweep();
+    expect(log.warn).toHaveBeenCalledWith("could not prune the caches", { error: "disk gone" });
   });
 });

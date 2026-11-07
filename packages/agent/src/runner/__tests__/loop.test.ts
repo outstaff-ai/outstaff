@@ -692,6 +692,7 @@ describe("work loop", () => {
         throw new Error("no worktree is added here");
       },
       worktrees: () => [],
+      releaseIdle: async () => ({ outcome: "in_use" }),
       async release(id) {
         released.push(id);
       },

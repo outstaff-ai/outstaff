@@ -61,6 +61,13 @@ export type MiseRunner = (
   opts: { cwd: string; env: NodeJS.ProcessEnv },
 ) => Promise<MiseResult>;
 
+/** Runs a program on PATH. A missing program is a result with code 127, not a throw. */
+export type ProgramRunner = (
+  file: string,
+  args: string[],
+  opts: { cwd: string; env: NodeJS.ProcessEnv; timeoutMs?: number },
+) => Promise<MiseResult>;
+
 export interface InstallToolsOptions {
   tools: EffectiveTool[];
   home: string;

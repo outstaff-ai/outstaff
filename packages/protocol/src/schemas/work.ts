@@ -26,6 +26,12 @@ export const workStateSchema = z.strictObject({
     .describe(
       "The item's status. `not_yours` when it belongs to someone else, whatever its status; `unknown` when the office has no such item.",
     ),
+  updatedAt: z
+    .string()
+    .optional()
+    .describe(
+      "When the item last changed (ISO-8601): its status, its place in the queue or a run starting. Only for the asker's own items.",
+    ),
 });
 
 /** What the office did with work a chat session filed: a ticket or a request, and where the work stands. */
