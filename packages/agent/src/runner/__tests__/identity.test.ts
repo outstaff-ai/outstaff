@@ -28,9 +28,11 @@ describe("identity prompt", () => {
     expect(text).toContain(
       "Write everything people read (pull requests, reviews, chat, tickets, documents) as a teammate does.",
     );
+
     expect(text).toContain(
       'Never mention your own machinery ("this shell", "my session", "the container"',
     );
+
     expect(text).toContain("say what was done and what it means");
   });
 
