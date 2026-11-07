@@ -15,12 +15,14 @@
 // E2E_PREBUILT=1   use the images that are already tagged (outstaff/{office,agent-e2e,e2e-stubs}:local)
 // E2E_KEEP=1       leave the stack and its files up after the run, for a look around
 // E2E_TIMEOUT_MS   bound of the whole run (default 600000)
+// E2E_ARTIFACTS    a folder for each service's full log and, on a failure, its details and the stub's state
 import { execFileSync, spawnSync } from "node:child_process";
 import { generateKeyPairSync, randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { wakesIn } from "./src/office-log.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -155,18 +157,90 @@ const logs = (service: string) => dc("logs", "--no-color", "--no-log-prefix", se
 
 let composeEnv: NodeJS.ProcessEnv = process.env;
 
-function fail(e: unknown): never {
-  process.stderr.write(`\nFAIL: ${e instanceof Error ? e.message : String(e)}\n`);
+/** Where the full logs and the failure go for CI to keep (E2E_ARTIFACTS), whatever the outcome. */
+const artifacts = process.env["E2E_ARTIFACTS"];
+
+/** Lines of a failure's details (a timeout's last read) that go to stderr; the artifacts keep all of them. */
+const DETAIL_LINES = 150;
+
+/** Writes each service's full log, and the failure with the stub's state if there is one, to E2E_ARTIFACTS. */
+function keepEvidence(failure?: { text: string; state?: string }) {
+  if (!artifacts) {
+    return;
+  }
+
+  try {
+    mkdirSync(artifacts, { recursive: true });
+    for (const service of dc("config", "--services").stdout.split("\n").filter(Boolean)) {
+      writeFileSync(join(artifacts, `${service}.log`), logs(service));
+    }
+
+    writeFileSync(join(artifacts, "ps.txt"), dc("ps", "-a").stdout);
+    if (failure) {
+      writeFileSync(join(artifacts, "failure.txt"), `${failure.text}\n`);
+      if (failure.state) {
+        writeFileSync(join(artifacts, "state.json"), failure.state);
+      }
+    }
+  } catch (e) {
+    process.stderr.write(`could not keep the evidence in ${artifacts}: ${String(e)}\n`);
+  }
+}
+
+/**
+ * Reports a failure: what failed, the tail of each service's log, then a capped part of the details (a timeout's last
+ * read can be longer than a job log keeps). The full logs, the details and the stub's state go to E2E_ARTIFACTS.
+ */
+async function fail(e: unknown) {
+  if (failing || ending) {
+    return;
+  }
+
+  failing = true;
+  const text = e instanceof Error ? e.message : String(e);
+  const [headline, ...details] = text.split("\n");
+  process.stderr.write(`\nFAIL: ${headline}\n`);
   for (const service of ["stubs", "office", "sam", "pia"]) {
     process.stderr.write(
       `\n---------------- ${service} log (tail)\n${logs(service).split("\n").slice(-120).join("\n")}\n`,
     );
   }
 
-  return teardown(1);
+  if (details.length) {
+    const kept = artifacts ? `; all of it in ${join(artifacts, "failure.txt")}` : "";
+    process.stderr.write(
+      `\n---------------- details (${Math.min(details.length, DETAIL_LINES)} of ${details.length} lines${kept})\n${details.slice(0, DETAIL_LINES).join("\n")}\n`,
+    );
+  }
+
+  process.stderr.write(`\nFAIL: ${headline}\n`);
+  // The stub may be what failed: its state is worth a few seconds, never the teardown.
+  const now = await Promise.race([
+    state().then(
+      (s) => JSON.stringify(s, null, 2),
+      () => undefined,
+    ),
+    sleep(10_000).then(() => undefined),
+  ]);
+
+  keepEvidence({ text, ...(now ? { state: now } : {}) });
+  teardown(1, true);
 }
 
-function teardown(code: number): never {
+let failing = false;
+let ending = false;
+
+/** Takes the stack down (unless E2E_KEEP=1) and exits once stdout and stderr have drained into the job log. */
+function teardown(code: number, kept = false) {
+  if (ending) {
+    return;
+  }
+
+  ending = true;
+  if (!kept) {
+    keepEvidence();
+  }
+
   if (process.env["E2E_KEEP"] === "1") {
     log(`left running: project ${project}, files in ${work}, stub at http://127.0.0.1:${port}`);
   } else {
@@ -174,7 +248,8 @@ function teardown(code: number): never {
     rmSync(work, { recursive: true, force: true });
   }
 
-  process.exit(code);
+  process.exitCode = code;
+  process.stdout.write("", () => process.stderr.write("", () => process.exit(code)));
 }
 
 // A killed run takes down its own compose project (and only that one) instead of leaving the stack behind.
@@ -467,16 +542,8 @@ function dcOrFail(what: string, ...args: string[]) {
   }
 }
 
-/** The kind of each wake the office queued, or folded into an open item, for a person, in order: from its log. */
-const wakesOf = (person: string) =>
-  [
-    ...logs("office").matchAll(
-      new RegExp(
-        `pipeline: (?:queued|folded the wake into) work item \\S+ for ${person} \\((\\w+)\\)`,
-        "g",
-      ),
-    ),
-  ].map((m) => m[1]);
+/** The kind of each round the office queued for a person, in order: one per work item, a folded wake not again. */
+const wakesOf = (person: string) => wakesIn(logs("office"), person);
 
 /** How many `merge_checks_failed` rounds the office queued for sam, or folded into an open one. */
 const fixRounds = () => wakesOf("sam").filter((k) => k === "merge_checks_failed").length;
@@ -4892,7 +4959,7 @@ function assertIncludes(list: string[], item: string, what: string) {
 }
 
 const bound = setTimeout(() => {
-  fail(new Error(`The run took longer than ${(deadline - started) / 1000}s.`));
+  void fail(new Error(`The run took longer than ${(deadline - started) / 1000}s.`));
 }, deadline - started);
 
 try {
@@ -4906,5 +4973,5 @@ try {
   teardown(0);
 } catch (e) {
   clearTimeout(bound);
-  fail(e);
+  await fail(e);
 }

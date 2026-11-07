@@ -21,6 +21,7 @@ export interface ChatDeskOptions {
     | "prSubject"
     | "lastWorker"
     | "catchUp"
+    | "refreshPrsOf"
     | "doc"
     | "linkDoc"
   >;

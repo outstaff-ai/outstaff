@@ -1,7 +1,8 @@
 import { configurePipeline } from "#/pipeline/configure.js";
 import { evaluatePipeline } from "#/pipeline/evaluate.js";
 import { toPipelineEvent } from "#/pipeline/from-workflow.js";
-import type { Act, Decision, Notify } from "#/pipeline/decisions.types.js";
+import type { Act, Decision, Notify, Wake } from "#/pipeline/decisions.types.js";
+import type { PipelineEvent } from "@outstaff/policy";
 import type { PipelineRunner } from "#/pipeline/runner.types.js";
 import type { LiveOptions } from "./live.types.js";
 import { stopWork } from "./stop.js";
@@ -37,6 +38,18 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
       : opts.notices?.add(d, event.id, event.at));
   };
 
+  /**
+   * Wakes are queued one at a time: finding the live item a wake joins and queuing a new one is one step, so two events
+   * judged at once (a ticket created for an agent and the idle pull after its hand-back) never queue two items for one
+   * subject.
+   */
+  let wakes: Promise<unknown> = Promise.resolve();
+  const queueWake = (d: Wake, event: PipelineEvent) => {
+    const run = wakes.then(() => enqueueWake(d, event, opts));
+    wakes = run.catch(() => undefined);
+    return run;
+  };
+
   const runner: PipelineRunner = {
     async handle(raw, meta) {
       const event = toPipelineEvent(raw, meta, clock.now().toISOString());
@@ -67,7 +80,7 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
         }
 
         if (d.type === "wake") {
-          const { itemId, folded } = await enqueueWake(d, event, opts);
+          const { itemId, folded } = await queueWake(d, event);
           d.itemId = itemId;
           if (folded) {
             d.folded = folded;
