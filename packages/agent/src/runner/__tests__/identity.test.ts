@@ -25,7 +25,9 @@ describe("identity prompt", () => {
 
   it("asks for a teammate's voice, without the agent's own machinery", () => {
     const text = buildIdentityPrompt({ team, handle: "sam", role });
-    expect(text).toContain("is written as a teammate writes");
+    expect(text).toContain(
+      "Write everything people read (pull requests, reviews, chat, tickets, documents) as a teammate does.",
+    );
     expect(text).toContain(
       'Never mention your own machinery ("this shell", "my session", "the container"',
     );
