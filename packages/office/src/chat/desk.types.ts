@@ -45,7 +45,7 @@ export interface ChatDeskOptions {
 }
 
 /** What the office's chat handling does besides taking messages in: the filing and attach verbs, and the reports. */
-export interface ChatRequests extends Omit<ChatDesk, "message"> {
+export interface ChatRequests extends Omit<ChatDesk, "message" | "cursors"> {
   /**
    * An item the scheduler blocked (the agent did not hand it back): queues the report its agent owes the requester,
    * so the agent posts it as itself (the thread of a chat item, else a direct message), live if connected and

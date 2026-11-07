@@ -49,7 +49,7 @@ settings:
   token_rotation_enabled: false
 ```
 
-To let an agent read the history of a channel it was mentioned in, add `channels:history` (and `groups:history` for private channels) and subscribe to nothing more; threads in direct messages need only `im:history`.
+To let an agent read the history of a channel it was mentioned in, add `channels:history` (and `groups:history` for private channels) and subscribe to nothing more; threads in direct messages need only `im:history`. The same scopes let an agent catch up on mentions in a channel written while it was offline; direct messages are caught up on with `im:history` alone.
 
 ## Create the office app (optional, one per team)
 

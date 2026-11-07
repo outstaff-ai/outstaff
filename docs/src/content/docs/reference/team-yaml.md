@@ -1859,7 +1859,7 @@ How agents take chat messages, and what they show in chat.
 
 - Type: `object`
 - Optional
-- Default: `{"parallel_sessions":2,"profile":true}`
+- Default: `{"parallel_sessions":2,"profile":true,"catch_up_hours":24}`
 
 #### policies.chat.parallel_sessions
 
@@ -1878,6 +1878,16 @@ Publish the agent's profile in chat: role, status, and current work grouped by t
 - Type: `boolean`
 - Optional
 - Default: `true`
+
+#### policies.chat.catch_up_hours
+
+How far back an agent picks up the chat messages written to it while it was offline, when its chat connects: each is taken as if it had just arrived, oldest first, up to 10 per conversation. Anything older, or beyond the 10, is not picked up, and the agent says so once in that conversation. 0 turns catching up off. Needs a chat adapter with chat.catchUp. Default 24.
+
+- Type: `integer`
+- Optional
+- Default: `24`
+- Minimum 0
+- Maximum 168
 
 ### policies.commands
 

@@ -11,6 +11,7 @@ import { saveAttachments } from "./attachments.js";
 import { acknowledgements } from "./chat-acknowledge.js";
 import { fromTrustedHuman, linksToList, officeMessage, reportBody } from "./chat-report.js";
 import type { ChatRelayOptions, ChatRelay, ReportDestination, ReportTarget } from "./chat.types.js";
+import { catchUp } from "./chat-catch-up.js";
 import { chatContext } from "./chat-context.js";
 import { placementNote } from "./chat-replies.js";
 import { linkLine, splitReply, tag } from "./chat-text.js";
@@ -82,7 +83,14 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
     }
   }
 
-  async function onMessage(m: ChatMessage) {
+  const seen = (m: ChatMessage) => {
+    if (acknowledge) {
+      chat.react(m.channel, m.id, "eyes").catch(() => {});
+    }
+  };
+
+  /** A live message is seen at once; one picked up on catching up only once the office says it is new. */
+  async function onMessage(m: ChatMessage, caughtUp = false) {
     // The adapter filters already; the relay never relies on that alone.
     if (!fromTrustedHuman(m)) {
       return;
@@ -90,12 +98,15 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
     const thread = m.thread ?? m.id;
     const participant = await takesPart(m);
-    if (acknowledge) {
-      chat.react(m.channel, m.id, "eyes").catch(() => {});
+    if (!caughtUp) {
+      seen(m);
     }
 
     // The office takes the message in as an event; the reply comes with the work it starts.
-    await toOffice(m, participant, thread);
+    const taken = await toOffice(m, participant, thread);
+    if (caughtUp && taken?.repeated === false) {
+      seen(m);
+    }
   }
 
   /** Where a report goes: the threads it belongs to, else a direct message with the requester (no thread, no mention). */
@@ -160,8 +171,19 @@ export function createChatRelay(opts: ChatRelayOptions): ChatRelay {
 
   return {
     async start() {
-      await chat.start(onMessage);
+      await chat.start((m) => onMessage(m));
       await opts.profile?.start();
+      // What was written while the agent was offline: Slack and the like do not deliver it once the agent is back.
+      // In the background, so a slow chat or office never holds up the work loop; it never throws.
+      void catchUp({
+        chat,
+        office,
+        hours: team.policies?.chat?.catch_up_hours ?? 24,
+        log,
+        now,
+        take: (m) => onMessage(m, true),
+        post: (channel, thread, text) => post(channel, thread, text),
+      });
     },
 
     async stop() {

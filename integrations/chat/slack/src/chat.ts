@@ -2,12 +2,14 @@ import { WebClient } from "@slack/web-api";
 import { PortError, type AdapterContext, type Chat, type ChatMessage } from "@outstaff/core";
 import type { SlackEvent, SlackMessage, SlackWeb } from "./api.js";
 import { callSlack, slackErrorName, toPortError } from "./errors.js";
+import { missedSince } from "./catch-up.js";
 import { chatMessageOf, isHomeOpened, isRequest } from "./chat-message.js";
 import { downloadSlackFile } from "./files.js";
 import { readPages } from "./history.js";
 import { createHome } from "./home.js";
 import { splitMrkdwn, toMrkdwn } from "./mrkdwn.js";
 import { createSocketModeSocket } from "./socket.js";
+import { MEMBER_ID } from "./identities.js";
 import { createTrust } from "./trust.js";
 import type { Sender, SlackDeps, SlackOptions } from "./types.js";
 
@@ -122,6 +124,32 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
     await handler(message);
   };
 
+  const openDirect = async (userId: string) => {
+    const known = direct.get(userId);
+    if (known) {
+      return known;
+    }
+
+    const opened = await callSlack(() => web.conversations.open({ users: userId }));
+    const id = opened.channel?.id;
+    if (!id) {
+      throw new PortError("unavailable", "Slack did not return a direct message channel.");
+    }
+
+    direct.set(userId, id);
+    return id;
+  };
+
+  /** The direct messages with the team's listed humans; one Slack will not open is left out. */
+  const directs = async () => {
+    const ids = (ctx.team.humans ?? []).flatMap((h) =>
+      h.identities.chat && MEMBER_ID.test(h.identities.chat) ? [h.identities.chat] : [],
+    );
+
+    const opened = await Promise.all(ids.map((id) => openDirect(id).catch(() => undefined)));
+    return opened.filter((d): d is string => d !== undefined);
+  };
+
   const onEvent = async (e: SlackEvent) => {
     try {
       await receive(e);
@@ -220,21 +248,21 @@ export function createSlackChat(ctx: AdapterContext<SlackOptions>, deps: SlackDe
       return downloadSlackFile(ctx.fetch, token, file);
     },
 
-    async openDirect(userId) {
-      const known = direct.get(userId);
-      if (known) {
-        return known;
-      }
-
-      const opened = await callSlack(() => web.conversations.open({ users: userId }));
-      const id = opened.channel?.id;
-      if (!id) {
-        throw new PortError("unavailable", "Slack did not return a direct message channel.");
-      }
-
-      direct.set(userId, id);
-      return id;
+    async missedSince(opts) {
+      return missedSince(
+        {
+          web,
+          log: ctx.log,
+          botUserId: async () => (await ensureBotUserId()) ?? "",
+          directs,
+          toMessage,
+          remember,
+        },
+        opts,
+      );
     },
+
+    openDirect,
 
     async setAgentProfile(userId, profile) {
       await home.set(userId, profile);

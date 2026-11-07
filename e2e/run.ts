@@ -1486,6 +1486,9 @@ async function main() {
     `restart: the agent restarted mid-round on #${pr4.pr.number} -> the round was interrupted, queued first, resumed and finished`,
   );
 
+  // ---- 7c. messages written while the agent is stopped are picked up when it starts (see caughtUpAfterStop)
+  await caughtUpAfterStop();
+
   // ---- 8. a ticket that needs several pull requests (see splitWork)
   await splitWork();
 
@@ -4593,6 +4596,48 @@ async function approve(number: number) {
     state: "approved",
     actor: "merge-approver",
   });
+}
+
+/** Sam's posts in a chat thread. */
+const answers = (s: Json, thread: string) =>
+  s.chat.posts.filter((p: Json) => p.thread === thread && p.agent === "sam");
+
+/**
+ * 7c. Chat messages written while sam is stopped are not lost. Sam answers a direct message, then its container
+ * stops; the human writes a reply in that thread and a new direct message, which no live connection delivers. When
+ * sam starts again it reads them from the chat history after where each conversation left off at the office, and
+ * answers each exactly once, with nothing said about messages left out.
+ */
+async function caughtUpAfterStop() {
+  const question = "Where do the greetings live?";
+  const first = await stub("POST", "/_test/chat/say", { text: question });
+  await until("sam answering in the thread before it stops", (s) =>
+    s.chat.posts.find((p: Json) => p.thread === first.id),
+  );
+
+  await until("sam idle before it stops", (s) => idle(s) || undefined);
+  dcOrFail("The agent did not stop", "stop", "sam");
+  await stub("POST", "/_test/chat/say", { text: question, thread: first.id });
+  const direct = await stub("POST", "/_test/chat/say", { text: question });
+  dcOrFail("The agent did not start", "start", "sam");
+
+  await until("sam answering the reply and the direct message written while it was stopped", (s) =>
+    answers(s, first.id).length >= 2 && answers(s, direct.id).length >= 1 ? s : undefined,
+  );
+
+  await officePolledTwice("both were answered");
+  const after = await state();
+  assertEq(answers(after, first.id).length, 2, "the reply in the thread is answered once");
+  assertEq(answers(after, direct.id).length, 1, "the new direct message is answered once");
+  assertEq(
+    after.chat.posts.some((p: Json) => /I was offline/.test(p.text)),
+    false,
+    "nothing was left out, so nothing is said about it",
+  );
+
+  step(
+    "catch-up: a thread reply and a direct message written while sam was stopped are each answered once after it starts",
+  );
 }
 
 /** Asks sam in chat and waits for the answer in the thread. */

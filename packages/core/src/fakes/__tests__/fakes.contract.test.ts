@@ -54,7 +54,13 @@ chatContract("fake", async () => {
   return {
     subject,
     seed: subject.seed,
-    capabilities: ["chat.messages", "chat.history", "chat.agentProfile", "chat.files"],
+    capabilities: [
+      "chat.messages",
+      "chat.history",
+      "chat.agentProfile",
+      "chat.files",
+      "chat.catchUp",
+    ],
   };
 });
 

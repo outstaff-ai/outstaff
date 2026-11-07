@@ -101,7 +101,15 @@ export type {
 } from "./vcs-merge.js";
 
 export { splitAtLines } from "./split-lines.js";
-export type { Chat, ChatFile, ChatMessage, AgentProfile } from "./chat.js";
+export type {
+  Chat,
+  ChatCursor,
+  ChatFile,
+  ChatMessage,
+  ChatMissed,
+  ChatMissedOptions,
+  AgentProfile,
+} from "./chat.js";
 
 export type {
   ModelUsage,

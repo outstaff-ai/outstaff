@@ -107,6 +107,9 @@ export interface WorkSource {
 /** Chat requests of trusted humans, and the report back to them. Optional: without it chat messages are unsupported. */
 export interface ChatDesk {
   message(person: string, m: PayloadOf<"chat_message">): Promise<PayloadOf<"chat_message_result">>;
+
+  /** Where the person's chat conversations left off, latest first: the agent catches up from there. */
+  cursors(person: string): Promise<PayloadOf<"chat_cursors_result">>;
   report(
     person: string,
     workItemId: string,

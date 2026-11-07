@@ -23,6 +23,7 @@ export const LACKING: Record<Capability, string> = {
   "chat.history": "read earlier chat messages",
   "chat.agentProfile": "show the agent's profile and status in chat",
   "chat.files": "read files shared in chat",
+  "chat.catchUp": "pick up chat messages written while it was offline",
   "runtime.sessions": "keep sessions between runs",
   "runtime.usage": "track LLM usage against limits",
   "runtime.permissions": "run under its permission policy",

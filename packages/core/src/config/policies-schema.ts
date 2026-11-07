@@ -270,8 +270,18 @@ export const policiesSchema = z
               "Publish the agent's profile in chat: role, status, and current work grouped by ticket or pull request. Needs a chat adapter with chat.agentProfile. Default on.",
             ),
           ),
+        catch_up_hours: z
+          .int()
+          .min(0)
+          .max(168)
+          .default(24)
+          .meta(
+            d(
+              "How far back an agent picks up the chat messages written to it while it was offline, when its chat connects: each is taken as if it had just arrived, oldest first, up to 10 per conversation. Anything older, or beyond the 10, is not picked up, and the agent says so once in that conversation. 0 turns catching up off. Needs a chat adapter with chat.catchUp. Default 24.",
+            ),
+          ),
       })
-      .default({ parallel_sessions: 2, profile: true })
+      .default({ parallel_sessions: 2, profile: true, catch_up_hours: 24 })
       .meta(d("How agents take chat messages, and what they show in chat.")),
     commands: teamCommandsSchema.optional(),
     custom: z

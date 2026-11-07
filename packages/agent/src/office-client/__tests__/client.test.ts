@@ -331,6 +331,7 @@ describe("office connection", () => {
       await connectUp();
       const message = conn.chatMessage({
         messageId: "m1",
+        at: "2026-01-01T00:00:00.000Z",
         channel: "D1",
         text: "hi",
         author: { id: "U1" },

@@ -239,7 +239,7 @@ export async function createOffice(input: CreateOfficeInput): Promise<Office> {
     doctor,
     messaging,
     usage,
-    chat: { ...chatDesk, message: chatEntry.message },
+    chat: { ...chatDesk, ...chatEntry },
     ...officeDocDesks({ store, workState, log }),
     ...officeTicketDesks({ store, workState, team, log }),
     ciLogs: officeCiLogs({ vcs: ports.vcs, team, log }),
