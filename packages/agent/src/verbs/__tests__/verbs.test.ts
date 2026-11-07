@@ -1434,6 +1434,25 @@ describe("me", () => {
     expect((await run("me", fakeEnv().env)).text).toContain("Tools: none");
   });
 
+  it("shows a repository that could not be prepared as not ready, with why", async () => {
+    const f = fakeEnv();
+    const shop = {
+      name: "shop",
+      dir: "/home/agent/repos/shop",
+      ref: { host: "github.com", owner: "acme", name: "shop" },
+      access: "write" as const,
+      kind: "primary",
+      error: "git fetch failed: could not read Username",
+    };
+
+    f.env.repositories = { ready: [], unprepared: () => [shop] };
+    const r = await run("me", f.env);
+    expect(r.text).toContain("shop: write (not ready: git fetch failed: could not read Username)");
+    expect(r.data).toMatchObject({
+      unprepared: [{ name: "shop", error: "git fetch failed: could not read Username" }],
+    });
+  });
+
   it("reports connected ports", async () => {
     const r = await run("me", fakeEnv({ tracker: false }).env);
     expect(r.data).toMatchObject({ connected: { tracker: false, knowledge: true } });

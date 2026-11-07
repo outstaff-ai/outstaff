@@ -1,10 +1,24 @@
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseRepoUrl, repoGrant, silentLogger, type GitMode, type RepoRef } from "@outstaff/core";
+import {
+  parseRepoUrl,
+  PortError,
+  repoGrant,
+  silentLogger,
+  type GitMode,
+  type Logger,
+  type RepoRef,
+} from "@outstaff/core";
 import { cappedAccess } from "./access.js";
 import { moveToDefault } from "./base-clone.js";
 import { runGit } from "./git.js";
-import type { ClonedRepo, RunGit, SyncRepositoriesOptions } from "./types.js";
+import type {
+  ClonedRepo,
+  Repositories,
+  RunGit,
+  SyncRepositoriesOptions,
+  UnpreparedRepo,
+} from "./types.js";
 
 type TeamRepo = SyncRepositoriesOptions["team"]["repos"][number];
 type Author = NonNullable<
@@ -57,10 +71,44 @@ const helperConfig = (helper: string) => [
   "credential.useHttpPath=true",
 ];
 
-/** Fetches a clone that is there, or clones into a directory that is absent or empty. */
-async function fetchOrClone(git: RunGit, helper: string, dir: string, url: string) {
+/**
+ * Makes a clone's `origin` the configured URL, so a repository that moved (another owner, a new name) is fetched where
+ * it is now. The clone keeps its objects, refs and config.
+ */
+async function followUrl(git: RunGit, log: Logger, name: string, dir: string, url: string) {
+  const current = await git(["remote", "get-url", "origin"], { cwd: dir }).then(
+    (out) => out.trim(),
+    () => undefined,
+  );
+
+  if (current === url) {
+    return;
+  }
+
+  if (current === undefined) {
+    await git(["remote", "add", "origin", url], { cwd: dir });
+  } else {
+    await git(["remote", "set-url", "origin", url], { cwd: dir });
+  }
+
+  log.info("the repository's URL changed, so its clone follows it", {
+    repo: name,
+    from: current ?? null,
+    to: url,
+  });
+}
+
+/** Fetches a clone that is there, from the configured URL, or clones into a directory that is absent or empty. */
+async function fetchOrClone(
+  git: RunGit,
+  log: Logger,
+  helper: string,
+  repo: { name: string; dir: string; url: string },
+) {
+  const { name, dir, url } = repo;
   const config = helperConfig(helper);
   if (existsSync(join(dir, ".git"))) {
+    await followUrl(git, log, name, dir, url);
     await git([...config, "fetch", "--prune", "origin"], { cwd: dir });
 
     return;
@@ -98,14 +146,15 @@ async function prepareRepository(
   ref: Required<RepoRef>,
 ): Promise<ClonedRepo> {
   const git = opts.git ?? runGit;
+  const log = opts.log ?? silentLogger;
   const helper = opts.helper ?? CREDENTIAL_HELPER;
   const remote = opts.remoteUrl ?? defaultRemote;
   const dir = join(opts.reposDir, repo.name);
   const issued = await opts.vcs.credentials(opts.person, ref, access);
-  await fetchOrClone(git, helper, dir, remote(ref));
+  await fetchOrClone(git, log, helper, { name: repo.name, dir, url: remote(ref) });
   await configureClone(git, dir, helper, issued.author);
   writePrePushHook(dir, access, repo.default_branch);
-  await moveToDefault(git, opts.log ?? silentLogger, {
+  await moveToDefault(git, log, {
     name: repo.name,
     dir,
     defaultBranch: repo.default_branch,
@@ -128,30 +177,63 @@ async function prepareRepository(
  * leaves each clone detached at the fetched default branch.
  * Repos without a grant are never touched. The credentials asked for here only validate the grant and give the
  * commit author: git itself gets its token from the credential helper, at each request.
+ * A repo that cannot be prepared is logged and kept with its error, to be tried again with `retry`.
  */
-export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<ClonedRepo[]> {
+export async function syncRepositories(opts: SyncRepositoriesOptions): Promise<Repositories> {
   const log = opts.log ?? silentLogger;
   const me = opts.team.people.find((p) => p.handle === opts.person);
-  const out: ClonedRepo[] = [];
-  if (!me) {
-    return out;
-  }
+  const ready: ClonedRepo[] = [];
+  const failed = new Map<string, { repo: TeamRepo; unprepared: UnpreparedRepo }>();
 
-  mkdirSync(opts.reposDir, { recursive: true });
-  for (const repo of opts.team.repos) {
-    const grant = repoGrant(me, repo);
-    if (!grant) {
-      continue;
-    }
-
-    const access = cappedAccess(grant, opts.profile);
-    const ref = parseRepoUrl(repo.url);
+  async function attempt(repo: TeamRepo, access: GitMode, ref: Required<RepoRef>) {
     try {
-      out.push(await prepareRepository(opts, repo, access, ref));
+      const cloned = await prepareRepository(opts, repo, access, ref);
+      failed.delete(repo.name);
+      ready.push(cloned);
+
+      return cloned;
     } catch (e) {
-      log.warn("could not prepare a repository", { repo: repo.name, error: reason(e) });
+      const error = reason(e);
+      log.warn("could not prepare a repository", { repo: repo.name, error });
+      const dir = join(opts.reposDir, repo.name);
+      failed.set(repo.name, {
+        repo,
+        unprepared: { name: repo.name, dir, ref, access, kind: repo.kind, error },
+      });
+
+      throw new PortError("unavailable", `${repo.name} could not be prepared: ${error}`, {
+        cause: e,
+      });
     }
   }
 
-  return out;
+  if (me) {
+    mkdirSync(opts.reposDir, { recursive: true });
+    for (const repo of opts.team.repos) {
+      const grant = repoGrant(me, repo);
+      if (grant) {
+        await attempt(repo, cappedAccess(grant, opts.profile), parseRepoUrl(repo.url)).catch(
+          () => undefined,
+        );
+      }
+    }
+  }
+
+  return {
+    ready,
+    unprepared: () => [...failed.values()].map((f) => f.unprepared),
+    async retry(name) {
+      const done = ready.find((r) => r.name === name);
+      if (done) {
+        return done;
+      }
+
+      const f = failed.get(name);
+      if (!f) {
+        throw new PortError("not_found", `${name} is not a repository you have a grant on.`);
+      }
+
+      return attempt(f.repo, f.unprepared.access, f.unprepared.ref);
+    },
+  };
 }

@@ -15,7 +15,7 @@ import { systemClientClock, type OfficeConnection } from "#/office-client/index.
 import {
   createWorkspaces,
   syncRepositories,
-  type ClonedRepo,
+  type Repositories,
   type Workspaces,
 } from "#/repos/index.js";
 import { createNotesReader } from "#/notes/index.js";
@@ -91,22 +91,32 @@ export function prepareDirs(layout: Layout, capabilities: Capability[]): string[
   return addDirs;
 }
 
-/** Clones the repositories the person has a grant on; without a code host there are none. */
+/** No repositories, for a person without a code host: nothing to try again either. */
+const noRepositories = (): Repositories => ({
+  ready: [],
+  unprepared: () => [],
+  retry: (name) => Promise.reject(new Error(`${name} is not a repository you have a grant on.`)),
+});
+
+/**
+ * Clones the repositories the person has a grant on, and notes them in the verbs' environment; without a code host
+ * there are none.
+ */
 export async function cloneRepositories(
   { opts, team, person, log }: StartupContext,
   env: AgentEnv,
   rendered: RenderedWorkdir,
   layout: Layout,
-): Promise<ClonedRepo[]> {
+): Promise<Repositories> {
   if (!env.vcs) {
     log.info("no code host for this person, so no repositories are cloned", {
       reason: env.unavailable?.vcs ?? "no vcs integration is configured",
     });
 
-    return [];
+    return noRepositories();
   }
 
-  return syncRepositories({
+  const repositories = await syncRepositories({
     team,
     person,
     vcs: env.vcs,
@@ -115,6 +125,9 @@ export async function cloneRepositories(
     log,
     ...opts.repositories,
   });
+
+  env.repositories = repositories;
+  return repositories;
 }
 
 export function usageReporter(
@@ -152,11 +165,12 @@ const chatParts = ({ chat, profile, chatPolicy }: LoopParts) => ({
 export function agentWorkspaces(
   { opts, log }: StartupContext,
   layout: Layout,
-  repos: ClonedRepo[],
+  repos: Repositories,
 ): Workspaces {
   return createWorkspaces({
     layout,
-    repos,
+    repos: repos.ready,
+    unprepared: repos,
     log,
     ...(opts.repositories?.git ? { git: opts.repositories.git } : {}),
   });

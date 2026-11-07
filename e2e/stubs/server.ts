@@ -1,5 +1,6 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, symlinkSync } from "node:fs";
 import { createServer as createHttp, type IncomingMessage, type ServerResponse } from "node:http";
+import { join } from "node:path";
 import { createServer as createHttps } from "node:https";
 import {
   createRouter,
@@ -61,6 +62,14 @@ await repo.init({
 const ops = new BareRepo(env("STUB_DATA_DIR"), "acme", "ops");
 await ops.init({ "README.md": "# Acme Ops\n" });
 
+// ops renamed, as the e2e moves it in the team file: the same repository, served at acme/platform-ops too.
+const moved = join(env("STUB_DATA_DIR"), "acme", "platform-ops.git");
+if (!existsSync(moved)) {
+  symlinkSync(ops.dir, moved);
+}
+
+const platformOps = new BareRepo(env("STUB_DATA_DIR"), "acme", "platform-ops");
+
 // A gh script extension the team declares pinned under tools.gh.extensions; the agent installs it at start.
 const hello = new BareRepo(env("STUB_DATA_DIR"), "acme", "gh-hello");
 await hello.init(
@@ -70,7 +79,7 @@ await hello.init(
 
 const github = createGithubE2e({
   repo,
-  more: [ops],
+  more: [ops, platformOps],
   extensions: [hello],
   apps: pairs(env("STUB_APPS")),
   publicKey: readFileSync(env("STUB_APP_PUBLIC_KEY"), "utf8"),

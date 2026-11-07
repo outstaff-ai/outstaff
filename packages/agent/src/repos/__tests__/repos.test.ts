@@ -1,5 +1,13 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { silentLogger, type RepoRef, type Vcs } from "@outstaff/core";
@@ -10,18 +18,14 @@ import { acmeTeam } from "@outstaff/testing.agent";
 import { cappedAccess, fileOnlySecrets } from "#/repos/access.js";
 import { syncRepositories } from "#/repos/clone.js";
 import { runGit } from "#/repos/git.js";
-import type { RunGit } from "#/repos/types.js";
+import type { RunGit, SyncRepositoriesOptions } from "#/repos/types.js";
 import {
   createCredentialHelper,
   parseCredentialRequest,
   repoForRequest,
 } from "#/repos/credential-helper.js";
-import {
-  createWorkspaces,
-  findConventionFiles,
-  headBranchOf,
-  repoForItem,
-} from "#/repos/workspaces.js";
+import { createWorkspaces, findConventionFiles, headBranchOf } from "#/repos/workspaces.js";
+import { repoForItem } from "#/repos/item-repo.js";
 
 const sh = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
@@ -199,7 +203,7 @@ describe("syncRepositories", () => {
     const { vcs, credentials, ready } = samVcs();
     await ready;
     const reposDir = join(r.dir, "home", "repos");
-    const run = () =>
+    const sync = (o: Partial<SyncRepositoriesOptions> = {}) =>
       syncRepositories({
         team: acmeTeam(),
         person: "sam",
@@ -208,9 +212,11 @@ describe("syncRepositories", () => {
         reposDir,
         remoteUrl: r.remoteUrl,
         log: silentLogger,
+        ...o,
       });
 
-    return { ...r, vcs, credentials, reposDir, run };
+    const run = async () => (await sync()).ready;
+    return { ...r, vcs, credentials, reposDir, sync, run };
   }
 
   it("clones the repos the person has a grant on and nothing else", async () => {
@@ -234,7 +240,7 @@ describe("syncRepositories", () => {
 
   it("treats a write grant as read for the readonly profile, hook included", async () => {
     const s = await setup();
-    const repos = await syncRepositories({
+    const { ready: repos } = await syncRepositories({
       team: acmeTeam(),
       person: "sam",
       vcs: s.vcs,
@@ -305,6 +311,91 @@ describe("syncRepositories", () => {
     expect(statSync(join(shop, ".git/hooks/pre-push")).mode & 0o111).not.toBe(0);
   });
 
+  it("follows a repository that moved: the existing clone's origin is reset and the fetch succeeds", async () => {
+    const s = await setup();
+    await s.run();
+    const shop = join(s.reposDir, "shop");
+    const before = sh(shop, "rev-parse", "origin/main").trim();
+
+    // The repository moves to another owner; the old address is gone.
+    const moved = join(s.dir, "remote/acme-moved/shop.git");
+    mkdirSync(join(s.dir, "remote/acme-moved"), { recursive: true });
+    renameSync(s.bare("shop"), moved);
+    const seed = join(s.dir, "seed/shop");
+    writeFileSync(join(seed, "MOVED.md"), "moved\n");
+    sh(seed, "add", ".");
+    sh(seed, "commit", "-q", "-m", "after the move");
+    sh(seed, "push", "-q", moved, "main");
+
+    const info = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
+    const remoteUrl = (r: Required<RepoRef>) => (r.name === "shop" ? moved : s.bare(r.name));
+    const repos = await s.sync({ remoteUrl, log: { ...silentLogger, info } });
+
+    expect(repos.unprepared()).toEqual([]);
+    expect(repos.ready.map((r) => r.name)).toContain("shop");
+    expect(sh(shop, "remote", "get-url", "origin").trim()).toBe(moved);
+    expect(sh(shop, "rev-parse", "origin/main").trim()).toBe(sh(seed, "rev-parse", "HEAD").trim());
+    expect(sh(shop, "cat-file", "-t", before).trim()).toBe("commit");
+    expect(existsSync(join(shop, "MOVED.md"))).toBe(true);
+    expect(info).toHaveBeenCalledWith("the repository's URL changed, so its clone follows it", {
+      repo: "shop",
+      from: s.bare("shop"),
+      to: moved,
+    });
+
+    // Once it follows, a restart leaves the remote alone; a clone with no origin at all gets one.
+    info.mockClear();
+    sh(join(s.reposDir, "design-system"), "remote", "remove", "origin");
+    await s.sync({ remoteUrl, log: { ...silentLogger, info } });
+    expect(info.mock.calls.map((c) => c[1]?.["repo"])).toEqual(["design-system"]);
+    expect(sh(join(s.reposDir, "design-system"), "remote", "get-url", "origin").trim()).toBe(
+      s.bare("design-system"),
+    );
+  });
+
+  it("keeps a repository that failed with its error, and prepares it on a retry once fixed", async () => {
+    const s = await setup();
+    const missing = join(s.dir, "remote/acme-new/shop.git");
+    const repos = await s.sync({
+      remoteUrl: (r) => (r.name === "shop" ? missing : s.bare(r.name)),
+    });
+
+    expect(repos.ready.map((r) => r.name)).toEqual(["design-system"]);
+    expect(repos.unprepared()).toEqual([
+      {
+        name: "shop",
+        dir: join(s.reposDir, "shop"),
+        ref: ref("shop"),
+        access: "write",
+        kind: "primary",
+        error: expect.stringContaining("git clone failed") as string,
+      },
+    ]);
+
+    await expect(repos.retry("shop")).rejects.toMatchObject({
+      code: "unavailable",
+      message: expect.stringMatching(/^shop could not be prepared: git clone failed/) as string,
+    });
+
+    expect(repos.unprepared().map((u) => u.name)).toEqual(["shop"]);
+
+    mkdirSync(join(s.dir, "remote/acme-new"), { recursive: true });
+    renameSync(s.bare("shop"), missing);
+    const shop = await repos.retry("shop");
+    expect(shop).toMatchObject({ name: "shop", access: "write" });
+    expect(repos.ready.map((r) => r.name)).toEqual(["design-system", "shop"]);
+    expect(repos.unprepared()).toEqual([]);
+    expect(await repos.retry("shop")).toBe(shop);
+    await expect(repos.retry("infra")).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("prepares nothing for someone who is not on the team", async () => {
+    const s = await setup();
+    const repos = await s.sync({ person: "nobody" });
+    expect(repos.ready).toEqual([]);
+    expect(repos.unprepared()).toEqual([]);
+  });
+
   it("leaves a base clone with local changes where it is and reports it", async () => {
     const s = await setup();
     await s.run();
@@ -314,7 +405,7 @@ describe("syncRepositories", () => {
     pushSeed(s, "shop", "NEW.md");
 
     const warn = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
-    const repos = await syncRepositories({
+    const { ready: repos } = await syncRepositories({
       team: acmeTeam(),
       person: "sam",
       vcs: s.vcs,
@@ -336,7 +427,7 @@ describe("syncRepositories", () => {
   it("skips a repo it cannot reach and keeps the others", async () => {
     const s = await setup();
     const warn = vi.fn<(message: string, data?: Record<string, unknown>) => void>();
-    const repos = await syncRepositories({
+    const { ready: repos } = await syncRepositories({
       team: acmeTeam(),
       person: "sam",
       vcs: s.vcs,
@@ -360,7 +451,7 @@ describe("push safety", () => {
     const { vcs, ready } = samVcs();
     await ready;
     const reposDir = join(r.dir, "home", "repos");
-    const repos = await syncRepositories({
+    const { ready: repos } = await syncRepositories({
       team: acmeTeam(),
       person: "sam",
       vcs,
@@ -421,7 +512,7 @@ describe("workspaces", () => {
     await ready;
     const home = join(r.dir, "home");
     const layout = { worktreesDir: join(home, "worktrees"), scratchDir: join(home, "scratch") };
-    const repos = await syncRepositories({
+    const { ready: repos } = await syncRepositories({
       team: acmeTeam(),
       person: "sam",
       vcs,
@@ -767,6 +858,95 @@ describe("workspaces", () => {
     });
 
     expect(await readOnly.prepare(offer("w5"))).toBeUndefined();
+  });
+
+  describe("a repository that could not be prepared at start", () => {
+    /** shop, the primary repository, is not where its URL points until `fix()` moves it there. */
+    async function unprepared() {
+      const r = remotes(["shop", "design-system"]);
+      const { vcs, ready } = samVcs();
+      await ready;
+      const home = join(r.dir, "home");
+      const layout = { worktreesDir: join(home, "worktrees"), scratchDir: join(home, "scratch") };
+      const moved = join(r.dir, "remote/acme-new/shop.git");
+      const repos = await syncRepositories({
+        team: acmeTeam(),
+        person: "sam",
+        vcs,
+        profile: "code",
+        reposDir: join(home, "repos"),
+        remoteUrl: (x) => (x.name === "shop" ? moved : r.bare(x.name)),
+      });
+
+      let now = 1_000_000;
+      const workspaces = createWorkspaces({
+        layout,
+        repos: repos.ready,
+        unprepared: repos,
+        now: () => now,
+      });
+
+      const fix = () => {
+        mkdirSync(join(r.dir, "remote/acme-new"), { recursive: true });
+        renameSync(r.bare("shop"), moved);
+      };
+
+      const later = (ms: number) => void (now += ms);
+      return { ...r, layout, repos, workspaces, fix, later };
+    }
+
+    it("is prepared on worktree add once fixed, and the refusal names the error until then", async () => {
+      const s = await unprepared();
+      await expect(s.workspaces.add("y1", "shop")).rejects.toMatchObject({
+        code: "unavailable",
+        message: expect.stringMatching(
+          /^shop could not be prepared, so no worktree is added: git clone failed: .*does not exist/,
+        ) as string,
+      });
+
+      s.fix();
+      expect(await s.workspaces.add("y1", "acme-example/shop")).toMatchObject({
+        repo: "shop",
+        existed: false,
+      });
+
+      expect(existsSync(join(s.layout.worktreesDir, "shop/y1/README.md"))).toBe(true);
+      expect(s.repos.unprepared()).toEqual([]);
+      expect(s.workspaces.worktrees().map((w) => w.repo)).toEqual(["shop"]);
+    });
+
+    it("is tried again at the start of a round that may need it, at most once a minute", async () => {
+      const s = await unprepared();
+      // Nothing is named and no prepared repository is writable: the round may need shop.
+      expect(await s.workspaces.prepare(offer("y2"))).toBeUndefined();
+      s.fix();
+      s.later(30_000);
+      expect(await s.workspaces.prepare(offer("y2"))).toBeUndefined();
+      s.later(30_000);
+      expect((await s.workspaces.prepare(offer("y2")))?.repo).toBe("shop");
+    });
+
+    it("is tried again for a round that names it, and not for one that names a prepared repository", async () => {
+      const s = await unprepared();
+      const retry = vi.spyOn(s.repos, "retry");
+      const ds = "https://github.com/acme-example/design-system/pull/3";
+      await s.workspaces.prepare(offer("y3", { subjects: [{ type: "pr", ref: "3", url: ds }] }));
+      expect(retry).not.toHaveBeenCalled();
+
+      s.fix();
+      const url = "https://github.com/acme-example/shop/issues/4";
+      const named = offer("y4", { links: [{ url, title: "shop#4" }] });
+      expect((await s.workspaces.prepare(named))?.repo).toBe("shop");
+      expect(retry).toHaveBeenCalledWith("shop");
+    });
+
+    it("is tried again before a chat session reads the clones", async () => {
+      const s = await unprepared();
+      expect((await s.workspaces.refresh()).map((h) => h.name)).toEqual(["design-system"]);
+      s.fix();
+      s.later(60_000);
+      expect((await s.workspaces.refresh()).map((h) => h.name)).toEqual(["design-system", "shop"]);
+    });
   });
 
   describe("a worktree added to an item in another repository", () => {

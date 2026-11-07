@@ -1,12 +1,20 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { parseRepoUrl, silentLogger } from "@outstaff/core";
+import { silentLogger } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
 import { createCloneRefresher } from "./base-clone.js";
-import type { ClonedRepo, RepoHead, Workspaces, WorkspacesOptions } from "./types.js";
+import { neededBy, repoForItem } from "./item-repo.js";
+import type {
+  ClonedRepo,
+  RepoHead,
+  UnpreparedRepo,
+  Workspaces,
+  WorkspacesOptions,
+} from "./types.js";
 import { runGit } from "./git.js";
 import {
   addWorktree,
+  clonedRepo,
   ensureParent,
   holderOf,
   otherWorktrees,
@@ -71,39 +79,6 @@ export function headBranchOf(offer: Offer): string | undefined {
   return undefined;
 }
 
-/** The repo an item is about: one named by a subject or link, else the primary repo or the first one that can be written. */
-export function repoForItem(offer: Offer, repos: ClonedRepo[]): ClonedRepo | undefined {
-  const urls = [
-    ...offer.context.subjects.map((s) => s.url),
-    ...offer.context.links.map((l) => l.url),
-  ];
-
-  for (const url of urls) {
-    if (!url) {
-      continue;
-    }
-
-    try {
-      const ref = parseRepoUrl(url.replace(/^(https?:\/\/[^/]+\/[^/]+\/[^/]+).*$/, "$1"));
-      const hit = repos.find(
-        (r) =>
-          r.ref.host === ref.host &&
-          r.ref.owner.toLowerCase() === ref.owner.toLowerCase() &&
-          r.ref.name.toLowerCase() === ref.name.toLowerCase(),
-      );
-
-      if (hit) {
-        return hit;
-      }
-    } catch {
-      // Not a repository URL.
-    }
-  }
-
-  const writable = repos.filter((r) => r.access === "write");
-  return writable.find((r) => r.kind === "primary") ?? writable[0];
-}
-
 /** The names of the entries of a directory; none when it does not exist. */
 const namesIn = (dir: string) => (existsSync(dir) ? readdirSync(dir) : []);
 
@@ -135,6 +110,27 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       return { name: repo.name, commit, atDefault: false };
     }
   };
+
+  const gap = opts.minFetchGapMs ?? 60_000;
+  const now = opts.now ?? Date.now;
+  const triedAt = new Map<string, number>();
+  const unprepared = () => opts.unprepared?.unprepared() ?? [];
+
+  /**
+   * Tries unprepared repositories again, each in its clone's turn; a throttled try skips one tried less than a minute
+   * ago. A failure is only recorded, by the retry itself.
+   */
+  async function retry(list: UnpreparedRepo[], { throttled = false } = {}) {
+    for (const u of list) {
+      const last = triedAt.get(u.name);
+      if (throttled && last !== undefined && now() - last < gap) {
+        continue;
+      }
+
+      triedAt.set(u.name, now());
+      await clones.exclusive(u.dir, () => opts.unprepared!.retry(u.name)).catch(() => undefined);
+    }
+  }
 
   const worktreeOf = (repo: string, id: string) => join(opts.layout.worktreesDir, repo, safeId(id));
   const scratchOf = (id: string) => join(opts.layout.scratchDir, safeId(id));
@@ -221,6 +217,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
   return {
     async prepare(offer) {
+      await retry(neededBy(offer, opts.repos, unprepared()), { throttled: true });
       const repo = repoForItem(offer, opts.repos);
       if (!repo) {
         return undefined;
@@ -230,12 +227,18 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       return clones.exclusive(repo.dir, () => prepareIn(repo, offer));
     },
 
-    refresh() {
+    async refresh() {
+      await retry(unprepared(), { throttled: true });
       return Promise.all(opts.repos.map(readable));
     },
 
     async add(workItemId, name, branch) {
-      const repo = writableRepo(opts.repos, name);
+      const failed = clonedRepo(unprepared(), name);
+      if (failed) {
+        await retry([failed]);
+      }
+
+      const repo = writableRepo(opts.repos, name, unprepared());
       return clones.exclusive(repo.dir, () => addIn(repo, workItemId, branch));
     },
 

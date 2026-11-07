@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, realpathSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { PortError } from "@outstaff/core";
-import type { ClonedRepo, RunGit } from "./types.js";
+import type { ClonedRepo, RunGit, UnpreparedRepo } from "./types.js";
 
 /** The worktree that has `branch` checked out, if any: git checks a branch out in one worktree only. */
 export async function holderOf(
@@ -53,8 +53,11 @@ export async function addWorktree(
   }
 }
 
-/** The repo of the person's clones that `name` names: its short name, `owner/name` or a link. */
-export function clonedRepo(repos: ClonedRepo[], name: string): ClonedRepo | undefined {
+/** The repo of the person's repos that `name` names: its short name, `owner/name` or a link. */
+export function clonedRepo<R extends Pick<ClonedRepo, "name" | "ref">>(
+  repos: R[],
+  name: string,
+): R | undefined {
   const text = name
     .trim()
     .toLowerCase()
@@ -72,9 +75,24 @@ export function clonedRepo(repos: ClonedRepo[], name: string): ClonedRepo | unde
   });
 }
 
-/** Refuses a repository the person cannot write: no grant at all, or one their profile reads only. */
-export function writableRepo(repos: ClonedRepo[], name: string): ClonedRepo {
+/**
+ * Refuses a repository the person cannot write: no grant at all, one that could not be prepared (with why), or one
+ * their profile reads only.
+ */
+export function writableRepo(
+  repos: ClonedRepo[],
+  name: string,
+  unprepared: UnpreparedRepo[] = [],
+): ClonedRepo {
   const repo = clonedRepo(repos, name);
+  const failed = repo ? undefined : clonedRepo(unprepared, name);
+  if (failed) {
+    throw new PortError(
+      "unavailable",
+      `${failed.name} could not be prepared, so no worktree is added: ${failed.error}`,
+    );
+  }
+
   if (!repo) {
     const granted = repos.map((r) => r.name).join(", ") || "none";
     throw new PortError(

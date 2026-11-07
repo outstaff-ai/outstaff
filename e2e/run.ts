@@ -2811,6 +2811,7 @@ async function main() {
 
   await notesOnTheVolume();
   await notesInTheKnowledgeBase();
+  await repositoryMoved();
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
@@ -4741,21 +4742,22 @@ const samsPage = (s: Json) => {
   return root && s.docs.find((d: Json) => d.parentId === root.id && d.title === "Sam Duarte");
 };
 
-/** Switches the team to `memory.store: knowledge` and restarts the office, whose new team restarts the agents. */
-async function switchToKnowledge() {
+/**
+ * Changes the team file (both copies) with `patch`, checks it validates and restarts the office, whose new team makes
+ * the agents prepare again. `what` names the change in the error when it does not validate.
+ */
+async function restartOfficeWith(what: string, patch: (text: string) => string) {
   // Nothing in flight: a round the restart interrupted would run again under the new team.
   await until("the agent idle before the office restarts", (s) => idle(s) || undefined);
   await officePolledTwice("the last chat session handed back");
   const dir = join(work, "team");
   for (const file of [join(dir, "team.yaml"), join(dir, ".outstaff/team.yaml")]) {
-    writeFileSync(file, `${readFileSync(file, "utf8")}memory:\n  store: knowledge\n`);
+    writeFileSync(file, patch(readFileSync(file, "utf8")));
   }
 
   const check = spawnSync("node", [cli, "validate"], { cwd: dir, encoding: "utf8" });
   if (check.status !== 0) {
-    throw new Error(
-      `The team file with store: knowledge does not validate:\n${check.stdout}${check.stderr}`,
-    );
+    throw new Error(`The team file ${what} does not validate:\n${check.stdout}${check.stderr}`);
   }
 
   // A restart only: `up` would also recreate the stubs, whose state is in memory.
@@ -4770,6 +4772,10 @@ async function switchToKnowledge() {
 
   await waitFor("the office healthy again after its restart", healthy, (h) => h.ok || undefined);
 }
+
+/** Switches the team to `memory.store: knowledge` and restarts the office, whose new team restarts the agents. */
+const switchToKnowledge = () =>
+  restartOfficeWith("with store: knowledge", (text) => `${text}memory:\n  store: knowledge\n`);
 
 /**
  * 16. `memory.store: knowledge`: on its start with the new team, sam moves its notes (the volume's file and the old
@@ -5025,6 +5031,61 @@ async function heldForChecks() {
 
   step(
     `notify after checks: ${key} handed back twice -> nothing while ci ran or failed, one direct message after the green run on ${short}`,
+  );
+}
+
+/**
+ * 17. a repository moves: ops is acme/platform-ops in the team file from now on, and its old address gets no
+ * credentials. On its start with the new team, sam's existing clone of ops follows the new URL, and a round adds an
+ * ops worktree and pushes there, with no restart of the agent's container.
+ */
+async function repositoryMoved() {
+  const oldUrl = "github.acme.example/acme/ops";
+  const newUrl = "github.acme.example/acme/platform-ops";
+  await restartOfficeWith("with ops moved", (text) => {
+    const at = /github\.acme\.example\/acme\/ops(?![\w.-])/g;
+    if (text.match(at)?.length !== 1) {
+      throw new Error(`The team file has not exactly one repository at ${oldUrl}:\n${text}`);
+    }
+
+    return text.replace(at, newUrl);
+  });
+
+  const followed = new RegExp(
+    `URL changed, so its clone follows it.*"repo":"ops".*"from":"https://${oldUrl}\\.git".*"to":"https://${newUrl}\\.git"`,
+  );
+
+  await waitFor(
+    "sam's clone of ops following the new URL",
+    async () => ({ ok: followed.test(logs("sam")) }),
+    (r) => r.ok || undefined,
+  );
+
+  assertEq(
+    /could not prepare a repository.*"repo":"ops"/.test(logs("sam")),
+    false,
+    "ops was prepared on the start with the new team",
+  );
+
+  const { key } = await stub("POST", "/_test/tickets", {
+    title: "Note the moved ops repository",
+    description: "cross-repo: note it in the moved ops too",
+    assignee: "sam",
+  });
+
+  const done = await until(`${key} commented with the change in the moved ops`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === key);
+    return t.comments.find((c: Json) => c.body.includes("Cross-repo:"));
+  });
+
+  assertEq(
+    /pushed [0-9a-f]{40} to ops chore\/\S+-ops from \S+\/worktrees\/ops\/\S+;/.test(done.body),
+    true,
+    `the round added an ops worktree and pushed to the moved repository (${done.body})`,
+  );
+
+  step(
+    `repository moved: ops moved to acme/platform-ops -> sam's clone followed the new URL, ${key} added an ops worktree and pushed there`,
   );
 }
 
