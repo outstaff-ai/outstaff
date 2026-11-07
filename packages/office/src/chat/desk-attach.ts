@@ -44,8 +44,29 @@ export function createAttach(
 
     const target = resolveOwnWork(opts.workState, person, request.target);
 
-    // A ticket is the work of its open pull request, when it has one.
+    // The human may have closed or merged the pull request a moment ago, before the office's next poll: the ticket's
+    // pull requests are read from the code host again, so the request goes to the work as it stands now.
     let { ticket, pr } = target;
+    const known = ticket?.key ?? pr?.ticket;
+    if (known) {
+      await opts.workState.refreshPrsOf(known).catch((error: unknown) => {
+        log.warn("could not read the pull requests again", {
+          person,
+          ticket: known,
+          error: String(error),
+        });
+      });
+    }
+
+    if (pr) {
+      const subject = opts.workState.prSubject(pr.ref);
+      pr =
+        opts.workState
+          .pullRequests(pr.ref.number)
+          .find((p) => opts.workState.prSubject(p.ref) === subject) ?? pr;
+    }
+
+    // A ticket is the work of its open pull request, when it has one.
     if (!pr && ticket) {
       // A pull request opened a moment ago may not be in the work state yet. Looking is best effort: a repository the
       // office cannot list (no access yet) must not fail the request, which then goes to the ticket as it stands.

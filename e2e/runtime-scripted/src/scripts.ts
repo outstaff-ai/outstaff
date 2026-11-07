@@ -1144,13 +1144,11 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   };
 
   yield { type: "shell", command: "git add -A", cwd };
-  yield { type: "shell", command: `git commit -m ${q(`chore: follow up on #${number}`)}`, cwd };
+  // The commit names the ticket, as every other commit here does, so a later rebase finds the branch (`branchOf`).
+  const pr = followUpPr(number, feedback, own);
+  yield { type: "shell", command: `git commit -m ${q(pr.title)}`, cwd };
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
-  const opened = yield {
-    type: "tool",
-    tool: "pr_open",
-    input: { repo, ...followUpPr(number, feedback, own) },
-  };
+  const opened = yield { type: "tool", tool: "pr_open", input: { repo, ...pr } };
 
   const url = firstUrl(opened);
   yield {
