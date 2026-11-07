@@ -11,6 +11,7 @@ import type {
 } from "#/ports/index.js";
 import type { FakeVcsOptions } from "./types.js";
 import { EventLog, steppingClock } from "./util.js";
+import { createHistory } from "./vcs-history.js";
 import type { FakeBranchRule, FakeVcsState, StoredPr } from "./vcs.types.js";
 
 export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
@@ -120,6 +121,7 @@ export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
   };
 
   const defaultRepo: RepoRef = { host, owner: "acme", name: "app" };
+  const history = createHistory(newSha);
 
   return {
     host,
@@ -144,6 +146,7 @@ export function createVcsState(opts: FakeVcsOptions): FakeVcsState {
     key,
     withHost,
     newSha,
+    history,
     emit,
     need,
     read,

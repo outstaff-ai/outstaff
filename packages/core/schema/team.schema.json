@@ -948,6 +948,19 @@
       },
       "additionalProperties": false
     },
+    "scheduler": {
+      "description": "How the office runs the work queue.",
+      "type": "object",
+      "properties": {
+        "stale_run_after_minutes": {
+          "description": "Minutes an active work item may go without a heartbeat from its agent before the office ends its run as stale and queues it again: a run the agent lost, or an offer nobody accepted. A running agent beats every 15 seconds. The second stale run in a row blocks the item. Default 5.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1440
+        }
+      },
+      "additionalProperties": false
+    },
     "tools": {
       "description": "Tools every agent of the team installs at start, with the commands they may run.",
       "type": "object",
@@ -1712,6 +1725,11 @@
           "description": "Let an agent with nothing queued or running start its next ready ticket: assigned to it, in the ready status, highest tracker priority first, then the one ready the longest. Counts as automatic work. Default on.",
           "type": "boolean"
         },
+        "recheck_blocked": {
+          "default": true,
+          "description": "Wake the PM on a blocked ticket when something it may wait on happened: a check that failed on the merge commit of its pull request passes on a later commit of the default branch while its work goes on, one of several tickets linked as its blockers closes, or the human it is assigned to writes about it on another ticket. The PM checks whether the block still holds, and unblocks or closes the ticket with a comment when it does not. At most once per ticket and cause in 24 hours. Default on.",
+          "type": "boolean"
+        },
         "retry": {
           "default": {
             "base_minutes": 1,
@@ -1822,6 +1840,38 @@
               "type": "number",
               "minimum": 0,
               "maximum": 1440
+            }
+          },
+          "additionalProperties": false
+        },
+        "reconcile": {
+          "default": {
+            "every": "2h",
+            "stale_hours": 48
+          },
+          "description": "The periodic board sweep: the office checks each open ticket against the facts it has (pull requests merged, blockers closed, no work running) and wakes the PM only when one disagrees, with the facts for each.",
+          "type": "object",
+          "properties": {
+            "every": {
+              "default": "2h",
+              "description": "How often the office sweeps the open tickets in active, review and blocked for ones whose status or assignee no longer matches what it knows, and wakes the PM with the list when it finds any: minutes (`30m`) or hours (`2h`), fractions allowed, or `off`. Default 2h.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "const": "off"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d+(\\.\\d+)?[mh]$"
+                }
+              ]
+            },
+            "stale_hours": {
+              "default": 48,
+              "description": "Hours a blocked ticket assigned to a human may go without a change in the tracker before the sweep lists it. Default 48.",
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 8760
             }
           },
           "additionalProperties": false

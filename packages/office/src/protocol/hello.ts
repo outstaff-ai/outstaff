@@ -51,6 +51,8 @@ export async function handleHello(
     return;
   }
 
+  // Before this connection is the person's, so nothing is offered on it until the office's view matches the agent's.
+  const resume = await source.reconcile(person, m.payload.running);
   const old = conns.get(person);
   c.person = person;
   conns.set(person, c);
@@ -60,7 +62,6 @@ export async function handleHello(
   }
 
   armIdle(c, heartbeatMs * 3);
-  const outstanding = await source.outstanding(person);
   const { reports, acts } = await queuedFor(ctx, person);
   send(
     c,
@@ -69,7 +70,7 @@ export async function handleHello(
       protocolVersion: PROTOCOL_VERSION,
       heartbeatMs,
       team: opts.team,
-      resume: outstanding.filter((o) => o.accepted).map((o) => o.offer.workItem.id),
+      resume,
       ...(reports.length ? { reports } : {}),
       ...(acts.length ? { acts } : {}),
     },

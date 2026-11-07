@@ -7,6 +7,7 @@ import type { Scheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
 import { checkedResult } from "./hand-back-checks.js";
 import { workMoves } from "./work-moves.js";
+import { reconciler } from "./work-reconcile.js";
 import { workStatus } from "./work-status.js";
 import { offerBuilder } from "./work-offer.js";
 import type { HandBackResult, WorkSourceOptions } from "./work-source.types.js";
@@ -112,7 +113,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
           return undefined;
         }
 
-        const started = await scheduler.markActive(item.id);
+        const started = await scheduler.offer(item.id);
         if (started.started) {
           await store.upsertSubject(OFFER_SUBJECT, item.id, { accepted: false });
           return offerOf(started.item);
@@ -134,6 +135,8 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
         throw new ProtocolError("invalid", `Work item ${id} is ${item.status}, not offered.`);
       }
 
+      // The run starts with the accept, before anything that takes time, so a slow start leaves no offer without it.
+      await scheduler.startRun(id);
       await store.upsertSubject(OFFER_SUBJECT, id, { accepted: true });
       await store.tagRun(id, on);
       // Before the agent hears back, so its run starts on the ticket as the office left it.
@@ -232,6 +235,7 @@ export function schedulerWorkSource(opts: WorkSourceOptions): WorkSource {
       return Promise.all(items.map((i) => summaryOf(i, q.workItemId)));
     },
 
+    reconcile: reconciler(opts, async (id) => (await stateOf(id)).accepted),
     ...workMoves(opts, own, summaryOf),
     ...workStatus(store),
   };

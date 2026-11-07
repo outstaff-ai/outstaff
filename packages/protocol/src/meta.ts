@@ -5,13 +5,13 @@ export const MESSAGE_META = {
   hello: {
     from: "agent",
     summary:
-      "First message on every connection. Authenticates the person and checks the protocol version.",
+      "First message on every connection. Authenticates the person, checks the protocol version and names the items the agent is still running, so the office can reconcile its view with the agent's.",
     replies: ["welcome", "error"],
   },
   welcome: {
     from: "office",
     summary:
-      "The connection is accepted. Carries the team config the agent works from, and lists accepted items to resume, the reports to requesters the agent was offline for and the acts it has not answered; the agent posts and makes those itself and confirms each.",
+      "The connection is accepted. Carries the team config the agent works from, and lists the running items the office kept, the reports to requesters the agent was offline for and the acts it has not answered; the agent posts and makes those itself and confirms each.",
     replies: [],
   },
   offer: {

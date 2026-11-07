@@ -11,7 +11,8 @@ import {
   type QueuedReport,
 } from "@outstaff/protocol";
 import { WebSocket } from "ws";
-import { FATAL, unavailable } from "./errors.js";
+import { createBeats } from "./beats.js";
+import { FATAL, Unanswered, unavailable } from "./errors.js";
 import { heldFor } from "./held.js";
 import { officeMethods } from "./methods.js";
 import { createOfferQueue } from "./offers.js";
@@ -59,7 +60,6 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   let attempt = 0;
   let counter = 0;
   let rejected: { code: ErrorCode; message: string } | undefined;
-  let resumeIds: string[] = [];
   const reports = heldFor<QueuedReport>();
   const acts = heldFor<QueuedAct>();
   let team: Team | undefined;
@@ -69,7 +69,6 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   // A work item and chat sessions run at once; each is kept alive by a heartbeat of its own.
   const activeItems = new Set<string>();
   let cancelBackoff: (() => void) | undefined;
-  let cancelBeat: (() => void) | undefined;
   const offers = createOfferQueue();
   const { request, call, ack, settle, failPending, settleWaiters, whenConnected } = createRequests({
     clock,
@@ -93,25 +92,23 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     return id;
   }
 
-  function scheduleBeat(heartbeatMs: number) {
-    cancelBeat?.();
-    cancelBeat = clock.setTimeout(() => {
-      if (state !== "connected") {
-        return;
+  const beats = createBeats({
+    clock,
+    log,
+    request,
+    connected: () => state === "connected",
+    items: () => activeItems,
+    silent: () => socket?.terminate(),
+  });
+
+  /** A running item the office no longer has active was ended while the agent was away; it is not kept alive. */
+  function keepResumed(resume: string[]) {
+    for (const id of activeItems) {
+      if (!resume.includes(id)) {
+        log.info("the office no longer has a running item active", { workItemId: id });
+        activeItems.delete(id);
       }
-
-      const beats =
-        activeItems.size === 0
-          ? [request("heartbeat", {}, heartbeatMs)]
-          : [...activeItems].map((workItemId) => request("heartbeat", { workItemId }, heartbeatMs));
-
-      Promise.all(beats)
-        .then(() => scheduleBeat(heartbeatMs))
-        .catch(() => {
-          log.warn("office did not answer a heartbeat; reconnecting");
-          socket?.terminate();
-        });
-    }, heartbeatMs);
+    }
   }
 
   function teamChanged(next: Team) {
@@ -125,7 +122,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
   function welcomed(welcome: PayloadOf<"welcome">) {
     attempt = 0;
     state = "connected";
-    resumeIds = welcome.resume;
+    keepResumed(welcome.resume);
     if (welcome.reports?.length) {
       reports.deliver(welcome.reports);
     }
@@ -134,7 +131,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       acts.deliver(welcome.acts);
     }
 
-    scheduleBeat(welcome.heartbeatMs);
+    beats.start(welcome.heartbeatMs);
     const previous = team;
     team = welcome.team;
     settleWaiters();
@@ -187,6 +184,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
         token: opts.token,
         protocolVersion: PROTOCOL_VERSION,
         agentVersion: opts.agentVersion,
+        running: [...activeItems],
       });
     });
 
@@ -215,8 +213,8 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
       }
 
       socket = undefined;
-      cancelBeat?.();
-      failPending(unavailable("The connection to the office was lost."));
+      beats.stop();
+      failPending(new Unanswered("The connection to the office was lost."));
       if (state === "stopped") {
         return;
       }
@@ -251,7 +249,7 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
     async stop() {
       state = "stopped";
       cancelBackoff?.();
-      cancelBeat?.();
+      beats.stop();
       failPending(unavailable("The client stopped."));
       settleWaiters(unavailable("The client stopped."));
       offers.end();
@@ -261,7 +259,6 @@ export function createOfficeConnection(opts: OfficeConnectionOptions): OfficeCon
 
     state: () => state,
     rejection: () => rejected,
-    resume: () => [...resumeIds],
     teamConfig: () => team,
     onTeamConfigChange(handler) {
       teamHandler = handler;

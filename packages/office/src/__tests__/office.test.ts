@@ -187,12 +187,12 @@ describe("createOffice", () => {
       toReview: ["opened pull request acme/app#1"],
     });
 
-    // Sam's own process made the changes, as sam.
+    // Sam's own process made the changes, as sam: the move, then the assignment.
     await vi.waitFor(async () =>
-      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review"),
+      expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1"),
     );
 
-    expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-1");
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("review");
     const moved = (await tracker.events()).events.filter((e) => e.type === "moved");
     // Starting the work made the ticket active, the hand-back moved it to review.
     expect(moved.map((e) => [e.data["to"], e.actor.id])).toEqual([
@@ -581,7 +581,42 @@ describe("createOffice", () => {
     expect(await office.parts.scheduler.isPausedFor("sam", held)).toBeNull();
   });
 
-  it("keeps whether an item was accepted across a reconnect", async () => {
+  it("starts no run before the agent accepts, and requeues an offer it did not take when it reconnects", async () => {
+    const sam = connect("sam");
+    await sam.whenConnected();
+    const issue = await tracker.createIssue({
+      title: "Search page",
+      body: "",
+      status: "ready",
+      assignee: "u-2",
+    });
+
+    await office.parts.intake.pollOnce();
+    const offer = await next(sam);
+    const id = offer.workItem.id;
+    expect((await store.getItem(id))?.status).toBe("active");
+    expect(await store.listRuns(id)).toEqual([]);
+    await sam.stop();
+
+    const again = connect("sam");
+    expect((await next(again)).workItem.id).toBe(id);
+    expect(await store.listRuns(id)).toEqual([]);
+    expect((await store.readJournal(id)).map((j) => j.text)).toContain(
+      "Requeued: the agent reconnected without having taken this offer.",
+    );
+
+    // Nothing started: the ticket was not moved to active for the offer nobody took.
+    expect((await tracker.events()).events.filter((e) => e.type === "moved")).toEqual([]);
+
+    await again.accept(id, { runtime: "claude", model: "sonnet" });
+    await again.accept(id, { runtime: "claude", model: "sonnet" });
+    expect(await store.listRuns(id)).toMatchObject([{ finishedAt: null, runtime: "claude" }]);
+    await vi.waitFor(async () =>
+      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("active"),
+    );
+  });
+
+  it("requeues an accepted item the agent no longer runs when it reconnects, and offers it again with its session", async () => {
     const sam = connect("sam");
     await sam.whenConnected();
     await office.parts.scheduler.enqueue({
@@ -592,12 +627,21 @@ describe("createOffice", () => {
     });
 
     const offer = await next(sam);
-    await sam.accept(offer.workItem.id, { runtime: "claude", model: "sonnet" });
+    const id = offer.workItem.id;
+    await sam.accept(id, { runtime: "claude", model: "sonnet" });
+    await sam.session(id, "sess-1");
     await sam.stop();
 
     const again = connect("sam");
-    await again.whenConnected();
-    expect(again.resume()).toEqual([offer.workItem.id]);
+    const offered = await next(again);
+    expect(offered.workItem.id).toBe(id);
+    expect(offered.sessionId).toBe("sess-1");
+    expect(await store.listRuns(id)).toMatchObject([
+      {
+        outcome: "abandoned",
+        error: "the agent reconnected without this item running, so its run was abandoned.",
+      },
+    ]);
   });
 
   it("keeps the session of an item and offers it again after the agent drops the item", async () => {

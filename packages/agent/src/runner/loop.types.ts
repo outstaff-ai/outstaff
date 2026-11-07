@@ -9,15 +9,7 @@ import type { ProfilePublisher, SessionManager, UsageReporter } from "./types.js
 /** What the loop uses of the office connection. Heartbeats are sent by the connection itself while an item is accepted. */
 export type WorkConnection = Pick<
   OfficeConnection,
-  | "offers"
-  | "accept"
-  | "decline"
-  | "progress"
-  | "handBack"
-  | "fail"
-  | "session"
-  | "journal"
-  | "resume"
+  "offers" | "accept" | "decline" | "progress" | "handBack" | "fail" | "session" | "journal"
 >;
 
 export interface WorkLoopOptions {

@@ -13,3 +13,14 @@ export const PORT_CODE: Partial<Record<ErrorCode, PortErrorCode>> = {
 };
 
 export const unavailable = (message: string) => new PortError("unavailable", message);
+
+/**
+ * A request the office may or may not have handled: the connection dropped while it waited, or no answer came in time.
+ * Messages that are safe to repeat are sent once more; the rest are left to the caller.
+ */
+export class Unanswered extends PortError {
+  constructor(message: string) {
+    super("unavailable", message);
+    this.name = "Unanswered";
+  }
+}

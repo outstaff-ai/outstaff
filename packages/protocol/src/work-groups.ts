@@ -12,6 +12,7 @@ const WHAT: Record<string, string> = {
   ci_failed: "CI failed",
   merge_checks_failed: "fixing checks that failed after merge",
   milestone: "closing a finished milestone",
+  reconcile: "putting the board right",
 };
 
 const keyOf = (i: WorkSummary) =>

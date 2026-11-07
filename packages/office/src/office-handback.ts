@@ -15,7 +15,8 @@ const HANDED_BACK = new Set(["done", "waiting", "blocked"]);
 
 /**
  * The item's tickets besides the one it is about: those its agent created (`created`), and those of the pull requests
- * it opened (`opened`). A hand-back gives the ones that are in review to the requester too.
+ * it opened (`opened`). A hand-back gives the ones that are in review to the requester too. `attached` are the ones a
+ * request added to the round (a further ticket its chat session filed), which the round may have moved as well.
  */
 async function madeTickets(
   store: Store,
@@ -39,13 +40,14 @@ async function madeTickets(
   return {
     created: keys((r) => r.role === "created"),
     opened: keys((r) => r.source === PR_OPEN_SOURCE || opened(r.ref)),
+    attached: keys((r) => r.role === "attached"),
   };
 }
 
 // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
 // Trying to unblock a ticket is not a hand-back on it either, nor the PM's round on a milestone its closing finished:
 // the ticket stays as it is.
-const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock", "milestone"]);
+const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock", "milestone", "reconcile"]);
 
 /** The hand-back's status: the item's, except a silent finish, which leaves the item done and the ticket alone. */
 const statusOf = (item: WorkItem, result: Pick<HandBackResult, "status">) =>
@@ -146,7 +148,7 @@ export function createHandedBack(deps: {
     }
 
     const runs = await store.listRuns(item.id);
-    const made = await madeTickets(store, workState, item, subject.ticket);
+    const { attached, ...made } = await madeTickets(store, workState, item, subject.ticket);
     const event: WorkflowEvent = {
       type: "agent.handed_back",
       subject,
@@ -159,9 +161,15 @@ export function createHandedBack(deps: {
     };
 
     // The policies read who last worked on the tickets, and the tickets themselves, from the state. The agent may have
-    // moved or assigned them during the round, after the tracker was last polled, so all are re-read first.
+    // moved or assigned them during the round, after the tracker was last polled, so all are re-read first. So is a
+    // ticket attached to the round: one it moved out of ready must not look ready to the idle pull that follows.
     const tickets = [
-      ...new Set([...(subject.ticket ? [subject.ticket] : []), ...made.created, ...made.opened]),
+      ...new Set([
+        ...(subject.ticket ? [subject.ticket] : []),
+        ...made.created,
+        ...made.opened,
+        ...attached,
+      ]),
     ];
 
     await refresh(workState, item.person, tickets).catch((error: unknown) => {

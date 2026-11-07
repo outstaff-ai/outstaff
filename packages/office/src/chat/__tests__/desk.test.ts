@@ -60,6 +60,8 @@ describe("chat requests", () => {
   let makeDesk: (over?: TeamConfig) => ChatRequests;
   let tickets: TicketRecord[];
   let pulls: PrRecord[];
+  // Pull requests the human closed on the code host that the work state has not read yet.
+  let closedOnHost: Set<number>;
   let workers: Record<string, string>;
   let docs: DocLink[];
 
@@ -86,6 +88,11 @@ describe("chat requests", () => {
     ticket: (key: string) => tickets.find((t) => t.key === key),
     lastWorker: (key: string) => workers[key],
     catchUp: async () => {},
+    refreshPrsOf: async (key: string) => {
+      for (const p of pulls.filter((x) => x.ticket === key && closedOnHost.has(x.ref.number))) {
+        p.state = "closed";
+      }
+    },
     prSubject: (ref: { number: number }) => `acme/app#${ref.number}`,
     doc: (id: string) => docs.findLast((d) => d.id === id) as DocRecord | undefined,
     linkDoc: async (d: DocLink) => void docs.push(d),
@@ -151,6 +158,7 @@ describe("chat requests", () => {
   beforeEach(async () => {
     tickets = [];
     pulls = [];
+    closedOnHost = new Set();
     workers = {};
     docs = [];
     n = 0;
@@ -940,6 +948,60 @@ describe("chat requests", () => {
             ticket: "ACME-13",
             error: "Error: Resource not accessible by integration",
           }),
+        ],
+      ]);
+    });
+
+    it("reads the ticket's pull requests again first: one the human just closed is not the work any more", async () => {
+      // The human closed #14 and replied in the thread before the office's next poll saw the close.
+      ticket("ACME-14", { status: "review", assignee: { id: "u-1", kind: "human" } });
+      workers["ACME-14"] = "sam";
+      pull(14, { ticket: "ACME-14", draft: false });
+      closedOnHost.add(14);
+
+      const { attached } = await attach("ACME-14", true);
+      expect(await store.getItem(attached.item.id)).toMatchObject({
+        kind: "assigned",
+        subject: { type: "ticket", ref: "ACME-14" },
+      });
+
+      expect(attached.attached).not.toHaveProperty("pr");
+    });
+
+    it("refuses a pull request named by number that the human just closed", async () => {
+      ticket("ACME-15");
+      pull(15, { ticket: "ACME-15", draft: false });
+      closedOnHost.add(15);
+      const s = await session();
+      await expect(
+        desk.attachWork("sam", s.id, { target: "15", confirmed: true }),
+      ).rejects.toMatchObject({ message: expect.stringContaining("PR #15 is closed") as string });
+    });
+
+    it("still attaches when the pull requests cannot be read again, and logs why", async () => {
+      ticket("ACME-17");
+      const warned: unknown[][] = [];
+      desk = createChatDesk({
+        clock,
+        store,
+        scheduler,
+        team: teamConfig(),
+        workState: {
+          ...knownWork(),
+          refreshPrsOf: () => Promise.reject(new Error("GitHub is down")),
+        },
+        tracker,
+        linksOf: async () => [],
+        notify: (p) => notified.push(p),
+        logger: { ...silentLogger, warn: (...args: unknown[]) => void warned.push(args) },
+      });
+
+      const { attached } = await attach("ACME-17");
+      expect(await store.getItem(attached.item.id)).toMatchObject({ kind: "assigned" });
+      expect(warned).toEqual([
+        [
+          "could not read the pull requests again",
+          expect.objectContaining({ ticket: "ACME-17", error: "Error: GitHub is down" }),
         ],
       ]);
     });

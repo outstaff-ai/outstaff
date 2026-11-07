@@ -9,10 +9,12 @@ import type { WorkState } from "#/workstate/types.js";
 describe("the hand-back of an item", () => {
   let store: Store;
   let judged: WorkflowEvent[];
+  let refreshed: string[];
 
   beforeEach(async () => {
     store = await openStore("sqlite::memory:");
     judged = [];
+    refreshed = [];
   });
 
   afterEach(async () => {
@@ -24,8 +26,9 @@ describe("the hand-back of an item", () => {
       store,
       workState: {
         refreshWorkers: async () => {},
-        refreshTicket: async () => {},
+        refreshTicket: async (key: string) => void refreshed.push(key),
         refreshPrsOf: async () => {},
+        prsOfTicket: () => [],
       } as unknown as WorkState,
       judge: async (event) => void judged.push(event),
       log: silentLogger,
@@ -88,5 +91,18 @@ describe("the hand-back of an item", () => {
       before: { status: "review", assignee: { id: "ada.admin", kind: "human" } },
       notified: { human: "ada.admin", prs: {} },
     });
+  });
+
+  it("re-reads a ticket attached to the round before judging, without handing it to anyone", async () => {
+    // A chat session filed ACME-1 as the round and ACME-2 into it; the round moved both out of ready. The idle pull
+    // after the hand-back must see ACME-2 as the tracker has it now, not as the last poll did.
+    const round = await done();
+    await store.addItemRefs(round.id, [
+      { type: "ticket", ref: "ACME-2", role: "attached", source: "work_link" },
+    ]);
+
+    await handedBack()(round, { summary: "Built it.", status: "done" });
+    expect(refreshed).toEqual(["ACME-1", "ACME-2"]);
+    expect(judged.at(-1)?.data).toEqual(base(round.id));
   });
 });

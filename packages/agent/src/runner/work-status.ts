@@ -29,7 +29,7 @@ const untouchedBlocked = (
  * Work on a teammate's blocked ticket: it is blocked when the round starts and stays so until the teammate picks it up
  * again, so only the agent moving it to blocked makes the hand-back blocked.
  */
-const ON_BLOCKED_WORK = new Set(["unblock"]);
+const ON_BLOCKED_WORK = new Set(["unblock", "reconcile"]);
 
 /**
  * What a finished run is handed back as. An open question makes it wait. A ticket the agent left blocked, or a ticket

@@ -1,4 +1,4 @@
-import type { RestCheckRun } from "@outstaff/integration.vcs.github";
+import type { RestCheckRun, RestWorkflowRun } from "@outstaff/integration.vcs.github";
 import type { Route } from "@outstaff/testing.http";
 import { RUN_ID } from "./actions-routes.js";
 import { branchRoutes } from "./branch-routes.js";
@@ -22,12 +22,36 @@ const checkRun = (s: GithubStore, c: StoredCheckRun): RestCheckRun => ({
   details_url: c.job ? jobUrl(s, c.id) : null,
   app: { slug: c.job ? "github-actions" : "other-ci" },
   ...(c.output ? { output: c.output } : {}),
+  ...(c.workflow ? { check_suite: { id: suiteOf(c) } } : {}),
 });
+
+/** A check run with a workflow is the one job of a workflow run of its own, whose check suite this is. */
+const suiteOf = (c: StoredCheckRun) => SUITE_BASE + c.id;
+const SUITE_BASE = 1000;
+
+/** The workflow runs of a commit, as `GET /actions/runs?head_sha=` lists them. */
+const workflowRuns = (s: GithubStore, sha: string): RestWorkflowRun[] =>
+  (s.checks.get(sha) ?? []).flatMap((c) =>
+    c.workflow ? [{ name: c.workflow, check_suite_id: suiteOf(c) }] : [],
+  );
 
 /** Where a log redirect points, and the route that serves it: on its own origin, or under a path of this server. */
 function logPlace(s: GithubStore) {
   const base = s.logUrl ?? `${LOG_ORIGIN}/logs`;
   return { base, route: s.logUrl ? `${new URL(s.logUrl).pathname}/:id` : `${base}/:id` };
+}
+
+/** Where `head` stands against `base`, as the compare API says. */
+async function compareStatus(s: GithubStore, base: string, head: string) {
+  if (base === head) {
+    return "identical";
+  }
+
+  if (await s.backend.isAncestor(base, head)) {
+    return "ahead";
+  }
+
+  return (await s.backend.isAncestor(head, base)) ? "behind" : "diverged";
 }
 
 /** Checks, Actions jobs and their logs, commit statuses, permissions and the event feed. */
@@ -40,6 +64,20 @@ export function repoRoutes(s: GithubStore, repo: string): Route[] {
       handler: (r) => ({
         check_runs: (s.checks.get(r.params["sha"]!) ?? []).map((c) => checkRun(s, c)),
       }),
+    },
+    {
+      method: "GET",
+      path: `${repo}/actions/runs`,
+      handler: (r) => ({ workflow_runs: workflowRuns(s, r.query.get("head_sha") ?? "") }),
+    },
+    {
+      method: "GET",
+      path: `${repo}/compare/:basehead`,
+      handler: async (r) => {
+        const [base = "", head = ""] = r.params["basehead"]!.split("...");
+        // `status` alone would be read as the reply's HTTP status.
+        return { status: 200, body: { status: await compareStatus(s, base, head) } };
+      },
     },
     {
       method: "GET",

@@ -926,6 +926,22 @@ Ports (for example chat) whose adapter's live checks the office does not run, fo
 - Optional
 - Allowed values: `chat`, `vcs`, `runtime`, `tracker`, `knowledge`, `avatars`
 
+## scheduler
+
+How the office runs the work queue.
+
+- Type: `object`
+- Optional
+
+### scheduler.stale_run_after_minutes
+
+Minutes an active work item may go without a heartbeat from its agent before the office ends its run as stale and queues it again: a run the agent lost, or an offer nobody accepted. A running agent beats every 15 seconds. The second stale run in a row blocks the item. Default 5.
+
+- Type: `integer`
+- Optional
+- Minimum 1
+- Maximum 1440
+
 ## tools
 
 Tools every agent of the team installs at start, with the commands they may run.
@@ -1623,6 +1639,14 @@ Let an agent with nothing queued or running start its next ready ticket: assigne
 - Optional
 - Default: `true`
 
+### policies.recheck_blocked
+
+Wake the PM on a blocked ticket when something it may wait on happened: a check that failed on the merge commit of its pull request passes on a later commit of the default branch while its work goes on, one of several tickets linked as its blockers closes, or the human it is assigned to writes about it on another ticket. The PM checks whether the block still holds, and unblocks or closes the ticket with a comment when it does not. At most once per ticket and cause in 24 hours. Default on.
+
+- Type: `boolean`
+- Optional
+- Default: `true`
+
 ### policies.retry
 
 How a failing work item is retried: exponential backoff, then blocked.
@@ -1746,6 +1770,31 @@ Minutes the checks on a merge commit must stay finished, with none failed and no
 - Default: `2`
 - Minimum 0
 - Maximum 1440
+
+### policies.reconcile
+
+The periodic board sweep: the office checks each open ticket against the facts it has (pull requests merged, blockers closed, no work running) and wakes the PM only when one disagrees, with the facts for each.
+
+- Type: `object`
+- Optional
+- Default: `{"every":"2h","stale_hours":48}`
+
+#### policies.reconcile.every
+
+How often the office sweeps the open tickets in active, review and blocked for ones whose status or assignee no longer matches what it knows, and wakes the PM with the list when it finds any: minutes (`30m`) or hours (`2h`), fractions allowed, or `off`. Default 2h.
+
+- Type: `string`
+- Optional
+- Default: `2h`
+
+#### policies.reconcile.stale_hours
+
+Hours a blocked ticket assigned to a human may go without a change in the tracker before the sweep lists it. Default 48.
+
+- Type: `number`
+- Optional
+- Default: `48`
+- Maximum 8760
 
 ### policies.messages
 

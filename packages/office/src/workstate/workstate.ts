@@ -5,7 +5,7 @@ import { currentWork, docOpen, personForRole, stackedOn, toWorkflowPr } from "./
 import { blockedAgent, inRound, openBlockers } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
-import { createMergeChecks } from "./merge-checks.js";
+import { createTimedWork } from "./timed-work.js";
 import { isOpen, visible } from "./open.js";
 import { createPrs } from "./prs.js";
 import { readyTickets, ticketStatusAt } from "./ready.js";
@@ -87,7 +87,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   const prOps = createPrs(core, ticketOps);
   const requesters = createRequesters(core, ticketOps);
   const { saveDoc, touchDoc, linkDoc } = createDocs(core);
-  const { followMerges } = createMergeChecks(core);
+  const { followMerges } = createTimedWork(core, unblockOps);
   const { refreshPr, ticketOfDraft } = prOps;
   const { deliver, handle } = createEvents(core, {
     ...ticketOps,

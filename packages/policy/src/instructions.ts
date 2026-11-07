@@ -39,6 +39,9 @@ export const INSTRUCTION_VARIABLES = [
   "parent.closed",
   "milestone",
   "milestone.id",
+  "recovered",
+  "why",
+  "stale",
 ] as const;
 
 const isCause = (v: unknown): v is MergeCause =>
@@ -69,6 +72,40 @@ function causeVariables(data: Record<string, unknown>): Record<string, string> {
     "cause.number": number(cause.pr),
     "cause.title": cause.title,
   };
+}
+
+/**
+ * For a `pr.merge_checks_passed` whose failed checks passed later on the default branch: which, where and on what
+ * commit, as `deploy passes on main at abc1234, which includes #77's merge`; empty for any other event.
+ */
+function recoveredOf(event: EvaluationContext["event"]): string {
+  const on = stringOf(event.data["recoveredOn"]);
+  if (!on || !event.subject.pr) {
+    return "";
+  }
+
+  const list = event.data["recovered"];
+  const names = (Array.isArray(list) ? (list as { name?: unknown }[]) : [])
+    .map((c) => c?.name)
+    .filter((n): n is string => typeof n === "string");
+
+  const verb = names.length === 1 ? "passes" : "pass";
+  return `${names.join(", ")} ${verb} on ${stringOf(event.data["base"])} at ${on.slice(0, 7)}, which includes #${number(event.subject.pr)}'s merge`;
+}
+
+/** The tickets a `board.stale` lists, one line each: `- ACME-1 (blocked, with dana): the facts`. */
+function staleOf(tickets: unknown): string {
+  const list = Array.isArray(tickets)
+    ? (tickets as { ticket?: unknown; status?: unknown; assignee?: unknown; facts?: unknown }[])
+    : [];
+
+  return list
+    .filter((t) => typeof t?.ticket === "string")
+    .map((t) => {
+      const who = typeof t.assignee === "string" ? `, with ${t.assignee}` : "";
+      return `- ${String(t.ticket)} (${stringOf(t.status)}${who}): ${stringOf(t.facts)}`;
+    })
+    .join("\n");
 }
 
 /** Who closed the ticket a `ticket.closed` or `ticket.unblocked` names, from its `closedBy`; `someone` when unknown. */
@@ -137,6 +174,9 @@ export function instructionVariables(
     ...closedVariables(event.type, event.data),
     ...parentVariables(ctx),
     ...milestoneVariables(ctx),
+    recovered: recoveredOf(event),
+    why: stringOf(event.data["why"]),
+    stale: staleOf(event.data["tickets"]),
   };
 }
 

@@ -92,7 +92,7 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
     async merge(repo, number, actor) {
       const s = need(repo, number);
       s.pr.state = "merged";
-      s.pr.mergeCommitSha = newSha();
+      s.pr.mergeCommitSha = st.history.merge(key(repo), s.pr.base.ref, s.pr.head.sha);
       touch(s);
       emit("pr.merged", repo, number, actor);
       return structuredClone(s.pr);
@@ -245,9 +245,13 @@ export function fakeVcsSeed(st: FakeVcsState): VcsSeed {
         status: c.status,
         url: `${links.commit(repo, sha)}/checks/${encodeURIComponent(c.name)}`,
         ...(logId ? { logId } : {}),
+        ...(c.workflow ? { workflow: c.workflow } : {}),
       });
 
       checks.set(k, list);
+    },
+    async commit(repo, branch, o = {}) {
+      return st.history.commit(key(repo), branch, o.from);
     },
     async permission(repo, login, level) {
       perms.set(`${key(repo)}:${login}`, level);

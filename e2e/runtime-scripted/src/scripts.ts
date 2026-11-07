@@ -1144,13 +1144,11 @@ export async function* mergedFeedback(ctx: ItemContext): Script {
   };
 
   yield { type: "shell", command: "git add -A", cwd };
-  yield { type: "shell", command: `git commit -m ${q(`chore: follow up on #${number}`)}`, cwd };
+  // The commit names the ticket, as every other commit here does, so a later rebase finds the branch (`branchOf`).
+  const pr = followUpPr(number, feedback, own);
+  yield { type: "shell", command: `git commit -m ${q(pr.title)}`, cwd };
   yield { type: "shell", command: `git push origin ${q(branch)}`, cwd };
-  const opened = yield {
-    type: "tool",
-    tool: "pr_open",
-    input: { repo, ...followUpPr(number, feedback, own) },
-  };
+  const opened = yield { type: "tool", tool: "pr_open", input: { repo, ...pr } };
 
   const url = firstUrl(opened);
   yield {
@@ -1737,6 +1735,12 @@ export async function* mergeChecksFailed(ctx: ItemContext): Script {
   const url = need(check.url, "the failed check's link");
   const more = yield { type: "tool", tool: "ci_log", input: { url, lines: 50 } };
   const cause = /^ {2}(error: .*)$/m.exec(more)?.[1] ?? "see the log";
+  const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+  const outside = /^outside cause: (.+)$/m.exec(shown)?.[1];
+  if (outside) {
+    return yield* blockOnOutsideCause(key, number, check.name, `${outside} (${cause})`);
+  }
+
   // The code host's CLI, through the wrapper's per-call token: re-run the failed run; a merge with it is refused.
   const run = need(/\/actions\/runs\/(\d+)\//.exec(url)?.[1], "the check's workflow run");
   yield { type: "shell", command: `gh run rerun ${run}`, cwd };
@@ -1780,6 +1784,29 @@ export async function* mergeChecksFailed(ctx: ItemContext): Script {
   };
 
   return `${check.name} failed after #${number}; opened the fix ${firstUrl(opened)}`;
+}
+
+/**
+ * A check that failed after the merge for a reason outside the pull request (`outside cause: <what>` on the ticket):
+ * nothing in it to fix, so the agent blocks the ticket, says why, and hands it back for a human to decide.
+ */
+async function* blockOnOutsideCause(
+  key: string,
+  number: number,
+  name: string,
+  why: string,
+): AsyncGenerator<Action, string, string> {
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: {
+      key,
+      body: `Blocked: ${name} failed after #${number} merged, from outside it: ${why}. Nothing in #${number} to fix.`,
+    },
+  };
+
+  return `Stopped: ${name} failed after #${number} from outside the pull request: ${why}`;
 }
 
 /**

@@ -1,8 +1,8 @@
 import type { WorkItem } from "#/store/types.js";
 import type { SchedulerDeps } from "./checks.types.js";
-import { INTERRUPTED } from "./constants.js";
-import { backoffMs, orderQueue } from "./policy.js";
-import type { BlockNotice, FailResult, FinishInput, RetryRequest } from "./types.js";
+import { ABANDONED, INTERRUPTED } from "./constants.js";
+import { backoffMs, orderQueue, trailingStale } from "./policy.js";
+import type { AbandonResult, BlockNotice, FailResult, FinishInput, RetryRequest } from "./types.js";
 
 export async function finishItem(
   deps: SchedulerDeps,
@@ -137,4 +137,32 @@ export async function retryItem(
   );
 
   return queued;
+}
+
+export async function abandonItem(
+  deps: SchedulerDeps,
+  itemId: string,
+  reason: string,
+): Promise<AbandonResult | null> {
+  const { store, log } = deps;
+  const item = await store.getItem(itemId);
+  if (item?.status !== "active") {
+    return null;
+  }
+
+  const run = await deps.checks.openRun(itemId);
+  if (run) {
+    await store.finishRun(run.id, { outcome: ABANDONED, error: reason });
+    // An agent that keeps losing the item's run (a crash loop) does not get it again and again.
+    const runs = await store.listRuns(itemId);
+    if (trailingStale(runs.map((r) => r.outcome)) > 1) {
+      const blocked = await deps.checks.blockItem(item, `Lost again: ${reason}`, "stale");
+      return { item: blocked.item, blocked };
+    }
+  }
+
+  const queued = await store.updateItem(itemId, { status: "queued" });
+  await store.appendJournal(itemId, "scheduler", `Requeued: ${reason}`);
+  log.warn("work item requeued", { item: itemId, person: item.person, reason });
+  return { item: queued };
 }

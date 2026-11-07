@@ -16,7 +16,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`chat_to_addressed`](#chat_to_addressed) | `chat.message` | wake `addressed` (kind `chat`) |
 | [`review_to_author`](#review_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `review_feedback`) |
 | [`merged_feedback_to_author`](#merged_feedback_to_author) | `pr.review_submitted`, `pr.comment` | wake `author` (kind `merged_feedback`) |
-| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merge_checks_passed` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`, assign it to the agent acted for |
+| [`merged_closes_ticket`](#merged_closes_ticket) | `pr.merge_checks_passed` | act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`, assign it to the agent acted for; when the checks that failed on the merge commit passed later on a commit of the default branch that contains it, the note says which, where and on what commit |
 | [`merge_checks_failed_to_agent`](#merge_checks_failed_to_agent) | `pr.merge_checks_failed` | wake `author`, else `assignee`, else `last_worker` (kind `merge_checks_failed`) |
 | [`rebase_to_author`](#rebase_to_author) | `pr.conflicted`, `pr.behind_base`, `pr.base_merged` | wake `author` (kind `rebase`) |
 | [`ci_failed_to_author`](#ci_failed_to_author) | `pr.ci_failed` | wake `author` (kind `ci_failed`) |
@@ -38,6 +38,8 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`milestone_done_to_pm`](#milestone_done_to_pm) | `ticket.closed` | wake the PM (`role:pm`, kind `milestone`) on the closed ticket, when every other ticket of its milestone the office knows is done or canceled |
 | [`unblocked_to_blocked_agent`](#unblocked_to_blocked_agent) | `ticket.unblocked` | wake `blocked_agent` (kind `unblocked`) |
 | [`unblocked_to_ready`](#unblocked_to_ready) | `ticket.unblocked` | act for `assignee`: move the ticket to `ready`, then wake them (kind `assigned`), unless the blocker is a sub-ticket of the same parent and the parent is with that agent (`parentAgent`): then only move it; with no agent assigned, act for `closer`: move the ticket to `ready` |
+| [`blocked_maybe_resolved_to_pm`](#blocked_maybe_resolved_to_pm) | `ticket.block_maybe_resolved` | wake `role:pm` (kind `unblock`), when the team has a PM |
+| [`stale_board_to_pm`](#stale_board_to_pm) | `board.stale` | wake `role:pm` (kind `reconcile`), on the first ticket listed, with the list; nothing for a sweep that found none |
 | [`doc_comment_to_agent`](#doc_comment_to_agent) | `doc.commented` | wake `mentioned`, else `doc_author` (kind `doc_feedback`) |
 | [`doc_comment_to_mentioned_agent`](#doc_comment_to_mentioned_agent) | `doc.commented` | wake `mentioned` (kind `doc_feedback`) |
 | [`link_doc_on_ticket`](#link_doc_on_ticket) | `doc.linked` | act for `doc_author`, else `actor`: link the document on the ticket, when the knowledge base can link documents on tickets (`knowledge.issueLinks`) |
@@ -115,9 +117,9 @@ Instruction:
 
 ### merged_closes_ticket
 
-A merge into the default branch closes the ticket once the checks on its merge commit pass (or none start), unless another of its pull requests or one of its sub-tickets is open; the ticket ends with the agent who did the work: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
+A merge into the default branch closes the ticket once the checks on its merge commit pass (or none start, or the ones that failed pass later on a commit of the default branch that contains it), unless another of its pull requests or one of its sub-tickets is open; the ticket ends with the agent who did the work: for the author, or, for a human's pull request, the agent the ticket is assigned to, else the agent who last worked on it.
 
-Listens to `pr.merge_checks_passed`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`, assign it to the agent acted for.
+Listens to `pr.merge_checks_passed`. Decides: act for `author`, else `assignee`, else `last_worker`: move the ticket to `done`, assign it to the agent acted for; when the checks that failed on the merge commit passed later on a commit of the default branch that contains it, the note says which, where and on what commit.
 
 When:
 
@@ -553,6 +555,40 @@ Instruction:
 
 Note posted with the change: none; the instruction is the wake's.
 
+### blocked_maybe_resolved_to_pm
+
+Something a blocked ticket may wait on happened (a check that failed on its merge passes on the default branch while its work goes on, one of several linked blockers closes, or the human holding it writes about it on another ticket): the PM is woken on the ticket to check whether the block still holds. The work state raises it at most once per ticket and cause in 24 hours. Switch it off with `policies.recheck_blocked: false`.
+
+Listens to `ticket.block_maybe_resolved`. Decides: wake `role:pm` (kind `unblock`), when the team has a PM.
+
+On only while `policies.recheck_blocked` is on.
+
+When:
+
+- `ticket_status: blocked`
+
+Instruction:
+
+```text
+{{ticket}} is blocked, and something it may wait on happened: {{why}}. Check whether the block still holds. If it does not, unblock it: assign it back to the agent who works on it with a comment saying what changed, or, when its work is done, move it to done with a comment saying why. If it still holds, do nothing: change nothing, comment nothing, and hand back silent.
+```
+
+### stale_board_to_pm
+
+The office's periodic board sweep (`policies.reconcile.every`) found open tickets whose status or assignee no longer matches what it knows (a ticket in review whose pull requests all merged, a blocked ticket whose blockers all closed, an active ticket nobody works on, a parent whose sub-tickets all closed): the PM is woken once with the list and the facts for each, to put each right; a sweep that found none is traced and wakes no one. A ticket is listed again for the same reason only after a day.
+
+Listens to `board.stale`. Decides: wake `role:pm` (kind `reconcile`), on the first ticket listed, with the list; nothing for a sweep that found none.
+
+When: always.
+
+Instruction:
+
+```text
+The office's board sweep found tickets whose status or assignee no longer matches what it knows:
+{{stale}}
+For each, check the ticket (`ost ticket show <key>`). If it is out of step, put its status and assignee right and say why on it in one line. If it is actually fine, leave it alone and say nothing. Start no new work.
+```
+
 ### doc_comment_to_agent
 
 A human's comment on a document wakes the agent it mentions, else the agent who wrote it.
@@ -755,6 +791,8 @@ Every event the pipeline decides on. A policy's `on` lists some of them.
 - `ticket.moved`
 - `ticket.created`
 - `ticket.unblocked`
+- `ticket.block_maybe_resolved`
+- `board.stale`
 - `ticket.closed`
 - `doc.commented`
 - `doc.linked`
@@ -800,3 +838,6 @@ An instruction or note may use these placeholders, written `{{name}}`. One the e
 - `parent.closed`
 - `milestone`
 - `milestone.id`
+- `recovered`
+- `why`
+- `stale`

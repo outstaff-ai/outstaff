@@ -66,12 +66,13 @@ class Agent {
     }
   }
 
-  async hello(person: string, token: string, version = PROTOCOL_VERSION) {
+  async hello(person: string, token: string, version = PROTOCOL_VERSION, running: string[] = []) {
     return this.send("hello", {
       person,
       token,
       protocolVersion: version,
       agentVersion: "0.0.0-test",
+      running,
     });
   }
 
@@ -398,6 +399,30 @@ describe("protocol server", () => {
       expect((await a.next("offer")).payload).toMatchObject({ workItem: { id: "w2" } });
     });
 
+    it("answers a heartbeat at once while a slow request of the same agent is still handled", async () => {
+      source.enqueue("ada", "w1");
+      const a = await login();
+      await a.next("offer");
+
+      let release!: () => void;
+      const slow = new Promise<void>((resolve) => (release = resolve));
+      const accept = source.accept.bind(source);
+      source.accept = async (...args) => {
+        await slow;
+        await accept(...args);
+      };
+
+      const accepting = a.send("accept", { workItemId: "w1", runtime: "claude", model: "sonnet" });
+      const beat = a.send("heartbeat", { workItemId: "w1" });
+      expect(await a.next("ack")).toMatchObject({ replyTo: beat });
+      expect(a.inbox).toEqual([]);
+
+      release();
+      expect(await a.next("ack")).toMatchObject({ replyTo: accepting });
+      await settle();
+      expect(source.calls).toEqual(["heartbeat:ada:w1", "accept:ada:w1"]);
+    });
+
     it("offers the next item after a failure, and requeues a declined one on the next poll", async () => {
       source.enqueue("ada", "w1");
       source.enqueue("ada", "w2");
@@ -431,16 +456,18 @@ describe("protocol server", () => {
       expect((await a.next("offer")).payload).toMatchObject({ workItem: { id: "w2" } });
     });
 
-    it("sends an offer again after a disconnect until it is accepted", async () => {
+    it("requeues what the agent does not run when it says hello, and offers it again", async () => {
       source.enqueue("ada", "w1");
       const first = await login();
       await first.next("offer");
       await first.close();
       await settle();
 
+      // The offer was never taken: it goes back to the queue and comes again.
       const second = await login();
       const again = await second.next("offer");
       expect(again.payload).toMatchObject({ workItem: { id: "w1" } });
+      expect(source.calls).toEqual(["requeue:ada:w1"]);
 
       // Not repeated on the same connection by the poll.
       clock.advance(300);
@@ -453,14 +480,23 @@ describe("protocol server", () => {
       await second.next("ack");
       await second.next("ack");
 
-      // Once accepted it is resumed, not offered.
+      // An agent still running it carries on, and is not offered it again.
       await second.close();
       await settle();
       const third = await connect();
-      await third.hello("ada", tokens.ada);
+      await third.hello("ada", tokens.ada, PROTOCOL_VERSION, ["w1"]);
       expect((await third.next("welcome")).payload).toMatchObject({ resume: ["w1"] });
       await settle();
       expect(third.inbox.filter((m) => m.type === "offer")).toEqual([]);
+      expect(source.stateOf("w1")).toBe("accepted");
+
+      // One that lost it gets it again.
+      await third.close();
+      await settle();
+      const fourth = await connect();
+      await fourth.hello("ada", tokens.ada);
+      expect((await fourth.next("welcome")).payload).toMatchObject({ resume: [] });
+      expect((await fourth.next("offer")).payload).toMatchObject({ workItem: { id: "w1" } });
     });
 
     it("answers roster and work requests", async () => {
@@ -541,7 +577,13 @@ describe("protocol server", () => {
         JSON.stringify({
           id: "x6",
           type: "hello",
-          payload: { person: "ada", token: "ada-secret", protocolVersion: 1, agentVersion: "1" },
+          payload: {
+            person: "ada",
+            token: "ada-secret",
+            protocolVersion: 1,
+            agentVersion: "1",
+            running: [],
+          },
         }),
       );
 
