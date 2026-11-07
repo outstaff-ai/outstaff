@@ -46,6 +46,7 @@ interface OfferExtras {
   kind?: string;
   trigger?: string;
   ticketStatus?: string;
+  ticket?: string;
   feedback?: Record<string, unknown>[];
 
   /** The pull requests of the item; by default one open for review, so a done hand-back has something to review. */
@@ -108,6 +109,7 @@ const offeredItem = (id: string, extra: OfferExtras) => ({
   id,
   kind: extra.kind ?? (extra.origin ? "chat" : "ticket"),
   ...(extra.feedback ? { subject: { type: "pr", ref: "git.acme.example/acme/app#1" } } : {}),
+  ...(extra.ticket ? { subject: { type: "ticket", ref: extra.ticket } } : {}),
   title: `Fix ${id}`,
   priority: 1,
   trigger: extra.trigger ?? "human",
@@ -308,6 +310,7 @@ describe("work loop", () => {
       moves: ("blocked" | "review")[],
       text = "Could not continue.",
       chat?: Pick<ChatRelay, "context" | "report" | "acknowledge" | "attachments">,
+      { message, ticket }: { message?: string; ticket?: string } = {},
     ) => {
       await connect();
       const runtime: Runtime = {
@@ -315,6 +318,11 @@ describe("work loop", () => {
           const move = req.tools.find((t) => t.name === "ticket_move")!;
           for (const to of moves) {
             await move.handler({ key: "SHOP-1", to }, { workItemId: "w1" });
+          }
+
+          if (message) {
+            const handBack = req.tools.find((t) => t.name === "handback")!;
+            await handBack.handler({ status: "blocked", message }, { workItemId: "w1" });
           }
 
           yield { type: "finished", ok: true, text };
@@ -328,7 +336,7 @@ describe("work loop", () => {
       });
 
       await fake.tracker.createIssue({ title: "Checkout", body: "", status: "active", labels: [] });
-      socket.offerWith("w1");
+      socket.offerWith("w1", ticket ? { ticket } : {});
       await until(() => sentOf("handback").length === 1);
       return { status: (sentOf("handback")[0]!.payload as { status: string }).status, logs };
     };
@@ -356,6 +364,23 @@ describe("work loop", () => {
         item: "w1",
         text: "Need the staging key from ops.",
       });
+    });
+
+    it("is reported in the agent's message for the human when it gave one, with no prefix", async () => {
+      const { chat, reports } = relay();
+      const message =
+        "SHOP-1 needs one of these from you: the staging key, or a go-ahead to mock it.";
+
+      await hand(["blocked"], "Stopped at the deploy step.", chat, { message });
+      await until(() => reports.length === 1);
+      expect(reports[0]).toMatchObject({ kind: "blocked", text: message });
+    });
+
+    it("says the ticket is blocked when the agent left no words", async () => {
+      const { chat, reports } = relay();
+      await hand(["blocked"], "", chat, { ticket: "SHOP-1" });
+      await until(() => reports.length === 1);
+      expect(reports[0]).toMatchObject({ kind: "blocked", text: "SHOP-1 is blocked." });
     });
 
     it("is not reported when it was handed back as done", async () => {

@@ -6,6 +6,7 @@ import type {
   RulePack,
   Toolset,
 } from "./types.js";
+import type { InstalledExtension } from "./tool-extensions.types.js";
 
 /** Person beats team beats toolset; the winning declaration replaces the others whole, so its `allow` is the only one. */
 export function effectiveTools(input: EffectiveToolsInput): EffectiveTool[] {
@@ -116,4 +117,46 @@ export function toolsToPacks(tools: EffectiveTool[]): RulePack[] {
   }
 
   return [...packs.values()];
+}
+
+/** Whether an `allow` entry of the tool starts with `command`, so that the entries narrow it. */
+function narrows(tool: EffectiveTool | undefined, command: string): boolean {
+  const allow = tool?.allow;
+  if (!Array.isArray(allow)) {
+    return false;
+  }
+
+  return allow.some((entry) =>
+    typeof entry === "string"
+      ? entry.trim().split(/\s+/)[0] === command
+      : entry.subcommand?.[0] === command,
+  );
+}
+
+/**
+ * Allows the command of each installed extension of a tool (`gh actions-lock ...`), unless the tool's `allow` entries
+ * name that command, which then narrow it like any other subcommand. A command that is not an installed extension's
+ * gets nothing here, so it stays where the other rules leave it.
+ */
+export function extensionsToPack(
+  installed: InstalledExtension[],
+  tools: EffectiveTool[],
+): RulePack | undefined {
+  const rules = installed
+    .filter(
+      (x) =>
+        !narrows(
+          tools.find((t) => t.name === x.tool),
+          x.command,
+        ),
+    )
+    .map((x): CommandRule => ({
+      id: `tools.${x.tool}.extension.${x.command}`,
+      program: x.tool,
+      subcommand: [x.command],
+      effect: "allow",
+      reason: `${x.tool} ${x.command} is the declared extension ${x.extension}.`,
+    }));
+
+  return rules.length > 0 ? { id: "tools.extensions", source: "team", rules } : undefined;
 }

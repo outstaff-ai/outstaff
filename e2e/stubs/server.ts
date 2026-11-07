@@ -70,9 +70,17 @@ if (!existsSync(moved)) {
 
 const platformOps = new BareRepo(env("STUB_DATA_DIR"), "acme", "platform-ops");
 
+// A gh script extension the team declares pinned under tools.gh.extensions; the agent installs it at start.
+const hello = new BareRepo(env("STUB_DATA_DIR"), "acme", "gh-hello");
+await hello.init(
+  { "gh-hello": '#!/bin/sh\necho "hello from acme/gh-hello v1.0.0 ($GH_REPO)"\n' },
+  { executable: ["gh-hello"], tag: "v1.0.0" },
+);
+
 const github = createGithubE2e({
   repo,
   more: [ops, platformOps],
+  extensions: [hello],
   apps: pairs(env("STUB_APPS")),
   publicKey: readFileSync(env("STUB_APP_PUBLIC_KEY"), "utf8"),
   permissions: { "ada-admin": "write", "grace-lead": "write" },

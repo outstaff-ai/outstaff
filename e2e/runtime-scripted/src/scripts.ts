@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
 import { answerTeammate, decideTopic, decideWithPm } from "./decide.js";
-import { fileForLater, planInChat, plannedTickets } from "./plan.js";
+import { fileForLater, planInChat, plannedTickets, startNextMilestone } from "./plan.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
 
 /** The JSON body of an `http` answer: the line between the headers and the data note. */
@@ -1641,6 +1641,7 @@ export async function* chat(ctx: ItemContext): Script {
   return (
     (yield* notes(ctx, latest)) ??
     (yield* planInChat(talk, latest)) ??
+    (yield* startNextMilestone(latest)) ??
     (yield* fileForLater(latest)) ??
     (yield* aboutWork(ctx, talk, latest))
   );
@@ -1744,12 +1745,15 @@ export async function* mergeChecksFailed(ctx: ItemContext): Script {
   const run = need(/\/actions\/runs\/(\d+)\//.exec(url)?.[1], "the check's workflow run");
   yield { type: "shell", command: `gh run rerun ${run}`, cwd };
   yield* mustBeDenied(`gh pr merge ${number} --merge`, cwd);
+  // The team's pinned extension, installed at start: its command runs; installing another is refused.
+  const hello = String(yield { type: "shell", command: "gh hello", cwd }).trim();
+  yield* mustBeDenied("gh extension install acme/gh-hello --pin v1.0.0", cwd);
   yield {
     type: "tool",
     tool: "ticket_comment",
     input: {
       key,
-      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}. gh run rerun ${run}: requested.`,
+      body: `${check.name} failed after #${number} merged: ${check.lines.find((l) => l.startsWith("error:")) ?? "no log"} (from the wake). ost ci log: ${cause}. gh run rerun ${run}: requested. gh hello: ${hello}.`,
     },
   };
 

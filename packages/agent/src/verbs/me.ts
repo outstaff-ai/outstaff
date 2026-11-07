@@ -5,10 +5,21 @@ import type { UnpreparedRepo } from "#/repos/types.js";
 import type { ToolStatus } from "#/tools/types.js";
 import type { AgentEnv, NetworkAccess } from "./types.js";
 
+const extensionsOf = (t: ToolStatus) =>
+  t.extensions?.length
+    ? ` with ${t.extensions
+        .map((x) =>
+          x.state === "unavailable"
+            ? `${x.extension} UNAVAILABLE`
+            : `${t.name} ${x.command} (${x.extension})`,
+        )
+        .join(", ")}`
+    : "";
+
 const toolLine = (t: ToolStatus) =>
   t.state === "unavailable"
     ? `${t.name} ${t.version} UNAVAILABLE (${t.error})`
-    : `${t.name} ${t.version}`;
+    : `${t.name} ${t.version}${extensionsOf(t)}`;
 
 const listOrNone = (items: string[], sep: string) => (items.length ? items.join(sep) : "none");
 

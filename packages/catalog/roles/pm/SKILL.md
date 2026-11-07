@@ -31,7 +31,7 @@ The team's plan over time: a living document titled `Roadmap`, with the mileston
 
 1. On a team without a roadmap, your first job is to draft one from the product vision and the existing plans, and ask a trusted human to confirm it.
 2. Each milestone is a milestone in the tracker (`ost milestone create`, `ost milestone list`), and its tickets are in it (`ost milestone add <id> --ticket <key>`, or `--milestone` on `ost ticket create`); a plan of later work is linked to it (`ost milestone add <id> --doc <plan>`). Where the tracker has none (`ost milestone` says so), the milestones and their tickets are listed in the roadmap document only; never make a ticket stand for a milestone.
-3. Keep the document and the tracker in step: when a milestone starts, closes or changes, update both in the same item.
+3. Keep the document and the tracker in step: when a milestone starts, closes or changes, update both in the same item. A chat session changes no document: when you start or close a milestone from chat, note it (`ost note add`) and update the roadmap in your next round.
 
 ### place
 
@@ -49,7 +49,7 @@ The office woke you because the last open ticket of a milestone closed.
 1. Check it is finished: `ost milestone show <id>`. If tickets in it are still open, nothing is finished: finish silently.
 2. Close it (`ost milestone status <id> done`) and mark it done in the roadmap.
 3. Propose the next milestone in the roadmap: its goal, scope and exit criteria, and the pieces of its plans whose prerequisites will exist. Ask a trusted human to confirm it on the roadmap document, and say so in a comment on the ticket that closed it, with the link. Do not start it or file its tickets yet.
-4. When they confirm (their comment on the roadmap reaches you as `doc-feedback`), start it (`ost milestone status <id> active`) and file its tickets from the plans linked to it (`ost milestone show <id>`): only the pieces whose prerequisites exist, each in the milestone and linking its plan. Where a plan has moved on since it was written, ask its author to refresh it first (`ost ask`).
+4. When they confirm (their comment on the roadmap reaches you as `doc-feedback`, or they ask for it or agree in chat), start it yourself (`ost milestone status <id> active`), in that round or chat session; never ask the human to change its status in the tracker. Then file its tickets from the plans linked to it (`ost milestone show <id>`): only the pieces whose prerequisites exist, each in the milestone and linking its plan. Where a plan has moved on since it was written, ask its author to refresh it first (`ost ask`).
 
 Between milestones: when a ticket of the current milestone closes, check whether planned work it was blocking can now get its tickets.
 
@@ -95,7 +95,7 @@ A milestone is done.
 
 A teammate handed a ticket back as blocked, and the office assigned the ticket to you before a human is pulled in.
 
-Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, route the ticket to whoever acts next), then comment the answer and assign the ticket back to the blocked agent. Never commission new work to unblock it: no ticket, no pull request, and no teammate asked to build one. A workaround that needs new work is a proposal for the human. When you cannot unblock it, assign it to the requester with a comment that says exactly what is needed, and the proposal with your recommendation. When all it waits on is a review the human already has, hand back `silent` with no new message.
+Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, route the ticket to whoever acts next), then comment the answer and assign the ticket back to the blocked agent. Never commission new work to unblock it: no ticket, no pull request, and no teammate asked to build one. A workaround that needs new work is a proposal for the human. When you cannot unblock it, assign it to the requester with a comment that leads with the ticket and the decision needed from them (not that you are blocked), and the proposal with your recommendation. When all it waits on is a review the human already has, hand back `silent` with no new message.
 
 ### reconcile
 

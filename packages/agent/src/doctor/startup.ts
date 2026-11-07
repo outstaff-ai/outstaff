@@ -4,7 +4,7 @@ import { actsCheck } from "./acts.js";
 import { diskCheck } from "./disk.js";
 import { networkChecks } from "./network.js";
 import { repoChecks } from "./repos.js";
-import { toolPathChecks, toolStatusChecks } from "./tools.js";
+import { extensionChecks, toolPathChecks, toolStatusChecks } from "./tools.js";
 import type { DoctorReporter, StartupChecksInput } from "./types.js";
 
 /**
@@ -15,6 +15,7 @@ export async function startupChecks(input: StartupChecksInput): Promise<DoctorCh
   return [
     ...toolStatusChecks(input.tools),
     ...toolPathChecks(input.tools, input.env, input.executable),
+    ...extensionChecks(input.tools),
     ...(input.ports ? actsCheck(input.team, input.ports) : []),
     ...repoChecks(input.repositories),
     ...(await networkChecks(input, input.team, input.person, true)),

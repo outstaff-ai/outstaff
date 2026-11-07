@@ -3,6 +3,7 @@ import { CONFIG_CODES } from "#/config/codes.js";
 import { customIssue } from "#/config/issues.js";
 import { PROFILES } from "./constants.js";
 import { checkEntries } from "./tool-entries.js";
+import { checkExtensions } from "./tool-extensions.js";
 import { checkOptions } from "./tool-options.js";
 
 const d = (description: string) => ({ description });
@@ -145,6 +146,15 @@ export const toolDeclarationSchema = z
           'Options mise passes to the tool\'s backend, such as url, bin_path and checksum for an http: source. A value is a string, or a map for platform-keyed options: platforms: { linux-x64: { url: "..." } }. Needs source.',
         ),
       ),
+    extensions: z
+      .array(z.string().min(1))
+      .min(1)
+      .optional()
+      .meta(
+        d(
+          "Extensions of the code host's CLI to install at agent start, each pinned to an exact release tag or full commit id: [\"github/gh-actions-lock@v1.2.0\"]. Only the tool the vcs adapter names as its CLI (gh for GitHub) takes them. A declared extension's command is allowed; an `allow` entry that starts with it narrows it.",
+        ),
+      ),
     valued_options: z
       .array(z.string().regex(/^--?[^\s=-][^\s=]*$/, "Use the option as typed, for example -c."))
       .min(1)
@@ -209,6 +219,7 @@ export const toolsSchema = z
       checkOptions(name, t, ctx);
       checkEntries(name, "allow", t.allow, ctx);
       checkEntries(name, "deny", t.deny, ctx);
+      checkExtensions(name, t.extensions, ctx);
     }
   })
   .meta(

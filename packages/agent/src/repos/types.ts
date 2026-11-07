@@ -40,8 +40,11 @@ export interface HostCliRunnerOptions extends CredentialHelperOptions {
 }
 
 export interface HostCliRunner {
-  /** Runs the code host's CLI with `args` in `cwd`, with a fresh token, and resolves to its exit code. */
-  run(args: string[], cwd: string): Promise<number>;
+  /**
+   * Runs the code host's CLI with `args` in `cwd`, with a fresh token, and resolves to its exit code. The token is for
+   * `repo` (`owner/name`) when given, else for the repository `-R` names, else for the working directory's.
+   */
+  run(args: string[], cwd: string, repo?: string): Promise<number>;
 }
 
 export interface CredentialHelper {
