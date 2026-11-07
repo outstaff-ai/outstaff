@@ -25,36 +25,38 @@ async function sizeOnce(path: string, seen: Set<string>): Promise<number> {
   return s.blocks * 512;
 }
 
+/** One folder's walk, from the entries left; resolves to its size and whether it was cut short. */
+async function walk(path: string, seen: Set<string>, budget: { left: number }) {
+  let bytes = 0;
+  const stack = [path];
+  while (stack.length > 0 && budget.left > 0) {
+    const dir = stack.pop()!;
+    bytes += await sizeOnce(dir, seen);
+    const entries = await entriesOf(dir);
+    budget.left -= entries.length;
+    stack.push(...entries.filter((e) => e.isDirectory()).map((e) => join(dir, e.name)));
+    for (const e of entries.filter((x) => !x.isDirectory())) {
+      bytes += await sizeOnce(join(dir, e.name), seen);
+    }
+  }
+
+  return { bytes, capped: stack.length > 0 };
+}
+
 /**
  * Measures the folders in one walk, like `du`: symbolic links are not followed, and a file hard-linked into several
  * folders (pnpm links its store into each `node_modules`) counts once, in the first folder that has it. A missing
- * folder is 0. The walk stops after `maxEntries` entries in all; the folders it did not finish are `capped`.
+ * folder is 0. The walk stops after about `maxEntries` entries in all; the folders it did not finish are `capped`.
  */
 export async function measureFolders(
   folders: HomeFolder[],
   maxEntries = MAX_ENTRIES,
 ): Promise<MeasuredFolder[]> {
   const seen = new Set<string>();
-  let left = maxEntries;
+  const budget = { left: maxEntries };
   const measured: MeasuredFolder[] = [];
   for (const folder of folders) {
-    let bytes = 0;
-    const stack = [folder.path];
-    while (stack.length > 0 && left > 0) {
-      const dir = stack.pop()!;
-      bytes += await sizeOnce(dir, seen);
-      for (const e of await entriesOf(dir)) {
-        left -= 1;
-        const path = join(dir, e.name);
-        if (e.isDirectory()) {
-          stack.push(path);
-        } else {
-          bytes += await sizeOnce(path, seen);
-        }
-      }
-    }
-
-    measured.push({ ...folder, bytes, capped: stack.length > 0 });
+    measured.push({ ...folder, ...(await walk(folder.path, seen, budget)) });
   }
 
   return measured;

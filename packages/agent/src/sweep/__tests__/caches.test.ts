@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { HomeFolder } from "#/home/index.js";
-import type { MiseResult } from "#/tools/index.js";
+import type { MiseResult, ProgramRunner } from "#/tools/index.js";
 import { createCachePruner } from "#/sweep/caches.js";
 import { removeOlderThan } from "#/sweep/old-files.js";
 import { capturingLog } from "./marcus.js";
@@ -29,7 +29,7 @@ function pruner(share: number, installed = ["mise", "pnpm", "npm"]) {
     [folderOf["npm"]!]: 400 * MIB,
   };
 
-  const run = vi.fn(async (file: string, args: string[]): Promise<MiseResult> => {
+  const run = vi.fn<ProgramRunner>(async (file, args): Promise<MiseResult> => {
     if (!installed.includes(file)) {
       return { code: 127, stdout: "", stderr: `${file} is not installed in this image.` };
     }
