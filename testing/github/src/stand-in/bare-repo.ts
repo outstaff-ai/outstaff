@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { git, must } from "./git-run.js";
@@ -30,8 +30,14 @@ export class BareRepo implements RepoBackend {
     this.dir = join(root, owner, `${name}.git`);
   }
 
-  /** Creates the repository with one commit of `files` on main, unless it exists. */
-  async init(files: Record<string, string>): Promise<void> {
+  /**
+   * Creates the repository with one commit of `files` on main, unless it exists. `executable` files are committed
+   * with their execute bit; `tag` tags the commit.
+   */
+  async init(
+    files: Record<string, string>,
+    opts: { executable?: string[]; tag?: string } = {},
+  ): Promise<void> {
     if (existsSync(this.dir)) {
       return;
     }
@@ -43,11 +49,18 @@ export class BareRepo implements RepoBackend {
       await must(["init", "--initial-branch=main", work]);
       for (const [path, text] of Object.entries(files)) {
         writeFileSync(join(work, path), text);
+        if (opts.executable?.includes(path)) {
+          chmodSync(join(work, path), 0o755);
+        }
       }
 
       await must(["add", "-A"], work);
       await must(["commit", "-m", "Initial commit"], work);
       await must(["push", this.dir, "main"], work);
+      if (opts.tag) {
+        await must(["tag", opts.tag], work);
+        await must(["push", this.dir, opts.tag], work);
+      }
     });
   }
 
@@ -58,6 +71,17 @@ export class BareRepo implements RepoBackend {
     );
 
     return r.code === 0 ? r.stdout.trim() : undefined;
+  }
+
+  /** The commit a branch, tag or commit id names; undefined when it names none. */
+  async resolve(ref: string): Promise<string | undefined> {
+    const r = await git(["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], this.dir);
+    return r.code === 0 ? r.stdout.trim() : undefined;
+  }
+
+  /** Whether a file is at `path` on the default branch. */
+  async has(path: string): Promise<boolean> {
+    return (await git(["cat-file", "-e", `main:${path}`], this.dir)).code === 0;
   }
 
   async branches(): Promise<Record<string, string>> {

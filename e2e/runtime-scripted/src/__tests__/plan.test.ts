@@ -89,6 +89,33 @@ describe("planning in chat", () => {
   });
 });
 
+describe("starting the next milestone from chat", () => {
+  const start = { from: "ada", agent: false, text: "Start the next milestone." };
+
+  it("starts the first planned milestone itself and says so", async () => {
+    const r = await play(chat({ ...base, conversation: [start] }), {
+      milestone_list:
+        "- 12 [planned] Checkout cleanup: https://plan.example/i/12\n- 13 [planned] Payments: https://plan.example/i/13",
+    });
+
+    expect(r.tools).toEqual([
+      { tool: "milestone_list", input: { status: ["planned"] } },
+      { tool: "milestone_status", input: { id: "12", to: "active" } },
+    ]);
+
+    expect(r.text).toBe("Started Checkout cleanup (12).");
+  });
+
+  it("says so when no milestone is planned", async () => {
+    const r = await play(chat({ ...base, conversation: [start] }), {
+      milestone_list: "No milestones.",
+    });
+
+    expect(r.tools.map((t) => t.tool)).toEqual(["milestone_list"]);
+    expect(r.text).toBe("There is no planned milestone to start.");
+  });
+});
+
 describe("a request for later in chat", () => {
   const later = {
     from: "ada",

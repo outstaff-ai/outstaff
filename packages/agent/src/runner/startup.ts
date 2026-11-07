@@ -9,6 +9,7 @@ import { loadCatalogs, loadToolsets } from "./catalogs.js";
 import { startChat } from "./startup-chat.js";
 import { loadStartupContext, officeConnection } from "./startup-context.js";
 import { createRuntime, runtimeAdapter, writeWorkdirFiles } from "./startup-runtime.js";
+import { installToolExtensions } from "./startup-extensions.js";
 import { buildPolicies, installHostCli, renderWorkdir } from "./startup-steps.js";
 import {
   agentWorkspaces,
@@ -58,6 +59,14 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
   const tools = effectiveTools({ toolsets, team: team.tools, person: me.tools });
   const toolStatuses = await installTools(ctx, env, tools);
   installHostCli(opts, env);
+  const extensions = await installToolExtensions(
+    opts,
+    env,
+    { team, person, profile: rendered.profile, log },
+    tools,
+    toolStatuses,
+  );
+
   const runtimeDef = runtimeAdapter(ctx);
   const capabilities = roleCapabilities(ctx, roles, rendered.extends, runtimeDef);
   const addDirs = prepareDirs(layout, capabilities);
@@ -73,6 +82,7 @@ export async function prepareAgent(opts: StartupOptions): Promise<PreparedAgent>
     layout,
     toolsets,
     tools,
+    extensions,
     capabilities,
   });
 

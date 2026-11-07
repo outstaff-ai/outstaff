@@ -27,6 +27,8 @@ export const CONFIG_CODES = {
   toolsOptionsWithoutSource: "tools.options_without_source",
   toolsReservedOption: "tools.reserved_option",
   toolsHttpChecksum: "tools.http_checksum",
+  toolsInvalidExtension: "tools.invalid_extension",
+  toolsUnpinnedExtension: "tools.unpinned_extension",
   policiesCommandProgram: "policies.command_program",
   policiesCustomInvalid: "policies.custom_invalid",
   adapterInvalidOptions: "integrations.invalid_options",

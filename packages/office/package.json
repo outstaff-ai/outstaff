@@ -45,7 +45,7 @@
     "@outstaff/integration.vcs.github": "workspace:*",
     "@outstaff/policy": "workspace:*",
     "@outstaff/protocol": "workspace:*",
-    "kysely": "0.29.7",
+    "kysely": "0.29.8",
     "pg": "8.23.1",
     "ws": "8.22.1"
   },

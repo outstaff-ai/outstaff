@@ -1,6 +1,7 @@
 import type { Link } from "@outstaff/protocol";
 import type { Offer } from "#/office-client/index.js";
 import type { ChatReportKind } from "#/verbs/office.types.js";
+import { blockedText } from "./chat-report.js";
 import { JOURNAL_PROMPT, journalEntry } from "./journal.js";
 import type { WorkerContext } from "./loop.types.js";
 import { linksIn } from "./links.js";
@@ -14,13 +15,13 @@ import type { HandBack, HandBackStatus, ItemRun, Outcome } from "./work.types.js
 export { CHAT_KIND } from "./work-setup.js";
 
 /** What the requester is told about a finished item, by status; waiting items report once they are done. */
-const REPORTS: Partial<Record<HandBackStatus, { kind: "result" | "blocked"; fallback: string }>> = {
-  done: { kind: "result", fallback: "Done." },
+const REPORTS: Partial<Record<HandBackStatus, "result" | "blocked">> = {
+  done: "result",
   // A silent finish leaves the ticket alone; a chat request still gets its answer in the thread.
-  silent: { kind: "result", fallback: "Done." },
+  silent: "result",
   // The office says whether the agent tells the requester about a blocked item (when the team has no PM to route it
   // to, or the switch says so); the runner posts it, so it does not depend on the model.
-  blocked: { kind: "blocked", fallback: "Blocked." },
+  blocked: "blocked",
 };
 
 /** The hand-back's words: the summary with its links, and the agent's message for the human when it gave one. */
@@ -29,6 +30,20 @@ const handedBackWords = (summary: string, message: string | undefined) => ({
   ...(message ? { message } : {}),
   links: linksIn(summary),
 });
+
+/** What the requester is told: the summary of a result, and the agent's own words of a blocked item. */
+function reportText(offer: Offer, kind: "result" | "blocked", summary: string, message?: string) {
+  if (kind === "result") {
+    return summary || "Done.";
+  }
+
+  const { subject } = offer.workItem;
+  return blockedText({
+    message,
+    summary,
+    ...(subject?.type === "ticket" ? { ticket: subject.ref } : {}),
+  });
+}
 
 /** Statuses that end the item: its worktree and scratch directory go. */
 const FINISHED = new Set<HandBackStatus>(["done", "silent"]);
@@ -156,9 +171,9 @@ export function createWorker(ctx: WorkerContext) {
       usage: usageReport(run),
     });
 
-    const tell = REPORTS[status];
-    if (tell && !item.filedWork()) {
-      await report(offer, tell.kind, summary || tell.fallback, linksIn(summary));
+    const kind = REPORTS[status];
+    if (kind && !item.filedWork()) {
+      await report(offer, kind, reportText(offer, kind, summary, item.message()), linksIn(summary));
     }
 
     // Waiting and blocked items keep their worktree for the next round.

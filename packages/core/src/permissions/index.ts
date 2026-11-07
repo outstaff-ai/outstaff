@@ -3,7 +3,8 @@ export { commandRules } from "./builtin-rules.js";
 export { CHAT_VERBS, PROFILE_SPECS, profileAllowsWrite } from "./profiles.js";
 
 export { loadToolset, parseToolset, teamCommandsToPack, toolsetToPack } from "./packs.js";
-export { effectiveTools, toolsToPacks } from "./tools.js";
+export { effectiveTools, extensionsToPack, toolsToPacks } from "./tools.js";
+export { isPinnedRef, parseToolExtension } from "./tool-extensions.js";
 export { teamCommandsSchema, toolsSchema, toolsetSchema } from "./schema.js";
 
 export { evaluate } from "./evaluate.js";
@@ -34,3 +35,5 @@ export type {
   Toolset,
   WorktreeOwner,
 } from "./types.js";
+
+export type { InstalledExtension, ToolExtension } from "./tool-extensions.types.js";
