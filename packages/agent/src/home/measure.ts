@@ -9,20 +9,20 @@ export const MAX_ENTRIES = 2_000_000;
 const entriesOf = (dir: string): Promise<Dirent[]> =>
   readdir(dir, { withFileTypes: true }).catch(() => []);
 
-/** The space a file takes on disk, once per inode; zero when it was counted already or is gone. */
-async function sizeOnce(path: string, seen: Set<string>): Promise<number> {
+/**
+ * The space an entry takes on disk, once per inode (zero when it was counted already or is gone), and whether it is a
+ * folder to go into: a link to one is not.
+ */
+async function sizeOnce(path: string, seen: Set<string>) {
   const s = await lstat(path).catch(() => undefined);
   if (!s) {
-    return 0;
+    return { bytes: 0, dir: false };
   }
 
   const key = `${s.dev}:${s.ino}`;
-  if (seen.has(key)) {
-    return 0;
-  }
-
+  const bytes = seen.has(key) ? 0 : s.blocks * 512;
   seen.add(key);
-  return s.blocks * 512;
+  return { bytes, dir: s.isDirectory() };
 }
 
 /** One folder's walk, from the entries left; resolves to its size and whether it was cut short. */
@@ -31,12 +31,17 @@ async function walk(path: string, seen: Set<string>, budget: { left: number }) {
   const stack = [path];
   while (stack.length > 0 && budget.left > 0) {
     const dir = stack.pop()!;
-    bytes += await sizeOnce(dir, seen);
+    const own = await sizeOnce(dir, seen);
+    bytes += own.bytes;
+    if (!own.dir) {
+      continue;
+    }
+
     const entries = await entriesOf(dir);
     budget.left -= entries.length;
     stack.push(...entries.filter((e) => e.isDirectory()).map((e) => join(dir, e.name)));
     for (const e of entries.filter((x) => !x.isDirectory())) {
-      bytes += await sizeOnce(join(dir, e.name), seen);
+      bytes += (await sizeOnce(join(dir, e.name), seen)).bytes;
     }
   }
 
@@ -46,7 +51,8 @@ async function walk(path: string, seen: Set<string>, budget: { left: number }) {
 /**
  * Measures the folders in one walk, like `du`: symbolic links are not followed, and a file hard-linked into several
  * folders (pnpm links its store into each `node_modules`) counts once, in the first folder that has it. A missing
- * folder is 0. The walk stops after about `maxEntries` entries in all; the folders it did not finish are `capped`.
+ * folder is 0, and a file or link is its own size. The walk stops after about `maxEntries` entries in all; the folders
+ * it did not finish are `capped`.
  */
 export async function measureFolders(
   folders: HomeFolder[],

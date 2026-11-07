@@ -1,8 +1,8 @@
 import type { WorkState } from "@outstaff/protocol";
 
-/** A known folder of the agent's home that can grow large. */
+/** A folder of the agent's home, as the breakdown names it. */
 export interface HomeFolder {
-  /** What it is, for a person: `worktrees`, `pnpm store`, ... */
+  /** What it is, for a person: `worktrees`, or its path with `~` for the home (`~/.cache/pnpm`). */
   name: string;
   path: string;
 }
@@ -19,6 +19,8 @@ export type MeasureFolders = (folders: HomeFolder[]) => Promise<MeasuredFolder[]
 export interface HomeSpaceOptions {
   home: string;
   env: NodeJS.ProcessEnv;
+
+  /** Named `worktrees` in the breakdown, with its items. */
   worktreesDir: string;
 
   /** The items that have a worktree, and the office's state of each. */
@@ -31,12 +33,15 @@ export interface HomeSpaceOptions {
 
 /** What fills the agent's home. */
 export interface HomeSpace {
-  /** The known folders, in the order they are measured: a store before the worktrees that link into it. */
-  folders(): HomeFolder[];
+  /**
+   * The home's entries, with the cache and data homes split into theirs, in the order they are measured: the cache and
+   * data homes' first, the worktrees last, so a file a store hard-links into a worktree counts in the store.
+   */
+  folders(): Promise<HomeFolder[]>;
 
   /**
-   * The largest known folders with their sizes, largest first, worktrees with how many are blocked or waiting; for the
-   * doctor's fix line. Undefined when nothing could be measured.
+   * The five largest folders with their sizes, largest first, the worktrees with how many items have one and
+   * how many of those are blocked or waiting; for the doctor's fix line. Undefined when nothing could be measured.
    */
   breakdown(): Promise<string | undefined>;
 }

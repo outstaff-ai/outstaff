@@ -2,9 +2,10 @@ import { existsSync, mkdirSync, mkdtempSync, utimesSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
+import type { VolumeUsage } from "#/doctor/types.js";
 import { measureFolders, type HomeFolder } from "#/home/index.js";
 import type { MiseResult, ProgramRunner } from "#/tools/index.js";
-import { createCachePruner } from "#/sweep/caches.js";
+import { CACHE_RULES, createCachePruner } from "#/sweep/caches.js";
 import { removeOlderThan } from "#/sweep/old-files.js";
 import { capturingLog } from "./marcus.js";
 
@@ -25,10 +26,10 @@ function written(dir: string, ms: number, ...names: string[]) {
 }
 
 /**
- * Marcus's home, with the volume `share` full, the tools in `installed` on PATH and, with `mise`, two download
- * archives of mise: one written two hours ago, one a minute ago.
+ * Marcus's home, with the volume `share` full, the tools in `installed` runnable and, with `mise`, two download
+ * archives of mise: one written two hours ago, one a minute ago. The pnpm and npm folders are there.
  */
-function pruner(share: number, installed = ["pnpm", "npm"], mise = true) {
+function pruner(share: number, installed = ["mise", "pnpm", "npm"], mise = true) {
   const home = mkdtempSync(join(tmpdir(), "ost-caches-"));
   const calls: string[] = [];
   const downloads = join(home, ".cache/mise/downloads-cas");
@@ -45,6 +46,8 @@ function pruner(share: number, installed = ["pnpm", "npm"], mise = true) {
     npm: join(home, ".npm"),
   };
 
+  mkdirSync(folderOf["pnpm"]!, { recursive: true });
+  mkdirSync(join(folderOf["npm"]!, "_cacache/index-v5"), { recursive: true });
   const sizes: Record<string, number> = {
     [folderOf["pnpm"]!]: 600 * MIB,
     [folderOf["npm"]!]: 400 * MIB,
@@ -65,9 +68,9 @@ function pruner(share: number, installed = ["pnpm", "npm"], mise = true) {
   });
 
   const measure = async (folders: HomeFolder[]) =>
-    folders[0]!.path === downloads
+    sizes[folders[0]!.path] === undefined
       ? measureFolders(folders)
-      : folders.map((f) => ({ ...f, bytes: sizes[f.path] ?? 0, capped: false }));
+      : folders.map((f) => ({ ...f, bytes: sizes[f.path]!, capped: false }));
 
   const log = capturingLog();
   const caches = createCachePruner({
@@ -102,7 +105,7 @@ describe("cache pruning", () => {
   });
 
   it("also prunes the pnpm store and old npm entries over the doctor's warning share", async () => {
-    const t = pruner(0.8, ["pnpm", "npm"], false);
+    const t = pruner(0.8, ["mise", "pnpm", "npm"], false);
     const index = join(t.home, ".npm/_cacache/index-v5/ab/cd");
     const [old] = written(index, 31 * 24 * 60 * 60 * 1000, "old");
     const [recent] = written(index, 29 * 24 * 60 * 60 * 1000, "recent");
@@ -119,11 +122,26 @@ describe("cache pruning", () => {
     );
   });
 
-  it("skips a tool that is not installed, quietly", async () => {
-    const t = pruner(0.9, ["pnpm"], false);
+  it("skips a tool that is not installed, or whose shim resolves no version in the home, quietly", async () => {
+    const t = pruner(0.9);
+    t.run.mockImplementation(async (file) =>
+      file === "pnpm"
+        ? { code: 1, stdout: "", stderr: "mise ERROR No version is set for shim: pnpm" }
+        : file === "npm"
+          ? { code: 127, stdout: "", stderr: "npm is not installed in this image." }
+          : { code: 0, stdout: "", stderr: "" },
+    );
 
-    expect((await t.caches.prune()).map((p) => p.cache)).toEqual(["pnpm"]);
+    expect((await t.caches.prune()).map((p) => p.cache)).toEqual(["mise"]);
+    expect(t.run.mock.calls.filter(([, args]) => args[0] !== "--version")).toEqual([]);
     expect(t.log.warn).not.toHaveBeenCalled();
+  });
+
+  it("skips a rule whose folder does not exist without running its tool", async () => {
+    const t = pruner(0.5, ["mise"], false);
+
+    expect(await t.caches.prune()).toEqual([]);
+    expect(t.run).not.toHaveBeenCalled();
   });
 
   it("logs nothing when no tool is installed", async () => {
@@ -159,6 +177,59 @@ describe("cache pruning", () => {
     });
 
     expect((await caches.prune()).map((p) => p.cache)).toEqual(["mise"]);
+  });
+
+  it("runs a rule for every sweep without reading the volume, when no rule waits for a full one", async () => {
+    const home = mkdtempSync(join(tmpdir(), "ost-caches-"));
+    mkdirSync(join(home, ".acme"));
+    const volume = vi.fn<(path: string) => Promise<VolumeUsage>>(async () => ({
+      used: 99,
+      total: 100,
+    }));
+
+    const run = vi.fn<ProgramRunner>(async () => ({ code: 0, stdout: "", stderr: "" }));
+    const caches = createCachePruner({
+      home,
+      env: {},
+      run,
+      volume,
+      rules: [
+        {
+          tool: "acme",
+          folder: (h) => join(h, ".acme"),
+          command: ["gc"],
+          when: "every_sweep",
+        },
+      ],
+    });
+
+    expect(await caches.prune()).toEqual([{ cache: "acme", freed: 0 }]);
+    expect(run.mock.calls.map(([file, args]) => [file, ...args].join(" "))).toEqual([
+      "acme --version",
+      "acme gc",
+    ]);
+
+    expect(volume).not.toHaveBeenCalled();
+  });
+
+  it("finds each tool's cache where the tool puts it", () => {
+    const folders = (env: NodeJS.ProcessEnv) =>
+      Object.fromEntries(CACHE_RULES.map((r) => [r.tool, r.folder("/home/marcus", env)]));
+
+    expect(folders({})).toEqual({
+      mise: "/home/marcus/.cache/mise",
+      pnpm: "/home/marcus/.local/share/pnpm",
+      npm: "/home/marcus/.npm",
+    });
+
+    expect(folders({ XDG_CACHE_HOME: "/cache", XDG_DATA_HOME: "/data" })).toMatchObject({
+      mise: "/cache/mise",
+      pnpm: "/data/pnpm",
+    });
+
+    expect(
+      folders({ MISE_CACHE_DIR: "/var/mise", npm_config_cache: "/npm", XDG_DATA_HOME: "/data" }),
+    ).toEqual({ mise: "/var/mise", pnpm: "/data/pnpm", npm: "/npm" });
   });
 
   it("finds nothing old in a folder that does not exist", async () => {

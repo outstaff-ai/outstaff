@@ -40,13 +40,33 @@ export interface PrunedCache {
   freed: number;
 }
 
+/**
+ * How the sweep prunes one tool's cache. `olderThan` removes the files below `folder/below` not written for `ms`;
+ * `command` then runs the tool with those arguments in the agent's home. A rule has one or both.
+ */
+export interface CacheRule {
+  /** The program that owns the cache; the rule applies only when it runs from the agent's home. */
+  tool: string;
+
+  /** The cache's folder, measured before and after for what was freed, as the tool resolves it from home and env. */
+  folder: (home: string, env: NodeJS.ProcessEnv) => string;
+  olderThan?: { below: string; ms: number };
+  command?: string[];
+
+  /** `every_sweep`, or `short_of_space`: only while the home volume is over the doctor's warning share. */
+  when: "every_sweep" | "short_of_space";
+}
+
 export interface CachePrunerOptions {
   home: string;
   env: NodeJS.ProcessEnv;
   log?: Logger;
 
-  /** Runs mise, pnpm and npm. Defaults to the programs on PATH. */
+  /** Runs each rule's tool. Defaults to the programs on PATH. */
   run?: ProgramRunner;
+
+  /** Defaults to {@link CACHE_RULES}. */
+  rules?: CacheRule[];
 
   /** Reads how full the home volume is. Defaults to statfs. */
   volume?: (path: string) => Promise<VolumeUsage>;

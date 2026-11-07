@@ -2,7 +2,7 @@ import { linkSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { cacheDirs, createHomeSpace, humanSize, measureFolders } from "#/home/index.js";
+import { cacheHome, createHomeSpace, dataHome, humanSize, measureFolders } from "#/home/index.js";
 import type { HomeFolder } from "#/home/index.js";
 
 const MIB = 1024 ** 2;
@@ -54,30 +54,27 @@ describe("measuring the home", () => {
     expect(second).toMatchObject({ bytes: 0, capped: true });
   });
 
-  it("finds each tool's folders where the tool puts them", () => {
-    expect(cacheDirs("/home/sam", {})).toEqual({
-      miseData: "/home/sam/.local/share/mise",
-      miseCache: "/home/sam/.cache/mise",
-      pnpmStore: "/home/sam/.local/share/pnpm",
-      pnpmCache: "/home/sam/.cache/pnpm",
-      npmCache: "/home/sam/.npm",
-    });
+  it("measures a link as itself, not what it points at, and a file as its size", async () => {
+    const home = homeDir();
+    mkdirSync(join(home, "big"));
+    writeFileSync(join(home, "big/blob"), "x".repeat(256 * 1024));
+    symlinkSync(join(home, "big"), join(home, "link"));
+    writeFileSync(join(home, "notes.txt"), "y".repeat(64 * 1024));
 
-    expect(
-      cacheDirs("/home/sam", {
-        MISE_DATA_DIR: "/opt/mise",
-        MISE_CACHE_DIR: "/var/mise",
-        XDG_DATA_HOME: "/data",
-        XDG_CACHE_HOME: "/cache",
-        npm_config_cache: "/npm",
-      }),
-    ).toEqual({
-      miseData: "/opt/mise",
-      miseCache: "/var/mise",
-      pnpmStore: "/data/pnpm",
-      pnpmCache: "/cache/pnpm",
-      npmCache: "/npm",
-    });
+    const [link, file] = await measureFolders([
+      { name: "link", path: join(home, "link") },
+      { name: "notes", path: join(home, "notes.txt") },
+    ]);
+
+    expect(link!.bytes).toBeLessThan(256 * 1024);
+    expect(file!.bytes).toBeGreaterThanOrEqual(64 * 1024);
+  });
+
+  it("finds the cache and data homes where XDG puts them", () => {
+    expect(cacheHome("/home/sam", {})).toBe("/home/sam/.cache");
+    expect(dataHome("/home/sam", {})).toBe("/home/sam/.local/share");
+    expect(cacheHome("/home/sam", { XDG_CACHE_HOME: "/cache" })).toBe("/cache");
+    expect(dataHome("/home/sam", { XDG_DATA_HOME: "/data" })).toBe("/data");
   });
 
   it("writes sizes the way a person reads them", () => {
@@ -87,21 +84,44 @@ describe("measuring the home", () => {
 });
 
 describe("what fills the home", () => {
+  /** Sam's home: whatever tools happen to have left there, and the worktrees. */
+  function samsHome(extra: string[] = []) {
+    const home = homeDir();
+    for (const dir of [
+      ".cache/acme-cli",
+      ".cache/pip",
+      ".local/share/mise",
+      ".local/share/pnpm",
+      ".local/bin",
+      ".npm",
+      "work",
+      "worktrees/shop/ACME-12",
+      ...extra,
+    ]) {
+      mkdirSync(join(home, dir), { recursive: true });
+    }
+
+    writeFileSync(join(home, ".bashrc"), "");
+    return home;
+  }
+
   const SIZES: Record<string, number> = {
-    "pnpm store": 625 * MIB,
-    "mise tools": 665 * MIB,
-    "mise cache": 552 * MIB,
-    "npm cache": 437 * MIB,
-    "pnpm cache": 0,
+    "~/.local/share/pnpm": 625 * MIB,
+    "~/.local/share/mise": 665 * MIB,
+    "~/.cache/acme-cli": 552 * MIB,
+    "~/.npm": 437 * MIB,
+    "~/.cache/pip": 12 * MIB,
+    "~/.local/bin": 3 * MIB,
     worktrees: 1.2 * GIB,
   };
 
   const space = (over: Partial<Parameters<typeof createHomeSpace>[0]> = {}) => {
     const measured: HomeFolder[][] = [];
-    const home = createHomeSpace({
-      home: "/home/sam",
+    const home = over.home ?? samsHome();
+    const homeSpace = createHomeSpace({
+      home,
       env: {},
-      worktreesDir: "/home/sam/worktrees",
+      worktreesDir: join(home, "worktrees"),
       held: () => ["ACME-12", "ACME-15", "ACME-20"],
       workStatus: async (ids) =>
         ids.map((workItemId, i) => ({ workItemId, state: i === 0 ? "active" : "blocked" })),
@@ -109,26 +129,57 @@ describe("what fills the home", () => {
         measured.push(folders);
         return folders.map((f) => ({
           ...f,
-          bytes: SIZES[f.name]!,
-          capped: f.name === "mise tools",
+          bytes: SIZES[f.name] ?? 0,
+          capped: f.name === "~/.local/share/mise",
         }));
       },
       ...over,
     });
 
-    return { home, measured };
+    return { home: homeSpace, measured };
   };
 
-  it("names the largest folders, largest first, with the worktrees' items", async () => {
+  it("names the five largest folders, largest first, with the worktrees' items", async () => {
     const { home, measured } = space();
 
     expect(await home.breakdown()).toBe(
-      "Largest in the home: worktrees 1.2 GiB (3 items, 2 blocked or waiting), mise tools over 665 MiB, pnpm store 625 MiB, mise cache 552 MiB, npm cache 437 MiB.",
+      "Largest in the home: worktrees 1.2 GiB (3 items, 2 blocked or waiting), ~/.local/share/mise over 665 MiB, ~/.local/share/pnpm 625 MiB, ~/.cache/acme-cli 552 MiB, ~/.npm 437 MiB.",
     );
 
-    // The store is measured before the worktrees that link into it.
+    // The cache and data homes are split into their entries and measured first; the worktrees last, so a store
+    // hard-linked into them counts in the store. A folder that holds them is not measured as well.
     const names = measured[0]!.map((f) => f.name);
-    expect(names.indexOf("pnpm store")).toBeLessThan(names.indexOf("worktrees"));
+    expect(names.slice(0, 4).toSorted()).toEqual([
+      "~/.cache/acme-cli",
+      "~/.cache/pip",
+      "~/.local/share/mise",
+      "~/.local/share/pnpm",
+    ]);
+
+    expect(names.at(-1)).toBe("worktrees");
+    expect(names).toEqual(
+      expect.arrayContaining(["~/.local/bin", "~/.npm", "~/work", "~/.bashrc"]),
+    );
+
+    expect(names).not.toContain("~/.cache");
+    expect(names).not.toContain("~/.local");
+  });
+
+  it("follows XDG overrides, inside the home or out of it", async () => {
+    const home = samsHome(["xdg/data/acme"]);
+    const elsewhere = homeDir();
+    mkdirSync(join(elsewhere, "pnpm"));
+    const { home: s, measured } = space({
+      home,
+      env: { XDG_CACHE_HOME: elsewhere, XDG_DATA_HOME: join(home, "xdg/data") },
+    });
+
+    await s.breakdown();
+
+    const names = measured[0]!.map((f) => f.name);
+    expect(names.slice(0, 2).toSorted()).toEqual([join(elsewhere, "pnpm"), "~/xdg/data/acme"]);
+    expect(names).toEqual(expect.arrayContaining(["~/.cache", "~/.local"]));
+    expect(names).not.toContain("~/xdg");
   });
 
   it("counts the items alone when the office cannot say their state", async () => {
@@ -141,14 +192,14 @@ describe("what fills the home", () => {
     expect(await space({ held: () => [] }).home.breakdown()).toContain("worktrees 1.2 GiB, ");
 
     const empty = createHomeSpace({
-      home: "/home/sam",
+      home: homeDir(),
       env: {},
-      worktreesDir: "/home/sam/worktrees",
+      worktreesDir: "/nowhere/worktrees",
       held: () => [],
       workStatus: async () => [],
-      measure: async (folders) => folders.map((f) => ({ ...f, bytes: 0, capped: false })),
     });
 
+    expect(await empty.folders()).toEqual([]);
     expect(await empty.breakdown()).toBeUndefined();
   });
 });
