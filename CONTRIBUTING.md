@@ -35,7 +35,7 @@ pnpm install && pnpm --filter outstaff... run build   # the test runs the built 
 node e2e/run.ts                                       # builds the images, runs the loop, tears everything down
 ```
 
-Needs Docker with Compose, `openssl` and `git`. `E2E_PREBUILT=1` skips the image build, `E2E_KEEP=1` leaves the stack up for a look around, `E2E_TIMEOUT_MS` bounds the run (default ten minutes). On a failure it prints the tail of the stub, office and agent logs. The office polls the stubs every second (`OUTSTAFF_POLL_INTERVAL_MS`, a testing knob below the config's minimum), and a check that something does not happen waits for two more office polls, which the office counts in its health answer, instead of a fixed time.
+Needs Docker with Compose, `openssl` and `git`. `E2E_PREBUILT=1` skips the image build, `E2E_KEEP=1` leaves the stack up for a look around, `E2E_TIMEOUT_MS` bounds the run (default ten minutes). On a failure it prints the tail of the stub, office and agent logs, then the first lines of the details; `E2E_ARTIFACTS=<dir>` also writes each service's full log there and, on a failure, the details and the stub's state (the workflow keeps them as the run's artifacts for seven days). The office polls the stubs every second (`OUTSTAFF_POLL_INTERVAL_MS`, a testing knob below the config's minimum), and a check that something does not happen waits for two more office polls, which the office counts in its health answer, instead of a fixed time.
 
 What is real: the `ost hire` command, the office with Postgres, the agent image, the GitHub and Its a Plan adapters talking HTTP, the agent's `ost` verbs, git cloning, committing, pushing and force-pushing over https with the credential helper, and the App JWT and installation token flow.
 

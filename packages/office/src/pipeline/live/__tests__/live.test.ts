@@ -183,6 +183,30 @@ describe("createLivePipeline", () => {
     ]);
   });
 
+  it("queues one item when a ticket's own wake and the idle pull for it are judged at once", async () => {
+    const { opts, store: s } = await setup();
+    const live = createLivePipeline(opts);
+    const idle = {
+      id: "office:idle:sam:2026-10-05T09:00:00.000Z",
+      type: "agent.idle" as const,
+      at: "2026-10-05T09:00:00.000Z",
+      subject: {},
+      actor: { kind: "agent" as const, id: "sam" },
+      data: {},
+    };
+
+    // The ticket assigned to sam and the idle pull after his last hand-back, both before either queued anything.
+    const [own, pulled] = await Promise.all([
+      live.handle(assigned, { source: "tracker", externalId: "e-1" }),
+      live.judge(idle),
+    ]);
+
+    const items = await s.listItems({ person: "sam" });
+    expect(items).toHaveLength(1);
+    expect(own?.decisions).toMatchObject([{ type: "wake", itemId: items[0]!.id }]);
+    expect(pulled?.decisions).toMatchObject([{ type: "wake", itemId: items[0]!.id }]);
+  });
+
   it("has the agent mark its ticket active when its work starts", async () => {
     const { opts, acts } = await setup();
     const live = createLivePipeline(opts);
