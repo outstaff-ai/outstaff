@@ -4,6 +4,7 @@ import type { WorkState } from "@outstaff/protocol";
 import { describe, expect, it, vi } from "vitest";
 import { createManualClock } from "#/office-client/__tests__/testing.js";
 import { createSweeper } from "#/sweep/sweeper.js";
+import type { CachePruner } from "#/sweep/types.js";
 import { DAY, capturingLog, fakeOffice, marcus, offer, sh, worktreesOf } from "./marcus.js";
 
 const ITEMS = ["ACME-12", "ACME-15", "ACME-18", "ACME-20", "ACME-22"];
@@ -206,7 +207,7 @@ describe("sweeper", () => {
     const m = marcus();
     await m.workspaces.prepare(offer("ACME-12"));
     const fake = fakeOffice({ "ACME-12": "done" });
-    const prune = vi.fn(async () => []);
+    const prune = vi.fn<CachePruner["prune"]>(async () => []);
     const log = capturingLog();
     const sweeper = createSweeper({
       office: fake.office,

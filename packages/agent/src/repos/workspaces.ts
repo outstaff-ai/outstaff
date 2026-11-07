@@ -147,6 +147,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
     scratchOf,
     preparedAt: (id) => preparedAt.get(safeId(id)),
   });
+
   const space = (
     repo: ClonedRepo,
     worktree: string,

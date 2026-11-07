@@ -51,6 +51,10 @@ repos:
 
 [`office`](/reference/team-yaml/#office) controls how the office learns about changes: by polling every so many seconds, or by webhooks.
 
+## Agent
+
+[`agent`](/reference/team-yaml/#agent) holds settings of every agent's own container: `agent.sweep.idle_days` is how long a blocked or waiting item may go without a change before its agent removes its worktree, when everything in it is pushed.
+
 ## Workflow
 
 [`workflow`](/reference/team-yaml/#workflow) maps the canonical statuses (`backlog`, `ready`, `active`, `review`, `blocked`, `done`, `canceled`) to the names in your tracker, and names the needs-human label. What the office does with each event is decided by the [event pipeline](/concepts/automation/): [`pipeline.policies`](/reference/team-yaml/#pipelinepolicies) turns a default policy off, narrows it or replaces its instruction, and a few behaviours outside the pipeline have a switch under `policies`.

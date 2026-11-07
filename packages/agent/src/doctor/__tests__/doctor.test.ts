@@ -155,7 +155,7 @@ describe("the agent's startup checks", () => {
 
   it("names what fills the volume in the fix, measuring only once it warns", async () => {
     const largest = "Largest in the home: worktrees 1.2 GiB (15 items, 14 blocked or waiting).";
-    const breakdown = vi.fn(async () => largest);
+    const breakdown = vi.fn<() => Promise<string>>(async () => largest);
 
     expect(await diskCheck("/home/agent", volume(79), breakdown)).not.toHaveProperty("fix");
     expect(breakdown).not.toHaveBeenCalled();

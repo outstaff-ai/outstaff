@@ -165,6 +165,7 @@ describe("sweeping idle items", () => {
     const logged = t.log.info.mock.calls.filter(
       ([m]) => m === "kept the workspace of an idle item",
     );
+
     expect(logged).toHaveLength(KEPT.length * 2);
   });
 
