@@ -48,7 +48,7 @@ export interface CacheRule {
   /** The program that owns the cache; the rule applies only when it runs from the agent's home. */
   tool: string;
 
-  /** The cache's folder, measured before and after for what was freed, as the tool resolves it from home and env. */
+  /** The cache's folder, as the tool resolves it from home and env; measured before and after for what was freed. */
   folder: (home: string, env: NodeJS.ProcessEnv) => string;
   olderThan?: { below: string; ms: number };
   command?: string[];

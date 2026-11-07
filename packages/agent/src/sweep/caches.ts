@@ -74,7 +74,9 @@ export function createCachePruner(opts: CachePrunerOptions): CachePruner {
       return undefined;
     }
 
-    const was = await size(folder);
+    // A command may free anything in the folder; an age alone only what is below its target.
+    const measured = rule.command ? folder : target;
+    const was = await size(measured);
     if (rule.olderThan) {
       await removeOlderThan(target, now() - rule.olderThan.ms);
     }
@@ -86,7 +88,7 @@ export function createCachePruner(opts: CachePrunerOptions): CachePruner {
       }
     }
 
-    return { cache: rule.tool, freed: Math.max(0, was - (await size(folder))) };
+    return { cache: rule.tool, freed: Math.max(0, was - (await size(measured))) };
   }
 
   return {
