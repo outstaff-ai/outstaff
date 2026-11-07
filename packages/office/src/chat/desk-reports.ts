@@ -109,7 +109,8 @@ export function createReports(opts: ChatDeskOptions): Reports {
         itemId: item.id,
         key,
         kind,
-        summary: result.summary,
+        // A blocked report leads with the agent's message for the human, like the one it posts itself.
+        summary: (kind === "blocked" && result.message) || result.summary,
         links: result.links,
         at: clock.now().toISOString(),
       });

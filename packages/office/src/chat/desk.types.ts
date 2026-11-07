@@ -58,7 +58,10 @@ export interface ChatRequests extends Omit<ChatDesk, "message"> {
    * the blocked report when the blocked agent reports itself. The agent claims it with `chat_report`; if it did not
    * (it was offline), `queued` hands it over when the agent connects. The office posts nothing.
    */
-  handedBack(item: WorkItem, result: { summary: string; links: Link[] }): Promise<void>;
+  handedBack(
+    item: WorkItem,
+    result: { summary: string; message?: string | undefined; links: Link[] },
+  ): Promise<void>;
 }
 
 /** The chat session a filing verb was called from, with its origin. */

@@ -95,7 +95,7 @@ A milestone is done.
 
 A teammate handed a ticket back as blocked, and the office assigned the ticket to you before a human is pulled in.
 
-Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, route the ticket to whoever acts next), then comment the answer and assign the ticket back to the blocked agent. Never commission new work to unblock it: no ticket, no pull request, and no teammate asked to build one. A workaround that needs new work is a proposal for the human. When you cannot unblock it, assign it to the requester with a comment that says exactly what is needed, and the proposal with your recommendation. When all it waits on is a review the human already has, hand back `silent` with no new message.
+Follow `process/unblock.md`: try everything first (answer from what you know, find the information, `ost ask` the right teammate, route the ticket to whoever acts next), then comment the answer and assign the ticket back to the blocked agent. Never commission new work to unblock it: no ticket, no pull request, and no teammate asked to build one. A workaround that needs new work is a proposal for the human. When you cannot unblock it, assign it to the requester with a comment that leads with the ticket and the decision needed from them (not that you are blocked), and the proposal with your recommendation. When all it waits on is a review the human already has, hand back `silent` with no new message.
 
 ### reconcile
 

@@ -784,9 +784,13 @@ describe("chat relay", () => {
 
     it("tells the thread what is needed when blocked, and that it failed with a retry", async () => {
       await setup({ chatReport: () => ({ post: true, links: [ticket()] }) });
-      await relay.report(offerOf(), "blocked", "I need the staging credentials.");
+      await relay.report(offerOf(), "blocked", "ACME-1 needs the staging credentials from you.");
       await relay.report(offerOf(), "failed", "model overloaded\nstack trace");
-      expect(chat.posts[0]!.text).toContain("I am blocked. I need the staging credentials.");
+      expect(chat.posts[0]!.text).toMatch(
+        /^<@U0DANA0001> \[ACME-1\]\(.+\) needs the staging credentials/,
+      );
+
+      expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
       expect(chat.posts[0]!.text).toContain(tracker.links.issue("ACME-1"));
       expect(chat.posts[1]!.text).toContain(
         "could not finish this. I will try again. model overloaded",
@@ -821,7 +825,7 @@ describe("chat relay", () => {
       expect(chat.posts[0]).toMatchObject({ channel: "D-U0DANA0001" });
       expect(chat.posts[0]!.text).toBe(
         [
-          `I am blocked. Need the staging key from ops to finish [ACME-1](${tracker.links.issue("ACME-1")}).`,
+          `Need the staging key from ops to finish [ACME-1](${tracker.links.issue("ACME-1")}).`,
           `- ACME-1: Search: ${tracker.links.issue("ACME-1")}`,
           "- PR 4: https://git.acme.example/acme/app/pull/4",
         ].join("\n"),
@@ -872,10 +876,7 @@ describe("chat relay", () => {
           "C1",
           "<@U0DANA0001> Search page is up.\n- PR 4: https://git.acme.example/acme/app/pull/4",
         ],
-        [
-          "D-U0DANA0001",
-          `I am blocked. Need the staging key.\n- ACME-1: ${tracker.links.issue("ACME-1")}`,
-        ],
+        ["D-U0DANA0001", `Need the staging key.\n- ACME-1: ${tracker.links.issue("ACME-1")}`],
       ]);
 
       expect(chat.posts[0]!.thread).toBe("t1");
