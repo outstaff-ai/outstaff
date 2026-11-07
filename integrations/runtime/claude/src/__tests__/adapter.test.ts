@@ -130,7 +130,7 @@ describe("claude-agent-sdk create", () => {
     } as never);
 
   it("scrubs the declared secret keys of the whole office from the agent's environment", () => {
-    make({ secretKeys: ["GH_APP_PRIVATE_KEY"] });
+    make({ scrubKeys: ["GH_APP_PRIVATE_KEY"] });
     expect(createRuntime.mock.calls[0]![0].scrubKeys).toEqual(["GH_APP_PRIVATE_KEY"]);
   });
 

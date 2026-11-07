@@ -54,8 +54,9 @@ RUN apt-get update \
  && useradd --uid ${UID} --gid ${UID} --home-dir /home/outstaff --create-home --shell /bin/bash outstaff \
  && mkdir -p /var/lib/outstaff \
  && chown outstaff:outstaff /var/lib/outstaff
-ENV NODE_ENV=production \
-    HOME=/home/outstaff
+# No NODE_ENV here: the agent's sessions start from the image's environment, and a team's tests, installs and builds
+# must not run with NODE_ENV=production. The office sets it below; the agent sets it on its own process at start.
+ENV HOME=/home/outstaff
 WORKDIR /home/outstaff
 COPY LICENSE NOTICE /usr/share/doc/outstaff/
 ENTRYPOINT ["/usr/bin/tini", "--"]
@@ -137,7 +138,8 @@ RUN ln -s /opt/outstaff/dist/main.js /usr/local/bin/outstaff-office \
  && chmod 0755 /opt/outstaff/dist/main.js
 ARG OUTSTAFF_VERSION=
 USER outstaff
-ENV OUTSTAFF_STORE_URL=sqlite:///var/lib/outstaff/office.db \
+ENV NODE_ENV=production \
+    OUTSTAFF_STORE_URL=sqlite:///var/lib/outstaff/office.db \
     OUTSTAFF_HEALTH_PORT=8081 \
     OUTSTAFF_VERSION=${OUTSTAFF_VERSION}
 EXPOSE 8080 8081 8082

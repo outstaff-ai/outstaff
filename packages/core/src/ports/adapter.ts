@@ -16,8 +16,11 @@ export interface AdapterContext<Options> {
   options: Options;
   secrets: SecretSource;
 
-  /** Every secret key declared by the registered adapters, both scopes. Set by the host; adapters that start child processes scrub these from the child's environment. */
-  secretKeys?: readonly string[];
+  /**
+   * What adapters that start child processes scrub from the child's environment. Set by the host: every secret key
+   * declared by the registered adapters, both scopes, and on the agent its own process settings (`NODE_ENV`).
+   */
+  scrubKeys?: readonly string[];
   team: TeamConfig;
 
   /** Which container the port is created for. Absent means "person". */

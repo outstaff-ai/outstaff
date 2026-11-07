@@ -511,6 +511,19 @@ describe("child process environment", () => {
     });
   });
 
+  it("keeps the agent's own NODE_ENV out of the session when the host scrubs it, and passes the container's", async () => {
+    const own = await envOf({
+      env: { PATH: "/bin", NODE_ENV: "production" },
+      scrubKeys: ["NODE_ENV"],
+    });
+
+    expect(own).not.toHaveProperty("NODE_ENV");
+    expect(own).toMatchObject({ PATH: "/bin" });
+
+    const container = await envOf({ env: { PATH: "/bin", NODE_ENV: "development" } });
+    expect(container).toMatchObject({ NODE_ENV: "development" });
+  });
+
   it("leaves Claude Code's subprocess scrub off by default, so the credential reaches its commands", async () => {
     const env = await envOf({
       env: { ANTHROPIC_API_KEY: "key", CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1" },

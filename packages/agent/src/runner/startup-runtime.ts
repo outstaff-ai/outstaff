@@ -19,8 +19,11 @@ export function writeWorkdirFiles(def: RuntimeAdapter, rendered: RenderedWorkdir
   }
 }
 
-/** The secrets the runtime keeps out of the model's reach: the agent token, grant tokens and adapter secrets. */
-function runtimeSecretKeys({ opts, team, me }: StartupContext): string[] {
+/**
+ * What the runtime keeps out of the session's environment: the secrets (the agent token, grant tokens and adapter
+ * secrets), out of the model's reach, and the agent's own process settings, which a team's commands must not inherit.
+ */
+function runtimeScrubKeys({ opts, team, me, ownEnvKeys }: StartupContext): string[] {
   const network = networkGrants(team, me);
 
   return [
@@ -28,6 +31,7 @@ function runtimeSecretKeys({ opts, team, me }: StartupContext): string[] {
       "OUTSTAFF_AGENT_TOKEN",
       ...grantTokenKeys(network),
       ...opts.registry.list().flatMap((d) => d.secrets("person").map((s) => s.key)),
+      ...ownEnvKeys,
     ]),
   ];
 }
@@ -39,7 +43,7 @@ export async function createRuntime(ctx: StartupContext, def: RuntimeAdapter): P
   return (await def.create({
     options: def.options.parse(rawOptions),
     secrets,
-    secretKeys: runtimeSecretKeys(ctx),
+    scrubKeys: runtimeScrubKeys(ctx),
     team,
     log,
     fetch,

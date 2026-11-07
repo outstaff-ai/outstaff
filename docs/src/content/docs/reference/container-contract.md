@@ -18,6 +18,8 @@ These are the planned names; the images are tracked in [#45](https://github.com/
 
 There is one agent image for every role. The tools a person needs are not in the image: at start the agent installs the toolsets of its role's permission profile and the tools declared in `team.yaml` into `$HOME` with mise (see [Tools](/guides/tools/)). A team that wants no install at start, or no egress for it, can prebuild its own image with the tools instead.
 
+The agent's sessions start from the agent container's environment, so the agent image sets no `NODE_ENV`: a team's tests, installs and builds run the way they do on a developer's machine. The agent sets `NODE_ENV=production` on its own process at start and keeps it out of its sessions. A `NODE_ENV` you set on the agent container is the team's choice: the agent and its sessions both run with it. A repository can set its own as usual (its scripts, test runner or mise config). The office image sets `NODE_ENV=production`.
+
 Images never contain secrets. A client image that needs one at build time takes it with BuildKit `--secret`, never `ARG` or `ENV`, because both end up in the image history.
 
 Docker is not assumed inside the containers: nothing in the office or the agent starts containers, and the images do not carry a Docker client.
