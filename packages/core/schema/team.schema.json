@@ -957,6 +957,30 @@
       },
       "additionalProperties": false
     },
+    "agent": {
+      "description": "Settings of every agent's own container.",
+      "type": "object",
+      "properties": {
+        "sweep": {
+          "default": {
+            "idle_days": 7
+          },
+          "description": "The agent's daily sweep of its home: the worktrees and scratch folders of finished and idle items, and its tool and package caches.",
+          "type": "object",
+          "properties": {
+            "idle_days": {
+              "default": 7,
+              "description": "Days a blocked or waiting work item may go without a change before its agent removes the item's worktree and scratch folder, but only when nothing in the worktree can be lost: no uncommitted or untracked changes and every commit pushed to the branch's upstream (or, with no branch, none beyond the default branch). A later round makes the worktree again from the branch. 0 turns this off; finished items are swept either way. Default 7.",
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 365
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "scheduler": {
       "description": "How the office runs the work queue.",
       "type": "object",

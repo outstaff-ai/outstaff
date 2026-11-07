@@ -2,7 +2,7 @@ import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { silentLogger, type Logger, type TeamConfig } from "@outstaff/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { actsCheck } from "#/doctor/acts.js";
 import { diskCheck, volumeUsage } from "#/doctor/disk.js";
 import { reportAgentChecks, reportStartupChecks, startupChecks } from "#/doctor/startup.js";
@@ -150,6 +150,25 @@ describe("the agent's startup checks", () => {
       name: "Home volume space",
       status: "warn",
       detail: "The usage of /x could not be read: ENOENT",
+    });
+  });
+
+  it("names what fills the volume in the fix, measuring only once it warns", async () => {
+    const largest = "Largest in the home: worktrees 1.2 GiB (15 items, 14 blocked or waiting).";
+    const breakdown = vi.fn<() => Promise<string>>(async () => largest);
+
+    expect(await diskCheck("/home/agent", volume(79), breakdown)).not.toHaveProperty("fix");
+    expect(breakdown).not.toHaveBeenCalled();
+
+    expect(await diskCheck("/home/agent", volume(81), breakdown)).toMatchObject({
+      status: "warn",
+      fix: `${largest} Free space or grow the volume.`,
+    });
+
+    const failing = () => Promise.reject(new Error("EACCES"));
+    expect(await diskCheck("/home/agent", volume(95), failing)).toMatchObject({
+      status: "fail",
+      fix: "Free space or grow the volume.",
     });
   });
 

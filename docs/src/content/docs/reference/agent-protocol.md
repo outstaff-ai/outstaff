@@ -575,7 +575,7 @@ Sent by: office.
 
 ### `work_status`
 
-Asks for the state of a list of work items, for example to find the ones whose worktree and scratch folder can go.
+Asks for the state of a list of work items, for example to find the ones whose worktree and scratch folder can go: finished ones, and blocked or waiting ones with no activity for a while.
 
 Sent by: agent. Answered by: `work_status_result`, `error`.
 
@@ -585,7 +585,7 @@ Sent by: agent. Answered by: `work_status_result`, `error`.
 
 ### `work_status_result`
 
-The state of each item asked about, in the order asked. An item of someone else is `not_yours` and an item the office does not have is `unknown`; nothing else about either is given.
+The state of each item asked about, in the order asked, and when each of the asker's own items last changed. An item of someone else is `not_yours` and an item the office does not have is `unknown`; nothing else about either is given.
 
 Sent by: office.
 
@@ -594,6 +594,7 @@ Sent by: office.
 | `items`              | list of objects                                                                                    | yes      |                                                                                                                                  |
 | `items[].workItemId` | string                                                                                             | yes      | Id of the work item.                                                                                                             |
 | `items[].state`      | `queued` or `active` or `waiting` or `blocked` or `done` or `canceled` or `not_yours` or `unknown` | yes      | The item's status. `not_yours` when it belongs to someone else, whatever its status; `unknown` when the office has no such item. |
+| `items[].updatedAt`  | string                                                                                             | no       | When the item last changed (ISO-8601): its status, its place in the queue or a run starting. Only for the asker's own items.     |
 
 ### `work_move`
 

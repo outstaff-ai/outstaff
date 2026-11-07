@@ -11,7 +11,8 @@ import type {
 import type { ClientClock, OfficeConnection } from "#/office-client/index.js";
 import type { ClonedRepo, SyncRepositoriesOptions, Workspaces } from "#/repos/index.js";
 import type { Sweeper } from "#/sweep/index.js";
-import type { MiseRunner, ToolStatus } from "#/tools/index.js";
+import type { MiseRunner, ProgramRunner, ToolStatus } from "#/tools/index.js";
+import type { HomeSpace } from "#/home/index.js";
 import type { AgentEnv } from "#/verbs/types.js";
 import type { ChatRelay } from "./chat.types.js";
 import type { ProfilePublisher } from "./types.js";
@@ -55,8 +56,11 @@ export interface StartupOptions {
   /** Overrides for cloning: the remote of each repo, the credential helper command, the git runner (tests only). */
   repositories?: Pick<SyncRepositoriesOptions, "remoteUrl" | "helper" | "git">;
 
-  /** Overrides for tool installation: the mise runner and what to do with the shims directory (tests only). */
-  tools?: { mise?: MiseRunner; addToPath?: (shimsDir: string) => void };
+  /**
+   * Overrides for tools: the mise runner, what to do with the shims directory, and the runner of the cache tools the
+   * sweep prunes with (mise, pnpm, npm) (tests only).
+   */
+  tools?: { mise?: MiseRunner; addToPath?: (shimsDir: string) => void; run?: ProgramRunner };
 }
 
 export interface PreparedAgent {
@@ -79,6 +83,9 @@ export interface PreparedAgent {
 
   /** Removes the workspaces of items the person has no work on any more. Not started by `prepareAgent`: call `start()` once connected. */
   sweeper: Sweeper;
+
+  /** What fills the agent's home, measured on demand for the doctor's fix line. */
+  homeSpace: HomeSpace;
 
   /** The declared tools and whether each is available. */
   tools: ToolStatus[];
