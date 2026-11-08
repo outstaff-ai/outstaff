@@ -177,6 +177,15 @@ export type AddedWorktree =
   | { repo: string; worktree: string; branch: string | undefined; existed: boolean }
   | { repo: string; heldBy: string };
 
+/**
+ * What releasing an idle item's workspace did: removed it; kept it because removing it could lose work (`reasons`,
+ * one per worktree, and `noted` when an earlier sweep kept it already); or left it to a round that took the item.
+ */
+export type IdleRelease =
+  | { outcome: "released" }
+  | { outcome: "kept"; reasons: string[]; noted: boolean }
+  | { outcome: "in_use" };
+
 export interface Workspaces {
   /**
    * Fetches, then returns the item's worktree and scratch directory, creating them on the first round. Undefined when
@@ -203,6 +212,14 @@ export interface Workspaces {
 
   /** Removes the item's worktree and scratch directory. The branch stays, so unmerged commits are not lost. */
   release(workItemId: string): Promise<void>;
+
+  /**
+   * Removes an idle item's worktrees and scratch directory only when nothing in them can be lost: no uncommitted or
+   * untracked changes (ignored files do not count), and every commit on the branch's upstream (its configured upstream,
+   * else the remote branch of the same name), or, without a branch, none beyond the default branch. Leaves them to a
+   * round that prepared the item at or after `since` (epoch ms).
+   */
+  releaseIdle(workItemId: string, since: number): Promise<IdleRelease>;
 
   /** The ids of the items that have a worktree or a scratch directory now. */
   held(): string[];

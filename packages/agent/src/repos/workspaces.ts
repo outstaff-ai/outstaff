@@ -1,8 +1,9 @@
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
 import { silentLogger } from "@outstaff/core";
 import type { Offer } from "#/office-client/index.js";
 import { createCloneRefresher } from "./base-clone.js";
+import { createRelease } from "./release.js";
 import { neededBy, repoForItem } from "./item-repo.js";
 import type {
   ClonedRepo,
@@ -134,6 +135,19 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
   const worktreeOf = (repo: string, id: string) => join(opts.layout.worktreesDir, repo, safeId(id));
   const scratchOf = (id: string) => join(opts.layout.scratchDir, safeId(id));
+
+  // When a round last prepared each item, so a sweep never removes the worktree of an item that just started.
+  const preparedAt = new Map<string, number>();
+  const releaser = createRelease({
+    git,
+    log,
+    repos: opts.repos,
+    clones,
+    worktreeOf,
+    scratchOf,
+    preparedAt: (id) => preparedAt.get(safeId(id)),
+  });
+
   const space = (
     repo: ClonedRepo,
     worktree: string,
@@ -217,6 +231,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
 
   return {
     async prepare(offer) {
+      preparedAt.set(safeId(offer.workItem.id), now());
       await retry(neededBy(offer, opts.repos, unprepared()), { throttled: true });
       const repo = repoForItem(offer, opts.repos);
       if (!repo) {
@@ -233,6 +248,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
     },
 
     async add(workItemId, name, branch) {
+      preparedAt.set(safeId(workItemId), now());
       const failed = clonedRepo(unprepared(), name);
       if (failed) {
         await retry([failed]);
@@ -253,28 +269,7 @@ export function createWorkspaces(opts: WorkspacesOptions): Workspaces {
       return [...new Set(dirs.flatMap(namesIn))];
     },
 
-    async release(workItemId) {
-      for (const repo of opts.repos) {
-        const worktree = worktreeOf(repo.name, workItemId);
-        if (!existsSync(worktree)) {
-          continue;
-        }
-
-        try {
-          await clones.exclusive(repo.dir, async () => {
-            await git(["worktree", "remove", "--force", worktree], { cwd: repo.dir });
-            await git(["worktree", "prune"], { cwd: repo.dir });
-          });
-        } catch (e) {
-          log.warn("could not remove a worktree", {
-            workItemId,
-            worktree,
-            error: e instanceof Error ? e.message : String(e),
-          });
-        }
-      }
-
-      rmSync(scratchOf(workItemId), { recursive: true, force: true });
-    },
+    release: releaser.release,
+    releaseIdle: releaser.releaseIdle,
   };
 }

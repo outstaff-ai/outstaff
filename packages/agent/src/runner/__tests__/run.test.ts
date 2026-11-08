@@ -61,6 +61,7 @@ function setup(): { home: string; options: StartupOptions } {
       tools: {
         mise: withGlobalConfig(async () => ({ code: 0, stdout: "", stderr: "" })),
         addToPath: () => {},
+        run: async () => ({ code: 127, stdout: "", stderr: "not installed" }),
       },
     },
   };

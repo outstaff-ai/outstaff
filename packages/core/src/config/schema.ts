@@ -140,6 +140,30 @@ export const teamConfigSchema = z
       })
       .optional()
       .meta(d("Office settings: event intake and the doctor checks.")),
+    agent: z
+      .strictObject({
+        sweep: z
+          .strictObject({
+            idle_days: z
+              .int()
+              .min(0)
+              .max(365)
+              .default(7)
+              .meta(
+                d(
+                  "Days a blocked or waiting work item may go without a change before its agent removes the item's worktree and scratch folder, but only when nothing in the worktree can be lost: no uncommitted or untracked changes and every commit pushed to the branch's upstream (or, with no branch, none beyond the default branch). A later round makes the worktree again from the branch. 0 turns this off; finished items are swept either way. Default 7.",
+                ),
+              ),
+          })
+          .default({ idle_days: 7 })
+          .meta(
+            d(
+              "The agent's daily sweep of its home: the worktrees and scratch folders of finished and idle items, and its tool and package caches.",
+            ),
+          ),
+      })
+      .optional()
+      .meta(d("Settings of every agent's own container.")),
     scheduler: z
       .strictObject({
         stale_run_after_minutes: z
