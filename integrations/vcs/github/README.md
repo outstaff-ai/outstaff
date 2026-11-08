@@ -9,6 +9,7 @@ integrations:
     # apiUrl: https://ghe.acme.example/api/v3   # GitHub Enterprise Server (default https://api.github.com)
     # webUrl: https://ghe.acme.example          # used for links (default https://github.com)
     # graphqlUrl: ...                           # derived from apiUrl when omitted
+    # assetsBranch: outstaff-assets             # where ost pr attach stores images (the default)
 ```
 
 ## Identities: who opened a pull request
@@ -121,6 +122,7 @@ The adapter contributes a rule pack for the `gh` CLI (`githubVcs.permissions()`,
 - Review threads: exactly three fixed GraphQL documents (list threads with comments, read the last comment of a thread, resolve). Logins are compared without the `[bot]` suffix, since GraphQL leaves it off.
 - Permissions: collaborator permission mapped to `admin | write | read | none` (`maintain` is `write`, `triage` is `read`).
 - Events: `pr.opened` (also reopened, with `data.reopened`), `pr.closed`, `pr.merged`, `pr.synchronize`, `pr.review_submitted`, `pr.comment` (review comments, which carry `data.reviewId` when they belong to a review, and comments on pull requests). `externalId` is the GitHub event id.
+- Images on pull requests (`vcs.images`, `ost pr attach`): the image is committed with the git data API (blob, tree, commit, ref) as the person's own App to the assets branch (`assetsBranch`, default `outstaff-assets`) at `<pr number>/<file name>`. The first image creates the branch as an orphan, so nothing reaches the default branch or its history; later ones commit on top of it, and one of the same name replaces the earlier one. The link is `<webUrl>/<owner>/<repo>/blob/<branch>/<path>?raw=true`, which GitHub serves with the viewer's access, so it renders in private repositories, where an image hosted elsewhere breaks behind GitHub's image proxy. png, jpeg, gif and webp only, by their bytes, up to 10 MB. `ost doctor` warns when a ruleset would stop the App creating or pushing the branch. See [Images on pull requests](https://docs.outstaff.work/guides/pr-images/).
 - Links: pull request, commit and thread URLs from `webUrl`.
 - Errors: 404 `not_found`; 401/403 `forbidden`; 429, or 403 with `retry-after`, `x-ratelimit-remaining: 0` or a "rate limit" message, `rate_limited` with `retryAfterMs`; 409 `conflict`; 400/422 `invalid`; 5xx and network failures `unavailable`.
 

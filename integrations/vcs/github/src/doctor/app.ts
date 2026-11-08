@@ -1,5 +1,6 @@
 import type { DeriveContext, DoctorCheck, SecretSource } from "@outstaff/core";
 import { signAppJwt } from "#/jwt.js";
+import { assetsCheck } from "./assets.js";
 import { privateKey } from "#/setup.js";
 import { call } from "./api.js";
 import { bad, ok } from "./findings.js";
@@ -112,6 +113,7 @@ async function accountChecks(
     ...checks,
     ...workflowsCheck(want, slug, granted, repos),
     ...(await repositoryChecks(ctx, jwt, id, want, data.repository_selection, writes)),
+    ...(await assetsCheck(ctx, jwt, id, want, slug)),
   ];
 }
 

@@ -2130,6 +2130,7 @@ describe("verb catalogue", () => {
       "pr.resolve",
       "pr.open",
       "pr.update",
+      "pr.attach",
       "pr.review",
       "pr.reply",
       "pr.comment",

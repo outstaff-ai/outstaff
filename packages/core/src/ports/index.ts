@@ -91,6 +91,8 @@ export type {
 export type { Reaction, ReactionTarget, UnreadRepo, VcsEvent, VcsEventPage } from "./vcs-events.js";
 
 export type { ReviewThread, ReviewThreadComment } from "./vcs-threads.js";
+export type { PullRequestImage, StoredImage } from "./vcs-images.js";
+export { IMAGE_TYPE_NAMES, MAX_IMAGE_BYTES, imageFileName } from "./images.js";
 
 export type {
   BranchRule,

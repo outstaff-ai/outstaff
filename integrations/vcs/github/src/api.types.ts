@@ -231,3 +231,22 @@ export interface RestRule {
     strict_required_status_checks_policy?: boolean;
   };
 }
+
+/** A branch reference of the git data API: `GET /git/ref/heads/{branch}`, `POST /git/refs`, `PATCH /git/refs/...`. */
+export interface RestGitRef {
+  ref: string;
+  object: { sha: string };
+}
+
+/** A blob or tree the git data API made: `POST /git/blobs`, `POST /git/trees`. */
+export interface RestGitObject {
+  sha: string;
+}
+
+/** A commit of the git data API: `GET /git/commits/{sha}`, `POST /git/commits`. */
+export interface RestGitCommit {
+  sha: string;
+  tree: { sha: string };
+  parents?: { sha: string }[];
+  message?: string;
+}

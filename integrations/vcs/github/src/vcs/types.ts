@@ -25,6 +25,9 @@ export interface GithubContext {
 
   /** Web root, where links point, without a trailing slash. */
   web: string;
+
+  /** The branch that holds the images of pull requests. */
+  assetsBranch: string;
   secrets: SecretSource;
 
   /** The person this container runs as. */

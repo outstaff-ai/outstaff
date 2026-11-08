@@ -1,6 +1,7 @@
 import type { PullRequest } from "@outstaff/core";
 import type { NewSeedPullRequest, VcsSeed } from "@outstaff/core/contracts";
 import { addComment, submitReview } from "#/stand-in/conversation.js";
+import { gitDataFile } from "#/stand-in/git-data-routes.js";
 import { closePull, emit, headSha, nextSeq, prPayload, pullUrl, touch } from "#/stand-in/model.js";
 import type { GithubStore, MemoryRepo, StoredPull } from "#/stand-in/types.js";
 import type { FakeVcsRef } from "#/types.js";
@@ -157,6 +158,13 @@ export function createSeed(s: GithubStore, git: MemoryRepo, vcsRef: FakeVcsRef):
       return id;
     },
     check: async (_repo, sha, c) => seedCheck(s, sha, c),
+    // The adapter's default assets branch.
+    async storedImage(_repo, number, name) {
+      const base64 = gitDataFile(s.git, "outstaff-assets", `${number}/${name}`);
+      return base64 === undefined
+        ? undefined
+        : { data: new Uint8Array(Buffer.from(base64, "base64")) };
+    },
     async permission(_repo, login, level) {
       s.perms.set(login, level);
     },

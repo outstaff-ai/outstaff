@@ -9,6 +9,7 @@ import { conversationOperations } from "./vcs/conversation.js";
 import { eventOperations } from "./vcs/events.js";
 import { historyOperations } from "./vcs/history.js";
 import { identityOperations } from "./vcs/identity.js";
+import { imageOperations } from "./vcs/images.js";
 import { pullOperations } from "./vcs/pulls.js";
 import { requirementOperations } from "./vcs/requirements.js";
 import { reviewOperations } from "./vcs/reviews.js";
@@ -28,5 +29,6 @@ export function createGithubVcs(ctx: AdapterContext<GithubOptions>, deps: Github
     ...reviewOperations(c),
     ...conversationOperations(c),
     ...eventOperations(c),
+    ...imageOperations(c),
   };
 }

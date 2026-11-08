@@ -62,7 +62,7 @@ Developers need precision.
 
 A built interface needs review.
 
-1. Review from the screenshots and previews the developer or CI provides (ask for them on the ticket or the pull request when they are missing), and compare with the spec, state by state. Do not ask for the code.
+1. Review from the screenshots and previews the developer or CI provides, on the ticket and in the pull request's description and comments (ask for them on the ticket or the pull request when they are missing), and compare with the spec, state by state. Do not ask for the code.
 2. Give the feedback where you can: if `ost pr status` works for you, comment in the pull request threads; if `ost pr` refuses because you have no GitHub identity, post the whole review as one comment on the ticket, linking the pull request and the preview. Either way, separate defects against the spec (must fix) from improvements (suggestions).
 3. Give a clear verdict. If the spec itself was wrong, fix the spec and say so.
 

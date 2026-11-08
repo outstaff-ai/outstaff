@@ -10,7 +10,7 @@ Agents never talk to the tracker, the knowledge base or the code host directly. 
 - Every result carries the URLs of the things it touches, built from the adapters' link templates.
 - Inputs are validated; there are no destructive verbs: nothing deletes, force-merges or edits other people's text, and the one verb that merges, `pr merge`, is refused unless the team opted in with `policies.merge.on_approval`, merges only your own approved pull request, and never bypasses branch protection.
 - Text that `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` post (and `ticket comment` on a tracker where `@` mentions users) is guarded: `@handle` of a teammate becomes their name, a configured human's `identities.vcs` stays a mention, and any other `@login` is refused, because on the code host it would notify an unrelated user. Code spans and blocks, emails and `@scope/package` are left alone.
-- `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.
+- `pr open`, `pr update`, `pr attach`, `pr review`, `pr reply` and `pr comment` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.
 - A verb that needs a port the team has not configured fails with `unsupported` ("no tracker configured for this team"); the office verbs (`ask`, `work`, `roster`) fail with `unavailable` when the agent is not connected to an office. The `ost` command in the shell of an agent container has no office connection of its own: inside a session, the office verbs go through the `ost` tool of the session, and the error of the command says so.
 - Commands take `--json` to print `{ text, data, links }`; errors print `{ error: { code, message } }`. The identity comes from `OUTSTAFF_PERSON` and the team from `--team` or the usual team lookup.
 
@@ -833,6 +833,32 @@ Examples:
 ```sh
 ost pr update 42 --title "feat(cart): add coupon codes"
 ost pr update 42 --body-file .scratch/pr.md --ready
+```
+
+## pr.attach
+
+Store an image for a pull request and print the markdown that shows it.
+
+Stores an image (png, jpeg, gif or webp, up to 10 MB) for a pull request where the code host renders it, as you, and prints the markdown that shows it: put that in the description (pr update) or a comment (pr comment). An image hosted elsewhere, such as the tracker, does not render on the code host. The file is one in the scratch directory of this item or in the worktree. One with the same name for the same pull request replaces the earlier one. Needs a write grant on the repository and a code host that stores images.
+
+```
+ost pr attach <number> <path> [--repo <repo>] [--alt <alt>]
+```
+
+Runtime tool: `pr_attach`
+
+| Input | Type | Required | Description |
+| --- | --- | --- | --- |
+| `repo` | string | no | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `number` | integer | yes | Pull request number. |
+| `path` | string | yes | Path of the image to attach. |
+| `alt` | string | no | Alt text of the image: what it shows. Default: the file name. |
+
+Examples:
+
+```sh
+ost pr attach 42 /scratch/w1/cart-empty.png
+ost pr attach 42 .scratch/cart.png --alt "Cart with a coupon applied"
 ```
 
 ## pr.review

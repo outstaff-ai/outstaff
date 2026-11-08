@@ -18,6 +18,9 @@ export type {
   RestCheckRun,
   RestCompare,
   RestEvent,
+  RestGitCommit,
+  RestGitObject,
+  RestGitRef,
   RestIssueComment,
   RestPull,
   RestRepoReviewComment,
@@ -120,6 +123,7 @@ export const githubVcs = defineAdapter({
     "vcs.ciRuns",
     "vcs.reactions",
     "vcs.merge",
+    "vcs.images",
   ],
   options: githubOptions,
   // Agents hold the read-only office App too: they clone read-granted repos with it.

@@ -2,6 +2,8 @@ export { BareRepo } from "./bare-repo.js";
 export { createGithubE2e } from "./e2e.js";
 export { createGithubStandIn, tickingClock } from "./stand-in.js";
 export { createMemoryRepo } from "./memory-repo.js";
+export { gitDataFile } from "./git-data-routes.js";
+export type { GitData, StoredGitCommit } from "./git-data.types.js";
 export { appAuth } from "./app-auth.js";
 export { fakeAuth, OFFICE_APP, OWN_APP } from "./fake-auth.js";
 export type {

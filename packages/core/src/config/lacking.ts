@@ -19,6 +19,7 @@ export const LACKING: Record<Capability, string> = {
   "vcs.webhooks": "react to repository changes instantly",
   "vcs.reactions": "react to pull request comments",
   "vcs.merge": "merge pull requests",
+  "vcs.images": "attach images to pull requests",
   "chat.messages": "send chat messages",
   "chat.history": "read earlier chat messages",
   "chat.agentProfile": "show the agent's profile and status in chat",
