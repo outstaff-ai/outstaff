@@ -49,7 +49,7 @@ async function create(port: OfficePort, input: Input) {
   const ctx: AdapterContext<unknown> = {
     options: parsed.data,
     secrets: input.secrets,
-    secretKeys: input.registry
+    scrubKeys: input.registry
       .list()
       .flatMap((d) => [
         ...d.secrets("office").map((s) => s.key),

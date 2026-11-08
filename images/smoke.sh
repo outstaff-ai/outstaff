@@ -55,6 +55,8 @@ smoke_agent() {
   expect "$image" 'git version' git --version
   expect "$image" '^20[0-9]{2}\.' mise --version
   expect "$image" '^curl [0-9]' curl --version
+  # A session's shell starts from the image's environment; a team's commands must not run with NODE_ENV=production.
+  expect "$image" '^unset$' sh -c 'echo "${NODE_ENV-unset}"'
   # The pinned Claude Code binary the SDK launches.
   expect "$image" 'Claude Code' sh -c 'exec /opt/outstaff/node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-linux-*/node_modules/@anthropic-ai/claude-agent-sdk-linux-*/claude --version'
   # Claude Code's sandbox for the agent's commands: bubblewrap (never setuid) and socat.

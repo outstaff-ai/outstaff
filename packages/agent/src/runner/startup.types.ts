@@ -105,6 +105,9 @@ export interface StartupContext {
   teamDir: string;
   me: TeamConfig["people"][number];
   log: Logger;
+
+  /** The settings of the agent's own process that startup set and the container did not (see `setOwnEnv`). */
+  ownEnvKeys: readonly string[];
 }
 
 /** The runtime adapter the team names. */

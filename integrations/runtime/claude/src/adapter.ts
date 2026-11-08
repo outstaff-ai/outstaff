@@ -196,7 +196,7 @@ export const claudeAgentSdk = defineAdapter({
       options: ctx.options,
       log: ctx.log,
       secrets: ctx.secrets,
-      scrubKeys: ctx.secretKeys ?? secrets.map((s) => s.key),
+      scrubKeys: ctx.scrubKeys ?? secrets.map((s) => s.key),
     });
   },
 });

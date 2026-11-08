@@ -179,7 +179,7 @@ people:`,
               options: z.looseObject({}),
               secrets: () => [],
               create: (ctx) => {
-                scrub = ctx.secretKeys;
+                scrub = ctx.scrubKeys;
                 return createFakeRuntime();
               },
             })
@@ -198,6 +198,46 @@ people:`,
     const run = (command: string) => evaluate(agent.policy, { kind: "shell", command, cwd });
     // The grants feed the verbs; the shell reaches the network directly, as the deployment's network policy allows.
     expect(run("curl -s https://hub.acme.example/status").effect).toBe("allow");
+  });
+
+  /** The keys the host tells the runtime to scrub from the session's environment. */
+  async function scrubbed(options: ReturnType<typeof setup>["options"]) {
+    let scrub: readonly string[] | undefined;
+    options.registry = new AdapterRegistry();
+    for (const def of registry().list()) {
+      options.registry.register(
+        def.port === "runtime"
+          ? defineAdapter({
+              port: "runtime",
+              name: "fake",
+              capabilities: ["runtime.sessions", "runtime.usage", "runtime.permissions"],
+              options: z.looseObject({}),
+              secrets: () => [],
+              create: (ctx) => {
+                scrub = ctx.scrubKeys;
+                return createFakeRuntime();
+              },
+            })
+          : def,
+      );
+    }
+
+    await prepareAgent(options);
+    return scrub;
+  }
+
+  it("runs the agent with NODE_ENV=production and keeps it out of the session", async () => {
+    const { options } = setup();
+    const scrub = await scrubbed(options);
+    expect(options.env).toMatchObject({ NODE_ENV: "production" });
+    expect(scrub).toContain("NODE_ENV");
+  });
+
+  it("passes a NODE_ENV the container sets to the session", async () => {
+    const { options } = setup({ NODE_ENV: "development" });
+    const scrub = await scrubbed(options);
+    expect(options.env).toMatchObject({ NODE_ENV: "development" });
+    expect(scrub).not.toContain("NODE_ENV");
   });
 
   it("prepares a sweeper that removes the scratch folders of items the person no longer has", async () => {

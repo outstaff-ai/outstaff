@@ -1,6 +1,7 @@
 import { envSecretSource, parseTeamConfig, silentLogger, teamFor } from "@outstaff/core";
 import { createOfficeConnection, type OfficeConnection } from "#/office-client/index.js";
 import { StartupError, present } from "./startup-error.js";
+import { setOwnEnv } from "./own-env.js";
 import { shareTeamFile } from "./team-file.js";
 import type { StartupContext, StartupOptions } from "./startup.types.js";
 
@@ -43,6 +44,7 @@ export async function loadStartupContext(
   connection: OfficeConnection,
 ): Promise<StartupContext> {
   const log = opts.log ?? silentLogger;
+  const ownEnvKeys = setOwnEnv(opts.env);
   const person = present(opts.env, "OUTSTAFF_PERSON");
   const secrets = opts.secrets ?? envSecretSource(opts.env);
   const teamFile = await teamFromOffice(connection);
@@ -57,5 +59,5 @@ export async function loadStartupContext(
   // From here on the team is as this person sees it: `integrations.runtime` is the runtime they run on.
   const team = teamFor(teamFile, me);
 
-  return { opts, person, secrets, team, teamDir, me, log };
+  return { opts, person, secrets, team, teamDir, me, log, ownEnvKeys };
 }
