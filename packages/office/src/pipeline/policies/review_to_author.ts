@@ -4,7 +4,8 @@ import { wakes } from "./spec.js";
 
 export const policy = definePolicy({
   id: "review_to_author",
-  summary: "A human's review or comment on an agent's open pull request wakes its author.",
+  summary:
+    "A trusted human's or teammate's review or comment on an agent's open pull request wakes its author.",
   on: ["pr.review_submitted", "pr.comment"],
   when: feedbackOn({ pr_open: true }),
   instruction:

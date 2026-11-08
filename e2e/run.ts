@@ -1,6 +1,7 @@
 // The acme loop end to end, on Docker Compose: a ticket is assigned, the agent clones, commits and opens a pull
 // request, a human asks for changes while another asks a question in chat (answered by a chat session before the round ends), the agent fixes and resolves the thread, a review with only a summary gets a
-// pull request comment, a batch review with two inline comments gets a reply in each thread, a short "yes" to the agent's own earlier comment is answered from the conversation, the human merges, a
+// pull request comment, a batch review with two inline comments gets a reply in each thread, a short "yes" to the agent's own earlier comment is answered from the conversation, a teammate agent's review
+// wakes the author, who answers in its thread, the human merges, a
 // second pull request now conflicts and the agent rebases it and pushes with a lease, and a comment on the merged pull
 // request gets a reply and a follow-up pull request (for a follow-up ticket of its own), and a ticket that needs several pull
 // requests is split into sub-tickets first, one pull request each: the one in review goes to the human with the
@@ -1008,9 +1009,50 @@ async function main() {
     `conversation: "yes" on #${pr1.pr.number} -> the round read the agent's earlier proposal (${proposal}) and pushed it`,
   );
 
+  // ---- 3d'. a teammate's review: mira, the architect, requests changes on sam's pull request; sam is woken as for a
+  // human's review and answers in the thread, and its own replies wake no one
+  const reviewRounds = () => wakesOf("sam").filter((k) => k === "review_feedback").length;
+  const roundsBefore = reviewRounds();
+  const shaMira = agreed.pr.head.sha;
+  await stub("POST", `/_test/pulls/${pr1.pr.number}/review`, {
+    actor: "acme-mira[bot]",
+    state: "changes_requested",
+    comments: [
+      { path: "greeting.txt", line: 1, body: "Teammate review: trim the trailing space." },
+    ],
+  });
+
+  const teammate = await until(
+    "the teammate's inline comment answered and resolved by sam, the ticket back in review",
+    (s) => {
+      const pr = s.github.pulls.find((p: Json) => p.number === pr1.pr.number);
+      const t = s.tickets.find((x: Json) => x.key === first);
+      const th = pr.threads.find((x: Json) => x.comments[0].body.includes("Teammate review"));
+      return pr.head.sha !== shaMira &&
+        th?.resolved &&
+        th.comments.length > 1 &&
+        t.status === "In Review"
+        ? { pr, th }
+        : undefined;
+    },
+  );
+
+  assertEq(teammate.th.comments[0].author, "acme-mira[bot]", "the teammate left the review");
+  assertEq(teammate.th.comments.at(-1).author, "acme-sam[bot]", "the author replied in the thread");
+  await officePolledTwice("sam answered the teammate's review");
+  assertEq(
+    reviewRounds(),
+    roundsBefore + 1,
+    "one round for the review, none for sam's own replies",
+  );
+
+  step(
+    `teammate review: mira requested changes on #${pr1.pr.number} -> sam woken once, fix pushed, thread replied and resolved`,
+  );
+
   // ---- 3e. a chat request about the open pull request: the agent asks first (it is in review), then adds it to that
   // pull request instead of creating a ticket
-  const sha4 = agreed.pr.head.sha;
+  const sha4 = teammate.pr.head.sha;
   const ticketsBefore = (await state()).tickets.length;
   const pullsBefore = (await state()).github.pulls.length;
   const wish = `For PR #${pr1.pr.number}, also say goodbye on the last line.`;

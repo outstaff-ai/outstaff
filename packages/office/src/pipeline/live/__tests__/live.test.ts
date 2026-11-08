@@ -8,7 +8,7 @@ import {
 import { afterEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
 import { readFeedback } from "#/work-feedback.js";
-import { createScheduler, type EnqueueInput } from "#/scheduler/index.js";
+import { createScheduler, isLoopGuarded, type EnqueueInput } from "#/scheduler/index.js";
 import { openStore, type Store } from "#/store/index.js";
 import type { Act } from "#/pipeline/decisions.types.js";
 import { createMemoryTraceStore } from "#/pipeline/memory-traces.js";
@@ -181,6 +181,24 @@ describe("createLivePipeline", () => {
         reason: "no one to wake: mira (actor) is not an agent on the team",
       },
     ]);
+  });
+
+  it("queues a teammate's review for the author as agent-triggered work, which the loop guard limits", async () => {
+    const { opts, store: s } = await setup();
+    const live = createLivePipeline(opts);
+    await live.handle(
+      {
+        type: "pr.review_submitted",
+        subject: { pr: { repo: REPO, number: 9 } },
+        actor: { kind: "agent", id: "mira" },
+        data: { state: "changes_requested", body: "The empty state needs a test." },
+      },
+      { source: "vcs", externalId: "r-1" },
+    );
+
+    const [item] = await s.listItems({ person: "sam" });
+    expect(item).toMatchObject({ kind: "review_feedback", trigger: "agent" });
+    expect(isLoopGuarded(item!.trigger)).toBe(true);
   });
 
   it("queues one item when a ticket's own wake and the idle pull for it are judged at once", async () => {
