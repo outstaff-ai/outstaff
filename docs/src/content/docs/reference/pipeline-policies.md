@@ -71,14 +71,16 @@ Instruction:
 
 ### review_to_author
 
-A human's review or comment on an agent's open pull request wakes its author.
+A trusted human's or teammate's review or comment on an agent's open pull request wakes its author (who counts: `policies.feedback.from`).
 
 Listens to `pr.review_submitted`, `pr.comment`. Decides: wake `author` (kind `review_feedback`).
 
 When:
 
 - all of:
-  - `actor_kind: human`
+  - `feedback_actor: true`
+  - not:
+    - `actor_is: author`
   - `pr_author_kind: agent`
   - `pr_open: true`
   - not:
@@ -94,14 +96,16 @@ Instruction:
 
 ### merged_feedback_to_author
 
-A human's review or comment on an agent's merged pull request wakes its author.
+A trusted human's or teammate's review or comment on an agent's merged pull request wakes its author (who counts: `policies.feedback.from`).
 
 Listens to `pr.review_submitted`, `pr.comment`. Decides: wake `author` (kind `merged_feedback`).
 
 When:
 
 - all of:
-  - `actor_kind: human`
+  - `feedback_actor: true`
+  - not:
+    - `actor_is: author`
   - `pr_author_kind: agent`
   - `pr_merged: true`
   - not:

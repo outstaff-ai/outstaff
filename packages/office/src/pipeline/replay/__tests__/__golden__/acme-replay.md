@@ -114,10 +114,10 @@ How to read it:
 | 48 | `pr.merge_checks_passed` acme-example/shop#55 | (drop: no agent to act for: pull request has no agent author; ticket is not assigned to an agent; no agent has worked on the ticket yet) |
 | 49 | `pr.merge_checks_passed` acme-example/shop#56 | (drop: no policy matched) |
 | 50 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merged_feedback): _ada-admin commented on your merged pull request #41 (Search API). Answer there. If they ask for a change, open a follow-up pull request._ |
-| 51 | `pr.comment` acme-example/shop#60 by ines | (drop: no policy matched) |
+| 51 | `pr.comment` acme-example/shop#60 by ines | wake sam (review_feedback): _ines left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
 
 ## Coalescing
 
-The pipeline's 25 wakes become 23 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 26 wakes become 24 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

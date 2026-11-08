@@ -30,6 +30,7 @@ export type {
   WorkflowEventType,
   OfficeEventType,
   WorkflowOptions,
+  FeedbackFrom,
   WorkflowPr,
   WorkflowState,
   WorkflowStatusMap,

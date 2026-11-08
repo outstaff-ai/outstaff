@@ -4,7 +4,8 @@ import { wakes } from "./spec.js";
 
 export const policy = definePolicy({
   id: "merged_feedback_to_author",
-  summary: "A human's review or comment on an agent's merged pull request wakes its author.",
+  summary:
+    "A trusted human's or teammate's review or comment on an agent's merged pull request wakes its author (who counts: `policies.feedback.from`).",
   on: ["pr.review_submitted", "pr.comment"],
   when: feedbackOn({ pr_merged: true }),
   instruction:

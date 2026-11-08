@@ -40,10 +40,16 @@ export const BLOCKED_HAND_BACK: PipelineCondition = {
   ],
 };
 
-/** A trusted human's review or comment on an agent's pull request; a bare approval is a sign-off, not feedback. */
+/**
+ * A review or comment on an agent's pull request by a trusted human, or a teammate agent unless
+ * `policies.feedback.from` is humans, and not by its author: replying in its own threads does not wake it again.
+ * Untrusted actors never get here (the pipeline drops their events before any policy), and neither the office's
+ * automation nor a host's bot gives feedback. A bare approval is a sign-off, not feedback.
+ */
 export const feedbackOn = (state: { pr_open: true } | { pr_merged: true }): PipelineCondition => ({
   all: [
-    HUMAN,
+    { feedback_actor: true },
+    { not: { actor_is: "author" } },
     { pr_author_kind: "agent" },
     state,
     { not: { all: [{ review_state: ["approved"] }, { has_body: false }] } },

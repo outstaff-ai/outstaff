@@ -49,6 +49,14 @@ export const POLICY_SWITCHES: readonly PolicySwitch[] = [
       "Start another round when feedback arrived after the agent was offered its work, so nothing written during a round is lost.",
   },
   {
+    path: "feedback.from",
+    default: "humans_and_teammates",
+    off: "humans",
+    kind: "office",
+    behaviour:
+      "Whose review or comment on an agent's pull request, open or merged, wakes its author (the review_to_author and merged_feedback_to_author policies): a trusted human's, and a teammate agent's too. With humans, only a trusted human's. Never the author's own comments, a bot's or the office's, or an approval with no text; an untrusted person's comment wakes no one either way. A wake from a teammate's review is agent-triggered work, which the loop guard limits.",
+  },
+  {
     path: "hand_back.blocked_notify",
     default: "pm",
     off: "agent",

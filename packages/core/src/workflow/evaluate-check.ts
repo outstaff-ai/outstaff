@@ -1,6 +1,6 @@
 import { isApprover } from "#/policies/approvers.js";
 import type { ApproverCandidate } from "#/policies/types.js";
-import { DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
+import { DEFAULT_FEEDBACK_FROM, DEFAULT_NEEDS_HUMAN_LABEL } from "./constants.js";
 import type { Check, ConditionChecks, ConditionKey, Ctx } from "./evaluate.types.js";
 import { roundOf, statusOf } from "./event-time.js";
 import type { Condition, ConditionEvent, WorkflowPr } from "./types.js";
@@ -125,6 +125,15 @@ const CHECKS: ConditionChecks = {
       approves(ctx, { kind, id, trusted: ctx.event.data["untrusted"] !== true }) === wanted;
 
     return { ok, detail: `actor ${id} is ${wanted ? "" : "not "}an allowed approver` };
+  },
+  feedback_actor: (wanted, ctx) => {
+    const { kind, id } = ctx.event.actor;
+    const from = ctx.opts.feedbackFrom ?? DEFAULT_FEEDBACK_FROM;
+    const gives = kind === "human" || (kind === "agent" && from === "humans_and_teammates");
+    return {
+      ok: gives === wanted,
+      detail: `actor ${id} (${kind}) ${gives ? "gives" : "does not give"} feedback under policies.feedback.from ${from}, wanted ${wanted ? "one who does" : "one who does not"}`,
+    };
   },
   pr_draft: (wanted, ctx) => {
     const draft = ctx.pr?.draft;

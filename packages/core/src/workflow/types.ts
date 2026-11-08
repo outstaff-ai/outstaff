@@ -188,7 +188,13 @@ export interface WorkflowOptions {
 
   /** Who a ticket goes back to when no requester is known: the tracker identity of the first listed human who has one. */
   fallbackRequester?: string;
+
+  /** `policies.feedback.from`: whose feedback on an agent's pull request counts for the `feedback_actor` condition. */
+  feedbackFrom?: FeedbackFrom;
 }
+
+/** Whose review or comment on an agent's pull request wakes its author (`policies.feedback.from`). */
+export type FeedbackFrom = "humans" | "humans_and_teammates";
 
 export type Condition =
   | { all: Condition[] }
@@ -202,6 +208,7 @@ export type Condition =
   | { has_label: string }
   | { pr_author_kind: "human" | "agent" | "bot" }
   | { approver: boolean }
+  | { feedback_actor: boolean }
   | { pr_draft: boolean }
   | { pr_open: boolean }
   | { pr_merged: boolean }

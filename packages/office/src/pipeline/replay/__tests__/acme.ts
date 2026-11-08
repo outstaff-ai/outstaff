@@ -19,8 +19,7 @@ export function acmeTeam(): TeamConfig {
   };
 }
 
-export function acmeSetup(): ReplaySetup {
-  const team = acmeTeam();
+export function acmeSetup(team: TeamConfig = acmeTeam()): ReplaySetup {
   // Its a Plan, the acme tracker, links pull requests on tickets.
   const pipeline = configurePipeline(team, [], ["tracker.development"]);
   return { policies: pipeline.policies, pipelineOptions: pipeline.options };

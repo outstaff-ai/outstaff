@@ -29,6 +29,9 @@ export const WORKFLOW_EVENT_TYPES = [
 
 export const DEFAULT_NEEDS_HUMAN_LABEL = "needs-human";
 
+/** `policies.feedback.from` when a team sets none: a teammate's review wakes the author, as a human's does. */
+export const DEFAULT_FEEDBACK_FROM = "humans_and_teammates";
+
 /**
  * How an agent ended its turn on a work item: finished with a result to review, waiting for an answer, unable to
  * continue, or finished silently, with nothing to hand on and the ticket put back as the round found it.

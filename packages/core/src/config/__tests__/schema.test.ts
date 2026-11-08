@@ -128,7 +128,7 @@ describe("parseTeamConfig", () => {
       agent_loop_guard: { max_runs_per_subject_per_hour: 12 },
       usage: { defer_scheduled_at: 0.85, pause_automatic_at: 0.95 },
       acknowledge: { chat: true, vcs: true },
-      feedback: { follow_up_round: true },
+      feedback: { follow_up_round: true, from: "humans_and_teammates" },
       hand_back: { blocked_notify: "pm", fallback: "first_human" },
       tickets: { prs_per_ticket: "one" },
       notify_handoff: true,
@@ -147,7 +147,11 @@ describe("parseTeamConfig", () => {
   it("keeps what the team sets in policies and fills the rest with defaults", () => {
     const r = parseTeamConfig({
       ...valid(),
-      policies: { acknowledge: { vcs: false }, hand_back: { blocked_notify: "agent" } },
+      policies: {
+        acknowledge: { vcs: false },
+        hand_back: { blocked_notify: "agent" },
+        feedback: { from: "humans" },
+      },
     });
 
     if (!r.ok) {
@@ -160,7 +164,7 @@ describe("parseTeamConfig", () => {
       fallback: "first_human",
     });
 
-    expect(r.config.policies?.feedback).toEqual({ follow_up_round: true });
+    expect(r.config.policies?.feedback).toEqual({ follow_up_round: true, from: "humans" });
   });
 
   it("rejects an unknown switch and a value outside a switch's choices", () => {
@@ -178,6 +182,10 @@ describe("parseTeamConfig", () => {
     expect(
       bad((c) => (c.policies = { hand_back: { blocked_notify: "everyone" } }))[0],
     ).toMatchObject({ path: ["policies", "hand_back", "blocked_notify"] });
+
+    expect(bad((c) => (c.policies = { feedback: { from: "agents" } }))[0]).toMatchObject({
+      path: ["policies", "feedback", "from"],
+    });
   });
 
   it("names what replaced each key the event pipeline made obsolete", () => {
