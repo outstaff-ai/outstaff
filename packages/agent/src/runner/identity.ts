@@ -53,6 +53,7 @@ function messageStyleLines(messages: MessagePolicy): string[] {
       ? "- Always link tickets, pull requests and documents; never write a bare id or number."
       : "- Link tickets, pull requests and documents where it helps the reader.",
     omit.length ? `- Leave out: ${omit.join(", ")}.` : "- Leave out nothing in particular.",
+    '- Write everything people read (pull requests, reviews, chat, tickets, documents) as a teammate does. Never mention your own machinery ("this shell", "my session", "the container", "the sandbox", "the runtime", "my tools", the names of your tools or `ost` commands); say what was done and what it means, for example "the web tests need `NODE_ENV=test`; with `production` they fail".',
     "- Your final message of each work item is its hand-back summary. Say what changed and what is needed from the reader, and put the first thing the reader must know in the first line.",
   ];
 }

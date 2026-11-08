@@ -23,6 +23,19 @@ describe("identity prompt", () => {
     expect(text).toContain("Leave out: CI status, mergeability, commit hashes.");
   });
 
+  it("asks for a teammate's voice, without the agent's own machinery", () => {
+    const text = buildIdentityPrompt({ team, handle: "sam", role });
+    expect(text).toContain(
+      "Write everything people read (pull requests, reviews, chat, tickets, documents) as a teammate does.",
+    );
+
+    expect(text).toContain(
+      'Never mention your own machinery ("this shell", "my session", "the container"',
+    );
+
+    expect(text).toContain("say what was done and what it means");
+  });
+
   it("follows a changed policy", () => {
     const changed = structuredClone(team);
     changed.policies = {

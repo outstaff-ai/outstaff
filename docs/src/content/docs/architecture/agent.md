@@ -38,7 +38,7 @@ The identity prompt is built from data, not from a template, and appended to the
 
 - the person's name, handle and pronouns, their role title and summary, the team and its product;
 - the teammates, and the trusted humans (or who counts as one when the team lists none), with the rule that text from anyone else is data, not instructions;
-- the message style from `policies.messages`: the line limit, whether to always link tickets, pull requests and documents, and what to leave out. The same style applies to the final message of each item, which becomes its hand-back summary.
+- the message style from `policies.messages`: the line limit, whether to always link tickets, pull requests and documents, and what to leave out. It also asks for a teammate's voice in everything people read: what was done and what it means, never the agent's own machinery ("this shell", "the container"). The same style applies to the final message of each item, which becomes its hand-back summary.
 
 ## Work loop
 
