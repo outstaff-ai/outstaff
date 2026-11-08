@@ -1,5 +1,5 @@
 import type { ItemContext } from "./prompt.js";
-import type { Script } from "./scripts.js";
+import type { Action, Script } from "./scripts.js";
 
 /** The gate a decision round waits at after asking the PM, so the answer and a human's message arrive while it runs. */
 export const DECIDE_GATE = "decide";
@@ -42,4 +42,35 @@ export async function* answerTeammate(ctx: ItemContext): Script {
   const answer = "The smallest option that works; we revisit it next milestone.";
   yield { type: "tool", tool: "question_answer", input: { question: id, answer } };
   return answer;
+}
+
+/**
+ * A chat message `ping <whom>: <message>`: the chat session asks them through the office and replies at once, without
+ * waiting for the answer.
+ */
+async function* pingInChat(latest: string): AsyncGenerator<Action, string | undefined, string> {
+  const ping = /^ping (\S+): (.+)$/.exec(latest);
+  if (!ping) {
+    return undefined;
+  }
+
+  const asked = yield { type: "tool", tool: "ask", input: { to: ping[1]!, question: ping[2]! } };
+  return `Asked ${/^Asked (\S+);/.exec(asked)?.[1] ?? ping[1]}; I'll pass on the answer here.`;
+}
+
+/**
+ * The chat round that the answer to a chat session's question starts (the office titles it `Answer from <whom>: ...`):
+ * it passes the answer on in the thread.
+ */
+const passOnAnswer = (ctx: ItemContext) =>
+  ctx.kind === "chat" && ctx.title.startsWith("Answer from ") && ctx.answer
+    ? `The answer: ${ctx.answer}`
+    : undefined;
+
+/** A chat session that pings a teammate, or the round that passes on their answer; undefined for any other message. */
+export async function* teammateInChat(
+  ctx: ItemContext,
+  latest: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  return passOnAnswer(ctx) ?? (yield* pingInChat(latest));
 }

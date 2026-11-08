@@ -339,12 +339,16 @@ function parseOpenSubtickets(prompt: string): Pick<ItemContext, "openSubtickets"
 }
 
 // The office's brief of a question: "Question <id> from <asker> (<role>):" over the question; an answer the asker gets:
-// "<who> answered question <id> (<question>):" over the answer; and the milestone wake's instruction.
+// "<who> answered question <id> (<question>):" over the answer, or, in a follow-up round, "- <who> on question <id>
+// (<question>): <answer>"; and the milestone wake's instruction.
 function parseConversations(
   prompt: string,
 ): Pick<ItemContext, "question" | "answer" | "milestone"> {
   const q = /Question (\S+) from (\S+) \([^)\n]*\):\n(.+)/.exec(prompt);
-  const a = /answered question \S+ \([^\n]*\):\n(.+)/.exec(prompt)?.[1];
+  const a =
+    /answered question \S+ \([^\n]*\):\n(.+)/.exec(prompt)?.[1] ??
+    /^- \S+ on question \S+ \([^\n]*\): (.+)$/m.exec(prompt)?.[1];
+
   const m = /the last open ticket of milestone "(.+?)" \((\S+?)\)/.exec(prompt);
   return {
     ...(q ? { question: { id: q[1]!, from: q[2]!, text: q[3]! } } : {}),

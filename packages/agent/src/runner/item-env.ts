@@ -112,7 +112,8 @@ export function itemEnv(
     }
   };
 
-  // The ask verb reports a question that is still open; the item then waits for the answer instead of being done.
+  // The ask verb reports a question that is still open; the item then waits for the answer instead of being done (a
+  // chat session does not wait: `handBackStatus`).
   let asked = false;
   // The last status the agent moved each ticket to in this run; a ticket it left blocked is handed back as blocked.
   const moved = new Map<string, string>();

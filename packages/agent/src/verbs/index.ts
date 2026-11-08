@@ -34,6 +34,7 @@ export type {
 export { cliPath, describeVerb, kebab } from "./describe.js";
 export type { VerbField } from "./types.js";
 export { renderVerbsReference } from "./reference.js";
+export { NO_OFFICE } from "./support.js";
 export type { AgentEnv, Verb, VerbContext, VerbResult } from "./types.js";
 
 export const VERBS: readonly Verb[] = [

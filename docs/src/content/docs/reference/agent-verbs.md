@@ -11,7 +11,7 @@ Agents never talk to the tracker, the knowledge base or the code host directly. 
 - Inputs are validated; there are no destructive verbs: nothing deletes, force-merges or edits other people's text, and the one verb that merges, `pr merge`, is refused unless the team opted in with `policies.merge.on_approval`, merges only your own approved pull request, and never bypasses branch protection.
 - Text that `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` post (and `ticket comment` on a tracker where `@` mentions users) is guarded: `@handle` of a teammate becomes their name, a configured human's `identities.vcs` stays a mention, and any other `@login` is refused, because on the code host it would notify an unrelated user. Code spans and blocks, emails and `@scope/package` are left alone.
 - `pr open`, `pr update`, `pr review`, `pr reply` and `pr comment` act as the person's own identity and refuse without a write grant (a review and `pr diff` need read). `pr resolve` goes through the code host adapter, which refuses unless the last comment in the thread is yours.
-- A verb that needs a port the team has not configured fails with `unsupported` ("no tracker configured for this team"); the office verbs (`ask`, `work`, `roster`) fail with `unavailable` when the agent is not connected to an office.
+- A verb that needs a port the team has not configured fails with `unsupported` ("no tracker configured for this team"); the office verbs (`ask`, `work`, `roster`) fail with `unavailable` when the agent is not connected to an office. The `ost` command in the shell of an agent container has no office connection of its own: inside a session, the office verbs go through the `ost` tool of the session, and the error of the command says so.
 - Commands take `--json` to print `{ text, data, links }`; errors print `{ error: { code, message } }`. The identity comes from `OUTSTAFF_PERSON` and the team from `--team` or the usual team lookup.
 
 ## ticket.show
@@ -1060,7 +1060,7 @@ ost me
 
 Ask a teammate, or anyone with a role, a question through the office.
 
-Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. A role nobody has gets an explicit reply: ask a human.
+Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. In a chat session, reply to the requester now, saying whom you asked: the session ends as usual, and the answer comes in a new round in the same thread, for you to pass on. A role nobody has gets an explicit reply: ask a human.
 
 ```
 ost ask <to> <question>

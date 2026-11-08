@@ -1,6 +1,7 @@
 import { CHAT_ORIGIN_SUBJECT, readOrigin } from "./chat/origin.js";
 import type { ChatOriginRecord } from "./chat/types.js";
 import type { LateInput, LateRoundOptions } from "./late-round.types.js";
+import { CHAT_KIND } from "#/scheduler/policy.js";
 import type { Conversation, Store, WorkItem } from "./store/types.js";
 import { addFeedback, deliverFeedback, FOLLOW_UP_SUBJECT } from "./work-feedback.js";
 
@@ -46,7 +47,7 @@ async function carryOrigin(store: Store, from: WorkItem, to: WorkItem): Promise<
 /**
  * Hands the late input to the follow-up round: the feedback (counted as delivered on the finished item, so it is
  * carried once), its references and chat threads, and the answers in its journal with the asker's session, which
- * asked the questions.
+ * asked the questions. A chat session's answers also take its threads, so the round tells the requester there.
  */
 async function carry(store: Store, item: WorkItem, round: WorkItem, late: LateInput) {
   if (late.feedback.length > 0) {
@@ -63,6 +64,10 @@ async function carry(store: Store, item: WorkItem, round: WorkItem, late: LateIn
     await store.appendJournal(round.id, "office", lateAnswers(late.answers));
     if (!round.sessionId) {
       await store.updateItem(round.id, { sessionId: item.sessionId, workspace: item.workspace });
+    }
+
+    if (item.kind === CHAT_KIND) {
+      await carryOrigin(store, item, round);
     }
   }
 }

@@ -83,6 +83,7 @@ const rows: Row[] = [
   ["chat may read git history", "chat", sh("git log --oneline"), "allow"],
   ["chat may not push", "chat", sh("git push origin HEAD"), "deny", "git.read-only-repo"],
   ["chat may not commit", "chat", sh("git commit -m x"), "deny", "git.read-only-repo"],
+  ["chat may ask a teammate", "chat", { kind: "ost", command: "ask" }, "allow"],
   ["chat may comment on a ticket", "chat", { kind: "ost", command: "ticket.comment" }, "allow"],
   ["chat may create a ticket", "chat", { kind: "ost", command: "ticket.create" }, "allow"],
   [

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DECIDE_GATE } from "#/decide.js";
+import { parsePrompt } from "#/prompt.js";
 import { assigned, SCRIPTS, type Action } from "#/scripts.js";
 
 const base = {
@@ -81,5 +82,44 @@ describe("a decision made with the PM", () => {
     ]);
 
     await expect(play(SCRIPTS["question"]!(base))).rejects.toThrow("the question");
+  });
+});
+
+describe("a teammate pinged from chat", () => {
+  const chat = {
+    ...base,
+    kind: "chat",
+    title: "Chat with Ada",
+    conversation: [{ from: "Ada", agent: false, text: "ping pm: The greetings are live." }],
+  };
+
+  it("asks them and replies at once", async () => {
+    const script = SCRIPTS["chat"]!(chat);
+    const first = await script.next();
+    expect(first.value).toEqual({
+      type: "tool",
+      tool: "ask",
+      input: { to: "pm", question: "The greetings are live." },
+    });
+
+    const end = await script.next("Asked pia; no answer yet (question q7).");
+    expect(end).toEqual({ done: true, value: "Asked pia; I'll pass on the answer here." });
+  });
+
+  it("passes the answer on in the round it starts, and only there", async () => {
+    const prompt = [
+      "Work item c2 (chat): Answer from pia: Chat with Ada",
+      "",
+      "Journal of earlier rounds:",
+      "- 2030-01-01T00:00:00Z office: Answers that arrived while you were working:",
+      "- pia on question q7 (The greetings are live.): Noted, thanks.",
+    ].join("\n");
+
+    const ctx = parsePrompt(prompt)!;
+    expect(ctx.answer).toBe("Noted, thanks.");
+    expect((await play(SCRIPTS["chat"]!(ctx))).text).toBe("The answer: Noted, thanks.");
+    expect(
+      (await play(SCRIPTS["chat"]!({ ...ctx, title: "Chat with Ada", conversation: [] }))).text,
+    ).not.toContain("Noted, thanks.");
   });
 });

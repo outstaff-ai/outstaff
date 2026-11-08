@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { acmeTeam, fakeEnv } from "@outstaff/testing.agent";
 import type { Context } from "#/types.js";
 import { run } from "#/program.js";
+import { IN_AGENT_NO_OFFICE } from "#/commands/verbs.js";
 
 async function ost(args: string[], f = fakeEnv(), env: Record<string, string> = {}, stdin = "") {
   let out = "";
@@ -172,7 +173,20 @@ describe("ost verbs", () => {
 
   it("says when it is not connected to an office", async () => {
     const r = await ost(["work", "list"], fakeEnv({ office: false }));
-    expect(r.err).toContain("not connected to an office");
+    expect(r.err).toBe("error    unavailable: not connected to an office\n");
+  });
+
+  it("points an agent's shell at the session's ost tool when it has no office", async () => {
+    const env = { OUTSTAFF_OFFICE_URL: "ws://office:8080/agent" };
+    const r = await ost(["ask", "mira", "Ok?"], fakeEnv({ office: false }), env);
+    expect(r.code).toBe(1);
+    expect(r.err).toBe(`error    unavailable: ${IN_AGENT_NO_OFFICE}\n`);
+    expect(r.err).toContain("the ost tool of your session");
+
+    const json = await ost(["--json", "roster"], fakeEnv({ office: false }), env);
+    expect(JSON.parse(json.out)).toEqual({
+      error: { code: "unavailable", message: IN_AGENT_NO_OFFICE },
+    });
   });
 
   it("needs OUTSTAFF_PERSON when it builds the environment itself", async () => {

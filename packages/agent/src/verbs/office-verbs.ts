@@ -11,7 +11,7 @@ export const ask = defineVerb({
   name: "ask",
   summary: "Ask a teammate, or anyone with a role, a question through the office.",
   description:
-    "Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. A role nobody has gets an explicit reply: ask a human.",
+    "Asks a person of the team by handle, or a role (the least busy person with it answers; your own role means a peer). The office routes it; the answer may come later, as a new message in your work item. In a chat session, reply to the requester now, saying whom you asked: the session ends as usual, and the answer comes in a new round in the same thread, for you to pass on. A role nobody has gets an explicit reply: ask a human.",
   input: z.strictObject({
     to: z.string().min(1).max(30).describe("Handle of a teammate, or a role such as architect."),
     question: z

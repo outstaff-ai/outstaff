@@ -37,9 +37,12 @@ export const requireKnowledge = (env: AgentEnv): Knowledge =>
 
 export const requireVcs = (env: AgentEnv): Vcs => need(env, "vcs", env.vcs, "code host");
 
+/** What an office verb says without an office connection, as the shell's `ost` has none. */
+export const NO_OFFICE = "not connected to an office";
+
 export function requireOffice(env: AgentEnv): OfficeClient {
   if (!env.office) {
-    throw new PortError("unavailable", "not connected to an office");
+    throw new PortError("unavailable", NO_OFFICE);
   }
 
   return env.office;
