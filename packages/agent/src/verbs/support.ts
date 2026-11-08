@@ -83,7 +83,7 @@ export function requireHumanStarted(env: AgentEnv, what: "file a ticket" | "open
   if (from) {
     throw new PortError(
       "forbidden",
-      `This round is ${from}, not a trusted human's request, so it does not ${what}: only a trusted human starts new work, and a teammate's question, mention or approval is not their confirmation. Put the proposal to a trusted human instead: comment it on the ticket (what, why, and your recommendation), or, answering a question, suggest it in your answer for the asker to take to a human; then hand back.`,
+      `This round is ${from}, not a trusted human's request, so it does not ${what}: only a trusted human starts new work, and a teammate's question, mention or approval is not their confirmation. Put the proposal to a trusted human instead: comment it on the ticket (what, why, and your recommendation), or, answering a question, suggest it in your answer: the asker files it when a trusted human asked for the work, and otherwise takes it to one; then hand back.`,
     );
   }
 

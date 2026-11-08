@@ -1174,6 +1174,63 @@ describe("reviewFeedback follows the repository's own commit rules", () => {
   });
 });
 
+describe("reviewFeedback files the follow-up a review asks for", () => {
+  const round = (body: string) =>
+    play(
+      reviewFeedback({
+        ...ctx,
+        kind: "review_feedback",
+        pr: 1,
+        feedback: [{ kind: "review", body, threads: [] }],
+      }),
+      answerBy(
+        [
+          [(a) => a.type === "read", "hello\nworld\n"],
+          [(a) => isShell(a, "git rev-parse --abbrev-ref HEAD"), "assigned/w1-add-a-greeting"],
+          [
+            (a) => shellStarts(a, "git log"),
+            "origin/assigned/w1-add-a-greeting|SHOP-1: Add a greeting",
+          ],
+          [(a) => isTool(a, "pr_threads"), ""],
+          [
+            (a) => isTool(a, "ticket_create"),
+            "Created SHOP-2.\nSHOP-2: Rework\nStatus: Ready (ready)\nAssignee: Mira\nhttp://tracker/SHOP-2",
+          ],
+        ],
+        "abc123",
+      ),
+    );
+
+  const created = (seen: Action[]) =>
+    seen.flatMap((a) => (a.type === "tool" && a.tool === "ticket_create" ? [a.input] : []));
+
+  const comments = (seen: Action[]) =>
+    seen.flatMap((a) =>
+      a.type === "tool" && a.tool === "pr_comment" ? [(a.input as { body: string }).body] : [],
+    );
+
+  it("files a teammate's work for their role, ready, and links it in the answer", async () => {
+    const { seen } = await round("Not here.\n\nfollow-up for architect: Rework the migrations");
+    expect(created(seen)).toEqual([
+      {
+        title: "Rework the migrations",
+        body: "Asked for in the review of SHOP-1.",
+        assignee: "role:architect",
+        status: "ready",
+      },
+    ]);
+
+    expect(comments(seen)[0]).toContain("Filed the follow-up as [SHOP-2](http://tracker/SHOP-2).");
+  });
+
+  it("files work for later in the backlog, unassigned", async () => {
+    const { seen } = await round("Fine.\n\nfollow-up: Add a farewell");
+    expect(created(seen)).toEqual([
+      { title: "Add a farewell", body: "Asked for in the review of SHOP-1." },
+    ]);
+  });
+});
+
 describe("doc feedback", () => {
   const shown = (comments: string[]) =>
     `Cart design (design/SHOP-1.md)\nhttp://tracker/SHOP/docs/2\n\n# Cart design\n\nKeep the cart in the session.\n\nComments (${comments.length}):\n${comments.join("\n")}`;

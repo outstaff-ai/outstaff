@@ -800,23 +800,39 @@ async function* proposalApproved(
   return proposal;
 }
 
-/** Files a reviewer's "follow-up: <title>", related to this ticket; returns the key of the ticket filed. */
+/** A follow-up the round filed: its key, and its link for the reply. */
+interface FiledFollowUp {
+  key: string;
+  url?: string;
+}
+
+/**
+ * Files a reviewer's "follow-up: <title>", related to this ticket, in the backlog for later. "follow-up for <role>:
+ * <title>" is work the reviewer asks of a teammate: filed for that role, ready, so the office wakes whoever has it.
+ */
 async function* fileFollowUp(
   key: string,
   conversational: Feedback[],
-): AsyncGenerator<Action, string | undefined, string> {
-  const title = conversational.map((f) => /^follow-up: (.+)$/im.exec(f.body)?.[1]).find(Boolean);
-  if (!title) {
+): AsyncGenerator<Action, FiledFollowUp | undefined, string> {
+  const asked = conversational
+    .map((f) => /^follow-up(?: for ([a-z]+))?: (.+)$/im.exec(f.body))
+    .find(Boolean);
+
+  if (!asked) {
     return undefined;
   }
 
+  const [, role, title] = asked;
+  const forRole = role ? { assignee: `role:${role}`, status: "ready" } : {};
   const created = yield {
     type: "tool",
     tool: "ticket_create",
-    input: { title, body: `Found while reviewing ${key}.` },
+    input: { title, body: `Asked for in the review of ${key}.`, ...forRole },
   };
 
-  return /^Created (\S+?)\./m.exec(created)?.[1];
+  const filed = /^Created (\S+?)\./m.exec(created)?.[1];
+  const url = /^(https?:\/\/\S+)$/m.exec(created)?.[1];
+  return filed ? { key: filed, ...(url ? { url } : {}) } : undefined;
 }
 
 const quoted = (text: string) =>
@@ -844,10 +860,19 @@ async function* answerThreads(
 }
 
 /** The answer to a summary or a conversation comment: what it says quoted, its link, and what was done. */
-function conversationAnswer(f: Feedback, sha: string, approved?: string): string {
+function conversationAnswer(
+  f: Feedback,
+  sha: string,
+  approved?: string,
+  followUp?: FiledFollowUp,
+): string {
   const link = f.url ? `${f.url}\n\n` : "";
   const done = approved === undefined ? "" : `Done as proposed: ${approved}. `;
-  return `${quoted(f.body)}\n\n${link}${done}Fixed in ${sha}.`;
+  const filed = followUp
+    ? ` Filed the follow-up as ${followUp.url ? `[${followUp.key}](${followUp.url})` : followUp.key}.`
+    : "";
+
+  return `${quoted(f.body)}\n\n${link}${done}Fixed in ${sha}.${filed}`;
 }
 
 /** What a review round did, for its last message. */
@@ -876,7 +901,8 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   // A short "yes" answers an earlier comment (the agent's own proposal): read the conversation to know what it says.
   const approval = conversational.find((f) => f.kind === "comment" && /^yes\b/i.test(f.body));
   const proposal = approval ? yield* proposalApproved(repo, number) : undefined;
-  // A reviewer's "follow-up: <title>" is work for later: filed from here, related to this ticket, not asked of anyone.
+  // A reviewer's "follow-up: <title>" is work for later, and "follow-up for <role>: <title>" a teammate's: either is
+  // filed from here, related to this ticket, and not asked of anyone.
   const filedFollowUp = yield* fileFollowUp(key, conversational);
   const current = yield { type: "read", path: `${cwd}/${FILE}` };
   yield {
@@ -891,11 +917,11 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
   yield* answerThreads(repo, number, ids, sha);
   // A summary or a conversation comment has no thread: answer it on the pull request, quoting what it says.
   for (const f of conversational.filter((c) => c.body)) {
-    const answer = conversationAnswer(f, sha, f === approval ? proposal : undefined);
+    const answer = conversationAnswer(f, sha, f === approval ? proposal : undefined, filedFollowUp);
     yield { type: "tool", tool: "pr_comment", input: { repo, number, body: answer } };
   }
 
-  return addressed(ids.length, number, sha, filedFollowUp);
+  return addressed(ids.length, number, sha, filedFollowUp?.key);
 }
 
 /** The open top-level comments `doc_show` lists, as `- <id> [resolved] (reply to <id>) <author>: <text>`. */
