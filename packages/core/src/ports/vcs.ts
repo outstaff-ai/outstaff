@@ -4,6 +4,7 @@ import type { RepoRef } from "./types.js";
 import type { Check, CheckLog, CheckReadOptions } from "./vcs-checks.js";
 import type { CredentialUse, HostCli } from "./vcs-cli.js";
 import type { ReviewThread } from "./vcs-threads.js";
+import type { PullRequestImage, StoredImage } from "./vcs-images.js";
 import type { Reaction, ReactionTarget, VcsEvent, VcsEventPage } from "./vcs-events.js";
 
 export interface PullRequest {
@@ -213,6 +214,14 @@ export interface Vcs {
 
   /** A top-level comment on the pull request conversation; resolves with its link. Needs a write grant. */
   commentOnPullRequest(repo: RepoRef, number: number, body: string): Promise<{ url: string }>;
+
+  /**
+   * Capability `vcs.images`. Stores an image for a pull request, as the person this port instance belongs to, where
+   * the host's markdown renders it, and returns its link for the description or a comment. A file of the same name
+   * for the same pull request replaces the earlier one. Needs a write grant. Takes a png, jpeg, gif or webp of at most
+   * 10 MB whose name ends in its type's extension (`invalid` otherwise); `not_found` for an unknown pull request.
+   */
+  storeImage?(repo: RepoRef, number: number, image: PullRequestImage): Promise<StoredImage>;
 
   /**
    * Adds the reaction as the person this port instance belongs to. Adding one that is already there is not an

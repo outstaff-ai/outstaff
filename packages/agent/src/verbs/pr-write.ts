@@ -7,6 +7,7 @@ import { body, bodyFile, number, repo, textOf } from "./pr-write-support.js";
 import { prComment, prReply, prReview } from "./pr-review.js";
 import { prDiff, prMerge } from "./pr-merge.js";
 import { afterOpen, draftTicket, oneForTicket } from "./pr-open-ticket.js";
+import { prAttach } from "./pr-attach.js";
 
 export const prOpen = defineVerb({
   name: "pr.open",
@@ -132,4 +133,13 @@ export const prUpdate = defineVerb({
   },
 });
 
-export const prWriteVerbs = [prOpen, prUpdate, prReview, prReply, prComment, prDiff, prMerge];
+export const prWriteVerbs = [
+  prOpen,
+  prUpdate,
+  prAttach,
+  prReview,
+  prReply,
+  prComment,
+  prDiff,
+  prMerge,
+];

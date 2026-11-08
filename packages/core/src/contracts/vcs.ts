@@ -5,6 +5,7 @@ import type { ContractSetupFn } from "./types.js";
 import { vcsCallerCases } from "./vcs-caller.js";
 import { vcsConversationCases } from "./vcs-conversation.js";
 import { vcsHistoryCases } from "./vcs-history.js";
+import { vcsImageCases } from "./vcs-images.js";
 import { vcsMergingCases } from "./vcs-merging.js";
 import { vcsPullRequestCases } from "./vcs-pull-requests.js";
 
@@ -24,5 +25,6 @@ export function vcsContract(name: string, setup: ContractSetupFn<Vcs, VcsSeed>):
     vcsMergingCases({ get, repoOf });
     vcsConversationCases({ get, repoOf });
     vcsHistoryCases({ get, repoOf });
+    vcsImageCases({ get, repoOf });
   });
 }

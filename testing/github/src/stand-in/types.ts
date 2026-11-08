@@ -11,6 +11,7 @@ import type {
   ThreadNode,
 } from "@outstaff/integration.vcs.github";
 import type { StandInReply, StandInRequest } from "@outstaff/testing.http";
+import type { GitData } from "./git-data.types.js";
 
 /** An owner and a repository name. */
 export interface StandInRepo {
@@ -220,6 +221,9 @@ export interface GithubStore {
 
   /** The further repositories (`more`) whose pull requests the App may not list, as a missing installation answers. */
   pullsDenied: Set<string>;
+
+  /** What the git data API wrote: the branch of pull request images, for one. */
+  git: GitData;
 }
 
 export interface StandInOptions {

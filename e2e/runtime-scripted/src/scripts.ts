@@ -757,11 +757,50 @@ async function* workOnTicket(ctx: ItemContext, key: string): Script {
   };
 
   const url = firstUrl(opened);
+  yield* screenshotsOnPr(repo, key, shown, opened);
   if (sub) {
     return yield* openSubTicketPr(ctx, { key, sub, rules, branch, url });
   }
 
   return yield* followUpOnTicket(key, shown, url);
+}
+
+/**
+ * The images attached to the ticket that the runner downloaded (`- <name> (image/..., <size>): <path>` in ticket
+ * show) go on the pull request too: each is stored with pr attach, and the markdown it prints is added to the
+ * description, so whoever reviews on the code host sees them.
+ */
+async function* screenshotsOnPr(
+  repo: string,
+  key: string,
+  shown: string,
+  opened: string,
+): AsyncGenerator<Action, void, string> {
+  const paths = [...shown.matchAll(/^- \S+ \(image\/(?:png|jpeg|gif|webp)[^)]*\): (\S+)$/gm)].map(
+    (m) => m[1]!,
+  );
+
+  const number = Number(/#(\d+)/.exec(opened)?.[1]);
+  if (paths.length === 0 || !number) {
+    return;
+  }
+
+  const shots: string[] = [];
+  for (const path of paths) {
+    const stored = yield {
+      type: "tool",
+      tool: "pr_attach",
+      input: { repo, number, path, alt: "Screenshot" },
+    };
+
+    shots.push(need(/^!\[.*\]\(.+\)$/m.exec(stored)?.[0], "the markdown of the image"));
+  }
+
+  yield {
+    type: "tool",
+    tool: "pr_update",
+    input: { repo, number, body: `Closes ${key}\n\n${shots.join("\n")}\n` },
+  };
 }
 
 /** The threads a review round answers: a review's prompt lists them; otherwise every open thread is meant. */

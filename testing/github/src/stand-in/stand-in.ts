@@ -4,6 +4,7 @@ import { authRoutes } from "./auth-routes.js";
 import { branchRoutes } from "./branch-routes.js";
 import { commentRoutes } from "./comment-routes.js";
 import { fakeAuth } from "./fake-auth.js";
+import { createGitData, gitDataRoutes } from "./git-data-routes.js";
 import { graphqlRoute } from "./graphql.js";
 import { listRoutes } from "./list-routes.js";
 import { createMemoryRepo } from "./memory-repo.js";
@@ -40,12 +41,13 @@ function createStore(opts: StandInOptions): GithubStore {
     queueDelayMs: opts.queueDelayMs,
     logUrl: opts.logUrl,
     pullsDenied: new Set(),
+    git: createGitData(),
   };
 }
 
 /**
  * The parts of GitHub the vcs adapter uses: the App and installation endpoints, pull requests, reviews, comments
- * and reactions, checks and Actions logs, the default branch's rules, the events feed, and GraphQL. One implementation, served in process to
+ * and reactions, checks and Actions logs, the git data API, the default branch's rules, the events feed, and GraphQL. One implementation, served in process to
  * the adapter tests and over HTTP to the end-to-end run; what differs between them is injected through `opts`.
  */
 export function createGithubStandIn(opts: StandInOptions) {
@@ -61,6 +63,7 @@ export function createGithubStandIn(opts: StandInOptions) {
     ...commentRoutes(store, auth, repo),
     ...reactionRoutes(store, auth, repo),
     ...repoRoutes(store, repo),
+    ...gitDataRoutes(store.git, auth, repo),
     ...actionsRoutes(store, auth, repo),
     ...branchRoutes(store.branch, repo, (b) => store.backend.sha(b)),
     ...moreRoutes(store, api, opts.more ?? []),

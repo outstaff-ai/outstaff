@@ -105,6 +105,13 @@ export interface VcsSeed {
   /** A comment on the pull request conversation. Resolves to the comment id. */
   comment(repo: RepoRef, number: number, actor: string, body: string): Promise<string>;
 
+  /** The bytes of the image `storeImage` stored for a pull request under `name`, or undefined when there is none. */
+  storedImage?(
+    repo: RepoRef,
+    number: number,
+    name: string,
+  ): Promise<{ data: Uint8Array } | undefined>;
+
   /** Who reacted to a comment with what, for the kit to see the effect of `react`. */
   reactions?(repo: RepoRef, target: ReactionTarget): Promise<{ user: string; reaction: string }[]>;
   thread(

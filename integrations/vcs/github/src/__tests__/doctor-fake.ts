@@ -41,6 +41,12 @@ interface Fake {
   /** Repositories (`owner/name`) that have a `.github/workflows/` directory. */
   workflows?: string[];
 
+  /** The rule types of each repository (`owner/name`) for the assets branch; a repository left out answers 404. */
+  rules?: Record<string, string[]>;
+
+  /** Repositories (`owner/name`) where the assets branch exists. */
+  assets?: string[];
+
   /** The App's installations on other accounts, as `GET /app/installations` lists them; a status fails the list. */
   others?: Other[] | { status: number };
 }
@@ -112,6 +118,22 @@ function workflowsReply(a: Fake, path: string): Response {
   return (a.workflows ?? []).includes(repo) ? json(200, []) : json(404, {});
 }
 
+const RULES = /^\/repos\/(.+?\/.+?)\/rules\/branches\/.+$/;
+const ASSETS_REF = /^\/repos\/(.+?\/.+?)\/git\/ref\/heads\/.+$/;
+
+function rulesReply(a: Fake, path: string): Response {
+  const types = a.rules?.[RULES.exec(path)![1]!];
+  return types
+    ? json(
+        200,
+        types.map((type) => ({ type })),
+      )
+    : json(404, {});
+}
+
+const assetsReply = (a: Fake, path: string): Response =>
+  (a.assets ?? []).includes(ASSETS_REF.exec(path)![1]!) ? json(200, {}) : json(404, {});
+
 /** The repositories of the installation the token was minted for. */
 function reposReply(a: Fake, installation?: number): Response {
   const repos = othersOf(a).find((o) => o.id === installation)?.repos ?? a.repos ?? [];
@@ -133,6 +155,8 @@ const ROUTES: [(path: string) => boolean, (a: Fake, ids: Ids, path: string) => R
   ],
   [(path) => path === "/installation/repositories", (a, ids) => reposReply(a, ids.installation)],
   [(path) => WORKFLOWS.test(path), (a, _ids, path) => workflowsReply(a, path)],
+  [(path) => RULES.test(path), (a, _ids, path) => rulesReply(a, path)],
+  [(path) => ASSETS_REF.test(path), (a, _ids, path) => assetsReply(a, path)],
 ];
 
 /** A fake GitHub for the doctor tests: the App, installation and contents endpoints, answered per App id. */

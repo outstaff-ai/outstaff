@@ -52,6 +52,7 @@ export function createFakeAdapterRegistry(): AdapterRegistry {
           "vcs.ciRuns",
           "vcs.reactions",
           "vcs.merge",
+          "vcs.images",
         ],
         options,
         secrets: none,

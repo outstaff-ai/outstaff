@@ -45,7 +45,7 @@ vcsContract("fake", async () => {
   return {
     subject,
     seed: subject.seed,
-    capabilities: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions"],
+    capabilities: ["vcs.pullRequests", "vcs.reviewThreads", "vcs.reactions", "vcs.images"],
   };
 });
 

@@ -1337,6 +1337,34 @@ ost pr update 42 --body-file .scratch/pr.md --ready
 ost pr update 42 --title "feat(cart): add coupon codes" --json
 ```
 
+## ost pr attach
+
+Store an image for a pull request and print the markdown that shows it.
+
+Stores an image (png, jpeg, gif or webp, up to 10 MB) for a pull request where the code host renders it, as you, and prints the markdown that shows it: put that in the description (pr update) or a comment (pr comment). An image hosted elsewhere, such as the tracker, does not render on the code host. The file is one in the scratch directory of this item or in the worktree. One with the same name for the same pull request replaces the earlier one. Needs a write grant on the repository and a code host that stores images.
+
+```
+ost pr attach <number> <path> [options]
+```
+
+| Option | Description |
+| --- | --- |
+| `--repo <repo>` | Repository: its name in team.yaml or host/owner/name. Default: the repository the current worktree's origin points at. |
+| `--alt <alt>` | Alt text of the image: what it shows. Default: the file name. |
+
+Exit codes:
+
+- 0: the verb succeeded
+- 1: the input was invalid, the team or a port could not be reached, or the verb refused
+
+Examples:
+
+```sh
+ost pr attach 42 /scratch/w1/cart-empty.png
+ost pr attach 42 .scratch/cart.png --alt "Cart with a coupon applied"
+ost pr attach 42 /scratch/w1/cart-empty.png --json
+```
+
 ## ost pr review
 
 Submit a review: approve, request changes or comment.

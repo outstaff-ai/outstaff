@@ -222,6 +222,7 @@ export function createGithubContext(
     log: ctx.log,
     apiUrl,
     web,
+    assetsBranch: options.assetsBranch,
     secrets,
     self,
     sleep,

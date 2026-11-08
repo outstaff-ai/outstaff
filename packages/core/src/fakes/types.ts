@@ -15,6 +15,7 @@ import type {
   KnowledgeNotes,
   Member,
   NewAttachment,
+  PullRequestImage,
   PullRequestToLink,
   RepoRef,
   RunRequest,
@@ -163,6 +164,9 @@ export interface FakeVcsOptions {
 
 export interface FakeVcs extends Vcs {
   seed: VcsSeed;
+
+  /** Every image stored with `storeImage`, by `<repo key>/<number>/<name>`; one of the same name replaces it. */
+  images: Map<string, Omit<PullRequestImage, "name">>;
 }
 
 export interface FakeClock {

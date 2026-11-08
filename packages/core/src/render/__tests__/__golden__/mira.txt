@@ -858,7 +858,7 @@ Elsewhere, pick the affected checks yourself:
 - The tests that cover the code you changed.
 - Never the whole suite, and never container image builds.
 
-Screenshots of UI work, when the repository or the ticket asks for them, come from a headless browser. Your image has the libraries and fonts Chromium needs, but no browser: install the one the repository's Playwright pins with `npx playwright install chromium` (never `--with-deps`, which needs root) and keep Playwright's default launch options (Chromium's own sandbox cannot run in your container). Save them in your scratch directory and attach them where the repository or the ticket asks.
+Screenshots of UI work, when the repository or the ticket asks for them, come from a headless browser. Your image has the libraries and fonts Chromium needs, but no browser: install the one the repository's Playwright pins with `npx playwright install chromium` (never `--with-deps`, which needs root) and keep Playwright's default launch options (Chromium's own sandbox cannot run in your container). Save them in your scratch directory and attach them where the repository or the ticket asks: to the ticket (`ost ticket attach`) and to the pull request, so whoever reviews it on the code host sees them. `ost pr attach <pr> <path> --alt "<what it shows>"` stores the image where the code host renders it and prints the markdown; put that in the pull request's description (`ost pr update --body-file`) or a comment. A link to an image hosted elsewhere, such as the ticket's attachment, does not render on the code host.
 
 Then push, watch CI with `ost pr status`, and fix what it reports. CI is the gate.
 
