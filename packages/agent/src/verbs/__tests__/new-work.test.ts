@@ -129,3 +129,53 @@ describe("a round on a ticket in backlog starts no new work", () => {
     expect((await refusal(f.createTicket())).message).toContain("a teammate's mention");
   });
 });
+
+/** sam in a round of the given kind, filing a follow-up for the architect, whose role the office gives to mira. */
+async function followUpFor(round: Round) {
+  const f = fakeEnv();
+  const mira = await f.tracker.seed.member({ name: "Mira Okafor", username: "mira.okafor" });
+  f.office.resolveRole = async (role) => {
+    f.office.rolesResolved.push(role);
+    return "mira";
+  };
+
+  const file = () =>
+    runVerb(
+      findVerb("ticket.create")!,
+      { ...f.env, round },
+      {
+        title: "Rework the order migrations",
+        body: "Asked for in the review.",
+        assignee: "role:architect",
+        status: "ready",
+      },
+      {},
+    );
+
+  return { ...f, mira, file };
+}
+
+describe("a trusted human's feedback starts the work it asks for", () => {
+  it.each<[string, Round]>([
+    ["a human's review", { kind: "review_feedback", trigger: "human", ticketStatus: "review" }],
+    ["a human's feedback on a merged pull request", { kind: "merged_feedback", trigger: "human" }],
+    ["a human's comment on the ticket", { kind: "ticket_comment", trigger: "human" }],
+  ])("files a ticket for a teammate in %s", async (_, round) => {
+    const f = await followUpFor(round);
+    expect((await f.file()).text).toContain("Created SHOP-1.");
+
+    const filed = await f.tracker.getIssue("SHOP-1");
+    expect(filed.assignee?.id).toBe(f.mira.id);
+    expect(filed.status.canonical).toBe("ready");
+    expect(f.office.rolesResolved).toEqual(["architect"]);
+  });
+
+  it("still refuses a ticket for a teammate in a teammate's question", async () => {
+    const f = await followUpFor({ kind: "question", trigger: "agent" });
+    const e = await refusal(f.file());
+    expect(e.message).toMatch(/does not file a ticket: only a trusted human starts new work/);
+    expect(e.message).toContain("the asker files it when a trusted human asked for the work");
+    expect(f.office.rolesResolved).toEqual([]);
+    expect(await f.tracker.listIssues({})).toEqual([]);
+  });
+});
