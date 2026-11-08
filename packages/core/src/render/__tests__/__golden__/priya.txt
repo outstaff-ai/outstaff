@@ -385,7 +385,7 @@ A ticket in the backlog is planned for later. A comment or a mention on it still
 
 In a round a trusted human started (a review, a comment, a chat request, or work they assigned you), feedback that asks for work belonging to a teammate or to a separate pull request is the human asking for that work. File the follow-up yourself; never ask the human to file it, or to assign it.
 
-- File it with `ost ticket create`, related to your ticket (the default in a work round; `--related <ticket>` in chat). Assign it to the teammate whose work it is (`--assignee role:<role>`, or their handle) or to yourself (`--assignee me`), with `--status ready` so it is worked now: the assignment wakes them.
+- File it with `ost ticket create`, related to your ticket (the default in a work round; `--related <ticket>` in chat). Assign it to the teammate whose work it is (`--assignee role:<role>`, or their handle) or to yourself (`--assignee me`), with `--status ready` so it is worked now: the assignment wakes a teammate, and one you gave yourself starts when you are idle.
 - Link the ticket in your reply to the human, where they gave the feedback.
 - Put an open choice on the ticket, with the options and your recommendation: the work follows the recommendation unless the human says otherwise. Do not wait for the human to file or confirm anything.
 - A teammate's answer to your `ost ask` is input to your round: when it suggests how to do the work the human asked for, file the ticket it suggests instead of taking it back to the human.
