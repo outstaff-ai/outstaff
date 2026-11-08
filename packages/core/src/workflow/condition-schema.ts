@@ -49,6 +49,13 @@ export const conditionSchema: z.ZodType<Condition> = z.lazy(() =>
           "The actor of the event is (or is not) an allowed approver of a merge, as policies.merge.approvers says.",
         ),
       ),
+    z
+      .strictObject({ feedback_actor: z.boolean() })
+      .meta(
+        d(
+          "The actor of the event is (or is not) someone whose review or comment wakes the author of an agent's pull request, as policies.feedback.from says: a human, or with humans_and_teammates an agent too. Never automation.",
+        ),
+      ),
     z.strictObject({ pr_draft: z.boolean() }).meta(d("The pull request is (or is not) a draft.")),
     z.strictObject({ pr_open: z.boolean() }).meta(d("The pull request is (or is not) open.")),
     z.strictObject({ pr_merged: z.boolean() }).meta(d("The pull request is (or is not) merged.")),

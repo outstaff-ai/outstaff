@@ -1292,6 +1292,11 @@ An extra condition that must hold as well: narrows the policy, never widens it.
 - Type: `boolean`
 - Required
 
+#### pipeline.policies.<key>.when.feedback_actor
+
+- Type: `boolean`
+- Required
+
 #### pipeline.policies.<key>.when.pr_draft
 
 - Type: `boolean`
@@ -1623,7 +1628,7 @@ How agents act on feedback from trusted people beyond the first round.
 
 - Type: `object`
 - Optional
-- Default: `{"follow_up_round":true}`
+- Default: `{"follow_up_round":true,"from":"humans_and_teammates"}`
 
 #### policies.feedback.follow_up_round
 
@@ -1632,6 +1637,15 @@ Start another round when feedback arrived after the agent was offered its work. 
 - Type: `boolean`
 - Optional
 - Default: `true`
+
+#### policies.feedback.from
+
+Whose review or comment on an agent's pull request, open or merged, wakes its author: humans (trusted humans only) or humans_and_teammates (trusted humans and the team's other agents). Never the author's own comments, a bot's, or an approval with no text; an untrusted person's comment wakes no one either way. Default humans_and_teammates.
+
+- Type: `string`
+- Optional
+- Default: `humans_and_teammates`
+- Allowed values: `humans`, `humans_and_teammates`
 
 ### policies.hand_back
 

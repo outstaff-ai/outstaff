@@ -22,12 +22,12 @@ export const SAM = { kind: "agent" as const, id: "sam" };
 export const OFFICE = { kind: "automation" as const, id: "office" };
 
 /** The built-in policies on an event: the trace the bus and the aggregation make. */
-export const traceOf = (e: PipelineEvent, world: World = {}) =>
-  evaluatePipeline(e, stateOf(world), BUILT_IN_POLICIES, OPTS);
+export const traceOf = (e: PipelineEvent, world: World = {}, options = OPTS) =>
+  evaluatePipeline(e, stateOf(world), BUILT_IN_POLICIES, options);
 
 /** What one built-in policy makes of an event, through the bus and the aggregation: its decisions, or the condition that failed. */
-export function judge(id: string, e: PipelineEvent, world: World = {}) {
-  const trace = traceOf(e, world);
+export function judge(id: string, e: PipelineEvent, world: World = {}, options = OPTS) {
+  const trace = traceOf(e, world, options);
   const p = trace.policies.find((t) => t.policy === id)!;
   return p.matched
     ? trace.decisions.filter((d) => d.policy === id).map(describeDecision)

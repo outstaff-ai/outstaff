@@ -216,6 +216,27 @@ describe("conditions", () => {
     expect(holds({ work_kind: ["assigned"] }, bare).detail).toContain("unknown");
   });
 
+  it("judge who gives feedback on an agent's pull request by policies.feedback.from", () => {
+    const by = (kind: "human" | "agent" | "automation") =>
+      ev("pr.comment", { actor: { kind, id: kind === "agent" ? "mira" : "ada" } });
+
+    // Default: humans and teammates.
+    expect(ok({ feedback_actor: true }, by("human"))).toBe(true);
+    expect(ok({ feedback_actor: true }, by("agent"))).toBe(true);
+    expect(ok({ feedback_actor: false }, by("automation"))).toBe(true);
+    expect(holds({ feedback_actor: true }, by("agent")).detail).toBe(
+      "actor mira (agent) gives feedback under policies.feedback.from humans_and_teammates, wanted one who does",
+    );
+
+    const humans = { feedbackFrom: "humans" as const };
+    expect(ok({ feedback_actor: true }, by("human"), world(), humans)).toBe(true);
+    expect(holds({ feedback_actor: true }, by("agent"), world(), humans).detail).toBe(
+      "actor mira (agent) does not give feedback under policies.feedback.from humans, wanted one who does",
+    );
+
+    expect(ok({ feedback_actor: false }, by("agent"), world(), humans)).toBe(true);
+  });
+
   it("judge approvals by the allowed approvers", () => {
     expect(ok({ approver: true })).toBe(true);
     expect(ok({ approver: false }, ev("pr.opened", { data: { untrusted: true } }))).toBe(true);
@@ -498,9 +519,17 @@ describe("options", () => {
     expect(workflowOptions({ humans })).toEqual({
       needsHumanLabel: "needs-human",
       approvers: ["humans"],
+      feedbackFrom: "humans_and_teammates",
       humans,
       fallbackRequester: "grace.t",
     });
+
+    expect(
+      workflowOptions({
+        humans,
+        policies: { feedback: { from: "humans" }, merge: { approvers: ["humans"] } } as never,
+      }).feedbackFrom,
+    ).toBe("humans");
 
     expect(workflowOptions({ humans: [humans[0]!] }).fallbackRequester).toBeUndefined();
     expect(workflowOptions({}).fallbackRequester).toBeUndefined();

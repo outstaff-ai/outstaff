@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { judge, onPr, prWorld, traceOf, OFFICE, SAM } from "./support.js";
+import { judge, onPr, OPTS, prWorld, traceOf, OFFICE, SAM } from "./support.js";
 
 const MIRA = { kind: "agent" as const, id: "mira" };
 const BARE_APPROVAL = { not: { all: [{ review_state: ["approved"] }, { has_body: false }] } };
@@ -39,11 +39,22 @@ describe("merged_feedback_to_author", () => {
 
     const office = onPr("pr.comment", { kind: "comment", body: "Deployed." }, OFFICE);
     expect(judge("merged_feedback_to_author", office, merged())).toEqual({
-      failed: { not: { actor_kind: "automation" } },
+      failed: { feedback_actor: true },
     });
 
     const bare = onPr("pr.review_submitted", { state: "approved", body: "" }, MIRA);
     expect(judge("merged_feedback_to_author", bare, merged())).toEqual({ failed: BARE_APPROVAL });
+  });
+
+  it("with policies.feedback.from humans, only a trusted human's feedback wakes the author", () => {
+    const humansOnly = { ...OPTS, feedbackFrom: "humans" as const };
+    const review = onPr("pr.review_submitted", { state: "commented", body: "Log the time." }, MIRA);
+    expect(judge("merged_feedback_to_author", review, merged(), humansOnly)).toEqual({
+      failed: { feedback_actor: true },
+    });
+
+    const human = onPr("pr.review_submitted", { state: "commented", body: "Log the time." });
+    expect(judge("merged_feedback_to_author", human, merged(), humansOnly)).toHaveLength(1);
   });
 
   it("not an untrusted actor's comment: the event is recorded and wakes no one", () => {

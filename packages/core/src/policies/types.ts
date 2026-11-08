@@ -11,7 +11,7 @@ export interface PolicySwitch {
   default: PolicyValue;
 
   /** The value that turns the behaviour off (or, for a limit, lifts it). */
-  off: false | "none" | "many" | "agent";
+  off: false | "none" | "many" | "agent" | "humans";
 
   /** What outstaff does while the switch is on, for `ost policies` and the docs. */
   behaviour: string;

@@ -5,7 +5,7 @@ sidebar:
   order: 11
 ---
 
-**Status:** replaced by [0018](/decisions/0018-pipeline-only/), except the status mapping (`workflow.statuses`), which stays. [0023](/decisions/0023-ticket-closes-after-merge-checks/) replaces its one pull request per ticket rule: `ost pr open` refuses a ticket with another open pull request, not one with a merged one.
+**Status:** replaced by [0018](/decisions/0018-pipeline-only/), except the status mapping (`workflow.statuses`), which stays. [0023](/decisions/0023-ticket-closes-after-merge-checks/) replaces its one pull request per ticket rule: `ost pr open` refuses a ticket with another open pull request, not one with a merged one. [0029](/decisions/0029-teammates-feedback-wakes-the-author/) replaces its rule that only a trusted human's feedback wakes the author of an agent's pull request.
 
 ## Context
 

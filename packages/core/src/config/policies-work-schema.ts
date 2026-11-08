@@ -91,8 +91,16 @@ export const feedbackSchema = z
           "Start another round when feedback arrived after the agent was offered its work. Default on.",
         ),
       ),
+    from: z
+      .enum(["humans", "humans_and_teammates"])
+      .default("humans_and_teammates")
+      .meta(
+        d(
+          "Whose review or comment on an agent's pull request, open or merged, wakes its author: humans (trusted humans only) or humans_and_teammates (trusted humans and the team's other agents). Never the author's own comments, a bot's, or an approval with no text; an untrusted person's comment wakes no one either way. Default humans_and_teammates.",
+        ),
+      ),
   })
-  .default({ follow_up_round: true })
+  .default({ follow_up_round: true, from: "humans_and_teammates" })
   .meta(d("How agents act on feedback from trusted people beyond the first round."));
 
 export const handBackSchema = z

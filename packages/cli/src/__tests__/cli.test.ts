@@ -323,19 +323,20 @@ describe("ost policies", () => {
   it("lists every switch of the acme team with its value and source", async () => {
     const r = await ost(acme(), ["policies"]);
     expect(r.code).toBe(0);
-    expect(r.out).toBe(`SWITCH                             VALUE        SOURCE
-policies.acknowledge.chat          true         team.yaml
-policies.acknowledge.vcs           true         team.yaml
-policies.chat.profile              true         team.yaml
-policies.design.canvas             true         team.yaml
-policies.feedback.follow_up_round  true         team.yaml
-policies.hand_back.blocked_notify  pm           default
-policies.hand_back.fallback        first_human  team.yaml
-policies.tickets.prs_per_ticket    one          team.yaml
-policies.pull_ready                true         default
-policies.recheck_blocked           true         default
-policies.notify_handoff            true         default
-policies.merge.on_approval         false        default
+    expect(r.out).toBe(`SWITCH                             VALUE                 SOURCE
+policies.acknowledge.chat          true                  team.yaml
+policies.acknowledge.vcs           true                  team.yaml
+policies.chat.profile              true                  team.yaml
+policies.design.canvas             true                  team.yaml
+policies.feedback.follow_up_round  true                  team.yaml
+policies.feedback.from             humans_and_teammates  default
+policies.hand_back.blocked_notify  pm                    default
+policies.hand_back.fallback        first_human           team.yaml
+policies.tickets.prs_per_ticket    one                   team.yaml
+policies.pull_ready                true                  default
+policies.recheck_blocked           true                  default
+policies.notify_handoff            true                  default
+policies.merge.on_approval         false                 default
 `);
   });
 
