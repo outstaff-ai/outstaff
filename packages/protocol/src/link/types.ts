@@ -1,6 +1,7 @@
 import type { z } from "zod";
 import type { itemSchema, itemSummarySchema, personSchema, scheduledBySchema } from "./entities.js";
 import type { traceSchema } from "./trace.js";
+import type { PERIOD_GROUPS, periodTotalsSchema } from "./usage.js";
 import type { healthCheckSchema, healthSchema } from "./health.js";
 import type {
   LINK_ERROR_CODES,
@@ -26,6 +27,8 @@ export type LinkItemSummary = z.infer<typeof itemSummarySchema>;
 export type LinkHealth = z.infer<typeof healthSchema>;
 export type LinkHealthCheck = z.infer<typeof healthCheckSchema>;
 export type LinkSource = LinkTrace["event"]["source"];
+export type PeriodGroup = (typeof PERIOD_GROUPS)[number];
+export type PeriodTotals = z.infer<typeof periodTotalsSchema>;
 
 export interface LinkMessageMeta {
   from: "office" | "service" | "both";

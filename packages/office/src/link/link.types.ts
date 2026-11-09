@@ -16,6 +16,7 @@ export type LinkStore = Pick<
   | "countTraces"
   | "listTracesRecorded"
   | "listRunUsage"
+  | "listPeriodRuns"
   | "itemsWithoutTicket"
   | "listItemRefs"
   | "findItemRefs"

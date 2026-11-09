@@ -11,7 +11,7 @@ export type { NewDoctorCheck, StoredDoctorCheck } from "./doctor.types.js";
 export type { Run, RunRuntime } from "./runs.types.js";
 export type { ItemRef, ItemRefRole, ItemRefType, NewItemRef } from "./refs.types.js";
 export type { Moment, MomentQuery, MomentRef, NewMoment, RecallStore } from "./recall.types.js";
-export type { ModelCounts, RunUsageFilter, RunUsageRow } from "./usage.types.js";
+export type { ModelCounts, PeriodRun, RunUsageFilter, RunUsageRow } from "./usage.types.js";
 
 export interface NewEvent {
   source: string;

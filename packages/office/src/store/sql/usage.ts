@@ -1,6 +1,6 @@
-import type { Selectable } from "kysely";
+import type { ExpressionBuilder, Selectable } from "kysely";
 import type { Database, Db } from "#/store/schema.js";
-import type { ModelCounts, RunUsageRow, Store } from "#/store/types.js";
+import type { ModelCounts, PeriodRun, RunUsageRow, Store } from "#/store/types.js";
 import { iso } from "./ids.js";
 import type { StoreInternals } from "./types.js";
 import { addCounts, isEmpty, usageDelta } from "./usage-delta.js";
@@ -72,13 +72,23 @@ async function keepLatest(db: Db, session: string, models: ModelCounts[], at: st
   }
 }
 
+/** Runs that were going at some time from `from` up to `to`. */
+const runningIn = (
+  eb: ExpressionBuilder<Database, "runs">,
+  { from, to }: { from: string; to: string },
+) =>
+  eb.and([
+    eb("runs.started_at", "<", to),
+    eb.or([eb("runs.finished_at", "is", null), eb("runs.finished_at", ">=", from)]),
+  ]);
+
 /** The store's queries on what runs used. */
 export function usageQueries({
   db,
   now,
 }: StoreInternals): Pick<
   Store,
-  "recordRunUsage" | "listRunUsage" | "itemsOfTicket" | "itemsWithoutTicket"
+  "recordRunUsage" | "listRunUsage" | "listPeriodRuns" | "itemsOfTicket" | "itemsWithoutTicket"
 > {
   return {
     recordRunUsage(runId, session, models) {
@@ -136,6 +146,11 @@ export function usageQueries({
         q = q.where("runs.finished_at", "<", filter.until);
       }
 
+      const period = filter.runningIn;
+      if (period) {
+        q = q.where((eb) => runningIn(eb, period));
+      }
+
       const rows = await q.orderBy("runs.started_at").orderBy("run_usage.model").execute();
       return rows.map((r): RunUsageRow => ({
         ...toCounts(r),
@@ -143,6 +158,37 @@ export function usageQueries({
         workItemId: r.work_item_id,
         person: r.person,
         kind: r.kind,
+        finishedAt: r.finished_at,
+      }));
+    },
+
+    async listPeriodRuns(from, to) {
+      const rows = await db
+        .selectFrom("runs")
+        .innerJoin("work_items", "work_items.id", "runs.work_item_id")
+        .select([
+          "runs.id",
+          "runs.work_item_id",
+          "runs.started_at",
+          "runs.finished_at",
+          "work_items.person",
+          "work_items.subject_type",
+          "work_items.subject_ref",
+        ])
+        .where((eb) => runningIn(eb, { from, to }))
+        .orderBy("runs.started_at")
+        .orderBy("runs.id")
+        .execute();
+
+      return rows.map((r): PeriodRun => ({
+        runId: r.id,
+        workItemId: r.work_item_id,
+        person: r.person,
+        subject:
+          r.subject_type !== null && r.subject_ref !== null
+            ? { type: r.subject_type, ref: r.subject_ref }
+            : null,
+        startedAt: r.started_at,
         finishedAt: r.finished_at,
       }));
     },

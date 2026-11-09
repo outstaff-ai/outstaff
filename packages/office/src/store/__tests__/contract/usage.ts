@@ -71,6 +71,47 @@ export function usageCases(ctx: ContractContext): void {
     expect(await ctx.store.listRunUsage({ since: "9999" })).toEqual([]);
   });
 
+  it("finds the runs going in a period, and their usage", async () => {
+    const a = await item({ type: "ticket", ref: "ACME-1" });
+    const done = await ctx.store.startRun(a.id);
+    await ctx.store.recordRunUsage(done.id, "s1", [counts("opus", 1)]);
+    await ctx.store.finishRun(done.id, { outcome: "ok" });
+    const b = await item();
+    const open = await ctx.store.startRun(b.id);
+    await ctx.store.recordRunUsage(open.id, "s2", [counts("opus", 2)]);
+
+    const all = await ctx.store.listPeriodRuns("0000", "9999");
+    expect(all).toEqual([
+      {
+        runId: done.id,
+        workItemId: a.id,
+        person: "ann",
+        subject: { type: "ticket", ref: "ACME-1" },
+        startedAt: done.startedAt,
+        finishedAt: expect.any(String),
+      },
+      {
+        runId: open.id,
+        workItemId: b.id,
+        person: "ann",
+        subject: null,
+        startedAt: open.startedAt,
+        finishedAt: null,
+      },
+    ]);
+
+    // A run still going is in every later period; a period that ends where a run starts doesn't have it.
+    const later = { from: "9999", to: "99999" };
+    expect((await ctx.store.listPeriodRuns(later.from, later.to)).map((r) => r.runId)).toEqual([
+      open.id,
+    ]);
+
+    expect(await ctx.store.listPeriodRuns("0000", done.startedAt)).toEqual([]);
+    expect((await ctx.store.listRunUsage({ runningIn: later })).map((r) => r.runId)).toEqual([
+      open.id,
+    ]);
+  });
+
   it("finds the items of a ticket by subject or reference, and the ones of none", async () => {
     const own = await item({ type: "ticket", ref: "ACME-1" });
     const pr = await item({ type: "pr", ref: "github.com/acme/shop#7" });
