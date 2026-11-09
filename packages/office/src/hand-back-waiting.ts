@@ -16,25 +16,35 @@ const prPiece = (pr: PrRecord) => ({
   text: `pull request ${pr.title} is ${pr.draft ? "a draft" : "open for review"}`,
 });
 
-/** An open sub-ticket: in flight when it is in review, or an agent has it. */
+/** The agent a sub-ticket is with that works on it: none for a blocked one, which waits on an answer. */
+const workingAgent = (record: TicketRecord | undefined) =>
+  record?.assignee?.kind === "agent" && record.status !== "blocked"
+    ? record.assignee.id
+    : undefined;
+
+/**
+ * An open sub-ticket: in flight when it is in review, or an agent has it. A blocked one waits on an answer or a
+ * decision, not on work: never in flight, whoever has it.
+ */
 function subPiece(key: string, record: TicketRecord | undefined) {
-  const assignee = record?.assignee;
-  if (record?.status === "review") {
+  const status = record?.status ?? "unknown";
+  const agent = workingAgent(record);
+  if (status === "review") {
     return { inFlight: true, text: `${key} is in review` };
   }
 
-  return assignee?.kind === "agent"
-    ? { inFlight: true, text: `${key} is with ${assignee.id}` }
-    : { inFlight: false, text: `${key} is ${record?.status ?? "unknown"}` };
+  return agent
+    ? { inFlight: true, text: `${key} is with ${agent}` }
+    : { inFlight: false, text: `${key} is ${status}` };
 }
 
 /**
  * What an item's ticket waits on, when everything open on it is work in flight: its open pull requests are open for
  * a human's review, and each open sub-ticket is in review or held by an agent. Nothing there is blocked, so a
  * `blocked` hand-back on it is taken as `silent`. Empty when the ticket has nothing open, when anything open is not in
- * flight (a draft, a sub-ticket a human holds outside review, one nobody holds), or when the ticket itself is blocked
- * or closed: a real block, which escalates. The ticket and its sub-tickets are read again first, as the agent may have
- * changed them in the round.
+ * flight (a draft, a blocked sub-ticket, a sub-ticket a human holds outside review, one nobody holds), or when the
+ * ticket itself is blocked or closed: a real block, which escalates. The ticket and its sub-tickets are read again
+ * first, as the agent may have changed them in the round.
  */
 export function officeWaitingOn(deps: { store: Reader; workState: TicketReader }) {
   const { store, workState } = deps;

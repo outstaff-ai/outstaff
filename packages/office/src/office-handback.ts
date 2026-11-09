@@ -47,7 +47,13 @@ async function madeTickets(
 // Answering comments on a document, or a question on a ticket someone else has, changes nothing on the ticket.
 // Trying to unblock a ticket is not a hand-back on it either, nor the PM's round on a milestone its closing finished:
 // the ticket stays as it is.
-const NOT_ON_TICKET = new Set(["doc_feedback", "asked", "unblock", "milestone", "reconcile"]);
+export const NOT_ON_TICKET = new Set([
+  "doc_feedback",
+  "asked",
+  "unblock",
+  "milestone",
+  "reconcile",
+]);
 
 /** The hand-back's status: the item's, except a silent finish, which leaves the item done and the ticket alone. */
 const statusOf = (item: WorkItem, result: Pick<HandBackResult, "status">) =>
@@ -79,7 +85,7 @@ async function beforeOf(
 async function dataOf(
   store: Pick<Store, "getSubject">,
   item: WorkItem,
-  result: Pick<HandBackResult, "summary" | "message" | "status" | "waitingOn">,
+  result: Pick<HandBackResult, "summary" | "message" | "status" | "waitingOn" | "silentAgain">,
   ticket: string | undefined,
 ) {
   const before = await beforeOf(store, item, ticket);
@@ -91,6 +97,7 @@ async function dataOf(
     ...(result.message ? { message: result.message } : {}),
     ...(before ? { before } : {}),
     ...(result.waitingOn?.length ? { waitingOn: result.waitingOn } : {}),
+    ...(result.silentAgain ? { silentAgain: result.silentAgain } : {}),
   };
 }
 
@@ -136,7 +143,7 @@ export function createHandedBack(deps: {
   const { store, workState, judge, log } = deps;
   return async (
     item: WorkItem,
-    result: Pick<HandBackResult, "summary" | "message" | "status" | "waitingOn">,
+    result: Pick<HandBackResult, "summary" | "message" | "status" | "waitingOn" | "silentAgain">,
   ): Promise<void> => {
     if (!HANDED_BACK.has(item.status) || !item.subject || NOT_ON_TICKET.has(item.kind)) {
       return;

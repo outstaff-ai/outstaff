@@ -48,7 +48,7 @@ export const NOTHING_TO_REVIEW_PROMPT = [
   "- If you need a decision or an answer from a human, or anything outside your control: comment where the work came from (the ticket, or the chat thread) with what you need and from whom, and end the round. It is handed back as `blocked` (`ost handback blocked`).",
   "- If you wait for another agent's answer, ask it with `ost ask`; the item then waits for it.",
   "- If you did make a result, open or link it now: `ost pr open`, `ost pr update --ready`, `ost doc create`. An answer that needs a human's review: comment it on the ticket and move the ticket to review (`ost ticket move <key> review`).",
-  "- If the work needed nothing from you (a comment or mention that asks nothing of you), or you wait on a human's review of a pull request or on sub-tickets someone else holds, say `ost handback silent`: the ticket is put back as the round found it. Waiting on a review is not blocked.",
+  "- If the work needed nothing from you (a comment or mention that asks nothing of you), or you wait on a human's review of a pull request or on sub-tickets in review or with an agent, say `ost handback silent`: the ticket is put back as the round found it. Waiting on a review is not blocked; waiting on an answer or a decision is: say `ost handback blocked`.",
   "",
   "End with one line that says where the work is and what is needed.",
 ].join("\n");

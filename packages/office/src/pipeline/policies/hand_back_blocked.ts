@@ -1,11 +1,16 @@
-import { definePolicy } from "@outstaff/policy";
+import { definePolicy, type ActSpec } from "@outstaff/policy";
 import { BLOCKED_HAND_BACK } from "./conditions.js";
 import { HANDED_IN, withHandedIn } from "./hand-in.js";
-import { handedOver, requesterOf, UNLESS_HANDED_OVER } from "./handover.js";
+import { handedOver, requesterOf, silentAgain, UNLESS_HANDED_OVER } from "./handover.js";
 import { acts } from "./spec.js";
 import { unblocker } from "./unblocker.js";
 
-const toRequester = acts({ as: "actor", ops: [{ move: "blocked" }, { assign: "requester" }] });
+const toRequesterSpec: ActSpec = {
+  as: "actor",
+  ops: [{ move: "blocked" }, { assign: "requester" }],
+};
+
+const toRequester = acts(toRequesterSpec);
 
 export const policy = definePolicy({
   id: "hand_back_blocked",
@@ -14,12 +19,13 @@ export const policy = definePolicy({
   on: ["agent.handed_back"],
   when: BLOCKED_HAND_BACK,
   decides: `${toRequester.decides}, when no PM unblocks it, ${UNLESS_HANDED_OVER}; ${HANDED_IN}`,
-  decide: (event, ctx) => {
+  decide: (_event, ctx) => {
     const pm = unblocker(ctx);
     if ("skip" in pm) {
       const to = requesterOf(ctx);
       const kept = handedOver(ctx, to);
-      return withHandedIn(ctx, kept.length > 0 ? kept : toRequester.decide(event, ctx), to);
+      const blocked = kept.length > 0 ? kept : ctx.act(toRequesterSpec, silentAgain(ctx));
+      return withHandedIn(ctx, blocked, to);
     }
 
     return [

@@ -6,6 +6,15 @@ import type { CiState, CurrentWork, DocRecord, PrRecord } from "./types.js";
 
 export const TERMINAL = new Set(["done", "canceled"]);
 
+/** The default branch the team file gives the repository, else `main`. */
+export function defaultBranch(
+  core: Pick<WorkstateCore, "repos" | "team" | "sameRepo">,
+  repo: RepoRef,
+): string {
+  const i = core.repos.findIndex((r) => core.sameRepo(r, repo));
+  return (i >= 0 ? core.team.repos[i]?.default_branch : undefined) ?? "main";
+}
+
 /** Handle of the agent playing a catalog role, if exactly one is configured. */
 export function personForRole(core: Pick<WorkstateCore, "team">, role: string): string | undefined {
   const matches = core.team.people.filter((p) => p.role === role || p.extends?.includes(role));

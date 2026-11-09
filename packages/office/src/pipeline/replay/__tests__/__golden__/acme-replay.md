@@ -8,7 +8,7 @@ How to read it:
 - A merge re-checks the repository's other open pull requests and raises `pr.conflicted`, `pr.behind_base` or `pr.base_merged` for every pull request the merge changed something under; those rows say derived.
 - A change to the policies that changes a decision changes this file: review the difference like any other.
 
-**51 events** (5 derived from merges).
+**57 events** (5 derived from merges).
 
 ## A stacked pull request series merges
 
@@ -116,8 +116,19 @@ How to read it:
 | 50 | `pr.review_submitted` acme-example/shop#41 by ada-admin | wake sam (merged_feedback): _ada-admin commented on your merged pull request #41 (Search API). Answer there. If they ask for a change, open a follow-up pull request._ |
 | 51 | `pr.comment` acme-example/shop#60 by ines | wake sam (review_feedback): _ines left feedback on your pull request #60 (Wishlist). Address each point, answer in its thread and push._ |
 
+## A ticket the agent cannot progress: no idle pull loop
+
+| # | Event | Decisions |
+| - | - | - |
+| 52 | `agent.idle` no subject by sam | wake sam (assigned): _You have nothing queued. Your next ready work is ACME-190. Work on it the way the repository asks._ |
+| 53 | `agent.started` ACME-190 by sam | move ACME-190 to active (for sam) |
+| 54 | `agent.handed_back` ACME-190 by sam | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-190 to blocked (for sam)<br>assign ACME-190 to agent priya (for sam)<br>wake priya (unblock): _sam handed ACME-190 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to sam. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent._ |
+| 55 | `agent.handed_back` ACME-190 by sam | (drop: handed back blocked, but it waits on work in flight (ACME-192 is in review), which is not blocked: ACME-190 stays active, not back in ready, as it waits on work in flight) |
+| 56 | `agent.idle` no subject by sam | (drop: sam handed back ACME-190 silent at 2026-10-05T13:22:00.000Z, and no one else acted on it since: not pulled again until someone does) |
+| 57 | `agent.handed_back` ACME-190 by sam | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-190 to blocked (for sam)<br>assign ACME-190 to agent priya (for sam)<br>wake priya (unblock): _sam handed ACME-190 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to sam. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent._ |
+
 ## Coalescing
 
-The pipeline's 26 wakes become 24 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 29 wakes become 27 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

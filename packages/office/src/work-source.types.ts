@@ -23,6 +23,12 @@ export interface HandBackResult {
    */
   waitingOn?: string[] | undefined;
 
+  /**
+   * For a `silent` hand-back the office took as `blocked`: the agent handed the ticket back silent before, and nothing
+   * from anyone else on it followed. The hand-back's event carries it, so its trace says why.
+   */
+  silentAgain?: string | undefined;
+
   /** What the round used, per runtime session. */
   usage?: SessionUsageReport[] | undefined;
 }
@@ -36,11 +42,18 @@ export interface WorkSourceOptions {
   /**
    * The work state, whose pull requests a merge's context names. A `done` hand-back that does not say what it leaves
    * to review (an older agent) is checked against it, and taken as `blocked` when it leaves nothing. A `blocked`
-   * hand-back on a ticket whose open work is all in flight (in review, or with an agent) is taken as `silent`.
+   * hand-back on a ticket whose open work is all in flight (in review, or with an agent) is taken as `silent`, and a
+   * second `silent` one on a ticket nobody else acted on since the first as `blocked`.
    */
   workState?: Pick<
     WorkState,
-    "repoPrs" | "ticket" | "prsOfTicket" | "refreshTicket" | "subTickets" | "lastWorker"
+    | "repoPrs"
+    | "ticket"
+    | "prsOfTicket"
+    | "refreshTicket"
+    | "subTickets"
+    | "lastWorker"
+    | "silencedAt"
   >;
   roles?: RosterOptions["roles"];
 

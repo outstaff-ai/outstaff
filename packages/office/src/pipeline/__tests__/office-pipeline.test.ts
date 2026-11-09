@@ -57,7 +57,11 @@ async function make() {
   return createOfficePipeline({
     team: team(),
     store,
-    workState: { ...createStaticWorkflowState({}), readyTickets: () => [] } as never,
+    workState: {
+      ...createStaticWorkflowState({}),
+      readyTickets: () => [],
+      heard: async () => {},
+    } as never,
     scheduler: { enqueue: () => Promise.reject(new Error("not in this test")) },
     push: () => false,
     clock: manualClock(),

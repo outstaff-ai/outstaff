@@ -1,7 +1,13 @@
 import { parseRepoUrl, repoKey, vcsAgentLogins, type PrRef, type RepoRef } from "@outstaff/core";
-import type { Cancel } from "#/types.js";
 import type { RefreshCtx, WorkstateCore } from "./core.types.js";
-import { currentWork, docOpen, personForRole, stackedOn, toWorkflowPr } from "./derive.js";
+import {
+  currentWork,
+  defaultBranch,
+  docOpen,
+  personForRole,
+  stackedOn,
+  toWorkflowPr,
+} from "./derive.js";
 import { blockedAgent, inRound, openBlockers } from "./blocked.js";
 import { createDocs } from "./docs.js";
 import { createEvents } from "./events.js";
@@ -11,6 +17,8 @@ import { createPrs } from "./prs.js";
 import { readyTickets, ticketStatusAt } from "./ready.js";
 import { createRequesters } from "./requesters.js";
 import { createRescan } from "./rescan.js";
+import { repeating } from "./repeat.js";
+import { createSilenced, silencedAt } from "./silenced.js";
 import { createTickets } from "./tickets.js";
 import { createUnblock } from "./unblock.js";
 import type { WorkState, WorkstateOptions } from "./types.js";
@@ -66,6 +74,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     handedBack: new Set(),
     work: new Map(),
     pickups: new Map(),
+    silenced: new Map(),
     notTickets: new Set(),
     handlers: [],
     sameRepo,
@@ -100,6 +109,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     followMerges,
   });
 
+  const silenced = createSilenced(core);
   const { refreshWorkers, doRescan, load } = createRescan(core, {
     ...ticketOps,
     ...unblockOps,
@@ -109,37 +119,10 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   /** The pull requests the office can still read: a gone one is left out of every answer. */
   const seen = () => [...prs.values()].filter(visible);
 
-  let timer: Cancel | undefined;
-  let followTimer: Cancel | undefined;
-  let running = false;
-
-  const scheduleFollow = () => {
-    followTimer = clock.setTimeout(() => {
-      void state.followMerges().then(
-        () => running && scheduleFollow(),
-        (error: unknown) => {
-          logger.warn("following merges failed", { error: String(error) });
-          if (running) {
-            scheduleFollow();
-          }
-        },
-      );
-    }, followInterval(opts));
-  };
-
-  const schedule = () => {
-    timer = clock.setTimeout(() => {
-      void state.rescan().then(
-        () => running && schedule(),
-        (error: unknown) => {
-          logger.warn("workstate rescan failed", { error: String(error) });
-          if (running) {
-            schedule();
-          }
-        },
-      );
-    }, refreshMs);
-  };
+  const rescans = repeating(clock, logger, "workstate rescan", refreshMs, () => state.rescan());
+  const follows = repeating(clock, logger, "following merges", followInterval(opts), () =>
+    state.followMerges(),
+  );
 
   const state: WorkState = {
     prSubject,
@@ -214,21 +197,15 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     },
 
     async start() {
-      if (running) {
-        return;
+      if (!rescans.running()) {
+        rescans.start();
+        follows.start();
       }
-
-      running = true;
-      schedule();
-      scheduleFollow();
     },
 
     async stop() {
-      running = false;
-      timer?.();
-      followTimer?.();
-      timer = undefined;
-      followTimer = undefined;
+      rescans.stop();
+      follows.stop();
       await chain;
     },
 
@@ -280,10 +257,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     initiativeTickets: (id) =>
       [...tickets.values()].filter((r) => r.initiative?.id === id).map((r) => r.key),
 
-    defaultBranch(repo) {
-      const i = repos.findIndex((r) => sameRepo(r, repo));
-      return (i >= 0 ? team.repos[i]?.default_branch : undefined) ?? "main";
-    },
+    defaultBranch: (repo) => defaultBranch(core, repo),
 
     stackedOn: (repo, branch) => stackedOn(core, repo, branch),
 
@@ -291,8 +265,11 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
 
     currentWork: (person) => currentWork(core, person),
     readyTickets: (person) => readyTickets(core, person),
+    silencedAt: (ticket, person) => silencedAt(core, ticket, person),
+    heard: (event) => locked(() => silenced.heard(event)),
   };
 
   await load();
+  await silenced.load();
   return state;
 }

@@ -57,7 +57,7 @@ describe("a sub-ticket closing", () => {
 
     expect(wake).toMatchObject({
       instruction:
-        "ACME-49 was closed as done. The open sub-tickets of ACME-48: ACME-50, ACME-51. Continue with the next one in the order you planned, the way the repository asks. When none is for you to do now (it waits on a human's review, or on a sub-ticket someone else has), you are waiting, not blocked: hand back silent, with no new message.",
+        "ACME-49 was closed as done. The open sub-tickets of ACME-48: ACME-50, ACME-51. Continue with the next one in the order you planned, the way the repository asks. When none is for you to do now and each waits on a human's review or on work someone else has under way, you are waiting, not blocked: hand back silent, with no new message. When one waits on an answer or a decision (it is blocked, or nobody answered a question on it yet), hand back blocked, naming who and what.",
     });
 
     expect(judge("subtickets_closed_move_parent", closed(), w)).toEqual([
