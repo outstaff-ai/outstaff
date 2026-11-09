@@ -109,3 +109,75 @@ export const docComments: ReplayScenario = {
     },
   ],
 };
+
+const parent = (status: "ready" | "active" | "blocked", to = "sam") => ({
+  "ACME-190": ticket(status, to),
+  "ACME-191": ticket("blocked", "ada.admin", { parent: "ACME-190" }),
+  "ACME-192": ticket("review", "ada.admin", { parent: "ACME-190" }),
+});
+
+const onParent = (
+  id: string,
+  type: "agent.started" | "agent.handed_back",
+  minute: number,
+  data = {},
+) =>
+  ev(id, type, "sam", { ticket: "ACME-190" }, at(minute), {
+    kind: "assigned",
+    workItem: `item-${id}`,
+    ...data,
+  });
+
+const SILENCED_AT = at(262);
+
+/**
+ * The loop an idle pull and a silent hand-back made: a parent the agent cannot progress until a human decides on one of
+ * its sub-tickets. Handed back blocked it goes to the PM; a silent one that waits on work in flight leaves it active;
+ * the idle pull skips a ticket handed back silent; and a second silent hand-back the office took as blocked goes to the
+ * PM with the office's reason.
+ */
+export const silentLoop: ReplayScenario = {
+  title: "A ticket the agent cannot progress: no idle pull loop",
+  steps: [
+    {
+      event: ev("s9-idle", "agent.idle", "sam", {}, at(260)),
+      world: {
+        tickets: parent("ready"),
+        ready: { sam: [{ key: "ACME-190", readyAt: "2026-10-05T07:00:00.000Z" }] },
+      },
+    },
+    { event: onParent("s9-start", "agent.started", 261), world: { tickets: parent("ready") } },
+    {
+      event: onParent("s9-blocked", "agent.handed_back", 262, {
+        status: "blocked",
+        before: { status: "ready" },
+      }),
+      world: { tickets: parent("active"), roles: ROLES },
+    },
+    {
+      event: onParent("s9-silent-in-flight", "agent.handed_back", 263, {
+        status: "silent",
+        before: { status: "ready", assignee: { kind: "agent", id: "sam" } },
+        waitingOn: ["ACME-192 is in review"],
+      }),
+      world: { tickets: parent("active"), roles: ROLES },
+    },
+    {
+      event: ev("s9-idle-skips", "agent.idle", "sam", {}, at(264)),
+      world: {
+        tickets: parent("ready"),
+        ready: {
+          sam: [{ key: "ACME-190", readyAt: "2026-10-05T07:00:00.000Z", silencedAt: SILENCED_AT }],
+        },
+      },
+    },
+    {
+      event: onParent("s9-silent-again", "agent.handed_back", 265, {
+        status: "blocked",
+        before: { status: "ready" },
+        silentAgain: `sam handed ACME-190 back silent at ${SILENCED_AT}, and again with nothing from anyone else on it since: taking it as blocked`,
+      }),
+      world: { tickets: parent("active"), roles: ROLES },
+    },
+  ],
+};

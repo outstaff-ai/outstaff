@@ -70,6 +70,7 @@ async function setup(extra: { pipeline?: unknown; logger?: Logger } = {}) {
     ticket: (key: string) => (key === "ACME-1" ? { title: "Search page" } : undefined),
     readyTickets: (person: string) =>
       person === "sam" ? [{ key: "ACME-1", readyAt: "2026-10-05T07:00:00.000Z" }] : [],
+    heard: async () => {},
   };
 
   const opts: LiveOptions = {

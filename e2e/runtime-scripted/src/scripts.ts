@@ -467,11 +467,13 @@ async function* nextSubTicket(
   const cwd = need(ctx.worktree, "the worktree");
   const repo = need(ctx.repo, "the repository");
   const shown = yield { type: "tool", tool: "ticket_show", input: { key: sub } };
-  // A part that waits on the human's review leaves nothing to do now. This agent hands back blocked, as one did live:
-  // the office takes it as silent, since the parent only waits on work in flight.
-  if (/^waits: review$/m.test(shown)) {
+  // A part that waits on the human's review or decision leaves nothing to do now. This agent hands back blocked, as one
+  // did live: for a review the office takes it as silent, since the parent only waits on work in flight; for a
+  // decision (the part is blocked) it stays blocked.
+  const waits = /^waits: (review|decision)$/m.exec(shown)?.[1];
+  if (waits) {
     yield { type: "tool", tool: "handback", input: { status: "blocked" } };
-    return `Blocked until the human reviews ${sub}.`;
+    return `Blocked until the human ${waits === "review" ? "reviews" : "decides on"} ${sub}.`;
   }
 
   const rules = yield* conventions(ctx, cwd);

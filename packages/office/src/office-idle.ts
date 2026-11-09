@@ -12,8 +12,9 @@ const TICKET_CHANGES = new Set(["ticket.created", "ticket.assigned", "ticket.mov
 /**
  * The idle pull (`policies.pull_ready`): an agent with no work item queued or running starts its next ready ticket.
  * Checked when a ticket change gives the agent a ready ticket, after a hand-back, on the scheduler's tick and when the
- * agent connects. The office raises `agent.idle` only when there is a ready ticket to start, so an idle team leaves no
- * trace every tick; the `idle_pulls_next` policy decides what it starts.
+ * agent connects. The office raises `agent.idle` only when there is a ready ticket to start, or once for the ready
+ * tickets the agent handed back silent (the policy's drop says why it skips them), so an idle team leaves no trace
+ * every tick; the `idle_pulls_next` policy decides what it starts.
  */
 export function createIdlePull(opts: IdlePullOptions): IdlePull {
   const { team, workState, scheduler, pipeline, clock, logger } = opts;
@@ -27,6 +28,27 @@ export function createIdlePull(opts: IdlePullOptions): IdlePull {
     return run;
   };
 
+  /** The silenced ready tickets each agent's last `agent.idle` saw, so the drop that skips them is traced once. */
+  const skipped = new Map<string, string>();
+
+  /**
+   * Whether an idle pull has anything to say: a ready ticket it may start, or ready tickets set aside after a silent
+   * hand-back that the last `agent.idle` did not see yet, whose drop says why. A tick that would only drop again is
+   * left out.
+   */
+  const news = (person: string): string | undefined => {
+    const ready = workState.readyTickets(person);
+    const silenced = ready
+      .flatMap((t) => (t.silencedAt ? [`${t.key}@${t.silencedAt}`] : []))
+      .toSorted()
+      .join(" ");
+
+    const startable = ready.some((t) => !t.silencedAt);
+    return startable || (silenced !== "" && skipped.get(person) !== silenced)
+      ? silenced
+      : undefined;
+  };
+
   const busy = async (person: string) =>
     (await opts.store.listItems({ person })).some(
       (i) => BUSY.has(i.status) && i.kind !== CHAT_KIND,
@@ -34,7 +56,7 @@ export function createIdlePull(opts: IdlePullOptions): IdlePull {
 
   /** Whether the person is an agent with nothing to do and a ready ticket to start, and may start it now. */
   const shouldPull = async (person: string): Promise<boolean> => {
-    if (!agents.has(person) || workState.readyTickets(person).length === 0) {
+    if (!agents.has(person) || news(person) === undefined) {
       return false;
     }
 
@@ -55,6 +77,7 @@ export function createIdlePull(opts: IdlePullOptions): IdlePull {
       return;
     }
 
+    skipped.set(person, news(person) ?? "");
     const at = clock.now().toISOString();
     const event: PipelineEvent = {
       id: `office:idle:${person}:${at}`,

@@ -16,6 +16,7 @@ import type { Clock } from "#/types.js";
 import type { IntakeMeta } from "#/intake/index.js";
 import type { MergeChecks } from "./merge-checks.types.js";
 import type { Store } from "#/store/index.js";
+import type { HeardEvent } from "./silenced.types.js";
 
 export type { MergeCheck, MergeChecks } from "./merge-checks.types.js";
 
@@ -72,6 +73,12 @@ export interface ReadyTicket {
 
   /** The tracker's priority, when it has one: 1 is the most urgent. */
   priority?: number | undefined;
+
+  /**
+   * When the agent last handed it back silent (or the parent an idle pull would wake it on), with no event on it from
+   * anyone else since (ISO-8601).
+   */
+  silencedAt?: string | undefined;
 }
 
 /** A knowledge document an agent wrote for a ticket (or in a chat request), kept so comments on it reach the agent. */
@@ -224,6 +231,15 @@ export interface WorkState extends WorkflowState {
    * the last `refreshWorkers`.
    */
   readyTickets(person: string): ReadyTicket[];
+
+  /**
+   * When the person last handed the ticket back silent, while nothing from anyone else on it, its pull requests or
+   * its sub-tickets followed (`silencedAt` of a ready ticket).
+   */
+  silencedAt(ticket: string, person: string): string | undefined;
+
+  /** Takes in an event the office judged, for the silent hand-backs it holds or releases (see `silencedAt`). */
+  heard(event: HeardEvent): Promise<void>;
 
   /**
    * Reads the checks on the merge commit of each merge not decided yet, and raises `pr.merge_checks_passed` or

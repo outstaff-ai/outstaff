@@ -652,6 +652,17 @@ describe("assigned, for a ticket split into a part now and a part later", () => 
 
     expect(text).toBe("Blocked until the human reviews SHOP-3.");
   });
+
+  it("woken on the parent when the next part waits on the human's decision, hands back blocked too", async () => {
+    const woken = { ...ctx, openSubtickets: ["SHOP-3"] };
+    const { seen, text } = await play(
+      assigned(woken),
+      answerBy([[(a) => isTool(a, "ticket_show"), "SHOP-3 Price it\n\nwaits: decision"]], ""),
+    );
+
+    expect(seen.at(-1)).toEqual({ type: "tool", tool: "handback", input: { status: "blocked" } });
+    expect(text).toBe("Blocked until the human decides on SHOP-3.");
+  });
 });
 
 describe("branchFor", () => {

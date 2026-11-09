@@ -1,6 +1,6 @@
 import type { ActTarget, Resolved } from "@outstaff/core";
 import { nextReadyTicket } from "./idle.js";
-import type { ActSpec, OpSpec, PolicyContext, WakeSpec } from "./policy.types.js";
+import type { ActSpec, OpSpec, PolicyContext, ReadyTicket, WakeSpec } from "./policy.types.js";
 import type { BookkeepingOp, Proposal, WakeSubject } from "./proposal.types.js";
 
 type Ctx = Omit<PolicyContext, "wake" | "act">;
@@ -9,15 +9,27 @@ const drop = (reason: string): Proposal => ({ type: "drop", reason });
 
 const onTicket = (ref: string): WakeSubject => ({ type: "ticket", ref });
 
+/** Why an idle pull leaves out the ready tickets the agent handed back silent, with no one else acting on them since. */
+const setAside = (person: string, silenced: readonly ReadyTicket[]) =>
+  `${person} handed back ${silenced.map((t) => `${t.key} silent at ${t.silencedAt}`).join(", ")}, and no one else acted on ${silenced.length > 1 ? "them" : "it"} since: not pulled again until someone does`;
+
 /**
  * An idle agent's next ready ticket. A sub-ticket of an open parent wakes the agent on the parent instead, naming its
- * ready sub-tickets: the agent planned their order when it split the parent, and keeps to it.
+ * ready sub-tickets: the agent planned their order when it split the parent, and keeps to it. A ticket the agent
+ * handed back silent, with nothing from anyone else on it since, is left out: the round would find what the last one
+ * found.
  */
 function nextReady(person: string, ctx: Ctx): Resolved<{ subject?: WakeSubject; next?: string }> {
-  const ready = ctx.state.readyTickets(person);
+  const all = ctx.state.readyTickets(person);
+  const ready = all.filter((t) => !t.silencedAt);
   const next = nextReadyTicket(ready)?.key;
   if (!next) {
-    return { skip: `no ready ticket is assigned to ${person}` };
+    const silenced = all.filter((t) => t.silencedAt).toSorted((a, b) => a.key.localeCompare(b.key));
+    return {
+      skip: silenced.length
+        ? setAside(person, silenced)
+        : `no ready ticket is assigned to ${person}`,
+    };
   }
 
   const parent = ctx.state.parentOf(next);
