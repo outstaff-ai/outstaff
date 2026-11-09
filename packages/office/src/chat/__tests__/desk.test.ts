@@ -14,6 +14,7 @@ import { readOrigin, threadsOf, withThread } from "#/chat/origin.js";
 import type { DocLink, DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
 import { addFeedback, readFeedback } from "#/work-feedback.js";
 import { chatLinks } from "#/link/chat-links.js";
+import { messageRefs } from "#/chat/refs.js";
 
 function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({
@@ -666,6 +667,28 @@ describe("chat requests", () => {
 
       expect((await links(later.item.id)).attached).toMatchObject([{ id: item.id, how: "about" }]);
       expect(await links(other.item.id)).toEqual({ attached: [], chatSessions: [] });
+    });
+
+    it("leaves out a session in the thread that neither filed, attached nor was about the work", async () => {
+      const refs = messageRefs({ channel: "D1", messageId: "m9", text: "hi" }, "trigger");
+      const work = await store.enqueue({
+        person: "sam",
+        kind: "assigned",
+        title: "t",
+        trigger: "human",
+        refs,
+      });
+
+      const chat = await store.enqueue({
+        person: "sam",
+        kind: "chat",
+        title: "c",
+        trigger: "human",
+        refs,
+      });
+
+      expect(await links(work.id)).toEqual({ attached: [], chatSessions: [] });
+      expect(await links(chat.id)).toEqual({ attached: [], chatSessions: [] });
     });
   });
 
