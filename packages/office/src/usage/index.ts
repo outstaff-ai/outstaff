@@ -7,7 +7,7 @@ export {
 
 export { createUsageFields, USAGE_FIELDS_SUBJECT } from "./fields.js";
 export { recordRoundUsage } from "./run-usage.js";
-export { runUsageOf, teamUsage } from "./team-usage.js";
+export { itemUsageOf, runUsageOf, teamUsage } from "./team-usage.js";
 export { ticketUsage } from "./ticket-usage.js";
 
 export type { UsageFields, UsageFieldsOptions } from "./fields.types.js";

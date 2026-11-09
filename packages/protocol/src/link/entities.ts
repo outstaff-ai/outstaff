@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { time } from "./fields.js";
-import { runUsageSchema } from "./usage.js";
+import { itemUsageSchema, runUsageSchema } from "./usage.js";
 
 export const itemSubjectSchema = z
   .strictObject({ type: z.string(), ref: z.string() })
@@ -94,6 +94,7 @@ export const itemSchema = z.strictObject({
   scheduledBy: scheduledBySchema
     .nullable()
     .describe("The policy and event that queued it, when the event pipeline did."),
+  usage: itemUsageSchema,
   runs: z
     .array(
       z.strictObject({

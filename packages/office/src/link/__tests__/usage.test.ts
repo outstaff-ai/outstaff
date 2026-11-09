@@ -3,6 +3,7 @@ import type { TicketUsage } from "@outstaff/protocol";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { manualClock } from "#/clock.js";
 import { findItem } from "#/link/item.js";
+import { findItems } from "#/link/items.js";
 import type { OfficeLinkOptions } from "#/link/link.types.js";
 import { answer } from "#/link/requests.js";
 import { openStore, type Store } from "#/store/index.js";
@@ -135,5 +136,48 @@ describe("usage over the office link", () => {
 
     const empty = await store.enqueue({ person: "sam", kind: "k", title: "t", trigger: "human" });
     expect((await findItem(store, empty.id))!.item.runs).toEqual([]);
+  });
+
+  it("adds up the item's runs that reported usage, on the item and in the list", async () => {
+    const item = await ran(10, { type: "ticket", ref: "ACME-1" });
+    const again = await store.startRun(item.id);
+    await store.recordRunUsage(again.id, "s-again", [
+      { model: "claude-opus-5-5", ...counts(5, 0.05) },
+    ]);
+
+    await store.finishRun(again.id, { outcome: "done" });
+    await store.startRun(item.id);
+
+    const usage = {
+      totals: {
+        inputTokens: 16,
+        outputTokens: 16,
+        cacheReadTokens: 16,
+        cacheCreationTokens: 16,
+        tokens: 64,
+        costUsd: expect.closeTo(0.15),
+        runs: 2,
+      },
+      models: [
+        {
+          model: "claude-opus-5-5",
+          totals: expect.objectContaining({ tokens: 60, runs: 2, costUsd: expect.closeTo(0.15) }),
+        },
+        { model: "claude-haiku-5-5", totals: expect.objectContaining({ tokens: 4, runs: 1 }) },
+      ],
+    };
+
+    const found = (await findItem(store, item.id))!.item;
+    expect([found.runs.length, found.usage]).toEqual([3, usage]);
+
+    const empty = await store.enqueue({ person: "sam", kind: "k", title: "t", trigger: "human" });
+    const list = await findItems(store, {});
+    expect(Object.fromEntries(list.items.map((i) => [i.id, i.usage]))).toEqual({
+      [item.id]: usage,
+      [empty.id]: {
+        totals: expect.objectContaining({ tokens: 0, costUsd: 0, runs: 0 }),
+        models: [],
+      },
+    });
   });
 });
