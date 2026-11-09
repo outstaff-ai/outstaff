@@ -17,6 +17,9 @@ export interface ChatOriginRecord extends ChatOrigin {
   /** For a chat session: the work item it filed last for the message. The thread belongs to that item from then on. */
   filed?: string;
 
+  /** For a chat session: every work item it attached a request to (`ost work attach`), oldest first. */
+  attached?: string[];
+
   /**
    * For a chat session: the work item its first ticket for the agent itself was filed as. The agent's later tickets of
    * the same session join it while it waits in the queue, so one request is one round, however many tickets it filed.

@@ -140,6 +140,16 @@ const ITEM = {
       usage: { totals: TOTALS, models: [{ model: "claude-opus-5-5", totals: TOTALS }] },
     },
   ],
+  attached: [],
+  chatSessions: [
+    {
+      id: "item-0",
+      person: "sam",
+      startedAt: "2026-10-05T07:50:00.000Z",
+      finishedAt: "2026-10-05T07:55:00.000Z",
+      how: "attached",
+    },
+  ],
   journal: {
     entries: 1,
     latest: [{ at: "2026-10-05T09:00:00.000Z", author: "office", text: "Merge it." }],

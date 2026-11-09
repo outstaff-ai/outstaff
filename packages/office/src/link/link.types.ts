@@ -17,6 +17,8 @@ export type LinkStore = Pick<
   | "listTracesRecorded"
   | "listRunUsage"
   | "itemsWithoutTicket"
+  | "listItemRefs"
+  | "findItemRefs"
 >;
 
 export interface OfficeLinkOptions {
