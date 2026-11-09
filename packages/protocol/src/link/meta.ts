@@ -57,6 +57,8 @@ export const LINK_METHOD_META: Record<LinkMethod, string> = {
     "Tokens and API-equivalent cost of agent runs that finished in a window (default all of them): per person, with the part of each person's runs that names no ticket (unattributed), and per day. The cost is what the tokens cost at API list prices, not what a subscription bills.",
   ticket_usage:
     "One ticket's tokens and API-equivalent cost: its own runs (the runs of every work item whose subject or references name it) by person, model and kind of round, and its total with its sub-tickets rolled up, as the tracker says which they are.",
+  period_usage:
+    "Tokens, API-equivalent cost and working time of agent runs in a period, in a time zone, as totals and grouped by any of person, subject, model, day and month. Only time inside runs counts: queued, waiting and blocked time counts nowhere. A run that crosses the period's edges, or a day or month boundary in `tz`, is split there: its time where it fell, and its tokens and cost in proportion to its time on each side. Tokens and cost are zero when the team does not track usage (`usage.track_cost`).",
   health:
     "The doctor checks: the ones the office runs at start, every day at `office.doctor.daily_at`, on demand and, while one fails or warns, every `office.doctor.retry_minutes`, and the ones each agent reports when it starts. A failing check stays failing until a later run passes.",
 };

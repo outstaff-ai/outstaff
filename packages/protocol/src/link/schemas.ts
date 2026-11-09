@@ -1,9 +1,11 @@
 import { z } from "zod";
-import { itemSchema, itemSubjectSchema, itemSummarySchema, personSchema } from "./entities.js";
+import { itemSchema, itemSummarySchema, personSchema } from "./entities.js";
 import { traceSchema } from "./trace.js";
-import { time } from "./fields.js";
+import { itemSubjectSchema, time } from "./fields.js";
 import { healthSchema } from "./health.js";
 import {
+  periodUsageParamsSchema,
+  periodUsageResultSchema,
   ticketUsageParamsSchema,
   ticketUsageResultSchema,
   usageParamsSchema,
@@ -134,6 +136,11 @@ export const requestSchema = z.discriminatedUnion("method", [
     method: z.literal("ticket_usage"),
     params: ticketUsageParamsSchema,
   }),
+  z.strictObject({
+    id: requestId,
+    method: z.literal("period_usage"),
+    params: periodUsageParamsSchema,
+  }),
 ]);
 
 const results = {
@@ -181,6 +188,7 @@ const results = {
   health: healthSchema,
   usage: usageResultSchema,
   ticket_usage: ticketUsageResultSchema,
+  period_usage: periodUsageResultSchema,
 };
 
 export const responseSchema = z.union([
@@ -196,6 +204,7 @@ export const responseSchema = z.union([
       results.health,
       results.usage,
       results.ticket_usage,
+      results.period_usage,
     ]),
   }),
   z.strictObject({

@@ -29,6 +29,21 @@ export interface RunUsageFilter {
 
   /** Runs that finished before this time. */
   until?: string;
+
+  /** Runs that were going at some time from `from` up to `to`, not included. */
+  runningIn?: { from: string; to: string };
+}
+
+/** A run that was going at some time in a period, with its work item's person and subject. */
+export interface PeriodRun {
+  runId: string;
+  workItemId: string;
+  person: string;
+  subject: { type: string; ref: string } | null;
+  startedAt: string;
+
+  /** When the run finished; null while it runs. */
+  finishedAt: string | null;
 }
 
 export interface UsageStore {
@@ -39,6 +54,9 @@ export interface UsageStore {
    */
   recordRunUsage(runId: string, session: string, models: ModelCounts[]): Promise<ModelCounts[]>;
   listRunUsage(filter: RunUsageFilter): Promise<RunUsageRow[]>;
+
+  /** The runs that were going at some time from `from` up to `to` (ISO-8601, `to` not included), oldest first. */
+  listPeriodRuns(from: string, to: string): Promise<PeriodRun[]>;
 
   /** Ids of the work items whose subject is the ticket or whose references name it, oldest first. */
   itemsOfTicket(ticket: string): Promise<string[]>;

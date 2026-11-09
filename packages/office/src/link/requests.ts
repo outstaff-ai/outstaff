@@ -8,7 +8,7 @@ import type { OfficeLinkOptions } from "./link.types.js";
 import { listPeople } from "./people.js";
 import { present } from "./present.js";
 import { countEvents } from "./totals.js";
-import { ticketUsage, usage } from "./usage.js";
+import { periodUsage, ticketUsage, usage } from "./usage.js";
 
 const error = (id: string, code: LinkErrorCode, message: string): LinkResponse => ({
   id,
@@ -95,6 +95,7 @@ const HANDLERS: { [M in LinkMethod]: Handler<M> } = {
   health: (opts, r) => health(opts, r.id, r.params?.run === true),
   usage: (opts, r) => usage(opts, r.id, r.params),
   ticket_usage: (opts, r) => ticketUsage(opts, r.id, r.params.ticket),
+  period_usage: (opts, r) => periodUsage(opts, r.id, r.params),
 };
 
 // A method is matched to its own request by the table, which the compiler cannot follow through the lookup.

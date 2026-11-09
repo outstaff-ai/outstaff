@@ -1,5 +1,5 @@
 import type { UsageTotals } from "@outstaff/protocol";
-import type { RunUsageRow } from "#/store/types.js";
+import type { ModelCounts, RunUsageRow } from "#/store/types.js";
 
 export const NO_USAGE: UsageTotals = {
   inputTokens: 0,
@@ -12,8 +12,8 @@ export const NO_USAGE: UsageTotals = {
 };
 
 /** The rows added up; `runs` counts the distinct runs among them. */
-export function totalsOf(rows: readonly RunUsageRow[]): UsageTotals {
-  const sum = (pick: (r: RunUsageRow) => number) => rows.reduce((n, r) => n + pick(r), 0);
+export function totalsOf(rows: readonly (ModelCounts & Pick<RunUsageRow, "runId">)[]): UsageTotals {
+  const sum = (pick: (r: ModelCounts) => number) => rows.reduce((n, r) => n + pick(r), 0);
   const inputTokens = sum((r) => r.inputTokens);
   const outputTokens = sum((r) => r.outputTokens);
   const cacheReadTokens = sum((r) => r.cacheReadTokens);

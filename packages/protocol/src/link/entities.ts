@@ -1,13 +1,6 @@
 import { z } from "zod";
-import { time } from "./fields.js";
+import { itemSubjectSchema, time } from "./fields.js";
 import { itemUsageSchema, runUsageSchema } from "./usage.js";
-
-export const itemSubjectSchema = z
-  .strictObject({ type: z.string(), ref: z.string() })
-  .nullable()
-  .describe(
-    "What the item is about: a ticket key, a pull request (`host/owner/name#n`) or a document id.",
-  );
 
 const runtimeField = z
   .string()
