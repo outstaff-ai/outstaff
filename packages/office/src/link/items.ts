@@ -1,7 +1,8 @@
 import type { LinkItemSummary, LinkResultOf } from "@outstaff/protocol";
 import type { WakeReason } from "#/pipeline/live/live.types.js";
 import { WAKE_SUBJECT } from "#/pipeline/live/wake.js";
-import type { WorkItem } from "#/store/types.js";
+import type { RunUsageRow, WorkItem } from "#/store/types.js";
+import { itemUsageOf } from "#/usage/index.js";
 import type { ItemFilter, LinkStore } from "./link.types.js";
 
 /** The pipeline policy and event that queued an item, when the live pipeline did. */
@@ -10,10 +11,11 @@ export async function scheduledBy(store: Pick<LinkStore, "getSubject">, id: stri
   return reason ? { policy: reason.policy, eventId: reason.event } : null;
 }
 
-/** A work item without its runs and journal. */
+/** A work item without its runs and journal; `usage` holds the usage rows of its runs. */
 export const summary = async (
   store: Pick<LinkStore, "getSubject">,
   i: WorkItem,
+  usage: readonly RunUsageRow[],
 ): Promise<LinkItemSummary> => ({
   id: i.id,
   kind: i.kind,
@@ -26,6 +28,7 @@ export const summary = async (
   createdAt: i.createdAt,
   updatedAt: i.updatedAt,
   scheduledBy: await scheduledBy(store, i.id),
+  usage: itemUsageOf(usage),
 });
 
 /** Work items newest first, by when they were created; `before` is the time cursor of the next page. */
@@ -43,7 +46,11 @@ export async function findItems(store: LinkStore, f: ItemFilter): Promise<LinkRe
   // A page never ends in the middle of the items of one time, so `before` = `nextBefore` misses none.
   const cut = all.slice(0, limit).at(-1)?.createdAt;
   const page = all.filter((i, n) => n < limit || i.createdAt === cut);
-  const items = await Promise.all(page.map((i) => summary(store, i)));
+  const usage =
+    page.length === 0 ? [] : await store.listRunUsage({ workItemIds: page.map((i) => i.id) });
+
+  const ownUsage = (i: WorkItem) => usage.filter((u) => u.workItemId === i.id);
+  const items = await Promise.all(page.map((i) => summary(store, i, ownUsage(i))));
   const total = matching.length;
   return page.length < all.length ? { items, total, nextBefore: cut! } : { items, total };
 }

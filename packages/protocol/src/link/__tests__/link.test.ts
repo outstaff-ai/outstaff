@@ -119,6 +119,7 @@ const ITEM = {
     policy: "approval_to_merge_after_feedback",
     eventId: "workstate:handed_back:w1:r1",
   },
+  usage: { totals: TOTALS, models: [{ model: "claude-opus-5-5", totals: TOTALS }] },
   runs: [
     {
       startedAt: "2026-10-05T09:00:30.000Z",
@@ -184,6 +185,7 @@ describe("the office link messages", () => {
                 createdAt: "2026-10-05T08:00:00.000Z",
                 updatedAt: "2026-10-05T08:30:00.000Z",
                 scheduledBy: null,
+                usage: { totals: { ...TOTALS, tokens: 0, costUsd: 0, runs: 0 }, models: [] },
               },
             ],
             total: 7,

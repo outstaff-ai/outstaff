@@ -1,7 +1,7 @@
 import type { LinkItem } from "@outstaff/protocol";
 import { ITEM_EVENTS_SUBJECT } from "#/pipeline/live/wake.js";
 import type { Trace } from "#/pipeline/trace.types.js";
-import { runUsageOf } from "#/usage/index.js";
+import { itemUsageOf, runUsageOf } from "#/usage/index.js";
 import { scheduledBy as reasonOf } from "./items.js";
 import type { LinkStore } from "./link.types.js";
 
@@ -45,6 +45,7 @@ export async function findItem(
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
       scheduledBy,
+      usage: itemUsageOf(usage),
       runs: runs.map((r) => ({
         startedAt: r.startedAt,
         finishedAt: r.finishedAt,

@@ -19,6 +19,11 @@ describe("findItems", () => {
     return store.enqueue({ person, kind, title: `${kind} ${minute}`, trigger: "human" });
   };
 
+  it("lists no items when none match", async () => {
+    await add("sam", 1);
+    expect(await findItems(store, { person: "noor" })).toEqual({ items: [], total: 0 });
+  });
+
   it("lists items newest first, filtered by status and person, paged by creation time without splitting one", async () => {
     const a = await add("sam", 1);
     const b = await add("noor", 2);

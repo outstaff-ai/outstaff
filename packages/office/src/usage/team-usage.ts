@@ -36,16 +36,17 @@ export async function teamUsage(
   };
 }
 
-/** One run's usage for the link: its totals and per model; null when nothing was recorded. */
-export function runUsageOf(
-  rows: readonly RunUsageRow[],
-): LinkResultOf<"item">["item"]["runs"][number]["usage"] {
-  if (rows.length === 0) {
-    return null;
-  }
-
+/** The rows' usage for the link: their totals and per model, all zero when there are none. */
+export function itemUsageOf(rows: readonly RunUsageRow[]): LinkResultOf<"item">["item"]["usage"] {
   return {
     totals: totalsOf(rows),
     models: groupTotals(rows, (r) => r.model).map((g) => ({ model: g.key, totals: g.totals })),
   };
+}
+
+/** One run's usage for the link: its totals and per model; null when nothing was recorded. */
+export function runUsageOf(
+  rows: readonly RunUsageRow[],
+): LinkResultOf<"item">["item"]["runs"][number]["usage"] {
+  return rows.length === 0 ? null : itemUsageOf(rows);
 }
