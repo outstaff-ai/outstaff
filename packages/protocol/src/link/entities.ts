@@ -85,7 +85,7 @@ export const personSchema = z.strictObject({
 const chatLinkField = z
   .enum(["filed", "attached", "about"])
   .describe(
-    "How the session and the work are tied: the session filed the work (`ost ticket create`, `ost work link`), attached its request to it (`ost work attach`), or was a later message in the thread of that work.",
+    "How the session and the work are tied: the session filed the work (`ost ticket create` or `ost work queue` in the session), attached its request to it (`ost work attach`), or was a later message in the thread of that work.",
   );
 
 /** One work item in full: what it is, its runs, and the end of its journal. */
