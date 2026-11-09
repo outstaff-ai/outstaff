@@ -191,6 +191,7 @@ export function createAttach(
     await store.upsertSubject(CHAT_ORIGIN_SUBJECT, session.id, {
       ...origin,
       filed: item.id,
+      attached: [...new Set([...(origin.attached ?? []), item.id])],
       requests: [...(origin.requests ?? []), filing.requestKey(`attach ${request.target}`)],
     });
 

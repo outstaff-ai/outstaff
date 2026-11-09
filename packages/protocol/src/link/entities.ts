@@ -82,6 +82,12 @@ export const personSchema = z.strictObject({
     .describe("Queued items, in the order they run."),
 });
 
+const chatLinkField = z
+  .enum(["filed", "attached", "about"])
+  .describe(
+    "How the session and the work are tied: the session filed the work (`ost ticket create` or `ost work queue` in the session), attached its request to it (`ost work attach`), or was a later message in the thread of that work.",
+  );
+
 /** One work item in full: what it is, its runs, and the end of its journal. */
 export const itemSchema = z.strictObject({
   ...itemFields,
@@ -111,6 +117,34 @@ export const itemSchema = z.strictObject({
       }),
     )
     .describe("Every run, oldest first."),
+  attached: z
+    .array(
+      z.strictObject({
+        id: z.string().describe("Id of the work item."),
+        kind: z.string(),
+        title: z.string(),
+        subject: itemSubjectSchema,
+        how: chatLinkField,
+      }),
+    )
+    .describe(
+      "For a `chat` item: the person's work items the session filed, attached its request to, or was about, oldest first. Empty for any other item.",
+    ),
+  chatSessions: z
+    .array(
+      z.strictObject({
+        id: z.string().describe("Id of the `chat` work item."),
+        person: z.string(),
+        startedAt: time.nullable().describe("When its first run started; null before it ran."),
+        finishedAt: time
+          .nullable()
+          .describe("When its last run finished; null while it runs or before it ran."),
+        how: chatLinkField,
+      }),
+    )
+    .describe(
+      "For any other item: the person's chat sessions that filed it, attached a request to it, or were about it, oldest first. Empty for a `chat` item.",
+    ),
   journal: z
     .strictObject({
       entries: z.number().int().describe("How many entries the journal has."),
@@ -121,5 +155,10 @@ export const itemSchema = z.strictObject({
     .describe("The item's journal, in short."),
 });
 
-/** A work item in a list: the item without its runs and journal. */
-export const itemSummarySchema = itemSchema.omit({ runs: true, journal: true });
+/** A work item in a list: the item without its runs, its chat links and journal. */
+export const itemSummarySchema = itemSchema.omit({
+  runs: true,
+  attached: true,
+  chatSessions: true,
+  journal: true,
+});

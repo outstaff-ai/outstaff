@@ -13,6 +13,8 @@ import { openChatSession } from "#/chat/session.js";
 import { readOrigin, threadsOf, withThread } from "#/chat/origin.js";
 import type { DocLink, DocRecord, PrRecord, TicketRecord } from "#/workstate/index.js";
 import { addFeedback, readFeedback } from "#/work-feedback.js";
+import { chatLinks } from "#/link/chat-links.js";
+import { messageRefs } from "#/chat/refs.js";
 
 function teamConfig(withPm = true, policies?: Record<string, unknown>): TeamConfig {
   const result = parseTeamConfig({
@@ -626,6 +628,70 @@ describe("chat requests", () => {
     });
   });
 
+  describe("on the office link", () => {
+    const links = async (id: string) => chatLinks(store, (await store.getItem(id))!);
+
+    it("ties filed work and the session both ways, and a later session in the thread as about it", async () => {
+      const { session, item } = await fileWork("Add a search page", "ACME-5");
+      const run = await store.startRun(session.id);
+      await store.finishRun(run.id, { outcome: "done" });
+      const later = await say("any news?", "m1");
+      const other = await say("unrelated");
+
+      expect(await links(session.id)).toEqual({
+        attached: [
+          {
+            id: item.id,
+            kind: "assigned",
+            title: expect.stringContaining("ACME-5"),
+            subject: { type: "ticket", ref: "ACME-5" },
+            how: "filed",
+          },
+        ],
+        chatSessions: [],
+      });
+
+      expect(await links(item.id)).toEqual({
+        attached: [],
+        chatSessions: [
+          {
+            id: session.id,
+            person: "sam",
+            startedAt: run.startedAt,
+            finishedAt: expect.any(String),
+            how: "filed",
+          },
+          { id: later.item.id, person: "sam", startedAt: null, finishedAt: null, how: "about" },
+        ],
+      });
+
+      expect((await links(later.item.id)).attached).toMatchObject([{ id: item.id, how: "about" }]);
+      expect(await links(other.item.id)).toEqual({ attached: [], chatSessions: [] });
+    });
+
+    it("leaves out a session in the thread that neither filed, attached nor was about the work", async () => {
+      const refs = messageRefs({ channel: "D1", messageId: "m9", text: "hi" }, "trigger");
+      const work = await store.enqueue({
+        person: "sam",
+        kind: "assigned",
+        title: "t",
+        trigger: "human",
+        refs,
+      });
+
+      const chat = await store.enqueue({
+        person: "sam",
+        kind: "chat",
+        title: "c",
+        trigger: "human",
+        refs,
+      });
+
+      expect(await links(work.id)).toEqual({ attached: [], chatSessions: [] });
+      expect(await links(chat.id)).toEqual({ attached: [], chatSessions: [] });
+    });
+  });
+
   describe("attaching a request to existing work", () => {
     const ticket = (key: string, extra: Partial<TicketRecord> = {}) => {
       const rec: TicketRecord = {
@@ -689,6 +755,14 @@ describe("chat requests", () => {
         work: [],
         attached: { ticket: { ref: "ACME-11" }, pr: { ref: "#11" } },
       });
+
+      expect((await chatLinks(store, s)).attached).toMatchObject([
+        { id: running!.id, how: "attached" },
+      ]);
+
+      expect((await chatLinks(store, running!)).chatSessions).toMatchObject([
+        { id: s.id, how: "attached" },
+      ]);
 
       // The active round is not interrupted and nothing is queued or asked.
       expect((await store.getItem(running!.id))!.status).toBe("active");
