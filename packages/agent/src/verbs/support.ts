@@ -71,15 +71,23 @@ function startedByAgent(round: Round): string | undefined {
 const onBacklog = (round: Round) => round.ticketStatus === "backlog" && round.kind !== "chat";
 
 /**
+ * A pull request for a ticket assigned to the agent is not new work, whatever started the round: a human asked for the
+ * work when they filed or assigned the ticket. Not in an unblock, though: the PM holds the ticket only to unblock it.
+ */
+const continuesOwnTicket = (round: Round, what: string) =>
+  what === "open a pull request" && round.assignedToYou === true && round.kind !== "unblock";
+
+/**
  * Only a trusted human starts new work. A round another agent started (a question, an unblock, an agent's mention)
  * may answer, comment, route existing work and hand back, but files no ticket and opens no pull request; it puts the
- * proposal to a trusted human instead. So does a round on a ticket in backlog (a comment or a mention on it): the work
+ * proposal to a trusted human instead. A pull request for the agent's own assigned ticket is the exception: the ticket
+ * is its to work on. A round on a ticket in backlog (a comment or a mention on it) starts nothing either: the work
  * starts when a human moves the ticket on, or asks for it in chat. Other rounds a human started, and work on an
  * assigned ticket, are not limited.
  */
 export function requireHumanStarted(env: AgentEnv, what: "file a ticket" | "open a pull request") {
   const round = env.round;
-  const from = round && startedByAgent(round);
+  const from = round && !continuesOwnTicket(round, what) && startedByAgent(round);
   if (from) {
     throw new PortError(
       "forbidden",

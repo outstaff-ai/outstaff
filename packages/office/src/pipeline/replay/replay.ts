@@ -48,6 +48,7 @@ export function runReplay(scenarios: readonly ReplayScenario[], setup: ReplaySet
     person: c.person,
     subject: `${c.subject.type} ${c.subject.ref}`,
     kind: c.kind,
+    ...(c.tookOver ? { tookOver: c.tookOver } : {}),
     events: c.events,
   }));
 

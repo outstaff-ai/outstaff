@@ -49,6 +49,13 @@ export interface Coalesce {
 
   /** Adds this wake to the held item an earlier one queued. */
   fold(item: WorkItem): Promise<void>;
+
+  /**
+   * When this wake wins over the held item instead of folding into it (it gives the agent the ticket to work on, and
+   * the held item is only a mention or a comment on it): what moves the held item's feedback, references and events
+   * onto the item this wake queues, held until the same time; the held one is canceled into it. Undefined to fold.
+   */
+  takesOver?(held: WorkItem): ((into: WorkItem) => Promise<void>) | undefined;
 }
 
 export interface EnqueueInput extends Omit<NewWorkItem, "position"> {

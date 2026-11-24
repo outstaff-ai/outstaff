@@ -251,9 +251,10 @@ export function latestChatMessage(prompt: string): string | undefined {
   return [...prompt.matchAll(/asked in chat \(thread [^)]*\)[^\n]*:\n([^\n]*)/g)].at(-1)?.[1];
 }
 
-// The wake's context quotes each of the ticket's latest comments under its author, indented as `    > <line>`.
+// The wake's context quotes each of the ticket's latest comments under its author, indented as `    > <line>`; the PM's
+// answer may mention the agent first (`@sam Unblocked: ...`).
 function parseUnblocked(prompt: string): Pick<ItemContext, "unblocked"> {
-  const answer = /^ {4}> Unblocked: (.+)$/m.exec(prompt)?.[1];
+  const answer = /^ {4}> (?:@\S+ )?Unblocked: (.+)$/m.exec(prompt)?.[1];
   return answer ? { unblocked: answer } : {};
 }
 

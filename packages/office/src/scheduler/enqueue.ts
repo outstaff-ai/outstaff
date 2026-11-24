@@ -11,8 +11,14 @@ interface CoalesceWindow {
   until: string;
 }
 
-/** The held item a wake folds into: one whose window is still open at the wake's time and that has not started. */
-async function openWindow(store: Store, c: Coalesce): Promise<WorkItem | undefined> {
+/**
+ * The held item a wake folds into, and when its window closes: one whose window is still open at the wake's time and
+ * that has not started.
+ */
+async function openWindow(
+  store: Store,
+  c: Coalesce,
+): Promise<{ item: WorkItem; until: string } | undefined> {
   if (c.windowMs <= 0) {
     return undefined;
   }
@@ -26,16 +32,23 @@ async function openWindow(store: Store, c: Coalesce): Promise<WorkItem | undefin
   }
 
   const item = await store.getItem(open.itemId);
-  return item?.status === "queued" ? item : undefined;
+  return item?.status === "queued" ? { item, until: open.until } : undefined;
 }
 
-/** Opens the item's window and holds it until the window closes, unless that time has passed already. */
-async function hold(deps: SchedulerDeps, item: WorkItem, c: Coalesce): Promise<WorkItem> {
+/**
+ * Opens the item's window and holds it until the window closes (`until`, else the wake's time and window), unless that
+ * time has passed already.
+ */
+async function hold(
+  deps: SchedulerDeps,
+  item: WorkItem,
+  c: Coalesce,
+  until = new Date(Date.parse(c.at) + c.windowMs).toISOString(),
+): Promise<WorkItem> {
   if (c.windowMs <= 0) {
     return item;
   }
 
-  const until = new Date(Date.parse(c.at) + c.windowMs).toISOString();
   await deps.store.upsertSubject(COALESCE_SUBJECT, c.key, {
     itemId: item.id,
     until,
@@ -63,10 +76,11 @@ async function place(checks: Checks, item: WorkItem, placement: Placement): Prom
   }
 }
 
-/** Creates the item, held for its coalescing window if it has one. */
+/** Creates the item, held for its coalescing window if it has one (until `until`, for one that took a held item over). */
 async function create(
   deps: SchedulerDeps,
   input: Omit<EnqueueInput, "placement" | "init">,
+  until?: string,
 ): Promise<WorkItem> {
   const { coalesce, ...rest } = input;
   const created = await deps.store.enqueue({
@@ -74,12 +88,39 @@ async function create(
     priority: input.priority ?? priorityFor(input.trigger, input.kind),
   });
 
-  return coalesce ? hold(deps, created, coalesce) : created;
+  return coalesce ? hold(deps, created, coalesce, until) : created;
+}
+
+/** What a wake meets in its window: a held item to fold into, or one it takes over, with what moves it across. */
+type Met =
+  | { fold: WorkItem }
+  | { over: WorkItem; until: string; absorb: (into: WorkItem) => Promise<void> };
+
+async function meet(store: Store, c: Coalesce | undefined): Promise<Met | undefined> {
+  const open = c ? await openWindow(store, c) : undefined;
+  if (!open) {
+    return undefined;
+  }
+
+  const absorb = c!.takesOver?.(open.item);
+  return absorb ? { over: open.item, until: open.until, absorb } : { fold: open.item };
+}
+
+/** The held item a wake took over: it carries on in the new item, and is canceled, saying so. */
+async function takenOver(store: Store, met: Extract<Met, { over: WorkItem }>, by: WorkItem) {
+  await met.absorb(by);
+  await store.updateItem(met.over.id, { status: "canceled" });
+  await store.appendJournal(
+    met.over.id,
+    "office",
+    `Taken over by work item ${by.id} (${by.kind}): it gives the ticket to work on, and this item's feedback went with it.`,
+  );
 }
 
 /**
- * Queues an item, or folds it into the held item of the same coalescing key. `held` hears of an item held for its
- * window, so it can be released on time.
+ * Queues an item, or folds it into the held item of the same coalescing key. A wake that wins over the held item
+ * (`takesOver`) queues its own instead, held until the same time, and the held one is canceled into it. `held` hears
+ * of an item held for its window, so it can be released on time.
  */
 export async function enqueueItem(
   deps: SchedulerDeps,
@@ -88,18 +129,22 @@ export async function enqueueItem(
 ): Promise<WorkItem> {
   const { store } = deps;
   const { placement, init, ...rest } = input;
-  const into = rest.coalesce ? await openWindow(store, rest.coalesce) : undefined;
-  if (into) {
-    await rest.coalesce!.fold(into);
-    return into;
+  const met = await meet(store, rest.coalesce);
+  if (met && "fold" in met) {
+    await rest.coalesce!.fold(met.fold);
+    return met.fold;
   }
 
-  const created = await create(deps, rest);
+  const created = await create(deps, rest, met?.until);
   if (created.notBefore !== null) {
     held(created);
   }
 
   await init?.(created);
+  if (met) {
+    await takenOver(store, met, created);
+  }
+
   if (placement !== undefined) {
     await place(deps.checks, created, placement);
   }

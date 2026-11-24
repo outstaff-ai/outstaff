@@ -35,6 +35,12 @@ const decisionSchema = z.discriminatedUnion("type", [
       .describe(
         "Set when the wake joined an item an earlier one queued: every event of that item so far.",
       ),
+    tookOver: z
+      .string()
+      .optional()
+      .describe(
+        "Set when the wake won over the held item an earlier one queued (it gives the agent the ticket to work on, the other only mentioned it): that item, canceled into this one.",
+      ),
   }),
   z.strictObject({
     type: z.literal("act"),

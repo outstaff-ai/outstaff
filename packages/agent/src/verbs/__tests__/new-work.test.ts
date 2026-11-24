@@ -103,6 +103,43 @@ describe("only a trusted human starts new work", () => {
   );
 });
 
+describe("a pull request for the agent's own assigned ticket is not new work, whatever started the round", () => {
+  const own: [string, Round][] = [
+    ["a teammate's mention", { kind: "asked", trigger: "agent", assignedToYou: true }],
+    ["a teammate's question", { kind: "question", trigger: "agent", assignedToYou: true }],
+    ["the office's sweep", { kind: "reconcile", trigger: "automation", assignedToYou: true }],
+  ];
+
+  it.each(own)(
+    "opens it in %s on a ticket assigned to the agent, and still files no ticket",
+    async (_, round) => {
+      const f = await inRound(round);
+      expect((await f.openPr()).text).toContain("Opened");
+      const e = await refusal(f.createTicket());
+      expect(e.message).toMatch(/does not file a ticket: only a trusted human starts new work/);
+      expect(await f.tracker.listIssues({})).toEqual([]);
+    },
+  );
+
+  it("still refuses it in an unblock, which holds the ticket only to unblock it, and on a ticket in backlog", async () => {
+    const unblock = await inRound({ kind: "unblock", trigger: "agent", assignedToYou: true });
+    expect((await refusal(unblock.openPr())).message).toContain("an unblock");
+
+    const backlog = await inRound({
+      kind: "asked",
+      trigger: "agent",
+      ticketStatus: "backlog",
+      assignedToYou: true,
+    });
+
+    expect((await refusal(backlog.openPr())).message).toMatch(
+      /on a ticket in backlog, so it does not open a pull request/,
+    );
+
+    expect((await backlog.vcs.events([backlog.repo])).events).toEqual([]);
+  });
+});
+
 describe("a round on a ticket in backlog starts no new work", () => {
   it.each(onBacklog)(
     "refuses a new ticket and a pull request in %s, before anything is made",

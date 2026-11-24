@@ -138,3 +138,39 @@ export const ticketComments: ReplayScenario = {
     },
   ],
 };
+
+const devops = (status: "active" | "blocked", to: string): ReplayWorld => ({
+  tickets: { "ACME-195": ticket(status, to) },
+  roles: ROLES,
+});
+
+/**
+ * The PM answers a blocked agent's questions in a comment that mentions it, and assigns the ticket back, in one go.
+ * The office reads both after the assignment: the mention is of the ticket's assignee, so it carries no teammate's
+ * limits, and the two wakes fold into one run of the assignment's kind, with the comment as its feedback.
+ */
+export const answeredAndAssigned: ReplayScenario = {
+  title: "The PM answers a blocked ticket in a mention and gives it back: one assigned round",
+  steps: [
+    {
+      event: ev("s13-blocked", "agent.handed_back", "kofi", { ticket: "ACME-195" }, at(270), {
+        status: "blocked",
+        kind: "assigned",
+        workItem: "item-s13",
+        before: { status: "active" },
+      }),
+      world: devops("active", "kofi"),
+    },
+    {
+      event: ev("s13-answer", "ticket.commented", "priya", { ticket: "ACME-195" }, at(275), {
+        body: "@kofi 1. eu-west-1. 2. The staging bucket. 3. Nightly.",
+        mentions: ["kofi"],
+      }),
+      world: devops("blocked", "kofi"),
+    },
+    {
+      event: ev("s13-assigned", "ticket.assigned", "priya", { ticket: "ACME-195" }, at(275, 1)),
+      world: devops("blocked", "kofi"),
+    },
+  ],
+};

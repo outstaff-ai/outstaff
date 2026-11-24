@@ -25,17 +25,27 @@ const unique = (refs: Ref[]) =>
 const linksOf = (subjects: Ref[]) =>
   subjects.flatMap((s) => (s.url ? [{ url: s.url, title: s.title ?? s.ref }] : []));
 
-/** The canonical status of the ticket the item is about, as the work state last saw it. */
-async function ticketStatusOf(store: Store, item: WorkItem): Promise<string | undefined> {
+/** The ticket the item is about, as the work state last saw it: its canonical status, and whether it is the item's agent's. */
+async function ticketOf(
+  store: Store,
+  item: WorkItem,
+): Promise<{ status: string | undefined; assigned: boolean }> {
   const key = await itemTicket(store, item);
-  const rec = key ? (await store.getSubject("ticket", key))?.data : undefined;
-  return (rec as TicketRecord | undefined)?.status;
+  const rec = (key ? (await store.getSubject("ticket", key))?.data : undefined) as
+    | TicketRecord
+    | undefined;
+
+  const assignee = rec?.assignee;
+  return {
+    status: rec?.status,
+    assigned: assignee?.kind === "agent" && assignee.id === item.person,
+  };
 }
 
 function offeredItem(
   item: WorkItem,
   origin: ChatOriginRecord | undefined,
-  ticketStatus: string | undefined,
+  { status: ticketStatus, assigned }: { status: string | undefined; assigned: boolean },
 ): Offer["workItem"] {
   return {
     id: item.id,
@@ -46,6 +56,7 @@ function offeredItem(
     ...(item.parentId ? { parentId: item.parentId } : {}),
     ...(item.subject ? { subject: item.subject } : {}),
     ...(ticketStatus ? { ticketStatus } : {}),
+    ...(assigned ? { assignedToYou: true as const } : {}),
     ...(origin ? { origin: publicOrigin(origin) } : {}),
   };
 }
@@ -101,11 +112,11 @@ export function offerBuilder(
     const interrupted = await interruptedBefore(item.id);
     const journal = await journalOf(item, about);
     const wake = await wakeOf(item, fresh);
-    const ticketStatus = await ticketStatusOf(store, item);
+    const ticket = await ticketOf(store, item);
     return {
       ...(item.sessionId ? { sessionId: item.sessionId } : {}),
       ...(interrupted ? { interrupted } : {}),
-      workItem: offeredItem(item, origin, ticketStatus),
+      workItem: offeredItem(item, origin, ticket),
       context: {
         journal,
         subjects,

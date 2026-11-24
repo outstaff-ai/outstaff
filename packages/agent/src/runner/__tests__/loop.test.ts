@@ -46,6 +46,7 @@ interface OfferExtras {
   kind?: string;
   trigger?: string;
   ticketStatus?: string;
+  assignedToYou?: true;
   ticket?: string;
   feedback?: Record<string, unknown>[];
 
@@ -105,6 +106,12 @@ const chatOrigin = (files: Record<string, unknown>[] | undefined) => ({
 
 const OPEN_PR = { type: "pr", ref: "acme/app#1", title: "Checkout", state: "open", draft: false };
 
+/** What the offer says of the item's ticket: its status, and whether it is assigned to the agent. */
+const ticketFields = ({ ticketStatus, assignedToYou }: OfferExtras) => ({
+  ...(ticketStatus ? { ticketStatus } : {}),
+  ...(assignedToYou ? { assignedToYou } : {}),
+});
+
 const offeredItem = (id: string, extra: OfferExtras) => ({
   id,
   kind: extra.kind ?? (extra.origin ? "chat" : "ticket"),
@@ -113,7 +120,7 @@ const offeredItem = (id: string, extra: OfferExtras) => ({
   title: `Fix ${id}`,
   priority: 1,
   trigger: extra.trigger ?? "human",
-  ...(extra.ticketStatus ? { ticketStatus: extra.ticketStatus } : {}),
+  ...ticketFields(extra),
   ...(extra.origin ? { origin: chatOrigin(extra.files) } : {}),
 });
 
@@ -1077,6 +1084,41 @@ describe("work loop", () => {
         trigger,
         ...(ticketStatus ? { ticketStatus } : {}),
         ...(fromChat ? { origin: true } : {}),
+      });
+
+      await until(() => sentOf("handback").length === 1);
+      expect(got).toBe(want);
+      await loop.stop();
+      await conn.stop();
+    },
+  );
+
+  it.each([
+    [false, "forbidden"],
+    [true, "allowed"],
+  ])(
+    "tells the verbs whether a teammate's mention is on the agent's own ticket (%s): its pull request is %s",
+    async (assignedToYou, want) => {
+      await connect();
+      let got = "";
+      const runtime: Runtime = {
+        async *run(req) {
+          const open = req.tools.find((t) => t.name === "pr_open")!;
+          got = await open.handler({ repo: "nowhere", head: "x", title: "fix: x" }, {}).then(
+            () => "allowed",
+            (e: unknown) =>
+              (e as { code?: string }).code === "forbidden" ? "forbidden" : "allowed",
+          );
+
+          yield { type: "finished", ok: true, text: "Done." };
+        },
+      };
+
+      start(runtime);
+      socket.offerWith("w1", {
+        kind: "asked",
+        trigger: "agent",
+        ...(assignedToYou ? { assignedToYou } : {}),
       });
 
       await until(() => sentOf("handback").length === 1);

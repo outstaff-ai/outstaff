@@ -409,6 +409,10 @@ describe("parsePrompt", () => {
     );
 
     expect(parsePrompt(woken)?.unblocked).toBe("friendly");
+    expect(
+      parsePrompt(woken.replace("> Unblocked: friendly", "> @sam Unblocked: friendly"))?.unblocked,
+    ).toBe("friendly");
+
     expect(parsePrompt(round)?.unblocked).toBeUndefined();
   });
 

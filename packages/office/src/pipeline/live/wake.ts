@@ -1,6 +1,6 @@
-import { addFeedback } from "#/work-feedback.js";
+import { addFeedback, readFeedback } from "#/work-feedback.js";
 import { triggerRefs } from "#/refs/index.js";
-import { MERGE_KIND, priorityFor } from "#/scheduler/index.js";
+import { MERGE_KIND, outranks, priorityFor } from "#/scheduler/index.js";
 import { chatTitle, joinChatSession, messageOf, openChatSession } from "#/chat/session.js";
 import type { WorkItem, WorkItemTrigger } from "#/store/types.js";
 import { coalesceKey } from "#/pipeline/coalesce.js";
@@ -53,11 +53,13 @@ function titleOf(event: PipelineEvent, wake: Wake, opts: LiveOptions): string {
   return m ? chatTitle(m) : `${wake.kind.replaceAll(/[_-]/g, " ")}: ${whatOf(event, wake, opts)}`;
 }
 
+/** The events whose wakes queued or joined the item, in the order they came. */
+const eventsOf = async (opts: LiveOptions, itemId: string): Promise<string[]> =>
+  ((await opts.store.getSubject(ITEM_EVENTS_SUBJECT, itemId))?.data as string[] | undefined) ?? [];
+
 /** Adds the event to the item's events; returns them all, in the order they came. */
 async function linkEvent(opts: LiveOptions, itemId: string, eventId: string): Promise<string[]> {
-  const ids =
-    ((await opts.store.getSubject(ITEM_EVENTS_SUBJECT, itemId))?.data as string[] | undefined) ??
-    [];
+  const ids = await eventsOf(opts, itemId);
 
   if (ids.includes(eventId)) {
     return ids;
@@ -70,7 +72,8 @@ async function linkEvent(opts: LiveOptions, itemId: string, eventId: string): Pr
 
 /**
  * Adds a wake to an item queued or running for an earlier one: its feedback, what it refers to, and its instruction
- * when the item is of another kind. Returns the item's events.
+ * when the item is of another kind that does not win over it (`outranks`): a mention folded into an assignment comes
+ * as feedback only. Returns the item's events.
  */
 async function join(item: WorkItem, wake: Wake, event: PipelineEvent, opts: LiveOptions) {
   for (const f of wake.feedback) {
@@ -87,7 +90,7 @@ async function join(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
     await joinChatSession(opts.store, item.id, m, opts.workState);
   }
 
-  if (item.kind !== wake.kind) {
+  if (item.kind !== wake.kind && !outranks(item.kind, wake.kind)) {
     await opts.store.appendJournal(item.id, "office", wake.instruction);
   }
 
@@ -115,17 +118,43 @@ async function init(item: WorkItem, wake: Wake, event: PipelineEvent, opts: Live
 }
 
 /**
+ * The held item a wake took over carries on in the new one: its feedback, what it refers to, and its events, first.
+ * Its instruction stays behind: the new item has the wake's.
+ */
+async function absorb(held: WorkItem, into: WorkItem, opts: LiveOptions): Promise<string[]> {
+  for (const f of await readFeedback(opts.store, held.id)) {
+    await addFeedback(opts.store, into.id, f);
+  }
+
+  await opts.store.addItemRefs(
+    into.id,
+    (await opts.store.listItemRefs(held.id)).map(({ type, ref, url, role, source }) => ({
+      type,
+      ref,
+      url,
+      role,
+      source,
+    })),
+  );
+
+  const all = [...(await eventsOf(opts, held.id)), ...(await eventsOf(opts, into.id))];
+  await opts.store.upsertSubject(ITEM_EVENTS_SUBJECT, into.id, all);
+  return all;
+}
+
+/**
  * Queues the run a wake asks for. A wake for an item of the same kind and subject that is queued or running joins that
  * item (a chat message or a merge only one that is queued: a running session does not see it, and a running merge
  * decided on older facts); a wake for the same person and subject (a merge only with a merge) within its window (`coalesceMs`, which the aggregation set) of the first is folded into the item the first
- * queued, which is held until then. A chat wake has no window: its item is offered at once. `folded` lists the events
- * of the item it joined, this one last.
+ * queued, which is held until then; unless the wake gives the agent the ticket to work on and the held item is only a
+ * mention or a comment on it: the wake then takes the held item over (`tookOver`), with its feedback. A chat wake has
+ * no window: its item is offered at once. `folded` lists the events of the item it joined or took over, this one last.
  */
 export async function enqueueWake(
   wake: Wake,
   event: PipelineEvent,
   opts: LiveOptions,
-): Promise<{ itemId: string; folded?: string[] }> {
+): Promise<{ itemId: string; folded?: string[]; tookOver?: string }> {
   const subject = itemSubject(event, wake, opts);
   const joinable = wake.subject.type === "chat" || wake.kind === MERGE_KIND ? QUEUED : LIVE;
   const live = (await opts.store.listItems({ person: wake.person })).find(
@@ -141,6 +170,7 @@ export async function enqueueWake(
   }
 
   let folded: string[] | undefined;
+  let tookOver: string | undefined;
   const trigger = triggerOf(event);
   const item = await opts.scheduler.enqueue({
     person: wake.person,
@@ -159,8 +189,15 @@ export async function enqueueWake(
       fold: async (into) => {
         folded = await join(into, wake, event, opts);
       },
+      takesOver: (held) =>
+        outranks(wake.kind, held.kind)
+          ? async (into) => {
+              tookOver = held.id;
+              folded = await absorb(held, into, opts);
+            }
+          : undefined,
     },
   });
 
-  return { itemId: item.id, ...(folded ? { folded } : {}) };
+  return { itemId: item.id, ...(folded ? { folded } : {}), ...(tookOver ? { tookOver } : {}) };
 }

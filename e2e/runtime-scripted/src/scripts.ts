@@ -153,8 +153,9 @@ const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
 /**
  * A ticket that says `blocked: <what>` cannot go on: the agent blocks it, says why, and still hands the item back as
  * done. The office made the ticket active when the round started, a retry of a blocked ticket too. A blocked ticket the
- * PM answered (`unblocked`, from the comment the wake carries) goes on with the answer instead. Returns the message to
- * stop with, or undefined to go on.
+ * PM answered (`unblocked`, from the comment the wake carries) goes on with the answer instead: a decision written
+ * down, or, for a ticket that says `resume: pull request`, the ticket's own work and its pull request. Returns the
+ * message to stop with, or undefined to go on.
  */
 async function* blockIfStuck(
   key: string,
@@ -172,6 +173,10 @@ async function* blockIfStuck(
       tool: "ticket_comment",
       input: { key, body: `Resumed with: ${unblocked}` },
     };
+
+    if (/^resume: pull request$/m.test(shown)) {
+      return undefined;
+    }
 
     // The decision is the result to review: a done hand-back needs one.
     const written = yield {
@@ -1944,7 +1949,8 @@ async function* toRequester(
 
 /**
  * The PM unblocks a ticket an agent handed back as blocked. A ticket that says `pm knows: <answer>` is answered on the
- * ticket and given back to the blocked agent; any other needs a human, so it goes to the requester the office named,
+ * ticket, in a comment that mentions the blocked agent when it says `pm mentions: yes`, and given back to the blocked
+ * agent; any other needs a human, so it goes to the requester the office named,
  * with what is needed, and with the workaround she would have filed (`pm would file: <title>`) as a proposal.
  */
 export async function* unblock(ctx: ItemContext): Script {
@@ -1957,7 +1963,13 @@ export async function* unblock(ctx: ItemContext): Script {
   const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
   const answer = /^pm knows: (.+)$/m.exec(shown)?.[1];
   if (answer) {
-    yield { type: "tool", tool: "ticket_comment", input: { key, body: `Unblocked: ${answer}` } };
+    const to = /^pm mentions: yes$/m.test(shown) ? `@${blocked} ` : "";
+    yield {
+      type: "tool",
+      tool: "ticket_comment",
+      input: { key, body: `${to}Unblocked: ${answer}` },
+    };
+
     yield { type: "tool", tool: "ticket_assign", input: { key, to: blocked } };
     return `Unblocked ${key}: ${answer}. Gave it back to ${blocked}.`;
   }

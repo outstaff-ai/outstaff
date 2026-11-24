@@ -50,6 +50,15 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
     return run;
   };
 
+  /** Queues a wake, and notes on its decision, and in the log, the item it queued, joined or took over. */
+  const queueTraced = async (d: Wake, event: PipelineEvent) => {
+    const { itemId, folded, tookOver } = await queueWake(d, event);
+    Object.assign(d, { itemId }, folded ? { folded } : {}, tookOver ? { tookOver } : {});
+    const did = folded && !tookOver ? "folded the wake into" : "queued";
+    const over = tookOver ? `, taking over work item ${tookOver}` : "";
+    logger.info(`pipeline: ${did} work item ${itemId} for ${d.person} (${d.kind})${over}`);
+  };
+
   const runner: PipelineRunner = {
     async handle(raw, meta) {
       const event = toPipelineEvent(raw, meta, clock.now().toISOString());
@@ -82,16 +91,8 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
         }
 
         if (d.type === "wake") {
-          const { itemId, folded } = await queueWake(d, event);
-          d.itemId = itemId;
-          if (folded) {
-            d.folded = folded;
-          }
-
+          await queueTraced(d, event);
           queued = true;
-          logger.info(
-            `pipeline: ${folded ? "folded the wake into" : "queued"} work item ${itemId} for ${d.person} (${d.kind})`,
-          );
         }
       }
 

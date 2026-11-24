@@ -29,6 +29,23 @@ export const TICKET_CLOSED_KIND = "ticket_closed";
 export const MERGE_KIND = "merge";
 
 /**
+ * The kinds of wake that give the agent the ticket to work on: assigned to it (or moved to active, or its next ready
+ * ticket), and unblocked for it.
+ */
+const WORK_KINDS = new Set(["assigned", "unblocked"]);
+
+/** The kinds of wake that only talk about the ticket: a mention of the agent, or a comment on it. */
+const TALK_KINDS = new Set(["asked", "ticket_comment"]);
+
+/**
+ * Whether a wake of `kind` wins over one of `other` when the two fold into one run: a wake that gives the agent the
+ * ticket to work on wins over a mention or a comment on it, so the run is the work, with the other's feedback. Any
+ * other pair folds as before: the first kind, with both instructions.
+ */
+export const outranks = (kind: string, other: string): boolean =>
+  WORK_KINDS.has(kind) && TALK_KINDS.has(other);
+
+/**
  * The repository a merge item decides on, from its pull request subject (`<repository>#<number>`); undefined for any
  * other item. One merge runs per repository at a time.
  */

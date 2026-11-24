@@ -68,14 +68,17 @@ export async function itemFiles(
 }
 
 /**
- * What the verbs know of the item's round: its kind, who started it, and the status of its ticket. An item from chat
- * (a chat session, or work one attached or filed) is a trusted human's direct request, so the status of its ticket
- * does not limit it and is left out.
+ * What the verbs know of the item's round: its kind, who started it, the status of its ticket, and whether the ticket
+ * is assigned to the agent. An item from chat (a chat session, or work one attached or filed) is a trusted human's
+ * direct request, so the status of its ticket does not limit it and is left out.
  */
-const roundOf = ({ workItem: { kind, trigger, ticketStatus, origin } }: Offer): Round => ({
+const roundOf = ({
+  workItem: { kind, trigger, ticketStatus, assignedToYou, origin },
+}: Offer): Round => ({
   kind,
   trigger,
   ...(ticketStatus && !origin ? { ticketStatus } : {}),
+  ...(assignedToYou ? { assignedToYou } : {}),
 });
 
 /**

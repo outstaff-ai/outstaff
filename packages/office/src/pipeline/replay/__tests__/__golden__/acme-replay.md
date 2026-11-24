@@ -8,7 +8,7 @@ How to read it:
 - A merge re-checks the repository's other open pull requests and raises `pr.conflicted`, `pr.behind_base` or `pr.base_merged` for every pull request the merge changed something under; those rows say derived.
 - A change to the policies that changes a decision changes this file: review the difference like any other.
 
-**57 events** (5 derived from merges).
+**60 events** (5 derived from merges).
 
 ## A stacked pull request series merges
 
@@ -127,8 +127,17 @@ How to read it:
 | 56 | `agent.idle` no subject by sam | (drop: sam handed back ACME-190 silent at 2026-10-05T13:22:00.000Z, and no one else acted on it since: not pulled again until someone does) |
 | 57 | `agent.handed_back` ACME-190 by sam | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-190 to blocked (for sam)<br>assign ACME-190 to agent priya (for sam)<br>wake priya (unblock): _sam handed ACME-190 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to sam. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent._ |
 
+## The PM answers a blocked ticket in a mention and gives it back: one assigned round
+
+| # | Event | Decisions |
+| - | - | - |
+| 58 | `agent.handed_back` ACME-195 by kofi | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-195 to blocked (for kofi)<br>assign ACME-195 to agent priya (for kofi)<br>wake priya (unblock): _kofi handed ACME-195 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to kofi. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent._ |
+| 59 | `ticket.commented` ACME-195 by priya | wake kofi (asked): _priya mentioned you in a comment on ACME-195. Read the comment and judge first whether anything in it is for you: a question you can answer, or an action that is yours. If something is, answer it, or do what it asks, on the ticket, once. If nothing is, end the round silently: no comment and no message; finish with `ost handback silent` and a one-line journal note. Never restate what someone else already said or asked. The ticket stays with its assignee: leave its assignee and status as they are, unless the comment asks you to take the ticket over. ACME-195's status now: blocked. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work._ |
+| 60 | `ticket.assigned` ACME-195 by priya | wake kofi (assigned): _ACME-195 is assigned to you. Work on it the way the repository asks._ |
+
 ## Coalescing
 
-The pipeline's 29 wakes become 27 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 32 wakes become 29 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)
+- kofi, assigned on ticket ACME-195: 2 events (replay:s13-answer, replay:s13-assigned); the assigned wake won over asked

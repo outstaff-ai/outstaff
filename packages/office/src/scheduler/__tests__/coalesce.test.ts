@@ -73,6 +73,39 @@ describe("coalescing in the scheduler's enqueue", () => {
     });
   });
 
+  it("lets a wake that takes the held item over queue its own, held until the same time, and cancels the held one", async () => {
+    const { store: s, scheduler, folds, wake } = await setup();
+    const mention = await scheduler.enqueue(wake(0));
+    const absorbed: [string, string][] = [];
+    const assigned = await scheduler.enqueue({
+      ...wake(20, {
+        takesOver: (held) => async (into) => void absorbed.push([held.id, into.id]),
+      }),
+      kind: "assigned",
+    });
+
+    expect(assigned.id).not.toBe(mention.id);
+    expect(assigned).toMatchObject({ kind: "assigned", status: "queued", notBefore: at(60) });
+    expect(absorbed).toEqual([[mention.id, assigned.id]]);
+    expect(folds).toEqual([]);
+    expect(await s.getItem(mention.id)).toMatchObject({ status: "canceled" });
+    expect((await s.readJournal(mention.id)).map((j) => j.text)).toEqual([
+      `Taken over by work item ${assigned.id} (assigned): it gives the ticket to work on, and this item's feedback went with it.`,
+    ]);
+
+    expect((await s.getSubject(COALESCE_SUBJECT, "sam pr acme/shop#9"))?.data).toEqual({
+      itemId: assigned.id,
+      until: at(60),
+    });
+
+    // A wake that does not take it over folds into the new item.
+    expect((await scheduler.enqueue(wake(30, { takesOver: () => undefined }))).id).toBe(
+      assigned.id,
+    );
+
+    expect(folds).toEqual([assigned.id]);
+  });
+
   it("releases the held item when its window closes, and tells the person", async () => {
     const { clock, store: s, scheduler, released, wake } = await setup();
     const first = await scheduler.enqueue(wake(0));

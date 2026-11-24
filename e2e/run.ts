@@ -8,7 +8,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, which the agent that works the ticket also stores on the assets branch and shows in its pull request's description, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a request to start the next milestone starts it in the chat session, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and a CI fix that hands back while a round the human asked for in chat on the same pull request waits in the queue tells nothing, so the human hears once, after that round, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again, and work asked for in chat while one round runs with nothing queued is placed next and acknowledged as running after that round, with no question, and runs once it ends, and a chat session asked to ping the PM asks her, replies at once, and passes her answer on in the same thread, and a human's review that asks for the architect's work makes the author file the follow-up for her, ready, link it on the pull request, and the office wake her. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, which the agent that works the ticket also stores on the assets branch and shows in its pull request's description, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a request to start the next milestone starts it in the chat session, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and a CI fix that hands back while a round the human asked for in chat on the same pull request waits in the queue tells nothing, so the human hears once, after that round, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again, and work asked for in chat while one round runs with nothing queued is placed next and acknowledged as running after that round, with no question, and runs once it ends, and a chat session asked to ping the PM asks her, replies at once, and passes her answer on in the same thread, and a human's review that asks for the architect's work makes the author file the follow-up for her, ready, link it on the pull request, and the office wake her, and, with coalescing on, a PM's answer that mentions the agent, with the ticket assigned back to it, is one round of the assignment's kind that opens the pull request. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -2860,6 +2860,7 @@ async function main() {
   await notesOnTheVolume();
   await notesInTheKnowledgeBase();
   await repositoryMoved();
+  await answeredInMentionOneRound();
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
@@ -5424,6 +5425,96 @@ async function repositoryMoved() {
 
   step(
     `repository moved: ops moved to acme/platform-ops -> sam's clone followed the new URL, ${key} added an ops worktree and pushed there`,
+  );
+}
+
+const BACKUP_ANSWER = "eu-west-1, the staging bucket, nightly";
+
+/**
+ * 17. the PM answers a blocked ticket in a comment that mentions the agent, and gives the ticket back. With coalescing
+ * on (the run turns it off elsewhere, so each event wakes at once), the mention and the assignment are one round of
+ * the assignment's kind: sam resumes with the answer and opens the pull request, and asks nobody for a "go". Last in
+ * the run, so coalescing stays on.
+ */
+async function answeredInMentionOneRound() {
+  await restartOfficeWith("with coalescing", (text) => {
+    // The hired team file is written out again by the CLI, so the setting's layout is its own.
+    const off = /coalesce_seconds: 0(?!\d)/;
+    if (!off.test(text)) {
+      throw new Error(`The team file does not turn coalescing off:\n${text}`);
+    }
+
+    return text.replace(off, "coalesce_seconds: 10");
+  });
+
+  await agentIdle();
+  const samBefore = wakesOf("sam").length;
+  const piaBefore = piaWakes().length;
+  const logBefore = logs("office").length;
+  const { key } = await stub("POST", "/_test/tickets", {
+    title: "Back up the order database",
+    description: `blocked: three answers: the region, the bucket, how often\npm knows: ${BACKUP_ANSWER}\npm mentions: yes\nresume: pull request`,
+    assignee: "sam",
+  });
+
+  const opened = await until(
+    `${key}: the PM's answer mentioned sam, who opened the pull request`,
+    (s) => {
+      const t = ticketOf(s, key);
+      const said = (author: string, body: string) =>
+        t.comments.some((c: Json) => c.author === author && c.body === body);
+
+      const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${key}`));
+      return said("pia", `@sam Unblocked: ${BACKUP_ANSWER}`) &&
+        said("sam", `Resumed with: ${BACKUP_ANSWER}`) &&
+        pr
+        ? { t, pr }
+        : undefined;
+    },
+  );
+
+  await agentIdle();
+  await officePolledTwice(`${key}: the pull request opened`);
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore)),
+    JSON.stringify(["assigned", "assigned"]),
+    "sam ran the ticket, then one round for the PM's mention and assignment together, of the assignment's kind",
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once, to unblock it",
+  );
+
+  // The mention was judged and coalesced: its item taken over by the assignment's (the mention came first), or the
+  // mention folded into the assignment's item (the assignment came first).
+  const since = logs("office").slice(logBefore);
+  const mentioned = /pipeline: queued work item (\S+) for sam \(asked\)/.exec(since)?.[1];
+  assertEq(
+    mentioned
+      ? since.includes(`for sam (assigned), taking over work item ${mentioned}`)
+      : /pipeline: folded the wake into work item \S+ for sam \(asked\)/.test(since),
+    true,
+    `pia's mention of sam woke him and was coalesced with the assignment (mention item: ${mentioned ?? "none"})`,
+  );
+
+  const after = ticketOf(await state(), key);
+  const bySam = after.comments.filter((c: Json) => c.author === "sam");
+  assertSame(
+    bySam.slice(0, 2).map((c: Json) => c.body.split(":")[0]),
+    ["Blocked", "Resumed with"],
+    "sam blocked it, then resumed with the answer",
+  );
+
+  assertEq(
+    bySam.some((c: Json) => /\bgo\b/i.test(c.body) || c.body.startsWith("Noted:")),
+    false,
+    "no round answered the mention on its own, and sam asked nobody for a go",
+  );
+
+  step(
+    `one round: ${key} blocked -> pia answered in a comment that mentions sam and gave it back -> one assigned round, which resumed and opened #${opened.pr.number}`,
   );
 }
 
