@@ -39,6 +39,37 @@ function namesOf(person: TeamConfig["people"][number], members: readonly Member[
   ].filter((n): n is string => typeof n === "string" && n !== "");
 }
 
+/** What a tracker event names a member as: its username, else its id (as `trackerActors` does). */
+const actorId = (member: Member) => member.username ?? member.id;
+
+/**
+ * The humans the comments can name, each with the names they answer to and the id a tracker event gives them: the
+ * team file's humans (by their tracker identity, code host login, chat id and name, and their tracker member's
+ * username and name), and the tracker's other human members.
+ */
+function humansOf(team: TeamConfig, members: readonly Member[]): [string, string[]][] {
+  const agents = new Set(
+    team.people.flatMap((p) => (p.identities?.tracker ? [p.identities.tracker] : [])),
+  );
+
+  const listed = (team.humans ?? []).flatMap((h): [string, string[]][] => {
+    const member = memberOf(h.identities.tracker, members);
+    const id = member ? actorId(member) : h.identities.tracker;
+    const { tracker, vcs, chat } = h.identities;
+    const names = [tracker, vcs, chat, h.name, member?.username, member?.name];
+    return id ? [[id, names.filter((n): n is string => !!n)]] : [];
+  });
+
+  const others = members
+    .filter((m) => m.kind === "human" && !agents.has(m.id) && !agents.has(m.username ?? ""))
+    .map((m): [string, string[]] => [
+      actorId(m),
+      [m.username, m.name, m.id].filter((n): n is string => !!n),
+    ]);
+
+  return [...listed, ...others];
+}
+
 function tables(team: TeamConfig, members: readonly Member[]) {
   const exact: Names = new Map();
   const loose: Names = new Map();
@@ -49,19 +80,33 @@ function tables(team: TeamConfig, members: readonly Member[]) {
     }
   }
 
-  return { exact, loose };
+  const humanExact: Names = new Map();
+  const humanLoose: Names = new Map();
+  for (const [id, names] of humansOf(team, members)) {
+    for (const name of names) {
+      add(humanExact, name.toLowerCase(), id);
+      add(humanLoose, normalizeName(name), id);
+    }
+  }
+
+  return { exact, loose, humans: { exact: humanExact, loose: humanLoose } };
 }
 
 /** The one handle a name is, exactly and then normalised; nothing when it is nobody's, or more than one person's. */
-function lookup(t: ReturnType<typeof tables>, name: string): string | undefined {
+function lookup(t: { exact: Names; loose: Names }, name: string): string | undefined {
   const found = t.exact.get(name.toLowerCase()) ?? t.loose.get(normalizeName(name));
   return found?.size === 1 ? [...found][0] : undefined;
 }
 
+/** The names a comment mentions, as strings: what an adapter put in `data.mentions`. */
+const namesIn = (names: unknown): string[] =>
+  Array.isArray(names) ? names.filter((n): n is string => typeof n === "string") : [];
+
 /**
  * Maps the `@name`s an adapter parsed out of a comment to the handles of the team's agents: by tracker username,
  * tracker identity, handle or name, exactly (ignoring case), else by their normalised forms. A name two people answer
- * to resolves to nobody, with a warning. The tracker's usernames are read at start and again once they are older than
+ * to resolves to nobody, with a warning. `humans` maps the names no agent answers to onto the humans they are, as a
+ * tracker event names them, the same way. The tracker's usernames are read at start and again once they are older than
  * `ttlMs`; when they cannot be read within `timeoutMs`, the last ones read are kept until the next refresh.
  */
 export function createMentionResolver(opts: {
@@ -123,19 +168,24 @@ export function createMentionResolver(opts: {
 
   const stale = () => loadedAt === undefined || clock.now().getTime() - loadedAt >= ttl;
 
+  /** The names, each looked up with `find` on fresh tables, first mention first, without repeats. */
+  const each = async (names: unknown, find: (name: string) => string | undefined) => {
+    const list = namesIn(names);
+    if (list.length === 0) {
+      return [];
+    }
+
+    if (tracker && stale()) {
+      await load();
+    }
+
+    return [...new Set(list.map(find).filter((h): h is string => h !== undefined))];
+  };
+
   return {
     load,
-    async resolve(names) {
-      if (!Array.isArray(names) || names.length === 0) {
-        return [];
-      }
-
-      if (tracker && stale()) {
-        await load();
-      }
-
-      const handles = names.flatMap((n) => (typeof n === "string" ? [lookup(current, n)] : []));
-      return [...new Set(handles.filter((h): h is string => h !== undefined))];
-    },
+    resolve: (names) => each(names, (n) => lookup(current, n)),
+    humans: (names) =>
+      each(names, (n) => (lookup(current, n) ? undefined : lookup(current.humans, n))),
   };
 }

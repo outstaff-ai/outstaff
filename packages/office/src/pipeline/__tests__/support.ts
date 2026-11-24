@@ -5,7 +5,7 @@ import {
   type StaticWorkflowData,
   type WorkflowPr,
 } from "@outstaff/core";
-import type { PipelineEvent, PipelineEventType, ReadyTicket } from "@outstaff/policy";
+import type { PipelineEvent, PipelineEventType, ReadyTicket, WaitingAgent } from "@outstaff/policy";
 import type { PipelineOptions, PipelineState } from "#/pipeline/state.types.js";
 
 export const REPO = { host: "github.com", owner: "acme-example", name: "shop" };
@@ -34,11 +34,15 @@ export function pr(number: number, o: Partial<WorkflowPr> = {}): WorkflowPr {
 
 export const HUMAN_AUTHOR = { login: "grace-lead", kind: "human" } as const;
 
-export type World = StaticWorkflowData & { ready?: Record<string, ReadyTicket[]> };
+export type World = StaticWorkflowData & {
+  ready?: Record<string, ReadyTicket[]>;
+  waiting?: Record<string, Record<string, WaitingAgent[]>>;
+};
 
 export const stateOf = (world: World = {}): PipelineState => ({
   ...createStaticWorkflowState(world),
   readyTickets: (person) => world.ready?.[person] ?? [],
+  waitingOn: (ticket, human) => world.waiting?.[ticket]?.[human] ?? [],
 });
 
 export function event(

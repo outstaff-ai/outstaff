@@ -1,4 +1,5 @@
 import type { ReplayScenario } from "#/pipeline/replay/replay.types.js";
+import { answerToAsker } from "./answers.js";
 import { ciFailure, otherPrEvents, reviewRound } from "./reviews.js";
 import { stackedMerge, unrelatedConflict } from "./merges.js";
 import { chat, docComments, handBacks, idle, silentLoop } from "./office.js";
@@ -18,4 +19,5 @@ export const ACME_REPLAY: ReplayScenario[] = [
   ciFailure,
   otherPrEvents,
   silentLoop,
+  answerToAsker,
 ];

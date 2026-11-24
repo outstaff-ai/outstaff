@@ -8,7 +8,7 @@
 // hand-back, the parent stays active with the agent, and each sub-ticket that merges wakes the agent on the parent
 // for the next, the parent going to review with the human once every sub-ticket is in review, until the last one closes
 // the parent, and an agent waiting on a human's review hands back blocked, which the office takes as silent: no PM is
-// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, which the agent that works the ticket also stores on the assets branch and shows in its pull request's description, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a request to start the next milestone starts it in the chat session, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and a CI fix that hands back while a round the human asked for in chat on the same pull request waits in the queue tells nothing, so the human hears once, after that round, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again, and work asked for in chat while one round runs with nothing queued is placed next and acknowledged as running after that round, with no question, and runs once it ends, and a chat session asked to ping the PM asks her, replies at once, and passes her answer on in the same thread, and a human's review that asks for the architect's work makes the author file the follow-up for her, ready, link it on the pull request, and the office wake her. The office, Postgres and the agent are the real images; GitHub,
+// woken and nobody is told again, and an approval by the merge approver wakes the author to decide the merge, which joins the merge queue, the host merges it and the ticket is done (that ticket was filed from a chat thread, so its review and merge rounds tell the human in the thread, never in a direct message), and of two approved pull requests that change the same file the older merges first while the other waits, is rebased and merges after, and a direct message with a picture is answered and its ticket gets the picture, which the agent that works the ticket also stores on the assets branch and shows in its pull request's description, an agent's design document is linked on its ticket by the agent, a comment on it and one on a handed-back ticket reach the agent, a blocked ticket goes to the PM, who unblocks it (the agent resumes) or hands it to the human saying what is needed, and a ticket she would file for a workaround is refused in her unblock round, so she proposes it to the human instead, an answer the PM posts on such a ticket later wakes the agent blocked on it, a mention of the agent on a blocked ticket held by a human is answered without taking the ticket, an agent's mention of the PM wakes the PM to answer, and a ticket the agent assigned to itself is started by the office once the agent is idle, and a ticket the PM files from chat for the developer is the developer's from the start, and a request that spans two roles is filed by the PM as one ticket per role, assigned by role, each landing on the person with that role, the dependent one blocked and its assignee woken only when the other closes, and a request to the PM in chat for better planning gets a proposal and nothing filed until the human confirms, then a milestone with its tickets, one reply and one round, and a request to start the next milestone starts it in the chat session, and a ticket canceled while its round waits in the queue never runs, and a mention written just before the human closes its ticket wakes the agent, who answers and leaves it closed, and a deploy check that fails on a merge commit wakes the author with its log while the ticket stays open, until a fix on the same ticket merges green, and a hand-back's notice waits for the pull request's required check: nothing while it runs or when it fails (the author is woken and pushes a fix), one direct message after the fix's green run, and a CI fix that hands back while a round the human asked for in chat on the same pull request waits in the queue tells nothing, so the human hears once, after that round, and `ost recall` finds a ticket the agent handled and its chat about it, never the PM's private chat, and the tokens and cost of a sub-ticket and its parent are totalled by the office and written into the tracker's usage fields by the agent, and a chat edit in another item's worktree is refused naming that work and the attach command, which puts the change on its pull request, and a round adds a worktree in a second repository and pushes there, while a repository without a grant is refused, and a reply in the thread of a ticket in review whose pull request the human closed continues that ticket, though the office cannot list one repository's pull requests, back to active and into review again, and work asked for in chat while one round runs with nothing queued is placed next and acknowledged as running after that round, with no question, and runs once it ends, and a chat session asked to ping the PM asks her, replies at once, and passes her answer on in the same thread, and a human's review that asks for the architect's work makes the author file the follow-up for her, ready, link it on the pull request, and the office wake her, and a human's answer on a design sub-ticket the designer closed wakes the PM who asked them there, who splits its parent. The office, Postgres and the agent are the real images; GitHub,
 // the tracker and the model are stand-ins (e2e/stubs, e2e/runtime-scripted); the PM, pia, runs on the same agent image.
 //
 //   node e2e/run.ts
@@ -1539,6 +1539,9 @@ async function main() {
 
   // ---- 8c. a ticket the agent cannot progress is blocked, and a silent one is not pulled again (see noIdleLoop)
   await noIdleLoop();
+
+  // ---- 8d. a human's answer on a design sub-ticket wakes the PM that asked there (see answerWakesAsker)
+  await answerWakesAsker();
 
   // ---- 9. a direct message with a picture: it is answered (it used to be dropped), the ticket it becomes gets the
   // picture, and the agent that works the ticket downloads the picture from the tracker.
@@ -4132,6 +4135,111 @@ async function noIdleLoop() {
 
   step(
     `no loop, silent: a thanks on ready ${thanked} -> sam's round finished silently, back in ready -> the idle pull skipped it, traced once -> a human's comment woke sam again`,
+  );
+}
+
+/**
+ * 8d. a human's answer wakes the agent that asked them. Pia, the PM, holds a parent until the human confirms its design:
+ * she asks them on the design sub-ticket, mentioning them, and hands the parent back blocked. Sam, as the designer,
+ * closes the design ticket and mentions pia there, which wakes no one on a closed ticket. The human's approval on the
+ * design ticket wakes pia, who is neither its last worker nor blocked on it, and as the human's word it lets her split
+ * the parent into build tickets. A later comment of the human's there answers nothing she asked since.
+ */
+async function answerWakesAsker() {
+  await agentIdle();
+  await officePolledTwice("the last round handed back");
+  const filed = (title: string, description: string, status: string, as?: string) =>
+    stub("POST", "/_test/tickets", {
+      title,
+      description,
+      status,
+      ...(as ? { as, assignee: "ada.admin" } : {}),
+    });
+
+  const { key: design } = await filed("Design the gift card page", "", "In Review", "sam");
+  const { key: copy } = await filed("Write the gift card copy", "", "Backlog");
+  const { key: parent } = await filed(
+    "Build the gift card page",
+    `confirm design: ${design}`,
+    "Ready",
+  );
+
+  for (const key of [design, copy]) {
+    await stub("POST", `/_test/tickets/${key}/parent`, { parent });
+  }
+
+  await officePolledTwice(`${parent} and its sub-tickets were filed`);
+  const piaBefore = piaWakes().length;
+  await stub("POST", `/_test/tickets/${parent}/assign`, { to: "pia" });
+  // The hand-back gives the blocked parent to the human; the ticket key in pia's question is linked on the tracker.
+  const asked = await until(`pia asked the human on ${design} and blocked ${parent}`, (s) => {
+    const question = ticketOf(s, design).comments.find((c: Json) =>
+      c.body.startsWith("@ada-admin please confirm that revision; then I split "),
+    );
+
+    const held = ticketOf(s, parent);
+    return question && held.status === "Blocked" && held.assignee === "ada.admin"
+      ? question
+      : undefined;
+  });
+
+  assertEq(asked.body.includes(parent), true, "pia names the parent she splits once confirmed");
+
+  await officePolledTwice(`${parent} blocked`);
+  // The designer closes the design ticket, then mentions pia on it: an agent's mention on a closed ticket wakes no one.
+  await stub("POST", `/_test/tickets/${design}/move`, { to: "Done", as: "sam" });
+  await stub("POST", `/_test/tickets/${design}/comment`, {
+    body: "@pia the design is final, the parent can now be split.",
+    as: "sam",
+  });
+
+  await officePolledTwice(`sam closed ${design} and mentioned pia there`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore)),
+    JSON.stringify(["assigned"]),
+    "the designer's mention on the closed ticket did not wake pia",
+  );
+
+  const samBefore = wakesOf("sam").length;
+  await stub("POST", `/_test/tickets/${design}/comment`, {
+    body: "All good, let's build with this version.",
+  });
+
+  const split = await until(`pia split ${parent} after the human's answer on ${design}`, (s) => {
+    const parts = s.tickets.filter(
+      (t: Json) => t.parent === parent && t.title.startsWith("Build the gift card "),
+    );
+
+    const said = ticketOf(s, parent).comments.some((c: Json) => c.body.startsWith("Split into "));
+    return parts.length === 2 && said ? parts : undefined;
+  });
+
+  assertEq(
+    JSON.stringify(split.map((t: Json) => t.title).toSorted()),
+    JSON.stringify(["Build the gift card form", "Build the gift card preview"]),
+    "the human's word let pia file the build tickets",
+  );
+
+  assertEq(ticketOf(await state(), design).status, "Done", `${design} stays closed`);
+  await agentIdle();
+  await officePolledTwice(`pia split ${parent}`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore)),
+    JSON.stringify(["assigned", "ticket_comment"]),
+    "the human's answer woke pia once",
+  );
+
+  assertEq(wakesOf("sam").length, samBefore, "the answer was for pia, not the designer");
+  await stub("POST", `/_test/tickets/${design}/comment`, { body: "Thanks!" });
+  await officePolledTwice(`the human thanked on ${design}`);
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore)),
+    JSON.stringify(["assigned", "ticket_comment"]),
+    "a later comment of the human's answers nothing pia asked since",
+  );
+
+  step(
+    `answer wakes the asker: pia asked the human on ${design}, ${parent} blocked -> sam closed ${design}, his mention of pia woke no one -> the human approved on ${design}, which woke pia -> she split ${parent} into ${split.map((t: Json) => t.key).join(", ")}`,
   );
 }
 

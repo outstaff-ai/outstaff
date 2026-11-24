@@ -556,6 +556,69 @@ describe("the office with the event pipeline live", () => {
     });
   });
 
+  it("wakes the agent that asked the human on a ticket closed since with the human's answer there, once", async () => {
+    const { tracker, ada, sam, pia } = await start();
+    const parent = await tracker
+      .as(ada)
+      .createIssue({ title: "Gift cards", body: "", status: "blocked" });
+
+    const design = await tracker.as(ada).createIssue({
+      title: "Design the gift card page",
+      body: "",
+      status: "review",
+      assignee: sam.id,
+    });
+
+    await office!.parts.intake.pollOnce();
+    clock.advance(1_000);
+    await tracker
+      .as(pia)
+      .comment(
+        design.key,
+        `@ada-admin please confirm that revision; then I split ${parent.key} into build tickets.`,
+      );
+
+    clock.advance(1_000);
+    await tracker.as(sam).transition(design.key, "done");
+    await office!.parts.intake.pollOnce();
+    expect(decided(await commentTrace(design.key))).toEqual(["drop"]);
+
+    // A teammate's mention on the closed ticket wakes no one.
+    clock.advance(1_000);
+    await tracker.as(sam).comment(design.key, "@pia the parent can now be split.");
+    await office!.parts.intake.pollOnce();
+    expect(decided(await commentTrace(design.key, 2))).toEqual(["drop"]);
+
+    // The human's answer is for pia, who asked: she is woken on it, though the ticket is closed and hers is another.
+    clock.advance(1_000);
+    await tracker.as(ada).comment(design.key, "All good, let's build with this version.");
+    await office!.parts.intake.pollOnce();
+    const answer = await commentTrace(design.key, 3);
+    expect(decided(answer)).toEqual(["wake pia (ticket_comment)"]);
+    expect(answer.decisions[0]).toMatchObject({
+      policy: "ticket_comment_to_waiting_agent",
+      subject: { type: "ticket", ref: design.key },
+    });
+
+    expect(
+      answer.policies.find((p) => p.policy === "ticket_comment_to_waiting_agent"),
+    ).toMatchObject({
+      proposals: [
+        { reason: expect.stringMatching(/^pia waits on .+ on .+: it mentioned them there at /) },
+      ],
+    });
+
+    expect((await store.listItems({ person: "pia" })).map((i) => [i.kind, i.trigger])).toEqual([
+      ["ticket_comment", "human"],
+    ]);
+
+    // Her next comment answers nothing pia asked since.
+    clock.advance(1_000);
+    await tracker.as(ada).comment(design.key, "Thanks!");
+    await office!.parts.intake.pollOnce();
+    expect(decided(await commentTrace(design.key, 4))).toEqual(["drop"]);
+  });
+
   it("bounds two agents that keep mentioning each other with the loop guard", async () => {
     const { tracker, ada, sam, pia } = await start();
     const issue = await tracker.as(ada).createIssue({

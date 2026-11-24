@@ -8,7 +8,7 @@ How to read it:
 - A merge re-checks the repository's other open pull requests and raises `pr.conflicted`, `pr.behind_base` or `pr.base_merged` for every pull request the merge changed something under; those rows say derived.
 - A change to the policies that changes a decision changes this file: review the difference like any other.
 
-**57 events** (5 derived from merges).
+**62 events** (5 derived from merges).
 
 ## A stacked pull request series merges
 
@@ -127,8 +127,18 @@ How to read it:
 | 56 | `agent.idle` no subject by sam | (drop: sam handed back ACME-190 silent at 2026-10-05T13:22:00.000Z, and no one else acted on it since: not pulled again until someone does) |
 | 57 | `agent.handed_back` ACME-190 by sam | (drop: the team's PM, priya, unblocks it: hand_back_blocked_to_pm gives it to them)<br>move ACME-190 to blocked (for sam)<br>assign ACME-190 to agent priya (for sam)<br>wake priya (unblock): _sam handed ACME-190 back as blocked, and it is assigned to you to unblock. Try everything before involving a human: answer from what you know, find the information, or ask the right teammate with `ost ask`. You start no new work: file no ticket and open no pull request (both are refused in this round); a workaround that needs new work is a proposal for the human. When it is unblocked, comment the answer on the ticket and assign it back to sam. Only if a human is needed, assign it to the requester, ada.admin, with a comment that says exactly what is needed. If all it waits on is a review the human already has (the ticket or its pull request is in review with them), nothing is blocked: leave it, send no new message, and hand back silent._ |
 
+## A human's answer wakes the agent that asked them
+
+| # | Event | Decisions |
+| - | - | - |
+| 58 | `ticket.commented` ACME-201 by priya | (drop: no policy matched) |
+| 59 | `ticket.moved` ACME-201 by leo | (drop: no policy matched) |
+| 60 | `ticket.commented` ACME-201 by leo | (drop: no policy matched) |
+| 61 | `ticket.commented` ACME-201 by ada.admin | wake priya (ticket_comment): _ada.admin commented on ACME-201, where you asked them something: this is their answer to you. Act on it: continue the work you held for it, on whichever ticket that is (for example the one you are blocked on, or a parent you were splitting), and say there what you did. It is a trusted human's word, so it starts new work a teammate's mention cannot, such as filing the tickets it confirms. If it does not answer what you asked, answer it on ACME-201 and keep waiting. ACME-201's status now: done. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work._ |
+| 62 | `ticket.commented` ACME-201 by ada.admin | (drop: no policy matched) |
+
 ## Coalescing
 
-The pipeline's 29 wakes become 27 runs when wakes for the same person and subject within the window are folded together.
+The pipeline's 30 wakes become 28 runs when wakes for the same person and subject within the window are folded together.
 
 - sam, review_feedback on pr acme-example/shop#60: 3 events (replay:s3-changes, replay:s3-comment-1, replay:s3-comment-2)

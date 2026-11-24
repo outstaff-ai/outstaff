@@ -188,10 +188,16 @@ export interface IngestOptions {
   drain(): Promise<void>;
 }
 
-/** The agents the `@name`s of a comment mention. */
+/** The agents and humans the `@name`s of a comment mention. */
 export interface MentionResolver {
   /** The handles of the agents the names are, first mention first; names that are nobody on the team are dropped. */
   resolve(names: unknown): Promise<string[]>;
+
+  /**
+   * The humans the names no agent answers to are, as a tracker event names them (a member's username, else its id),
+   * first mention first; names that are no known human are dropped.
+   */
+  humans(names: unknown): Promise<string[]>;
 
   /** Reads the tracker's members again now. Never throws: on a failure the last ones read are kept. */
   load(): Promise<void>;

@@ -1,12 +1,16 @@
 import type { MergeRequirements, StaticWorkflowData } from "@outstaff/core";
 import type { PipelineEvent } from "@outstaff/policy";
 import type { ConfiguredPolicy } from "@outstaff/policy";
-import type { ReadyTicket } from "@outstaff/policy";
+import type { ReadyTicket, WaitingAgent } from "@outstaff/policy";
 import type { PipelineOptions } from "#/pipeline/state.types.js";
 
-/** The world after an event: the office's static state plus the agents' ready tickets. */
+/**
+ * The world after an event: the office's static state plus the agents' ready tickets and the agents waiting on a
+ * human, by ticket and human.
+ */
 export interface ReplayWorld extends StaticWorkflowData {
   ready?: Record<string, ReadyTicket[]>;
+  waiting?: Record<string, Record<string, WaitingAgent[]>>;
 }
 
 /** A merge step also re-checks every other open pull request of the repository, as the work state does. */

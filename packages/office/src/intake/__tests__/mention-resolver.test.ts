@@ -133,6 +133,39 @@ describe("createMentionResolver", () => {
     expect(tracker.members).toHaveBeenCalledTimes(2);
   });
 
+  it("maps the names no agent answers to onto the humans they are, as tracker events name them", async () => {
+    const ADA: Member = { id: "u-ada", name: "Ada Admin", username: "ada.admin", kind: "human" };
+    const DANA: Member = { id: "u-dana", name: "Dana Ito", kind: "human" };
+    const { resolver } = resolverWith(async () => [SAM, ADA, DANA], {
+      humans: [
+        { name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "u-ada", chat: "U0ADA" } },
+        { name: "Ivy Ops", identities: { tracker: "ivy.ops" } },
+        { name: "Mona Merge", identities: { vcs: "merge-approver" } },
+      ],
+    });
+
+    // Ada by her code host login, chat id, name, tracker identity and username; Ivy with no tracker member by her
+    // identity; Dana, a tracker member the team file does not list, by her name or id; Mona with no tracker identity
+    // is no one a tracker event names.
+    for (const name of ["ada-admin", "U0ADA", "Ada_Admin", "u-ada", "ADA.ADMIN"]) {
+      expect(await resolver.humans([name])).toEqual(["ada.admin"]);
+    }
+
+    expect(await resolver.humans(["ivy.ops", "dana.ito", "u-dana", "merge-approver"])).toEqual([
+      "ivy.ops",
+      "u-dana",
+    ]);
+
+    // An agent's name is the agent's, never a human's; nobody is no one; the order is the first mention's.
+    expect(await resolver.humans(["sam.duarte", "Sam", "nobody", 3])).toEqual([]);
+    expect(await resolver.humans(["dana ito", "ada-admin", "Ada Admin"])).toEqual([
+      "u-dana",
+      "ada.admin",
+    ]);
+
+    expect(await resolver.humans(undefined)).toEqual([]);
+  });
+
   it("matches the team file alone without a tracker", async () => {
     const resolver = createMentionResolver({
       team: teamConfig(),

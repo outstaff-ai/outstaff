@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import type { Feedback, ItemContext } from "./prompt.js";
+import { askToConfirm, splitOnAnswer } from "./confirm.js";
 import { answerTeammate, decideTopic, decideWithPm, teammateInChat } from "./decide.js";
 import { fileForLater, planInChat, plannedTickets, startNextMilestone } from "./plan.js";
 import { milestoneDone, placeFeature, planFeature, startMilestone } from "./roadmap.js";
@@ -688,9 +689,10 @@ async function* holdIfAsked(shown: string): AsyncGenerator<Action, void, string>
  */
 export async function* assigned(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
-  // The PM has no repositories: her own tickets are the ones she filed from a confirmed plan.
+  // The PM has no repositories: her own tickets wait on a human's word, or are the ones she filed from a confirmed plan.
   if (!ctx.worktree) {
-    return yield* plannedTickets(ctx, key);
+    const shown = yield { type: "tool", tool: "ticket_show", input: { key } };
+    return (yield* askToConfirm(key, shown)) ?? (yield* plannedTickets(ctx, key));
   }
 
   const next = ctx.openSubtickets?.[0];
@@ -1053,8 +1055,9 @@ const passedOn = ([, to, cc, question]: RegExpExecArray) =>
 export async function* ticketComment(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
   const feedback = need(ctx.feedback[0], "the comment");
-  if (ctx.backlog) {
-    return yield* answerOnBacklog(key, feedback.body);
+  const other = commentRound(ctx, key, feedback.body);
+  if (other) {
+    return yield* other;
   }
 
   const decide = /^decide: (.+)$/m.exec(feedback.body)?.[1];
@@ -1082,6 +1085,15 @@ export async function* ticketComment(ctx: ItemContext): Script {
     : { type: "tool", tool: "ticket_move", input: { key, to: "review" } };
 
   return ask ? `Asked ${ask[1]} on ${key}.` : `Answered the comment on ${key}.`;
+}
+
+/** A comment on a ticket in backlog, or a human's answer to what the agent asked them: a round of its own. */
+function commentRound(ctx: ItemContext, key: string, body: string): Script | undefined {
+  if (ctx.backlog) {
+    return answerOnBacklog(key, body);
+  }
+
+  return ctx.answersAsker ? splitOnAnswer(ctx, key) : undefined;
 }
 
 /**

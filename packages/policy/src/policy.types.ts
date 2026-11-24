@@ -33,9 +33,19 @@ export type PersonRef =
 export type PersonSpec = PersonRef | readonly PersonRef[];
 
 /** A condition only the pipeline knows: the event's actor is that person (for example the assignee themselves). */
-export type PipelineLeaf = {
+export interface ActorIsLeaf {
   actor_is: "assignee" | "author" | "doc_author" | "last_worker" | "blocked_agent";
-};
+}
+
+/**
+ * A condition only the pipeline knows: an agent waits (or, with false, none waits) on the event's actor on the ticket,
+ * as `PolicyState.waitingOn` has it: it mentioned them there since their last comment.
+ */
+export interface AwaitedLeaf {
+  awaited_human: boolean;
+}
+
+export type PipelineLeaf = ActorIsLeaf | AwaitedLeaf;
 
 /** A condition, a pipeline leaf, or a combination of them. */
 export type PipelineCondition =
@@ -71,10 +81,29 @@ export interface ReadyTicket {
   silencedAt?: string | undefined;
 }
 
+/**
+ * An agent waiting on a human on a ticket: it commented there after the human's last comment there, mentioning them.
+ */
+export interface WaitingAgent {
+  agent: string;
+
+  /** When it wrote the comment that made it wait (ISO-8601). */
+  at: string;
+
+  /** A link to that comment, when the tracker gives one. */
+  url?: string | undefined;
+}
+
 /** The world a policy reads, after the event happened: the office's work state, read-only. */
 export interface PolicyState extends WorkflowState {
   /** Ready tickets assigned to the agent that it has not picked up yet, in any order. */
   readyTickets(person: string): ReadyTicket[];
+
+  /**
+   * The agents waiting on the human (as tracker events name them) on the ticket when the human commented at `at`
+   * (ISO-8601): each mentioned them there before it, after their last comment there. Oldest comment first.
+   */
+  waitingOn(ticket: string, human: string, at: string): WaitingAgent[];
 }
 
 /** What the team's config tells the policies. */

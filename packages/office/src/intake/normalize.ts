@@ -89,24 +89,28 @@ export function normalizeDocEvent(
 
 /**
  * Replaces the names in `data.mentions` with the handles of the agents they mention, or removes them when the comment
- * mentions no agent. An agent's mention of itself does not count, and an automation's comment mentions no one.
+ * mentions no agent, and puts the humans the other names are in `data.mentionedHumans` (as tracker events name them).
+ * A mention of oneself does not count, and an automation's comment mentions no one.
  */
 export async function resolveMentions(
   event: WorkflowEvent,
   mentions: MentionResolver,
 ): Promise<void> {
   const { actor } = event;
-  const handles =
-    actor.kind === "automation"
-      ? []
-      : (await mentions.resolve(event.data["mentions"])).filter(
-          (h) => actor.kind !== "agent" || h !== actor.id,
-        );
+  const names = event.data["mentions"];
+  const others = (ids: string[], kind: string) =>
+    actor.kind === "automation" ? [] : ids.filter((id) => actor.kind !== kind || id !== actor.id);
 
+  const handles = others(await mentions.resolve(names), "agent");
+  const humans = others(await mentions.humans(names), "human");
+  delete event.data["mentions"];
+  delete event.data["mentionedHumans"];
   if (handles.length > 0) {
     event.data["mentions"] = handles;
-  } else {
-    delete event.data["mentions"];
+  }
+
+  if (humans.length > 0) {
+    event.data["mentionedHumans"] = humans;
   }
 }
 

@@ -34,6 +34,7 @@ import { policy as ticketCommentToAgent } from "./ticket_comment_to_agent.js";
 import { policy as ticketCommentToBlockedAgent } from "./ticket_comment_to_blocked_agent.js";
 import { policy as ticketCommentToLastWorker } from "./ticket_comment_to_last_worker.js";
 import { policy as ticketCommentToMentionedAgent } from "./ticket_comment_to_mentioned_agent.js";
+import { policy as ticketCommentToWaitingAgent } from "./ticket_comment_to_waiting_agent.js";
 import { policy as unblockedToBlockedAgent } from "./unblocked_to_blocked_agent.js";
 import { policy as unblockedToReady } from "./unblocked_to_ready.js";
 
@@ -55,6 +56,7 @@ export const BUILT_IN_POLICIES: readonly Policy[] = [
   ticketCommentToMentionedAgent,
   ticketCommentToBlockedAgent,
   ticketCommentToLastWorker,
+  ticketCommentToWaitingAgent,
   movedActiveToAssignee,
   movedActiveToLastWorker,
   closedStopsWork,

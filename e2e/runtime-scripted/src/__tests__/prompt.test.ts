@@ -49,6 +49,22 @@ describe("parsePrompt", () => {
     expect(parsePrompt(buildWorkPrompt(comment, { resumed: false }))?.backlog).toBeUndefined();
   });
 
+  it("reads that a human's comment answers what the agent asked them, from the wake's instruction", () => {
+    const answer = offer("ticket_comment");
+    answer.context.journal = [
+      {
+        at: "2026-01-01T00:00:00Z",
+        author: "office",
+        text: "ada.admin commented on SHOP-1, where you asked them something: this is their answer to you. Act on it.",
+      },
+    ];
+
+    expect(parsePrompt(buildWorkPrompt(answer, { resumed: false }))?.answersAsker).toBe(true);
+    expect(
+      parsePrompt(buildWorkPrompt(offer("ticket_comment"), { resumed: false }))?.answersAsker,
+    ).toBeUndefined();
+  });
+
   it("reads the notes the round started with, and a version of them that is not used", () => {
     const prompt = buildWorkPrompt(offer("chat"), {
       resumed: false,
