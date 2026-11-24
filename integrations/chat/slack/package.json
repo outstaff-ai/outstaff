@@ -37,7 +37,7 @@
   "dependencies": {
     "@outstaff/core": "workspace:*",
     "@slack/socket-mode": "3.1.0",
-    "@slack/web-api": "8.2.0",
+    "@slack/web-api": "8.3.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
