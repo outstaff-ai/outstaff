@@ -37,6 +37,7 @@ function workStateOf() {
     refreshTicket: async (key: string, by?: unknown) => void refreshed.push([key, by]),
     refreshPrsOf: async () => {},
     lastWorker: () => undefined,
+    silencedAt: () => undefined,
   };
 }
 

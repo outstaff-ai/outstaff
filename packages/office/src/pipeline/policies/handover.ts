@@ -29,3 +29,12 @@ export function handedOver(ctx: PolicyContext, to: string | undefined): Proposal
 
 /** What every hand-back policy decides besides its act, in words for the reference. */
 export const UNLESS_HANDED_OVER = "unless the agent handed the ticket over to someone else";
+
+/**
+ * Why the office took a `silent` hand-back as blocked, when it did: the agent handed the ticket back silent before,
+ * and nobody else acted on it since. The reason of the blocked hand-back's decisions, so the trace says it.
+ */
+export function silentAgain(ctx: PolicyContext): string | undefined {
+  const why = ctx.event.data["silentAgain"];
+  return typeof why === "string" ? why : undefined;
+}

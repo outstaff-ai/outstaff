@@ -30,10 +30,13 @@ function workStateOf() {
   const tickets = new Map<string, Partial<TicketRecord>>();
   const prs = new Map<string, PrRecord[]>();
   const refreshed: [string, unknown][] = [];
+  const silenced = new Map<string, string>();
   return {
     tickets,
     prs,
     refreshed,
+    silenced,
+    silencedAt: (ticket: string, person: string) => silenced.get(`${ticket} ${person}`),
     ticket: (key: string) => tickets.get(key) as TicketRecord | undefined,
     prsOfTicket: (key: string) => prs.get(key) ?? [],
     subTickets: (key: string) => [...tickets].filter(([, t]) => t.parent === key).map(([k]) => k),
@@ -110,6 +113,13 @@ describe("officeWaitingOn", () => {
     expect(await check()).toEqual([]);
 
     state.tickets.set("ACME-49", { parent: "ACME-48" });
+    expect(await check()).toEqual([]);
+  });
+
+  it("waits on nothing when a sub-ticket is blocked: it waits on an answer, whoever has it", async () => {
+    parent(state);
+    state.tickets.set("ACME-49", { status: "review", assignee: human("ada"), parent: "ACME-48" });
+    state.tickets.set("ACME-50", { status: "blocked", assignee: agent("sam"), parent: "ACME-48" });
     expect(await check()).toEqual([]);
   });
 
@@ -208,6 +218,38 @@ describe("work source: a blocked hand-back that waits on work in flight", () => 
         "a blocked hand-back on ACME-48, which is in backlog; taking it as silent",
       );
     }
+  });
+
+  it("takes a second silent hand-back as blocked when nobody else acted on the ticket since the first", async () => {
+    const again = (s: ReturnType<typeof workStateOf>) => {
+      inFlight(s);
+      s.silenced.set("ACME-48 sam", "2026-10-05T07:00:00.000Z");
+    };
+
+    // A round queued before the first silent hand-back is not one in a row.
+    const before = (s: ReturnType<typeof workStateOf>) => {
+      inFlight(s);
+      s.silenced.set("ACME-48 sam", new Date(clock.now().getTime() + 60_000).toISOString());
+    };
+
+    expect((await handBack("silent", before)).item.status).toBe("done");
+
+    const { item, warned, handed } = await handBack("silent", again);
+    const why =
+      "sam handed ACME-48 back silent at 2026-10-05T07:00:00.000Z, and again with nothing from anyone else on it since: taking it as blocked";
+
+    expect(item.status).toBe("blocked");
+    expect(handed[0]).toMatchObject({ status: "blocked", silentAgain: why });
+    expect(handed[0]?.waitingOn).toBeUndefined();
+    expect(warned.at(-1)).toBe(why);
+
+    // Another agent's silent hand-back on it is its first.
+    const other = (s: ReturnType<typeof workStateOf>) => {
+      inFlight(s);
+      s.silenced.set("ACME-48 noor", "2026-10-05T07:00:00.000Z");
+    };
+
+    expect((await handBack("silent", other)).item.status).toBe("done");
   });
 
   it("lets ticket work finish silently only while it waits on work in flight", async () => {

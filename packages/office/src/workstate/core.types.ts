@@ -77,6 +77,9 @@ export interface WorkstateCore {
   /** Each person's work on each ticket, by `pickupKey`. */
   pickups: Map<string, Pickup>;
 
+  /** Each ticket's silent hand-backs that nothing from anyone else followed: when, by agent (see `silenced.ts`). */
+  silenced: Map<string, Map<string, string>>;
+
   /** Keys that looked like tickets but that the tracker does not know. */
   notTickets: Set<string>;
   handlers: WorkstateHandler[];

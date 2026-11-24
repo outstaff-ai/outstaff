@@ -63,6 +63,12 @@ export interface ReadyTicket {
 
   /** The tracker's priority, when it has one: 1 is the most urgent. */
   priority?: number | undefined;
+
+  /**
+   * When the agent last handed it back silent (or the parent an idle pull would wake it on), with no event on it from
+   * anyone else since (ISO-8601). An idle pull does not hand it to the agent again until someone else acts on it.
+   */
+  silencedAt?: string | undefined;
 }
 
 /** The world a policy reads, after the event happened: the office's work state, read-only. */

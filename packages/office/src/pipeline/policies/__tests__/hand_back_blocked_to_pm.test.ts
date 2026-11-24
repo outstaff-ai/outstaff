@@ -60,6 +60,26 @@ describe("hand_back_blocked_to_pm", () => {
     expect(wake.instruction).toContain("assign it to the requester, ada.admin, with a comment");
   });
 
+  it("gives the office's reason when it took a second silent hand-back as blocked", () => {
+    const why =
+      "sam handed ACME-1 back silent at 2026-10-05T07:00:00.000Z, and again with nothing from anyone else on it since: taking it as blocked";
+
+    const again = event("agent.handed_back", {
+      subject: { ticket: "ACME-1" },
+      actor: SAM,
+      data: { status: "blocked", kind: "assigned", silentAgain: why },
+    });
+
+    const decisions = traceOf(again, world("active")).policies.find(
+      (r) => r.policy === "hand_back_blocked_to_pm",
+    )?.proposals;
+
+    expect(decisions).toMatchObject([
+      { type: "act", reason: why },
+      { type: "wake", reason: why },
+    ]);
+  });
+
   it("still wakes the PM when the ticket is already blocked and with them", () => {
     expect(judge("hand_back_blocked_to_pm", back("blocked"), world("blocked", "priya"))).toEqual([
       "drop: nothing to change: move: ACME-1 is already blocked; assign: ACME-1 is already assigned to priya",

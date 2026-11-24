@@ -2,6 +2,7 @@ import { SILENT_KINDS } from "@outstaff/core";
 import { officeToReview } from "./hand-back-review.js";
 import { officeWaitingOn } from "./hand-back-waiting.js";
 import { itemTicket } from "./item-ticket.js";
+import { NOT_ON_TICKET } from "./office-handback.js";
 import type { WorkItem } from "./store/types.js";
 import type { HandBackResult, WorkSourceOptions } from "./work-source.types.js";
 
@@ -93,6 +94,32 @@ async function checkedBacklog(
   return { ...result, status: "silent" };
 }
 
+/**
+ * A second `silent` hand-back of a ticket by the same agent, in a round queued after the first, with nothing from anyone
+ * else on it, its pull requests or its sub-tickets since, would find what the first found: a loop. It is taken as `blocked`, so the ticket
+ * goes to blocked and to whoever unblocks it, and the hand-back's event says why. A wrong status costs one round.
+ */
+async function checkedRepeat(
+  opts: WorkSourceOptions & { workState: NonNullable<WorkSourceOptions["workState"]> },
+  item: WorkItem,
+  result: HandBackResult,
+): Promise<HandBackResult> {
+  if (result.status !== "silent" || NOT_ON_TICKET.has(item.kind)) {
+    return result;
+  }
+
+  const ticket = await itemTicket(opts.store, item);
+  const at = ticket ? opts.workState.silencedAt(ticket, item.person) : undefined;
+  // A round queued before the first silent hand-back came from something that happened before it: not in a row.
+  if (!at || Date.parse(item.createdAt) <= Date.parse(at)) {
+    return result;
+  }
+
+  const silentAgain = `${item.person} handed ${ticket} back silent at ${at}, and again with nothing from anyone else on it since: taking it as blocked`;
+  opts.logger?.warn(silentAgain, { item: item.id, person: item.person });
+  return { ...result, status: "blocked", waitingOn: undefined, silentAgain };
+}
+
 /** The status as the office takes it, before the backlog check. */
 function checkedStatus(
   opts: WorkSourceOptions & { workState: NonNullable<WorkSourceOptions["workState"]> },
@@ -118,6 +145,7 @@ export async function checkedResult(
     return result;
   }
 
-  const taken = await checkedStatus({ ...opts, workState }, item, result);
-  return taken.status === "blocked" ? checkedBacklog({ ...opts, workState }, item, taken) : taken;
+  const checked = { ...opts, workState };
+  const taken = await checkedRepeat(checked, item, await checkedStatus(checked, item, result));
+  return taken.status === "blocked" ? checkedBacklog(checked, item, taken) : taken;
 }

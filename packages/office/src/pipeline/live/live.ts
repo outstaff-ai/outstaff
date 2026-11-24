@@ -65,6 +65,8 @@ export function createLivePipeline(opts: LiveOptions): PipelineRunner {
     async judge(event) {
       const trace = evaluatePipeline(event, state, policies, options);
       await traces.record(trace);
+      // Judged on the state before it: a silent hand-back holds its ticket from the idle pull only after.
+      await state.heard(event);
       let queued = false;
       for (const d of trace.decisions) {
         if (d.type === "stop") {

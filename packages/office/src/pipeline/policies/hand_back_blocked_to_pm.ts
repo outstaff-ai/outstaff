@@ -1,7 +1,7 @@
 import { definePolicy, type ActSpec, type WakeSpec } from "@outstaff/policy";
 import { BLOCKED_HAND_BACK } from "./conditions.js";
 import { HANDED_IN, withHandedIn } from "./hand-in.js";
-import { handedOver, requesterOf, UNLESS_HANDED_OVER } from "./handover.js";
+import { handedOver, requesterOf, silentAgain, UNLESS_HANDED_OVER } from "./handover.js";
 import { acts, wakes } from "./spec.js";
 import { unblocker } from "./unblocker.js";
 
@@ -35,7 +35,8 @@ export const policy = definePolicy({
     }
 
     const kept = handedOver(ctx, pm.value);
-    const proposals = kept.length > 0 ? kept : [...ctx.act(toPm), ...ctx.wake(unblock)];
+    const why = silentAgain(ctx);
+    const proposals = kept.length > 0 ? kept : [...ctx.act(toPm, why), ...ctx.wake(unblock, why)];
     return withHandedIn(ctx, proposals, requesterOf(ctx));
   },
 });

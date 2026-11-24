@@ -16,3 +16,5 @@ export type {
   WorkstateMeta,
   WorkstateOptions,
 } from "./types.js";
+
+export type { HeardEvent } from "./silenced.types.js";

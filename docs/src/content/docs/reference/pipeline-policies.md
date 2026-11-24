@@ -453,7 +453,7 @@ When:
 Instruction:
 
 ```text
-{{ticket}} was {{closed}}. The open sub-tickets of {{parent}}: {{parent.open}}. Continue with the next one in the order you planned, the way the repository asks. When none is for you to do now (it waits on a human's review, or on a sub-ticket someone else has), you are waiting, not blocked: hand back silent, with no new message.
+{{ticket}} was {{closed}}. The open sub-tickets of {{parent}}: {{parent.open}}. Continue with the next one in the order you planned, the way the repository asks. When none is for you to do now and each waits on a human's review or on work someone else has under way, you are waiting, not blocked: hand back silent, with no new message. When one waits on an answer or a decision (it is blocked, or nobody answered a question on it yet), hand back blocked, naming who and what.
 ```
 
 ### subtickets_closed_move_parent
@@ -675,7 +675,7 @@ Note posted with the change: none, since the ticket shows the change. A team can
 
 ### hand_back_silent_restores
 
-A silent hand-back leaves the ticket as it was before the round: what the round's start changed (the move to active, the assignment to the agent) is undone, for the agent. A field someone changed since is left alone, and so is a parent the agent kept active for its open sub-tickets. The work item's other tickets awaiting review go to review and to the requester too. A blocked hand-back the office found waiting on work in flight (the ticket's pull requests open for review, its sub-tickets in review or with an agent) comes as silent, and its trace names that work: no PM is woken, and no human is told again.
+A silent hand-back leaves the ticket as it was before the round: what the round's start changed (the move to active, the assignment to the agent) is undone, for the agent. A field someone changed since is left alone, and so is a parent the agent kept active for its open sub-tickets. A ticket the round found ready that waits on work in flight stays active: back in ready, the idle pull would only start it again. The work item's other tickets awaiting review go to review and to the requester too. A blocked hand-back the office found waiting on work in flight (the ticket's pull requests open for review, its sub-tickets in review or with an agent) comes as silent, and its trace names that work: no PM is woken, and no human is told again.
 
 Listens to `agent.handed_back`. Decides: act for the agent: move the ticket back to the status it had before the round, and assign it back to whom it had, for each of the two still as the round's start set it; the item's other tickets awaiting review (the ones it created that are in review, and the ones whose pull request it opened) move to `review` and go to the requester.
 
@@ -758,7 +758,7 @@ When:
 
 ### idle_pulls_next
 
-An agent with nothing queued or running is woken with its next ready ticket: the highest tracker priority, then the one ready the longest (policies.pull_ready). For a sub-ticket of an open parent the agent is woken on the parent, so it takes the sub-tickets in the order it planned.
+An agent with nothing queued or running is woken with its next ready ticket: the highest tracker priority, then the one ready the longest (policies.pull_ready). For a sub-ticket of an open parent the agent is woken on the parent, so it takes the sub-tickets in the order it planned. A ticket the agent handed back silent (or whose parent it did) is skipped, with a drop that says so, until someone other than the agent acts on it.
 
 Listens to `agent.idle`. Decides: wake `actor` (kind `assigned`), with its next ready ticket (for a sub-ticket, on its parent).
 

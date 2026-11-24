@@ -1537,6 +1537,9 @@ async function main() {
   // ---- 8b. waiting on a human's review is not blocked (see waitingOnReview)
   await waitingOnReview();
 
+  // ---- 8c. a ticket the agent cannot progress is blocked, and a silent one is not pulled again (see noIdleLoop)
+  await noIdleLoop();
+
   // ---- 9. a direct message with a picture: it is answered (it used to be dropped), the ticket it becomes gets the
   // picture, and the agent that works the ticket downloads the picture from the tracker.
   const picture =
@@ -3992,6 +3995,143 @@ async function waitingOnReview() {
   assertEq(JSON.stringify(piaWakes().slice(piaBefore)), "[]", "the PM was never woken");
   step(
     `waiting end: ${later} in review -> ${parent} in review with the human, as sam; ${later} and ${inReview} done -> ${parent} done`,
+  );
+}
+
+/** Whether the office traced an `agent.idle` for sam whose drop names the ticket handed back silent. */
+const idleSkipTraced = (key: string) =>
+  dc(
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "outstaff",
+    "-d",
+    "outstaff",
+    "-tAc",
+    `select count(*) from pipeline_traces where type = 'agent.idle' and data like '%sam handed back ${key.replace(/'/g, "")} silent at%'`,
+  ).stdout.trim();
+
+/**
+ * 8c. no idle pull loop (the loop an idle pull and a silent hand-back made). First, a parent sam cannot progress until
+ * a human decides on one of its sub-tickets: the sub-ticket is blocked, so the parent does not only wait on work in
+ * flight, and sam's blocked hand-back moves it to blocked, to the PM, who gives it to the human; sam is not woken on it
+ * again. Then a ready ticket whose comment round sam hands back silent goes back to ready, and the idle pull skips it,
+ * with the drop in the trace, until a human comments on it again, which wakes sam.
+ */
+async function noIdleLoop() {
+  await agentIdle();
+  await officePolledTwice("the last round handed back");
+  const filed = (title: string, description: string, status: string, assignee: string) =>
+    stub("POST", "/_test/tickets", { title, description, status, assignee, as: "sam" });
+
+  const { key: parent } = await filed(
+    "Add a gift wrap option",
+    "Three parts.",
+    "In Progress",
+    "sam",
+  );
+
+  const { key: first } = await filed("Add the gift wrap checkbox", "", "In Progress", "sam");
+  const { key: decision } = await filed(
+    "Price the gift wrap",
+    "waits: decision",
+    "Blocked",
+    "ada.admin",
+  );
+
+  const { key: later } = await filed("Add the gift wrap note", "", "Backlog", "sam");
+  for (const key of [first, decision, later]) {
+    await stub("POST", `/_test/tickets/${key}/parent`, { parent });
+  }
+
+  await officePolledTwice(`${parent} and its sub-tickets were filed`);
+  const samBefore = wakesOf("sam").length;
+  const piaBefore = piaWakes().length;
+
+  // The first part closing wakes sam on the parent: the next part waits on the human's decision.
+  await stub("POST", `/_test/tickets/${first}/move`, { to: "Done" });
+  const blocked = await until(`${parent} blocked, given to the human by the PM`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === parent);
+    return t.status === "Blocked" && t.assignee === "ada.admin" ? t : undefined;
+  });
+
+  await agentIdle();
+  await officePolledTwice(`${parent} blocked`);
+  assertEq(
+    logs("office").includes(`a blocked hand-back waits on work in flight (${decision} is`),
+    false,
+    "a blocked sub-ticket is not work in flight: the blocked hand-back was not taken as silent",
+  );
+
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samBefore)),
+    JSON.stringify(["assigned"]),
+    `sam was woken once on ${parent}, and not again`,
+  );
+
+  assertEq(
+    JSON.stringify(piaWakes().slice(piaBefore)),
+    JSON.stringify(["unblock"]),
+    "pia was woken once, to unblock it",
+  );
+
+  const still = (await state()).tickets.find((x: Json) => x.key === parent);
+  assertEq(still.moves.length, blocked.moves.length, `nobody moved ${parent} since`);
+  step(
+    `no loop, blocked: ${first} closed -> sam woken on ${parent}, whose next part ${decision} waits on the human's decision -> sam handed back blocked -> ${parent} blocked, the PM gave it to the human; sam not woken again`,
+  );
+
+  // Sam is busy at a gate while a ready ticket of his gets a thanks: its round waits behind the busy one.
+  await stub("POST", "/_test/gates/loop/close");
+  const { key: busy } = await stub("POST", "/_test/tickets", {
+    title: "Check the gift wrap font",
+    description: "which repo: unclear\nhold: loop",
+  });
+
+  await stub("POST", `/_test/tickets/${busy}/assign`, { to: "sam" });
+  await until(`sam's round on ${busy} held at the gate`, (s) => s.chat.gates.loop?.arrived);
+  const { key: thanked } = await filed("Wrap the gift card too", "", "Ready", "sam");
+  await officePolledTwice(`${thanked} filed`);
+  const samAtThanks = wakesOf("sam").length;
+  await stub("POST", `/_test/tickets/${thanked}/comment`, { body: "Thanks for picking this up." });
+  await until(`a round on ${thanked}'s comment queued for sam`, () =>
+    wakesOf("sam").length > samAtThanks ? true : undefined,
+  );
+
+  await stub("POST", "/_test/gates/loop/open");
+  // The thanks round starts it (active) and finishes silently: back in ready, as the round found it.
+  await until(`${thanked} back in ready after the silent round`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === thanked);
+    const back = t.moves.some((m: Json) => m.from === "In Progress" && m.to === "Ready");
+    return back && t.status === "Ready" && idle(s) ? true : undefined;
+  });
+
+  await until(`the idle pull's skip of ${thanked} traced`, () =>
+    idleSkipTraced(thanked) === "1" ? true : undefined,
+  );
+
+  await officePolledTwice(`${thanked} skipped`);
+  await officePolledTwice(`${thanked} still skipped`);
+  assertEq(idleSkipTraced(thanked), "1", "the skip is traced once, not on every tick");
+  assertEq(
+    JSON.stringify(wakesOf("sam").slice(samAtThanks)),
+    JSON.stringify(["ticket_comment"]),
+    `the idle pull did not hand ${thanked} to sam again`,
+  );
+
+  // A human's comment is something new: it wakes sam, who answers and moves the ticket to review.
+  await stub("POST", `/_test/tickets/${thanked}/comment`, { body: "The card is in the drawer." });
+  await until(`sam woken on ${thanked} by the new comment`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === thanked);
+    return t.comments.some((c: Json) => c.author === "sam" && c.body.startsWith("Noted:"))
+      ? true
+      : undefined;
+  });
+
+  step(
+    `no loop, silent: a thanks on ready ${thanked} -> sam's round finished silently, back in ready -> the idle pull skipped it, traced once -> a human's comment woke sam again`,
   );
 }
 

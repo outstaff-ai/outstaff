@@ -1,5 +1,6 @@
 import { statusAt, type CanonicalStatus, type Issue } from "@outstaff/core";
 import type { Pickup, WorkstateCore } from "./core.types.js";
+import { silencedAt } from "./silenced.js";
 import type { ReadyTicket, TicketRecord } from "./types.js";
 
 /**
@@ -87,14 +88,22 @@ function pickedUp(core: WorkstateCore, person: string, t: TicketRecord): boolean
 const readyFor = (person: string, t: TicketRecord): boolean =>
   t.status === "ready" && !t.goneAt && t.assignee?.kind === "agent" && t.assignee.id === person;
 
+/** The person's silent hand-back on the ticket, or on the parent an idle pull would wake them on, still held. */
+const silencedOf = (core: WorkstateCore, person: string, t: TicketRecord) =>
+  silencedAt(core, t.key, person) ?? (t.parent ? silencedAt(core, t.parent, person) : undefined);
+
 /** The ready tickets assigned to the person that it has not picked up yet, in no particular order. */
 export function readyTickets(core: WorkstateCore, person: string): ReadyTicket[] {
   return [...core.tickets.values()]
     .filter((t) => readyFor(person, t) && !pickedUp(core, person, t))
-    .map((t) => ({
-      key: t.key,
-      title: t.title,
-      readyAt: t.statusSince ?? t.updatedAt,
-      ...(t.priority === undefined ? {} : { priority: t.priority }),
-    }));
+    .map((t) => {
+      const silenced = silencedOf(core, person, t);
+      return {
+        key: t.key,
+        title: t.title,
+        readyAt: t.statusSince ?? t.updatedAt,
+        ...(t.priority === undefined ? {} : { priority: t.priority }),
+        ...(silenced ? { silencedAt: silenced } : {}),
+      };
+    });
 }

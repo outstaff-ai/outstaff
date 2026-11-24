@@ -207,7 +207,7 @@ describe("createOffice", () => {
     expect(chat.posts).toEqual([]);
   });
 
-  it("puts the ticket back as the round found it on a silent finish", async () => {
+  it("keeps a ready ticket active on a silent finish while it waits on work in flight, and pulls it no more", async () => {
     const sam = connect("sam");
     await sam.whenConnected();
     const issue = await tracker.createIssue({
@@ -234,14 +234,13 @@ describe("createOffice", () => {
 
     await sam.handBack(offer.workItem.id, { summary: "Nothing for me.", status: "silent" });
     expect((await store.getItem(offer.workItem.id))?.status).toBe("done");
-    // The start moved it to active; sam had it already, so only the status goes back.
-    await vi.waitFor(async () =>
-      expect((await tracker.getIssue(issue.key)).status.canonical).toBe("ready"),
-    );
-
+    // The start moved it to active, and it stays there: back in ready, the idle pull would only start it again.
+    await office.parts.intake.pollOnce();
+    expect((await tracker.getIssue(issue.key)).status.canonical).toBe("active");
     const moved = (await tracker.events()).events.filter((e) => e.type === "moved");
-    expect(moved.map((e) => e.data["to"])).toEqual(["active", "ready"]);
+    expect(moved.map((e) => e.data["to"])).toEqual(["active"]);
     expect((await tracker.getIssue(issue.key)).assignee?.id).toBe("u-2");
+    expect(await store.listItems({ person: "sam", status: "queued" })).toEqual([]);
   });
 
   it("moves a ticket the agent took back during its round to review on a done hand-back, before the next poll", async () => {

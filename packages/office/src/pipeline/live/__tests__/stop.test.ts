@@ -70,6 +70,7 @@ async function setup(status: CanonicalStatus = "canceled", known = true) {
       tickets: { "ACME-144": { status, assignee: { id: "sam", kind: "agent" } } },
     }),
     ticket: (key: string) => (known && key === "ACME-144" ? ticket : undefined),
+    heard: async () => {},
   };
 
   const opts: LiveOptions = {

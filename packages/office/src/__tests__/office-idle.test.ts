@@ -136,6 +136,56 @@ describe("the idle pull", () => {
     expect((await items()).map((i) => i.subject?.ref)).toEqual([first.key, second.key]);
   });
 
+  it("skips a ticket sam handed back silent, traced once, until someone else acts on it", async () => {
+    const first = await ready("Search page");
+    await ws.rescan();
+    const idle = pull();
+    const silentBack = (by: { kind: string; id: string }, type = "agent.handed_back") =>
+      ws.heard({
+        type,
+        at: clock.now().toISOString(),
+        actor: by,
+        subject: { ticket: first.key },
+        data: { status: "silent" },
+      });
+
+    await silentBack({ kind: "agent", id: "sam" });
+    await idle.check("sam");
+    await idle.sweep();
+    await idle.sweep();
+    expect(await items()).toEqual([]);
+    expect(raised).toHaveLength(1);
+    const traced = await createOfficePipeline({
+      team: teamConfig(),
+      store,
+      workState: ws,
+      scheduler,
+      push: () => false,
+      clock,
+      logger,
+    }).traces.get(raised[0]!.id);
+
+    const run = traced?.policies.find((r) => r.policy === "idle_pulls_next");
+    expect(run?.proposals[0]).toMatchObject({ type: "drop" });
+    expect(JSON.stringify(run?.proposals[0])).toContain(
+      `sam handed back ${first.key} silent at 2030-01-01T08:01:00.000Z, and no one else acted on it since`,
+    );
+
+    // A different ready ticket is still pulled.
+    const second = await ready("Wishlist");
+    await ws.rescan();
+    await idle.sweep();
+    expect((await items()).map((i) => i.subject?.ref)).toEqual([second.key]);
+
+    // A human's comment on the first releases it: pulled once sam is free.
+    const [item] = await items();
+    await scheduler.markActive(item!.id);
+    await scheduler.finish(item!.id, { outcome: "done" });
+    await silentBack({ kind: "human", id: "ada.admin" }, "ticket.commented");
+    await idle.check("sam");
+    expect((await items()).map((i) => i.subject?.ref)).toEqual([second.key, first.key]);
+  });
+
   it("takes the tracker's priority first", async () => {
     await ready("Old");
     const urgent = await ready("Urgent");
