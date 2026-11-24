@@ -17,6 +17,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Do not leave a state undesigned: empty, loading, error, long text, small screens, keyboard and screen readers.
 - Feasibility questions go to the architect or a developer (`ost ask`).
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

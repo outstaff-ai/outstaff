@@ -1,6 +1,7 @@
 import type { Logger } from "@outstaff/core";
 import type {
   ErrorCode,
+  LessonCheck,
   Link,
   Message,
   MessageType,
@@ -129,6 +130,9 @@ export interface OfficeConnection extends OfficeClient {
 
       /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
       toReview?: string[];
+
+      /** Set when a trusted human commented or reviewed in the round: whether a lesson was asked for, and kept. */
+      lesson?: LessonCheck;
 
       /** The round's usage per runtime session, in the latest running totals the runtime reported. */
       usage?: SessionUsageReport[];

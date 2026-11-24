@@ -64,9 +64,21 @@ describe("the office's rounds after a hand-back", () => {
   describe("followUp", () => {
     it("queues one more round, once, for feedback that came after the offer, in the item's chat threads", async () => {
       const first = await item();
-      await addFeedback(store, first.id, { actor: "dana", kind: "review", body: "seen" });
+      await addFeedback(store, first.id, {
+        actor: "dana",
+        from: "human",
+        kind: "review",
+        body: "seen",
+      });
+
       await deliverFeedback(store, first.id);
-      await addFeedback(store, first.id, { actor: "dana", kind: "chat", body: "late" });
+      await addFeedback(store, first.id, {
+        actor: "dana",
+        from: "human",
+        kind: "chat",
+        body: "late",
+      });
+
       await store.addItemRefs(first.id, [
         { type: "ticket", ref: "ACME-1", role: "subject", source: "s" },
       ]);
@@ -104,7 +116,13 @@ describe("the office's rounds after a hand-back", () => {
       await rounds().followUp("nope");
 
       const late = await item({ title: "other" });
-      await addFeedback(store, late.id, { actor: "dana", kind: "chat", body: "late" });
+      await addFeedback(store, late.id, {
+        actor: "dana",
+        from: "human",
+        kind: "chat",
+        body: "late",
+      });
+
       await rounds({ feedback: { follow_up_round: false } }).followUp(late.id);
       expect((await store.listItems({ person: "sam" })).map((i) => i.id).toSorted()).toEqual(
         [quiet.id, late.id].toSorted(),
@@ -113,7 +131,13 @@ describe("the office's rounds after a hand-back", () => {
 
     it("keeps no chat origin for an item without one", async () => {
       const first = await bare();
-      await addFeedback(store, first.id, { actor: "dana", kind: "review", body: "late" });
+      await addFeedback(store, first.id, {
+        actor: "dana",
+        from: "human",
+        kind: "review",
+        body: "late",
+      });
+
       await end(first, "done");
       await rounds().followUp(first.id);
       const next = (await store.listItems({ person: "sam", status: "queued" }))[0]!;

@@ -260,3 +260,62 @@ describe("work source: the status of the item's ticket", () => {
     });
   });
 });
+
+describe("work source: the lesson check of a round a trusted human gave feedback in", () => {
+  let store: Store;
+  let clock: ManualClock;
+
+  beforeEach(async () => {
+    clock = manualClock();
+    store = await openStore("sqlite://:memory:", { now: () => clock.now() });
+  });
+
+  afterEach(async () => {
+    await store.close();
+  });
+
+  it("journals whether the hand-back was refused for a lesson, and what the agent kept", async () => {
+    const scheduler = createScheduler({ store, team, clock });
+    const lessons: unknown[] = [];
+    const source = schedulerWorkSource({
+      scheduler,
+      store,
+      team,
+      onHandedBack: async (_item, result) => void lessons.push(result.lesson),
+    });
+
+    const kept = {
+      noted: { from: ["ada-admin"], refused: true, kept: "noted" as const },
+      nothing: { from: ["ada-admin", "grace-lead"], refused: false, kept: "nothing" as const },
+      unanswered: { from: ["ada-admin"], refused: true, kept: "unanswered" as const },
+    };
+
+    const journals: string[] = [];
+    for (const lesson of [kept.noted, kept.nothing, kept.unanswered, undefined]) {
+      const w = await scheduler.enqueue({
+        person: "sam",
+        kind: "review_feedback",
+        title: "r",
+        trigger: "human",
+      });
+
+      await source.next("sam");
+      await source.handBack("sam", w.id, {
+        summary: "Addressed the review.",
+        links: [],
+        status: "silent",
+        ...(lesson ? { lesson } : {}),
+      });
+
+      journals.push((await store.readJournal(w.id)).map((j) => j.text).join("\n"));
+    }
+
+    expect(lessons).toEqual([kept.noted, kept.nothing, kept.unanswered, undefined]);
+    expect(journals).toEqual([
+      "Addressed the review.\n\nLesson check: feedback from ada-admin, a trusted human; the hand-back was refused once to ask for a lesson; a note changed in the round.",
+      "Addressed the review.\n\nLesson check: feedback from ada-admin, grace-lead, trusted humans; the agent said there was nothing to keep.",
+      "Addressed the review.\n\nLesson check: feedback from ada-admin, a trusted human; the hand-back was refused once to ask for a lesson; no note changed, and the agent did not say there was nothing to keep.",
+      "Addressed the review.",
+    ]);
+  });
+});

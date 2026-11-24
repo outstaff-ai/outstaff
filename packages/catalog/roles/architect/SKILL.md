@@ -19,6 +19,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 {{/if}}
 - Never ticket a whole feature. A new feature gets its plan section first, then the PM places it on the roadmap; only the work that can start now gets tickets.
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

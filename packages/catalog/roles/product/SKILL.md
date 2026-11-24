@@ -15,6 +15,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Scope changes and trade-offs between goals are decisions for a trusted human. Bring options and a recommendation, and wait for the answer (`process/work-items.md`, "When the request can't be done as asked").
 - Do not invent facts about users or the market. Mark assumptions as assumptions and say how to check them.
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

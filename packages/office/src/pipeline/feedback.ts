@@ -6,7 +6,7 @@ import type { PipelineEvent } from "@outstaff/policy";
 function blockedHandBack(event: PipelineEvent): Feedback[] {
   const summary = event.data["summary"];
   return event.data["status"] === "blocked" && typeof summary === "string"
-    ? [{ actor: event.actor.id, kind: "blocked", body: summary, at: event.at }]
+    ? [{ actor: event.actor.id, from: "agent", kind: "blocked", body: summary, at: event.at }]
     : [];
 }
 
@@ -25,6 +25,7 @@ export function feedbackFor(event: PipelineEvent): Feedback[] {
     return [
       {
         actor: event.actor.id,
+        from: "human",
         kind: "chat",
         body: typeof body === "string" ? body : "",
         at: event.at,

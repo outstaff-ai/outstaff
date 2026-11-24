@@ -1,5 +1,5 @@
 import type { Logger, Tracker, TeamConfig, Vcs } from "@outstaff/core";
-import type { Link, SessionUsageReport } from "@outstaff/protocol";
+import type { LessonCheck, Link, SessionUsageReport } from "@outstaff/protocol";
 import type { RosterOptions } from "./messaging/index.js";
 import type { BlockNotice, Scheduler } from "./scheduler/index.js";
 import type { Store, WorkItem } from "./store/types.js";
@@ -28,6 +28,12 @@ export interface HandBackResult {
    * from anyone else on it followed. The hand-back's event carries it, so its trace says why.
    */
   silentAgain?: string | undefined;
+
+  /**
+   * Set when the round's feedback carried a comment or review by a trusted human: whether `ost handback` refused once
+   * because no note changed, and what the agent kept. The journal and the hand-back's event carry it.
+   */
+  lesson?: LessonCheck | undefined;
 
   /** What the round used, per runtime session. */
   usage?: SessionUsageReport[] | undefined;

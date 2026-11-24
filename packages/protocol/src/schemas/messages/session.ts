@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { queuedActSchema } from "#/acts.js";
 import { linkSchema, workItemSchema } from "#/schemas/common.js";
-import { offerContextSchema } from "#/schemas/feedback.js";
+import { lessonCheckSchema, offerContextSchema } from "#/schemas/feedback.js";
 import { itemId, message, text } from "#/schemas/fields.js";
 import { usageWindowSchema } from "#/schemas/team.js";
 import { runUsageReportSchema } from "#/schemas/usage.js";
@@ -146,6 +146,11 @@ export const sessionMessages = [
         .optional()
         .describe(
           "For a done hand-back: what the agent's check found to review or finished, for example a pull request opened or ready for review, a document linked, the ticket closed, or a kind of work that finishes without one. The office takes a done hand-back without it as blocked when it finds nothing to review itself.",
+        ),
+      lesson: lessonCheckSchema
+        .optional()
+        .describe(
+          "Set when the round's feedback carried a comment or review by a trusted human: whether the hand-back was refused once for a lesson, and what the agent kept.",
         ),
       usage: runUsageReportSchema.optional(),
     }),

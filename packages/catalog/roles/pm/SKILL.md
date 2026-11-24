@@ -21,6 +21,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - A trusted human may tell you to change a ticket: assign it, move it, re-parent it or edit it. Do it on that ticket, in the same session, also in chat (`process/direct-requests.md`, "Changing a ticket on request"). Never file a second ticket for the same work instead.
 - Decisions on scope, spend, new technology, access and anything irreversible belong to a trusted human. Bring options and a recommendation, and wait for the answer (`process/work-items.md`, "When the request can't be done as asked").
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

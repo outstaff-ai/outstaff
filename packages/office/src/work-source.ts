@@ -6,6 +6,7 @@ import type { WorkSource } from "./protocol/source.types.js";
 import type { Scheduler } from "./scheduler/index.js";
 import type { WorkItem } from "./store/types.js";
 import { checkedResult } from "./hand-back-checks.js";
+import { lessonLine } from "./lesson-line.js";
 import { workMoves } from "./work-moves.js";
 import { reconciler } from "./work-reconcile.js";
 import { workStatus } from "./work-status.js";
@@ -27,7 +28,10 @@ interface OfferState {
 /** The journal entry of a hand-back: the agent's summary and the links it gave. */
 function handBackNote(result: HandBackResult): string {
   const links = result.links.map((l) => `- ${l.title ? `${l.title}: ` : ""}${l.url}`);
-  return [result.summary, ...(links.length > 0 ? ["", "Links:", ...links] : [])].join("\n");
+  const lesson = result.lesson ? ["", lessonLine(result.lesson)] : [];
+  return [result.summary, ...(links.length > 0 ? ["", "Links:", ...links] : []), ...lesson].join(
+    "\n",
+  );
 }
 
 /** Ends the run the way the agent handed it back. */

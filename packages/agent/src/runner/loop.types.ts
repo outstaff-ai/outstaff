@@ -1,4 +1,5 @@
 import type { Logger, Policy, Runtime, TeamConfig, ToolKind } from "@outstaff/core";
+import type { LessonCheck } from "@outstaff/protocol";
 import type { NotesReader } from "#/notes/types.js";
 import type { OfficeConnection } from "#/office-client/index.js";
 import type { ClonedRepo, Workspaces } from "#/repos/index.js";
@@ -110,4 +111,7 @@ export interface ItemEnv {
 
   /** The message for the human the agent gave with that hand-back; undefined when it gave none. */
   message(): string | undefined;
+
+  /** The round's lesson check, for the hand-back; undefined when no trusted human commented or reviewed. */
+  lesson(): LessonCheck | undefined;
 }

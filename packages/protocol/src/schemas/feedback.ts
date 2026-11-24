@@ -19,6 +19,11 @@ export const feedbackSchema = z.strictObject({
     .string()
     .min(1)
     .describe("Login of the person who gave the feedback; for a blocked hand-back, the agent."),
+  from: z
+    .enum(["human", "agent", "automation"])
+    .describe(
+      "Who gave it, as the office's trust model sees them: a trusted human (the office acts on no one else's words), an agent, or automation (a bot, or the code host's checks).",
+    ),
   kind: z
     .enum([
       "review",
@@ -54,6 +59,22 @@ export const feedbackSchema = z.strictObject({
     .array(inlineCommentSchema)
     .optional()
     .describe("For a review: its inline comments, oldest first."),
+});
+
+export const lessonCheckSchema = z.strictObject({
+  from: z
+    .array(z.string().min(1).max(200))
+    .min(1)
+    .max(50)
+    .describe("The trusted humans whose comments or reviews the round's feedback carried."),
+  refused: z
+    .boolean()
+    .describe("Whether `ost handback` refused once because no note had changed in the round."),
+  kept: z
+    .enum(["noted", "nothing", "unanswered"])
+    .describe(
+      "What the agent did about it: changed a note in the round, said there was nothing to keep (`--nothing-to-keep`), or neither.",
+    ),
 });
 
 export const conversationEntrySchema = z.strictObject({

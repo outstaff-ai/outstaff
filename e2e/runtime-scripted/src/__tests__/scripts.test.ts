@@ -165,6 +165,48 @@ describe("assigned, on a ticket that says to hold", () => {
   });
 });
 
+describe("assigned, on a ticket that needs access", () => {
+  const shown =
+    "SHOP-1 Orders dashboard\nStatus: In Progress (active)\nneeds access: platform repository";
+
+  it("blocks, asking a human for the access, without a note about it", async () => {
+    const { seen, text } = await play(assigned(ctx), () => shown);
+    expect(seen.slice(1)).toEqual([
+      { type: "tool", tool: "ticket_move", input: { key: "SHOP-1", to: "blocked" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Blocked: I need access to the platform repository." },
+      },
+    ]);
+
+    expect(text).toBe("Stopped: I need access to the platform repository.");
+  });
+
+  it("acts on the note it was taught instead: says what the work needs and goes on", async () => {
+    const note = "You won't get access to the platform repository: say what the dashboard needs.";
+    const seen: Action[] = [];
+    const answer = (a: Action) => (seen.push(a), isTool(a, "ticket_show") ? shown : "");
+    // The work goes on past the access question: it is stopped at the sandbox check here.
+    const onToWork = (a: Action) => isShell(a, "CI=1 pnpm --version") && "went on to the work";
+    await expect(
+      play(assigned({ ...ctx, notes: { list: [note] } }), answer, onToWork),
+    ).rejects.toThrow("went on to the work");
+
+    expect(seen).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: {
+          key: "SHOP-1",
+          body: `Per my notes, I won't ask for access to the platform repository: ${note} What this needs from the platform: a namespace for SHOP-1.`,
+        },
+      },
+    ]);
+  });
+});
+
 describe("assigned, continued from chat to check something", () => {
   it("answers the check on the ticket and moves it to review, opening nothing", async () => {
     const asked = "Closed your PR and handled the access. Can you check if you have access now?";
@@ -1185,6 +1227,65 @@ describe("reviewFeedback follows the repository's own commit rules", () => {
   });
 });
 
+describe("reviewFeedback keeps a reviewer's standing constraint", () => {
+  const taught =
+    "You won't get access to the platform repository: the platform is mine. Say what the dashboard needs and I add it.";
+
+  const round = (body: string) =>
+    play(
+      reviewFeedback({
+        ...ctx,
+        kind: "review_feedback",
+        pr: 1,
+        feedback: [{ kind: "review", body, threads: [] }],
+      }),
+      answerBy(
+        [
+          [(a) => a.type === "read", "hello\nworld\n"],
+          [(a) => isShell(a, "git rev-parse --abbrev-ref HEAD"), "assigned/w1-add-a-greeting"],
+          [
+            (a) => shellStarts(a, "git log"),
+            "origin/assigned/w1-add-a-greeting|SHOP-1: Add a greeting",
+          ],
+          [(a) => isTool(a, "pr_threads"), ""],
+        ],
+        "abc123",
+      ),
+      // The first hand-back is refused for the lesson, as `ost handback` does when no note changed.
+      (() => {
+        let refused = false;
+        return (a: Action) => {
+          if (!isTool(a, "handback") || refused) {
+            return false;
+          }
+
+          refused = true;
+          return "Not handed back yet: ... hand back again with --nothing-to-keep.";
+        };
+      })(),
+    );
+
+  const after = (seen: Action[]) =>
+    seen
+      .slice(seen.findIndex((a) => isTool(a, "handback")))
+      .map((a) => a.type === "tool" && a.tool);
+
+  it("hands back, is asked for the lesson, notes it and hands back again", async () => {
+    const { seen } = await round(taught);
+    expect(after(seen)).toEqual(["handback", "note_add", "handback"]);
+    expect(seen.find((a) => isTool(a, "note_add"))).toEqual({
+      type: "tool",
+      tool: "note_add",
+      input: { text: taught },
+    });
+  });
+
+  it("states no hand-back for an ordinary review", async () => {
+    const { seen } = await round("Also keep the greeting on one line.");
+    expect(seen.some((a) => isTool(a, "handback") || isTool(a, "note_add"))).toBe(false);
+  });
+});
+
 describe("reviewFeedback files the follow-up a review asks for", () => {
   const round = (body: string) =>
     play(
@@ -1353,6 +1454,41 @@ describe("ticket comment", () => {
   it("answers a mention and finishes silently", async () => {
     const { seen } = await comment("asked", "@sam Mobile too?");
     expect(seen.at(-1)).toEqual({ type: "tool", tool: "handback", input: { status: "silent" } });
+  });
+
+  it("hands back again saying there is nothing to keep when the hand-back is refused for a lesson", async () => {
+    const { seen } = await play(
+      ticketComment({
+        ...ctx,
+        kind: "ticket_comment",
+        feedback: [{ kind: "ticket_comment", body: "Thanks!", threads: [] }],
+      }),
+      () => "",
+      (a) =>
+        a.type === "tool" &&
+        a.tool === "handback" &&
+        !a.input["nothingToKeep"] &&
+        "Not handed back yet: ... hand back again with --nothing-to-keep.",
+    );
+
+    expect(seen).toEqual([
+      { type: "tool", tool: "handback", input: { status: "silent" } },
+      { type: "tool", tool: "handback", input: { status: "silent", nothingToKeep: true } },
+    ]);
+  });
+
+  it("fails on any other refusal of the hand-back", async () => {
+    await expect(
+      play(
+        ticketComment({
+          ...ctx,
+          kind: "ticket_comment",
+          feedback: [{ kind: "ticket_comment", body: "Thanks!", threads: [] }],
+        }),
+        () => "",
+        (a) => isTool(a, "handback") && "Only a work item hands back.",
+      ),
+    ).rejects.toThrow(/Only a work item/);
   });
 
   it("asks for a decision and says it is done, with nothing to review", async () => {

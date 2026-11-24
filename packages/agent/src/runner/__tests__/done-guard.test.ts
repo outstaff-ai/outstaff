@@ -30,6 +30,7 @@ const itemOf = (did: Did): ItemEnv => ({
   produced: () => did.produced ?? [],
   declared: () => did.declared,
   message: () => undefined,
+  lesson: () => undefined,
 });
 
 const runOf = (o: Offer, item: ItemEnv): ItemRun => ({

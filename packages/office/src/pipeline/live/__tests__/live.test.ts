@@ -281,7 +281,10 @@ describe("createLivePipeline", () => {
 });
 
 describe("enqueueWake", () => {
-  const feedback = [{ actor: "ada-admin", kind: "comment" as const, body: "Rename it." }];
+  const feedback = [
+    { actor: "ada-admin", from: "human" as const, kind: "comment" as const, body: "Rename it." },
+  ];
+
   const prWake = {
     type: "wake" as const,
     policy: "review_to_author",

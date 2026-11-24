@@ -10,6 +10,9 @@ import { join } from "node:path";
 import type { WorkLoopOptions, ItemEnv } from "./loop.types.js";
 import { reason } from "./reason.js";
 import { producedTracker } from "./item-produced.js";
+import { createLessons } from "#/notes/lesson.js";
+import type { Lessons } from "#/notes/types.js";
+import type { NotesReport, OfficeClient } from "#/verbs/office.types.js";
 
 /** The files of the chat message the item came from, saved under `dir`; none when it has none or there is no chat. */
 async function chatAttachments(
@@ -78,6 +81,20 @@ const roundOf = ({ workItem: { kind, trigger, ticketStatus, origin } }: Offer): 
   ...(ticketStatus && !origin ? { ticketStatus } : {}),
 });
 
+/** The `ost note` changes that answer the lesson check. */
+const NOTE_CHANGES = new Set(["added", "updated", "removed"]);
+
+/** The office's `notes_changed`, which also tells the round's lesson check that a note changed. */
+const answersLessons =
+  (office: OfficeClient, lessons: Lessons) =>
+  async (report: NotesReport): Promise<void> => {
+    if (NOTE_CHANGES.has(report.change)) {
+      lessons.noted();
+    }
+
+    await office.notesChanged(report);
+  };
+
 /**
  * The verbs' environment for one item. It notes the tickets the agent moves, whether it asked a question that is
  * still open, and whether a chat session filed its request as work.
@@ -136,10 +153,13 @@ export function itemEnv(
   const vcs = opts.env.vcs ? { vcs: made.vcs(opts.env.vcs) } : {};
   // The hand-back the agent states with `ost handback`; the last one counts.
   let declared: { status: DeclaredHandBack; message?: string | undefined } | undefined;
+  // A note changed through the office's `notes_changed` report answers the lesson check.
+  const lessons = createLessons(offer.context.feedback);
   const handBack = {
     handBack: {
       kind: offer.workItem.kind,
       declare: (status: DeclaredHandBack, message?: string) => (declared = { status, message }),
+      lessons,
     },
     round: roundOf(offer),
   };
@@ -160,6 +180,7 @@ export function itemEnv(
         office: {
           ...base,
           docLink: made.docLink(base),
+          notesChanged: answersLessons(base, lessons),
           async ask(q) {
             const r = await base.ask(q);
             asked ||= r.status === "pending";
@@ -199,5 +220,6 @@ export function itemEnv(
     produced: made.produced,
     declared: () => declared?.status,
     message: () => declared?.message,
+    lesson: () => lessons.outcome(),
   };
 }
