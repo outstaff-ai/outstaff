@@ -94,4 +94,58 @@ describe("coalesceWakes", () => {
 
     expect(runs.map((r) => r.events)).toEqual([["a", "b"], ["c"]]);
   });
+
+  it("makes an assignment and a mention on one ticket one assigned run, whichever came first", () => {
+    const onTicket = (id: string, time: string, kind: string, instruction: string) => {
+      const w = wake(id, time, { kind, instruction, policy: `${kind}_policy` });
+      return { ...w, wake: { ...w.wake, subject: { type: "ticket" as const, ref: "ACME-1" } } };
+    };
+
+    const assigned = (time: string) =>
+      onTicket("assign", time, "assigned", "ACME-1 is assigned to you.");
+
+    const asked = (time: string) =>
+      onTicket("mention", time, "asked", "priya mentioned you: open no pull request.");
+
+    const comment = (time: string) =>
+      onTicket("comment", time, "ticket_comment", "ada.admin commented.");
+
+    for (const [first, second, tookOver] of [
+      [asked("00:00"), assigned("00:01"), "asked"],
+      [assigned("00:00"), asked("00:01"), undefined],
+    ] as const) {
+      const [run, ...rest] = coalesceWakes([first, second]);
+      expect(rest).toEqual([]);
+      expect(run).toMatchObject({
+        kind: "assigned",
+        instructions: ["ACME-1 is assigned to you."],
+        feedback: [first.eventId, second.eventId].map((body) => ({ body })),
+        events: [first.eventId, second.eventId],
+      });
+
+      expect(run!.tookOver).toBe(tookOver);
+    }
+
+    // A second talk wake after the assignment won adds its feedback only; two of them keep both instructions.
+    const [won] = coalesceWakes([asked("00:00"), assigned("00:01"), comment("00:02")]);
+    expect(won).toMatchObject({ kind: "assigned", tookOver: "asked" });
+    expect(won!.instructions).toEqual(["ACME-1 is assigned to you."]);
+    const [talk] = coalesceWakes([asked("00:00"), comment("00:01")]);
+    expect(talk).toMatchObject({
+      kind: "asked",
+      instructions: expect.arrayContaining(["ada.admin commented."]),
+    });
+
+    expect(talk!.tookOver).toBeUndefined();
+
+    // Any other round on the ticket, the PM's sweep of the board, keeps its instruction: it carries the stale list.
+    const sweep = onTicket("sweep", "00:00", "reconcile", "The board's stale tickets: ACME-1.");
+    const [both] = coalesceWakes([sweep, assigned("00:01")]);
+    expect(both).toMatchObject({
+      kind: "reconcile",
+      instructions: ["The board's stale tickets: ACME-1.", "ACME-1 is assigned to you."],
+    });
+
+    expect(both!.tookOver).toBeUndefined();
+  });
 });

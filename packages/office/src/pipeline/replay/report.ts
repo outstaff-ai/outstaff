@@ -54,8 +54,9 @@ export function renderReplayReport(result: ReplayResult): string {
   );
 
   for (const c of folded) {
+    const won = c.tookOver ? `; the ${c.kind} wake won over ${c.tookOver}` : "";
     out.push(
-      `- ${c.person}, ${c.kind} on ${c.subject}: ${c.events.length} events (${c.events.join(", ")})`,
+      `- ${c.person}, ${c.kind} on ${c.subject}: ${c.events.length} events (${c.events.join(", ")})${won}`,
     );
   }
 

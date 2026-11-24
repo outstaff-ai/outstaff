@@ -15,8 +15,11 @@ export interface CoalescedWake {
   person: string;
   subject: WakeSubject;
 
-  /** The first wake's kind: one run has one kind. */
+  /** The first wake's kind, unless a later one won over it: one run has one kind. */
   kind: string;
+
+  /** The kind the run had before a wake that gives the agent the ticket to work on won over it. */
+  tookOver?: string;
 
   /** Each distinct instruction, in the order the wakes came. */
   instructions: string[];

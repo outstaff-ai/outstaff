@@ -1,4 +1,4 @@
-import { MERGE_KIND } from "#/scheduler/policy.js";
+import { MERGE_KIND, outranks } from "#/scheduler/policy.js";
 import type { CoalescedWake, PendingWake } from "./coalesce.types.js";
 
 /**
@@ -17,9 +17,30 @@ const keyOf = (w: PendingWake) => coalesceKey(w.wake.person, w.wake.subject, w.w
 const addNew = <T>(list: T[], item: T) => (list.includes(item) ? list : [...list, item]);
 
 /**
- * Folds wakes for the same person and subject into one run (a merge only with a merge), as the scheduler does: a wake with a window joins the run of
- * the first, while that one's window (`coalesceMs`) is open. A batch of review comments, or quick follow-ups. Oldest
- * first by event time; a wake with no window, a chat message's, folds into nothing and opens none.
+ * Adds a wake to the run it folds into. A wake that gives the agent the ticket to work on wins over the run's kind
+ * (`outranks`): the run takes its kind and its instruction alone, and the others' feedback; a wake the run's kind wins
+ * over brings its feedback only. Otherwise the run gains its instruction too.
+ */
+function fold(group: CoalescedWake, p: PendingWake): void {
+  const { wake } = p;
+  if (outranks(wake.kind, group.kind)) {
+    group.tookOver = group.kind;
+    group.kind = wake.kind;
+    group.instructions = [wake.instruction];
+  } else if (!outranks(group.kind, wake.kind)) {
+    group.instructions = addNew(group.instructions, wake.instruction);
+  }
+
+  group.feedback = [...group.feedback, ...wake.feedback];
+  group.policies = addNew(group.policies, wake.policy);
+  group.events = [...group.events, p.eventId];
+}
+
+/**
+ * Folds wakes for the same person and subject into one run (a merge only with a merge), as the scheduler does: a wake
+ * with a window joins the run of the first, while that one's window (`coalesceMs`) is open. A batch of review comments,
+ * or quick follow-ups. Oldest first by event time; a wake with no window, a chat message's, folds into nothing and opens
+ * none. Which wake wins the run's kind is `fold`'s.
  */
 export function coalesceWakes(pending: readonly PendingWake[]): CoalescedWake[] {
   const out: CoalescedWake[] = [];
@@ -28,11 +49,7 @@ export function coalesceWakes(pending: readonly PendingWake[]): CoalescedWake[] 
     const key = keyOf(p);
     const window = open.get(key);
     if (window && p.wake.coalesceMs > 0 && Date.parse(p.at) < window.until) {
-      const { group } = window;
-      group.instructions = addNew(group.instructions, p.wake.instruction);
-      group.feedback = [...group.feedback, ...p.wake.feedback];
-      group.policies = addNew(group.policies, p.wake.policy);
-      group.events = [...group.events, p.eventId];
+      fold(window.group, p);
       continue;
     }
 

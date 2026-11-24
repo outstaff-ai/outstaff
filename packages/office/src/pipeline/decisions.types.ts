@@ -33,6 +33,12 @@ export interface Wake {
    * or joining work of the same kind: every event of that item so far, this one last.
    */
   folded?: string[] | undefined;
+
+  /**
+   * Set when the wake won over the held item an earlier wake queued, as a wake that gives the agent the ticket to work
+   * on wins over a mention or a comment on it: that item's id. It was canceled into `itemId`, with its feedback.
+   */
+  tookOver?: string | undefined;
 }
 
 /**

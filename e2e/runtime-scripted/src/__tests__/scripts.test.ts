@@ -128,6 +128,36 @@ describe("assigned, on a ticket that says it is blocked", () => {
     expect(resumed.text).toBe("Resumed: friendly. The decision is .");
   });
 
+  it("goes on to the ticket's pull request with the answer, when the ticket says so", async () => {
+    const shown =
+      "SHOP-1 Backups\nStatus: In Progress (active)\nblocked: three answers\nresume: pull request";
+
+    const resumed = await play(
+      assigned({ ...ctx, unblocked: "eu-west-1" }),
+      answerBy(
+        [
+          [(a) => isTool(a, "ticket_show"), shown],
+          [(a) => a.type === "read", "hello\nworld\n"],
+          [(a) => isShell(a, "CI=1 pnpm --version"), "12.9.1\n"],
+          [(a) => isTool(a, "pr_open"), "Opened https://git.example/acme/shop/pull/7"],
+        ],
+        "",
+      ),
+    );
+
+    expect(resumed.seen.slice(0, 2)).toEqual([
+      { type: "tool", tool: "ticket_show", input: { key: "SHOP-1" } },
+      {
+        type: "tool",
+        tool: "ticket_comment",
+        input: { key: "SHOP-1", body: "Resumed with: eu-west-1" },
+      },
+    ]);
+
+    expect(resumed.seen.some((a) => isTool(a, "pr_open"))).toBe(true);
+    expect(resumed.seen.some((a) => isTool(a, "doc_create"))).toBe(false);
+  });
+
   it("asks a human on the ticket and stops, with nothing to review", async () => {
     const shown = "SHOP-1 Tone\nStatus: In Progress (active)\nask human: Which tone, Ada?";
     const asked = await play(assigned(ctx), () => shown);
@@ -234,6 +264,12 @@ describe("unblock", () => {
     ]);
 
     expect(done.text).toBe("Unblocked SHOP-1: friendly. Gave it back to sam.");
+
+    const mentioning = await play(unblock(pm), () => `${shown}\npm mentions: yes`);
+    expect(tools(mentioning.seen)[1]).toEqual([
+      "ticket_comment",
+      { key: "SHOP-1", body: "@sam Unblocked: friendly" },
+    ]);
   });
 
   it("gives the ticket to the requester, saying what is needed, when it cannot answer", async () => {

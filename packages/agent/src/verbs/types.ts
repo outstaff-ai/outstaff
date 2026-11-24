@@ -51,10 +51,10 @@ export interface HandBackTarget {
 }
 
 /**
- * The work item a run is on: what kind of work it is, who started it (for a mention, who mentioned), and the status of
- * its ticket when it was offered.
+ * The work item a run is on: what kind of work it is, who started it (for a mention, who mentioned), the status of its
+ * ticket when it was offered, and whether that ticket was assigned to the agent then.
  */
-export type Round = Pick<OfferedWorkItem, "kind" | "trigger" | "ticketStatus">;
+export type Round = Pick<OfferedWorkItem, "kind" | "trigger" | "ticketStatus" | "assignedToYou">;
 
 /** Everything a verb touches: who is acting, the team, and the ports built from its config. */
 export interface AgentEnv {

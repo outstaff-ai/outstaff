@@ -153,7 +153,7 @@ describe("formatTrace", () => {
     );
   });
 
-  it("names the item each wake queued, or was folded into with that item's events", () => {
+  it("names the item each wake queued, took over, or was folded into with that item's events", () => {
     const wake = {
       type: "wake" as const,
       policy: "chat_to_addressed",
@@ -173,6 +173,7 @@ describe("formatTrace", () => {
         wake,
         { ...wake, itemId: "w-1" },
         { ...wake, itemId: "w-1", folded: ["chat:sam:D-1:1", "chat:sam:D-1:3"] },
+        { ...wake, itemId: "w-2", folded: ["chat:sam:D-1:1", "chat:sam:D-1:3"], tookOver: "w-1" },
       ],
     };
 
@@ -185,6 +186,9 @@ describe("formatTrace", () => {
       "  wake sam (chat) on chat D-1",
       "    instruction: Answer.",
       "    folded into work item w-1, with the events chat:sam:D-1:1, chat:sam:D-1:3",
+      "  wake sam (chat) on chat D-1",
+      "    instruction: Answer.",
+      "    queued work item w-2, which won over work item w-1 and took it over, with the events chat:sam:D-1:1, chat:sam:D-1:3",
     ]);
   });
 

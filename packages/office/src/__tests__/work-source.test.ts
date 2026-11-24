@@ -230,12 +230,24 @@ describe("work source: the status of the item's ticket", () => {
     await store.close();
   });
 
-  it("offers the ticket's status as the work state last saw it, and none when it knows none", async () => {
+  it("offers the ticket's status and whether it is the agent's, as the work state last saw it, and none when it knows none", async () => {
     const scheduler = createScheduler({ store, team, clock });
     const source = schedulerWorkSource({ scheduler, store, team });
     await store.upsertSubject("ticket", "ACME-1", { key: "ACME-1", status: "backlog" });
     await store.upsertSubject("ticket", "ACME-2", { key: "ACME-2" });
-    for (const ref of ["ACME-1", "ACME-2"]) {
+    await store.upsertSubject("ticket", "ACME-3", {
+      key: "ACME-3",
+      status: "active",
+      assignee: { kind: "agent", id: "sam" },
+    });
+
+    await store.upsertSubject("ticket", "ACME-4", {
+      key: "ACME-4",
+      status: "blocked",
+      assignee: { kind: "agent", id: "priya" },
+    });
+
+    for (const ref of ["ACME-1", "ACME-2", "ACME-3", "ACME-4"]) {
       await scheduler.enqueue({
         person: "sam",
         kind: "ticket_comment",
@@ -256,7 +268,13 @@ describe("work source: the status of the item's ticket", () => {
     expect(Object.fromEntries(offered.map((w) => [w.title, w.ticketStatus]))).toEqual({
       "ACME-1": "backlog",
       "ACME-2": undefined,
+      "ACME-3": "active",
+      "ACME-4": "blocked",
       Hi: undefined,
     });
+
+    // Whether the ticket is the agent's own: only ACME-3 is assigned to sam.
+    expect(offered.filter((w) => w.assignedToYou).map((w) => w.title)).toEqual(["ACME-3"]);
+    expect(offered.find((w) => w.title === "ACME-3")).toMatchObject({ assignedToYou: true });
   });
 });

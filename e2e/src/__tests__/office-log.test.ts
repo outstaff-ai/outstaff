@@ -30,6 +30,18 @@ describe("wakesIn", () => {
     expect(wakesIn(log, "pia")).toEqual(["unblock"]);
   });
 
+  it("counts a wake that took over a held item as the one round, in place of the held one", () => {
+    const log = [
+      line("queued", "w1", "sam", "asked"),
+      line("queued", "w2", "sam", "assigned").replace(
+        "(assigned)",
+        "(assigned), taking over work item w1",
+      ),
+    ].join("\n");
+
+    expect(wakesIn(log, "sam")).toEqual(["assigned"]);
+  });
+
   it("counts a fold into an item it has not seen queued as that item's round", () => {
     expect(wakesIn(line("folded the wake into", "w9", "sam", "chat"), "sam")).toEqual(["chat"]);
   });

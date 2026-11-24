@@ -114,13 +114,17 @@ function aggregationLines(entries: Trace["aggregation"] = []): string[] {
   ];
 }
 
-/** A wake's instruction, and the item it queued or was folded into, with that item's events. */
+/** A wake's instruction, and the item it queued, took over or was folded into, with that item's events. */
 function wakeLines(d: Extract<Decision, { type: "wake" }>): string[] {
-  const item = d.folded
-    ? [`    folded into work item ${d.itemId}, with the events ${d.folded.join(", ")}`]
-    : d.itemId
-      ? [`    queued work item ${d.itemId}`]
-      : [];
+  const item = d.tookOver
+    ? [
+        `    queued work item ${d.itemId}, which won over work item ${d.tookOver} and took it over, with the events ${d.folded!.join(", ")}`,
+      ]
+    : d.folded
+      ? [`    folded into work item ${d.itemId}, with the events ${d.folded.join(", ")}`]
+      : d.itemId
+        ? [`    queued work item ${d.itemId}`]
+        : [];
 
   return [`    instruction: ${d.instruction}`, ...item];
 }

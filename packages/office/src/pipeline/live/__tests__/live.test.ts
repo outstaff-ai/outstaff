@@ -226,6 +226,47 @@ describe("createLivePipeline", () => {
     expect(pulled?.decisions).toMatchObject([{ type: "wake", itemId: items[0]!.id }]);
   });
 
+  it("traces and logs an assignment that won over a held mention", async () => {
+    const lines: string[] = [];
+    const { opts, store: s } = await setup({
+      logger: { ...silentLogger, info: (m) => void lines.push(m) },
+    });
+
+    const clock = manualClock("2026-10-05T09:00:00.000Z");
+    const scheduler = createScheduler({ store: s, team: opts.team, clock });
+    const live = createLivePipeline({ ...opts, scheduler, clock });
+    const mention = {
+      ...assigned,
+      type: "ticket.commented" as const,
+      data: { body: "@sam the answers are in.", mentions: ["sam"] },
+    };
+
+    const asked = await live.handle(mention, { source: "tracker", externalId: "c-1" });
+    const won = await live.handle(assigned, { source: "tracker", externalId: "e-1" });
+    const [canceled, item] = await s.listItems({ person: "sam" });
+    expect([canceled?.kind, canceled?.status, item?.kind, item?.status]).toEqual([
+      "asked",
+      "canceled",
+      "assigned",
+      "queued",
+    ]);
+
+    expect(asked?.decisions).toMatchObject([{ type: "wake", kind: "asked", itemId: canceled!.id }]);
+    expect(won?.decisions).toMatchObject([
+      {
+        type: "wake",
+        kind: "assigned",
+        itemId: item!.id,
+        tookOver: canceled!.id,
+        folded: ["tracker:c-1", "tracker:e-1"],
+      },
+    ]);
+
+    expect(lines).toContain(
+      `pipeline: queued work item ${item!.id} for sam (assigned), taking over work item ${canceled!.id}`,
+    );
+  });
+
   it("has the agent mark its ticket active when its work starts", async () => {
     const { opts, acts } = await setup();
     const live = createLivePipeline(opts);
@@ -383,4 +424,67 @@ describe("enqueueWake", () => {
       "Fix the checks.",
     ]);
   });
+
+  const toWork = {
+    ...prWake,
+    policy: "assigned_to_assignee",
+    kind: "assigned",
+    instruction: "ACME-1 is assigned to you.",
+    feedback: [],
+    subject: { type: "ticket" as const, ref: "ACME-1" },
+  };
+
+  const mention = {
+    ...toWork,
+    policy: "ticket_comment_to_mentioned_agent",
+    kind: "asked",
+    instruction: "priya mentioned you: open no pull request.",
+    feedback: [{ actor: "priya", kind: "comment" as const, body: "@sam the answers." }],
+  };
+
+  const onTicket = (id: string, seconds: number) => ({
+    id,
+    type: "ticket.commented" as const,
+    at: `2026-10-05T09:00:${String(seconds).padStart(2, "0")}.000Z`,
+    subject: { ticket: "ACME-1" },
+    actor: { kind: "agent" as const, id: "priya" },
+    data: {},
+  });
+
+  it.each([
+    ["the mention", [mention, toWork], "e-2", "asked"],
+    ["the assignment", [toWork, mention], "e-1", undefined],
+  ] as const)(
+    "makes an assignment and a mention on one ticket one assigned item, with the mention as feedback, when %s came first",
+    async (_, [a, b], reason, canceled) => {
+      const { opts, store: s } = await setup();
+      const clock = manualClock("2026-10-05T09:00:00.000Z");
+      const live = { ...opts, scheduler: createScheduler({ store: s, team: opts.team, clock }) };
+      const first = await enqueueWake(a, onTicket("e-1", 0), live);
+      const second = await enqueueWake(b, onTicket("e-2", 20), live);
+      const [item, ...others] = await s.listItems({ person: "sam", status: "queued" });
+      expect(others).toEqual([]);
+      expect(item).toMatchObject({
+        kind: "assigned",
+        title: "assigned: ACME-1 Search page",
+        notBefore: "2026-10-05T09:01:00.000Z",
+      });
+
+      expect((await s.readJournal(item!.id)).map((j) => j.text)).toEqual([
+        "ACME-1 is assigned to you.",
+      ]);
+
+      expect(await readFeedback(s, item!.id)).toEqual(mention.feedback);
+      expect((await s.getSubject(ITEM_EVENTS_SUBJECT, item!.id))?.data).toEqual(["e-1", "e-2"]);
+      expect((await s.getSubject(WAKE_SUBJECT, item!.id))?.data).toEqual({
+        event: reason,
+        policy: "assigned_to_assignee",
+      });
+
+      expect(second).toMatchObject({ itemId: item!.id, folded: ["e-1", "e-2"] });
+      expect(second.tookOver).toBe(canceled && first.itemId);
+      expect((await s.getItem(first.itemId))?.kind).toBe(canceled ?? "assigned");
+      expect((await s.listItemRefs(item!.id)).map((r) => r.ref)).toContain("ACME-1");
+    },
+  );
 });

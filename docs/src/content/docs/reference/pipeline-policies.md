@@ -309,7 +309,7 @@ Instruction:
 
 ### ticket_comment_to_mentioned_agent
 
-A comment on a ticket, by a human or another agent, wakes the agent it mentions first, to answer or act on it; the ticket stays with its assignee. A human's mention wakes it on a closed ticket too; an agent's comment on a closed ticket, or one that mentions no other agent, wakes no one.
+A comment on a ticket, by a human or another agent, wakes the agent it mentions first, to answer or act on it; the ticket stays with its assignee. A human's mention wakes it on a closed ticket too; an agent's comment on a closed ticket, or one that mentions no other agent, wakes no one. A teammate's mention starts no new work, unless the mentioned agent is the ticket's assignee: the ticket is theirs to work on.
 
 Listens to `ticket.commented`. Decides: wake `mentioned` (kind `asked`).
 

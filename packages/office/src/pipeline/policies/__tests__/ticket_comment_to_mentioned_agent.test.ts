@@ -44,6 +44,36 @@ describe("ticket_comment_to_mentioned_agent", () => {
     }
   });
 
+  it("a mention of the ticket's assignee leaves out a teammate's limits: the ticket is theirs to work on", () => {
+    const limit = "A teammate's mention starts no new work";
+    const toPm: World = { tickets: { "ACME-1": t("blocked", "mira") } };
+    const [toAssignee] = traceOf(comment(SAM, { mentions: ["mira"] }), toPm).decisions;
+    expect(toAssignee).toMatchObject({ type: "wake", person: "mira", kind: "asked" });
+    expect(toAssignee).toMatchObject({
+      instruction: expect.stringContaining(
+        "If something is, answer it, or do what it asks, on the ticket, once. If nothing is, end the round silently",
+      ),
+    });
+
+    expect(JSON.stringify(toAssignee)).not.toContain(limit);
+
+    // A mention of an agent that is not the assignee keeps the limits, as does a human assignee who shares its name.
+    const human: World = {
+      tickets: { "ACME-1": t("blocked", undefined, { assignee: { id: "mira", kind: "human" } }) },
+    };
+
+    for (const [mentioned, world] of [
+      ["leo", toPm],
+      ["mira", human],
+    ] as const) {
+      const [other] = traceOf(comment(SAM, { mentions: [mentioned] }), world).decisions;
+      expect(other).toMatchObject({
+        person: mentioned,
+        instruction: expect.stringContaining(limit),
+      });
+    }
+  });
+
   it("an agent's comment that mentions no other agent wakes no one", () => {
     expect(judge(ID, comment(SAM), world)).toEqual({ failed: { agent_mentioned: true } });
     expect(wakes(comment(SAM), world)).toEqual([]);

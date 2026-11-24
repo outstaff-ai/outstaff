@@ -52,6 +52,15 @@ export interface ReplayRow {
 export interface ReplayResult {
   scenarios: { title: string; rows: ReplayRow[] }[];
 
-  /** Every wake the pipeline decided, folded as the scheduler would. */
-  coalesced: { person: string; subject: string; kind: string; events: string[] }[];
+  /**
+   * Every wake the pipeline decided, folded as the scheduler would; `tookOver` is the kind a wake that gives the agent
+   * the ticket to work on won over.
+   */
+  coalesced: {
+    person: string;
+    subject: string;
+    kind: string;
+    tookOver?: string;
+    events: string[];
+  }[];
 }

@@ -88,7 +88,7 @@ export const workItemSchema = z.strictObject({
   trigger: z
     .enum(["human", "agent", "automation", "schedule"])
     .describe(
-      "Who started the item: for a mention (`asked`), who mentioned. A question, an unblock and an agent's mention are started by another agent: their round starts no new work.",
+      "Who started the item: for a mention (`asked`), who mentioned. A question, an unblock and an agent's mention are started by another agent: their round starts no new work. A question's or a mention's round, or the PM's sweep of the board, may still open a pull request for a ticket assigned to the agent (`assignedToYou`); an unblock's may not.",
     ),
   parentId: z.string().optional().describe("The item this one was split from, for questions."),
   subject: z.strictObject({ type: z.string(), ref: z.string() }).optional(),
@@ -97,6 +97,12 @@ export const workItemSchema = z.strictObject({
     .optional()
     .describe(
       "Canonical status of the ticket the item is about, as the office knew it when it offered the item, for example backlog or ready. A round on a ticket in backlog starts no new work.",
+    ),
+  assignedToYou: z
+    .literal(true)
+    .optional()
+    .describe(
+      "Set when the ticket the item is about is assigned to the agent the item is for, as the office knew it when it offered the item: the ticket is the agent's to work on, whatever started the round.",
     ),
   origin: chatOriginSchema
     .optional()
