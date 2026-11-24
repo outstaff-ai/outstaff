@@ -1,13 +1,13 @@
 ---
 title: Releasing
-description: How a maintainer cuts a release, what it publishes, and the one-time setup for npm trusted publishing and the release token.
+description: How a maintainer cuts a release or a release candidate, what each publishes, and the one-time setup for npm trusted publishing and the release token.
 ---
 
 One manual workflow, **Release** (`.github/workflows/release.yml`), versions and publishes everything together. All published packages share one version (lockstep), and so does the catalog the images carry. The version and the notes come from the [conventional commits](https://www.conventionalcommits.org/) since the last `v*` tag, so nothing is written by hand.
 
 ## Cut a release
 
-1. Open **Actions > Release > Run workflow** on `main`.
+1. Open **Actions > Release > Run workflow** on `main` and turn **rc** off. It is on by default until `0.1.0` is out; with it on, the run cuts a [release candidate](#cut-a-release-candidate) instead.
 2. Keep **dry_run** on for the first run. It prints the version and the release notes in the step summary and runs lint, typecheck, test and build and packs the tarballs, but changes and publishes nothing.
 3. Check the version and notes, then run it again with **dry_run** off.
 
@@ -24,7 +24,23 @@ While the version is `0.x`, a breaking change bumps the minor instead of the maj
 
 To preview locally, run `node scripts/release.ts --dry-run`. It prints the next version and notes and writes nothing.
 
+## Cut a release candidate
+
+A release candidate is a tag and images to try before a release, with no npm packages.
+
+1. Open **Actions > Release > Run workflow** on `main` with **rc** on.
+2. Keep **dry_run** on for the first run. It prints the candidate's version and notes and runs the checks, but changes and publishes nothing.
+3. Check the version and notes, then run it again with **dry_run** off.
+
+The version is `<next>-rc.<n>`. `<next>` is worked out exactly as for a release, from the last plain `vX.Y.Z` tag, the commits since it and `level`. `<n>` is one more than the highest existing `v<next>-rc.*` tag, or `1`, so candidates of an older version do not count. The notes cover the commits since the previous `v*` tag, release candidates included, so each candidate lists only what is new since the one before.
+
+A real run goes through the same end-to-end tests and checks as a release, then tags the commit it ran on as `v<next>-rc.<n>`, pushes only that tag and creates a GitHub prerelease with the notes. The tag push starts the Images workflow, which publishes `ghcr.io/outstaff-ai/office` and `ghcr.io/outstaff-ai/agent` with that version, for `linux/amd64` and `linux/arm64`. It writes no `package.json` version or `CHANGELOG.md`, makes no release commit, does not push to `main` and publishes nothing to npm.
+
+To preview locally, run `node scripts/release.ts --rc --dry-run`.
+
 ## What happens, in order
+
+These are the steps of a release. A release candidate works out only the notes in step 1, makes the tag without a commit in step 3, skips step 4 and pushes only the tag in step 5.
 
 1. **Version and notes.** `scripts/release.ts` writes the version into every published `packages/*/package.json` and `integrations/*/*/package.json` and prepends the notes to `CHANGELOG.md`. The notes group commits into Breaking changes, Features, Fixes, Performance and Other (`docs`, `refactor`, `revert`, `build`, `ci`). `chore`, `test` and `style` commits stay out.
 2. **Verify.** Version pinning, format, lint, typecheck, test and build must pass.

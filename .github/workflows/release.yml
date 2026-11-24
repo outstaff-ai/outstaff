@@ -4,6 +4,8 @@ name: Release
 # since the last v* tag (scripts/release.ts). Order: verify, commit and tag locally, publish
 # to npm, then push. A failed publish leaves main and the tags untouched. The tag push starts
 # the Images workflow, which publishes the ghcr images for the same version.
+# With rc on it cuts a release candidate instead: the same checks, then only a tag and a GitHub
+# prerelease. No package.json, CHANGELOG, release commit, push to main or npm publish.
 # Setup and recovery: docs/src/content/docs/guides/releasing.md
 
 on:
@@ -14,6 +16,10 @@ on:
         type: choice
         options: [auto, patch, minor, major]
         default: auto
+      rc:
+        description: "Cut a release candidate (<next>-rc.N): tag and prerelease only, no commit or npm publish."
+        type: boolean
+        default: true
       dry_run:
         description: "Work out the version and notes and verify, but change and publish nothing."
         type: boolean
@@ -41,6 +47,7 @@ jobs:
     env:
       LEVEL: ${{ inputs.level }}
       DRY_RUN: ${{ inputs.dry_run }}
+      RC: ${{ inputs.rc }}
     steps:
       # RELEASE_TOKEN must be allowed past the main ruleset (see the guide). Using it here
       # makes the release push and the tag push start other workflows, which GITHUB_TOKEN does not.
@@ -60,6 +67,7 @@ jobs:
         id: release
         run: |
           args=(--level "$LEVEL" --notes-file "$RUNNER_TEMP/notes.md")
+          if [ "$RC" = "true" ]; then args+=(--rc); fi
           if [ "$DRY_RUN" = "true" ]; then args+=(--dry-run); fi
           node scripts/release.ts "${args[@]}" | tee -a "$GITHUB_OUTPUT"
 
@@ -84,17 +92,20 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md packages/*/package.json integrations/*/*/package.json
-          git commit -m "chore(release): v$VERSION"
+          if [ "$RC" != "true" ]; then
+            git add CHANGELOG.md packages/*/package.json integrations/*/*/package.json
+            git commit -m "chore(release): v$VERSION"
+          fi
           git tag -a "v$VERSION" -m "v$VERSION"
 
+      # A release candidate publishes no packages, so there is nothing to pack.
       - name: Pack
-        if: steps.release.outputs.skip != 'true'
+        if: steps.release.outputs.skip != 'true' && inputs.rc != true
         run: pnpm -r --filter "./packages/*" --filter "./integrations/*/*" pack --pack-destination "$RUNNER_TEMP/tarballs"
 
       # Re-running after a partial failure is safe: versions already on npm are skipped.
       - name: Publish to npm
-        if: steps.release.outputs.skip != 'true' && inputs.dry_run != true
+        if: steps.release.outputs.skip != 'true' && inputs.dry_run != true && inputs.rc != true
         run: |
           for tarball in "$RUNNER_TEMP"/tarballs/*.tgz; do
             name=$(tar -xOzf "$tarball" package/package.json | node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).name')
@@ -105,11 +116,17 @@ jobs:
             npm publish "$tarball" --provenance --access public
           done
 
+      # A release candidate pushes only its tag; main is left alone.
       - name: Push the release commit and tag
         if: steps.release.outputs.skip != 'true' && inputs.dry_run != true
         env:
           TAG: ${{ steps.release.outputs.tag }}
-        run: git push --atomic origin HEAD:main "refs/tags/$TAG"
+        run: |
+          if [ "$RC" = "true" ]; then
+            git push origin "refs/tags/$TAG"
+          else
+            git push --atomic origin HEAD:main "refs/tags/$TAG"
+          fi
 
       - name: GitHub release
         if: steps.release.outputs.skip != 'true' && inputs.dry_run != true

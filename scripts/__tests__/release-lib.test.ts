@@ -3,6 +3,8 @@ import {
   bumpFor,
   increment,
   isPrerelease,
+  latestTag,
+  nextRc,
   nextVersion,
   parseCommit,
   prependChangelog,
@@ -118,9 +120,55 @@ describe("versioning", () => {
     expect(() => increment("1.2", "patch")).toThrow(/x.y.z/);
   });
 
-  it("marks 0.x as prerelease", () => {
+  it("marks 0.x and release candidates as prerelease", () => {
     expect(isPrerelease("0.1.0")).toBe(true);
     expect(isPrerelease("1.0.0")).toBe(false);
+    expect(isPrerelease("0.1.0-rc.32")).toBe(true);
+    expect(isPrerelease("1.0.0-rc.1")).toBe(true);
+  });
+});
+
+describe("release candidates", () => {
+  const rcs = (version: string, count: number): string[] =>
+    Array.from({ length: count }, (_, i) => `v${version}-rc.${i + 1}`);
+
+  it("the first candidate of a version is rc.1", () => {
+    expect(nextRc("0.1.0", [])).toBe("0.1.0-rc.1");
+    expect(nextRc("0.2.0", ["v0.1.0"])).toBe("0.2.0-rc.1");
+  });
+
+  it("follows the highest existing candidate, by number", () => {
+    expect(nextRc("0.1.0", rcs("0.1.0", 31))).toBe("0.1.0-rc.32");
+    expect(nextRc("0.1.0", ["v0.1.0-rc.10", "v0.1.0-rc.9"])).toBe("0.1.0-rc.11");
+  });
+
+  it("ignores candidates of an older version and other tags", () => {
+    const tags = [...rcs("0.1.0", 31), "v0.1.0", "v0.2.0-rc.x", "v0.2.0-rc.1-fix", "x0.2.0-rc.4"];
+    expect(nextRc("0.2.0", tags)).toBe("0.2.0-rc.1");
+  });
+
+  it("numbers the version an explicit level gives", () => {
+    const tags = [...rcs("0.1.0", 3), ...rcs("1.0.0", 2)];
+    expect(nextRc(nextVersion("0.0.0", [], "minor") as string, tags)).toBe("0.1.0-rc.4");
+    expect(nextRc(nextVersion("0.0.0", [], "major") as string, tags)).toBe("1.0.0-rc.3");
+    expect(nextRc(nextVersion("0.0.0", [], "patch") as string, tags)).toBe("0.0.1-rc.1");
+  });
+});
+
+describe("latestTag", () => {
+  it("a release starts from the highest plain release tag", () => {
+    expect(latestTag(["v0.1.0-rc.31", "v0.1.0", "v0.2.0-rc.1", "v0.0.9", "other"])).toBe("v0.1.0");
+    expect(latestTag(["v0.1.0-rc.1", "v0.1.0-rc.2"])).toBeNull();
+    expect(latestTag([])).toBeNull();
+  });
+
+  it("a candidate's notes start from the previous tag of any kind", () => {
+    const candidates = Array.from({ length: 31 }, (_, i) => `v0.1.0-rc.${i + 1}`);
+    expect(latestTag(candidates, true)).toBe("v0.1.0-rc.31");
+    expect(latestTag(["v0.1.0-rc.10", "v0.1.0-rc.9"], true)).toBe("v0.1.0-rc.10");
+    expect(latestTag(["v0.1.0-rc.31", "v0.1.0"], true)).toBe("v0.1.0");
+    expect(latestTag(["v0.1.0", "v0.2.0-rc.1", "v0.10.0-rc.1"], true)).toBe("v0.10.0-rc.1");
+    expect(latestTag(["latest"], true)).toBeNull();
   });
 });
 

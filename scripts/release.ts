@@ -1,8 +1,10 @@
 // Works out the next release from conventional commits and writes it into the repository:
 // the version of every published package, CHANGELOG.md and a notes file. It does not commit,
 // tag, publish or push; the Release workflow does that around it, in that order.
+// With --rc it works out the next release candidate (<next>-rc.N) instead and writes only the
+// notes file: a release candidate is a tag, not a release commit.
 //
-//   node scripts/release.ts [--level auto|patch|minor|major] [--dry-run] [--notes-file <path>]
+//   node scripts/release.ts [--level auto|patch|minor|major] [--rc] [--dry-run] [--notes-file <path>]
 //
 // stdout carries only `key=value` lines for the workflow (version, tag, prerelease, skip).
 // Everything human-readable goes to stderr.
@@ -12,6 +14,8 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import {
   isPrerelease,
+  latestTag,
+  nextRc,
   nextVersion,
   parseCommit,
   prependChangelog,
@@ -26,9 +30,10 @@ function git(...args: string[]): string {
   return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
 }
 
-function lastTag(): string | null {
-  const tags = git("tag", "--list", "v*", "--merged", "HEAD", "--sort=-v:refname");
-  return tags.split("\n").find((tag) => /^v\d+\.\d+\.\d+$/.test(tag)) ?? null;
+function tags(...args: string[]): string[] {
+  return git("tag", "--list", "v*", ...args)
+    .split("\n")
+    .filter((tag) => tag !== "");
 }
 
 function commitsSince(tag: string | null): Commit[] {
@@ -76,6 +81,7 @@ function out(key: string, value: string): void {
 const { values } = parseArgs({
   options: {
     level: { type: "string", default: "auto" },
+    rc: { type: "boolean", default: false },
     "dry-run": { type: "boolean", default: false },
     "notes-file": { type: "string" },
   },
@@ -88,24 +94,32 @@ if (!["auto", "patch", "minor", "major"].includes(level)) {
 
 const manifests = publishedManifests();
 const catalog = path.join(root, "packages/catalog/package.json");
-const tag = lastTag();
+const rc = values.rc;
+const merged = tags("--merged", "HEAD");
+const tag = latestTag(merged);
 // With no tag yet the base is the version the packages carry now (0.0.0 before the first release).
 const base = tag === null ? JSON.parse(readFileSync(catalog, "utf8")).version : tag.slice(1);
 const commits = commitsSince(tag);
-const version = nextVersion(base, commits, level);
+const next = nextVersion(base, commits, level);
 
 console.error(`last tag: ${tag ?? "none"}, base ${base}, ${commits.length} conventional commits`);
-if (version === null) {
+if (next === null) {
   console.error("nothing to release: no feat, fix, perf or breaking commits since the last tag");
   out("skip", "true");
   out("version", "");
   process.exit(0);
 }
 
-const notes = releaseNotes(commits);
-console.error(`next version: ${version}\n\n${notes}\n`);
+// A release candidate is numbered after every existing tag, merged or not, so its tag is new.
+// Its notes start at the previous tag of any kind, so each candidate lists only what is new.
+const version = rc ? nextRc(next, tags()) : next;
+const notesTag = rc ? latestTag(merged, true) : tag;
+const notes = releaseNotes(notesTag === tag ? commits : commitsSince(notesTag));
+console.error(
+  `next version: ${version}, notes since ${notesTag ?? "the first commit"}\n\n${notes}\n`,
+);
 
-if (!values["dry-run"]) {
+if (!values["dry-run"] && !rc) {
   for (const file of manifests) {
     writeFileSync(file, setPackageVersion(readFileSync(file, "utf8"), version));
   }

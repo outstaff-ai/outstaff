@@ -79,8 +79,56 @@ export function nextVersion(base: string, commits: readonly Commit[], level: Lev
   return bump === null ? null : increment(base, bump);
 }
 
+// A release candidate, and every 0.x release, is a prerelease.
 export function isPrerelease(version: string): boolean {
-  return parseVersion(version)[0] === 0;
+  const [plain = "", suffix] = version.split("-", 2);
+  return suffix !== undefined || parseVersion(plain)[0] === 0;
+}
+
+const RELEASE_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?$/;
+
+// The next release candidate of `target`: one more than the highest v<target>-rc.N among
+// `tags`, or rc.1. Release candidates of other versions do not count.
+export function nextRc(target: string, tags: readonly string[]): string {
+  const prefix = `v${target}-rc.`;
+  let highest = 0;
+  for (const tag of tags) {
+    const n = tag.startsWith(prefix) ? tag.slice(prefix.length) : "";
+    if (/^\d+$/.test(n)) {
+      highest = Math.max(highest, Number(n));
+    }
+  }
+
+  return `${target}-rc.${highest + 1}`;
+}
+
+// Sort key of a v* tag: x.y.z, then the rc number, with the plain release above all its rcs.
+function tagKey(tag: string): number[] | null {
+  const match = RELEASE_TAG.exec(tag);
+  if (!match) {
+    return null;
+  }
+
+  const rc = match[4] === undefined ? Number.POSITIVE_INFINITY : Number(match[4]);
+  return [Number(match[1]), Number(match[2]), Number(match[3]), rc];
+}
+
+function compareKeys(a: readonly number[], b: readonly number[]): number {
+  const i = a.findIndex((n, index) => n !== b[index]);
+  return i === -1 ? 0 : (a[i] as number) - (b[i] as number);
+}
+
+// The highest release tag in `tags`, or null. Plain releases only (vX.Y.Z) by default; with
+// `rc` release candidates count too, which is where the notes of a release candidate start.
+export function latestTag(tags: readonly string[], rc = false): string | null {
+  const ranked = tags
+    .flatMap((tag) => {
+      const key = tagKey(tag);
+      return key !== null && (rc || key[3] === Number.POSITIVE_INFINITY) ? [{ tag, key }] : [];
+    })
+    .toSorted((a, b) => compareKeys(b.key, a.key));
+
+  return ranked[0]?.tag ?? null;
 }
 
 const SECTIONS: readonly { title: string; types: readonly string[] }[] = [
