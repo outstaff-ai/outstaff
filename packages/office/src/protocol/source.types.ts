@@ -5,6 +5,7 @@ import type {
   Attached,
   Filed,
   Human,
+  LessonCheck,
   Link,
   Member,
   PayloadOf,
@@ -67,6 +68,9 @@ export interface WorkSource {
 
       /** For a done hand-back: what there is to review or what finished, as the agent's check found it. */
       toReview?: string[] | undefined;
+
+      /** Set when a trusted human commented or reviewed in the round: whether a lesson was asked for, and kept. */
+      lesson?: LessonCheck | undefined;
 
       /** What the round used, per runtime session, recorded on its run. */
       usage?: SessionUsageReport[] | undefined;

@@ -1,4 +1,4 @@
-import type { Link } from "@outstaff/protocol";
+import type { LessonCheck, Link } from "@outstaff/protocol";
 import type { Offer } from "#/office-client/index.js";
 import type { ChatReportKind } from "#/verbs/office.types.js";
 import { blockedText } from "./chat-report.js";
@@ -44,6 +44,8 @@ function reportText(offer: Offer, kind: "result" | "blocked", summary: string, m
     ...(subject?.type === "ticket" ? { ticket: subject.ref } : {}),
   });
 }
+
+const lessonOf = (lesson: LessonCheck | undefined) => (lesson ? { lesson } : {});
 
 /** Statuses that end the item: its worktree and scratch directory go. */
 const FINISHED = new Set<HandBackStatus>(["done", "silent"]);
@@ -168,6 +170,7 @@ export function createWorker(ctx: WorkerContext) {
       ...handedBackWords(summary, item.message()),
       status,
       ...(status === "done" ? { toReview } : {}),
+      ...lessonOf(item.lesson()),
       usage: usageReport(run),
     });
 

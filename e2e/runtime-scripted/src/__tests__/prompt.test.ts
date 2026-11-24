@@ -209,12 +209,19 @@ describe("parsePrompt", () => {
     o.context.feedback = [
       {
         actor: "grace",
+        from: "human",
         kind: "review",
         state: "commented",
         url: "https://g.example/pull/3#pullrequestreview-1",
         body: "Keep it short.\nOne line.",
       },
-      { actor: "grace", kind: "comment", url: "https://g.example/pull/3#c2", body: "Also this." },
+      {
+        actor: "grace",
+        from: "human",
+        kind: "comment",
+        url: "https://g.example/pull/3#c2",
+        body: "Also this.",
+      },
     ];
 
     expect(parsePrompt(buildWorkPrompt(o, { resumed: false }))?.feedback).toEqual([
@@ -233,6 +240,7 @@ describe("parsePrompt", () => {
     o.context.feedback = [
       {
         actor: "grace",
+        from: "human",
         kind: "review",
         state: "changes_requested",
         body: "",
@@ -313,7 +321,7 @@ describe("parsePrompt", () => {
         ...offer("review_feedback"),
         context: {
           ...offer("review_feedback").context,
-          feedback: [{ actor: "Ada Admin", kind: "chat", body: "Say goodbye." }],
+          feedback: [{ actor: "Ada Admin", from: "human", kind: "chat", body: "Say goodbye." }],
         },
       },
       { resumed: false },
@@ -339,6 +347,7 @@ describe("parsePrompt", () => {
         prompt([
           {
             actor: "ada.admin",
+            from: "human",
             kind: "doc_comment",
             docId: "2",
             anchorText: "Keep the cart\nin the session",
@@ -359,8 +368,11 @@ describe("parsePrompt", () => {
     ]);
 
     expect(
-      parsePrompt(prompt([{ actor: "ada.admin", kind: "ticket_comment", body: "Mobile too?" }]))
-        ?.feedback,
+      parsePrompt(
+        prompt([
+          { actor: "ada.admin", from: "human", kind: "ticket_comment", body: "Mobile too?" },
+        ]),
+      )?.feedback,
     ).toEqual([{ kind: "ticket_comment", body: "Mobile too?", threads: [] }]);
   });
 
@@ -371,7 +383,9 @@ describe("parsePrompt", () => {
         ...unblock,
         context: {
           ...unblock.context,
-          feedback: [{ actor: "sam", kind: "blocked", body: "Stopped: no tone yet." }],
+          feedback: [
+            { actor: "sam", from: "agent", kind: "blocked", body: "Stopped: no tone yet." },
+          ],
         },
       } as never,
       { resumed: false },
@@ -454,8 +468,8 @@ describe("latestChatMessage", () => {
     const woken = offer("chat");
     const context = woken.context as unknown as Record<string, unknown>;
     context["feedback"] = [
-      { actor: "ada.admin", kind: "chat", body: "For PR #1, also say goodbye." },
-      { actor: "ada.admin", kind: "chat", body: "This PR." },
+      { actor: "ada.admin", from: "human", kind: "chat", body: "For PR #1, also say goodbye." },
+      { actor: "ada.admin", from: "human", kind: "chat", body: "This PR." },
     ];
 
     expect(latestChatMessage(buildWorkPrompt(woken, { resumed: true }))).toBe("This PR.");

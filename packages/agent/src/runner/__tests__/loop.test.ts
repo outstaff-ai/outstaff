@@ -458,6 +458,61 @@ describe("work loop", () => {
     await loop.stop();
   });
 
+  it("asks once for what a trusted human taught, and hands back what the round kept", async () => {
+    await connect();
+    const home = mkdtempSync(join(tmpdir(), "ost-lesson-"));
+    const refusals: string[] = [];
+    const runtime: Runtime = {
+      async *run(req) {
+        const tool = (name: string) => req.tools.find((t) => t.name === name)!;
+        const at = { workItemId: "w1" };
+        await tool("handback")
+          .handler({ status: "done" }, at)
+          .catch((e: unknown) => refusals.push(String(e)));
+
+        await tool("note_add").handler(
+          {
+            text: "The platform is the human's: say what the dashboard needs, never ask for access.",
+          },
+          at,
+        );
+
+        await tool("handback").handler({ status: "done" }, at);
+        yield { type: "finished", ok: true, text: "Addressed the review." };
+      },
+    };
+
+    start(runtime, {
+      layout: {
+        home,
+        workDir: join(home, "work"),
+        reposDir: join(home, "repos"),
+        worktreesDir: join(home, "worktrees"),
+        scratchDir: join(home, "scratch"),
+        memoryDir: join(home, "memory"),
+        secretsDir: join(home, "secrets"),
+      },
+    });
+
+    socket.offerWith("w1", {
+      kind: "review_feedback",
+      feedback: [
+        { actor: "mira", from: "agent", kind: "comment", body: "Agreed." },
+        { actor: "ada-admin", from: "human", kind: "review", body: "You won't get access." },
+      ],
+    });
+
+    await until(() => sentOf("handback").length === 1);
+    expect(refusals).toHaveLength(1);
+    expect(refusals[0]).toContain("ada-admin (trusted), and no note changed");
+    expect(sentOf("handback")[0]?.payload).toMatchObject({
+      status: "done",
+      lesson: { from: ["ada-admin"], refused: true, kept: "noted" },
+    });
+
+    await loop.stop();
+  });
+
   it("hands back the message for the human the agent gave with ost handback, the last one stated", async () => {
     await connect();
     const runtime: Runtime = {
@@ -1827,15 +1882,28 @@ describe("work loop", () => {
       socket.offerWith("w1", {
         kind: "review_feedback",
         feedback: [
-          { actor: "dana", kind: "comment", body: "Why this way?", commentId: conversation },
           {
             actor: "dana",
+            from: "human",
+            kind: "comment",
+            body: "Why this way?",
+            commentId: conversation,
+          },
+          {
+            actor: "dana",
+            from: "human",
             kind: "review",
             body: "",
             comments: inline.map((c) => ({ id: c.id, path: c.path, body: c.body })),
           },
           // The same comment twice (a repeated delivery) is one reaction.
-          { actor: "dana", kind: "inline_comment", body: "rename", commentId: inline[0]!.id },
+          {
+            actor: "dana",
+            from: "human",
+            kind: "inline_comment",
+            body: "rename",
+            commentId: inline[0]!.id,
+          },
         ],
       });
 
@@ -1862,7 +1930,13 @@ describe("work loop", () => {
       runtime.enqueue([{ type: "finish", text: "Done." }]);
       start(runtime, { vcs });
       const feedback = [
-        { actor: "dana", kind: "comment", body: "Late thought.", commentId: conversation },
+        {
+          actor: "dana",
+          from: "human",
+          kind: "comment",
+          body: "Late thought.",
+          commentId: conversation,
+        },
       ];
 
       socket.offerWith("w1", { kind: "merged_feedback", feedback });
@@ -1889,7 +1963,9 @@ describe("work loop", () => {
 
       socket.offerWith("w1", {
         kind: "review_feedback",
-        feedback: [{ actor: "dana", kind: "comment", body: "Hm", commentId: conversation }],
+        feedback: [
+          { actor: "dana", from: "human", kind: "comment", body: "Hm", commentId: conversation },
+        ],
       });
 
       await until(() => types().includes("handback"));
@@ -1917,7 +1993,9 @@ describe("work loop", () => {
       start(runtime, { vcs, log });
       socket.offerWith("w1", {
         kind: "review_feedback",
-        feedback: [{ actor: "dana", kind: "comment", body: "Hm", commentId: conversation }],
+        feedback: [
+          { actor: "dana", from: "human", kind: "comment", body: "Hm", commentId: conversation },
+        ],
       });
 
       await until(() => types().includes("handback"));
@@ -1939,7 +2017,9 @@ describe("work loop", () => {
         start(runtime, { vcs });
         socket.offerWith("w1", {
           kind: "review_feedback",
-          feedback: [{ actor: "dana", kind: "comment", body: "Hm", commentId: conversation }],
+          feedback: [
+            { actor: "dana", from: "human", kind: "comment", body: "Hm", commentId: conversation },
+          ],
         });
 
         // The reaction is pending, so the run has not started.

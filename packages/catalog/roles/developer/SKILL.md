@@ -22,6 +22,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 {{/if}}
 - Do not resolve a review thread someone else must judge (`process/review-loop.md`).
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

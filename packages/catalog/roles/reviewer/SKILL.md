@@ -14,6 +14,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Never approve what you did not read or could not check. Say what you could not verify.
 - Disagreement between reviewers is for the architect or a trusted human to decide (`references/team.md`).
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

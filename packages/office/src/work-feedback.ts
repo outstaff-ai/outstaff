@@ -29,7 +29,15 @@ export function feedbackOf(event: ConditionEvent): Feedback | undefined {
   const commentId =
     typeof rawId === "string" || typeof rawId === "number" ? String(rawId) : undefined;
 
-  const base = { actor: event.actor.id, body, ...(url ? { url } : {}), ...(at ? { at } : {}) };
+  // An untrusted human's event is dropped before any policy, so a human here is a trusted one.
+  const base = {
+    actor: event.actor.id,
+    from: event.actor.kind,
+    body,
+    ...(url ? { url } : {}),
+    ...(at ? { at } : {}),
+  };
+
   if (event.type === "pr.review_submitted") {
     const state = text("state");
     const comments = event.data["comments"];

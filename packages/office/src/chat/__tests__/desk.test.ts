@@ -881,7 +881,12 @@ describe("chat requests", () => {
       expect(item.title).toContain("PR #11");
       expect(item.title).toContain("(ACME-11)");
       expect(await readFeedback(store, item.id)).toMatchObject([
-        { actor: "Dana", kind: "chat", body: "for the search PR, also support filters" },
+        {
+          actor: "Dana",
+          from: "human",
+          kind: "chat",
+          body: "for the search PR, also support filters",
+        },
       ]);
 
       expect(await readOrigin(store, item.id)).toMatchObject({ thread: "m1" });
@@ -1212,7 +1217,12 @@ describe("chat requests", () => {
         status: "queued",
       });
 
-      await addFeedback(store, queued!.id, { actor: "grace", kind: "review", body: "Please fix" });
+      await addFeedback(store, queued!.id, {
+        actor: "grace",
+        from: "human",
+        kind: "review",
+        body: "Please fix",
+      });
 
       const { attached } = await attach("11");
       expect(attached.item.id).toBe(queued!.id);

@@ -16,6 +16,7 @@ import type { OfficeClient } from "./office.types.js";
 
 import type { z } from "zod";
 import type { Attachment } from "#/runner/types.js";
+import type { Lessons } from "#/notes/types.js";
 import type { ToolStatus } from "#/tools/types.js";
 import type { Repositories, Workspaces } from "#/repos/types.js";
 
@@ -48,6 +49,9 @@ export interface HandBackTarget {
 
   /** `message` is the agent's words for the human the hand-back goes to, when it gave any. */
   declare(status: DeclaredHandBack, message?: string): void;
+
+  /** The round's lesson check, which may refuse the hand-back once. */
+  lessons: Lessons;
 }
 
 /**

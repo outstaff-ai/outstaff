@@ -2860,6 +2860,7 @@ async function main() {
   await notesOnTheVolume();
   await notesInTheKnowledgeBase();
   await repositoryMoved();
+  await keepsWhatItIsTaught();
 
   log(`all steps passed in ${((Date.now() - started) / 1000).toFixed(0)}s`);
 }
@@ -5424,6 +5425,113 @@ async function repositoryMoved() {
 
   step(
     `repository moved: ops moved to acme/platform-ops -> sam's clone followed the new URL, ${key} added an ops worktree and pushed there`,
+  );
+}
+
+/** Counts what the office's database has that matches `sql`, a `select count(*) ...`. */
+const countIn = (sql: string) =>
+  dc(
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-U",
+    "outstaff",
+    "-d",
+    "outstaff",
+    "-tAc",
+    sql,
+  ).stdout.trim();
+
+const PLATFORM_RULE =
+  "You won't get access to the platform repository: the platform is mine. The tenant controller already lets the team's ServiceAccount create namespaces, so say what the dashboard needs and I add it.";
+
+/**
+ * 18. sam keeps what a trusted human teaches. A trusted human's review on sam's pull request states a standing
+ * constraint ("you won't get access to X; Y already provides Z"). Sam addresses it and hands back; the hand-back is
+ * refused once, as no note changed, sam notes the rule and hands back again; the trace and the journal say so. On a
+ * later, unrelated ticket that needs that access, sam acts on the note instead of asking a human for the access again.
+ */
+async function keepsWhatItIsTaught() {
+  await agentIdle();
+  await stub("POST", "/_test/gates/review/open");
+  const { key } = await stub("POST", "/_test/tickets", {
+    title: "Add the orders dashboard",
+    assignee: "sam",
+  });
+
+  const opened = await until(`a pull request for ${key}, in review`, (s) => {
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${key}`));
+    const t = s.tickets.find((x: Json) => x.key === key);
+    return pr && t.status === "In Review" && t.assignee !== "sam" ? pr : undefined;
+  });
+
+  await stub("POST", `/_test/pulls/${opened.number}/review`, {
+    state: "commented",
+    body: PLATFORM_RULE,
+  });
+
+  await until("sam's note of the platform rule on its page", (s) =>
+    samsPage(s)?.body.includes(PLATFORM_RULE) ? true : undefined,
+  );
+
+  await agentIdle();
+  // The item settles before its hand-back is judged and traced: let the office catch up.
+  await officePolledTwice("the review round handed back");
+  const lessonTraced = [`"from":["grace-lead"]`, `"refused":true`, `"kept":"noted"`]
+    .map((part) => `data like '%"lesson":%${part}%'`)
+    .join(" and ");
+
+  assertEq(
+    countIn(
+      `select count(*) from pipeline_traces where type = 'agent.handed_back' and ${lessonTraced}`,
+    ),
+    "1",
+    "the hand-back's trace says it was refused once for a lesson, and a note was kept",
+  );
+
+  assertEq(
+    countIn(
+      "select count(*) from journal where text like '%Lesson check: feedback from grace-lead, a trusted human; the hand-back was refused once to ask for a lesson; a note changed in the round.%'",
+    ),
+    "1",
+    "the round's journal says so too",
+  );
+
+  step(
+    `lesson kept: a trusted human's review on #${opened.number} stated a standing rule -> the hand-back was refused once -> sam noted it, traced and journaled`,
+  );
+
+  const { key: later } = await stub("POST", "/_test/tickets", {
+    title: "Give the orders dashboard its namespace",
+    description: "needs access: platform repository",
+    assignee: "sam",
+  });
+
+  const acted = await until(`${later} worked from the note, in review`, (s) => {
+    const t = s.tickets.find((x: Json) => x.key === later);
+    const pr = s.github.pulls.find((p: Json) => p.body.includes(`Closes ${later}`));
+    const said = t.comments.find(
+      (c: Json) => c.author === "sam" && c.body.startsWith("Per my notes"),
+    );
+
+    return pr && said && t.status === "In Review" ? t : undefined;
+  });
+
+  assertEq(
+    acted.moves.some((m: Json) => m.to === "Blocked"),
+    false,
+    `${later} was never blocked asking a human for access to the platform repository`,
+  );
+
+  assertEq(
+    acted.comments.some((c: Json) => c.body.startsWith("Blocked: I need access")),
+    false,
+    "sam did not ask for the access again",
+  );
+
+  step(
+    `lesson used: ${later} needs the platform repository -> sam acted on the note, said what it needs, opened a pull request, never blocked`,
   );
 }
 

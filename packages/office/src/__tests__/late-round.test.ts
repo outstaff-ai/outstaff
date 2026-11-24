@@ -42,7 +42,12 @@ async function setup(opts: { answered?: boolean; chat?: boolean; kind?: string }
   const q1 = await h.messaging.ask("sam", { to: "mira", question: "One?", workItemId: item.id });
   const q2 = await h.messaging.ask("sam", { to: "noor", question: "Two?", workItemId: item.id });
   if (chat) {
-    await addFeedback(h.store, item.id, { actor: "U1", kind: "chat", body: "Go with plan B." });
+    await addFeedback(h.store, item.id, {
+      actor: "U1",
+      from: "human",
+      kind: "chat",
+      body: "Go with plan B.",
+    });
   }
 
   if (answered) {

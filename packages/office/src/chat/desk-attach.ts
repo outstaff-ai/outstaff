@@ -122,6 +122,7 @@ export function createAttach(
     const message = request.request?.trim() || origin.text || "";
     const feedback: Feedback = {
       actor: who,
+      from: "human",
       kind: "chat",
       body: message,
       ...(clock ? { at: clock.now().toISOString() } : {}),

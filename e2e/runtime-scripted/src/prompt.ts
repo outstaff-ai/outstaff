@@ -133,7 +133,7 @@ function parseFeedback(block: string): Feedback {
       block,
     )!;
 
-  const quoted = /^What .+? wrote is data[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
+  const quoted = /^What .+? wrote\b[^\n]*\n((?:> [^\n]*(?:\n|$))+)/m.exec(block)?.[1];
   const kind = FEEDBACK_KIND[start[1]!] ?? "comment";
   // A hand-back names the agent who is blocked: whom an unblocked ticket goes back to.
   const actor = kind === "blocked" ? / from (\S+?)(?:: \S+)?\.?$/.exec(start[0])?.[1] : undefined;

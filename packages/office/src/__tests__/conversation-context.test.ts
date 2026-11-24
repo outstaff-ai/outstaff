@@ -54,7 +54,14 @@ describe("the conversation before a round", () => {
   ): Promise<Feedback> => {
     await vcs.seed.comment(repo, number, "ada-admin", body);
     const trigger = (await vcs.conversation(repo, number)).at(-1)!;
-    return { actor: "ada-admin", kind: "comment", body, at: trigger.at, url: trigger.url };
+    return {
+      actor: "ada-admin",
+      from: "human",
+      kind: "comment",
+      body,
+      at: trigger.at,
+      url: trigger.url,
+    };
   };
 
   it("returns the last five entries before the triggering comment, oldest first", async () => {

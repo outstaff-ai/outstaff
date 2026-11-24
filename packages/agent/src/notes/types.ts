@@ -1,4 +1,5 @@
 import type { IgnoredNotesEdit, Note, NotesPage } from "@outstaff/core";
+import type { LessonCheck } from "@outstaff/protocol";
 
 /** Where an agent's notes are kept, chosen by `memory.store`: files on its volume, or the knowledge base. */
 export interface NotesStore {
@@ -34,3 +35,18 @@ export interface RoundNotes {
 
 /** Reads the notes a round starts with. */
 export type NotesReader = (workItemId: string) => Promise<RoundNotes>;
+
+/**
+ * The lesson check of one round: when its feedback carries a comment or review by a trusted human and no note changed,
+ * `ost handback` refuses once and asks for the lesson, or for `--nothing-to-keep`.
+ */
+export interface Lessons {
+  /** A note was added, changed or removed in the round. */
+  noted(): void;
+
+  /** At `ost handback`: the refusal to give, once, or undefined to take the hand-back. */
+  check(nothingToKeep: boolean): string | undefined;
+
+  /** What the round did about it, for the hand-back; undefined when no trusted human commented or reviewed. */
+  outcome(): LessonCheck | undefined;
+}

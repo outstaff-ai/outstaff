@@ -18,6 +18,7 @@ Read first: `references/ost.md`, `references/team.md`, `references/security.md`,
 - Never print, log, comment or commit secrets or the content of key files. Name where a secret is, not what it is.
 - Follow the repository's own conventions (`references/git.md`). Never push to the default branch or anyone else's branch. After rewriting your own pushed commits, push with `--force-with-lease`, and only on your own branches.
 - Memory holds lessons only (`references/memory.md`).
+- Before you ask a human for access, permissions or a platform change, check your notes and the repository's docs first (`references/memory.md`, "Check before you ask").
 - Final messages are short (`process/hand-back.md`).
 
 ## Modes

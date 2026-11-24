@@ -85,7 +85,10 @@ async function beforeOf(
 async function dataOf(
   store: Pick<Store, "getSubject">,
   item: WorkItem,
-  result: Pick<HandBackResult, "summary" | "message" | "status" | "waitingOn" | "silentAgain">,
+  result: Pick<
+    HandBackResult,
+    "summary" | "message" | "status" | "waitingOn" | "silentAgain" | "lesson"
+  >,
   ticket: string | undefined,
 ) {
   const before = await beforeOf(store, item, ticket);
@@ -98,6 +101,7 @@ async function dataOf(
     ...(before ? { before } : {}),
     ...(result.waitingOn?.length ? { waitingOn: result.waitingOn } : {}),
     ...(result.silentAgain ? { silentAgain: result.silentAgain } : {}),
+    ...(result.lesson ? { lesson: result.lesson } : {}),
   };
 }
 
@@ -143,7 +147,10 @@ export function createHandedBack(deps: {
   const { store, workState, judge, log } = deps;
   return async (
     item: WorkItem,
-    result: Pick<HandBackResult, "summary" | "message" | "status" | "waitingOn" | "silentAgain">,
+    result: Pick<
+      HandBackResult,
+      "summary" | "message" | "status" | "waitingOn" | "silentAgain" | "lesson"
+    >,
   ): Promise<void> => {
     if (!HANDED_BACK.has(item.status) || !item.subject || NOT_ON_TICKET.has(item.kind)) {
       return;

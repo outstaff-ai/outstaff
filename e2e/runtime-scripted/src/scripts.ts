@@ -147,6 +147,34 @@ async function* mustBeDenied(command: string, cwd: string): AsyncGenerator<Actio
   throw new Error(`${command} ran; the policy should deny it.`);
 }
 
+/**
+ * `ost handback`. In a round a trusted human commented on or reviewed, a hand-back with no note changed is refused
+ * once for a lesson: the agent keeps `lesson` when the round taught one and hands back again, else hands back again
+ * saying there is nothing to keep.
+ */
+async function* handBack(
+  input: Record<string, unknown>,
+  lesson?: string,
+): AsyncGenerator<Action, void, string> {
+  try {
+    yield { type: "tool", tool: "handback", input };
+  } catch (e) {
+    if (!/--nothing-to-keep/.test(String(e))) {
+      throw e;
+    }
+
+    if (lesson) {
+      yield { type: "tool", tool: "note_add", input: { text: lesson } };
+    }
+
+    yield {
+      type: "tool",
+      tool: "handback",
+      input: lesson ? input : { ...input, nothingToKeep: true },
+    };
+  }
+}
+
 /** The first link in a tool's answer: the ticket or pull request it is about. */
 const firstUrl = (text: string) => /https?:\/\/\S+/.exec(text)?.[0] ?? "";
 
@@ -472,7 +500,7 @@ async function* nextSubTicket(
   // decision (the part is blocked) it stays blocked.
   const waits = /^waits: (review|decision)$/m.exec(shown)?.[1];
   if (waits) {
-    yield { type: "tool", tool: "handback", input: { status: "blocked" } };
+    yield* handBack({ status: "blocked" });
     return `Blocked until the human ${waits === "review" ? "reviews" : "decides on"} ${sub}.`;
   }
 
@@ -592,7 +620,7 @@ async function* followUpOnTicket(
   }
 
   yield* holdAfterPush(shown);
-  yield { type: "tool", tool: "handback", input: { status: "done", message: addedFor(key) } };
+  yield* handBack({ status: "done", message: addedFor(key) });
   return `Opened ${url}`;
 }
 
@@ -659,6 +687,38 @@ async function* postUsage(key: string, of: string): AsyncGenerator<Action, strin
   return `Posted the usage of ${of} on ${key}.`;
 }
 
+/**
+ * A ticket that says `needs access: <what>`: when a note of the agent's covers it, the agent acts on the note, says on
+ * the ticket what the work needs in the note's terms and goes on; without one it blocks, asking a human for the
+ * access. Returns the message to stop with, or undefined to go on.
+ */
+async function* accessOrNote(
+  ctx: ItemContext,
+  key: string,
+  shown: string,
+): AsyncGenerator<Action, string | undefined, string> {
+  const what = /^needs access: (.+)$/m.exec(shown)?.[1]?.trim();
+  if (!what) {
+    return undefined;
+  }
+
+  const note = ctx.notes?.list.find((n) => n.toLowerCase().includes(what.toLowerCase()));
+  if (note) {
+    const body = `Per my notes, I won't ask for access to the ${what}: ${note} What this needs from the platform: a namespace for ${key}.`;
+    yield { type: "tool", tool: "ticket_comment", input: { key, body } };
+    return undefined;
+  }
+
+  yield { type: "tool", tool: "ticket_move", input: { key, to: "blocked" } };
+  yield {
+    type: "tool",
+    tool: "ticket_comment",
+    input: { key, body: `Blocked: I need access to the ${what}.` },
+  };
+
+  return `Stopped: I need access to the ${what}.`;
+}
+
 /** A blocked ticket, one that only asks for usage, or a check asked in chat: the message to stop with, else undefined. */
 async function* stopsEarly(
   ctx: ItemContext,
@@ -670,7 +730,11 @@ async function* stopsEarly(
     return yield* postUsage(key, usageOf);
   }
 
-  return (yield* blockIfStuck(key, shown, ctx.unblocked)) ?? (yield* checkFromChat(ctx, key));
+  return (
+    (yield* blockIfStuck(key, shown, ctx.unblocked)) ??
+    (yield* accessOrNote(ctx, key, shown)) ??
+    (yield* checkFromChat(ctx, key))
+  );
 }
 
 /** A ticket that says `hold: <gate>` keeps its round running until the driver opens that gate. */
@@ -922,6 +986,17 @@ function addressed(threads: number, number: number, sha: string, followUp?: stri
   return `Addressed ${threads} thread${threads === 1 ? "" : "s"} on pull request ${number} (${sha}).${filed}`;
 }
 
+/** A reviewer's standing constraint: what the agent will not get, and is not to ask for again. */
+const STANDING = /\byou won't get access to\b/i;
+
+/** A standing constraint a reviewer states is worth keeping: the hand-back asks for it once, and it is noted then. */
+async function* keepIfTaught(feedback: Feedback[]): AsyncGenerator<Action, void, string> {
+  const lesson = feedback.find((f) => STANDING.test(f.body))?.body;
+  if (lesson) {
+    yield* handBack({ status: "done" }, lesson);
+  }
+}
+
 /** A human gave feedback: fix on the pull request's own branch, answer every open thread and a summary or comment. */
 export async function* reviewFeedback(ctx: ItemContext): Script {
   const key = need(ctx.ticket, "the ticket");
@@ -962,6 +1037,7 @@ export async function* reviewFeedback(ctx: ItemContext): Script {
     yield { type: "tool", tool: "pr_comment", input: { repo, number, body: answer } };
   }
 
+  yield* keepIfTaught(conversational);
   return addressed(ids.length, number, sha, filedFollowUp?.key);
 }
 
@@ -1064,7 +1140,7 @@ export async function* ticketComment(ctx: ItemContext): Script {
 
   // A thanks asks nothing of the agent: it posts nothing and finishes silently, leaving the ticket as it was.
   if (/^thanks\b/i.test(feedback.body.trim())) {
-    yield { type: "tool", tool: "handback", input: { status: "silent" } };
+    yield* handBack({ status: "silent" });
     return `Nothing for me in the comment on ${key}.`;
   }
 
@@ -1077,9 +1153,11 @@ export async function* ticketComment(ctx: ItemContext): Script {
 
   // A mention on someone else's ticket needs nothing handed on: the round finishes silently. On its own ticket the
   // agent's answer is for the human to review, so it moves the ticket to review.
-  yield ctx.kind === "asked"
-    ? { type: "tool", tool: "handback", input: { status: "silent" } }
-    : { type: "tool", tool: "ticket_move", input: { key, to: "review" } };
+  if (ctx.kind === "asked") {
+    yield* handBack({ status: "silent" });
+  } else {
+    yield { type: "tool", tool: "ticket_move", input: { key, to: "review" } };
+  }
 
   return ask ? `Asked ${ask[1]} on ${key}.` : `Answered the comment on ${key}.`;
 }
@@ -1106,7 +1184,7 @@ async function* answerOnBacklog(key: string, body: string): AsyncGenerator<Actio
     input: { key, body: `Noted for later: ${body}\n${started}` },
   };
 
-  yield { type: "tool", tool: "handback", input: { status: "silent" } };
+  yield* handBack({ status: "silent" });
   return `Answered the comment on ${key}, which stays in backlog.`;
 }
 
@@ -1119,7 +1197,7 @@ async function* askForDecision(
   question: string,
 ): AsyncGenerator<Action, string, string> {
   yield { type: "tool", tool: "ticket_comment", input: { key, body: `Question: ${question}` } };
-  yield { type: "tool", tool: "handback", input: { status: "done" } };
+  yield* handBack({ status: "done" });
   return `Asked: ${question}`;
 }
 
@@ -1131,7 +1209,7 @@ async function* askForDecision(
 export async function* mentioned(ctx: ItemContext): Script {
   const feedback = need(ctx.feedback[0], "the comment");
   if (/\bFYI @\S+\s*$/.test(feedback.body)) {
-    yield { type: "tool", tool: "handback", input: { status: "silent" } };
+    yield* handBack({ status: "silent" });
     return "Mentioned for information only; nothing for me.";
   }
 
@@ -1789,11 +1867,7 @@ export async function* ciFailed(ctx: ItemContext): Script {
   yield { type: "shell", command: "git add -A", cwd };
   yield* commitToPush(ctx, cwd, branch, `${key}: fix the checks`);
   yield* holdAfterPush(ticket);
-  yield {
-    type: "tool",
-    tool: "handback",
-    input: { status: "done", message: fixedChecksOf(number) },
-  };
+  yield* handBack({ status: "done", message: fixedChecksOf(number) });
 
   return `Fixed the failing checks of pull request ${number}.`;
 }

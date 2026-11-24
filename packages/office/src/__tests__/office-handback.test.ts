@@ -75,6 +75,13 @@ describe("the hand-back of an item", () => {
     ]);
   });
 
+  it("carries the round's lesson check, so the trace shows it", async () => {
+    const item = await done({ kind: "review_feedback" });
+    const lesson = { from: ["ada-admin"], refused: true, kept: "nothing" as const };
+    await handedBack()(item, { summary: "Built it.", status: "done", lesson });
+    expect(judged.at(-1)?.data).toEqual({ ...base(item.id, "review_feedback"), lesson });
+  });
+
   it("gives a later round the ticket as the round found it and the last notice about it", async () => {
     await store.upsertSubject("pr", "pr:9", { ref: { number: 9 }, ticket: "ACME-1" });
     const merge = await done({ kind: "merge", subject: { type: "pr", ref: "pr:9" } });

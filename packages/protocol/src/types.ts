@@ -12,6 +12,7 @@ import type {
   conversationEntrySchema,
   feedbackSchema,
   inlineCommentSchema,
+  lessonCheckSchema,
   offerContextSchema,
 } from "./schemas/feedback.js";
 import type {
@@ -62,6 +63,7 @@ export type JournalLine = z.infer<typeof journalEntrySchema>;
 export type OfferedWorkItem = z.infer<typeof workItemSchema>;
 export type InlineComment = z.infer<typeof inlineCommentSchema>;
 export type Feedback = z.infer<typeof feedbackSchema>;
+export type LessonCheck = z.infer<typeof lessonCheckSchema>;
 export type ConversationEntry = z.infer<typeof conversationEntrySchema>;
 export type OfferContext = z.infer<typeof offerContextSchema>;
 export type WakeContext = z.infer<typeof wakeContextSchema>;

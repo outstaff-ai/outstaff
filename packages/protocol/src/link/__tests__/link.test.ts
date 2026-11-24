@@ -68,7 +68,7 @@ const TRACE = {
       person: "sam",
       kind: "merge",
       instruction: "Merge it.",
-      feedback: [{ actor: "ada-admin", kind: "comment", body: "ok" }],
+      feedback: [{ actor: "ada-admin", from: "human", kind: "comment", body: "ok" }],
       subject: { type: "pr", ref: "acme-example/shop#9" },
       coalesceMs: 60_000,
       itemId: "item-1",
