@@ -65,6 +65,38 @@ describe("mentions in a ticket comment", () => {
   });
 });
 
+describe("humans mentioned in a ticket comment", () => {
+  it("are the humans the names no agent answers to are, never the commenter", async () => {
+    const { tracker, intake, events } = await setup({
+      trackerActor: { id: "u-sam", name: "Sam", username: "u-sam", kind: "agent" },
+      teamExtra: {
+        humans: [{ name: "Ada Admin", identities: { vcs: "ada-admin", tracker: "ada" } }],
+      },
+    });
+
+    await tracker.seed.member({ name: "Dana Ito", username: "dana", kind: "human" });
+    const issue = await tracker.createIssue({ title: "Search", body: "" });
+    await tracker.comment(issue.key, "@ada-admin please confirm; @noor and @dana FYI");
+    await tracker.comment(issue.key, "@noor please review");
+    await intake.pollOnce();
+
+    expect(tracked(events).map((e) => [e.data["mentions"], e.data["mentionedHumans"]])).toEqual([
+      [["noor"], ["ada", "dana"]],
+      [["noor"], undefined],
+    ]);
+  });
+
+  it("leave out the human who wrote the comment", async () => {
+    const { tracker, intake, events } = await setup({ trackerActor: human("u1", "dana") });
+    await tracker.seed.member({ name: "Lee Park", username: "lee", kind: "human" });
+    const issue = await tracker.createIssue({ title: "Search", body: "" });
+    await tracker.comment(issue.key, "@dana here, cc @lee");
+    await intake.pollOnce();
+
+    expect(tracked(events)[0]?.data["mentionedHumans"]).toEqual(["lee"]);
+  });
+});
+
 describe("mentions in a document comment", () => {
   it("become the handles of the agents named", async () => {
     const knowledge = createFakeKnowledge({ author: "dana" });

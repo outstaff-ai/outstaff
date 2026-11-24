@@ -19,6 +19,7 @@ import { createRequesters } from "./requesters.js";
 import { createRescan } from "./rescan.js";
 import { repeating } from "./repeat.js";
 import { createSilenced, silencedAt } from "./silenced.js";
+import { createWaiting } from "./waiting.js";
 import { createTickets } from "./tickets.js";
 import { createUnblock } from "./unblock.js";
 import type { WorkState, WorkstateOptions } from "./types.js";
@@ -110,6 +111,7 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
   });
 
   const silenced = createSilenced(core);
+  const waiting = createWaiting(core);
   const { refreshWorkers, doRescan, load } = createRescan(core, {
     ...ticketOps,
     ...unblockOps,
@@ -266,10 +268,16 @@ export async function createWorkState(opts: WorkstateOptions): Promise<WorkState
     currentWork: (person) => currentWork(core, person),
     readyTickets: (person) => readyTickets(core, person),
     silencedAt: (ticket, person) => silencedAt(core, ticket, person),
-    heard: (event) => locked(() => silenced.heard(event)),
+    waitingOn: (ticket, human, at) => waiting.waitingOn(ticket, human, at),
+    heard: (event) =>
+      locked(async () => {
+        await silenced.heard(event);
+        await waiting.heard(event);
+      }),
   };
 
   await load();
   await silenced.load();
+  await waiting.load();
   return state;
 }

@@ -67,6 +67,9 @@ export interface ItemContext {
 
   /** The prompt says the item's ticket is in backlog: planned for later, so the round answers, never starts it. */
   backlog?: true;
+
+  /** The wake says a human's comment answers what the agent asked them on the ticket. */
+  answersAsker?: true;
 }
 
 /** A merge context as the prompt renders it: this pull request's mergeability and the other open pull requests. */
@@ -392,5 +395,8 @@ export function parsePrompt(prompt: string): ItemContext | undefined {
     ...parseOpenSubtickets(prompt),
     ...parseConversations(prompt),
     ...(/ is in backlog: work planned for later/.test(prompt) ? { backlog: true as const } : {}),
+    ...(/, where you asked them something: this is their answer to you\./.test(prompt)
+      ? { answersAsker: true as const }
+      : {}),
   };
 }

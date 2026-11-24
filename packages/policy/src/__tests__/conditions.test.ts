@@ -1,6 +1,7 @@
+import { createEvaluationContext, createStaticWorkflowState } from "@outstaff/core";
 import { describe, expect, it } from "vitest";
 import { evaluateCondition } from "#/conditions.js";
-import { ctxOf, event, pr, prRef } from "./support.js";
+import { ctxOf, event, OPTS, pr, prRef } from "./support.js";
 
 const assigned = {
   tickets: {
@@ -176,5 +177,51 @@ describe("evaluateCondition", () => {
 
     expect(evaluateCondition({ actor_is: "blocked_agent" }, by("noor", "ACME-1")).ok).toBe(false);
     expect(evaluateCondition({ actor_is: "blocked_agent" }, by("sam")).ok).toBe(false);
+  });
+
+  it("checks that an agent waits on the event's actor on the ticket, naming each one", () => {
+    const comment = (ticket?: string) =>
+      event("ticket.commented", ticket ? { subject: { ticket } } : {});
+
+    const world = {
+      waiting: {
+        "ACME-2": {
+          "ada-admin": [
+            { agent: "kofi", at: "2026-10-05T08:00:00.000Z" },
+            { agent: "mira", at: "2026-10-05T08:30:00.000Z" },
+          ],
+        },
+      },
+    };
+
+    expect(evaluateCondition({ awaited_human: true }, ctxOf(comment("ACME-2"), world))).toEqual({
+      ok: true,
+      detail:
+        "kofi (mentioned them at 2026-10-05T08:00:00.000Z), mira (mentioned them at 2026-10-05T08:30:00.000Z) wait on ada-admin on ACME-2",
+    });
+
+    const one = {
+      waiting: { "ACME-2": { "ada-admin": [world.waiting["ACME-2"]["ada-admin"][0]!] } },
+    };
+
+    expect(evaluateCondition({ awaited_human: false }, ctxOf(comment("ACME-2"), one))).toEqual({
+      ok: false,
+      detail: "kofi (mentioned them at 2026-10-05T08:00:00.000Z) waits on ada-admin on ACME-2",
+      failed: { awaited_human: false },
+    });
+
+    expect(evaluateCondition({ awaited_human: true }, ctxOf(comment("ACME-1"), world))).toEqual({
+      ok: false,
+      detail: "no agent waits on ada-admin on ACME-1",
+      failed: { awaited_human: true },
+    });
+
+    expect(evaluateCondition({ awaited_human: false }, ctxOf(comment(), world)).detail).toBe(
+      "no agent waits on ada-admin on the ticket",
+    );
+
+    // A state that does not know who waits on whom (the workflow rules' own) has no one waiting.
+    const bare = createEvaluationContext(comment("ACME-2"), createStaticWorkflowState({}), OPTS);
+    expect(evaluateCondition({ awaited_human: true }, bare).ok).toBe(false);
   });
 });

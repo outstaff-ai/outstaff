@@ -12,6 +12,7 @@ import type {
   WorkflowEvent,
   WorkflowState,
 } from "@outstaff/core";
+import type { WaitingAgent } from "@outstaff/policy";
 import type { Clock } from "#/types.js";
 import type { IntakeMeta } from "#/intake/index.js";
 import type { MergeChecks } from "./merge-checks.types.js";
@@ -238,7 +239,13 @@ export interface WorkState extends WorkflowState {
    */
   silencedAt(ticket: string, person: string): string | undefined;
 
-  /** Takes in an event the office judged, for the silent hand-backs it holds or releases (see `silencedAt`). */
+  /**
+   * The agents waiting on the human (as tracker events name them) on the ticket when the human commented at `at`:
+   * each mentioned them there before it, after their last comment there. Oldest comment first.
+   */
+  waitingOn(ticket: string, human: string, at: string): WaitingAgent[];
+
+  /** Takes in an event the office judged: see `silencedAt` and `waitingOn`. */
   heard(event: HeardEvent): Promise<void>;
 
   /**

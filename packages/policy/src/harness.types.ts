@@ -1,11 +1,15 @@
 import type { StaticWorkflowData } from "@outstaff/core";
 import type { PipelineEvent, PipelineEventType } from "./events.types.js";
-import type { ReadyTicket } from "./policy.types.js";
+import type { ReadyTicket, WaitingAgent } from "./policy.types.js";
 import type { ErrorProposal, Proposal } from "./proposal.types.js";
 
-/** The work state after an event, as plain data: tickets, pull requests and their links, and the ready tickets. */
+/**
+ * The work state after an event, as plain data: tickets, pull requests and their links, the ready tickets, and the
+ * agents waiting on a human, by ticket and human.
+ */
 export interface HarnessWorld extends StaticWorkflowData {
   ready?: Record<string, ReadyTicket[]>;
+  waiting?: Record<string, Record<string, WaitingAgent[]>>;
 }
 
 /** One recorded event and the world after it. */

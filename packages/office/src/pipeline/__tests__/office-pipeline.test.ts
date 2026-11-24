@@ -60,6 +60,7 @@ async function make() {
     workState: {
       ...createStaticWorkflowState({}),
       readyTickets: () => [],
+      waitingOn: () => [],
       heard: async () => {},
     } as never,
     scheduler: { enqueue: () => Promise.reject(new Error("not in this test")) },

@@ -74,7 +74,7 @@ The fields:
 `ctx` is a read-only view of the office for one event:
 
 - `ctx.event`: the event, as the trace shows it (`type`, `at`, `subject`, `actor`, `data`).
-- `ctx.state`: the work state after the event: tickets with their status, assignee, labels, requester and last worker; pull requests, their links to tickets and their stacks; documents and their authors; each agent's ready tickets. It answers questions; it changes nothing.
+- `ctx.state`: the work state after the event: tickets with their status, assignee, labels, requester and last worker; pull requests, their links to tickets and their stacks; documents and their authors; each agent's ready tickets; the agents waiting on a human on a ticket (`waitingOn`). It answers questions; it changes nothing.
 - `ctx.options`: what the team file tells the policies: the team's agents (`people`), its humans, the needs-human label, who approves merges, and what the team's integrations can do (`capabilities`, such as `tracker.development` or `knowledge.issueLinks`).
 - `ctx.ticket` and `ctx.pr`: the ticket the event is about (or the one its pull request is linked to), and the event's pull request.
 - `ctx.settings`: the entry's `settings`.

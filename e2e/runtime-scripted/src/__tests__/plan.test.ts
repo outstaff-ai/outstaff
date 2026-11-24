@@ -83,6 +83,7 @@ describe("planning in chat", () => {
     );
 
     expect(r.tools).toEqual([
+      { tool: "ticket_show", input: { key: "SHOP-50" } },
       { tool: "ticket_move", input: { key: "SHOP-50", to: "review" } },
       { tool: "ticket_move", input: { key: "SHOP-51", to: "review" } },
     ]);

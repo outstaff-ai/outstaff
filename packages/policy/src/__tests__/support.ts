@@ -6,7 +6,7 @@ import {
 } from "@outstaff/core";
 import type { PipelineEvent, PipelineEventType } from "#/events.types.js";
 import { harnessState } from "#/harness.js";
-import type { PolicyOptions, PolicyState, ReadyTicket } from "#/policy.types.js";
+import type { PolicyOptions, PolicyState, ReadyTicket, WaitingAgent } from "#/policy.types.js";
 
 export const REPO = { host: "github.com", owner: "acme-example", name: "shop" };
 export const prRef = (number: number) => ({ repo: REPO, number });
@@ -32,7 +32,10 @@ export function pr(number: number, o: Partial<WorkflowPr> = {}): WorkflowPr {
   };
 }
 
-export type World = StaticWorkflowData & { ready?: Record<string, ReadyTicket[]> };
+export type World = StaticWorkflowData & {
+  ready?: Record<string, ReadyTicket[]>;
+  waiting?: Record<string, Record<string, WaitingAgent[]>>;
+};
 
 export const stateOf = (world: World = {}): PolicyState => harnessState(world);
 

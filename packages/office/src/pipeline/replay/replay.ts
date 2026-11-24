@@ -17,6 +17,7 @@ import type {
 const stateOf = (world: ReplayWorld): PipelineState => ({
   ...createStaticWorkflowState(world),
   readyTickets: (person) => world.ready?.[person] ?? [],
+  waitingOn: (ticket, human) => world.waiting?.[ticket]?.[human] ?? [],
 });
 
 /**

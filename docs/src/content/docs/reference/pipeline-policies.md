@@ -28,6 +28,7 @@ A team changes a policy under [`pipeline.policies.<id>`](/reference/team-yaml/#p
 | [`ticket_comment_to_mentioned_agent`](#ticket_comment_to_mentioned_agent) | `ticket.commented` | wake `mentioned` (kind `asked`) |
 | [`ticket_comment_to_blocked_agent`](#ticket_comment_to_blocked_agent) | `ticket.commented` | wake `blocked_agent` (kind `ticket_comment`) |
 | [`ticket_comment_to_last_worker`](#ticket_comment_to_last_worker) | `ticket.commented` | wake `last_worker` (kind `ticket_comment`) |
+| [`ticket_comment_to_waiting_agent`](#ticket_comment_to_waiting_agent) | `ticket.commented` | wake each agent waiting on the human on the ticket (kind `ticket_comment`), instead of the `asked` wake of one the comment also mentions |
 | [`moved_active_to_assignee`](#moved_active_to_assignee) | `ticket.moved` | wake `assignee` (kind `assigned`) |
 | [`moved_active_to_last_worker`](#moved_active_to_last_worker) | `ticket.moved` | act for `last_worker`: assign it to the agent acted for, then wake them (kind `assigned`) |
 | [`closed_stops_work`](#closed_stops_work) | `ticket.closed` | stop the work on the ticket of every agent but the one who closed it; a ticket closed as done by an unknown closer or an automation stops nothing |
@@ -378,6 +379,24 @@ Instruction:
 
 ```text
 {{actor.id}} commented on {{ticket}}, which you handed back. Answer the comment on the ticket. If it needs more work, assign the ticket to yourself, move it to active and do the work. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.
+```
+
+### ticket_comment_to_waiting_agent
+
+A human's comment on a ticket, in any status, wakes every agent waiting on that human there: each agent that commented on the ticket after the human's last comment there, mentioning them. The comment is the human's answer to what the agent asked, so it can start new work.
+
+Listens to `ticket.commented`. Decides: wake each agent waiting on the human on the ticket (kind `ticket_comment`), instead of the `asked` wake of one the comment also mentions.
+
+When:
+
+- all of:
+  - `actor_kind: human`
+  - `awaited_human: true`
+
+Instruction:
+
+```text
+{{actor.id}} commented on {{ticket}}, where you asked them something: this is their answer to you. Act on it: continue the work you held for it, on whichever ticket that is (for example the one you are blocked on, or a parent you were splitting), and say there what you did. It is a trusted human's word, so it starts new work a teammate's mention cannot, such as filing the tickets it confirms. If it does not answer what you asked, answer it on {{ticket}} and keep waiting. {{ticket}}'s status now: {{status}}. A done or canceled ticket stays closed unless the comment asks to reopen it. A ticket in backlog stays in backlog: answer or update it, and do not start the work.
 ```
 
 ### moved_active_to_assignee

@@ -11,10 +11,14 @@ import type {
 } from "./proposal.types.js";
 import { runPolicy } from "./run.js";
 
-/** The state a step's world describes: the office's static work state plus the agents' ready tickets. */
+/**
+ * The state a step's world describes: the office's static work state plus the agents' ready tickets and the agents
+ * waiting on a human.
+ */
 export const harnessState = (world: HarnessWorld = {}): PolicyState => ({
   ...createStaticWorkflowState(world),
   readyTickets: (person) => world.ready?.[person] ?? [],
+  waitingOn: (ticket, human) => world.waiting?.[ticket]?.[human] ?? [],
 });
 
 /** An event for a test: a human's, now-ish, with nothing in it unless told otherwise. */
